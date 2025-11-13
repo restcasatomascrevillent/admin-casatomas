@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Clock } from "lucide-react";
+import { CalendarIcon, Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -29,7 +29,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useSalas, usePosicionesSala } from "@/hooks/useSalas";
+import { verificarDisponibilidad } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { es } from "date-fns/locale";
@@ -56,6 +58,12 @@ interface FormularioReservaProps {
 
 export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
   const [selectedSalaId, setSelectedSalaId] = useState<string>("");
+  const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
+    disponible: boolean;
+    mesasDisponibles: number;
+    mensaje: string;
+  } | null>(null);
+  const [verificando, setVerificando] = useState(false);
   const { data: salas } = useSalas();
   const { data: posiciones } = usePosicionesSala(selectedSalaId || null);
 
@@ -67,7 +75,68 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     },
   });
 
+  // Verificar disponibilidad automáticamente cuando cambian los campos relevantes
+  useEffect(() => {
+    const verificar = async () => {
+      const fecha = form.watch("fecha");
+      const hora = form.watch("hora");
+      const salaId = form.watch("sala_id");
+      const posicionId = form.watch("posicion_sala_id");
+      const numeroMesas = form.watch("numero_mesas");
+
+      // Solo verificar si tenemos todos los datos necesarios
+      if (!fecha || !hora || !salaId || !numeroMesas) {
+        setDisponibilidadInfo(null);
+        return;
+      }
+
+      setVerificando(true);
+      try {
+        const result = await verificarDisponibilidad(
+          format(fecha, "yyyy-MM-dd"),
+          hora,
+          salaId,
+          posicionId || null,
+          numeroMesas
+        );
+
+        if (result.disponible) {
+          setDisponibilidadInfo({
+            disponible: true,
+            mesasDisponibles: result.mesasDisponibles,
+            mensaje: `✓ Disponible: ${result.mesasDisponibles} mesas libres de ${result.totalMesas}`,
+          });
+        } else {
+          setDisponibilidadInfo({
+            disponible: false,
+            mesasDisponibles: result.mesasDisponibles,
+            mensaje: `✗ No hay disponibilidad: solo ${result.mesasDisponibles} mesas libres (necesitas ${numeroMesas})`,
+          });
+        }
+      } catch (error) {
+        console.error("Error verificando disponibilidad:", error);
+        setDisponibilidadInfo(null);
+      } finally {
+        setVerificando(false);
+      }
+    };
+
+    verificar();
+  }, [
+    form.watch("fecha"),
+    form.watch("hora"),
+    form.watch("sala_id"),
+    form.watch("posicion_sala_id"),
+    form.watch("numero_mesas"),
+  ]);
+
   const onSubmit = async (values: FormValues) => {
+    // Verificar disponibilidad una última vez antes de enviar
+    if (disponibilidadInfo && !disponibilidadInfo.disponible) {
+      toast.error("No hay disponibilidad para esta reserva");
+      return;
+    }
+
     try {
       // En modo público no requerir autenticación
       if (!isPublic) {
@@ -350,8 +419,23 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
           )}
         />
 
-        <Button type="submit" className="w-full">
-          Crear Reserva
+        {disponibilidadInfo && (
+          <Alert variant={disponibilidadInfo.disponible ? "default" : "destructive"}>
+            {disponibilidadInfo.disponible ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <AlertTriangle className="h-4 w-4" />
+            )}
+            <AlertDescription>{disponibilidadInfo.mensaje}</AlertDescription>
+          </Alert>
+        )}
+
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={verificando || (disponibilidadInfo !== null && !disponibilidadInfo.disponible)}
+        >
+          {verificando ? "Verificando..." : "Crear Reserva"}
         </Button>
       </form>
     </Form>
