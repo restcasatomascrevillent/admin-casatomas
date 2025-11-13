@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Plus } from "lucide-react";
+import { FormularioReserva } from "@/components/reservas/FormularioReserva";
+import { CalendarioDisponibilidad } from "@/components/reservas/CalendarioDisponibilidad";
 
 interface Reservation {
   id: string;
@@ -26,6 +29,7 @@ interface Reservation {
 export default function Reservas() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [openDialog, setOpenDialog] = useState(false);
 
   useEffect(() => {
     fetchReservations();
@@ -119,7 +123,28 @@ export default function Reservas() {
             <h2 className="text-3xl font-bold tracking-tight">Reservas</h2>
             <p className="text-muted-foreground">Gestiona las reservas del restaurante</p>
           </div>
+          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Reserva
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Nueva Reserva</DialogTitle>
+              </DialogHeader>
+              <FormularioReserva
+                onSuccess={() => {
+                  setOpenDialog(false);
+                  fetchReservations();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
+
+        <CalendarioDisponibilidad />
 
         <div className="flex gap-2">
           <Button
