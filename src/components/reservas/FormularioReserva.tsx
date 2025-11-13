@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSalas, usePosicionesSala } from "@/hooks/useSalas";
+import { useSalas } from "@/hooks/useSalas";
 import { verificarDisponibilidad } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,7 +44,6 @@ const formSchema = z.object({
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   sala_id: z.string().min(1, "Selecciona una sala"),
-  posicion_sala_id: z.string().optional(),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   numero_mesas: z.number().min(1, "Mínimo 1 mesa"),
   notas_cliente: z.string().optional(),
@@ -67,7 +66,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
   const { data: salas } = useSalas();
-  const { data: posiciones } = usePosicionesSala(selectedSalaId || null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -83,7 +81,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
       const fecha = form.watch("fecha");
       const hora = form.watch("hora");
       const salaId = form.watch("sala_id");
-      const posicionId = form.watch("posicion_sala_id");
       const numeroMesas = form.watch("numero_mesas");
 
       // Solo verificar si tenemos todos los datos necesarios
@@ -98,7 +95,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
           format(fecha, "yyyy-MM-dd"),
           hora,
           salaId,
-          posicionId || null,
+          null,
           numeroMesas
         );
 
@@ -128,7 +125,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     form.watch("fecha"),
     form.watch("hora"),
     form.watch("sala_id"),
-    form.watch("posicion_sala_id"),
     form.watch("numero_mesas"),
   ]);
 
@@ -156,7 +152,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
         sala_id: values.sala_id,
-        posicion_sala_id: values.posicion_sala_id || null,
         numero_comensales: values.numero_comensales,
         numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
@@ -174,7 +169,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
       // Enviar al webhook
       try {
         const sala = salas?.find(s => s.id === values.sala_id);
-        const posicion = posiciones?.find(p => p.id === values.posicion_sala_id);
         
         await fetch("https://n8npersonal.miguelbenito.space/webhook-test/3e80cbf2-709c-457b-ba07-d9cd8d7860ab", {
           method: "POST",
@@ -185,7 +179,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
             ...reservaData,
             reserva_id: (reservaCreada as any)?.id,
             sala_nombre: sala?.nombre,
-            posicion_nombre: posicion?.nombre,
           }),
         });
       } catch (webhookError) {
