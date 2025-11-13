@@ -51,9 +51,10 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface FormularioReservaProps {
   onSuccess?: () => void;
+  isPublic?: boolean;
 }
 
-export const FormularioReserva = ({ onSuccess }: FormularioReservaProps) => {
+export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
   const [selectedSalaId, setSelectedSalaId] = useState<string>("");
   const { data: salas } = useSalas();
   const { data: posiciones } = usePosicionesSala(selectedSalaId || null);
@@ -68,10 +69,13 @@ export const FormularioReserva = ({ onSuccess }: FormularioReservaProps) => {
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Debes iniciar sesión");
-        return;
+      // En modo público no requerir autenticación
+      if (!isPublic) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error("Debes iniciar sesión");
+          return;
+        }
       }
 
       const { error } = await supabase.from("reservas").insert({
@@ -86,12 +90,15 @@ export const FormularioReserva = ({ onSuccess }: FormularioReservaProps) => {
         numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
         estado: "pendiente",
-        user_id: user.id,
       });
 
       if (error) throw error;
 
-      toast.success("Reserva creada correctamente");
+      toast.success(
+        isPublic 
+          ? "¡Reserva recibida! Te contactaremos pronto para confirmarla." 
+          : "Reserva creada correctamente"
+      );
       form.reset();
       onSuccess?.();
     } catch (error: any) {
