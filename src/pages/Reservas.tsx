@@ -35,7 +35,15 @@ export default function Reservas() {
     const { data, error } = await supabase
       .from("reservas")
       .select(`
-        *,
+        id,
+        fecha,
+        hora,
+        numero_comensales,
+        estado,
+        notas_cliente,
+        nombre,
+        telefono,
+        email,
         salas (nombre)
       `)
       .order("fecha", { ascending: true })

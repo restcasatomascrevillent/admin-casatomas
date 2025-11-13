@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, CalendarDays, Home, UtensilsCrossed, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Home, UtensilsCrossed, BarChart3 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -22,8 +22,6 @@ import { useAuth } from "@/hooks/useAuth";
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed },
-  { title: "Trabajadores", url: "/trabajadores", icon: Users },
-  { title: "Turnos", url: "/turnos", icon: CalendarDays },
   { title: "Salas", url: "/salas", icon: Home },
   { title: "Análisis", url: "/analisis", icon: BarChart3 },
 ];

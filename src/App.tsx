@@ -6,9 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Trabajadores from "./pages/Trabajadores";
 import Reservas from "./pages/Reservas";
-import Turnos from "./pages/Turnos";
 import Salas from "./pages/Salas";
 import Analisis from "./pages/Analisis";
 import NotFound from "./pages/NotFound";
@@ -40,26 +38,10 @@ const App = () => (
             }
           />
           <Route
-            path="/trabajadores"
-            element={
-              <ProtectedRoute>
-                <Trabajadores />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/reservas"
             element={
               <ProtectedRoute>
                 <Reservas />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/turnos"
-            element={
-              <ProtectedRoute>
-                <Turnos />
               </ProtectedRoute>
             }
           />
