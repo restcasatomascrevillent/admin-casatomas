@@ -11,6 +11,7 @@ import ReservaPublica from "./pages/ReservaPublica";
 import ReservaConfirmacion from "./pages/ReservaConfirmacion";
 import Salas from "./pages/Salas";
 import Analisis from "./pages/Analisis";
+import Trabajadores from "./pages/Trabajadores";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Analisis />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trabajadores"
+            element={
+              <ProtectedRoute>
+                <Trabajadores />
               </ProtectedRoute>
             }
           />
