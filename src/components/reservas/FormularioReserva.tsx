@@ -40,7 +40,7 @@ import { useNavigate } from "react-router-dom";
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre es requerido"),
   telefono: z.string().min(9, "Teléfono inválido"),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  email: z.string().email("Email inválido").min(1, "El email es requerido"),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   sala_id: z.string().min(1, "Selecciona una sala"),
@@ -152,7 +152,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
       const reservaData = {
         nombre: values.nombre,
         telefono: values.telefono,
-        email: values.email || null,
+        email: values.email,
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
         sala_id: values.sala_id,
@@ -253,7 +253,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email (opcional)</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="juan@email.com" {...field} />
               </FormControl>
