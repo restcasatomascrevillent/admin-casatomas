@@ -35,6 +35,7 @@ import { verificarDisponibilidad } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { es } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre es requerido"),
@@ -57,6 +58,7 @@ interface FormularioReservaProps {
 }
 
 export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
+  const navigate = useNavigate();
   const [selectedSalaId, setSelectedSalaId] = useState<string>("");
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
     disponible: boolean;
@@ -147,7 +149,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         }
       }
 
-      const { error } = await supabase.from("reservas" as any).insert({
+      const reservaData = {
         nombre: values.nombre,
         telefono: values.telefono,
         email: values.email || null,
@@ -159,17 +161,46 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
         estado: "pendiente",
-      });
+      };
+
+      const { data: reservaCreada, error } = await supabase
+        .from("reservas" as any)
+        .insert(reservaData)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast.success(
-        isPublic 
-          ? "¡Reserva recibida! Te contactaremos pronto para confirmarla." 
-          : "Reserva creada correctamente"
-      );
-      form.reset();
-      onSuccess?.();
+      // Enviar al webhook
+      try {
+        const sala = salas?.find(s => s.id === values.sala_id);
+        const posicion = posiciones?.find(p => p.id === values.posicion_sala_id);
+        
+        await fetch("https://n8npersonal.miguelbenito.space/webhook-test/3e80cbf2-709c-457b-ba07-d9cd8d7860ab", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...reservaData,
+            reserva_id: (reservaCreada as any)?.id,
+            sala_nombre: sala?.nombre,
+            posicion_nombre: posicion?.nombre,
+          }),
+        });
+      } catch (webhookError) {
+        console.error("Error enviando al webhook:", webhookError);
+        // No fallar la reserva si el webhook falla
+      }
+
+      if (isPublic) {
+        // Redirigir a página de confirmación
+        navigate("/reserva-confirmacion");
+      } else {
+        toast.success("Reserva creada correctamente");
+        form.reset();
+        onSuccess?.();
+      }
     } catch (error: any) {
       toast.error("Error al crear reserva: " + error.message);
     }
