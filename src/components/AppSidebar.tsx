@@ -1,7 +1,6 @@
 import { LayoutDashboard, Home, UtensilsCrossed, BarChart3 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +14,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -30,30 +28,10 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut } = useAuth();
   const location = useLocation();
-  const [nombreRestaurante, setNombreRestaurante] = useState("Mi Restaurante");
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data, error } = await supabase
-          .from("profiles" as any)
-          .select("nombre_restaurante")
-          .eq("id", user.id)
-          .maybeSingle();
-        
-        if (!error && data !== null && 'nombre_restaurante' in data) {
-          setNombreRestaurante((data as any).nombre_restaurante);
-        }
-      }
-    };
-
-    fetchProfile();
-  }, []);
 
   return (
     <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
@@ -62,8 +40,8 @@ export function AppSidebar() {
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-6 w-6 text-sidebar-primary" />
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold text-sidebar-foreground">{nombreRestaurante}</h2>
-              <span className="text-xs text-muted-foreground">Panel de Gestión</span>
+              <h2 className="text-lg font-semibold text-sidebar-foreground">Panel Admin</h2>
+              <span className="text-xs text-muted-foreground">Gestión del Restaurante</span>
             </div>
           </div>
         )}

@@ -10,7 +10,6 @@ export interface Sala {
   numero_mesas: number;
   caracteristicas: any;
   activa: boolean;
-  user_id: string;
 }
 
 export interface PosicionSala {
@@ -61,13 +60,10 @@ export const useCrearSala = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (sala: Omit<Sala, "id" | "user_id" | "created_at" | "updated_at">) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
+    mutationFn: async (sala: Omit<Sala, "id" | "created_at" | "updated_at">) => {
       const { data, error } = await supabase
         .from("salas")
-        .insert({ ...sala, user_id: user.id })
+        .insert(sala)
         .select()
         .single();
       

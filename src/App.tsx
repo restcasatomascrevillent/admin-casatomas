@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
+import ReservaPublica from "./pages/ReservaPublica";
 import Salas from "./pages/Salas";
 import Analisis from "./pages/Analisis";
 import NotFound from "./pages/NotFound";
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reservar" element={<ReservaPublica />} />
           <Route
             path="/"
             element={
