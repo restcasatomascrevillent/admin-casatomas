@@ -15,13 +15,9 @@ interface Reservation {
   numero_comensales: number;
   estado: string;
   notas_cliente: string | null;
-  cliente_id: string | null;
-  clientes: {
-    nombre: string;
-    apellidos: string | null;
-    telefono: string;
-    email: string | null;
-  } | null;
+  nombre: string;
+  telefono: string;
+  email: string | null;
   salas: {
     nombre: string;
   } | null;
@@ -40,7 +36,6 @@ export default function Reservas() {
       .from("reservas")
       .select(`
         *,
-        clientes (nombre, apellidos, telefono, email),
         salas (nombre)
       `)
       .order("fecha", { ascending: true })
@@ -168,9 +163,7 @@ export default function Reservas() {
                     </TableCell>
                     <TableCell>{reservation.hora}</TableCell>
                     <TableCell>
-                      {reservation.clientes
-                        ? `${reservation.clientes.nombre} ${reservation.clientes.apellidos || ""}`
-                        : "Sin cliente"}
+                      {reservation.nombre || "Sin nombre"}
                     </TableCell>
                     <TableCell>{reservation.numero_comensales}</TableCell>
                     <TableCell>{reservation.salas?.nombre || "-"}</TableCell>
