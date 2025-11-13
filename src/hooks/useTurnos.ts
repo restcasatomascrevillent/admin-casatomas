@@ -89,9 +89,12 @@ export const useCrearAsignacion = () => {
 
   return useMutation({
     mutationFn: async (asignacion: Omit<AsignacionTurno, "id" | "created_at" | "updated_at">) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
       const { data, error } = await supabase
         .from("asignaciones_turno")
-        .insert(asignacion)
+        .insert({ ...asignacion, user_id: user.id })
         .select()
         .single();
       
