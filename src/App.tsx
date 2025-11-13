@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
 import ReservaPublica from "./pages/ReservaPublica";
+import ReservaConfirmacion from "./pages/ReservaConfirmacion";
 import Salas from "./pages/Salas";
 import Analisis from "./pages/Analisis";
 import NotFound from "./pages/NotFound";
@@ -21,10 +22,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/reservar" element={<ReservaPublica />} />
-          <Route
-            path="/"
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/reservar" element={<ReservaPublica />} />
+        <Route path="/reserva-confirmacion" element={<ReservaConfirmacion />} />
+        <Route
+          path="/"
             element={
               <ProtectedRoute>
                 <Dashboard />
