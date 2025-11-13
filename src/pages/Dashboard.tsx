@@ -14,8 +14,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [workers, reservations, rooms] = await Promise.all([
-        supabase.from("trabajadores").select("id", { count: "exact", head: true }),
+      const [reservations, rooms] = await Promise.all([
         supabase.from("reservas").select("id, estado", { count: "exact" }),
         supabase.from("salas").select("id", { count: "exact", head: true }),
       ]);
@@ -24,7 +23,7 @@ export default function Dashboard() {
         reservations.data?.filter((r) => r.estado === "pendiente").length || 0;
 
       setStats({
-        totalWorkers: workers.count || 0,
+        totalWorkers: 0,
         totalReservations: reservations.count || 0,
         pendingReservations: pendingCount,
         totalRooms: rooms.count || 0,
@@ -35,12 +34,6 @@ export default function Dashboard() {
   }, []);
 
   const statCards = [
-    {
-      title: "Trabajadores Activos",
-      value: stats.totalWorkers,
-      icon: Users,
-      description: "Personal registrado",
-    },
     {
       title: "Reservas Totales",
       value: stats.totalReservations,
@@ -71,7 +64,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {statCards.map((stat) => (
             <Card key={stat.title} className="hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -93,7 +86,7 @@ export default function Dashboard() {
           <CardContent>
             <p className="text-muted-foreground">
               Utiliza el menú lateral para navegar entre las diferentes secciones del sistema.
-              Podrás gestionar trabajadores, reservas, turnos, salas y analizar datos históricos.
+              Podrás gestionar reservas, salas y analizar datos históricos.
             </p>
           </CardContent>
         </Card>
