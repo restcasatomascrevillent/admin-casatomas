@@ -44,13 +44,15 @@ export default function Reservas() {
         nombre,
         telefono,
         email,
-        salas (nombre)
+        sala_id,
+        salas!reservas_sala_id_fkey (nombre)
       `)
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
 
     if (error) {
       toast.error("Error al cargar reservas");
+      console.error(error);
     } else {
       setReservations(data || []);
     }
