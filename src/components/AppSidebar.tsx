@@ -42,14 +42,14 @@ export function AppSidebar() {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
+        const { data, error } = await supabase
+          .from("profiles" as any)
           .select("nombre_restaurante")
           .eq("id", user.id)
           .maybeSingle();
         
-        if (profile) {
-          setNombreRestaurante(profile.nombre_restaurante);
+        if (!error && data !== null && 'nombre_restaurante' in data) {
+          setNombreRestaurante((data as any).nombre_restaurante);
         }
       }
     };
