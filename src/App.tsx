@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Trabajadores from "./pages/Trabajadores";
@@ -21,14 +22,63 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/auth" replace />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/trabajadores" element={<Trabajadores />} />
-          <Route path="/reservas" element={<Reservas />} />
-          <Route path="/turnos" element={<Turnos />} />
-          <Route path="/salas" element={<Salas />} />
-          <Route path="/analisis" element={<Analisis />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trabajadores"
+            element={
+              <ProtectedRoute>
+                <Trabajadores />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reservas"
+            element={
+              <ProtectedRoute>
+                <Reservas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/turnos"
+            element={
+              <ProtectedRoute>
+                <Turnos />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/salas"
+            element={
+              <ProtectedRoute>
+                <Salas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analisis"
+            element={
+              <ProtectedRoute>
+                <Analisis />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -1,6 +1,7 @@
-import { LayoutDashboard, Users, CalendarDays, Home, UtensilsCrossed, BarChart3, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Home, UtensilsCrossed, BarChart3 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,8 +16,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -29,22 +30,32 @@ const menuItems = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { signOut } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
+  const [nombreRestaurante, setNombreRestaurante] = useState("Mi Restaurante");
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Error al cerrar sesión");
-    } else {
-      toast.success("Sesión cerrada");
-      navigate("/auth");
-    }
-  };
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("nombre_restaurante")
+          .eq("id", user.id)
+          .maybeSingle();
+        
+        if (profile) {
+          setNombreRestaurante(profile.nombre_restaurante);
+        }
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   return (
     <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
@@ -52,7 +63,10 @@ export function AppSidebar() {
         {!isCollapsed && (
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-6 w-6 text-sidebar-primary" />
-            <h2 className="text-lg font-semibold text-sidebar-foreground">Aroma Assist</h2>
+            <div className="flex flex-col">
+              <h2 className="text-lg font-semibold text-sidebar-foreground">{nombreRestaurante}</h2>
+              <span className="text-xs text-muted-foreground">Panel de Gestión</span>
+            </div>
           </div>
         )}
         {isCollapsed && <UtensilsCrossed className="h-6 w-6 text-sidebar-primary mx-auto" />}
@@ -85,9 +99,8 @@ export function AppSidebar() {
         <Button
           variant="ghost"
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
-          onClick={handleLogout}
+          onClick={() => signOut()}
         >
-          <LogOut className="h-4 w-4" />
           {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
         </Button>
       </SidebarFooter>
