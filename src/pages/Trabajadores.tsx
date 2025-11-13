@@ -1,0 +1,113 @@
+import { useState } from "react";
+import { Plus, UserCog, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { ListaTrabajadores } from "@/components/trabajadores/ListaTrabajadores";
+import { FormularioTrabajador } from "@/components/trabajadores/FormularioTrabajador";
+import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+export default function Trabajadores() {
+  const [dialogAbierto, setDialogAbierto] = useState(false);
+  const [trabajadorEditando, setTrabajadorEditando] = useState<string | null>(null);
+
+  const handleNuevoTrabajador = () => {
+    setTrabajadorEditando(null);
+    setDialogAbierto(true);
+  };
+
+  const handleEditarTrabajador = (id: string) => {
+    setTrabajadorEditando(id);
+    setDialogAbierto(true);
+  };
+
+  const handleCerrarDialog = () => {
+    setDialogAbierto(false);
+    setTrabajadorEditando(null);
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Gestión de Personal</h1>
+            <p className="text-muted-foreground">
+              Administra trabajadores, turnos y horarios
+            </p>
+          </div>
+          <Button onClick={handleNuevoTrabajador}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Trabajador
+          </Button>
+        </div>
+
+        <Tabs defaultValue="trabajadores" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="trabajadores">
+              <UserCog className="mr-2 h-4 w-4" />
+              Trabajadores
+            </TabsTrigger>
+            <TabsTrigger value="turnos">
+              <Clock className="mr-2 h-4 w-4" />
+              Turnos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="trabajadores">
+            <Card>
+              <CardHeader>
+                <CardTitle>Personal del Restaurante</CardTitle>
+                <CardDescription>
+                  Lista de todos los trabajadores registrados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ListaTrabajadores onEditar={handleEditarTrabajador} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="turnos">
+            <Card>
+              <CardHeader>
+                <CardTitle>Calendario de Turnos</CardTitle>
+                <CardDescription>
+                  Programa y visualiza los turnos del personal
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CalendarioTurnos />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <Dialog open={dialogAbierto} onOpenChange={setDialogAbierto}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {trabajadorEditando ? "Editar Trabajador" : "Nuevo Trabajador"}
+              </DialogTitle>
+              <DialogDescription>
+                Completa la información del trabajador
+              </DialogDescription>
+            </DialogHeader>
+            <FormularioTrabajador
+              trabajadorId={trabajadorEditando}
+              onSuccess={handleCerrarDialog}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+    </DashboardLayout>
+  );
+}
