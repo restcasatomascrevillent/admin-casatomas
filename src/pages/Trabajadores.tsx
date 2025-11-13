@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { ListaTrabajadores } from "@/components/trabajadores/ListaTrabajadores";
 import { FormularioTrabajador } from "@/components/trabajadores/FormularioTrabajador";
 import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
+import { GenerarDatosFicticios } from "@/components/trabajadores/GenerarDatosFicticios";
 import {
   Dialog,
   DialogContent,
@@ -44,10 +45,13 @@ export default function Trabajadores() {
               Administra trabajadores, turnos y horarios
             </p>
           </div>
-          <Button onClick={handleNuevoTrabajador}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Trabajador
-          </Button>
+          <div className="flex gap-2">
+            <GenerarDatosFicticios />
+            <Button onClick={handleNuevoTrabajador}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Trabajador
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="trabajadores" className="space-y-4">
