@@ -78,7 +78,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         }
       }
 
-      const { error } = await supabase.from("reservas").insert({
+      const { error } = await supabase.from("reservas" as any).insert({
         nombre: values.nombre,
         telefono: values.telefono,
         email: values.email || null,

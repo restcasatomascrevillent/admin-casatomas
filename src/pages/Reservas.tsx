@@ -37,7 +37,7 @@ export default function Reservas() {
 
   const fetchReservations = async () => {
     const { data, error } = await supabase
-      .from("reservas")
+      .from("reservas" as any)
       .select(`
         id,
         fecha,
@@ -58,7 +58,7 @@ export default function Reservas() {
       toast.error("Error al cargar reservas");
       console.error(error);
     } else {
-      setReservations(data || []);
+      setReservations((data as any) || []);
     }
   };
 
