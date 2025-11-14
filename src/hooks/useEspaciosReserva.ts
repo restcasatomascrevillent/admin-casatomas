@@ -17,12 +17,12 @@ export const useEspaciosReserva = () => {
     queryKey: ["espacios_reserva"],
     queryFn: async () => {
       const { data, error} = await supabase
-        .from("espacios_reserva")
+        .from("espacios_reserva" as any)
         .select("*")
         .order("nombre");
       
       if (error) throw error;
-      return data;
+      return data as any;
     },
   });
 };
@@ -33,7 +33,7 @@ export const useCrearEspacio = () => {
   return useMutation({
     mutationFn: async (espacio: Omit<EspacioReserva, "id" | "created_at" | "updated_at">) => {
       const { data, error } = await supabase
-        .from("espacios_reserva")
+        .from("espacios_reserva" as any)
         .insert(espacio)
         .select()
         .single();
@@ -57,7 +57,7 @@ export const useActualizarEspacio = () => {
   return useMutation({
     mutationFn: async ({ id, ...espacio }: Partial<EspacioReserva> & { id: string }) => {
       const { data, error } = await supabase
-        .from("espacios_reserva")
+        .from("espacios_reserva" as any)
         .update(espacio)
         .eq("id", id)
         .select()
@@ -82,7 +82,7 @@ export const useEliminarEspacio = () => {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("espacios_reserva")
+        .from("espacios_reserva" as any)
         .delete()
         .eq("id", id);
       

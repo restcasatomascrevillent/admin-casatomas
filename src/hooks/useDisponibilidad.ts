@@ -56,9 +56,9 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
     queryFn: async () => {
       // Obtener todos los espacios de reserva
       const { data: espacios, error: espaciosError } = await supabase
-        .from("espacios_reserva")
+        .from("espacios_reserva" as any)
         .select("id, nombre, numero_mesas, capacidad_maxima")
-        .eq("activa", true);
+        .eq("activa", true) as any;
 
       if (espaciosError) throw espaciosError;
 
@@ -144,10 +144,10 @@ export const verificarDisponibilidad = async (
 ) => {
   // Obtener info del espacio
   const { data: espacio } = await supabase
-    .from("espacios_reserva")
+    .from("espacios_reserva" as any)
     .select("numero_mesas")
     .eq("id", espacioId)
-    .single();
+    .single() as any;
 
   if (!espacio) throw new Error("Espacio no encontrado");
 
