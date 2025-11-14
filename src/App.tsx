@@ -10,6 +10,7 @@ import Reservas from "./pages/Reservas";
 import ReservaPublica from "./pages/ReservaPublica";
 import ReservaConfirmacion from "./pages/ReservaConfirmacion";
 import Salas from "./pages/Salas";
+import Espacios from "./pages/Espacios";
 import Analisis from "./pages/Analisis";
 import Trabajadores from "./pages/Trabajadores";
 import NotFound from "./pages/NotFound";
@@ -55,6 +56,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Salas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/espacios"
+            element={
+              <ProtectedRoute>
+                <Espacios />
               </ProtectedRoute>
             }
           />
