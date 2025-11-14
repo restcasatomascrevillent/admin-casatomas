@@ -134,7 +134,74 @@ export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) =>
   });
 };
 
-// Hook para verificar disponibilidad específica antes de crear reserva
+// Hook para verificar disponibilidad específica por sala
+export const verificarDisponibilidadSala = async (
+  fecha: string,
+  hora: string,
+  salaId: string,
+  numeroMesas: number
+) => {
+  // Obtener info de la sala
+  const { data: sala } = await supabase
+    .from("salas" as any)
+    .select("numero_mesas, capacidad_maxima")
+    .eq("id", salaId)
+    .single() as any;
+
+  if (!sala) throw new Error("Sala no encontrada");
+
+  // Obtener ocupación actual
+  const { data: ocupacion } = await supabase
+    .from("ocupacion_diaria" as any)
+    .select("total_mesas_reservadas, total_comensales")
+    .eq("fecha", fecha)
+    .eq("hora", hora)
+    .eq("sala_id", salaId)
+    .maybeSingle();
+
+  const mesasOcupadas = (ocupacion as any)?.total_mesas_reservadas || 0;
+  const mesasDisponibles = sala.numero_mesas - mesasOcupadas;
+
+  return {
+    disponible: mesasDisponibles >= numeroMesas,
+    mesasDisponibles,
+    mesasOcupadas,
+    totalMesas: sala.numero_mesas,
+    capacidadMaxima: sala.capacidad_maxima,
+    comensalesActuales: (ocupacion as any)?.total_comensales || 0,
+  };
+};
+
+// Obtener horas disponibles para una fecha y sala específica
+export const obtenerHorasDisponibles = async (
+  fecha: string,
+  salaId: string,
+  numeroMesas: number = 1
+) => {
+  const horasDisponibles: string[] = [];
+  
+  // Generar todas las horas posibles (8:00 - 23:30)
+  for (let h = 8; h <= 23; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hora = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+      
+      const disponibilidad = await verificarDisponibilidadSala(
+        fecha,
+        hora,
+        salaId,
+        numeroMesas
+      );
+      
+      if (disponibilidad.disponible) {
+        horasDisponibles.push(hora);
+      }
+    }
+  }
+  
+  return horasDisponibles;
+};
+
+// Mantener compatibilidad con código existente (espacio)
 export const verificarDisponibilidad = async (
   fecha: string,
   hora: string,
