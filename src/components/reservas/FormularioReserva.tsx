@@ -65,7 +65,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     mensaje: string;
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
-  const { data: espacios } = useEspaciosReserva();
+  const { data: espacios } = useEspaciosReserva() as any;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function Espacios() {
-  const { data: espacios = [], isLoading } = useEspaciosReserva();
+  const { data: espacios = [], isLoading } = useEspaciosReserva() as any;
 
   const [showForm, setShowForm] = useState(false);
   const [espacioEditando, setEspacioEditando] = useState<any>();
