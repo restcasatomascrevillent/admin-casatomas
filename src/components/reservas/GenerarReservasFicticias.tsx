@@ -37,7 +37,7 @@ export const GenerarReservasFicticias = () => {
 
       const reservasFicticias = [
         // Hoy
-        { nombre: 'Carlos Ruiz', telefono: '612345001', email: 'carlos.ruiz@email.com', fecha_offset: 0, hora: '13:00', espacio_id: (espacios as any)[0].id, sala_id: (salas as any)[0].id, numero_comensales: 4, numero_mesas: 1, estado: 'confirmada', notas_cliente: 'Mesa junto a la ventana si es posible' },
+        { nombre: 'Carlos Ruiz', telefono: '612345001', email: 'carlos.ruiz@email.com', fecha_offset: 0, hora: '13:00', sala_id: (salas as any)[0].id, numero_comensales: 4, numero_mesas: 1, estado: 'confirmada', notas_cliente: 'Mesa junto a la ventana si es posible' },
         { nombre: 'María González', telefono: '612345002', email: 'maria.gonzalez@email.com', fecha_offset: 0, hora: '14:30', espacio_id: (espacios as any)[1 % espacios.length].id, sala_id: (salas as any)[1 % salas.length].id, numero_comensales: 2, numero_mesas: 1, estado: 'confirmada', notas_cliente: null },
         { nombre: 'Juan Pérez', telefono: '612345003', email: 'juan.perez@email.com', fecha_offset: 0, hora: '20:00', espacio_id: (espacios as any)[2 % espacios.length].id, sala_id: (salas as any)[2 % salas.length].id, numero_comensales: 6, numero_mesas: 2, estado: 'pendiente', notas_cliente: 'Cumpleaños, traeremos tarta' },
         { nombre: 'Ana Martín', telefono: '612345004', email: 'ana.martin@email.com', fecha_offset: 0, hora: '21:30', espacio_id: (espacios as any)[3 % espacios.length].id, sala_id: (salas as any)[3 % salas.length].id, numero_comensales: 8, numero_mesas: 2, estado: 'confirmada', notas_cliente: 'Cena de empresa' },
