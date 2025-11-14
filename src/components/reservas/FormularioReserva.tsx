@@ -3,10 +3,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Form,
   FormControl,
@@ -15,26 +14,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSalasPublicas } from "@/hooks/useSalasPublicas";
-import { verificarDisponibilidadSala, obtenerHorasDisponibles } from "@/hooks/useDisponibilidad";
+import { verificarDisponibilidadSala } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
 const formSchema = z.object({
@@ -63,16 +48,12 @@ interface FormularioReservaProps {
 
 export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreseleccionados }: FormularioReservaProps) => {
   const navigate = useNavigate();
-  const [selectedSalaId, setSelectedSalaId] = useState<string>("");
-  const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
-  const [cargandoHoras, setCargandoHoras] = useState(false);
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
     disponible: boolean;
     mesasDisponibles: number;
     mensaje: string;
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
-  const { data: salas } = useSalasPublicas() as any;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -88,7 +69,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       form.setValue("sala_id", datosPreseleccionados.sala_id);
       form.setValue("fecha", datosPreseleccionados.fecha);
       form.setValue("hora", datosPreseleccionados.hora);
-      setSelectedSalaId(datosPreseleccionados.sala_id);
     }
   }, [datosPreseleccionados, form]);
 
@@ -187,127 +167,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             </FormItem>
           )}
         />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="fecha"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>Fecha</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP", { locale: es })
-                        ) : (
-                          <span>Seleccionar fecha</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      locale={es}
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="hora"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Hora</FormLabel>
-                <Select 
-                  onValueChange={field.onChange} 
-                  defaultValue={field.value}
-                  disabled={cargandoHoras || horasDisponibles.length === 0}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={
-                        cargandoHoras 
-                          ? "Cargando horas..." 
-                          : horasDisponibles.length === 0 
-                          ? "No hay horas disponibles" 
-                          : "Seleccionar hora"
-                      } />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent className="bg-background z-50">
-                    {horasDisponibles.map((hora) => (
-                      <SelectItem key={hora} value={hora}>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {hora}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-                {horasDisponibles.length === 0 && !cargandoHoras && form.watch("sala_id") && form.watch("fecha") && (
-                  <p className="text-sm text-muted-foreground">
-                    No hay horarios disponibles para esta sala y fecha.
-                  </p>
-                )}
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
-          control={form.control}
-          name="sala_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Sala</FormLabel>
-              <Select
-                onValueChange={(value) => {
-                  field.onChange(value);
-                  setSelectedSalaId(value);
-                  // Resetear hora al cambiar sala
-                  form.setValue("hora", "");
-                }}
-                defaultValue={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar sala" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-background z-50">
-                  {salas?.map((sala) => (
-                    <SelectItem key={sala.id} value={sala.id}>
-                      {sala.nombre} - {sala.numero_mesas} mesas (Cap: {sala.capacidad_maxima} personas)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
