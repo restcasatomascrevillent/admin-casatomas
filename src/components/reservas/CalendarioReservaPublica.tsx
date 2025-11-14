@@ -82,20 +82,20 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
         <CardTitle className="text-2xl">Reserva tu Mesa</CardTitle>
         <CardDescription>Elige la sala, fecha y hora perfecta para tu experiencia</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Barra Lateral de Salas */}
-          <div className="w-full lg:w-72 flex-shrink-0">
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                Espacios Disponibles
-              </h3>
+      <CardContent className="space-y-6">
+        {/* Barra Horizontal de Salas */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Espacios Disponibles
+          </h3>
+          <div className="overflow-x-auto scrollbar-thin pb-2">
+            <div className="flex gap-3 min-w-max">
               {salas?.map((sala: any) => (
                 <button
                   key={sala.id}
                   onClick={() => setSalaSeleccionada(sala.id)}
                   className={cn(
-                    "w-full text-left p-5 rounded-xl transition-all duration-300",
+                    "flex-shrink-0 text-left p-4 rounded-xl transition-all duration-300 min-w-[280px]",
                     "hover:scale-[1.02] hover:shadow-lg",
                     salaSeleccionada === sala.id
                       ? "bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary shadow-lg shadow-primary/20"
@@ -125,7 +125,7 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
                       </span>
                     </div>
                     {sala.descripcion && (
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
                         {sala.descripcion}
                       </p>
                     )}
@@ -134,64 +134,64 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Contenido Principal - Calendario y Horarios */}
-          <div className="flex-1 space-y-6">
-            {/* Calendario */}
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Selecciona un Día</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Haz clic en un día para ver los horarios disponibles
-              </p>
-              <Calendar
-                mode="single"
-                selected={fechaSeleccionada}
-                onSelect={(date) => {
-                  setFechaSeleccionada(date);
-                  setHoraSeleccionada(""); // Reset hora al cambiar fecha
-                }}
-                disabled={(date) => date < new Date()}
-                locale={es}
-                className="rounded-md border pointer-events-auto"
-                modifiers={{
-                  disponible: (date) => {
-                    const disponibles = obtenerDisponibilidadDia(date);
-                    return disponibles !== null && disponibles > 0;
-                  },
-                  completo: (date) => {
-                    const disponibles = obtenerDisponibilidadDia(date);
-                    return disponibles !== null && disponibles === 0;
-                  },
-                }}
-                modifiersClassNames={{
-                  disponible: "bg-green-100 dark:bg-green-900/30 font-semibold",
-                  completo: "bg-red-100 dark:bg-red-900/30 text-muted-foreground line-through",
-                }}
-              />
-              
-              <div className="flex gap-4 mt-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
-                  <span>Disponible</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/30" />
-                  <span>Completo</span>
-                </div>
+        {/* Calendario y Horarios */}
+        <div className="space-y-6">
+          {/* Calendario */}
+          <div>
+            <h3 className="text-lg font-semibold mb-2">Selecciona un Día</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Haz clic en un día para ver los horarios disponibles
+            </p>
+            <Calendar
+              mode="single"
+              selected={fechaSeleccionada}
+              onSelect={(date) => {
+                setFechaSeleccionada(date);
+                setHoraSeleccionada(""); // Reset hora al cambiar fecha
+              }}
+              disabled={(date) => date < new Date()}
+              locale={es}
+              className="rounded-md border pointer-events-auto"
+              modifiers={{
+                disponible: (date) => {
+                  const disponibles = obtenerDisponibilidadDia(date);
+                  return disponibles !== null && disponibles > 0;
+                },
+                completo: (date) => {
+                  const disponibles = obtenerDisponibilidadDia(date);
+                  return disponibles !== null && disponibles === 0;
+                },
+              }}
+              modifiersClassNames={{
+                disponible: "bg-green-100 dark:bg-green-900/30 font-semibold",
+                completo: "bg-red-100 dark:bg-red-900/30 text-muted-foreground line-through",
+              }}
+            />
+            
+            <div className="flex gap-4 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
+                <span>Disponible</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/30" />
+                <span>Completo</span>
               </div>
             </div>
-
-            {/* Horarios Disponibles */}
-            {fechaSeleccionada && salaSeleccionada && (
-              <SelectorHorasDisponibles
-                fecha={fechaSeleccionada}
-                salaId={salaSeleccionada}
-                numeroMesas={numeroMesas}
-                onSeleccionarHora={setHoraSeleccionada}
-                horaSeleccionada={horaSeleccionada}
-              />
-            )}
           </div>
+
+          {/* Horarios Disponibles */}
+          {fechaSeleccionada && salaSeleccionada && (
+            <SelectorHorasDisponibles
+              fecha={fechaSeleccionada}
+              salaId={salaSeleccionada}
+              numeroMesas={numeroMesas}
+              onSeleccionarHora={setHoraSeleccionada}
+              horaSeleccionada={horaSeleccionada}
+            />
+          )}
         </div>
       </CardContent>
     </Card>
