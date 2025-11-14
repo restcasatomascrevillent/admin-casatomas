@@ -79,40 +79,55 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Selecciona una Sala</CardTitle>
-        <CardDescription>Elige el espacio que prefieres para tu reserva</CardDescription>
+        <CardTitle className="text-2xl">Reserva tu Mesa</CardTitle>
+        <CardDescription>Elige la sala, fecha y hora perfecta para tu experiencia</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Barra Lateral de Salas */}
-          <div className="w-full lg:w-64 flex-shrink-0">
-            <div className="space-y-2">
+          <div className="w-full lg:w-72 flex-shrink-0">
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                Espacios Disponibles
+              </h3>
               {salas?.map((sala: any) => (
                 <button
                   key={sala.id}
                   onClick={() => setSalaSeleccionada(sala.id)}
                   className={cn(
-                    "w-full text-left p-4 rounded-lg border-2 transition-all duration-200",
-                    "hover:border-primary/50 hover:shadow-md",
+                    "w-full text-left p-5 rounded-xl transition-all duration-300",
+                    "hover:scale-[1.02] hover:shadow-lg",
                     salaSeleccionada === sala.id
-                      ? "border-primary bg-primary/10 shadow-md"
-                      : "border-border bg-card"
+                      ? "bg-gradient-to-br from-primary/20 to-primary/5 border-2 border-primary shadow-lg shadow-primary/20"
+                      : "bg-card border-2 border-border hover:border-primary/30"
                   )}
                 >
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <span className={cn(
-                      "font-semibold text-base",
+                      "font-bold text-lg",
                       salaSeleccionada === sala.id ? "text-primary" : "text-foreground"
                     )}>
                       {sala.nombre}
                     </span>
-                    <span className="text-sm text-muted-foreground">
-                      {sala.numero_mesas} mesas · Cap. {sala.capacidad_maxima}
-                    </span>
-                    {sala.descripcion && (
-                      <span className="text-xs text-muted-foreground mt-1">
-                        {sala.descripcion}
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className={cn(
+                        "font-medium",
+                        salaSeleccionada === sala.id ? "text-primary/80" : "text-muted-foreground"
+                      )}>
+                        {sala.numero_mesas} mesas
                       </span>
+                      <span className="text-muted-foreground">•</span>
+                      <span className={cn(
+                        "font-medium",
+                        salaSeleccionada === sala.id ? "text-primary/80" : "text-muted-foreground"
+                      )}>
+                        Cap. {sala.capacidad_maxima}
+                      </span>
+                    </div>
+                    {sala.descripcion && (
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {sala.descripcion}
+                      </p>
                     )}
                   </div>
                 </button>
