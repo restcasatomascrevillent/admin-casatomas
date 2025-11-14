@@ -86,18 +86,24 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
         </CardHeader>
         <CardContent>
           <Tabs value={salaSeleccionada} onValueChange={setSalaSeleccionada}>
-            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${salas?.length || 1}, 1fr)` }}>
-              {salas?.map((sala: any) => (
-                <TabsTrigger key={sala.id} value={sala.id} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-semibold">{sala.nombre}</span>
-                    <span className="text-xs opacity-70">
-                      {sala.numero_mesas} mesas · Cap. {sala.capacidad_maxima}
-                    </span>
-                  </div>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="relative">
+              <TabsList className="inline-flex w-auto gap-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50 pb-2">
+                {salas?.map((sala: any) => (
+                  <TabsTrigger 
+                    key={sala.id} 
+                    value={sala.id} 
+                    className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap"
+                  >
+                    <div className="flex flex-col items-center gap-1 px-4">
+                      <span className="font-semibold">{sala.nombre}</span>
+                      <span className="text-xs opacity-70">
+                        {sala.numero_mesas} mesas · Cap. {sala.capacidad_maxima}
+                      </span>
+                    </div>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </Tabs>
         </CardContent>
       </Card>
