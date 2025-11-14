@@ -31,7 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { verificarDisponibilidad } from "@/hooks/useDisponibilidad";
+import { useSalasPublicas } from "@/hooks/useSalasPublicas";
+import { verificarDisponibilidad, verificarDisponibilidadSala, obtenerHorasDisponibles } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { es } from "date-fns/locale";
@@ -43,6 +44,7 @@ const formSchema = z.object({
   email: z.string().email("Email inválido").min(1, "El email es requerido"),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
+  sala_id: z.string().min(1, "Selecciona una sala"),
   espacio_id: z.string().min(1, "Selecciona un espacio"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   numero_mesas: z.number().min(1, "Mínimo 1 mesa"),
@@ -58,7 +60,10 @@ interface FormularioReservaProps {
 
 export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
   const navigate = useNavigate();
+  const [selectedSalaId, setSelectedSalaId] = useState<string>("");
   const [selectedEspacioId, setSelectedEspacioId] = useState<string>("");
+  const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
+  const [cargandoHoras, setCargandoHoras] = useState(false);
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
     disponible: boolean;
     mesasDisponibles: number;
@@ -66,6 +71,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
   const { data: espacios } = useEspaciosReserva() as any;
+  const { data: salas } = useSalasPublicas() as any;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -199,15 +205,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     }
   };
 
-  // Generar opciones de hora cada 30 minutos
-  const horasDisponibles = [];
-  for (let h = 8; h <= 23; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const hora = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-      horasDisponibles.push(hora);
-    }
-  }
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -304,13 +301,23 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Hora</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select 
+                  onValueChange={field.onChange} 
+                  defaultValue={field.value}
+                  disabled={cargandoHoras || horasDisponibles.length === 0}
+                >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar hora" />
+                      <SelectValue placeholder={
+                        cargandoHoras 
+                          ? "Cargando horas..." 
+                          : horasDisponibles.length === 0 
+                          ? "No hay horas disponibles" 
+                          : "Seleccionar hora"
+                      } />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent className="bg-background z-50">
                     {horasDisponibles.map((hora) => (
                       <SelectItem key={hora} value={hora}>
                         <div className="flex items-center gap-2">
@@ -322,10 +329,48 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
                   </SelectContent>
                 </Select>
                 <FormMessage />
+                {horasDisponibles.length === 0 && !cargandoHoras && form.watch("sala_id") && form.watch("fecha") && (
+                  <p className="text-sm text-muted-foreground">
+                    No hay horarios disponibles para esta sala y fecha.
+                  </p>
+                )}
               </FormItem>
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="sala_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Sala</FormLabel>
+              <Select
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setSelectedSalaId(value);
+                  // Resetear hora al cambiar sala
+                  form.setValue("hora", "");
+                }}
+                defaultValue={field.value}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar sala" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent className="bg-background z-50">
+                  {salas?.map((sala) => (
+                    <SelectItem key={sala.id} value={sala.id}>
+                      {sala.nombre} - {sala.numero_mesas} mesas (Cap: {sala.capacidad_maxima} personas)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
@@ -345,10 +390,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
                     <SelectValue placeholder="Seleccionar espacio" />
                   </SelectTrigger>
                 </FormControl>
-                <SelectContent>
+                <SelectContent className="bg-background z-50">
                   {espacios?.map((espacio) => (
                     <SelectItem key={espacio.id} value={espacio.id}>
-                      {espacio.nombre} - {espacio.numero_mesas} mesas
+                      {espacio.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>
