@@ -30,9 +30,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useSalasPublicas } from "@/hooks/useSalasPublicas";
-import { verificarDisponibilidad, verificarDisponibilidadSala, obtenerHorasDisponibles } from "@/hooks/useDisponibilidad";
+import { verificarDisponibilidadSala, obtenerHorasDisponibles } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { es } from "date-fns/locale";
@@ -45,7 +44,6 @@ const formSchema = z.object({
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   sala_id: z.string().min(1, "Selecciona una sala"),
-  espacio_id: z.string().min(1, "Selecciona un espacio"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   numero_mesas: z.number().min(1, "Mínimo 1 mesa"),
   notas_cliente: z.string().optional(),
@@ -61,7 +59,6 @@ interface FormularioReservaProps {
 export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
   const navigate = useNavigate();
   const [selectedSalaId, setSelectedSalaId] = useState<string>("");
-  const [selectedEspacioId, setSelectedEspacioId] = useState<string>("");
   const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
   const [cargandoHoras, setCargandoHoras] = useState(false);
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
@@ -70,7 +67,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     mensaje: string;
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
-  const { data: espacios } = useEspaciosReserva() as any;
   const { data: salas } = useSalasPublicas() as any;
 
   const form = useForm<FormValues>({
@@ -81,130 +77,55 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     },
   });
 
-  // Verificar disponibilidad automáticamente cuando cambian los campos relevantes
-  useEffect(() => {
-    const verificar = async () => {
-      const fecha = form.watch("fecha");
-      const hora = form.watch("hora");
-      const espacioId = form.watch("espacio_id");
-      const numeroMesas = form.watch("numero_mesas");
+  // Verificar disponibilidad automáticamente cuando cambian los campos relevantes (ya manejado arriba)
+  // Código antiguo eliminado
 
-      // Solo verificar si tenemos todos los datos necesarios
-      if (!fecha || !hora || !espacioId || !numeroMesas) {
-        setDisponibilidadInfo(null);
+  const onSubmit = async (values: FormValues) => {
+    try {
+      // Verificar disponibilidad una última vez
+      const disponibilidad = await verificarDisponibilidadSala(
+        format(values.fecha, "yyyy-MM-dd"),
+        values.hora,
+        values.sala_id,
+        values.numero_mesas
+      );
+
+      if (!disponibilidad.disponible) {
+        toast.error("Lo sentimos, ya no hay disponibilidad para esa hora");
         return;
       }
 
-      setVerificando(true);
-      try {
-        const result = await verificarDisponibilidad(
-          format(fecha, "yyyy-MM-dd"),
-          hora,
-          espacioId,
-          null,
-          numeroMesas
-        );
-
-        if (result.disponible) {
-          setDisponibilidadInfo({
-            disponible: true,
-            mesasDisponibles: result.mesasDisponibles,
-            mensaje: `✓ Disponible: ${result.mesasDisponibles} mesas libres de ${result.totalMesas}`,
-          });
-        } else {
-          setDisponibilidadInfo({
-            disponible: false,
-            mesasDisponibles: result.mesasDisponibles,
-            mensaje: `✗ No hay disponibilidad: solo ${result.mesasDisponibles} mesas libres (necesitas ${numeroMesas})`,
-          });
-        }
-      } catch (error) {
-        console.error("Error verificando disponibilidad:", error);
-        setDisponibilidadInfo(null);
-      } finally {
-        setVerificando(false);
-      }
-    };
-
-    verificar();
-  }, [
-    form.watch("fecha"),
-    form.watch("hora"),
-    form.watch("espacio_id"),
-    form.watch("numero_mesas"),
-  ]);
-
-  const onSubmit = async (values: FormValues) => {
-    // Verificar disponibilidad una última vez antes de enviar
-    if (disponibilidadInfo && !disponibilidadInfo.disponible) {
-      toast.error("No hay disponibilidad para esta reserva");
-      return;
-    }
-
-    try {
-      // En modo público no requerir autenticación
-      if (!isPublic) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          toast.error("Debes iniciar sesión");
-          return;
-        }
-      }
-
-      const reservaData = {
+      const { error } = await supabase.from("reservas" as any).insert({
         nombre: values.nombre,
         telefono: values.telefono,
         email: values.email,
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
-        espacio_id: values.espacio_id,
+        sala_id: values.sala_id,
+        espacio_id: values.sala_id, // Usamos sala_id también para espacio_id por compatibilidad con la BD
         numero_comensales: values.numero_comensales,
         numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
         estado: "pendiente",
-      };
-
-      const { data: reservaCreada, error } = await supabase
-        .from("reservas" as any)
-        .insert(reservaData)
-        .select()
-        .single();
+      });
 
       if (error) throw error;
 
-      // Enviar al webhook
-      try {
-        const espacio = espacios?.find(e => e.id === values.espacio_id);
-        
-        await fetch("https://n8npersonal.miguelbenito.space/webhook-test/3e80cbf2-709c-457b-ba07-d9cd8d7860ab", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ...reservaData,
-            reserva_id: (reservaCreada as any)?.id,
-            espacio_nombre: espacio?.nombre,
-          }),
-        });
-      } catch (webhookError) {
-        console.error("Error enviando al webhook:", webhookError);
-        // No fallar la reserva si el webhook falla
-      }
+      toast.success("¡Reserva creada exitosamente!");
+      form.reset();
 
       if (isPublic) {
-        // Redirigir a página de confirmación
-        navigate("/reserva-confirmacion");
-      } else {
-        toast.success("Reserva creada correctamente");
-        form.reset();
-        onSuccess?.();
+        navigate("/reserva/confirmacion");
+      } else if (onSuccess) {
+        onSuccess();
       }
     } catch (error: any) {
-      toast.error("Error al crear reserva: " + error.message);
+      console.error("Error creando reserva:", error);
+      toast.error("Error al crear la reserva: " + error.message);
     }
   };
 
+  // Código antiguo eliminado - ahora solo trabajamos con sala_id
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -363,37 +284,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
                   {salas?.map((sala) => (
                     <SelectItem key={sala.id} value={sala.id}>
                       {sala.nombre} - {sala.numero_mesas} mesas (Cap: {sala.capacidad_maxima} personas)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="espacio_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Espacio</FormLabel>
-              <Select
-                onValueChange={(value) => {
-                  field.onChange(value);
-                  setSelectedEspacioId(value);
-                }}
-                defaultValue={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar espacio" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-background z-50">
-                  {espacios?.map((espacio) => (
-                    <SelectItem key={espacio.id} value={espacio.id}>
-                      {espacio.nombre}
                     </SelectItem>
                   ))}
                 </SelectContent>
