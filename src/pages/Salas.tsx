@@ -48,7 +48,7 @@ export default function Salas() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Gestión de Salas</h2>
             <p className="text-muted-foreground">
-              Configura las salas de tu restaurante
+              Configura las salas de trabajo donde se asignan los empleados
             </p>
           </div>
           <Button onClick={() => setShowSalaForm(true)}>

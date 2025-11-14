@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useSalas } from "@/hooks/useSalas";
+import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { verificarDisponibilidad } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ const formSchema = z.object({
   email: z.string().email("Email inválido").min(1, "El email es requerido"),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
-  sala_id: z.string().min(1, "Selecciona una sala"),
+  espacio_id: z.string().min(1, "Selecciona un espacio"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   numero_mesas: z.number().min(1, "Mínimo 1 mesa"),
   notas_cliente: z.string().optional(),
@@ -58,14 +58,14 @@ interface FormularioReservaProps {
 
 export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
   const navigate = useNavigate();
-  const [selectedSalaId, setSelectedSalaId] = useState<string>("");
+  const [selectedEspacioId, setSelectedEspacioId] = useState<string>("");
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
     disponible: boolean;
     mesasDisponibles: number;
     mensaje: string;
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
-  const { data: salas } = useSalas();
+  const { data: espacios } = useEspaciosReserva();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -80,11 +80,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
     const verificar = async () => {
       const fecha = form.watch("fecha");
       const hora = form.watch("hora");
-      const salaId = form.watch("sala_id");
+      const espacioId = form.watch("espacio_id");
       const numeroMesas = form.watch("numero_mesas");
 
       // Solo verificar si tenemos todos los datos necesarios
-      if (!fecha || !hora || !salaId || !numeroMesas) {
+      if (!fecha || !hora || !espacioId || !numeroMesas) {
         setDisponibilidadInfo(null);
         return;
       }
@@ -94,7 +94,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         const result = await verificarDisponibilidad(
           format(fecha, "yyyy-MM-dd"),
           hora,
-          salaId,
+          espacioId,
           null,
           numeroMesas
         );
@@ -124,7 +124,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
   }, [
     form.watch("fecha"),
     form.watch("hora"),
-    form.watch("sala_id"),
+    form.watch("espacio_id"),
     form.watch("numero_mesas"),
   ]);
 
@@ -151,7 +151,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
         email: values.email,
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
-        sala_id: values.sala_id,
+        espacio_id: values.espacio_id,
         numero_comensales: values.numero_comensales,
         numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
@@ -168,7 +168,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
 
       // Enviar al webhook
       try {
-        const sala = salas?.find(s => s.id === values.sala_id);
+        const espacio = espacios?.find(e => e.id === values.espacio_id);
         
         await fetch("https://n8npersonal.miguelbenito.space/webhook-test/3e80cbf2-709c-457b-ba07-d9cd8d7860ab", {
           method: "POST",
@@ -178,7 +178,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
           body: JSON.stringify({
             ...reservaData,
             reserva_id: (reservaCreada as any)?.id,
-            sala_nombre: sala?.nombre,
+            espacio_nombre: espacio?.nombre,
           }),
         });
       } catch (webhookError) {
@@ -329,26 +329,26 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
 
         <FormField
           control={form.control}
-          name="sala_id"
+          name="espacio_id"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Sala</FormLabel>
+              <FormLabel>Espacio</FormLabel>
               <Select
                 onValueChange={(value) => {
                   field.onChange(value);
-                  setSelectedSalaId(value);
+                  setSelectedEspacioId(value);
                 }}
                 defaultValue={field.value}
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar sala" />
+                    <SelectValue placeholder="Seleccionar espacio" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {salas?.map((sala) => (
-                    <SelectItem key={sala.id} value={sala.id}>
-                      {sala.nombre} - {sala.numero_mesas} mesas
+                  {espacios?.map((espacio) => (
+                    <SelectItem key={espacio.id} value={espacio.id}>
+                      {espacio.nombre} - {espacio.numero_mesas} mesas
                     </SelectItem>
                   ))}
                 </SelectContent>
