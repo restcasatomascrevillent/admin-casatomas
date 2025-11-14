@@ -358,33 +358,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
           )}
         />
 
-        {posiciones && posiciones.length > 0 && (
-          <FormField
-            control={form.control}
-            name="posicion_sala_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Posición (opcional)</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar posición" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="">Sin posición específica</SelectItem>
-                    {posiciones.map((pos) => (
-                      <SelectItem key={pos.id} value={pos.id}>
-                        {pos.nombre} - Cap. {pos.capacidad_comensales}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
