@@ -77,93 +77,108 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
   }
 
   return (
-    <div className="space-y-4">
-      {/* Selector de Salas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Selecciona una Sala</CardTitle>
-          <CardDescription>Elige el espacio que prefieres para tu reserva</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={salaSeleccionada} onValueChange={setSalaSeleccionada}>
-            <div className="relative">
-              <TabsList className="inline-flex w-auto gap-2 overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50 pb-2">
-                {salas?.map((sala: any) => (
-                  <TabsTrigger 
-                    key={sala.id} 
-                    value={sala.id} 
-                    className="flex-shrink-0 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground whitespace-nowrap"
-                  >
-                    <div className="flex flex-col items-center gap-1 px-4">
-                      <span className="font-semibold">{sala.nombre}</span>
-                      <span className="text-xs opacity-70">
-                        {sala.numero_mesas} mesas · Cap. {sala.capacidad_maxima}
+    <Card>
+      <CardHeader>
+        <CardTitle>Selecciona una Sala</CardTitle>
+        <CardDescription>Elige el espacio que prefieres para tu reserva</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Barra Lateral de Salas */}
+          <div className="w-full lg:w-64 flex-shrink-0">
+            <div className="space-y-2">
+              {salas?.map((sala: any) => (
+                <button
+                  key={sala.id}
+                  onClick={() => setSalaSeleccionada(sala.id)}
+                  className={cn(
+                    "w-full text-left p-4 rounded-lg border-2 transition-all duration-200",
+                    "hover:border-primary/50 hover:shadow-md",
+                    salaSeleccionada === sala.id
+                      ? "border-primary bg-primary/10 shadow-md"
+                      : "border-border bg-card"
+                  )}
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className={cn(
+                      "font-semibold text-base",
+                      salaSeleccionada === sala.id ? "text-primary" : "text-foreground"
+                    )}>
+                      {sala.nombre}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {sala.numero_mesas} mesas · Cap. {sala.capacidad_maxima}
+                    </span>
+                    {sala.descripcion && (
+                      <span className="text-xs text-muted-foreground mt-1">
+                        {sala.descripcion}
                       </span>
-                    </div>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* Calendario */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Selecciona un Día</CardTitle>
-          <CardDescription>Haz clic en un día para ver los horarios disponibles</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Calendar
-            mode="single"
-            selected={fechaSeleccionada}
-            onSelect={(date) => {
-              setFechaSeleccionada(date);
-              setHoraSeleccionada(""); // Reset hora al cambiar fecha
-            }}
-            disabled={(date) => date < new Date()}
-            locale={es}
-            className="rounded-md border pointer-events-auto"
-            modifiers={{
-              disponible: (date) => {
-                const disponibles = obtenerDisponibilidadDia(date);
-                return disponibles !== null && disponibles > 0;
-              },
-              completo: (date) => {
-                const disponibles = obtenerDisponibilidadDia(date);
-                return disponibles !== null && disponibles === 0;
-              },
-            }}
-            modifiersClassNames={{
-              disponible: "bg-green-100 dark:bg-green-900/30 font-semibold",
-              completo: "bg-red-100 dark:bg-red-900/30 text-muted-foreground line-through",
-            }}
-          />
-          
-          <div className="flex gap-4 mt-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
-              <span>Disponible</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/30" />
-              <span>Completo</span>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Horarios Disponibles */}
-      {fechaSeleccionada && salaSeleccionada && (
-        <SelectorHorasDisponibles
-          fecha={fechaSeleccionada}
-          salaId={salaSeleccionada}
-          numeroMesas={numeroMesas}
-          onSeleccionarHora={setHoraSeleccionada}
-          horaSeleccionada={horaSeleccionada}
-        />
-      )}
-    </div>
+          {/* Contenido Principal - Calendario y Horarios */}
+          <div className="flex-1 space-y-6">
+            {/* Calendario */}
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Selecciona un Día</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Haz clic en un día para ver los horarios disponibles
+              </p>
+              <Calendar
+                mode="single"
+                selected={fechaSeleccionada}
+                onSelect={(date) => {
+                  setFechaSeleccionada(date);
+                  setHoraSeleccionada(""); // Reset hora al cambiar fecha
+                }}
+                disabled={(date) => date < new Date()}
+                locale={es}
+                className="rounded-md border pointer-events-auto"
+                modifiers={{
+                  disponible: (date) => {
+                    const disponibles = obtenerDisponibilidadDia(date);
+                    return disponibles !== null && disponibles > 0;
+                  },
+                  completo: (date) => {
+                    const disponibles = obtenerDisponibilidadDia(date);
+                    return disponibles !== null && disponibles === 0;
+                  },
+                }}
+                modifiersClassNames={{
+                  disponible: "bg-green-100 dark:bg-green-900/30 font-semibold",
+                  completo: "bg-red-100 dark:bg-red-900/30 text-muted-foreground line-through",
+                }}
+              />
+              
+              <div className="flex gap-4 mt-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
+                  <span>Disponible</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/30" />
+                  <span>Completo</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Horarios Disponibles */}
+            {fechaSeleccionada && salaSeleccionada && (
+              <SelectorHorasDisponibles
+                fecha={fechaSeleccionada}
+                salaId={salaSeleccionada}
+                numeroMesas={numeroMesas}
+                onSeleccionarHora={setHoraSeleccionada}
+                horaSeleccionada={horaSeleccionada}
+              />
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
