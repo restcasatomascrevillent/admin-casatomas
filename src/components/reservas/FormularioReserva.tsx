@@ -54,9 +54,14 @@ type FormValues = z.infer<typeof formSchema>;
 interface FormularioReservaProps {
   onSuccess?: () => void;
   isPublic?: boolean;
+  datosPreseleccionados?: {
+    sala_id: string;
+    fecha: Date;
+    hora: string;
+  } | null;
 }
 
-export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioReservaProps) => {
+export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreseleccionados }: FormularioReservaProps) => {
   const navigate = useNavigate();
   const [selectedSalaId, setSelectedSalaId] = useState<string>("");
   const [horasDisponibles, setHorasDisponibles] = useState<string[]>([]);
@@ -76,6 +81,16 @@ export const FormularioReserva = ({ onSuccess, isPublic = false }: FormularioRes
       numero_mesas: 1,
     },
   });
+
+  // Actualizar formulario cuando cambien los datos preseleccionados
+  useEffect(() => {
+    if (datosPreseleccionados) {
+      form.setValue("sala_id", datosPreseleccionados.sala_id);
+      form.setValue("fecha", datosPreseleccionados.fecha);
+      form.setValue("hora", datosPreseleccionados.hora);
+      setSelectedSalaId(datosPreseleccionados.sala_id);
+    }
+  }, [datosPreseleccionados, form]);
 
   // Verificar disponibilidad automáticamente cuando cambian los campos relevantes (ya manejado arriba)
   // Código antiguo eliminado
