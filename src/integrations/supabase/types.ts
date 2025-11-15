@@ -171,7 +171,7 @@ export type Database = {
       ocupacion_diaria: {
         Row: {
           created_at: string | null
-          espacio_id: string
+          espacio_id: string | null
           fecha: string
           hora: string | null
           id: string
@@ -182,7 +182,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          espacio_id: string
+          espacio_id?: string | null
           fecha: string
           hora?: string | null
           id?: string
@@ -193,7 +193,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          espacio_id?: string
+          espacio_id?: string | null
           fecha?: string
           hora?: string | null
           id?: string
