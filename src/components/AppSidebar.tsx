@@ -1,4 +1,4 @@
-import { LayoutDashboard, Home, UtensilsCrossed, BarChart3, Users, MapPin } from "lucide-react";
+import { LayoutDashboard, Home, UtensilsCrossed, BarChart3, Users, MapPin, BookOpen, Globe } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -23,6 +23,8 @@ const menuItems = [
   { title: "Espacios", url: "/espacios", icon: MapPin },
   { title: "Salas", url: "/salas", icon: Home },
   { title: "Personal", url: "/trabajadores", icon: Users },
+  { title: "Gestor Carta", url: "/gestor-carta", icon: BookOpen },
+  { title: "Gestión Web", url: "/gestion-web", icon: Globe },
   { title: "Análisis", url: "/analisis", icon: BarChart3 },
 ];
 
