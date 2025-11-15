@@ -45,17 +45,19 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
       {vinos.map((vino) => (
         <Card 
           key={vino.id} 
-          className={`relative transition-all duration-300 ${
-            !vino.activado ? "opacity-60 bg-muted/50" : "hover:shadow-md"
+          className={`relative transition-all duration-500 ease-in-out ${
+            !vino.activado 
+              ? "opacity-60 bg-muted/50 scale-[0.98]" 
+              : "hover:shadow-md hover:scale-[1.02]"
           }`}
         >
           <CardContent className="p-4">
             {/* Toggle en la esquina superior derecha */}
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border">
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border transition-all duration-300 hover:shadow-md">
               {vino.activado ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-green-600 animate-scale-in" />
               ) : (
-                <XCircle className="h-4 w-4 text-muted-foreground" />
+                <XCircle className="h-4 w-4 text-muted-foreground animate-scale-in" />
               )}
               <Switch
                 checked={vino.activado || false}
