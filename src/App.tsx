@@ -13,6 +13,8 @@ import Salas from "./pages/Salas";
 import Espacios from "./pages/Espacios";
 import Analisis from "./pages/Analisis";
 import Trabajadores from "./pages/Trabajadores";
+import GestorCarta from "./pages/GestorCarta";
+import GestionWeb from "./pages/GestionWeb";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +82,22 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Trabajadores />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gestor-carta"
+            element={
+              <ProtectedRoute>
+                <GestorCarta />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gestion-web"
+            element={
+              <ProtectedRoute>
+                <GestionWeb />
               </ProtectedRoute>
             }
           />
