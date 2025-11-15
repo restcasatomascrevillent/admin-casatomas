@@ -1,10 +1,38 @@
+import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ChefHat } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePlatos } from "@/hooks/usePlatos";
+import { PlatoForm } from "@/components/carta/PlatoForm";
+import { ListaPlatos } from "@/components/carta/ListaPlatos";
 
 export default function GestorCarta() {
+  const { platos, isLoading, categorias } = usePlatos();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("entrantes");
+
+  const categoriasDisponibles = ["entrantes", "principales", "postres", "bebidas", "especiales"];
+  
+  const getPlatosPorCategoria = (categoria: string) => {
+    return platos?.filter((p) => p.categoria === categoria) || [];
+  };
+
+  const handleAñadirPlato = () => {
+    setDialogOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -15,13 +43,17 @@ export default function GestorCarta() {
               Gestiona el menú y los platos de tu restaurante
             </p>
           </div>
-          <Button>
+          <Button onClick={handleAñadirPlato}>
             <Plus className="mr-2 h-4 w-4" />
             Añadir Plato
           </Button>
         </div>
 
-        <Tabs defaultValue="entrantes" className="w-full">
+        <Tabs 
+          defaultValue="entrantes" 
+          className="w-full"
+          onValueChange={setCategoriaSeleccionada}
+        >
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="entrantes">Entrantes</TabsTrigger>
             <TabsTrigger value="principales">Principales</TabsTrigger>
@@ -30,111 +62,28 @@ export default function GestorCarta() {
             <TabsTrigger value="especiales">Especiales</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="entrantes" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Entrantes</CardTitle>
-                <CardDescription>
-                  Gestiona los entrantes de tu carta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No hay platos todavía. Haz clic en "Añadir Plato" para comenzar.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="principales" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Platos Principales</CardTitle>
-                <CardDescription>
-                  Gestiona los platos principales de tu carta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No hay platos todavía. Haz clic en "Añadir Plato" para comenzar.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="postres" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Postres</CardTitle>
-                <CardDescription>
-                  Gestiona los postres de tu carta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No hay platos todavía. Haz clic en "Añadir Plato" para comenzar.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="bebidas" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bebidas</CardTitle>
-                <CardDescription>
-                  Gestiona las bebidas de tu carta
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No hay bebidas todavía. Haz clic en "Añadir Plato" para comenzar.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="especiales" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Platos Especiales</CardTitle>
-                <CardDescription>
-                  Gestiona los platos especiales del día o temporada
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      No hay platos especiales todavía. Haz clic en "Añadir Plato" para comenzar.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {categoriasDisponibles.map((categoria) => (
+            <TabsContent key={categoria} value={categoria} className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="capitalize">{categoria}</CardTitle>
+                  <CardDescription>
+                    Gestiona los {categoria} de tu carta
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ListaPlatos platos={getPlatosPorCategoria(categoria)} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))}
         </Tabs>
+
+        <PlatoForm 
+          open={dialogOpen} 
+          onOpenChange={setDialogOpen}
+          categoriaInicial={categoriaSeleccionada}
+        />
       </div>
     </DashboardLayout>
   );
