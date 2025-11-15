@@ -81,7 +81,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
             
             <div className="space-y-3">
               <div className="pr-20">
-                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
+                <h3 className="font-semibold text-lg leading-tight break-words">
                   {bebida.nombre}
                 </h3>
               </div>
