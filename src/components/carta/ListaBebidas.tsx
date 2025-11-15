@@ -79,26 +79,26 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
               </div>
             )}
             
-            <div className="pr-12">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-lg truncate">
+            <div className="space-y-3">
+              <div className="pr-20">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
                   {bebida.nombre}
                 </h3>
               </div>
               
               {bebida.descripcion && (
-                <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                   {bebida.descripcion}
                 </p>
               )}
 
-              <div className="flex items-center justify-between mt-3">
-                <div className="flex flex-col gap-1">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col gap-1 min-w-0">
                   <span className="text-xl font-bold text-primary">
                     {bebida.precio_eur ? `${bebida.precio_eur.toFixed(2)}€` : "N/A"}
                   </span>
                   {bebida.tamano && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground truncate">
                       {bebida.tamano}
                     </span>
                   )}

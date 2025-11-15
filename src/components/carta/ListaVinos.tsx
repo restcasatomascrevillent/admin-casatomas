@@ -79,35 +79,35 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               </div>
             )}
             
-            <div className="pr-12">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-lg truncate">
+            <div className="space-y-3">
+              <div className="pr-20">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
                   {vino.nombre}
                 </h3>
               </div>
               
               {vino.descripcion && (
-                <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                   {vino.descripcion}
                 </p>
               )}
 
               {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
-                <p className="text-xs text-muted-foreground mb-2">
+                <p className="text-xs text-muted-foreground line-clamp-1 break-all">
                   {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
                     .filter(Boolean)
                     .join(" • ")}
                 </p>
               )}
 
-              <div className="flex items-center justify-between mt-3">
+              <div className="flex items-end justify-between gap-3">
                 <span className="text-xl font-bold text-primary">
                   {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}€` : "N/A"}
                 </span>
               </div>
 
               {vino.alergenos_notas && (
-                <p className="text-xs text-muted-foreground mt-2 italic">
+                <p className="text-xs text-muted-foreground italic line-clamp-2 break-words pt-2 border-t">
                   {vino.alergenos_notas}
                 </p>
               )}
