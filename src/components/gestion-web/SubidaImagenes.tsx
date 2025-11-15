@@ -54,12 +54,6 @@ export function SubidaImagenes() {
     try {
       const archivo = values.archivo[0];
       
-      // Preparar los datos para enviar al webhook
-      const formData = new FormData();
-      formData.append("tipo", values.tipo);
-      formData.append("item_id", values.item_id);
-      formData.append("archivo", archivo);
-
       // Obtener el nombre del item
       let itemNombre = "";
       if (values.tipo === "plato") {
@@ -69,7 +63,17 @@ export function SubidaImagenes() {
         const sala = salas?.find(s => s.id === values.item_id);
         itemNombre = sala?.nombre || "";
       }
-      formData.append("item_nombre", itemNombre);
+
+      // Convertir archivo a base64
+      const archivoBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(archivo);
+      });
 
       // Enviar al webhook a través de la edge function
       const { data, error } = await supabase.functions.invoke("enviar-imagen-webhook", {
@@ -80,6 +84,7 @@ export function SubidaImagenes() {
           archivo_nombre: archivo.name,
           archivo_tipo: archivo.type,
           archivo_size: archivo.size,
+          archivo_base64: archivoBase64,
         },
       });
 

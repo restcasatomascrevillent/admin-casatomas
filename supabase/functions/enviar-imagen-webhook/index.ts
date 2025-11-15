@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { tipo, item_id, item_nombre, archivo_nombre, archivo_tipo, archivo_size } = await req.json();
+    const { tipo, item_id, item_nombre, archivo_nombre, archivo_tipo, archivo_size, archivo_base64 } = await req.json();
 
     console.log('Recibido request para enviar imagen:', {
       tipo,
@@ -21,6 +21,7 @@ serve(async (req) => {
       archivo_nombre,
       archivo_tipo,
       archivo_size,
+      archivo_base64_length: archivo_base64?.length || 0,
     });
 
     // Preparar los datos para el webhook
@@ -32,6 +33,7 @@ serve(async (req) => {
         nombre: archivo_nombre,
         tipo: archivo_tipo,
         size: archivo_size,
+        contenido_base64: archivo_base64,
       },
       fecha: new Date().toISOString(),
     };
