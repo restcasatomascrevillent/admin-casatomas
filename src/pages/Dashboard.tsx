@@ -14,16 +14,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [reservations, rooms] = await Promise.all([
+      const [reservations, rooms, workers] = await Promise.all([
         supabase.from("reservas").select("id, estado", { count: "exact" }),
         supabase.from("salas").select("id", { count: "exact", head: true }),
+        supabase.from("trabajadores").select("id", { count: "exact", head: true }),
       ]);
 
       const pendingCount =
         reservations.data?.filter((r) => r.estado === "pendiente").length || 0;
 
       setStats({
-        totalWorkers: 0,
+        totalWorkers: workers.count || 0,
         totalReservations: reservations.count || 0,
         pendingReservations: pendingCount,
         totalRooms: rooms.count || 0,
@@ -34,6 +35,12 @@ export default function Dashboard() {
   }, []);
 
   const statCards = [
+    {
+      title: "Trabajadores",
+      value: stats.totalWorkers,
+      icon: Users,
+      description: "Personal activo",
+    },
     {
       title: "Reservas Totales",
       value: stats.totalReservations,
@@ -64,7 +71,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statCards.map((stat) => (
             <Card key={stat.title} className="hover:shadow-lg transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
