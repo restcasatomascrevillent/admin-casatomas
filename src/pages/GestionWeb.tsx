@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Eye, FileText, Image, Layout, Settings } from "lucide-react";
+import { SubidaImagenes } from "@/components/gestion-web/SubidaImagenes";
 
 export default function GestionWeb() {
   return (
@@ -140,24 +141,7 @@ export default function GestionWeb() {
           </TabsContent>
 
           <TabsContent value="imagenes" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Galería de Imágenes</CardTitle>
-                <CardDescription>
-                  Gestiona las imágenes de tu restaurante y platos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
-                  <div className="text-center">
-                    <Image className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Próximamente: Gestor de imágenes
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SubidaImagenes />
           </TabsContent>
 
           <TabsContent value="configuracion" className="space-y-4">

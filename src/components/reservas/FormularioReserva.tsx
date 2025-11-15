@@ -82,7 +82,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
         sala_id: values.sala_id,
-        espacio_id: values.sala_id,
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente || null,
         estado: "pendiente",

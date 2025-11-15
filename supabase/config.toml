@@ -1,1 +1,4 @@
 project_id = "jeamoczmbfsnwkfjxcyo"
+
+[functions.enviar-imagen-webhook]
+verify_jwt = false
