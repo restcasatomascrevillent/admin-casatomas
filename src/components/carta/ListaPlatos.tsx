@@ -79,26 +79,26 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               </div>
             )}
             
-            <div className="pr-12">
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-lg truncate">
+            <div className="space-y-3">
+              <div className="pr-20">
+                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
                   {plato.nombre}
                 </h3>
               </div>
               
               {plato.descripcion && (
-                <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                   {plato.descripcion}
                 </p>
               )}
 
-              <div className="flex items-center justify-between mt-3">
-                <div className="flex flex-col gap-1">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col gap-1 min-w-0">
                   <span className="text-xl font-bold text-primary">
                     {plato.precio_eur ? `${plato.precio_eur.toFixed(2)}€` : "N/A"}
                   </span>
                   {plato.unidad && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground truncate">
                       por {plato.unidad}
                     </span>
                   )}
@@ -106,7 +106,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               </div>
 
               {plato.alergenos_notas && (
-                <p className="text-xs text-muted-foreground mt-2 italic">
+                <p className="text-xs text-muted-foreground italic line-clamp-2 break-words pt-2 border-t">
                   {plato.alergenos_notas}
                 </p>
               )}
