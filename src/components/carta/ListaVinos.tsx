@@ -1,8 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Wine } from "lucide-react";
+import { Wine, CheckCircle2, XCircle } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
+import { toast } from "sonner";
 
 interface ListaVinosProps {
   vinos: Vino[];
@@ -10,6 +11,21 @@ interface ListaVinosProps {
 
 export function ListaVinos({ vinos }: ListaVinosProps) {
   const { toggleActivado } = useVinos();
+
+  const handleToggle = (vino: Vino, checked: boolean) => {
+    toggleActivado.mutate(
+      { id: vino.id, activado: checked },
+      {
+        onSuccess: () => {
+          toast.success(
+            checked 
+              ? `${vino.nombre} está ahora activo` 
+              : `${vino.nombre} está ahora inactivo`
+          );
+        },
+      }
+    );
+  };
 
   if (vinos.length === 0) {
     return (
@@ -27,8 +43,27 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {vinos.map((vino) => (
-        <Card key={vino.id} className={!vino.activado ? "opacity-60" : ""}>
+        <Card 
+          key={vino.id} 
+          className={`relative transition-all duration-300 ${
+            !vino.activado ? "opacity-60 bg-muted/50" : "hover:shadow-md"
+          }`}
+        >
           <CardContent className="p-4">
+            {/* Toggle en la esquina superior derecha */}
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border">
+              {vino.activado ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : (
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+              <Switch
+                checked={vino.activado || false}
+                onCheckedChange={(checked) => handleToggle(vino, checked)}
+                disabled={toggleActivado.isPending}
+              />
+            </div>
+
             {vino.imagen_url && (
               <div className="mb-3 rounded-md overflow-hidden">
                 <img 
@@ -41,57 +76,39 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 />
               </div>
             )}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="font-semibold text-lg truncate">
-                    {vino.nombre}
-                  </h3>
-                  {!vino.activado && (
-                    <Badge variant="secondary" className="text-xs">
-                      Inactivo
-                    </Badge>
-                  )}
-                </div>
-                
-                {vino.descripcion && (
-                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                    {vino.descripcion}
-                  </p>
-                )}
-
-                {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
-                  <p className="text-xs text-muted-foreground mb-2">
-                    {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
-                      .filter(Boolean)
-                      .join(" • ")}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xl font-bold text-primary">
-                    {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}€` : "N/A"}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {vino.activado ? "Activo" : "Inactivo"}
-                    </span>
-                    <Switch
-                      checked={vino.activado || false}
-                      onCheckedChange={(checked) =>
-                        toggleActivado.mutate({ id: vino.id, activado: checked })
-                      }
-                    />
-                  </div>
-                </div>
-
-                {vino.alergenos_notas && (
-                  <p className="text-xs text-muted-foreground mt-2 italic">
-                    {vino.alergenos_notas}
-                  </p>
-                )}
+            
+            <div className="pr-12">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="font-semibold text-lg truncate">
+                  {vino.nombre}
+                </h3>
               </div>
+              
+              {vino.descripcion && (
+                <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                  {vino.descripcion}
+                </p>
+              )}
+
+              {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
+                <p className="text-xs text-muted-foreground mb-2">
+                  {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
+                    .filter(Boolean)
+                    .join(" • ")}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xl font-bold text-primary">
+                  {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}€` : "N/A"}
+                </span>
+              </div>
+
+              {vino.alergenos_notas && (
+                <p className="text-xs text-muted-foreground mt-2 italic">
+                  {vino.alergenos_notas}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
