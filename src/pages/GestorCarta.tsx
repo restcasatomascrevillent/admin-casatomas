@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
@@ -21,7 +22,9 @@ export default function GestorCarta() {
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
 
   const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos">("platos");
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("");
+  const [categoriaPlatos, setCategoriaPlatos] = useState<string>("");
+  const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
+  const [categoriaVinos, setCategoriaVinos] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
   
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
@@ -29,6 +32,17 @@ export default function GestorCarta() {
   const [dialogVinoOpen, setDialogVinoOpen] = useState(false);
 
   const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos;
+
+  // Inicializar la primera categoría cuando se carguen los datos
+  if (categoriasPlatos.length > 0 && !categoriaPlatos) {
+    setCategoriaPlatos(categoriasPlatos[0] || "");
+  }
+  if (categoriasBebidas.length > 0 && !categoriaBebidas) {
+    setCategoriaBebidas(categoriasBebidas[0] || "");
+  }
+  if (categoriasVinos.length > 0 && !categoriaVinos) {
+    setCategoriaVinos(categoriasVinos[0] || "");
+  }
 
   const filtrarPorEstado = <T extends { activado: boolean | null }>(items: T[]): T[] => {
     if (filtroEstado === "activos") {
@@ -131,35 +145,33 @@ export default function GestorCarta() {
                 </CardContent>
               </Card>
             ) : (
-              <Tabs 
-                defaultValue={categoriasPlatos[0]} 
-                className="w-full"
-                onValueChange={setCategoriaSeleccionada}
-              >
-                <TabsList className="w-full flex flex-wrap justify-start">
-                  {categoriasPlatos.map((categoria) => (
-                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
-                      {categoria}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-
-                {categoriasPlatos.map((categoria) => (
-                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="capitalize">{categoria}</CardTitle>
-                        <CardDescription>
-                          Gestiona los platos de {categoria}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ListaPlatos platos={getPlatosPorCategoria(categoria || "")} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle>Platos</CardTitle>
+                      <CardDescription>
+                        Gestiona los platos de tu carta
+                      </CardDescription>
+                    </div>
+                    <Select value={categoriaPlatos} onValueChange={setCategoriaPlatos}>
+                      <SelectTrigger className="w-full sm:w-[280px] bg-background">
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {categoriasPlatos.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ListaPlatos platos={getPlatosPorCategoria(categoriaPlatos)} />
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
@@ -174,35 +186,33 @@ export default function GestorCarta() {
                 </CardContent>
               </Card>
             ) : (
-              <Tabs 
-                defaultValue={categoriasBebidas[0]} 
-                className="w-full"
-                onValueChange={setCategoriaSeleccionada}
-              >
-                <TabsList className="w-full flex flex-wrap justify-start">
-                  {categoriasBebidas.map((categoria) => (
-                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
-                      {categoria}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-
-                {categoriasBebidas.map((categoria) => (
-                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="capitalize">{categoria}</CardTitle>
-                        <CardDescription>
-                          Gestiona las bebidas de {categoria}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ListaBebidas bebidas={getBebidasPorCategoria(categoria || "")} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle>Bebidas</CardTitle>
+                      <CardDescription>
+                        Gestiona las bebidas de tu carta
+                      </CardDescription>
+                    </div>
+                    <Select value={categoriaBebidas} onValueChange={setCategoriaBebidas}>
+                      <SelectTrigger className="w-full sm:w-[280px] bg-background">
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {categoriasBebidas.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ListaBebidas bebidas={getBebidasPorCategoria(categoriaBebidas)} />
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
 
@@ -217,35 +227,33 @@ export default function GestorCarta() {
                 </CardContent>
               </Card>
             ) : (
-              <Tabs 
-                defaultValue={categoriasVinos[0]} 
-                className="w-full"
-                onValueChange={setCategoriaSeleccionada}
-              >
-                <TabsList className="w-full flex flex-wrap justify-start">
-                  {categoriasVinos.map((categoria) => (
-                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
-                      {categoria}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-
-                {categoriasVinos.map((categoria) => (
-                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="capitalize">{categoria}</CardTitle>
-                        <CardDescription>
-                          Gestiona los vinos de {categoria}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ListaVinos vinos={getVinosPorCategoria(categoria || "")} />
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle>Vinos</CardTitle>
+                      <CardDescription>
+                        Gestiona los vinos de tu carta
+                      </CardDescription>
+                    </div>
+                    <Select value={categoriaVinos} onValueChange={setCategoriaVinos}>
+                      <SelectTrigger className="w-full sm:w-[280px] bg-background">
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {categoriasVinos.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ListaVinos vinos={getVinosPorCategoria(categoriaVinos)} />
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
         </Tabs>
@@ -253,17 +261,17 @@ export default function GestorCarta() {
         <PlatoForm 
           open={dialogPlatoOpen} 
           onOpenChange={setDialogPlatoOpen}
-          categoriaInicial={categoriaSeleccionada}
+          categoriaInicial={categoriaPlatos}
         />
         <BebidaForm 
           open={dialogBebidaOpen} 
           onOpenChange={setDialogBebidaOpen}
-          categoriaInicial={categoriaSeleccionada}
+          categoriaInicial={categoriaBebidas}
         />
         <VinoForm 
           open={dialogVinoOpen} 
           onOpenChange={setDialogVinoOpen}
-          categoriaInicial={categoriaSeleccionada}
+          categoriaInicial={categoriaVinos}
         />
       </div>
     </DashboardLayout>
