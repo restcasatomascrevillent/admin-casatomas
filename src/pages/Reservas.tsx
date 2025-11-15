@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, Clock, Plus } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { CalendarioDisponibilidad } from "@/components/reservas/CalendarioDisponibilidad";
 import { GenerarReservasFicticias } from "@/components/reservas/GenerarReservasFicticias";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Reservation {
   id: string;
@@ -148,36 +149,41 @@ export default function Reservas() {
           </div>
         </div>
 
-        <CalendarioDisponibilidad />
+        <Tabs defaultValue="lista" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="lista">Lista de Reservas</TabsTrigger>
+            <TabsTrigger value="calendario">Calendario de Ocupación</TabsTrigger>
+          </TabsList>
 
-        <div className="flex gap-2">
-          <Button
-            variant={filter === "all" ? "default" : "outline"}
-            onClick={() => setFilter("all")}
-          >
-            Todas
-          </Button>
-          <Button
-            variant={filter === "pendiente" ? "default" : "outline"}
-            onClick={() => setFilter("pendiente")}
-          >
-            Pendientes
-          </Button>
-          <Button
-            variant={filter === "verificada" ? "default" : "outline"}
-            onClick={() => setFilter("verificada")}
-          >
-            Verificadas
-          </Button>
-          <Button
-            variant={filter === "confirmada" ? "default" : "outline"}
-            onClick={() => setFilter("confirmada")}
-          >
-            Confirmadas
-          </Button>
-        </div>
+          <TabsContent value="lista" className="space-y-6">
+            <div className="flex gap-2">
+              <Button
+                variant={filter === "all" ? "default" : "outline"}
+                onClick={() => setFilter("all")}
+              >
+                Todas
+              </Button>
+              <Button
+                variant={filter === "pendiente" ? "default" : "outline"}
+                onClick={() => setFilter("pendiente")}
+              >
+                Pendientes
+              </Button>
+              <Button
+                variant={filter === "verificada" ? "default" : "outline"}
+                onClick={() => setFilter("verificada")}
+              >
+                Verificadas
+              </Button>
+              <Button
+                variant={filter === "confirmada" ? "default" : "outline"}
+                onClick={() => setFilter("confirmada")}
+              >
+                Confirmadas
+              </Button>
+            </div>
 
-        <Card>
+            <Card>
           <CardHeader>
             <CardTitle>Lista de Reservas</CardTitle>
           </CardHeader>
@@ -240,6 +246,12 @@ export default function Reservas() {
             </Table>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="calendario" className="space-y-6">
+            <CalendarioDisponibilidad />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
