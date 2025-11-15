@@ -11,6 +11,7 @@ export interface Bebida {
   tamano: string | null;
   orden: number | null;
   activado: boolean | null;
+  imagen_url: string | null;
   created_at: string | null;
   updated_at: string | null;
 }

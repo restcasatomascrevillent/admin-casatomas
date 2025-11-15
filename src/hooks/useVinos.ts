@@ -16,6 +16,7 @@ export interface Vino {
   alergenos_notas: string | null;
   orden: string | null;
   activado: boolean | null;
+  imagen_url: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
