@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, X, CheckCircle2, Eye } from "lucide-react";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useSalas } from "@/hooks/useSalas";
 import { toast } from "sonner";
@@ -38,6 +38,8 @@ export function SubidaImagenes() {
   const { platos } = usePlatos();
   const { data: salas } = useSalas();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -48,6 +50,25 @@ export function SubidaImagenes() {
 
   const tipoSeleccionado = form.watch("tipo");
   const fileInputRef = form.register("archivo");
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+        setShowPreview(true);
+      };
+      reader.readAsDataURL(file);
+    }
+    fileInputRef.onChange(e);
+  };
+
+  const clearPreview = () => {
+    setImagePreview(null);
+    setShowPreview(false);
+    form.setValue("archivo", new DataTransfer().files);
+  };
 
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
@@ -92,6 +113,7 @@ export function SubidaImagenes() {
 
       toast.success("Imagen enviada correctamente");
       form.reset();
+      clearPreview();
     } catch (error: any) {
       console.error("Error enviando imagen:", error);
       toast.error("Error al enviar la imagen: " + error.message);
@@ -178,23 +200,63 @@ export function SubidaImagenes() {
             <FormField
               control={form.control}
               name="archivo"
-              render={() => (
+              render={({ field: { value, ...fieldProps } }) => (
                 <FormItem>
-                  <FormLabel>Archivo de imagen</FormLabel>
+                  <FormLabel>Imagen</FormLabel>
                   <FormControl>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      {...fileInputRef}
-                      className="cursor-pointer"
-                    />
+                    <div className="space-y-4">
+                      <Input
+                        {...fieldProps}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="cursor-pointer"
+                      />
+                      
+                      {showPreview && imagePreview && (
+                        <div className="relative rounded-lg border-2 border-border bg-muted/50 p-4 animate-in fade-in-50 duration-500">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                              <Eye className="h-4 w-4" />
+                              Vista Previa
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 -mt-1 -mr-1"
+                              onClick={clearPreview}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="relative aspect-video w-full overflow-hidden rounded-md bg-background">
+                            <img
+                              src={imagePreview}
+                              alt="Preview"
+                              className="object-contain w-full h-full"
+                            />
+                          </div>
+                          
+                          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            Imagen lista para enviar
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting || !showPreview}
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -203,7 +265,7 @@ export function SubidaImagenes() {
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Subir Imagen
+                  Enviar al Webhook
                 </>
               )}
             </Button>
