@@ -5,22 +5,49 @@ import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePlatos } from "@/hooks/usePlatos";
+import { useBebidas } from "@/hooks/useBebidas";
+import { useVinos } from "@/hooks/useVinos";
 import { PlatoForm } from "@/components/carta/PlatoForm";
+import { BebidaForm } from "@/components/carta/BebidaForm";
+import { VinoForm } from "@/components/carta/VinoForm";
 import { ListaPlatos } from "@/components/carta/ListaPlatos";
+import { ListaBebidas } from "@/components/carta/ListaBebidas";
+import { ListaVinos } from "@/components/carta/ListaVinos";
 
 export default function GestorCarta() {
-  const { platos, isLoading, categorias } = usePlatos();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("entrantes");
+  const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos } = usePlatos();
+  const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas } = useBebidas();
+  const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
 
-  const categoriasDisponibles = ["entrantes", "principales", "postres", "bebidas", "especiales"];
+  const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos">("platos");
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("");
   
+  const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
+  const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
+  const [dialogVinoOpen, setDialogVinoOpen] = useState(false);
+
+  const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos;
+
   const getPlatosPorCategoria = (categoria: string) => {
     return platos?.filter((p) => p.categoria === categoria) || [];
   };
 
-  const handleAñadirPlato = () => {
-    setDialogOpen(true);
+  const getBebidasPorCategoria = (categoria: string) => {
+    return bebidas?.filter((b) => b.categoria === categoria) || [];
+  };
+
+  const getVinosPorCategoria = (categoria: string) => {
+    return vinos?.filter((v) => v.categoria === categoria) || [];
+  };
+
+  const handleAñadir = () => {
+    if (seccionActiva === "platos") {
+      setDialogPlatoOpen(true);
+    } else if (seccionActiva === "bebidas") {
+      setDialogBebidaOpen(true);
+    } else {
+      setDialogVinoOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -40,48 +67,169 @@ export default function GestorCarta() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Gestor de Carta</h2>
             <p className="text-muted-foreground">
-              Gestiona el menú y los platos de tu restaurante
+              Gestiona el menú, bebidas y vinos de tu restaurante
             </p>
           </div>
-          <Button onClick={handleAñadirPlato}>
+          <Button onClick={handleAñadir}>
             <Plus className="mr-2 h-4 w-4" />
-            Añadir Plato
+            Añadir
           </Button>
         </div>
 
         <Tabs 
-          defaultValue="entrantes" 
+          defaultValue="platos" 
           className="w-full"
-          onValueChange={setCategoriaSeleccionada}
+          onValueChange={(value) => setSeccionActiva(value as "platos" | "bebidas" | "vinos")}
         >
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="entrantes">Entrantes</TabsTrigger>
-            <TabsTrigger value="principales">Principales</TabsTrigger>
-            <TabsTrigger value="postres">Postres</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="platos">Platos</TabsTrigger>
             <TabsTrigger value="bebidas">Bebidas</TabsTrigger>
-            <TabsTrigger value="especiales">Especiales</TabsTrigger>
+            <TabsTrigger value="vinos">Vinos</TabsTrigger>
           </TabsList>
 
-          {categoriasDisponibles.map((categoria) => (
-            <TabsContent key={categoria} value={categoria} className="space-y-4">
+          {/* PLATOS */}
+          <TabsContent value="platos" className="space-y-4">
+            {categoriasPlatos.length === 0 ? (
               <Card>
-                <CardHeader>
-                  <CardTitle className="capitalize">{categoria}</CardTitle>
-                  <CardDescription>
-                    Gestiona los {categoria} de tu carta
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ListaPlatos platos={getPlatosPorCategoria(categoria)} />
+                <CardContent className="p-6">
+                  <p className="text-center text-muted-foreground">
+                    No hay platos todavía. Haz clic en "Añadir" para comenzar.
+                  </p>
                 </CardContent>
               </Card>
-            </TabsContent>
-          ))}
+            ) : (
+              <Tabs 
+                defaultValue={categoriasPlatos[0]} 
+                className="w-full"
+                onValueChange={setCategoriaSeleccionada}
+              >
+                <TabsList className="w-full flex flex-wrap justify-start">
+                  {categoriasPlatos.map((categoria) => (
+                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
+                      {categoria}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {categoriasPlatos.map((categoria) => (
+                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="capitalize">{categoria}</CardTitle>
+                        <CardDescription>
+                          Gestiona los platos de {categoria}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ListaPlatos platos={getPlatosPorCategoria(categoria || "")} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            )}
+          </TabsContent>
+
+          {/* BEBIDAS */}
+          <TabsContent value="bebidas" className="space-y-4">
+            {categoriasBebidas.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-center text-muted-foreground">
+                    No hay bebidas todavía. Haz clic en "Añadir" para comenzar.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs 
+                defaultValue={categoriasBebidas[0]} 
+                className="w-full"
+                onValueChange={setCategoriaSeleccionada}
+              >
+                <TabsList className="w-full flex flex-wrap justify-start">
+                  {categoriasBebidas.map((categoria) => (
+                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
+                      {categoria}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {categoriasBebidas.map((categoria) => (
+                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="capitalize">{categoria}</CardTitle>
+                        <CardDescription>
+                          Gestiona las bebidas de {categoria}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ListaBebidas bebidas={getBebidasPorCategoria(categoria || "")} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            )}
+          </TabsContent>
+
+          {/* VINOS */}
+          <TabsContent value="vinos" className="space-y-4">
+            {categoriasVinos.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-center text-muted-foreground">
+                    No hay vinos todavía. Haz clic en "Añadir" para comenzar.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs 
+                defaultValue={categoriasVinos[0]} 
+                className="w-full"
+                onValueChange={setCategoriaSeleccionada}
+              >
+                <TabsList className="w-full flex flex-wrap justify-start">
+                  {categoriasVinos.map((categoria) => (
+                    <TabsTrigger key={categoria} value={categoria || ""} className="capitalize">
+                      {categoria}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {categoriasVinos.map((categoria) => (
+                  <TabsContent key={categoria} value={categoria || ""} className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="capitalize">{categoria}</CardTitle>
+                        <CardDescription>
+                          Gestiona los vinos de {categoria}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <ListaVinos vinos={getVinosPorCategoria(categoria || "")} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            )}
+          </TabsContent>
         </Tabs>
 
         <PlatoForm 
-          open={dialogOpen} 
-          onOpenChange={setDialogOpen}
+          open={dialogPlatoOpen} 
+          onOpenChange={setDialogPlatoOpen}
+          categoriaInicial={categoriaSeleccionada}
+        />
+        <BebidaForm 
+          open={dialogBebidaOpen} 
+          onOpenChange={setDialogBebidaOpen}
+          categoriaInicial={categoriaSeleccionada}
+        />
+        <VinoForm 
+          open={dialogVinoOpen} 
+          onOpenChange={setDialogVinoOpen}
           categoriaInicial={categoriaSeleccionada}
         />
       </div>
