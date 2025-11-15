@@ -119,40 +119,14 @@ export function SubidaImagenes() {
         .from(bucketName)
         .upload(fileName, archivo, {
           cacheControl: '3600',
-          upsert: false, // Ya eliminamos la anterior, no necesitamos upsert
+          upsert: false,
         });
 
       if (uploadError) {
         throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
       }
 
-      // Convertir archivo a base64
-      const archivoBase64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(archivo);
-      });
-
-      // Enviar al webhook a través de la edge function
-      const { data, error } = await supabase.functions.invoke("enviar-imagen-webhook", {
-        body: {
-          tipo: values.tipo,
-          item_id: values.item_id,
-          item_nombre: itemNombre,
-          archivo_nombre: archivo.name,
-          archivo_tipo: archivo.type,
-          archivo_size: archivo.size,
-          archivo_base64: archivoBase64,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success("Imagen guardada en Supabase y enviada al webhook correctamente");
+      toast.success("Imagen guardada correctamente en Supabase Storage");
       form.reset();
       clearPreview();
     } catch (error: any) {
