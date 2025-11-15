@@ -92,12 +92,34 @@ export function SubidaImagenes() {
       const extension = archivo.name.split('.').pop();
       const fileName = `${values.item_id}.${extension}`;
 
+      // Eliminar imágenes anteriores con el mismo ID (cualquier extensión)
+      const { data: existingFiles } = await supabase.storage
+        .from(bucketName)
+        .list();
+
+      if (existingFiles) {
+        // Buscar archivos que empiecen con el ID del item
+        const filesToDelete = existingFiles
+          .filter(file => file.name.startsWith(values.item_id))
+          .map(file => file.name);
+
+        if (filesToDelete.length > 0) {
+          const { error: deleteError } = await supabase.storage
+            .from(bucketName)
+            .remove(filesToDelete);
+
+          if (deleteError) {
+            console.warn("Error eliminando imágenes anteriores:", deleteError);
+          }
+        }
+      }
+
       // Subir archivo a Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(fileName, archivo, {
           cacheControl: '3600',
-          upsert: true, // Sobrescribir si ya existe
+          upsert: false, // Ya eliminamos la anterior, no necesitamos upsert
         });
 
       if (uploadError) {
