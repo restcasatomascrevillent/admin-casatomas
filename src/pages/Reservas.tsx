@@ -23,7 +23,8 @@ interface Reservation {
   nombre: string;
   telefono: string;
   email: string | null;
-  espacios_reserva: {
+  sala_id: string;
+  salas: {
     nombre: string;
   } | null;
 }
@@ -39,7 +40,7 @@ export default function Reservas() {
 
   const fetchReservations = async () => {
     const { data, error } = await supabase
-      .from("reservas" as any)
+      .from("reservas")
       .select(`
         id,
         fecha,
@@ -50,8 +51,8 @@ export default function Reservas() {
         nombre,
         telefono,
         email,
-        espacio_id,
-        espacios_reserva!reservas_espacio_id_fkey (nombre)
+        sala_id,
+        salas!reservas_sala_id_fkey (nombre)
       `)
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
@@ -211,7 +212,7 @@ export default function Reservas() {
                       {reservation.nombre || "Sin nombre"}
                     </TableCell>
                     <TableCell>{reservation.numero_comensales}</TableCell>
-                    <TableCell>{reservation.espacios_reserva?.nombre || "-"}</TableCell>
+                    <TableCell>{reservation.salas?.nombre || "-"}</TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
