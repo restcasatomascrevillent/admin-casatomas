@@ -8,12 +8,10 @@ export interface DisponibilidadSala {
   sala: string;
   posicion_id: string | null;
   posicion: string | null;
-  total_mesas_reservadas: number;
   total_comensales: number;
   total_reservas: number;
-  total_mesas_sala: number;
   capacidad_maxima: number;
-  mesas_disponibles: number;
+  capacidad_disponible: number;
   porcentaje_ocupacion: number;
 }
 
@@ -22,14 +20,12 @@ export interface DisponibilidadHora {
   salas: {
     sala_id: string;
     sala_nombre: string;
-    total_mesas: number;
-    mesas_ocupadas: number;
-    mesas_disponibles: number;
     capacidad_maxima: number;
     comensales_actuales: number;
+    capacidad_disponible: number;
     porcentaje_ocupacion: number;
   }[];
-  total_mesas_disponibles: number;
+  capacidad_total_disponible: number;
   porcentaje_ocupacion_global: number;
 }
 
@@ -57,7 +53,7 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
       // Obtener todos los espacios de reserva
       const { data: espacios, error: espaciosError } = await supabase
         .from("espacios_reserva" as any)
-        .select("id, nombre, numero_mesas, capacidad_maxima")
+        .select("id, nombre, capacidad_maxima")
         .eq("activa", true) as any;
 
       if (espaciosError) throw espaciosError;
@@ -81,31 +77,28 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
           
           const salasPorHora = espacios.map((espacio) => {
             const ocupEspacio = ocupacionHora.filter((o: any) => o.espacio_id === espacio.id);
-            const mesasOcupadas = ocupEspacio.reduce((sum: number, o: any) => sum + o.total_mesas_reservadas, 0);
             const comensales = ocupEspacio.reduce((sum: number, o: any) => sum + o.total_comensales, 0);
-            const mesasDisponibles = espacio.numero_mesas - mesasOcupadas;
+            const capacidadDisponible = Math.max(0, espacio.capacidad_maxima - comensales);
             const porcentaje = (comensales / espacio.capacidad_maxima) * 100;
 
             return {
               sala_id: espacio.id,
               sala_nombre: espacio.nombre,
-              total_mesas: espacio.numero_mesas,
-              mesas_ocupadas: mesasOcupadas,
-              mesas_disponibles: mesasDisponibles,
               capacidad_maxima: espacio.capacidad_maxima,
               comensales_actuales: comensales,
+              capacidad_disponible: capacidadDisponible,
               porcentaje_ocupacion: porcentaje,
             };
           });
 
-          const totalMesasDisp = salasPorHora.reduce((sum, s) => sum + s.mesas_disponibles, 0);
+          const capacidadTotalDisp = salasPorHora.reduce((sum, s) => sum + s.capacidad_disponible, 0);
           const totalCapacidad = salasPorHora.reduce((sum, s) => sum + s.capacidad_maxima, 0);
           const totalComensales = salasPorHora.reduce((sum, s) => sum + s.comensales_actuales, 0);
 
           horarios.push({
             hora,
             salas: salasPorHora,
-            total_mesas_disponibles: totalMesasDisp,
+            capacidad_total_disponible: capacidadTotalDisp,
             porcentaje_ocupacion_global: totalCapacidad > 0 ? (totalComensales / totalCapacidad) * 100 : 0,
           });
         }
@@ -125,7 +118,9 @@ export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) =>
         .from("vista_ocupacion" as any)
         .select("*")
         .gte("fecha", fechaInicio)
-        .lte("fecha", fechaFin);
+        .lte("fecha", fechaFin)
+        .order("fecha", { ascending: true })
+        .order("hora", { ascending: true });
       
       if (error) throw error;
       return data as any[];
@@ -134,49 +129,69 @@ export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) =>
   });
 };
 
-// Hook para verificar disponibilidad específica por sala
+// Hook para verificar disponibilidad específica por espacio (basado en capacidad)
 export const verificarDisponibilidadSala = async (
   fecha: string,
   hora: string,
-  salaId: string,
-  numeroMesas: number
+  salaId: string
 ) => {
-  // Obtener info de la sala
+  // Obtener info del espacio/sala
   const { data: sala } = await supabase
-    .from("salas" as any)
-    .select("numero_mesas, capacidad_maxima")
+    .from("espacios_reserva" as any)
+    .select("capacidad_maxima")
     .eq("id", salaId)
     .single() as any;
 
-  if (!sala) throw new Error("Sala no encontrada");
+  if (!sala) {
+    // Intenta buscar en salas si no lo encuentra en espacios
+    const { data: salaData } = await supabase
+      .from("salas" as any)
+      .select("capacidad_maxima")
+      .eq("id", salaId)
+      .single() as any;
+    
+    if (!salaData) throw new Error("Sala/Espacio no encontrado");
+    
+    return verificarCapacidadDisponible(fecha, hora, salaId, salaData.capacidad_maxima);
+  }
 
+  return verificarCapacidadDisponible(fecha, hora, salaId, sala.capacidad_maxima);
+};
+
+// Función auxiliar para verificar capacidad disponible
+const verificarCapacidadDisponible = async (
+  fecha: string,
+  hora: string,
+  espacioId: string,
+  capacidadMaxima: number
+) => {
   // Obtener ocupación actual
   const { data: ocupacion } = await supabase
     .from("ocupacion_diaria" as any)
-    .select("total_mesas_reservadas, total_comensales")
+    .select("total_comensales")
     .eq("fecha", fecha)
     .eq("hora", hora)
-    .eq("sala_id", salaId)
+    .eq("espacio_id", espacioId)
     .maybeSingle();
 
-  const mesasOcupadas = (ocupacion as any)?.total_mesas_reservadas || 0;
-  const mesasDisponibles = sala.numero_mesas - mesasOcupadas;
+  const comensalesActuales = (ocupacion as any)?.total_comensales || 0;
+  const capacidadDisponible = Math.max(0, capacidadMaxima - comensalesActuales);
 
   return {
-    disponible: mesasDisponibles >= numeroMesas,
-    mesasDisponibles,
-    mesasOcupadas,
-    totalMesas: sala.numero_mesas,
-    capacidadMaxima: sala.capacidad_maxima,
-    comensalesActuales: (ocupacion as any)?.total_comensales || 0,
+    disponible: capacidadDisponible > 0,
+    capacidadDisponible,
+    capacidadMaxima,
+    comensalesActuales,
+    mensaje: capacidadDisponible > 0
+      ? `Hay capacidad para ${capacidadDisponible} comensales más`
+      : "No hay capacidad disponible en este horario",
   };
 };
 
-// Obtener horas disponibles para una fecha y sala específica
+// Obtener horas disponibles para una fecha y sala específica (basado en capacidad)
 export const obtenerHorasDisponibles = async (
   fecha: string,
-  salaId: string,
-  numeroMesas: number = 1
+  salaId: string
 ) => {
   const horasDisponibles: string[] = [];
   
@@ -188,8 +203,7 @@ export const obtenerHorasDisponibles = async (
       const disponibilidad = await verificarDisponibilidadSala(
         fecha,
         hora,
-        salaId,
-        numeroMesas
+        salaId
       );
       
       if (disponibilidad.disponible) {
@@ -206,34 +220,8 @@ export const verificarDisponibilidad = async (
   fecha: string,
   hora: string,
   espacioId: string,
-  posicionId: string | null,
-  numeroMesas: number
+  posicionId: string | null = null
 ) => {
-  // Obtener info del espacio
-  const { data: espacio } = await supabase
-    .from("espacios_reserva" as any)
-    .select("numero_mesas")
-    .eq("id", espacioId)
-    .single() as any;
-
-  if (!espacio) throw new Error("Espacio no encontrado");
-
-  // Obtener ocupación actual
-  const { data: ocupacion } = await supabase
-    .from("ocupacion_diaria" as any)
-    .select("total_mesas_reservadas")
-    .eq("fecha", fecha)
-    .eq("hora", hora)
-    .eq("espacio_id", espacioId)
-    .maybeSingle();
-
-  const mesasOcupadas = (ocupacion as any)?.total_mesas_reservadas || 0;
-  const mesasDisponibles = espacio.numero_mesas - mesasOcupadas;
-
-  return {
-    disponible: mesasDisponibles >= numeroMesas,
-    mesasDisponibles,
-    mesasOcupadas,
-    totalMesas: espacio.numero_mesas,
-  };
+  // Delegar a la función principal que ahora usa capacidad en lugar de mesas
+  return verificarDisponibilidadSala(fecha, hora, espacioId);
 };

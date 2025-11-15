@@ -177,13 +177,12 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
 
           {/* Horarios Disponibles */}
           {fechaSeleccionada && salaSeleccionada && (
-            <SelectorHorasDisponibles
-              fecha={fechaSeleccionada}
-              salaId={salaSeleccionada}
-              numeroMesas={numeroMesas}
-              onSeleccionarHora={setHoraSeleccionada}
-              horaSeleccionada={horaSeleccionada}
-            />
+          <SelectorHorasDisponibles
+            fecha={fechaSeleccionada}
+            salaId={salaSeleccionada}
+            onSeleccionarHora={setHoraSeleccionada}
+            horaSeleccionada={horaSeleccionada}
+          />
           )}
         </div>
       </CardContent>

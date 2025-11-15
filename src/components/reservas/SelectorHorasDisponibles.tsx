@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface SelectorHorasDisponiblesProps {
   fecha: Date;
   salaId: string;
-  numeroMesas: number;
   onSeleccionarHora: (hora: string) => void;
   horaSeleccionada?: string;
 }
@@ -19,14 +18,13 @@ interface SelectorHorasDisponiblesProps {
 interface HoraDisponibilidad {
   hora: string;
   disponible: boolean;
-  mesasDisponibles: number;
-  totalMesas: number;
+  capacidadDisponible: number;
+  capacidadMaxima: number;
 }
 
 export const SelectorHorasDisponibles = ({
   fecha,
   salaId,
-  numeroMesas,
   onSeleccionarHora,
   horaSeleccionada,
 }: SelectorHorasDisponiblesProps) => {
@@ -48,15 +46,14 @@ export const SelectorHorasDisponibles = ({
             const disponibilidad = await verificarDisponibilidadSala(
               fechaStr,
               hora,
-              salaId,
-              numeroMesas
+              salaId
             );
 
             todasLasHoras.push({
               hora,
               disponible: disponibilidad.disponible,
-              mesasDisponibles: disponibilidad.mesasDisponibles,
-              totalMesas: disponibilidad.totalMesas,
+              capacidadDisponible: disponibilidad.capacidadDisponible,
+              capacidadMaxima: disponibilidad.capacidadMaxima,
             });
           }
         }
@@ -72,7 +69,7 @@ export const SelectorHorasDisponibles = ({
     if (fecha && salaId) {
       cargarHorasDisponibilidad();
     }
-  }, [fecha, salaId, numeroMesas]);
+  }, [fecha, salaId]);
 
   if (cargando) {
     return (
@@ -116,7 +113,7 @@ export const SelectorHorasDisponibles = ({
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No hay horarios disponibles para este día</p>
-            <p className="text-sm mt-1">Selecciona otro día o reduce el número de mesas</p>
+            <p className="text-sm mt-1">Selecciona otro día</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
@@ -128,12 +125,12 @@ export const SelectorHorasDisponibles = ({
                 onClick={() => onSeleccionarHora(hora.hora)}
                 className="h-auto flex flex-col items-center py-3"
               >
-                <Clock className="h-4 w-4 mb-1" />
+                 <Clock className="h-4 w-4 mb-1" />
                 <span className="font-semibold">{hora.hora}</span>
                 {hora.disponible && (
                   <span className="text-xs opacity-70 flex items-center gap-1 mt-1">
                     <Users className="h-3 w-3" />
-                    {hora.mesasDisponibles}/{hora.totalMesas}
+                    {hora.capacidadDisponible}/{hora.capacidadMaxima}
                   </span>
                 )}
               </Button>
