@@ -197,27 +197,27 @@ export const CalendarioDisponibilidad = ({
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  sala.mesas_disponibles === 0
+                                  sala.capacidad_disponible === 0
                                     ? "bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100"
-                                    : sala.mesas_disponibles <= 2
+                                    : sala.capacidad_disponible <= 10
                                     ? "bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-100"
                                     : "bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100"
                                 )}
                               >
-                                {sala.mesas_disponibles > 0
-                                  ? `${sala.mesas_disponibles} ${
-                                      sala.mesas_disponibles === 1 ? "mesa libre" : "mesas libres"
+                                {sala.capacidad_disponible > 0
+                                  ? `${sala.capacidad_disponible} ${
+                                      sala.capacidad_disponible === 1 ? "plaza libre" : "plazas libres"
                                     }`
-                                  : "Sin mesas"}
+                                  : "Sin capacidad"}
                               </Badge>
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      {horario.total_mesas_disponibles > 0 && (
+                      {horario.capacidad_total_disponible > 0 && (
                         <div className="mt-2 text-xs text-muted-foreground text-right">
-                          Total: {horario.total_mesas_disponibles} mesas disponibles
+                          Total: {horario.capacidad_total_disponible} plazas disponibles
                         </div>
                       )}
                     </div>

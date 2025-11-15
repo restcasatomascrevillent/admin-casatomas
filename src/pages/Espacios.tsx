@@ -100,11 +100,6 @@ export default function Espacios() {
                       <span className="text-muted-foreground">Capacidad:</span>
                       <span className="font-medium">{espacio.capacidad_maxima} personas</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Mesas:</span>
-                      <span className="font-medium">{espacio.numero_mesas}</span>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
