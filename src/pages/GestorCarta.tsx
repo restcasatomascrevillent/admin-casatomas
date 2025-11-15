@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
@@ -21,6 +22,7 @@ export default function GestorCarta() {
 
   const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos">("platos");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
   
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
   const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
@@ -28,16 +30,29 @@ export default function GestorCarta() {
 
   const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos;
 
+  const filtrarPorEstado = <T extends { activado: boolean | null }>(items: T[]): T[] => {
+    if (filtroEstado === "activos") {
+      return items.filter((item) => item.activado === true);
+    }
+    if (filtroEstado === "inactivos") {
+      return items.filter((item) => item.activado === false);
+    }
+    return items;
+  };
+
   const getPlatosPorCategoria = (categoria: string) => {
-    return platos?.filter((p) => p.categoria === categoria) || [];
+    const platosFiltrados = platos?.filter((p) => p.categoria === categoria) || [];
+    return filtrarPorEstado(platosFiltrados);
   };
 
   const getBebidasPorCategoria = (categoria: string) => {
-    return bebidas?.filter((b) => b.categoria === categoria) || [];
+    const bebidasFiltradas = bebidas?.filter((b) => b.categoria === categoria) || [];
+    return filtrarPorEstado(bebidasFiltradas);
   };
 
   const getVinosPorCategoria = (categoria: string) => {
-    return vinos?.filter((v) => v.categoria === categoria) || [];
+    const vinosFiltrados = vinos?.filter((v) => v.categoria === categoria) || [];
+    return filtrarPorEstado(vinosFiltrados);
   };
 
   const handleAñadir = () => {
@@ -63,17 +78,35 @@ export default function GestorCarta() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Gestor de Carta</h2>
             <p className="text-muted-foreground">
               Gestiona el menú, bebidas y vinos de tu restaurante
             </p>
           </div>
-          <Button onClick={handleAñadir}>
-            <Plus className="mr-2 h-4 w-4" />
-            Añadir
-          </Button>
+          <div className="flex gap-3 items-center">
+            <ToggleGroup 
+              type="single" 
+              value={filtroEstado} 
+              onValueChange={(value) => value && setFiltroEstado(value as "todos" | "activos" | "inactivos")}
+              className="border rounded-md"
+            >
+              <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                Todos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="activos" aria-label="Mostrar activos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                Activos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="inactivos" aria-label="Mostrar inactivos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                Inactivos
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button onClick={handleAñadir}>
+              <Plus className="mr-2 h-4 w-4" />
+              Añadir
+            </Button>
+          </div>
         </div>
 
         <Tabs 
