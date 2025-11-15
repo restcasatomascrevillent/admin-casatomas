@@ -6,7 +6,6 @@ export interface SalaPublica {
   nombre: string;
   descripcion: string | null;
   capacidad_maxima: number;
-  numero_mesas: number;
   caracteristicas: any;
 }
 

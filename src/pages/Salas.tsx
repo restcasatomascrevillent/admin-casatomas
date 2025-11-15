@@ -107,10 +107,6 @@ export default function Salas() {
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span>Capacidad: {sala.capacidad_maxima} personas</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{sala.numero_mesas} mesas</span>
-                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -19,7 +19,6 @@ export const SalaForm = ({ open, onOpenChange, onSubmit, initialData, loading }:
   const [nombre, setNombre] = useState(initialData?.nombre || "");
   const [descripcion, setDescripcion] = useState(initialData?.descripcion || "");
   const [capacidadMaxima, setCapacidadMaxima] = useState(initialData?.capacidad_maxima?.toString() || "");
-  const [numeroMesas, setNumeroMesas] = useState(initialData?.numero_mesas?.toString() || "");
   const [activa, setActiva] = useState(initialData?.activa ?? true);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,7 +27,6 @@ export const SalaForm = ({ open, onOpenChange, onSubmit, initialData, loading }:
       nombre,
       descripcion: descripcion || null,
       capacidad_maxima: parseInt(capacidadMaxima),
-      numero_mesas: parseInt(numeroMesas),
       caracteristicas: {},
       activa,
     });
@@ -39,7 +37,6 @@ export const SalaForm = ({ open, onOpenChange, onSubmit, initialData, loading }:
     setNombre("");
     setDescripcion("");
     setCapacidadMaxima("");
-    setNumeroMesas("");
     setActiva(true);
     onOpenChange(false);
   };
@@ -75,31 +72,17 @@ export const SalaForm = ({ open, onOpenChange, onSubmit, initialData, loading }:
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="capacidad">Capacidad Máxima</Label>
-                <Input
-                  id="capacidad"
-                  type="number"
-                  min="1"
-                  value={capacidadMaxima}
-                  onChange={(e) => setCapacidadMaxima(e.target.value)}
-                  placeholder="0"
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="mesas">Número de Mesas</Label>
-                <Input
-                  id="mesas"
-                  type="number"
-                  min="1"
-                  value={numeroMesas}
-                  onChange={(e) => setNumeroMesas(e.target.value)}
-                  placeholder="0"
-                  required
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="capacidad">Capacidad Máxima</Label>
+              <Input
+                id="capacidad"
+                type="number"
+                min="1"
+                value={capacidadMaxima}
+                onChange={(e) => setCapacidadMaxima(e.target.value)}
+                placeholder="0"
+                required
+              />
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="activa">Sala Activa</Label>

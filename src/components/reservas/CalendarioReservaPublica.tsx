@@ -114,13 +114,6 @@ export const CalendarioReservaPublica = ({ onSeleccion }: CalendarioReservaPubli
                         "font-medium",
                         salaSeleccionada === sala.id ? "text-primary/80" : "text-muted-foreground"
                       )}>
-                        {sala.numero_mesas} mesas
-                      </span>
-                      <span className="text-muted-foreground">•</span>
-                      <span className={cn(
-                        "font-medium",
-                        salaSeleccionada === sala.id ? "text-primary/80" : "text-muted-foreground"
-                      )}>
                         Cap. {sala.capacidad_maxima}
                       </span>
                     </div>
