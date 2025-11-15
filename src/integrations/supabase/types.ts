@@ -132,6 +132,42 @@ export type Database = {
         }
         Relationships: []
       }
+      imagenes_base64: {
+        Row: {
+          categoria: string | null
+          contenido_base64: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          tamano_bytes: number | null
+          tipo_mime: string
+          updated_at: string
+        }
+        Insert: {
+          categoria?: string | null
+          contenido_base64: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          tamano_bytes?: number | null
+          tipo_mime: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string | null
+          contenido_base64?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          tamano_bytes?: number | null
+          tipo_mime?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ocupacion_diaria: {
         Row: {
           created_at: string | null
