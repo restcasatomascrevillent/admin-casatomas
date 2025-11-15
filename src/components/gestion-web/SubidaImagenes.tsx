@@ -49,25 +49,29 @@ export function SubidaImagenes() {
   });
 
   const tipoSeleccionado = form.watch("tipo");
-  const fileInputRef = form.register("archivo");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (files: FileList) => void) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
       const reader = new FileReader();
       reader.onload = () => {
         setImagePreview(reader.result as string);
         setShowPreview(true);
       };
       reader.readAsDataURL(file);
+      onChange(files);
     }
-    fileInputRef.onChange(e);
   };
 
   const clearPreview = () => {
     setImagePreview(null);
     setShowPreview(false);
-    form.setValue("archivo", new DataTransfer().files);
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (input) {
+      input.value = '';
+    }
+    form.resetField("archivo");
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -215,7 +219,7 @@ export function SubidaImagenes() {
             <FormField
               control={form.control}
               name="archivo"
-              render={({ field: { value, ...fieldProps } }) => (
+              render={({ field: { onChange, value, ...fieldProps } }) => (
                 <FormItem>
                   <FormLabel>Imagen</FormLabel>
                   <FormControl>
@@ -224,7 +228,7 @@ export function SubidaImagenes() {
                         {...fieldProps}
                         type="file"
                         accept="image/*"
-                        onChange={handleFileChange}
+                        onChange={(e) => handleFileChange(e, onChange)}
                         className="cursor-pointer"
                       />
                       
