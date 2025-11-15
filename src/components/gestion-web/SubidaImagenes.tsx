@@ -85,6 +85,25 @@ export function SubidaImagenes() {
         itemNombre = sala?.nombre || "";
       }
 
+      // Determinar el bucket según el tipo
+      const bucketName = values.tipo === "plato" ? "platos" : "salas";
+      
+      // Obtener la extensión del archivo
+      const extension = archivo.name.split('.').pop();
+      const fileName = `${values.item_id}.${extension}`;
+
+      // Subir archivo a Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(fileName, archivo, {
+          cacheControl: '3600',
+          upsert: true, // Sobrescribir si ya existe
+        });
+
+      if (uploadError) {
+        throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
+      }
+
       // Convertir archivo a base64
       const archivoBase64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -111,12 +130,12 @@ export function SubidaImagenes() {
 
       if (error) throw error;
 
-      toast.success("Imagen enviada correctamente");
+      toast.success("Imagen guardada en Supabase y enviada al webhook correctamente");
       form.reset();
       clearPreview();
     } catch (error: any) {
-      console.error("Error enviando imagen:", error);
-      toast.error("Error al enviar la imagen: " + error.message);
+      console.error("Error procesando imagen:", error);
+      toast.error("Error al procesar la imagen: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
