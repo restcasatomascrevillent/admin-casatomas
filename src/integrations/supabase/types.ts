@@ -64,6 +64,7 @@ export type Database = {
           created_at: string | null
           descripcion: string | null
           id: string
+          imagen_url: string | null
           nombre: string | null
           orden: number | null
           precio_eur: number | null
@@ -76,6 +77,7 @@ export type Database = {
           created_at?: string | null
           descripcion?: string | null
           id: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: number | null
           precio_eur?: number | null
@@ -88,6 +90,7 @@ export type Database = {
           created_at?: string | null
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: number | null
           precio_eur?: number | null
@@ -190,6 +193,7 @@ export type Database = {
           created_at: string | null
           descripcion: string | null
           id: string
+          imagen_url: string | null
           nombre: string | null
           orden: string | null
           precio_eur: number | null
@@ -205,6 +209,7 @@ export type Database = {
           created_at?: string | null
           descripcion?: string | null
           id: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
@@ -220,6 +225,7 @@ export type Database = {
           created_at?: string | null
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
@@ -489,6 +495,7 @@ export type Database = {
           denominacion_origen: string | null
           descripcion: string | null
           id: string
+          imagen_url: string | null
           nombre: string | null
           orden: string | null
           precio_eur: number | null
@@ -506,6 +513,7 @@ export type Database = {
           denominacion_origen?: string | null
           descripcion?: string | null
           id: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
@@ -523,6 +531,7 @@ export type Database = {
           denominacion_origen?: string | null
           descripcion?: string | null
           id?: string
+          imagen_url?: string | null
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null

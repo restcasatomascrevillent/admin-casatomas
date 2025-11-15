@@ -29,6 +29,18 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
       {vinos.map((vino) => (
         <Card key={vino.id} className={!vino.activado ? "opacity-60" : ""}>
           <CardContent className="p-4">
+            {vino.imagen_url && (
+              <div className="mb-3 rounded-md overflow-hidden">
+                <img 
+                  src={vino.imagen_url} 
+                  alt={vino.nombre || "Vino"} 
+                  className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">

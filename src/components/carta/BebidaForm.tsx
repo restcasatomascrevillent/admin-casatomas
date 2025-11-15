@@ -27,6 +27,7 @@ const formSchema = z.object({
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   descripcion: z.string().optional(),
   tamano: z.string().optional(),
+  imagen_url: z.string().url("Debe ser una URL válida").optional().or(z.literal("")),
 });
 
 interface BebidaFormProps {
@@ -46,6 +47,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
       precio_eur: 0,
       descripcion: "",
       tamano: "",
+      imagen_url: "",
     },
   });
 
@@ -89,6 +91,20 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                   <FormLabel>Categoría</FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: Refrescos, Cervezas, Cafés..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="imagen_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL de Imagen</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://ejemplo.com/imagen.jpg" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

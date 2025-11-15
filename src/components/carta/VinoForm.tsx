@@ -30,6 +30,7 @@ const formSchema = z.object({
   ubicacion_pais: z.string().optional(),
   ubicacion_region: z.string().optional(),
   alergenos_notas: z.string().optional(),
+  imagen_url: z.string().url("Debe ser una URL válida").optional().or(z.literal("")),
 });
 
 interface VinoFormProps {
@@ -52,6 +53,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       ubicacion_pais: "",
       ubicacion_region: "",
       alergenos_notas: "",
+      imagen_url: "",
     },
   });
 
@@ -95,6 +97,20 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   <FormLabel>Categoría</FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: Tinto, Blanco, Rosado..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="imagen_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL de Imagen</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://ejemplo.com/imagen.jpg" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

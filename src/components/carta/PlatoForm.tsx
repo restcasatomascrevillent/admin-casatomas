@@ -35,6 +35,7 @@ const formSchema = z.object({
   descripcion: z.string().optional(),
   unidad: z.string().optional(),
   alergenos_notas: z.string().optional(),
+  imagen_url: z.string().url("Debe ser una URL válida").optional().or(z.literal("")),
 });
 
 interface PlatoFormProps {
@@ -55,6 +56,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       descripcion: "",
       unidad: "",
       alergenos_notas: "",
+      imagen_url: "",
     },
   });
 
@@ -96,13 +98,13 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoría</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-background">
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-popover z-50">
                       <SelectItem value="entrantes">Entrantes</SelectItem>
                       <SelectItem value="principales">Principales</SelectItem>
                       <SelectItem value="postres">Postres</SelectItem>
@@ -157,6 +159,20 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                       className="resize-none"
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="imagen_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL de Imagen</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://ejemplo.com/imagen.jpg" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

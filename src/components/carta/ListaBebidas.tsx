@@ -29,6 +29,18 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
       {bebidas.map((bebida) => (
         <Card key={bebida.id} className={!bebida.activado ? "opacity-60" : ""}>
           <CardContent className="p-4">
+            {bebida.imagen_url && (
+              <div className="mb-3 rounded-md overflow-hidden">
+                <img 
+                  src={bebida.imagen_url} 
+                  alt={bebida.nombre || "Bebida"} 
+                  className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
