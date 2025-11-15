@@ -9,10 +9,10 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="h-16 border-b border-border bg-card flex items-center px-6 sticky top-0 z-10">
+        <div className="flex-1 flex flex-col overflow-x-hidden">
+          <header className="h-16 border-b border-border bg-card flex items-center px-6 sticky top-0 z-50 w-full">
             <SidebarTrigger className="mr-4" />
             <div className="flex items-center justify-between w-full">
               <div>
