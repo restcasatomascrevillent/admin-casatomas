@@ -57,6 +57,45 @@ export type Database = {
           },
         ]
       }
+      Bebidas: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string | null
+          orden: number | null
+          precio_eur: number | null
+          tamano: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id: string
+          nombre?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          tamano?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          tamano?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       espacios_reserva: {
         Row: {
           activa: boolean | null
@@ -66,7 +105,6 @@ export type Database = {
           descripcion: string | null
           id: string
           nombre: string
-          numero_mesas: number
           updated_at: string | null
         }
         Insert: {
@@ -77,7 +115,6 @@ export type Database = {
           descripcion?: string | null
           id?: string
           nombre: string
-          numero_mesas: number
           updated_at?: string | null
         }
         Update: {
@@ -88,7 +125,6 @@ export type Database = {
           descripcion?: string | null
           id?: string
           nombre?: string
-          numero_mesas?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -102,7 +138,6 @@ export type Database = {
           id: string
           sala_id: string
           total_comensales: number
-          total_mesas_reservadas: number
           total_reservas: number
           updated_at: string | null
         }
@@ -114,7 +149,6 @@ export type Database = {
           id?: string
           sala_id: string
           total_comensales?: number
-          total_mesas_reservadas?: number
           total_reservas?: number
           updated_at?: string | null
         }
@@ -126,7 +160,6 @@ export type Database = {
           id?: string
           sala_id?: string
           total_comensales?: number
-          total_mesas_reservadas?: number
           total_reservas?: number
           updated_at?: string | null
         }
@@ -146,6 +179,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      Platos: {
+        Row: {
+          activado: boolean | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string | null
+          orden: string | null
+          precio_eur: number | null
+          unidad: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id: string
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       registro_horas: {
         Row: {
@@ -216,7 +297,6 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
-          espacio_id: string
           estado: string
           fecha: string
           hora: string
@@ -224,7 +304,6 @@ export type Database = {
           nombre: string | null
           notas_cliente: string | null
           numero_comensales: number
-          numero_mesas: number | null
           sala_id: string
           telefono: string | null
           updated_at: string | null
@@ -232,7 +311,6 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
-          espacio_id: string
           estado?: string
           fecha: string
           hora: string
@@ -240,7 +318,6 @@ export type Database = {
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales: number
-          numero_mesas?: number | null
           sala_id: string
           telefono?: string | null
           updated_at?: string | null
@@ -248,7 +325,6 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
-          espacio_id?: string
           estado?: string
           fecha?: string
           hora?: string
@@ -256,19 +332,11 @@ export type Database = {
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales?: number
-          numero_mesas?: number | null
           sala_id?: string
           telefono?: string | null
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "reservas_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "reservas_sala_id_fkey"
             columns: ["sala_id"]
@@ -287,7 +355,6 @@ export type Database = {
           descripcion: string | null
           id: string
           nombre: string
-          numero_mesas: number
           updated_at: string | null
         }
         Insert: {
@@ -298,7 +365,6 @@ export type Database = {
           descripcion?: string | null
           id?: string
           nombre: string
-          numero_mesas: number
           updated_at?: string | null
         }
         Update: {
@@ -309,7 +375,6 @@ export type Database = {
           descripcion?: string | null
           id?: string
           nombre?: string
-          numero_mesas?: number
           updated_at?: string | null
         }
         Relationships: []
@@ -413,20 +478,72 @@ export type Database = {
           },
         ]
       }
+      Vinos: {
+        Row: {
+          activado: boolean | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          created_at: string | null
+          denominacion_origen: string | null
+          descripcion: string | null
+          id: string
+          nombre: string | null
+          orden: string | null
+          precio_eur: number | null
+          ubicacion_pais: string | null
+          ubicacion_region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          id: string
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       vista_ocupacion: {
         Row: {
+          capacidad_disponible: number | null
           capacidad_maxima: number | null
           espacio: string | null
           espacio_id: string | null
           fecha: string | null
           hora: string | null
-          mesas_disponibles: number | null
           porcentaje_ocupacion: number | null
           total_comensales: number | null
-          total_mesas_espacio: number | null
-          total_mesas_reservadas: number | null
           total_reservas: number | null
         }
         Relationships: [

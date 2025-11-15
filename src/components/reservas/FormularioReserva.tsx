@@ -30,7 +30,6 @@ const formSchema = z.object({
   hora: z.string().min(1, "Selecciona una hora"),
   sala_id: z.string().min(1, "Selecciona una sala"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
-  numero_mesas: z.number().min(1, "Mínimo 1 mesa"),
   notas_cliente: z.string().optional(),
 });
 
@@ -59,7 +58,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     resolver: zodResolver(formSchema),
     defaultValues: {
       numero_comensales: 2,
-      numero_mesas: 1,
     },
   });
 
@@ -77,19 +75,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
   const onSubmit = async (values: FormValues) => {
     try {
-      // Verificar disponibilidad una última vez
-      const disponibilidad = await verificarDisponibilidadSala(
-        format(values.fecha, "yyyy-MM-dd"),
-        values.hora,
-        values.sala_id,
-        values.numero_mesas
-      );
-
-      if (!disponibilidad.disponible) {
-        toast.error("Lo sentimos, ya no hay disponibilidad para esa hora");
-        return;
-      }
-
       const { error } = await supabase.from("reservas" as any).insert({
         nombre: values.nombre,
         telefono: values.telefono,
@@ -97,9 +82,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
         sala_id: values.sala_id,
-        espacio_id: values.sala_id, // Usamos sala_id también para espacio_id por compatibilidad con la BD
+        espacio_id: values.sala_id,
         numero_comensales: values.numero_comensales,
-        numero_mesas: values.numero_mesas,
         notas_cliente: values.notas_cliente || null,
         estado: "pendiente",
       });
@@ -169,9 +153,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="numero_comensales"
+        </div>
+
+        <FormField
+          control={form.control}
+          name="numero_comensales"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Número de comensales</FormLabel>
@@ -189,26 +175,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           />
 
           <FormField
-            control={form.control}
-            name="numero_mesas"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Número de mesas</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="1"
-                    {...field}
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-
-        <FormField
           control={form.control}
           name="notas_cliente"
           render={({ field }) => (

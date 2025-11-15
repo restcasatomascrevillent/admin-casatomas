@@ -11,7 +11,6 @@ export const GenerarEspaciosFicticios = () => {
           nombre: 'Sala Principal',
           descripcion: 'Espacio principal del restaurante con ambiente elegante',
           capacidad_maxima: 80,
-          numero_mesas: 20,
           caracteristicas: {
             ambiente: 'elegante',
             ubicacion: 'interior',
@@ -24,7 +23,6 @@ export const GenerarEspaciosFicticios = () => {
           nombre: 'Terraza Exterior',
           descripcion: 'Terraza al aire libre con vistas panorámicas',
           capacidad_maxima: 40,
-          numero_mesas: 10,
           caracteristicas: {
             ambiente: 'casual',
             ubicacion: 'exterior',
@@ -37,7 +35,6 @@ export const GenerarEspaciosFicticios = () => {
           nombre: 'Salón Privado VIP',
           descripcion: 'Espacio reservado para eventos privados y celebraciones',
           capacidad_maxima: 30,
-          numero_mesas: 6,
           caracteristicas: {
             ambiente: 'exclusivo',
             ubicacion: 'interior',
@@ -50,7 +47,6 @@ export const GenerarEspaciosFicticios = () => {
           nombre: 'Barra y Coctelería',
           descripcion: 'Zona de barra con ambiente informal',
           capacidad_maxima: 20,
-          numero_mesas: 8,
           caracteristicas: {
             ambiente: 'informal',
             ubicacion: 'interior',
@@ -63,7 +59,6 @@ export const GenerarEspaciosFicticios = () => {
           nombre: 'Jardín Interior',
           descripcion: 'Espacio cubierto con decoración botánica',
           capacidad_maxima: 50,
-          numero_mesas: 12,
           caracteristicas: {
             ambiente: 'natural',
             ubicacion: 'interior',

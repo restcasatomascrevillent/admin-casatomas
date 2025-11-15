@@ -26,7 +26,6 @@ const formSchema = z.object({
   nombre: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
   descripcion: z.string().optional(),
   capacidad_maxima: z.number().min(1, "La capacidad debe ser al menos 1"),
-  numero_mesas: z.number().min(1, "Debe haber al menos 1 mesa"),
   activa: z.boolean().default(true),
 });
 
@@ -48,7 +47,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
       nombre: espacio?.nombre || "",
       descripcion: espacio?.descripcion || "",
       capacidad_maxima: espacio?.capacidad_maxima || 10,
-      numero_mesas: espacio?.numero_mesas || 5,
       activa: espacio?.activa ?? true,
     },
   });
@@ -65,7 +63,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
           nombre: values.nombre,
           descripcion: values.descripcion || null,
           capacidad_maxima: values.capacidad_maxima,
-          numero_mesas: values.numero_mesas,
           activa: values.activa,
           caracteristicas: {},
         });
@@ -121,52 +118,33 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="numero_mesas"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de mesas</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="capacidad_maxima"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacidad máxima</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="capacidad_maxima"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Capacidad máxima</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
               name="activa"
               render={({ field }) => (
                 <FormItem className="flex items-center justify-between">
-                  <FormLabel>Espacio activo</FormLabel>
+                  <div className="space-y-0.5">
+                    <FormLabel>Espacio activo</FormLabel>
+                  </div>
                   <FormControl>
                     <Switch
                       checked={field.value}
@@ -177,7 +155,7 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
               )}
             />
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-3">
               <Button
                 type="button"
                 variant="outline"
@@ -185,8 +163,8 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
               >
                 Cancelar
               </Button>
-              <Button type="submit">
-                {espacio ? "Actualizar" : "Crear"}
+              <Button type="submit" disabled={crearEspacio.isPending || actualizarEspacio.isPending}>
+                {espacio ? "Actualizar" : "Crear"} espacio
               </Button>
             </div>
           </form>

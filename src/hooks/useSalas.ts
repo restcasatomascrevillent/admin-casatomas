@@ -7,7 +7,6 @@ export interface Sala {
   nombre: string;
   descripcion: string | null;
   capacidad_maxima: number;
-  numero_mesas: number;
   caracteristicas: any;
   activa: boolean;
 }
