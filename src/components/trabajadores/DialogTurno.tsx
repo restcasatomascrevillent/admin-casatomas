@@ -45,6 +45,16 @@ const formSchema = z.object({
   estado: z.enum(["programado", "activo", "completado", "cancelado"]),
   notas: z.string().optional(),
   salas: z.array(z.string()).optional(),
+}).refine((data) => {
+  // Validar que hora_fin > hora_inicio
+  const [horaI, minI] = data.hora_inicio.split(":").map(Number);
+  const [horaF, minF] = data.hora_fin.split(":").map(Number);
+  const minutosInicio = horaI * 60 + minI;
+  const minutosFin = horaF * 60 + minF;
+  return minutosFin > minutosInicio;
+}, {
+  message: "La hora de fin debe ser posterior a la hora de inicio (no se permiten turnos nocturnos que cruzan medianoche)",
+  path: ["hora_fin"],
 });
 
 type FormValues = z.infer<typeof formSchema>;
