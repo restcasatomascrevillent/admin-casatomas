@@ -228,6 +228,57 @@ export const useCrearTurno = () => {
   });
 };
 
+// Hook para actualizar turno
+export const useActualizarTurno = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...turno }: Partial<Turno> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("turnos" as any)
+        .update(turno)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["turnos"] });
+      queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
+      toast.success("Turno actualizado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error("Error al actualizar turno: " + error.message);
+    },
+  });
+};
+
+// Hook para eliminar turno
+export const useEliminarTurno = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("turnos" as any)
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["turnos"] });
+      queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
+      toast.success("Turno eliminado correctamente");
+    },
+    onError: (error: any) => {
+      toast.error("Error al eliminar turno: " + error.message);
+    },
+  });
+};
+
 // Hook para asignar sala a turno
 export const useAsignarSala = () => {
   const queryClient = useQueryClient();
