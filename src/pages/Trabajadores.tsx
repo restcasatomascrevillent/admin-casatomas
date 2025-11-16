@@ -9,6 +9,7 @@ import { FormularioTrabajador } from "@/components/trabajadores/FormularioTrabaj
 import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
 import { CalendarioTurnosSemanal } from "@/components/trabajadores/CalendarioTurnosSemanal";
 import { GenerarTurnosFicticios } from "@/components/trabajadores/GenerarTurnosFicticios";
+import { DialogTurno } from "@/components/trabajadores/DialogTurno";
 import { GenerarDatosFicticios } from "@/components/trabajadores/GenerarDatosFicticios";
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
 
 export default function Trabajadores() {
   const [dialogAbierto, setDialogAbierto] = useState(false);
+  const [dialogTurnoAbierto, setDialogTurnoAbierto] = useState(false);
   const [trabajadorEditando, setTrabajadorEditando] = useState<string | null>(null);
 
   const handleNuevoTrabajador = () => {
@@ -50,6 +52,13 @@ export default function Trabajadores() {
           <div className="flex gap-2">
             <GenerarDatosFicticios />
             <GenerarTurnosFicticios />
+            <Button 
+              variant="outline"
+              onClick={() => setDialogTurnoAbierto(true)}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Turno
+            </Button>
             <Button onClick={handleNuevoTrabajador}>
               <Plus className="mr-2 h-4 w-4" />
               Nuevo Trabajador
@@ -104,6 +113,13 @@ export default function Trabajadores() {
             />
           </DialogContent>
         </Dialog>
+
+        <DialogTurno
+          open={dialogTurnoAbierto}
+          onOpenChange={setDialogTurnoAbierto}
+          turnoId={null}
+          turnoData={null}
+        />
       </div>
     </DashboardLayout>
   );

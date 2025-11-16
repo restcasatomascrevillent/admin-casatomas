@@ -77,7 +77,7 @@ export const generarTurnosManualmente = async () => {
     // Miguel (limpieza) - Semana actual
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-14', hora_inicio: '07:00', hora_fin: '11:00', estado: 'completado', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-15', hora_inicio: '07:00', hora_fin: '11:00', estado: 'completado', notas: 'Limpieza matinal' },
-    { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-16', hora_inicio: '23:00', hora_fin: '02:00', estado: 'activo', notas: 'Limpieza nocturna' },
+    { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-16', hora_inicio: '07:00', hora_fin: '11:00', estado: 'activo', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-17', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-19', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza fin de semana' },
 
@@ -141,7 +141,7 @@ export const generarTurnosManualmente = async () => {
     // Miguel - Próxima semana
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-21', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-22', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza matinal' },
-    { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-23', hora_inicio: '23:00', hora_fin: '02:00', estado: 'programado', notas: 'Limpieza nocturna' },
+    { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-23', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-24', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza matinal' },
     { trabajador_id: '2b73c8fd-d452-4450-a711-1ae58d2749ca', fecha: '2025-01-26', hora_inicio: '07:00', hora_fin: '11:00', estado: 'programado', notas: 'Limpieza fin de semana' },
   ];
