@@ -66,6 +66,7 @@ interface DialogTurnoProps {
   turnoData?: any;
   fechaInicial?: string;
   trabajadorIdInicial?: string;
+  horaInicialProp?: string;
 }
 
 const ESTADOS = [
@@ -82,6 +83,7 @@ export const DialogTurno = ({
   turnoData,
   fechaInicial,
   trabajadorIdInicial,
+  horaInicialProp,
 }: DialogTurnoProps) => {
   const { data: trabajadores = [] } = useTrabajadoresActivos();
   const { data: salas = [] } = useSalas();
@@ -94,7 +96,7 @@ export const DialogTurno = ({
     defaultValues: {
       trabajador_id: trabajadorIdInicial || "",
       fecha: fechaInicial || new Date().toISOString().split("T")[0],
-      hora_inicio: "09:00",
+      hora_inicio: horaInicialProp || "09:00",
       hora_fin: "17:00",
       estado: "programado",
       notas: "",
@@ -113,11 +115,11 @@ export const DialogTurno = ({
         notas: turnoData.notas || "",
         salas: turnoData.salas_ids || [],
       });
-    } else if (fechaInicial || trabajadorIdInicial) {
+    } else if (fechaInicial || trabajadorIdInicial || horaInicialProp) {
       form.reset({
         trabajador_id: trabajadorIdInicial || "",
         fecha: fechaInicial || new Date().toISOString().split("T")[0],
-        hora_inicio: "09:00",
+        hora_inicio: horaInicialProp || "09:00",
         hora_fin: "17:00",
         estado: "programado",
         notas: "",

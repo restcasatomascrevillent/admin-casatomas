@@ -3,7 +3,6 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks }
 import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useTurnos, useTrabajadoresActivos, useActualizarTurno } from "@/hooks/useTrabajadores";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -41,42 +40,111 @@ const ESTADOS_COLORS: Record<string, string> = {
   cancelado: "bg-red-500/80 border-red-600",
 };
 
-const calcularDuracion = (horaInicio: string, horaFin: string) => {
-  const [horaI, minI] = horaInicio.split(":").map(Number);
-  const [horaF, minF] = horaFin.split(":").map(Number);
+const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7); // 7:00 a 23:00
+const ALTURA_HORA = 60; // Pixels por hora
+
+const timeToMinutes = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const calcularPosicionYAltura = (horaInicio: string, horaFin: string) => {
+  const minutosInicio = timeToMinutes(horaInicio);
+  const minutosFin = timeToMinutes(horaFin);
+  const minutosBase = 7 * 60; // 7:00 AM es la base
   
-  const minutosInicio = horaI * 60 + minI;
-  const minutosFin = horaF * 60 + minF;
-  const duracionMinutos = minutosFin - minutosInicio;
+  const top = ((minutosInicio - minutosBase) / 60) * ALTURA_HORA;
+  const height = ((minutosFin - minutosInicio) / 60) * ALTURA_HORA;
   
-  const horas = Math.floor(duracionMinutos / 60);
-  const minutos = duracionMinutos % 60;
+  return { top, height };
+};
+
+// Función para detectar superposiciones y calcular columnas
+const calcularColumnas = (turnos: TurnoConTrabajador[]) => {
+  if (turnos.length === 0) return [];
   
-  return minutos > 0 ? `${horas}h ${minutos}m` : `${horas}h`;
+  const turnosOrdenados = [...turnos].sort((a, b) => 
+    timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
+  );
+  
+  const columnas: { turno: TurnoConTrabajador; columna: number; totalColumnas: number }[] = [];
+  const columnasOcupadas: { turno: TurnoConTrabajador; finMinutos: number }[][] = [[]];
+  
+  turnosOrdenados.forEach((turno) => {
+    const inicioMinutos = timeToMinutes(turno.hora_inicio);
+    const finMinutos = timeToMinutes(turno.hora_fin);
+    
+    // Buscar una columna libre
+    let columnaEncontrada = -1;
+    for (let i = 0; i < columnasOcupadas.length; i++) {
+      const ultimoTurno = columnasOcupadas[i][columnasOcupadas[i].length - 1];
+      if (!ultimoTurno || ultimoTurno.finMinutos <= inicioMinutos) {
+        columnaEncontrada = i;
+        break;
+      }
+    }
+    
+    // Si no hay columna libre, crear una nueva
+    if (columnaEncontrada === -1) {
+      columnaEncontrada = columnasOcupadas.length;
+      columnasOcupadas.push([]);
+    }
+    
+    columnasOcupadas[columnaEncontrada].push({ turno, finMinutos });
+  });
+  
+  // Calcular el número total de columnas para cada turno
+  turnosOrdenados.forEach((turno) => {
+    const inicioMinutos = timeToMinutes(turno.hora_inicio);
+    const finMinutos = timeToMinutes(turno.hora_fin);
+    
+    // Contar cuántas columnas se superponen con este turno
+    let maxColumnas = 1;
+    columnasOcupadas.forEach((col) => {
+      col.forEach((item) => {
+        const itemInicio = timeToMinutes(item.turno.hora_inicio);
+        const itemFin = timeToMinutes(item.turno.hora_fin);
+        
+        // Hay superposición si los intervalos se cruzan
+        if (!(finMinutos <= itemInicio || inicioMinutos >= itemFin)) {
+          maxColumnas = Math.max(maxColumnas, columnasOcupadas.length);
+        }
+      });
+    });
+    
+    // Encontrar la columna de este turno
+    const columna = columnasOcupadas.findIndex((col) => 
+      col.some((item) => item.turno.id === turno.id)
+    );
+    
+    columnas.push({ turno, columna, totalColumnas: maxColumnas });
+  });
+  
+  return columnas;
 };
 
 interface TurnoCardProps {
   turno: TurnoConTrabajador;
   isDragging?: boolean;
   onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
-const TurnoCard = ({ turno, isDragging, onClick }: TurnoCardProps) => {
-  const duracion = calcularDuracion(turno.hora_inicio, turno.hora_fin);
-
+const TurnoCard = ({ turno, isDragging, onClick, style }: TurnoCardProps) => {
   return (
     <div
       className={cn(
-        "rounded px-2 py-1 text-white text-xs border-l-4 cursor-pointer hover:brightness-110 transition-all",
+        "absolute rounded px-2 py-1 text-white text-xs border-l-4 cursor-pointer hover:brightness-110 transition-all overflow-hidden",
         ESTADOS_COLORS[turno.estado] || "bg-gray-500/80 border-gray-600",
         isDragging && "opacity-50"
       )}
+      style={style}
       onClick={onClick}
       title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}`}
     >
-      <div className="font-semibold">{duracion}</div>
+      <div className="font-semibold truncate">{turno.trabajador_nombre}</div>
       <div className="text-[10px] opacity-90">
-        {turno.hora_inicio.substring(0, 5)}
+        {turno.hora_inicio.substring(0, 5)} - {turno.hora_fin.substring(0, 5)}
       </div>
       {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
         <div className="text-[10px] opacity-75 truncate">
@@ -89,11 +157,10 @@ const TurnoCard = ({ turno, isDragging, onClick }: TurnoCardProps) => {
 
 interface DraggableTurnoProps extends TurnoCardProps {
   turno: TurnoConTrabajador;
-  trabajadorId: string;
   fecha: string;
 }
 
-const DraggableTurno = ({ turno, trabajadorId, fecha, onClick }: DraggableTurnoProps) => {
+const DraggableTurno = ({ turno, fecha, onClick, style }: DraggableTurnoProps) => {
   const {
     attributes,
     listeners,
@@ -105,12 +172,12 @@ const DraggableTurno = ({ turno, trabajadorId, fecha, onClick }: DraggableTurnoP
     id: turno.id,
     data: {
       turno,
-      trabajadorId,
       fecha,
     },
   });
 
-  const style = {
+  const combinedStyle = {
+    ...style,
     transform: CSS.Transform.toString(transform),
     transition,
   };
@@ -121,63 +188,81 @@ const DraggableTurno = ({ turno, trabajadorId, fecha, onClick }: DraggableTurnoP
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={handleClick}>
-      <TurnoCard turno={turno} isDragging={isDragging} />
+    <div ref={setNodeRef} {...attributes} {...listeners} onClick={handleClick}>
+      <TurnoCard turno={turno} isDragging={isDragging} style={combinedStyle} />
     </div>
   );
 };
 
-interface DroppableCellProps {
-  trabajadorId: string;
+interface DroppableDayColumnProps {
   fecha: string;
   turnosDia: TurnoConTrabajador[];
-  onCrearTurno: (fecha: string, trabajadorId: string) => void;
+  onCrearTurno: (fecha: string, hora: string) => void;
   onEditarTurno: (turno: TurnoConTrabajador) => void;
 }
 
-const DroppableCell = ({
-  trabajadorId,
+const DroppableDayColumn = ({
   fecha,
   turnosDia,
   onCrearTurno,
   onEditarTurno,
-}: DroppableCellProps) => {
+}: DroppableDayColumnProps) => {
   const { setNodeRef, isOver } = useSortable({
-    id: `${trabajadorId}-${fecha}`,
+    id: `day-${fecha}`,
     data: {
-      trabajadorId,
       fecha,
     },
   });
+
+  const turnosConColumnas = calcularColumnas(turnosDia);
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative min-h-[80px] bg-muted/30 rounded-md border border-border/50 p-1 group",
-        isOver && "bg-primary/10 border-primary"
+        "relative border-l border-border/50 min-w-[120px] group",
+        isOver && "bg-primary/10"
       )}
+      style={{ height: HORAS_DIA.length * ALTURA_HORA }}
     >
-      {turnosDia.length > 0 ? (
-        <div className="space-y-1">
-          {turnosDia.map((turno) => (
-            <DraggableTurno
-              key={turno.id}
-              turno={turno}
-              trabajadorId={trabajadorId}
-              fecha={fecha}
-              onClick={() => onEditarTurno(turno)}
-            />
-          ))}
-        </div>
-      ) : (
-        <button
-          onClick={() => onCrearTurno(fecha, trabajadorId)}
-          className="w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Plus className="h-4 w-4 text-muted-foreground" />
-        </button>
-      )}
+      {/* Líneas horizontales para cada hora */}
+      {HORAS_DIA.map((hora, index) => (
+        <div
+          key={hora}
+          className="absolute left-0 right-0 border-t border-border/30"
+          style={{ top: index * ALTURA_HORA }}
+        />
+      ))}
+      
+      {/* Botón para crear turno (visible en hover) */}
+      <button
+        onClick={() => onCrearTurno(fecha, "09:00")}
+        className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-muted/20"
+      >
+        <Plus className="h-6 w-6 text-muted-foreground" />
+      </button>
+
+      {/* Turnos posicionados */}
+      {turnosConColumnas.map(({ turno, columna, totalColumnas }) => {
+        const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
+        const width = `${100 / totalColumnas}%`;
+        const left = `${(columna / totalColumnas) * 100}%`;
+
+        return (
+          <DraggableTurno
+            key={turno.id}
+            turno={turno}
+            fecha={fecha}
+            onClick={() => onEditarTurno(turno)}
+            style={{
+              top: `${top}px`,
+              height: `${height}px`,
+              width,
+              left,
+            }}
+          />
+        );
+      })}
     </div>
   );
 };
@@ -187,7 +272,7 @@ export const CalendarioTurnosSemanal = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<any>(null);
   const [fechaInicial, setFechaInicial] = useState<string | undefined>();
-  const [trabajadorIdInicial, setTrabajadorIdInicial] = useState<string | undefined>();
+  const [horaInicial, setHoraInicial] = useState<string | undefined>();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   
   const weekStart = startOfWeek(currentDate, { locale: es, weekStartsOn: 1 });
@@ -213,47 +298,27 @@ export const CalendarioTurnosSemanal = () => {
     
     return (turnosData as any[]).filter((turno: any) => {
       return turno.fecha >= startStr && turno.fecha <= endStr;
-    });
-  }, [turnosData, weekStart, weekEnd]);
-
-  // Organizar turnos por trabajador
-  const turnosPorTrabajador = useMemo(() => {
-    const map = new Map<string, TurnoConTrabajador[]>();
-    
-    turnosSemana.forEach((turno: any) => {
+    }).map((turno: any) => {
       const trabajador = trabajadores.find((t: any) => t.id === turno.trabajador_id);
-      const turnoConTrabajador: TurnoConTrabajador = {
+      return {
         ...turno,
         trabajador_nombre: trabajador ? `${trabajador.nombre} ${trabajador.apellidos}` : "Desconocido",
         puesto: trabajador?.puesto || "",
       };
-      
-      const existing = map.get(turno.trabajador_id) || [];
-      map.set(turno.trabajador_id, [...existing, turnoConTrabajador]);
     });
-    
-    return map;
-  }, [turnosSemana, trabajadores]);
+  }, [turnosData, weekStart, weekEnd, trabajadores]);
 
-  const trabajadoresConTurnos = Array.from(turnosPorTrabajador.entries())
-    .map(([trabajadorId, turnos]) => ({
-      trabajadorId,
-      trabajador: trabajadores.find((t: any) => t.id === trabajadorId),
-      turnos,
-    }))
-    .filter((item) => item.trabajador);
-
-  const handleCrearTurno = (fecha: string, trabajadorId: string) => {
+  const handleCrearTurno = (fecha: string, hora: string) => {
     setTurnoSeleccionado(null);
     setFechaInicial(fecha);
-    setTrabajadorIdInicial(trabajadorId);
+    setHoraInicial(hora);
     setDialogOpen(true);
   };
 
   const handleEditarTurno = (turno: any) => {
     setTurnoSeleccionado(turno);
     setFechaInicial(undefined);
-    setTrabajadorIdInicial(undefined);
+    setHoraInicial(undefined);
     setDialogOpen(true);
   };
 
@@ -268,25 +333,15 @@ export const CalendarioTurnosSemanal = () => {
     if (!over || active.id === over.id) return;
 
     const activeTurno = active.data.current?.turno as TurnoConTrabajador;
-    const overData = over.data.current as { trabajadorId: string; fecha: string } | undefined;
+    const overData = over.data.current as { fecha: string } | undefined;
 
     if (!activeTurno || !overData) return;
 
-    // Actualizar el turno con la nueva fecha o trabajador
-    const updates: any = {};
-    
+    // Actualizar el turno con la nueva fecha
     if (overData.fecha !== activeTurno.fecha) {
-      updates.fecha = overData.fecha;
-    }
-    
-    if (overData.trabajadorId !== activeTurno.trabajador_id) {
-      updates.trabajador_id = overData.trabajadorId;
-    }
-
-    if (Object.keys(updates).length > 0) {
       await actualizarTurnoMutation.mutateAsync({
         id: activeTurno.id,
-        ...updates,
+        fecha: overData.fecha,
       });
     }
   };
@@ -337,64 +392,66 @@ export const CalendarioTurnosSemanal = () => {
             onDragEnd={handleDragEnd}
           >
             <div className="overflow-x-auto">
-              {/* Header con días de la semana */}
-              <div className="grid grid-cols-[200px_1fr] gap-4 mb-4">
-                <div className="font-semibold text-sm">Trabajador</div>
-                <div className="grid grid-cols-7 gap-2">
-                  {weekDays.map((day) => (
-                    <div key={day.toString()} className="text-center">
-                      <div className="font-semibold text-sm">
-                        {format(day, "EEE", { locale: es })}
+              <div className="flex">
+                {/* Columna de horas */}
+                <div className="flex-shrink-0 w-16 pr-2">
+                  {/* Header vacío para alinear con los días */}
+                  <div className="h-12 border-b border-border/50" />
+                  
+                  {/* Horas del día */}
+                  <div className="relative" style={{ height: HORAS_DIA.length * ALTURA_HORA }}>
+                    {HORAS_DIA.map((hora, index) => (
+                      <div
+                        key={hora}
+                        className="absolute right-0 -translate-y-2 text-xs text-muted-foreground font-medium"
+                        style={{ top: index * ALTURA_HORA }}
+                      >
+                        {hora.toString().padStart(2, '0')}:00
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {format(day, "d MMM", { locale: es })}
+                    ))}
+                  </div>
+                </div>
+
+                {/* Columnas de días */}
+                <div className="flex-1 flex">
+                  {weekDays.map((day) => {
+                    const fechaStr = format(day, "yyyy-MM-dd");
+                    const turnosDia = turnosSemana.filter((t) => t.fecha === fechaStr);
+                    const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+
+                    return (
+                      <div key={day.toString()} className="flex-1">
+                        {/* Header del día */}
+                        <div className={cn(
+                          "h-12 flex flex-col items-center justify-center border-b border-l border-border/50",
+                          isToday && "bg-primary/10"
+                        )}>
+                          <div className={cn(
+                            "font-semibold text-sm",
+                            isToday && "text-primary"
+                          )}>
+                            {format(day, "EEE", { locale: es })}
+                          </div>
+                          <div className={cn(
+                            "text-xs text-muted-foreground",
+                            isToday && "text-primary font-medium"
+                          )}>
+                            {format(day, "d MMM", { locale: es })}
+                          </div>
+                        </div>
+
+                        {/* Columna de turnos */}
+                        <DroppableDayColumn
+                          fecha={fechaStr}
+                          turnosDia={turnosDia}
+                          onCrearTurno={handleCrearTurno}
+                          onEditarTurno={handleEditarTurno}
+                        />
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
-
-              {/* Filas de trabajadores */}
-              {trabajadoresConTurnos.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No hay turnos programados para esta semana
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {trabajadoresConTurnos.map(({ trabajadorId, trabajador, turnos }) => (
-                    <div key={trabajadorId} className="grid grid-cols-[200px_1fr] gap-4 items-start">
-                      {/* Columna de trabajador */}
-                      <div className="flex flex-col gap-1 py-2">
-                        <div className="font-medium text-sm">
-                          {trabajador.nombre} {trabajador.apellidos}
-                        </div>
-                        <Badge variant="outline" className="w-fit text-xs">
-                          {trabajador.puesto}
-                        </Badge>
-                      </div>
-
-                      {/* Grid de días */}
-                      <div className="grid grid-cols-7 gap-2">
-                        {weekDays.map((day) => {
-                          const fechaStr = format(day, "yyyy-MM-dd");
-                          const turnosDia = turnos.filter((t) => t.fecha === fechaStr);
-
-                          return (
-                            <DroppableCell
-                              key={day.toString()}
-                              trabajadorId={trabajadorId}
-                              fecha={fechaStr}
-                              turnosDia={turnosDia}
-                              onCrearTurno={handleCrearTurno}
-                              onEditarTurno={handleEditarTurno}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {/* Leyenda de estados */}
               <div className="flex items-center gap-4 mt-6 pt-4 border-t">
@@ -411,11 +468,8 @@ export const CalendarioTurnosSemanal = () => {
             <DragOverlay>
               {activeTurno ? (
                 <TurnoCard
-                  turno={{
-                    ...activeTurno,
-                    trabajador_nombre: "",
-                    puesto: "",
-                  }}
+                  turno={activeTurno}
+                  style={{ width: 100, height: 60 }}
                 />
               ) : null}
             </DragOverlay>
@@ -429,7 +483,7 @@ export const CalendarioTurnosSemanal = () => {
         turnoId={turnoSeleccionado?.id}
         turnoData={turnoSeleccionado}
         fechaInicial={fechaInicial}
-        trabajadorIdInicial={trabajadorIdInicial}
+        horaInicialProp={horaInicial}
       />
     </>
   );
