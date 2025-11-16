@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { ListaTrabajadores } from "@/components/trabajadores/ListaTrabajadores";
 import { FormularioTrabajador } from "@/components/trabajadores/FormularioTrabajador";
 import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
+import { CalendarioTurnosSemanal } from "@/components/trabajadores/CalendarioTurnosSemanal";
 import { GenerarDatosFicticios } from "@/components/trabajadores/GenerarDatosFicticios";
 import {
   Dialog,
@@ -81,17 +82,7 @@ export default function Trabajadores() {
           </TabsContent>
 
           <TabsContent value="turnos">
-            <Card>
-              <CardHeader>
-                <CardTitle>Calendario de Turnos</CardTitle>
-                <CardDescription>
-                  Programa y visualiza los turnos del personal
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CalendarioTurnos />
-              </CardContent>
-            </Card>
+            <CalendarioTurnosSemanal />
           </TabsContent>
         </Tabs>
 
