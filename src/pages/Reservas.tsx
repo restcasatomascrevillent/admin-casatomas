@@ -181,17 +181,19 @@ export default function Reservas() {
           </TabsList>
 
           <TabsContent value="lista" className="space-y-6">
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex gap-2 items-center">
-                <span className="text-sm font-medium text-muted-foreground">Período:</span>
+            <div className="flex flex-wrap gap-6 items-center">
+              <div className="flex gap-2 items-center px-4 py-2 rounded-lg bg-secondary/30 border border-secondary">
+                <span className="text-sm font-semibold text-secondary-foreground">Período:</span>
                 <Button
                   variant={dateFilter === "upcoming" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setDateFilter("upcoming")}
                 >
                   Desde Hoy
                 </Button>
                 <Button
                   variant={dateFilter === "all" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setDateFilter("all")}
                 >
                   Histórico
@@ -200,6 +202,7 @@ export default function Reservas() {
                   <PopoverTrigger asChild>
                     <Button
                       variant={dateFilter === "specific" ? "default" : "outline"}
+                      size="sm"
                       className={cn(
                         "justify-start text-left font-normal",
                         !selectedDate && "text-muted-foreground"
@@ -226,28 +229,32 @@ export default function Reservas() {
                 </Popover>
               </div>
               
-              <div className="flex gap-2 items-center">
-                <span className="text-sm font-medium text-muted-foreground">Estado:</span>
+              <div className="flex gap-2 items-center px-4 py-2 rounded-lg bg-accent/30 border border-accent">
+                <span className="text-sm font-semibold text-accent-foreground">Estado:</span>
                 <Button
                   variant={filter === "all" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setFilter("all")}
                 >
                   Todas
                 </Button>
                 <Button
                   variant={filter === "pendiente" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setFilter("pendiente")}
                 >
                   Pendientes
                 </Button>
                 <Button
                   variant={filter === "verificada" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setFilter("verificada")}
                 >
                   Verificadas
                 </Button>
                 <Button
                   variant={filter === "confirmada" ? "default" : "outline"}
+                  size="sm"
                   onClick={() => setFilter("confirmada")}
                 >
                   Confirmadas
