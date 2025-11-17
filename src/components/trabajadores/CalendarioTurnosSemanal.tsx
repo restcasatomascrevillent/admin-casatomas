@@ -33,11 +33,28 @@ interface TurnoConTrabajador {
   notas?: string;
 }
 
-const ESTADOS_COLORS: Record<string, string> = {
-  programado: "bg-blue-500/80 border-blue-600",
-  activo: "bg-green-500/80 border-green-600",
-  completado: "bg-gray-400/80 border-gray-500",
-  cancelado: "bg-red-500/80 border-red-600",
+const TRABAJADOR_COLORS = [
+  "bg-blue-500/90 border-blue-600",
+  "bg-purple-500/90 border-purple-600",
+  "bg-pink-500/90 border-pink-600",
+  "bg-rose-500/90 border-rose-600",
+  "bg-orange-500/90 border-orange-600",
+  "bg-amber-500/90 border-amber-600",
+  "bg-yellow-500/90 border-yellow-600",
+  "bg-lime-500/90 border-lime-600",
+  "bg-green-500/90 border-green-600",
+  "bg-emerald-500/90 border-emerald-600",
+  "bg-teal-500/90 border-teal-600",
+  "bg-cyan-500/90 border-cyan-600",
+  "bg-sky-500/90 border-sky-600",
+  "bg-indigo-500/90 border-indigo-600",
+  "bg-violet-500/90 border-violet-600",
+  "bg-fuchsia-500/90 border-fuchsia-600",
+];
+
+const getColorForTrabajador = (trabajadorId: string, allTrabajadores: any[]) => {
+  const index = allTrabajadores.findIndex((t) => t.id === trabajadorId);
+  return TRABAJADOR_COLORS[index % TRABAJADOR_COLORS.length];
 };
 
 const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7); // 7:00 a 23:00
@@ -125,27 +142,25 @@ const calcularColumnas = (turnos: TurnoConTrabajador[]) => {
 
 interface TurnoCardProps {
   turno: TurnoConTrabajador;
+  colorClass: string;
   isDragging?: boolean;
   onClick?: () => void;
   style?: React.CSSProperties;
 }
 
-const TurnoCard = ({ turno, isDragging, onClick, style }: TurnoCardProps) => {
+const TurnoCard = ({ turno, colorClass, isDragging, onClick, style }: TurnoCardProps) => {
   return (
     <div
       className={cn(
         "absolute rounded px-2 py-1 text-white text-xs border-l-4 cursor-pointer hover:brightness-110 transition-all overflow-hidden",
-        ESTADOS_COLORS[turno.estado] || "bg-gray-500/80 border-gray-600",
+        colorClass,
         isDragging && "opacity-50"
       )}
       style={style}
       onClick={onClick}
-      title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}`}
+      title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}\n${turno.puesto}`}
     >
       <div className="font-semibold truncate">{turno.trabajador_nombre}</div>
-      <div className="text-[10px] opacity-90">
-        {turno.hora_inicio.substring(0, 5)} - {turno.hora_fin.substring(0, 5)}
-      </div>
       {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
         <div className="text-[10px] opacity-75 truncate">
           {turno.salas_asignadas[0]}
@@ -155,12 +170,15 @@ const TurnoCard = ({ turno, isDragging, onClick, style }: TurnoCardProps) => {
   );
 };
 
-interface DraggableTurnoProps extends TurnoCardProps {
+interface DraggableTurnoProps {
   turno: TurnoConTrabajador;
   fecha: string;
+  colorClass: string;
+  onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
-const DraggableTurno = ({ turno, fecha, onClick, style }: DraggableTurnoProps) => {
+const DraggableTurno = ({ turno, fecha, colorClass, onClick, style }: DraggableTurnoProps) => {
   const {
     attributes,
     listeners,
@@ -189,7 +207,7 @@ const DraggableTurno = ({ turno, fecha, onClick, style }: DraggableTurnoProps) =
 
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} onClick={handleClick}>
-      <TurnoCard turno={turno} isDragging={isDragging} style={combinedStyle} />
+      <TurnoCard turno={turno} colorClass={colorClass} isDragging={isDragging} style={combinedStyle} />
     </div>
   );
 };
@@ -197,6 +215,7 @@ const DraggableTurno = ({ turno, fecha, onClick, style }: DraggableTurnoProps) =
 interface DroppableDayColumnProps {
   fecha: string;
   turnosDia: TurnoConTrabajador[];
+  trabajadores: any[];
   onCrearTurno: (fecha: string, hora: string) => void;
   onEditarTurno: (turno: TurnoConTrabajador) => void;
 }
@@ -204,6 +223,7 @@ interface DroppableDayColumnProps {
 const DroppableDayColumn = ({
   fecha,
   turnosDia,
+  trabajadores,
   onCrearTurno,
   onEditarTurno,
 }: DroppableDayColumnProps) => {
@@ -247,12 +267,14 @@ const DroppableDayColumn = ({
         const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
         const width = `${100 / totalColumnas}%`;
         const left = `${(columna / totalColumnas) * 100}%`;
+        const colorClass = getColorForTrabajador(turno.trabajador_id, trabajadores);
 
         return (
           <DraggableTurno
             key={turno.id}
             turno={turno}
             fecha={fecha}
+            colorClass={colorClass}
             onClick={() => onEditarTurno(turno)}
             style={{
               top: `${top}px`,
@@ -444,6 +466,7 @@ export const CalendarioTurnosSemanal = () => {
                         <DroppableDayColumn
                           fecha={fechaStr}
                           turnosDia={turnosDia}
+                          trabajadores={trabajadores}
                           onCrearTurno={handleCrearTurno}
                           onEditarTurno={handleEditarTurno}
                         />
@@ -453,15 +476,22 @@ export const CalendarioTurnosSemanal = () => {
                 </div>
               </div>
 
-              {/* Leyenda de estados */}
-              <div className="flex items-center gap-4 mt-6 pt-4 border-t">
-                <span className="text-xs text-muted-foreground font-medium">Estado:</span>
-                {Object.entries(ESTADOS_COLORS).map(([estado, color]) => (
-                  <div key={estado} className="flex items-center gap-2">
-                    <div className={cn("w-3 h-3 rounded border-2", color)} />
-                    <span className="text-xs capitalize">{estado}</span>
-                  </div>
-                ))}
+              {/* Leyenda de trabajadores */}
+              <div className="mt-6 pt-4 border-t">
+                <span className="text-xs text-muted-foreground font-medium mb-3 block">Trabajadores:</span>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {trabajadores.map((trabajador: any) => {
+                    const colorClass = getColorForTrabajador(trabajador.id, trabajadores);
+                    return (
+                      <div key={trabajador.id} className="flex items-center gap-2">
+                        <div className={cn("w-4 h-4 rounded border-2 flex-shrink-0", colorClass)} />
+                        <span className="text-xs truncate">
+                          {trabajador.nombre} {trabajador.apellidos}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -469,6 +499,7 @@ export const CalendarioTurnosSemanal = () => {
               {activeTurno ? (
                 <TurnoCard
                   turno={activeTurno}
+                  colorClass={getColorForTrabajador(activeTurno.trabajador_id, trabajadores)}
                   style={{ width: 100, height: 60 }}
                 />
               ) : null}
