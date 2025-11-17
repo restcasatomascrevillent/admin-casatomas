@@ -44,7 +44,7 @@ export function AppSidebar() {
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="h-6 w-6 text-sidebar-primary" />
             <div className="flex flex-col">
-              <h2 className="text-lg font-semibold text-sidebar-foreground">Panel Admin</h2>
+              <h2 className="text-lg font-semibold text-sidebar-foreground">Admin Panel</h2>
               <span className="text-xs text-muted-foreground">Gestión del Restaurante</span>
             </div>
           </div>
