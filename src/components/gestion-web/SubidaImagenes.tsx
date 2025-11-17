@@ -2,21 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +41,7 @@ export function SubidaImagenes() {
 
   // Filtrar platos por categoría seleccionada
   const platosFiltrados = categoriaSeleccionada
-    ? platos?.filter(p => p.categoria === categoriaSeleccionada && p.activado)
+    ? platos?.filter((p) => p.categoria === categoriaSeleccionada && p.activado)
     : [];
 
   // Datos de ejemplo para Novedades y Web (se configurarán en el futuro)
@@ -88,7 +75,7 @@ export function SubidaImagenes() {
     setShowPreview(false);
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     if (input) {
-      input.value = '';
+      input.value = "";
     }
     form.resetField("archivo");
   };
@@ -97,48 +84,44 @@ export function SubidaImagenes() {
     setIsSubmitting(true);
     try {
       const archivo = values.archivo[0];
-      
+
       // Obtener el nombre del item
       let itemNombre = "";
       let bucketName = "";
-      
+
       if (values.tipo === "platos") {
-        const plato = platos?.find(p => p.id === values.item_id);
+        const plato = platos?.find((p) => p.id === values.item_id);
         itemNombre = plato?.nombre || "";
         bucketName = "platos";
       } else if (values.tipo === "salas") {
-        const sala = salas?.find(s => s.id === values.item_id);
+        const sala = salas?.find((s) => s.id === values.item_id);
         itemNombre = sala?.nombre || "";
         bucketName = "salas";
       } else if (values.tipo === "novedades") {
-        const novedad = novedades.find(n => n.id === values.item_id);
+        const novedad = novedades.find((n) => n.id === values.item_id);
         itemNombre = novedad?.nombre || "";
         bucketName = "novedades";
       } else if (values.tipo === "web") {
-        const seccion = seccionesWeb.find(s => s.id === values.item_id);
+        const seccion = seccionesWeb.find((s) => s.id === values.item_id);
         itemNombre = seccion?.nombre || "";
         bucketName = "web";
       }
-      
+
       // Obtener la extensión del archivo
-      const extension = archivo.name.split('.').pop();
+      const extension = archivo.name.split(".").pop();
       const fileName = `${values.item_id}.${extension}`;
 
       // Eliminar imágenes anteriores con el mismo ID (cualquier extensión)
-      const { data: existingFiles } = await supabase.storage
-        .from(bucketName)
-        .list();
+      const { data: existingFiles } = await supabase.storage.from(bucketName).list();
 
       if (existingFiles) {
         // Buscar archivos que empiecen con el ID del item
         const filesToDelete = existingFiles
-          .filter(file => file.name.startsWith(values.item_id))
-          .map(file => file.name);
+          .filter((file) => file.name.startsWith(values.item_id))
+          .map((file) => file.name);
 
         if (filesToDelete.length > 0) {
-          const { error: deleteError } = await supabase.storage
-            .from(bucketName)
-            .remove(filesToDelete);
+          const { error: deleteError } = await supabase.storage.from(bucketName).remove(filesToDelete);
 
           if (deleteError) {
             console.warn("Error eliminando imágenes anteriores:", deleteError);
@@ -147,12 +130,10 @@ export function SubidaImagenes() {
       }
 
       // Subir archivo a Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from(bucketName)
-        .upload(fileName, archivo, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      const { error: uploadError } = await supabase.storage.from(bucketName).upload(fileName, archivo, {
+        cacheControl: "3600",
+        upsert: false,
+      });
 
       if (uploadError) {
         throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
@@ -173,9 +154,7 @@ export function SubidaImagenes() {
     <Card>
       <CardHeader>
         <CardTitle>Subir Imágenes</CardTitle>
-        <CardDescription>
-          Sube imágenes de platos o del restaurante
-        </CardDescription>
+        <CardDescription>Sube imágenes de platos o del restaurante</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -186,12 +165,12 @@ export function SubidaImagenes() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de imagen</FormLabel>
-                  <Select 
+                  <Select
                     onValueChange={(value) => {
                       field.onChange(value);
                       form.setValue("categoria", "");
                       form.setValue("item_id", "");
-                    }} 
+                    }}
                     value={field.value}
                   >
                     <FormControl>
@@ -218,11 +197,11 @@ export function SubidaImagenes() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Categoría del plato</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
                         field.onChange(value);
                         form.setValue("item_id", "");
-                      }} 
+                      }}
                       value={field.value}
                     >
                       <FormControl>
@@ -255,44 +234,52 @@ export function SubidaImagenes() {
                     {tipoSeleccionado === "novedades" && "Selecciona la novedad"}
                     {tipoSeleccionado === "web" && "Selecciona la sección"}
                   </FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
+                  <Select
+                    onValueChange={field.onChange}
                     value={field.value}
                     disabled={tipoSeleccionado === "platos" && !categoriaSeleccionada}
                   >
                     <FormControl>
                       <SelectTrigger className="bg-background">
-                        <SelectValue placeholder={
-                          tipoSeleccionado === "platos" && !categoriaSeleccionada
-                            ? "Primero selecciona una categoría"
-                            : "Selecciona..."
-                        } />
+                        <SelectValue
+                          placeholder={
+                            tipoSeleccionado === "platos" && !categoriaSeleccionada
+                              ? "Primero selecciona una categoría"
+                              : "Selecciona..."
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-popover z-50">
-                      {tipoSeleccionado === "platos" && platosFiltrados.map((plato) => (
-                        <SelectItem key={plato.id} value={plato.id}>
-                          {plato.nombre}
-                        </SelectItem>
-                      ))}
-                      
-                      {tipoSeleccionado === "salas" && salas?.filter(s => s.activa).map((sala) => (
-                        <SelectItem key={sala.id} value={sala.id}>
-                          {sala.nombre}
-                        </SelectItem>
-                      ))}
-                      
-                      {tipoSeleccionado === "novedades" && novedades.map((novedad) => (
-                        <SelectItem key={novedad.id} value={novedad.id}>
-                          {novedad.nombre}
-                        </SelectItem>
-                      ))}
-                      
-                      {tipoSeleccionado === "web" && seccionesWeb.map((seccion) => (
-                        <SelectItem key={seccion.id} value={seccion.id}>
-                          {seccion.nombre}
-                        </SelectItem>
-                      ))}
+                      {tipoSeleccionado === "platos" &&
+                        platosFiltrados.map((plato) => (
+                          <SelectItem key={plato.id} value={plato.id}>
+                            {plato.nombre}
+                          </SelectItem>
+                        ))}
+
+                      {tipoSeleccionado === "salas" &&
+                        salas
+                          ?.filter((s) => s.activa)
+                          .map((sala) => (
+                            <SelectItem key={sala.id} value={sala.id}>
+                              {sala.nombre}
+                            </SelectItem>
+                          ))}
+
+                      {tipoSeleccionado === "novedades" &&
+                        novedades.map((novedad) => (
+                          <SelectItem key={novedad.id} value={novedad.id}>
+                            {novedad.nombre}
+                          </SelectItem>
+                        ))}
+
+                      {tipoSeleccionado === "web" &&
+                        seccionesWeb.map((seccion) => (
+                          <SelectItem key={seccion.id} value={seccion.id}>
+                            {seccion.nombre}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -315,7 +302,7 @@ export function SubidaImagenes() {
                         onChange={(e) => handleFileChange(e, onChange)}
                         className="cursor-pointer"
                       />
-                      
+
                       {showPreview && imagePreview && (
                         <div className="relative rounded-lg border-2 border-border bg-muted/50 p-4 animate-in fade-in-50 duration-500">
                           <div className="flex items-start justify-between mb-3">
@@ -333,15 +320,11 @@ export function SubidaImagenes() {
                               <X className="h-4 w-4" />
                             </Button>
                           </div>
-                          
+
                           <div className="relative aspect-video w-full overflow-hidden rounded-md bg-background">
-                            <img
-                              src={imagePreview}
-                              alt="Preview"
-                              className="object-contain w-full h-full"
-                            />
+                            <img src={imagePreview} alt="Preview" className="object-contain w-full h-full" />
                           </div>
-                          
+
                           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                             <CheckCircle2 className="h-3 w-3 text-green-500" />
                             Imagen lista para enviar
@@ -355,11 +338,7 @@ export function SubidaImagenes() {
               )}
             />
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isSubmitting || !showPreview}
-            >
+            <Button type="submit" className="w-full" disabled={isSubmitting || !showPreview}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -368,7 +347,7 @@ export function SubidaImagenes() {
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Enviar al Webhook
+                  Subir imagen
                 </>
               )}
             </Button>
