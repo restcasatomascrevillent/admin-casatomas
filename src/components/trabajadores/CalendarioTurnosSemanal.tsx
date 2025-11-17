@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTurnos, useTrabajadoresActivos, useActualizarTurno } from "@/hooks/useTrabajadores";
 import { useAreasTrabajoActivas } from "@/hooks/useAreasTrabajo";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DialogTurno } from "./DialogTurno";
 import {
@@ -59,20 +59,27 @@ const getColorForTrabajador = (trabajadorId: string, allTrabajadores: any[]) => 
 };
 
 const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7); // 7:00 a 23:00
-const ALTURA_HORA = 60; // Pixels por hora
+
+const ZOOM_LEVELS = {
+  compacto: 40,
+  normal: 60,
+  expandido: 80,
+} as const;
+
+type ZoomLevel = keyof typeof ZOOM_LEVELS;
 
 const timeToMinutes = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 };
 
-const calcularPosicionYAltura = (horaInicio: string, horaFin: string) => {
+const calcularPosicionYAltura = (horaInicio: string, horaFin: string, alturaHora: number) => {
   const minutosInicio = timeToMinutes(horaInicio);
   const minutosFin = timeToMinutes(horaFin);
   const minutosBase = 7 * 60; // 7:00 AM es la base
   
-  const top = ((minutosInicio - minutosBase) / 60) * ALTURA_HORA;
-  const height = ((minutosFin - minutosInicio) / 60) * ALTURA_HORA;
+  const top = ((minutosInicio - minutosBase) / 60) * alturaHora;
+  const height = ((minutosFin - minutosInicio) / 60) * alturaHora;
   
   return { top, height };
 };
@@ -252,6 +259,7 @@ interface AreaColumnProps {
   areaNombre: string;
   turnosArea: TurnoConTrabajador[];
   trabajadores: any[];
+  alturaHora: number;
   onCrearTurno: (fecha: string, hora: string) => void;
   onEditarTurno: (turno: TurnoConTrabajador) => void;
 }
@@ -262,6 +270,7 @@ const AreaColumn = ({
   areaNombre,
   turnosArea,
   trabajadores,
+  alturaHora,
   onCrearTurno,
   onEditarTurno,
 }: AreaColumnProps) => {
@@ -280,14 +289,14 @@ const AreaColumn = ({
         "relative border-l border-border/50 flex-1 min-w-[100px] group",
         isOver && "bg-primary/10"
       )}
-      style={{ height: HORAS_DIA.length * ALTURA_HORA }}
+      style={{ height: HORAS_DIA.length * alturaHora }}
     >
       {/* Líneas horizontales para cada hora */}
       {HORAS_DIA.map((hora, index) => (
         <div
           key={hora}
           className="absolute left-0 right-0 border-t border-border/30"
-          style={{ top: index * ALTURA_HORA }}
+          style={{ top: index * alturaHora }}
         />
       ))}
       
@@ -304,7 +313,7 @@ const AreaColumn = ({
         const subcolumnas = calcularSubcolumnas(turnosArea);
         
         return turnosArea.map((turno) => {
-          const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
+          const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin, alturaHora);
           const colorClass = getColorForTrabajador(turno.trabajador_id, trabajadores);
           const { columna, totalColumnas } = subcolumnas[turno.id] || { columna: 0, totalColumnas: 1 };
           
@@ -339,6 +348,7 @@ export const CalendarioTurnosSemanal = () => {
   const [fechaInicial, setFechaInicial] = useState<string | undefined>();
   const [horaInicial, setHoraInicial] = useState<string | undefined>();
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("normal");
   
   const weekStart = startOfWeek(currentDate, { locale: es, weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentDate, { locale: es, weekStartsOn: 1 });
@@ -348,6 +358,8 @@ export const CalendarioTurnosSemanal = () => {
   const { data: turnosData = [] } = useTurnos();
   const { data: areas = [] } = useAreasTrabajoActivas();
   const actualizarTurnoMutation = useActualizarTurno();
+
+  const alturaHora = ZOOM_LEVELS[zoomLevel];
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -428,6 +440,36 @@ export const CalendarioTurnosSemanal = () => {
           <div className="flex items-center justify-between">
             <CardTitle>Calendario de Turnos</CardTitle>
             <div className="flex items-center gap-2">
+              {/* Controles de zoom */}
+              <div className="flex items-center gap-1 mr-2 border-r pr-2">
+                <Button
+                  variant={zoomLevel === "compacto" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setZoomLevel("compacto")}
+                  className="h-8 px-2"
+                >
+                  <ZoomOut className="h-3 w-3 mr-1" />
+                  Compacto
+                </Button>
+                <Button
+                  variant={zoomLevel === "normal" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setZoomLevel("normal")}
+                  className="h-8 px-2"
+                >
+                  Normal
+                </Button>
+                <Button
+                  variant={zoomLevel === "expandido" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setZoomLevel("expandido")}
+                  className="h-8 px-2"
+                >
+                  <ZoomIn className="h-3 w-3 mr-1" />
+                  Expandido
+                </Button>
+              </div>
+              
               <Button
                 variant="outline"
                 size="icon"
@@ -470,12 +512,12 @@ export const CalendarioTurnosSemanal = () => {
                   <div className="h-12 border-b border-border/50" />
                   
                   {/* Horas del día */}
-                  <div className="relative" style={{ height: HORAS_DIA.length * ALTURA_HORA }}>
+                  <div className="relative" style={{ height: HORAS_DIA.length * alturaHora }}>
                     {HORAS_DIA.map((hora, index) => (
                       <div
                         key={hora}
                         className="absolute right-0 -translate-y-2 text-xs text-muted-foreground font-medium"
-                        style={{ top: index * ALTURA_HORA }}
+                        style={{ top: index * alturaHora }}
                       >
                         {hora.toString().padStart(2, '0')}:00
                       </div>
@@ -547,13 +589,14 @@ export const CalendarioTurnosSemanal = () => {
                         <div key={`cols-${day.toString()}`} className="flex-1 flex">
                           {/* Columnas de áreas */}
                           {areas.map((area: any) => (
-                            <AreaColumn
+                             <AreaColumn
                               key={`${fechaStr}-${area.id}`}
                               fecha={fechaStr}
                               areaId={area.id}
                               areaNombre={area.nombre}
                               turnosArea={turnosPorArea[area.id] || []}
                               trabajadores={trabajadores}
+                              alturaHora={alturaHora}
                               onCrearTurno={handleCrearTurno}
                               onEditarTurno={handleEditarTurno}
                             />
@@ -566,6 +609,7 @@ export const CalendarioTurnosSemanal = () => {
                             areaNombre="Sin asignar"
                             turnosArea={turnosPorArea["sin_asignar"] || []}
                             trabajadores={trabajadores}
+                            alturaHora={alturaHora}
                             onCrearTurno={handleCrearTurno}
                             onEditarTurno={handleEditarTurno}
                           />
