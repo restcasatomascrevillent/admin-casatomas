@@ -29,7 +29,7 @@ interface TurnoConTrabajador {
   hora_fin: string;
   estado: string;
   puesto: string;
-  salas_asignadas?: string[];
+  areas_asignadas?: string[];
   notas?: string;
 }
 
@@ -161,9 +161,9 @@ const TurnoCard = ({ turno, colorClass, isDragging, onClick, style }: TurnoCardP
       title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}\n${turno.puesto}`}
     >
       <div className="font-semibold truncate">{turno.trabajador_nombre}</div>
-      {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
+      {turno.areas_asignadas && turno.areas_asignadas.length > 0 && (
         <div className="text-[10px] opacity-75 truncate">
-          {turno.salas_asignadas[0]}
+          {turno.areas_asignadas[0]}
         </div>
       )}
     </div>

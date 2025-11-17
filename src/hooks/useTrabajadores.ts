@@ -37,6 +37,13 @@ export interface AsignacionSala {
   created_at: string;
 }
 
+export interface AsignacionArea {
+  id: string;
+  turno_id: string;
+  area_id: string;
+  created_at: string;
+}
+
 export interface RegistroHoras {
   id: string;
   trabajador_id: string;
@@ -156,25 +163,19 @@ export const useEliminarTrabajador = () => {
   });
 };
 
-// Hook para obtener turnos
-export const useTurnos = (fecha?: string) => {
+// Hook para obtener todos los turnos
+export const useTurnos = () => {
   return useQuery({
-    queryKey: ["turnos", fecha],
+    queryKey: ["turnos"],
     queryFn: async () => {
-      let query = supabase
-        .from("turnos" as any)
+      const { data, error } = await supabase
+        .from("vista_turnos_con_areas")
         .select("*")
-        .order("fecha", { ascending: false })
-        .order("hora_inicio");
-
-      if (fecha) {
-        query = query.eq("fecha", fecha);
-      }
-
-      const { data, error } = await query;
+        .order("fecha", { ascending: true })
+        .order("hora_inicio", { ascending: true });
 
       if (error) throw error;
-      return data as any as Turno[];
+      return data;
     },
   });
 };
@@ -207,19 +208,37 @@ export const useCrearTurno = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (turno: Omit<Turno, "id" | "created_at" | "updated_at">) => {
+    mutationFn: async (turno: Omit<Turno, "id" | "created_at" | "updated_at"> & { areas?: string[] }) => {
+      const { areas, ...turnoData } = turno;
+      
       const { data, error } = await supabase
         .from("turnos" as any)
-        .insert(turno)
+        .insert(turnoData)
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (error || !data) throw error || new Error("No data returned");
+
+      const turnoCreado = data as any;
+
+      // Si hay áreas seleccionadas, crear las asignaciones
+      if (areas && areas.length > 0) {
+        const asignaciones = areas.map((area_id) => ({
+          turno_id: turnoCreado.id,
+          area_id: area_id,
+        }));
+
+        const { error: asignacionError } = await supabase
+          .from("asignaciones_area")
+          .insert(asignaciones);
+
+        if (asignacionError) throw asignacionError;
+      }
+
+      return turnoCreado;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
-      queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
       toast.success("Turno creado correctamente");
     },
     onError: (error: any) => {
@@ -233,7 +252,7 @@ export const useActualizarTurno = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...turno }: Partial<Turno> & { id: string }) => {
+    mutationFn: async ({ id, areas, ...turno }: Partial<Turno> & { id: string; areas?: string[] }) => {
       const { data, error } = await supabase
         .from("turnos" as any)
         .update(turno)
@@ -242,11 +261,34 @@ export const useActualizarTurno = () => {
         .single();
 
       if (error) throw error;
+
+      // Si hay áreas definidas, actualizar asignaciones
+      if (areas !== undefined) {
+        // Primero eliminar asignaciones existentes
+        await supabase
+          .from("asignaciones_area")
+          .delete()
+          .eq("turno_id", id);
+
+        // Luego crear las nuevas asignaciones
+        if (areas.length > 0) {
+          const asignaciones = areas.map((area_id) => ({
+            turno_id: id,
+            area_id: area_id,
+          }));
+
+          const { error: asignacionError } = await supabase
+            .from("asignaciones_area")
+            .insert(asignaciones);
+
+          if (asignacionError) throw asignacionError;
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
-      queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
       toast.success("Turno actualizado correctamente");
     },
     onError: (error: any) => {
@@ -270,7 +312,6 @@ export const useEliminarTurno = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
-      queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
       toast.success("Turno eliminado correctamente");
     },
     onError: (error: any) => {
