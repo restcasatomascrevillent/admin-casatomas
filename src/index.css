@@ -8,103 +8,107 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 35 25% 97%;
-    --foreground: 25 25% 15%;
+    --background: 0 0% 100%;
+    --foreground: 206 11% 25%;
 
     --card: 0 0% 100%;
-    --card-foreground: 25 25% 15%;
+    --card-foreground: 206 11% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 25 25% 15%;
+    --popover-foreground: 206 11% 25%;
 
-    --primary: 12 65% 60%;
+    --primary: 206 11% 25%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 35 35% 88%;
-    --secondary-foreground: 25 25% 15%;
+    --secondary: 25 13% 55%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 35 20% 92%;
-    --muted-foreground: 25 15% 45%;
+    --muted: 25 13% 85%;
+    --muted-foreground: 15 4% 39%;
 
-    --accent: 43 80% 45%;
+    --accent: 38 59% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 70% 50%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 15% 88%;
-    --input: 35 15% 88%;
-    --ring: 12 65% 60%;
+    --border: 25 13% 85%;
+    --input: 25 13% 85%;
+    --ring: 206 11% 25%;
 
     --radius: 0.75rem;
 
     /* Status colors */
     --status-pending: 45 93% 47%;
-    --status-pending-foreground: 25 25% 15%;
+    --status-pending-foreground: 206 11% 25%;
     --status-verified: 210 100% 50%;
     --status-verified-foreground: 0 0% 100%;
     --status-confirmed: 142 76% 36%;
     --status-confirmed-foreground: 0 0% 100%;
 
     /* Sidebar */
-    --sidebar-background: 25 30% 12%;
-    --sidebar-foreground: 35 15% 85%;
-    --sidebar-primary: 12 65% 60%;
+    --sidebar-background: 206 11% 25%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 38 59% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 25 25% 18%;
-    --sidebar-accent-foreground: 35 15% 85%;
-    --sidebar-border: 25 20% 20%;
-    --sidebar-ring: 12 65% 60%;
+    --sidebar-accent: 15 4% 39%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 25 13% 85%;
+    --sidebar-ring: 38 59% 45%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(12 65% 60%), hsl(25 70% 50%));
-    --gradient-accent: linear-gradient(135deg, hsl(43 80% 45%), hsl(35 75% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(206 11% 25% / 0.95), hsl(15 4% 39% / 0.9));
+    --gradient-section: linear-gradient(180deg, hsl(0 0% 100%), hsl(25 13% 95%));
+
+    /* Shadows */
+    --shadow-sm: 0 4px 20px hsl(206 11% 25% / 0.1);
+    --shadow-lg: 0 10px 40px hsl(206 11% 25% / 0.15);
   }
 
   .dark {
-    --background: 25 30% 10%;
-    --foreground: 35 15% 90%;
+    --background: 206 11% 15%;
+    --foreground: 0 0% 100%;
 
-    --card: 25 25% 13%;
-    --card-foreground: 35 15% 90%;
+    --card: 206 11% 20%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 25 25% 13%;
-    --popover-foreground: 35 15% 90%;
+    --popover: 206 11% 20%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 12 65% 60%;
+    --primary: 38 59% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 25 20% 20%;
-    --secondary-foreground: 35 15% 90%;
+    --secondary: 25 13% 35%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 25 15% 18%;
-    --muted-foreground: 35 10% 60%;
+    --muted: 206 11% 25%;
+    --muted-foreground: 25 13% 70%;
 
-    --accent: 43 80% 45%;
+    --accent: 38 59% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 70% 50%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 25 20% 22%;
-    --input: 25 20% 22%;
-    --ring: 12 65% 60%;
+    --border: 206 11% 30%;
+    --input: 206 11% 30%;
+    --ring: 38 59% 45%;
 
     --status-pending: 45 93% 47%;
-    --status-pending-foreground: 25 25% 15%;
+    --status-pending-foreground: 0 0% 100%;
     --status-verified: 210 100% 50%;
     --status-verified-foreground: 0 0% 100%;
     --status-confirmed: 142 76% 36%;
     --status-confirmed-foreground: 0 0% 100%;
 
-    --sidebar-background: 25 35% 8%;
-    --sidebar-foreground: 35 15% 85%;
-    --sidebar-primary: 12 65% 60%;
+    --sidebar-background: 206 11% 18%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 38 59% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 25 25% 14%;
-    --sidebar-accent-foreground: 35 15% 85%;
-    --sidebar-border: 25 25% 16%;
-    --sidebar-ring: 12 65% 60%;
+    --sidebar-accent: 15 4% 39%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 206 11% 25%;
+    --sidebar-ring: 38 59% 45%;
   }
 }
 
