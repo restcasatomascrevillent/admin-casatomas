@@ -10,6 +10,7 @@ import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
 import { CalendarioTurnosSemanal } from "@/components/trabajadores/CalendarioTurnosSemanal";
 import { GenerarTurnosFicticios } from "@/components/trabajadores/GenerarTurnosFicticios";
 import { GenerarAreasFicticias } from "@/components/trabajadores/GenerarAreasFicticias";
+import { AsignarAreasAutomaticamente } from "@/components/trabajadores/AsignarAreasAutomaticamente";
 import { DialogTurno } from "@/components/trabajadores/DialogTurno";
 import { GenerarDatosFicticios } from "@/components/trabajadores/GenerarDatosFicticios";
 import {
@@ -54,6 +55,7 @@ export default function Trabajadores() {
             <GenerarDatosFicticios />
             <GenerarTurnosFicticios />
             <GenerarAreasFicticias />
+            <AsignarAreasAutomaticamente />
             <Button
               variant="outline"
               onClick={() => setDialogTurnoAbierto(true)}
