@@ -32,6 +32,7 @@ interface Reservation {
 export default function Reservas() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<"upcoming" | "all">("upcoming");
   const [openDialog, setOpenDialog] = useState(false);
 
   useEffect(() => {
@@ -114,9 +115,18 @@ export default function Reservas() {
     }
   };
 
-  const filteredReservations = reservations.filter((r) =>
-    filter === "all" ? true : r.estado === filter
-  );
+  const filteredReservations = reservations.filter((r) => {
+    const statusMatch = filter === "all" ? true : r.estado === filter;
+    
+    if (dateFilter === "upcoming") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const reservationDate = new Date(r.fecha);
+      return statusMatch && reservationDate >= today;
+    }
+    
+    return statusMatch;
+  });
 
   return (
     <DashboardLayout>
@@ -157,31 +167,50 @@ export default function Reservas() {
           </TabsList>
 
           <TabsContent value="lista" className="space-y-6">
-            <div className="flex gap-2">
-              <Button
-                variant={filter === "all" ? "default" : "outline"}
-                onClick={() => setFilter("all")}
-              >
-                Todas
-              </Button>
-              <Button
-                variant={filter === "pendiente" ? "default" : "outline"}
-                onClick={() => setFilter("pendiente")}
-              >
-                Pendientes
-              </Button>
-              <Button
-                variant={filter === "verificada" ? "default" : "outline"}
-                onClick={() => setFilter("verificada")}
-              >
-                Verificadas
-              </Button>
-              <Button
-                variant={filter === "confirmada" ? "default" : "outline"}
-                onClick={() => setFilter("confirmada")}
-              >
-                Confirmadas
-              </Button>
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-2 items-center">
+                <span className="text-sm font-medium text-muted-foreground">Período:</span>
+                <Button
+                  variant={dateFilter === "upcoming" ? "default" : "outline"}
+                  onClick={() => setDateFilter("upcoming")}
+                >
+                  Desde Hoy
+                </Button>
+                <Button
+                  variant={dateFilter === "all" ? "default" : "outline"}
+                  onClick={() => setDateFilter("all")}
+                >
+                  Histórico
+                </Button>
+              </div>
+              
+              <div className="flex gap-2 items-center">
+                <span className="text-sm font-medium text-muted-foreground">Estado:</span>
+                <Button
+                  variant={filter === "all" ? "default" : "outline"}
+                  onClick={() => setFilter("all")}
+                >
+                  Todas
+                </Button>
+                <Button
+                  variant={filter === "pendiente" ? "default" : "outline"}
+                  onClick={() => setFilter("pendiente")}
+                >
+                  Pendientes
+                </Button>
+                <Button
+                  variant={filter === "verificada" ? "default" : "outline"}
+                  onClick={() => setFilter("verificada")}
+                >
+                  Verificadas
+                </Button>
+                <Button
+                  variant={filter === "confirmada" ? "default" : "outline"}
+                  onClick={() => setFilter("confirmada")}
+                >
+                  Confirmadas
+                </Button>
+              </div>
             </div>
 
             <Card>
