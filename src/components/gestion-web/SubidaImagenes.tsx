@@ -27,7 +27,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
-  tipo: z.enum(["restaurante", "plato"]),
+  tipo: z.enum(["platos", "salas", "novedades", "web"]),
+  categoria: z.string().optional(),
   item_id: z.string().min(1, "Selecciona un elemento"),
   archivo: z.instanceof(FileList).refine((files) => files?.length === 1, "Debes subir un archivo"),
 });
@@ -35,7 +36,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function SubidaImagenes() {
-  const { platos } = usePlatos();
+  const { platos, categorias } = usePlatos();
   const { data: salas } = useSalas();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -44,11 +45,29 @@ export function SubidaImagenes() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      tipo: "plato",
+      tipo: "platos",
     },
   });
 
   const tipoSeleccionado = form.watch("tipo");
+  const categoriaSeleccionada = form.watch("categoria");
+
+  // Filtrar platos por categoría seleccionada
+  const platosFiltrados = categoriaSeleccionada
+    ? platos?.filter(p => p.categoria === categoriaSeleccionada && p.activado)
+    : [];
+
+  // Datos de ejemplo para Novedades y Web (se configurarán en el futuro)
+  const novedades = [
+    { id: "nov1", nombre: "Menú de Navidad 2024" },
+    { id: "nov2", nombre: "Nueva Terraza de Verano" },
+  ];
+
+  const seccionesWeb = [
+    { id: "hero", nombre: "Imagen Hero Principal" },
+    { id: "about", nombre: "Sobre Nosotros" },
+    { id: "galeria", nombre: "Galería" },
+  ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (files: FileList) => void) => {
     const files = e.target.files;
@@ -81,16 +100,25 @@ export function SubidaImagenes() {
       
       // Obtener el nombre del item
       let itemNombre = "";
-      if (values.tipo === "plato") {
+      let bucketName = "";
+      
+      if (values.tipo === "platos") {
         const plato = platos?.find(p => p.id === values.item_id);
         itemNombre = plato?.nombre || "";
-      } else {
+        bucketName = "platos";
+      } else if (values.tipo === "salas") {
         const sala = salas?.find(s => s.id === values.item_id);
         itemNombre = sala?.nombre || "";
+        bucketName = "salas";
+      } else if (values.tipo === "novedades") {
+        const novedad = novedades.find(n => n.id === values.item_id);
+        itemNombre = novedad?.nombre || "";
+        bucketName = "novedades";
+      } else if (values.tipo === "web") {
+        const seccion = seccionesWeb.find(s => s.id === values.item_id);
+        itemNombre = seccion?.nombre || "";
+        bucketName = "web";
       }
-
-      // Determinar el bucket según el tipo
-      const bucketName = values.tipo === "plato" ? "platos" : "salas";
       
       // Obtener la extensión del archivo
       const extension = archivo.name.split('.').pop();
@@ -141,9 +169,6 @@ export function SubidaImagenes() {
     }
   };
 
-  const platosActivos = platos?.filter(p => p.activado) || [];
-  const salasActivas = salas?.filter(s => s.activa) || [];
-
   return (
     <Card>
       <CardHeader>
@@ -161,15 +186,24 @@ export function SubidaImagenes() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de imagen</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      form.setValue("categoria", "");
+                      form.setValue("item_id", "");
+                    }} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger className="bg-background">
                         <SelectValue placeholder="Selecciona el tipo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-popover z-50">
-                      <SelectItem value="plato">Plato</SelectItem>
-                      <SelectItem value="restaurante">Restaurante (Sala)</SelectItem>
+                      <SelectItem value="platos">Platos</SelectItem>
+                      <SelectItem value="salas">Salas</SelectItem>
+                      <SelectItem value="novedades">Novedades</SelectItem>
+                      <SelectItem value="web">Web</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -177,38 +211,88 @@ export function SubidaImagenes() {
               )}
             />
 
+            {tipoSeleccionado === "platos" && (
+              <FormField
+                control={form.control}
+                name="categoria"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoría del plato</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue("item_id", "");
+                      }} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Selecciona una categoría" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-popover z-50">
+                        {categorias?.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria}>
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="item_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    {tipoSeleccionado === "plato" ? "Selecciona el plato" : "Selecciona la sala"}
+                    {tipoSeleccionado === "platos" && "Selecciona el plato"}
+                    {tipoSeleccionado === "salas" && "Selecciona la sala"}
+                    {tipoSeleccionado === "novedades" && "Selecciona la novedad"}
+                    {tipoSeleccionado === "web" && "Selecciona la sección"}
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={tipoSeleccionado === "platos" && !categoriaSeleccionada}
+                  >
                     <FormControl>
                       <SelectTrigger className="bg-background">
                         <SelectValue placeholder={
-                          tipoSeleccionado === "plato" 
-                            ? "Selecciona un plato" 
-                            : "Selecciona una sala"
+                          tipoSeleccionado === "platos" && !categoriaSeleccionada
+                            ? "Primero selecciona una categoría"
+                            : "Selecciona..."
                         } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-popover z-50">
-                      {tipoSeleccionado === "plato" ? (
-                        platosActivos.map((plato) => (
-                          <SelectItem key={plato.id} value={plato.id}>
-                            {plato.nombre} - {plato.categoria}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        salasActivas.map((sala) => (
-                          <SelectItem key={sala.id} value={sala.id}>
-                            {sala.nombre}
-                          </SelectItem>
-                        ))
-                      )}
+                      {tipoSeleccionado === "platos" && platosFiltrados.map((plato) => (
+                        <SelectItem key={plato.id} value={plato.id}>
+                          {plato.nombre}
+                        </SelectItem>
+                      ))}
+                      
+                      {tipoSeleccionado === "salas" && salas?.filter(s => s.activa).map((sala) => (
+                        <SelectItem key={sala.id} value={sala.id}>
+                          {sala.nombre}
+                        </SelectItem>
+                      ))}
+                      
+                      {tipoSeleccionado === "novedades" && novedades.map((novedad) => (
+                        <SelectItem key={novedad.id} value={novedad.id}>
+                          {novedad.nombre}
+                        </SelectItem>
+                      ))}
+                      
+                      {tipoSeleccionado === "web" && seccionesWeb.map((seccion) => (
+                        <SelectItem key={seccion.id} value={seccion.id}>
+                          {seccion.nombre}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
