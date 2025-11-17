@@ -4,6 +4,7 @@ import { es } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTurnos, useTrabajadoresActivos, useActualizarTurno } from "@/hooks/useTrabajadores";
+import { useAreasTrabajoActivas } from "@/hooks/useAreasTrabajo";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DialogTurno } from "./DialogTurno";
@@ -29,7 +30,7 @@ interface TurnoConTrabajador {
   hora_fin: string;
   estado: string;
   puesto: string;
-  areas_asignadas?: string[];
+  areas_asignadas?: string[]; // IDs de áreas
   notas?: string;
 }
 
@@ -76,68 +77,35 @@ const calcularPosicionYAltura = (horaInicio: string, horaFin: string) => {
   return { top, height };
 };
 
-// Función para detectar superposiciones y calcular columnas
-const calcularColumnas = (turnos: TurnoConTrabajador[]) => {
-  if (turnos.length === 0) return [];
+// Función para agrupar turnos por área de trabajo
+const agruparTurnosPorArea = (turnos: TurnoConTrabajador[], areas: any[]) => {
+  // Crear un mapa de área -> turnos
+  const turnosPorArea: Record<string, TurnoConTrabajador[]> = {};
   
-  const turnosOrdenados = [...turnos].sort((a, b) => 
-    timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
-  );
+  // Inicializar con todas las áreas
+  areas.forEach((area) => {
+    turnosPorArea[area.id] = [];
+  });
   
-  const columnas: { turno: TurnoConTrabajador; columna: number; totalColumnas: number }[] = [];
-  const columnasOcupadas: { turno: TurnoConTrabajador; finMinutos: number }[][] = [[]];
+  // Crear categoría para "Sin asignar"
+  turnosPorArea["sin_asignar"] = [];
   
-  turnosOrdenados.forEach((turno) => {
-    const inicioMinutos = timeToMinutes(turno.hora_inicio);
-    const finMinutos = timeToMinutes(turno.hora_fin);
-    
-    // Buscar una columna libre
-    let columnaEncontrada = -1;
-    for (let i = 0; i < columnasOcupadas.length; i++) {
-      const ultimoTurno = columnasOcupadas[i][columnasOcupadas[i].length - 1];
-      if (!ultimoTurno || ultimoTurno.finMinutos <= inicioMinutos) {
-        columnaEncontrada = i;
-        break;
+  // Clasificar turnos por área
+  turnos.forEach((turno) => {
+    if (turno.areas_asignadas && turno.areas_asignadas.length > 0) {
+      // Asignar a la primera área (por simplicidad, podríamos mejorarlo)
+      const areaId = turno.areas_asignadas[0];
+      if (turnosPorArea[areaId]) {
+        turnosPorArea[areaId].push(turno);
+      } else {
+        turnosPorArea["sin_asignar"].push(turno);
       }
+    } else {
+      turnosPorArea["sin_asignar"].push(turno);
     }
-    
-    // Si no hay columna libre, crear una nueva
-    if (columnaEncontrada === -1) {
-      columnaEncontrada = columnasOcupadas.length;
-      columnasOcupadas.push([]);
-    }
-    
-    columnasOcupadas[columnaEncontrada].push({ turno, finMinutos });
   });
   
-  // Calcular el número total de columnas para cada turno
-  turnosOrdenados.forEach((turno) => {
-    const inicioMinutos = timeToMinutes(turno.hora_inicio);
-    const finMinutos = timeToMinutes(turno.hora_fin);
-    
-    // Contar cuántas columnas se superponen con este turno
-    let maxColumnas = 1;
-    columnasOcupadas.forEach((col) => {
-      col.forEach((item) => {
-        const itemInicio = timeToMinutes(item.turno.hora_inicio);
-        const itemFin = timeToMinutes(item.turno.hora_fin);
-        
-        // Hay superposición si los intervalos se cruzan
-        if (!(finMinutos <= itemInicio || inicioMinutos >= itemFin)) {
-          maxColumnas = Math.max(maxColumnas, columnasOcupadas.length);
-        }
-      });
-    });
-    
-    // Encontrar la columna de este turno
-    const columna = columnasOcupadas.findIndex((col) => 
-      col.some((item) => item.turno.id === turno.id)
-    );
-    
-    columnas.push({ turno, columna, totalColumnas: maxColumnas });
-  });
-  
-  return columnas;
+  return turnosPorArea;
 };
 
 interface TurnoCardProps {
@@ -161,11 +129,9 @@ const TurnoCard = ({ turno, colorClass, isDragging, onClick, style }: TurnoCardP
       title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}\n${turno.puesto}`}
     >
       <div className="font-semibold truncate">{turno.trabajador_nombre}</div>
-      {turno.areas_asignadas && turno.areas_asignadas.length > 0 && (
-        <div className="text-[10px] opacity-75 truncate">
-          {turno.areas_asignadas[0]}
-        </div>
-      )}
+      <div className="text-[10px] opacity-75 truncate">
+        {turno.puesto}
+      </div>
     </div>
   );
 };
@@ -212,35 +178,38 @@ const DraggableTurno = ({ turno, fecha, colorClass, onClick, style }: DraggableT
   );
 };
 
-interface DroppableDayColumnProps {
+interface AreaColumnProps {
   fecha: string;
-  turnosDia: TurnoConTrabajador[];
+  areaId: string;
+  areaNombre: string;
+  turnosArea: TurnoConTrabajador[];
   trabajadores: any[];
   onCrearTurno: (fecha: string, hora: string) => void;
   onEditarTurno: (turno: TurnoConTrabajador) => void;
 }
 
-const DroppableDayColumn = ({
+const AreaColumn = ({
   fecha,
-  turnosDia,
+  areaId,
+  areaNombre,
+  turnosArea,
   trabajadores,
   onCrearTurno,
   onEditarTurno,
-}: DroppableDayColumnProps) => {
+}: AreaColumnProps) => {
   const { setNodeRef, isOver } = useSortable({
-    id: `day-${fecha}`,
+    id: `area-${fecha}-${areaId}`,
     data: {
       fecha,
+      areaId,
     },
   });
-
-  const turnosConColumnas = calcularColumnas(turnosDia);
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "relative border-l border-border/50 min-w-[120px] group",
+        "relative border-l border-border/50 flex-1 min-w-[100px] group",
         isOver && "bg-primary/10"
       )}
       style={{ height: HORAS_DIA.length * ALTURA_HORA }}
@@ -263,10 +232,8 @@ const DroppableDayColumn = ({
       </button>
 
       {/* Turnos posicionados */}
-      {turnosConColumnas.map(({ turno, columna, totalColumnas }) => {
+      {turnosArea.map((turno) => {
         const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
-        const width = `${100 / totalColumnas}%`;
-        const left = `${(columna / totalColumnas) * 100}%`;
         const colorClass = getColorForTrabajador(turno.trabajador_id, trabajadores);
 
         return (
@@ -279,8 +246,8 @@ const DroppableDayColumn = ({
             style={{
               top: `${top}px`,
               height: `${height}px`,
-              width,
-              left,
+              width: "100%",
+              left: 0,
             }}
           />
         );
@@ -303,6 +270,7 @@ export const CalendarioTurnosSemanal = () => {
 
   const { data: trabajadores = [] } = useTrabajadoresActivos();
   const { data: turnosData = [] } = useTurnos();
+  const { data: areas = [] } = useAreasTrabajoActivas();
   const actualizarTurnoMutation = useActualizarTurno();
 
   const sensors = useSensors(
@@ -322,10 +290,15 @@ export const CalendarioTurnosSemanal = () => {
       return turno.fecha >= startStr && turno.fecha <= endStr;
     }).map((turno: any) => {
       const trabajador = trabajadores.find((t: any) => t.id === turno.trabajador_id);
+      
+      // Obtener IDs de áreas desde areas_ids
+      const areasIds = turno.areas_ids || [];
+      
       return {
         ...turno,
         trabajador_nombre: trabajador ? `${trabajador.nombre} ${trabajador.apellidos}` : "Desconocido",
         puesto: trabajador?.puesto || "",
+        areas_asignadas: areasIds, // Usar los IDs directamente
       };
     });
   }, [turnosData, weekStart, weekEnd, trabajadores]);
@@ -434,45 +407,96 @@ export const CalendarioTurnosSemanal = () => {
                   </div>
                 </div>
 
-                {/* Columnas de días */}
-                <div className="flex-1 flex">
-                  {weekDays.map((day) => {
-                    const fechaStr = format(day, "yyyy-MM-dd");
-                    const turnosDia = turnosSemana.filter((t) => t.fecha === fechaStr);
-                    const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                {/* Columnas de días con áreas */}
+                <div className="flex-1">
+                  {/* Headers de días */}
+                  <div className="flex">
+                    {weekDays.map((day) => {
+                      const fechaStr = format(day, "yyyy-MM-dd");
+                      const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
 
-                    return (
-                      <div key={day.toString()} className="flex-1">
-                        {/* Header del día */}
-                        <div className={cn(
-                          "h-12 flex flex-col items-center justify-center border-b border-l border-border/50",
-                          isToday && "bg-primary/10"
-                        )}>
+                      return (
+                        <div key={day.toString()} className="flex-1">
                           <div className={cn(
-                            "font-semibold text-sm",
-                            isToday && "text-primary"
+                            "h-12 flex flex-col items-center justify-center border-b border-l border-border/50",
+                            isToday && "bg-primary/10"
                           )}>
-                            {format(day, "EEE", { locale: es })}
-                          </div>
-                          <div className={cn(
-                            "text-xs text-muted-foreground",
-                            isToday && "text-primary font-medium"
-                          )}>
-                            {format(day, "d MMM", { locale: es })}
+                            <div className={cn(
+                              "font-semibold text-sm",
+                              isToday && "text-primary"
+                            )}>
+                              {format(day, "EEE", { locale: es })}
+                            </div>
+                            <div className={cn(
+                              "text-xs text-muted-foreground",
+                              isToday && "text-primary font-medium"
+                            )}>
+                              {format(day, "d MMM", { locale: es })}
+                            </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {/* Columna de turnos */}
-                        <DroppableDayColumn
-                          fecha={fechaStr}
-                          turnosDia={turnosDia}
-                          trabajadores={trabajadores}
-                          onCrearTurno={handleCrearTurno}
-                          onEditarTurno={handleEditarTurno}
-                        />
+                  {/* Headers de áreas */}
+                  <div className="flex border-b border-border/50">
+                    {weekDays.map((day) => (
+                      <div key={`areas-${day.toString()}`} className="flex-1 flex border-l border-border/50">
+                        {areas.map((area: any) => (
+                          <div
+                            key={area.id}
+                            className="flex-1 text-center py-1 px-1 border-l first:border-l-0 border-border/30 bg-muted/30"
+                          >
+                            <div className="text-[10px] font-medium truncate" title={area.nombre}>
+                              {area.nombre}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex-1 text-center py-1 px-1 border-l border-border/30 bg-muted/20">
+                          <div className="text-[10px] font-medium truncate">Sin área</div>
+                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+
+                  {/* Columnas de áreas por día */}
+                  <div className="flex">
+                    {weekDays.map((day) => {
+                      const fechaStr = format(day, "yyyy-MM-dd");
+                      const turnosDia = turnosSemana.filter((t: any) => t.fecha === fechaStr);
+                      const turnosPorArea = agruparTurnosPorArea(turnosDia, areas);
+
+                      return (
+                        <div key={`cols-${day.toString()}`} className="flex-1 flex">
+                          {/* Columnas de áreas */}
+                          {areas.map((area: any) => (
+                            <AreaColumn
+                              key={`${fechaStr}-${area.id}`}
+                              fecha={fechaStr}
+                              areaId={area.id}
+                              areaNombre={area.nombre}
+                              turnosArea={turnosPorArea[area.id] || []}
+                              trabajadores={trabajadores}
+                              onCrearTurno={handleCrearTurno}
+                              onEditarTurno={handleEditarTurno}
+                            />
+                          ))}
+                          {/* Columna "Sin asignar" */}
+                          <AreaColumn
+                            key={`${fechaStr}-sin_asignar`}
+                            fecha={fechaStr}
+                            areaId="sin_asignar"
+                            areaNombre="Sin asignar"
+                            turnosArea={turnosPorArea["sin_asignar"] || []}
+                            trabajadores={trabajadores}
+                            onCrearTurno={handleCrearTurno}
+                            onEditarTurno={handleEditarTurno}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
