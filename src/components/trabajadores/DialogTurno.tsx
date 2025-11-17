@@ -33,7 +33,7 @@ import {
   useEliminarTurno,
   useTrabajadoresActivos,
 } from "@/hooks/useTrabajadores";
-import { useSalas } from "@/hooks/useSalas";
+import { useAreasTrabajoActivas } from "@/hooks/useAreasTrabajo";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2 } from "lucide-react";
 
@@ -44,7 +44,7 @@ const formSchema = z.object({
   hora_fin: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato HH:MM"),
   estado: z.enum(["programado", "activo", "completado", "cancelado"]),
   notas: z.string().optional(),
-  salas: z.array(z.string()).optional(),
+  areas: z.array(z.string()).optional(),
 }).refine((data) => {
   // Validar que hora_fin > hora_inicio
   const [horaI, minI] = data.hora_inicio.split(":").map(Number);
@@ -86,7 +86,7 @@ export const DialogTurno = ({
   horaInicialProp,
 }: DialogTurnoProps) => {
   const { data: trabajadores = [] } = useTrabajadoresActivos();
-  const { data: salas = [] } = useSalas();
+  const { data: areas = [] } = useAreasTrabajoActivas();
   const crearMutation = useCrearTurno();
   const actualizarMutation = useActualizarTurno();
   const eliminarMutation = useEliminarTurno();
@@ -100,7 +100,7 @@ export const DialogTurno = ({
       hora_fin: "17:00",
       estado: "programado",
       notas: "",
-      salas: [],
+      areas: [],
     },
   });
 
@@ -113,7 +113,7 @@ export const DialogTurno = ({
         hora_fin: turnoData.hora_fin,
         estado: turnoData.estado,
         notas: turnoData.notas || "",
-        salas: turnoData.salas_ids || [],
+        areas: turnoData.areas_ids || [],
       });
     } else if (fechaInicial || trabajadorIdInicial || horaInicialProp) {
       form.reset({
@@ -123,17 +123,18 @@ export const DialogTurno = ({
         hora_fin: "17:00",
         estado: "programado",
         notas: "",
-        salas: [],
+        areas: [],
       });
     }
-  }, [turnoData, fechaInicial, trabajadorIdInicial, form]);
+  }, [turnoData, fechaInicial, trabajadorIdInicial, horaInicialProp, form]);
 
   const onSubmit = async (values: FormValues) => {
-    const { salas: salasSeleccionadas, ...turnoValues } = values;
+    const { areas: areasSeleccionadas, ...turnoValues } = values;
     
     const turnoData = {
       ...turnoValues,
       notas: values.notas || null,
+      areas: areasSeleccionadas,
     };
 
     if (turnoId) {
@@ -267,35 +268,38 @@ export const DialogTurno = ({
 
             <FormField
               control={form.control}
-              name="salas"
+              name="areas"
               render={() => (
                 <FormItem>
-                  <FormLabel>Salas Asignadas (opcional)</FormLabel>
+                  <FormLabel>Áreas de Trabajo Asignadas (opcional)</FormLabel>
                   <div className="grid grid-cols-2 gap-2">
-                    {salas.map((sala: any) => (
+                    {areas.map((area: any) => (
                       <FormField
-                        key={sala.id}
+                        key={area.id}
                         control={form.control}
-                        name="salas"
-                        render={({ field }) => (
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(sala.id)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...(field.value || []), sala.id])
-                                    : field.onChange(
-                                        field.value?.filter((value) => value !== sala.id)
-                                      );
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal cursor-pointer">
-                              {sala.nombre}
-                            </FormLabel>
-                          </FormItem>
-                        )}
+                        name="areas"
+                        render={({ field }) => {
+                          const value = field.value || [];
+                          return (
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={value.includes(area.id)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...value, area.id])
+                                      : field.onChange(
+                                          value.filter((v: string) => v !== area.id)
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal cursor-pointer">
+                                {area.nombre} {area.tipo ? `(${area.tipo})` : ""}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
                       />
                     ))}
                   </div>
