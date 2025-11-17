@@ -77,6 +77,79 @@ const calcularPosicionYAltura = (horaInicio: string, horaFin: string) => {
   return { top, height };
 };
 
+// Función para detectar si dos turnos se superponen
+const turnosSeSuperponen = (turno1: TurnoConTrabajador, turno2: TurnoConTrabajador) => {
+  const inicio1 = timeToMinutes(turno1.hora_inicio);
+  const fin1 = timeToMinutes(turno1.hora_fin);
+  const inicio2 = timeToMinutes(turno2.hora_inicio);
+  const fin2 = timeToMinutes(turno2.hora_fin);
+  
+  return inicio1 < fin2 && inicio2 < fin1;
+};
+
+// Función para calcular subcolumnas para turnos superpuestos
+const calcularSubcolumnas = (turnos: TurnoConTrabajador[]) => {
+  const turnosOrdenados = [...turnos].sort((a, b) => {
+    const inicioA = timeToMinutes(a.hora_inicio);
+    const inicioB = timeToMinutes(b.hora_inicio);
+    return inicioA - inicioB;
+  });
+
+  const columnas: TurnoConTrabajador[][] = [];
+  
+  turnosOrdenados.forEach((turno) => {
+    // Buscar una columna donde este turno no se superponga con ningún otro
+    let columnaEncontrada = false;
+    
+    for (let i = 0; i < columnas.length; i++) {
+      const superpone = columnas[i].some((turnoEnColumna) =>
+        turnosSeSuperponen(turno, turnoEnColumna)
+      );
+      
+      if (!superpone) {
+        columnas[i].push(turno);
+        columnaEncontrada = true;
+        break;
+      }
+    }
+    
+    if (!columnaEncontrada) {
+      columnas.push([turno]);
+    }
+  });
+
+  // Crear un mapa de turno.id -> { columna, totalColumnas }
+  const mapaSubcolumnas: Record<string, { columna: number; totalColumnas: number }> = {};
+  
+  turnosOrdenados.forEach((turno) => {
+    // Encontrar en qué columna está este turno
+    for (let i = 0; i < columnas.length; i++) {
+      if (columnas[i].some((t) => t.id === turno.id)) {
+        // Calcular cuántas columnas se necesitan en el rango de este turno
+        const turnosSuperpuestos = turnosOrdenados.filter((t) =>
+          turnosSeSuperponen(turno, t)
+        );
+        const columnasNecesarias = new Set<number>();
+        turnosSuperpuestos.forEach((ts) => {
+          for (let j = 0; j < columnas.length; j++) {
+            if (columnas[j].some((t) => t.id === ts.id)) {
+              columnasNecesarias.add(j);
+            }
+          }
+        });
+        
+        mapaSubcolumnas[turno.id] = {
+          columna: i,
+          totalColumnas: columnasNecesarias.size,
+        };
+        break;
+      }
+    }
+  });
+
+  return mapaSubcolumnas;
+};
+
 // Función para agrupar turnos por área de trabajo
 const agruparTurnosPorArea = (turnos: TurnoConTrabajador[], areas: any[]) => {
   // Crear un mapa de área -> turnos
@@ -232,26 +305,34 @@ const AreaColumn = ({
       </button>
 
       {/* Turnos posicionados */}
-      {turnosArea.map((turno) => {
-        const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
-        const colorClass = getColorForTrabajador(turno.trabajador_id, trabajadores);
+      {(() => {
+        const subcolumnas = calcularSubcolumnas(turnosArea);
+        
+        return turnosArea.map((turno) => {
+          const { top, height } = calcularPosicionYAltura(turno.hora_inicio, turno.hora_fin);
+          const colorClass = getColorForTrabajador(turno.trabajador_id, trabajadores);
+          const { columna, totalColumnas } = subcolumnas[turno.id] || { columna: 0, totalColumnas: 1 };
+          
+          const anchoSubcolumna = 100 / totalColumnas;
+          const leftSubcolumna = columna * anchoSubcolumna;
 
-        return (
-          <DraggableTurno
-            key={turno.id}
-            turno={turno}
-            fecha={fecha}
-            colorClass={colorClass}
-            onClick={() => onEditarTurno(turno)}
-            style={{
-              top: `${top}px`,
-              height: `${height}px`,
-              width: "100%",
-              left: 0,
-            }}
-          />
-        );
-      })}
+          return (
+            <DraggableTurno
+              key={turno.id}
+              turno={turno}
+              fecha={fecha}
+              colorClass={colorClass}
+              onClick={() => onEditarTurno(turno)}
+              style={{
+                top: `${top}px`,
+                height: `${height}px`,
+                width: `${anchoSubcolumna}%`,
+                left: `${leftSubcolumna}%`,
+              }}
+            />
+          );
+        });
+      })()}
     </div>
   );
 };
