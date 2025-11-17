@@ -181,84 +181,90 @@ export default function Reservas() {
           </TabsList>
 
           <TabsContent value="lista" className="space-y-6">
-            <div className="flex flex-wrap gap-6 items-center">
-              <div className="flex gap-2 items-center px-4 py-2 rounded-lg bg-secondary/30 border border-secondary">
-                <span className="text-sm font-semibold text-secondary-foreground">Período:</span>
-                <Button
-                  variant={dateFilter === "upcoming" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateFilter("upcoming")}
-                >
-                  Desde Hoy
-                </Button>
-                <Button
-                  variant={dateFilter === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateFilter("all")}
-                >
-                  Histórico
-                </Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={dateFilter === "specific" ? "default" : "outline"}
-                      size="sm"
-                      className={cn(
-                        "justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "d 'de' MMMM", { locale: es }) : "Seleccionar día"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => {
-                        setSelectedDate(date);
-                        if (date) {
-                          setDateFilter("specific");
-                        }
-                      }}
-                      initialFocus
-                      className={cn("p-3 pointer-events-auto")}
-                    />
-                  </PopoverContent>
-                </Popover>
+            <div className="flex flex-wrap gap-8 items-center py-2">
+              <div className="flex gap-3 items-center">
+                <span className="text-sm font-medium text-foreground/70 min-w-[60px]">Período</span>
+                <div className="flex gap-2">
+                  <Button
+                    variant={dateFilter === "upcoming" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setDateFilter("upcoming")}
+                  >
+                    Desde Hoy
+                  </Button>
+                  <Button
+                    variant={dateFilter === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setDateFilter("all")}
+                  >
+                    Histórico
+                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={dateFilter === "specific" ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "justify-start text-left font-normal",
+                          !selectedDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "d MMM", { locale: es }) : "Fecha"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => {
+                          setSelectedDate(date);
+                          if (date) {
+                            setDateFilter("specific");
+                          }
+                        }}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
               
-              <div className="flex gap-2 items-center px-4 py-2 rounded-lg bg-accent/30 border border-accent">
-                <span className="text-sm font-semibold text-accent-foreground">Estado:</span>
-                <Button
-                  variant={filter === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("all")}
-                >
-                  Todas
-                </Button>
-                <Button
-                  variant={filter === "pendiente" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("pendiente")}
-                >
-                  Pendientes
-                </Button>
-                <Button
-                  variant={filter === "verificada" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("verificada")}
-                >
-                  Verificadas
-                </Button>
-                <Button
-                  variant={filter === "confirmada" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilter("confirmada")}
-                >
-                  Confirmadas
-                </Button>
+              <div className="h-8 w-px bg-border" />
+              
+              <div className="flex gap-3 items-center">
+                <span className="text-sm font-medium text-foreground/70 min-w-[60px]">Estado</span>
+                <div className="flex gap-2">
+                  <Button
+                    variant={filter === "all" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilter("all")}
+                  >
+                    Todas
+                  </Button>
+                  <Button
+                    variant={filter === "pendiente" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilter("pendiente")}
+                  >
+                    Pendientes
+                  </Button>
+                  <Button
+                    variant={filter === "verificada" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilter("verificada")}
+                  >
+                    Verificadas
+                  </Button>
+                  <Button
+                    variant={filter === "confirmada" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setFilter("confirmada")}
+                  >
+                    Confirmadas
+                  </Button>
+                </div>
               </div>
             </div>
 
