@@ -7,11 +7,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Plus } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Plus, CalendarIcon } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { CalendarioDisponibilidad } from "@/components/reservas/CalendarioDisponibilidad";
 import { GenerarReservasFicticias } from "@/components/reservas/GenerarReservasFicticias";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Reservation {
   id: string;
@@ -32,7 +37,8 @@ interface Reservation {
 export default function Reservas() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [filter, setFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<"upcoming" | "all">("upcoming");
+  const [dateFilter, setDateFilter] = useState<"upcoming" | "all" | "specific">("upcoming");
+  const [selectedDate, setSelectedDate] = useState<Date>();
   const [openDialog, setOpenDialog] = useState(false);
 
   useEffect(() => {
@@ -125,6 +131,14 @@ export default function Reservas() {
       return statusMatch && reservationDate >= today;
     }
     
+    if (dateFilter === "specific" && selectedDate) {
+      const reservationDate = new Date(r.fecha);
+      const targetDate = new Date(selectedDate);
+      reservationDate.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+      return statusMatch && reservationDate.getTime() === targetDate.getTime();
+    }
+    
     return statusMatch;
   });
 
@@ -167,7 +181,7 @@ export default function Reservas() {
           </TabsList>
 
           <TabsContent value="lista" className="space-y-6">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-4 items-center">
               <div className="flex gap-2 items-center">
                 <span className="text-sm font-medium text-muted-foreground">Período:</span>
                 <Button
@@ -182,6 +196,34 @@ export default function Reservas() {
                 >
                   Histórico
                 </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={dateFilter === "specific" ? "default" : "outline"}
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "d 'de' MMMM", { locale: es }) : "Seleccionar día"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => {
+                        setSelectedDate(date);
+                        if (date) {
+                          setDateFilter("specific");
+                        }
+                      }}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               
               <div className="flex gap-2 items-center">
