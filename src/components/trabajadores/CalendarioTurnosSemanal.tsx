@@ -193,19 +193,14 @@ const TurnoCard = ({ turno, colorClass, isDragging, onClick, style }: TurnoCardP
   return (
     <div
       className={cn(
-        "absolute rounded px-2 py-1 text-white text-xs border-l-4 cursor-pointer hover:brightness-110 transition-all overflow-hidden",
+        "absolute rounded border-l-4 cursor-pointer hover:brightness-110 transition-all",
         colorClass,
         isDragging && "opacity-50"
       )}
       style={style}
       onClick={onClick}
       title={`${turno.trabajador_nombre}\n${turno.hora_inicio} - ${turno.hora_fin}\n${turno.estado}\n${turno.puesto}`}
-    >
-      <div className="font-semibold truncate">{turno.trabajador_nombre}</div>
-      <div className="text-[10px] opacity-75 truncate">
-        {turno.puesto}
-      </div>
-    </div>
+    />
   );
 };
 
