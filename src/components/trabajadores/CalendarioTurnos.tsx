@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTurnosCompleta, useTrabajadoresActivos } from "@/hooks/useTrabajadores";
-import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DialogTurno } from "./DialogTurno";
 
@@ -75,6 +75,7 @@ export const CalendarioTurnos = () => {
   const [dialogTurnoAbierto, setDialogTurnoAbierto] = useState(false);
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<any>(null);
   const [filtroPuesto, setFiltroPuesto] = useState<string>("todos");
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fechaSeleccionada = format(selectedDate, "yyyy-MM-dd");
   
   const { data: turnosMes } = useTurnosCompleta();
@@ -150,6 +151,18 @@ export const CalendarioTurnos = () => {
     setTimeout(() => {
       setTurnoSeleccionado(null);
     }, 100);
+  };
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -278,7 +291,37 @@ export const CalendarioTurnos = () => {
               <p className="text-sm text-muted-foreground">para esta fecha</p>
             </div>
           ) : (
-            <div className="overflow-x-auto bg-muted/30">
+            <div className="relative">
+              {/* Botones de scroll */}
+              {trabajadoresDelDia.length > 3 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full shadow-lg bg-background/95 backdrop-blur-sm hover:bg-background"
+                    onClick={scrollLeft}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full shadow-lg bg-background/95 backdrop-blur-sm hover:bg-background"
+                    onClick={scrollRight}
+                  >
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+              
+              {/* Gradientes de indicación de scroll */}
+              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+              
+              <div 
+                ref={scrollContainerRef}
+                className="overflow-x-auto bg-muted/30 scrollbar-thin scrollbar-thumb-primary/50 scrollbar-track-muted/30 hover:scrollbar-thumb-primary/70"
+              >
               <div className="min-w-max">
                 {/* Header con nombres de trabajadores */}
                 <div className="flex border-b sticky top-0 bg-card z-10 shadow-sm">
@@ -398,6 +441,7 @@ export const CalendarioTurnos = () => {
                     );
                   })}
               </div>
+            </div>
             </div>
           </div>
         )}
