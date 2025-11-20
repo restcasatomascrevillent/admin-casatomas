@@ -208,8 +208,8 @@ export const useCrearTurno = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (turno: Omit<Turno, "id" | "created_at" | "updated_at"> & { areas?: string[] }) => {
-      const { areas, ...turnoData } = turno;
+    mutationFn: async (turno: Omit<Turno, "id" | "created_at" | "updated_at"> & { areas?: string[]; salas?: string[] }) => {
+      const { areas, salas, ...turnoData } = turno;
       
       const { data, error } = await supabase
         .from("turnos" as any)
@@ -235,6 +235,20 @@ export const useCrearTurno = () => {
         if (asignacionError) throw asignacionError;
       }
 
+      // Si hay salas seleccionadas, crear las asignaciones
+      if (salas && salas.length > 0) {
+        const asignacionesSalas = salas.map((sala_id) => ({
+          turno_id: turnoCreado.id,
+          sala_id: sala_id,
+        }));
+
+        const { error: asignacionSalaError } = await supabase
+          .from("asignaciones_sala")
+          .insert(asignacionesSalas);
+
+        if (asignacionSalaError) throw asignacionSalaError;
+      }
+
       return turnoCreado;
     },
     onSuccess: () => {
@@ -252,7 +266,7 @@ export const useActualizarTurno = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, areas, ...turno }: Partial<Turno> & { id: string; areas?: string[] }) => {
+    mutationFn: async ({ id, areas, salas, ...turno }: Partial<Turno> & { id: string; areas?: string[]; salas?: string[] }) => {
       const { data, error } = await supabase
         .from("turnos" as any)
         .update(turno)
@@ -282,6 +296,29 @@ export const useActualizarTurno = () => {
             .insert(asignaciones);
 
           if (asignacionError) throw asignacionError;
+        }
+      }
+
+      // Si hay salas definidas, actualizar asignaciones
+      if (salas !== undefined) {
+        // Primero eliminar asignaciones existentes
+        await supabase
+          .from("asignaciones_sala")
+          .delete()
+          .eq("turno_id", id);
+
+        // Luego crear las nuevas asignaciones
+        if (salas.length > 0) {
+          const asignacionesSalas = salas.map((sala_id) => ({
+            turno_id: id,
+            sala_id: sala_id,
+          }));
+
+          const { error: asignacionSalaError } = await supabase
+            .from("asignaciones_sala")
+            .insert(asignacionesSalas);
+
+          if (asignacionSalaError) throw asignacionSalaError;
         }
       }
 

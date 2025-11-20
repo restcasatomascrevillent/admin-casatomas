@@ -9,9 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useTurnosCompleta, useTrabajadoresActivos } from "@/hooks/useTrabajadores";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DialogTurno } from "./DialogTurno";
 
 const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7); // 7:00 a 23:00
-const PIXELS_POR_HORA = 80;
+const PIXELS_POR_HORA = 60;
 
 const TRABAJADOR_COLORS = [
   'bg-primary/20 border-primary/40',
@@ -60,6 +61,8 @@ const ESTADO_DOT_COLORS: Record<string, string> = {
 export const CalendarioTurnos = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [open, setOpen] = useState(false);
+  const [dialogTurnoAbierto, setDialogTurnoAbierto] = useState(false);
+  const [turnoSeleccionado, setTurnoSeleccionado] = useState<any>(null);
   const fechaSeleccionada = format(selectedDate, "yyyy-MM-dd");
   
   const { data: turnosMes } = useTurnosCompleta();
@@ -115,8 +118,19 @@ export const CalendarioTurnos = () => {
     setSelectedDate(new Date());
   };
 
+  const handleTurnoClick = (turno: any) => {
+    setTurnoSeleccionado(turno);
+    setDialogTurnoAbierto(true);
+  };
+
+  const handleCloseTurnoDialog = () => {
+    setDialogTurnoAbierto(false);
+    setTurnoSeleccionado(null);
+  };
+
   return (
-    <Card>
+    <>
+      <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle>Vista Diaria</CardTitle>
         <div className="flex items-center gap-2">
@@ -258,8 +272,9 @@ export const CalendarioTurnos = () => {
                         return (
                           <div
                             key={turno.id}
+                            onClick={() => handleTurnoClick(turno)}
                             className={cn(
-                              "absolute left-1 right-1 rounded-md border-2 p-2 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow",
+                              "absolute left-1 right-1 rounded-md border-2 p-2 overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all",
                               colorClass
                             )}
                             style={{ top: `${top}px`, height: `${height}px` }}
@@ -275,10 +290,10 @@ export const CalendarioTurnos = () => {
                             </Badge>
                             {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
                               <div className="text-xs text-muted-foreground mt-1 truncate">
-                                {turno.salas_asignadas.join(", ")}
+                                📍 {turno.salas_asignadas.join(", ")}
                               </div>
                             )}
-                            {turno.notas && height > 80 && (
+                            {turno.notas && height > 60 && (
                               <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                 {turno.notas}
                               </div>
@@ -295,5 +310,16 @@ export const CalendarioTurnos = () => {
         )}
       </CardContent>
     </Card>
+
+    <DialogTurno
+      open={dialogTurnoAbierto}
+      onOpenChange={(open) => {
+        if (!open) handleCloseTurnoDialog();
+        setDialogTurnoAbierto(open);
+      }}
+      turnoId={turnoSeleccionado?.id || null}
+      turnoData={turnoSeleccionado}
+    />
+    </>
   );
 };
