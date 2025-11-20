@@ -34,7 +34,6 @@ import {
   useTrabajadoresActivos,
 } from "@/hooks/useTrabajadores";
 import { useAreasTrabajoActivas } from "@/hooks/useAreasTrabajo";
-import { useSalas } from "@/hooks/useSalas";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2 } from "lucide-react";
 
@@ -46,7 +45,6 @@ const formSchema = z.object({
   estado: z.enum(["programado", "activo", "completado", "cancelado"]),
   notas: z.string().optional(),
   areas: z.array(z.string()).optional(),
-  salas: z.array(z.string()).optional(),
 }).refine((data) => {
   // Validar que hora_fin > hora_inicio
   const [horaI, minI] = data.hora_inicio.split(":").map(Number);
@@ -89,7 +87,6 @@ export const DialogTurno = ({
 }: DialogTurnoProps) => {
   const { data: trabajadores = [] } = useTrabajadoresActivos();
   const { data: areas = [] } = useAreasTrabajoActivas();
-  const { data: salas = [] } = useSalas();
   const crearMutation = useCrearTurno();
   const actualizarMutation = useActualizarTurno();
   const eliminarMutation = useEliminarTurno();
@@ -104,7 +101,6 @@ export const DialogTurno = ({
       estado: "programado",
       notas: "",
       areas: [],
-      salas: [],
     },
   });
 
@@ -118,7 +114,6 @@ export const DialogTurno = ({
         estado: turnoData.estado,
         notas: turnoData.notas || "",
         areas: turnoData.areas_ids || [],
-        salas: turnoData.salas_ids || [],
       });
     } else if (fechaInicial || trabajadorIdInicial || horaInicialProp) {
       form.reset({
@@ -129,7 +124,6 @@ export const DialogTurno = ({
         estado: "programado",
         notas: "",
         areas: [],
-        salas: [],
       });
     }
   }, [turnoData, fechaInicial, trabajadorIdInicial, horaInicialProp, form]);
@@ -150,13 +144,11 @@ export const DialogTurno = ({
           id: turnoId,
           ...turnoData,
           areas: values.areas || [],
-          salas: values.salas || [],
         });
       } else {
         await crearMutation.mutateAsync({
           ...turnoData,
           areas: values.areas || [],
-          salas: values.salas || [],
         });
       }
       
@@ -319,48 +311,6 @@ export const DialogTurno = ({
                               </FormControl>
                               <FormLabel className="font-normal cursor-pointer">
                                 {area.nombre} {area.tipo ? `(${area.tipo})` : ""}
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="salas"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Salas/Ubicaciones Asignadas (opcional)</FormLabel>
-                  <div className="grid grid-cols-2 gap-2">
-                    {salas.filter((sala: any) => sala.activa).map((sala: any) => (
-                      <FormField
-                        key={sala.id}
-                        control={form.control}
-                        name="salas"
-                        render={({ field }) => {
-                          const value = field.value || [];
-                          return (
-                            <FormItem className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={value.includes(sala.id)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...value, sala.id])
-                                      : field.onChange(
-                                          value.filter((v: string) => v !== sala.id)
-                                        );
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal cursor-pointer">
-                                {sala.nombre}
                               </FormLabel>
                             </FormItem>
                           );

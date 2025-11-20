@@ -9,12 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Loader2, X, CheckCircle2, Eye } from "lucide-react";
 import { usePlatos } from "@/hooks/usePlatos";
-import { useSalas } from "@/hooks/useSalas";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
-  tipo: z.enum(["platos", "salas", "novedades", "web"]),
+  tipo: z.enum(["platos", "novedades", "web"]),
   categoria: z.string().optional(),
   item_id: z.string().min(1, "Selecciona un elemento"),
   archivo: z.instanceof(FileList).refine((files) => files?.length === 1, "Debes subir un archivo"),
@@ -24,7 +23,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function SubidaImagenes() {
   const { platos, categorias } = usePlatos();
-  const { data: salas } = useSalas();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -93,10 +91,6 @@ export function SubidaImagenes() {
         const plato = platos?.find((p) => p.id === values.item_id);
         itemNombre = plato?.nombre || "";
         bucketName = "platos";
-      } else if (values.tipo === "salas") {
-        const sala = salas?.find((s) => s.id === values.item_id);
-        itemNombre = sala?.nombre || "";
-        bucketName = "salas";
       } else if (values.tipo === "novedades") {
         const novedad = novedades.find((n) => n.id === values.item_id);
         itemNombre = novedad?.nombre || "";
@@ -180,7 +174,6 @@ export function SubidaImagenes() {
                     </FormControl>
                     <SelectContent className="bg-popover z-50">
                       <SelectItem value="platos">Platos</SelectItem>
-                      <SelectItem value="salas">Salas</SelectItem>
                       <SelectItem value="novedades">Novedades</SelectItem>
                       <SelectItem value="web">Web</SelectItem>
                     </SelectContent>
@@ -230,7 +223,6 @@ export function SubidaImagenes() {
                 <FormItem>
                   <FormLabel>
                     {tipoSeleccionado === "platos" && "Selecciona el plato"}
-                    {tipoSeleccionado === "salas" && "Selecciona la sala"}
                     {tipoSeleccionado === "novedades" && "Selecciona la novedad"}
                     {tipoSeleccionado === "web" && "Selecciona la sección"}
                   </FormLabel>
@@ -256,15 +248,6 @@ export function SubidaImagenes() {
                           <SelectItem key={plato.id} value={plato.id}>
                             {plato.nombre}
                           </SelectItem>
-                        ))}
-
-                      {tipoSeleccionado === "salas" &&
-                        salas
-                          ?.filter((s) => s.activa)
-                          .map((sala) => (
-                            <SelectItem key={sala.id} value={sala.id}>
-                              {sala.nombre}
-                            </SelectItem>
                           ))}
 
                       {tipoSeleccionado === "novedades" &&
