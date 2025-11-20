@@ -135,22 +135,36 @@ export const DialogTurno = ({
   }, [turnoData, fechaInicial, trabajadorIdInicial, horaInicialProp, form]);
 
   const onSubmit = async (values: FormValues) => {
-    const { areas: areasSeleccionadas, ...turnoValues } = values;
-    
-    const turnoData = {
-      ...turnoValues,
-      notas: values.notas || null,
-      areas: areasSeleccionadas,
-    };
+    try {
+      const turnoData = {
+        trabajador_id: values.trabajador_id,
+        fecha: values.fecha,
+        hora_inicio: values.hora_inicio,
+        hora_fin: values.hora_fin,
+        estado: values.estado,
+        notas: values.notas || null,
+      };
 
-    if (turnoId) {
-      await actualizarMutation.mutateAsync({ id: turnoId, ...turnoData });
-    } else {
-      await crearMutation.mutateAsync(turnoData as any);
+      if (turnoId) {
+        await actualizarMutation.mutateAsync({
+          id: turnoId,
+          ...turnoData,
+          areas: values.areas || [],
+          salas: values.salas || [],
+        });
+      } else {
+        await crearMutation.mutateAsync({
+          ...turnoData,
+          areas: values.areas || [],
+          salas: values.salas || [],
+        });
+      }
+      
+      form.reset();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error al guardar turno:", error);
     }
-
-    form.reset();
-    onOpenChange(false);
   };
 
   const handleEliminar = async () => {
