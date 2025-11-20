@@ -186,6 +186,42 @@ export type Database = {
         }
         Relationships: []
       }
+      config_redes_sociales: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          page_id: string | null
+          red_social: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          page_id?: string | null
+          red_social: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          page_id?: string | null
+          red_social?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       espacios_reserva: {
         Row: {
           activa: boolean | null
@@ -216,6 +252,51 @@ export type Database = {
           id?: string
           nombre?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      estadisticas_redes: {
+        Row: {
+          alcance: number | null
+          comentarios_totales: number | null
+          created_at: string | null
+          engagement_rate: number | null
+          fecha: string
+          id: string
+          likes_totales: number | null
+          publicaciones_mes: number | null
+          red_social: string
+          seguidores: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          alcance?: number | null
+          comentarios_totales?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          fecha?: string
+          id?: string
+          likes_totales?: number | null
+          publicaciones_mes?: number | null
+          red_social: string
+          seguidores?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          alcance?: number | null
+          comentarios_totales?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          fecha?: string
+          id?: string
+          likes_totales?: number | null
+          publicaciones_mes?: number | null
+          red_social?: string
+          seguidores?: number | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -354,6 +435,54 @@ export type Database = {
           precio_eur?: number | null
           unidad?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      publicaciones_redes: {
+        Row: {
+          contenido: string
+          created_at: string | null
+          error_mensaje: string | null
+          estado: string | null
+          fecha_programada: string | null
+          fecha_publicacion: string | null
+          id: string
+          imagen_url: string | null
+          post_id_facebook: string | null
+          post_id_instagram: string | null
+          red_social: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          contenido: string
+          created_at?: string | null
+          error_mensaje?: string | null
+          estado?: string | null
+          fecha_programada?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          imagen_url?: string | null
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
+          red_social: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          contenido?: string
+          created_at?: string | null
+          error_mensaje?: string | null
+          estado?: string | null
+          fecha_programada?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          imagen_url?: string | null
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
+          red_social?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
