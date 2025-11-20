@@ -25,6 +25,7 @@ export default function Trabajadores() {
   const [dialogAbierto, setDialogAbierto] = useState(false);
   const [dialogTurnoAbierto, setDialogTurnoAbierto] = useState(false);
   const [trabajadorEditando, setTrabajadorEditando] = useState<string | null>(null);
+  const [vistaTurnos, setVistaTurnos] = useState<"diaria" | "semanal">("semanal");
 
   const handleNuevoTrabajador = () => {
     setTrabajadorEditando(null);
@@ -96,8 +97,27 @@ export default function Trabajadores() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="turnos">
-            <CalendarioTurnosSemanal />
+          <TabsContent value="turnos" className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant={vistaTurnos === "diaria" ? "default" : "outline"}
+                onClick={() => setVistaTurnos("diaria")}
+              >
+                Vista Diaria
+              </Button>
+              <Button
+                variant={vistaTurnos === "semanal" ? "default" : "outline"}
+                onClick={() => setVistaTurnos("semanal")}
+              >
+                Vista Semanal
+              </Button>
+            </div>
+            
+            {vistaTurnos === "diaria" ? (
+              <CalendarioTurnos />
+            ) : (
+              <CalendarioTurnosSemanal />
+            )}
           </TabsContent>
         </Tabs>
 
