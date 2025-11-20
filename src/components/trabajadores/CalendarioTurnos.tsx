@@ -154,222 +154,245 @@ export const CalendarioTurnos = () => {
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Vista Diaria</CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Filtros por puesto */}
-            <div className="flex gap-1">
-              <Button
-                variant={filtroPuesto === "todos" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFiltroPuesto("todos")}
-              >
-                Todos
-              </Button>
-              <Button
-                variant={filtroPuesto === "cocina" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFiltroPuesto("cocina")}
-              >
-                Cocina
-              </Button>
-              <Button
-                variant={filtroPuesto === "camareros" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFiltroPuesto("camareros")}
-              >
-                Camareros
-              </Button>
-              <Button
-                variant={filtroPuesto === "limpieza" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFiltroPuesto("limpieza")}
-              >
-                Limpieza
-              </Button>
-            </div>
+      <Card className="border-none shadow-lg">
+        <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <CardTitle className="text-2xl">Vista Diaria</CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filtros por puesto */}
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+                <Button
+                  variant={filtroPuesto === "todos" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFiltroPuesto("todos")}
+                  className="transition-all"
+                >
+                  Todos
+                </Button>
+                <Button
+                  variant={filtroPuesto === "cocina" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFiltroPuesto("cocina")}
+                  className="transition-all"
+                >
+                  Cocina
+                </Button>
+                <Button
+                  variant={filtroPuesto === "camareros" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFiltroPuesto("camareros")}
+                  className="transition-all"
+                >
+                  Camareros
+                </Button>
+                <Button
+                  variant={filtroPuesto === "limpieza" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setFiltroPuesto("limpieza")}
+                  className="transition-all"
+                >
+                  Limpieza
+                </Button>
+              </div>
 
-            {/* Navegación de fechas */}
-            <Button variant="outline" size="sm" onClick={handleToday}>
-              Hoy
-            </Button>
-            <Button variant="outline" size="icon" onClick={handlePrevDay}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "justify-start text-left font-normal min-w-[240px]",
-                  !selectedDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {selectedDate ? (
-                  format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: es })
-                ) : (
-                  <span>Seleccionar fecha</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  if (date) {
-                    setSelectedDate(date);
-                    setOpen(false);
-                  }
-                }}
-                locale={es}
-                modifiers={modifiers}
-                className={cn("rounded-md border pointer-events-auto")}
-                modifiersStyles={modifiersStyles}
-              />
-              <div className="p-3 border-t">
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span>Programado</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-secondary" />
-                    <span>Activo</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                    <span>Completado</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-destructive" />
-                    <span>Cancelado</span>
+              {/* Navegación de fechas */}
+              <div className="flex gap-1 bg-muted/50 p-1 rounded-lg">
+                <Button variant="ghost" size="sm" onClick={handleToday}>
+                  Hoy
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handlePrevDay}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "justify-start text-left font-normal min-w-[240px] bg-card hover:bg-muted",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? (
+                    format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: es })
+                  ) : (
+                    <span>Seleccionar fecha</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setOpen(false);
+                    }
+                  }}
+                  locale={es}
+                  modifiers={modifiers}
+                  className={cn("rounded-md border pointer-events-auto")}
+                  modifiersStyles={modifiersStyles}
+                />
+                <div className="p-3 border-t bg-muted/50">
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                      <span>Programado</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-secondary" />
+                      <span>Activo</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+                      <span>Completado</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-destructive" />
+                      <span>Cancelado</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-            <Button variant="outline" size="icon" onClick={handleNextDay}>
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="icon" onClick={handleNextDay}>
               <ChevronRight className="h-4 w-4" />
             </Button>
+              </div>
+            </div>
           </div>
         </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <p className="text-muted-foreground">Cargando turnos...</p>
-        ) : !turnos || turnos.length === 0 ? (
-          <p className="text-muted-foreground">No hay turnos programados para esta fecha</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="min-w-max">
-              {/* Header con nombres de trabajadores */}
-              <div className="flex border-b sticky top-0 bg-card z-10">
-                <div className="w-20 flex-shrink-0 border-r p-2 font-medium text-sm">
-                  Hora
-                </div>
-                {trabajadoresDelDia.map((trabajador: any) => (
-                  <div 
-                    key={trabajador.id}
-                    className="flex-1 min-w-[200px] border-r p-2 text-center"
-                  >
-                    <div className="font-medium text-sm">{trabajador.nombre}</div>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {trabajador.puesto}
-                    </Badge>
-                  </div>
-                ))}
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : !turnos || turnos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center">
+              <div className="rounded-full bg-muted p-3 mb-4">
+                <CalendarIcon className="h-8 w-8 text-muted-foreground" />
               </div>
-
-              {/* Grid de horas y turnos */}
-              <div className="flex relative">
-                {/* Columna de horas */}
-                <div className="w-20 flex-shrink-0 border-r">
-                  {HORAS_DIA.map((hora) => (
-                    <div
-                      key={hora}
-                      className="text-xs text-muted-foreground p-2 border-b"
-                      style={{ height: `${PIXELS_POR_HORA}px` }}
+              <p className="text-lg font-medium text-muted-foreground">No hay turnos programados</p>
+              <p className="text-sm text-muted-foreground">para esta fecha</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto bg-muted/30">
+              <div className="min-w-max">
+                {/* Header con nombres de trabajadores */}
+                <div className="flex border-b sticky top-0 bg-card z-10 shadow-sm">
+                  <div className="w-20 flex-shrink-0 border-r p-3 font-semibold text-sm bg-muted/50">
+                    Hora
+                  </div>
+                  {trabajadoresDelDia.map((trabajador: any) => (
+                    <div 
+                      key={trabajador.id}
+                      className="flex-1 min-w-[200px] border-r p-3 text-center bg-gradient-to-b from-card to-muted/20"
                     >
-                      {hora.toString().padStart(2, '0')}:00
+                      <div className="font-semibold text-sm mb-1">{trabajador.nombre}</div>
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        {trabajador.puesto.replace('_', ' ')}
+                      </Badge>
                     </div>
                   ))}
                 </div>
 
-                {/* Columnas de trabajadores con turnos */}
-                {trabajadoresDelDia.map((trabajador: any) => {
-                  const turnosTrabajador = turnos.filter((t: any) => {
-                    if (t.trabajador_id !== trabajador.id) return false;
-                    
-                    // Aplicar filtro de puesto
-                    if (filtroPuesto !== "todos") {
-                      if (filtroPuesto === "cocina" && t.puesto !== "cocinero" && t.puesto !== "ayudante_cocina") return false;
-                      if (filtroPuesto === "camareros" && t.puesto !== "camarero" && t.puesto !== "ayudante_camarero") return false;
-                      if (filtroPuesto === "limpieza" && t.puesto !== "limpieza") return false;
-                    }
-                    
-                    return true;
-                  });
+                {/* Grid de horas y turnos */}
+                <div className="flex relative">
+                  {/* Columna de horas */}
+                  <div className="w-20 flex-shrink-0 border-r bg-muted/30">
+                    {HORAS_DIA.map((hora) => (
+                      <div
+                        key={hora}
+                        className="text-xs font-medium text-muted-foreground p-2 border-b flex items-center justify-center"
+                        style={{ height: `${PIXELS_POR_HORA}px` }}
+                      >
+                        {hora.toString().padStart(2, '0')}:00
+                      </div>
+                    ))}
+                  </div>
 
-                  return (
-                    <div 
-                      key={trabajador.id}
-                      className="flex-1 min-w-[200px] border-r relative"
-                      style={{ height: `${HORAS_DIA.length * PIXELS_POR_HORA}px` }}
-                    >
-                      {/* Líneas de hora */}
-                      {HORAS_DIA.map((hora) => (
-                        <div
-                          key={hora}
-                          className="border-b absolute w-full"
-                          style={{ top: `${(hora - 7) * PIXELS_POR_HORA}px`, height: `${PIXELS_POR_HORA}px` }}
-                        />
-                      ))}
+                  {/* Columnas de trabajadores con turnos */}
+                  {trabajadoresDelDia.map((trabajador: any) => {
+                    const turnosTrabajador = turnos.filter((t: any) => {
+                      if (t.trabajador_id !== trabajador.id) return false;
+                      
+                      // Aplicar filtro de puesto
+                      if (filtroPuesto !== "todos") {
+                        if (filtroPuesto === "cocina" && t.puesto !== "cocinero" && t.puesto !== "ayudante_cocina") return false;
+                        if (filtroPuesto === "camareros" && t.puesto !== "camarero" && t.puesto !== "ayudante_camarero") return false;
+                        if (filtroPuesto === "limpieza" && t.puesto !== "limpieza") return false;
+                      }
+                      
+                      return true;
+                    });
 
-                      {/* Turnos del trabajador */}
-                      {turnosTrabajador.map((turno: any) => {
-                        const { top, height } = calcularPosicionYAltura(
-                          turno.hora_inicio,
-                          turno.hora_fin
-                        );
-                        const colorClass = getColorForTrabajador(trabajador.id, trabajadoresIds);
-
-                        return (
+                    return (
+                      <div 
+                        key={trabajador.id}
+                        className="flex-1 min-w-[200px] border-r relative bg-card/50"
+                        style={{ height: `${HORAS_DIA.length * PIXELS_POR_HORA}px` }}
+                      >
+                        {/* Líneas de hora */}
+                        {HORAS_DIA.map((hora) => (
                           <div
-                            key={turno.id}
-                            onClick={() => handleTurnoClick(turno)}
-                            className={cn(
-                              "absolute left-1 right-1 rounded-md border-2 p-2 overflow-hidden cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all",
-                              colorClass
-                            )}
-                            style={{ top: `${top}px`, height: `${height}px` }}
-                          >
-                            <div className="text-xs font-semibold">
-                              {turno.hora_inicio} - {turno.hora_fin}
-                            </div>
-                            <Badge 
-                              variant={ESTADOS_COLORS[turno.estado] as any}
-                              className="mt-1 text-xs"
+                            key={hora}
+                            className="border-b absolute w-full bg-muted/10 hover:bg-muted/20 transition-colors"
+                            style={{ top: `${(hora - 7) * PIXELS_POR_HORA}px`, height: `${PIXELS_POR_HORA}px` }}
+                          />
+                        ))}
+
+                        {/* Turnos del trabajador */}
+                        {turnosTrabajador.map((turno: any) => {
+                          const { top, height } = calcularPosicionYAltura(
+                            turno.hora_inicio,
+                            turno.hora_fin
+                          );
+                          const colorClass = getColorForTrabajador(trabajador.id, trabajadoresIds);
+
+                          return (
+                            <div
+                              key={turno.id}
+                              onClick={() => handleTurnoClick(turno)}
+                              className={cn(
+                                "absolute left-2 right-2 rounded-lg border-2 p-3 overflow-hidden cursor-pointer transition-all duration-200",
+                                "hover:shadow-xl hover:scale-[1.02] hover:z-10",
+                                "backdrop-blur-sm",
+                                colorClass
+                              )}
+                              style={{ top: `${top}px`, height: `${height}px` }}
                             >
-                              {turno.estado}
-                            </Badge>
-                            {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
-                              <div className="text-xs font-medium text-foreground mt-1 truncate">
-                                📍 {turno.salas_asignadas.join(", ")}
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="text-xs font-bold text-foreground">
+                                  {turno.hora_inicio} - {turno.hora_fin}
+                                </div>
+                                <Badge 
+                                  variant={ESTADOS_COLORS[turno.estado] as any}
+                                  className="text-xs px-2 py-0.5"
+                                >
+                                  {turno.estado}
+                                </Badge>
                               </div>
-                            )}
-                            {turno.notas && height > 60 && (
-                              <div className="text-xs font-semibold text-foreground mt-2 line-clamp-2 bg-background/50 p-1 rounded">
-                                💬 {turno.notas}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
+                              
+                              {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
+                                <div className="flex items-center gap-1 text-xs font-medium text-foreground/90 mt-2 bg-background/40 px-2 py-1 rounded">
+                                  <span>📍</span>
+                                  <span className="truncate">{turno.salas_asignadas.join(", ")}</span>
+                                </div>
+                              )}
+                              
+                              {turno.notas && height > 80 && (
+                                <div className="text-xs font-medium text-foreground/80 mt-2 p-2 bg-background/60 rounded line-clamp-2 border-l-2 border-primary">
+                                  {turno.notas}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
               </div>
             </div>
           </div>
