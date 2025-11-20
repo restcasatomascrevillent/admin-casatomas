@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Facebook, Instagram, Calendar, Image, Send } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { CarruselPublicaciones } from "./CarruselPublicaciones";
 
 export function GestionRedesSociales() {
   const { toast } = useToast();
@@ -55,17 +56,25 @@ export function GestionRedesSociales() {
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-3">
-      <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5 text-primary" />
-            Crear Publicación
-          </CardTitle>
-          <CardDescription>
-            Publica contenido simultáneamente en tus redes sociales
-          </CardDescription>
-        </CardHeader>
+    <div className="space-y-6">
+      {/* Sección de últimas publicaciones */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Últimas Publicaciones</h3>
+        <CarruselPublicaciones />
+      </div>
+
+      {/* Formulario de crear publicación */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-primary" />
+              Crear Publicación
+            </CardTitle>
+            <CardDescription>
+              Publica contenido simultáneamente en tus redes sociales
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           <form onSubmit={handlePublicar} className="space-y-4">
             <div className="space-y-2">
@@ -181,6 +190,7 @@ export function GestionRedesSociales() {
             </div>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );
