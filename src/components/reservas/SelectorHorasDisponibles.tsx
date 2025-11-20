@@ -38,24 +38,22 @@ export const SelectorHorasDisponibles = ({
         const fechaStr = format(fecha, "yyyy-MM-dd");
         const todasLasHoras: HoraDisponibilidad[] = [];
 
-        // Generar todas las horas de 8:00 a 23:30
-        for (let h = 8; h <= 23; h++) {
-          for (let m = 0; m < 60; m += 30) {
-            const hora = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-            
-            const disponibilidad = await verificarDisponibilidadSala(
-              fechaStr,
-              hora,
-              salaId
-            );
+        // Solo 4 turnos específicos: 2 de comida y 2 de cena
+        const turnosDisponibles = ["13:00", "15:00", "20:30", "22:00"];
 
-            todasLasHoras.push({
-              hora,
-              disponible: disponibilidad.disponible,
-              capacidadDisponible: disponibilidad.capacidadDisponible,
-              capacidadMaxima: disponibilidad.capacidadMaxima,
-            });
-          }
+        for (const hora of turnosDisponibles) {
+          const disponibilidad = await verificarDisponibilidadSala(
+            fechaStr,
+            hora,
+            salaId
+          );
+
+          todasLasHoras.push({
+            hora,
+            disponible: disponibilidad.disponible,
+            capacidadDisponible: disponibilidad.capacidadDisponible,
+            capacidadMaxima: disponibilidad.capacidadMaxima,
+          });
         }
 
         setHorasDisponibilidad(todasLasHoras);
