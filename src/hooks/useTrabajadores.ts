@@ -253,6 +253,7 @@ export const useCrearTurno = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
+      queryClient.invalidateQueries({ queryKey: ["turnos-completa"] });
       toast.success("Turno creado correctamente");
     },
     onError: (error: any) => {
@@ -326,6 +327,7 @@ export const useActualizarTurno = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
+      queryClient.invalidateQueries({ queryKey: ["turnos-completa"] });
       toast.success("Turno actualizado correctamente");
     },
     onError: (error: any) => {
@@ -349,6 +351,7 @@ export const useEliminarTurno = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
+      queryClient.invalidateQueries({ queryKey: ["turnos-completa"] });
       toast.success("Turno eliminado correctamente");
     },
     onError: (error: any) => {
