@@ -15,6 +15,7 @@ import Analisis from "./pages/Analisis";
 import Trabajadores from "./pages/Trabajadores";
 import GestorCarta from "./pages/GestorCarta";
 import GestionWeb from "./pages/GestionWeb";
+import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -98,6 +99,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <GestionWeb />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/marketing"
+            element={
+              <ProtectedRoute>
+                <Marketing />
               </ProtectedRoute>
             }
           />
