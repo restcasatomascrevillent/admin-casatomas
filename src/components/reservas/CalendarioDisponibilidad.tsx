@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { format, addDays } from "date-fns";
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { useDisponibilidadRango, useDisponibilidadDetalladaPorFecha } from "@/hooks/useDisponibilidad";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, Users, TrendingUp, TrendingDown, Minus, MapPin } from "lucide-react";
+import { Clock, Users, TrendingUp, TrendingDown, Minus, MapPin, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 interface CalendarioDisponibilidadProps {
   onSelectFecha?: (fecha: Date) => void;
@@ -20,10 +20,16 @@ export const CalendarioDisponibilidad = ({
   salaId 
 }: CalendarioDisponibilidadProps) => {
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [month, setMonth] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
-  const fechaInicio = format(month, "yyyy-MM-01");
-  const fechaFin = format(addDays(month, 60), "yyyy-MM-dd");
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calendarStart = startOfWeek(monthStart, { locale: es });
+  const calendarEnd = endOfWeek(monthEnd, { locale: es });
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  const fechaInicio = format(calendarStart, "yyyy-MM-dd");
+  const fechaFin = format(addDays(calendarEnd, 7), "yyyy-MM-dd");
 
   const { data: disponibilidad, isLoading } = useDisponibilidadRango(
     fechaInicio,
@@ -34,14 +40,17 @@ export const CalendarioDisponibilidad = ({
     selectedDate ? format(selectedDate, "yyyy-MM-dd") : ""
   );
 
-  const handleSelect = (date: Date | undefined) => {
+  const handleSelect = (date: Date) => {
     setSelectedDate(date);
-    if (date && onSelectFecha) {
+    if (onSelectFecha) {
       onSelectFecha(date);
     }
   };
 
-  // Calcular ocupación promedio por fecha
+  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+
+  // Calcular ocupación por fecha
   const getOcupacionPorFecha = (date: Date) => {
     const fechaStr = format(date, "yyyy-MM-dd");
     const ocupacionDia = disponibilidad?.filter(
@@ -51,6 +60,7 @@ export const CalendarioDisponibilidad = ({
     if (!ocupacionDia || ocupacionDia.length === 0) return null;
 
     const totalReservas = ocupacionDia.reduce((sum: number, d: any) => sum + (d.total_reservas || 0), 0);
+    const totalComensales = ocupacionDia.reduce((sum: number, d: any) => sum + (d.total_comensales || 0), 0);
     const promedioOcupacion = ocupacionDia.reduce(
       (sum: number, d: any) => sum + (d.porcentaje_ocupacion || 0),
       0
@@ -58,18 +68,16 @@ export const CalendarioDisponibilidad = ({
 
     return {
       reservas: totalReservas,
+      comensales: totalComensales,
       ocupacion: promedioOcupacion,
     };
   };
 
-  const getDayClassName = (date: Date) => {
-    const ocupacion = getOcupacionPorFecha(date);
-    if (!ocupacion) return "";
-
-    if (ocupacion.ocupacion >= 90) return "bg-gradient-to-br from-red-500/20 to-red-600/30 dark:from-red-500/30 dark:to-red-600/40 border-red-400/50 text-red-900 dark:text-red-100 font-bold hover:scale-105 transition-all duration-200";
-    if (ocupacion.ocupacion >= 70) return "bg-gradient-to-br from-orange-500/20 to-orange-600/30 dark:from-orange-500/30 dark:to-orange-600/40 border-orange-400/50 text-orange-900 dark:text-orange-100 font-semibold hover:scale-105 transition-all duration-200";
-    if (ocupacion.ocupacion >= 50) return "bg-gradient-to-br from-yellow-500/20 to-yellow-600/30 dark:from-yellow-500/30 dark:to-yellow-600/40 border-yellow-400/50 text-yellow-900 dark:text-yellow-100 hover:scale-105 transition-all duration-200";
-    return "bg-gradient-to-br from-green-500/20 to-green-600/30 dark:from-green-500/30 dark:to-green-600/40 border-green-400/50 text-green-900 dark:text-green-100 hover:scale-105 transition-all duration-200";
+  const getOcupacionColor = (ocupacion: number) => {
+    if (ocupacion >= 90) return "from-red-500 to-red-600";
+    if (ocupacion >= 70) return "from-orange-500 to-orange-600";
+    if (ocupacion >= 50) return "from-yellow-500 to-yellow-600";
+    return "from-green-500 to-green-600";
   };
 
   const getOcupacionIcon = (porcentaje: number) => {
@@ -78,24 +86,19 @@ export const CalendarioDisponibilidad = ({
     return <TrendingDown className="h-4 w-4" />;
   };
 
-  const getColorBadgeOcupacion = (porcentaje: number) => {
-    if (porcentaje >= 90) return "bg-gradient-to-r from-red-500 to-red-600 text-white border-red-400/50 shadow-lg shadow-red-500/20";
-    if (porcentaje >= 70) return "bg-gradient-to-r from-orange-500 to-orange-600 text-white border-orange-400/50 shadow-lg shadow-orange-500/20";
-    if (porcentaje >= 50) return "bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-yellow-400/50 shadow-lg shadow-yellow-500/20";
-    return "bg-gradient-to-r from-green-500 to-green-600 text-white border-green-400/50 shadow-lg shadow-green-500/20";
-  };
+  const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   if (isLoading) {
     return (
       <Card className="border-2 shadow-xl">
         <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            Disponibilidad
+            <CalendarIcon className="h-5 w-5 text-primary" />
+            Calendario de Reservas
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          <Skeleton className="h-[400px] w-full rounded-xl" />
+          <Skeleton className="h-[800px] w-full rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -106,77 +109,145 @@ export const CalendarioDisponibilidad = ({
       {/* Calendario Principal */}
       <Card className="border-2 shadow-xl hover:shadow-2xl transition-shadow duration-300">
         <CardHeader className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-b">
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            Calendario de Disponibilidad
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-primary" />
+              {format(currentMonth, "MMMM yyyy", { locale: es }).charAt(0).toUpperCase() + format(currentMonth, "MMMM yyyy", { locale: es }).slice(1)}
+            </CardTitle>
+            
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={prevMonth} className="hover:scale-105 transition-transform">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentMonth(new Date())} className="hover:scale-105 transition-transform">
+                Hoy
+              </Button>
+              <Button variant="outline" size="sm" onClick={nextMonth} className="hover:scale-105 transition-transform">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           
-          {/* Leyenda Mejorada */}
+          {/* Leyenda */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-            <Badge variant="outline" className="bg-gradient-to-br from-green-500/10 to-green-600/20 border-green-400/50 justify-center py-2 hover:scale-105 transition-transform">
+            <Badge variant="outline" className="bg-gradient-to-br from-green-500/10 to-green-600/20 border-green-400/50 justify-center py-2">
               <TrendingDown className="mr-1 h-3 w-3" />
               Baja (&lt;50%)
             </Badge>
-            <Badge variant="outline" className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/20 border-yellow-400/50 justify-center py-2 hover:scale-105 transition-transform">
+            <Badge variant="outline" className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/20 border-yellow-400/50 justify-center py-2">
               <Minus className="mr-1 h-3 w-3" />
               Media (50-70%)
             </Badge>
-            <Badge variant="outline" className="bg-gradient-to-br from-orange-500/10 to-orange-600/20 border-orange-400/50 justify-center py-2 hover:scale-105 transition-transform">
+            <Badge variant="outline" className="bg-gradient-to-br from-orange-500/10 to-orange-600/20 border-orange-400/50 justify-center py-2">
               <TrendingUp className="mr-1 h-3 w-3" />
               Alta (70-90%)
             </Badge>
-            <Badge variant="outline" className="bg-gradient-to-br from-red-500/10 to-red-600/20 border-red-400/50 justify-center py-2 hover:scale-105 transition-transform">
+            <Badge variant="outline" className="bg-gradient-to-br from-red-500/10 to-red-600/20 border-red-400/50 justify-center py-2">
               <TrendingUp className="mr-1 h-3 w-3" />
               Completa (≥90%)
             </Badge>
           </div>
         </CardHeader>
         
-        <CardContent className="pt-6 pb-6">
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleSelect}
-              onMonthChange={setMonth}
-              locale={es}
-              className={cn("rounded-xl border-2 shadow-inner bg-gradient-to-b from-background to-muted/20 p-4 pointer-events-auto")}
-              modifiers={{
-                occupied: (date) => {
-                  const ocupacion = getOcupacionPorFecha(date);
-                  return ocupacion !== null;
-                },
-              }}
-              modifiersClassNames={{
-                occupied: "border-2 rounded-lg",
-              }}
-              components={{
-                Day: ({ date, ...props }) => {
-                  const ocupacion = getOcupacionPorFecha(date);
-                  const dayClass = getDayClassName(date);
-                  
-                  return (
-                    <button
-                      {...props}
-                      className={cn(
-                        "relative h-12 w-12 p-0 font-normal aria-selected:opacity-100 rounded-lg border-2 border-transparent",
-                        dayClass,
-                        selectedDate && format(date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd")
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-110"
-                          : ""
+        <CardContent className="p-6">
+          {/* Nombres de los días */}
+          <div className="grid grid-cols-7 gap-3 mb-3">
+            {weekDays.map((day) => (
+              <div
+                key={day}
+                className="text-center text-sm font-semibold text-muted-foreground py-2"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Grid de días */}
+          <div className="grid grid-cols-7 gap-3">
+            {calendarDays.map((day, idx) => {
+              const ocupacion = getOcupacionPorFecha(day);
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isSelected = selectedDate && format(day, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
+              const isCurrentDay = isToday(day);
+              const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleSelect(day)}
+                  disabled={!isCurrentMonth || isPast}
+                  className={cn(
+                    "relative min-h-[140px] p-3 rounded-xl border-2 transition-all duration-200",
+                    "flex flex-col gap-2 hover:scale-105 hover:shadow-lg disabled:hover:scale-100 disabled:hover:shadow-none",
+                    isSelected && "ring-2 ring-primary ring-offset-2 scale-105 shadow-xl",
+                    !isCurrentMonth && "opacity-40",
+                    isPast && !isCurrentDay && "opacity-50 cursor-not-allowed",
+                    isCurrentDay && "ring-2 ring-primary/50",
+                    ocupacion && isCurrentMonth && !isPast
+                      ? `bg-gradient-to-br ${getOcupacionColor(ocupacion.ocupacion)} bg-opacity-10 border-opacity-50`
+                      : "bg-card border-border hover:bg-muted/50"
+                  )}
+                >
+                  {/* Fecha */}
+                  <div className="flex items-center justify-between">
+                    <span className={cn(
+                      "text-lg font-bold",
+                      isCurrentDay && "bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center"
+                    )}>
+                      {format(day, "d")}
+                    </span>
+                    
+                    {ocupacion && isCurrentMonth && !isPast && (
+                      <div className={cn(
+                        "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold text-white",
+                        `bg-gradient-to-r ${getOcupacionColor(ocupacion.ocupacion)}`
+                      )}>
+                        {getOcupacionIcon(ocupacion.ocupacion)}
+                        {Math.round(ocupacion.ocupacion)}%
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Estadísticas del día */}
+                  {ocupacion && isCurrentMonth && !isPast ? (
+                    <div className="space-y-2 flex-1 flex flex-col justify-center">
+                      {/* Reservas */}
+                      <div className="flex items-center gap-2 text-xs bg-background/50 backdrop-blur-sm rounded-lg px-2 py-1.5 border">
+                        <Clock className="h-3 w-3 text-primary flex-shrink-0" />
+                        <span className="font-semibold">{ocupacion.reservas}</span>
+                        <span className="text-muted-foreground truncate">reservas</span>
+                      </div>
+
+                      {/* Comensales */}
+                      <div className="flex items-center gap-2 text-xs bg-background/50 backdrop-blur-sm rounded-lg px-2 py-1.5 border">
+                        <Users className="h-3 w-3 text-primary flex-shrink-0" />
+                        <span className="font-semibold">{ocupacion.comensales}</span>
+                        <span className="text-muted-foreground truncate">personas</span>
+                      </div>
+
+                      {/* Indicador visual de ocupación */}
+                      <div className="mt-1">
+                        <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden border">
+                          <div
+                            className={cn(
+                              "h-full transition-all duration-500 rounded-full",
+                              `bg-gradient-to-r ${getOcupacionColor(ocupacion.ocupacion)}`
+                            )}
+                            style={{ width: `${Math.min(ocupacion.ocupacion, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center">
+                      {isCurrentMonth && !isPast && (
+                        <span className="text-xs text-muted-foreground">Sin reservas</span>
                       )}
-                    >
-                      <time dateTime={format(date, "yyyy-MM-dd")} className="relative z-10">
-                        {format(date, "d")}
-                      </time>
-                      {ocupacion && (
-                        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-current opacity-50" />
-                      )}
-                    </button>
-                  );
-                },
-              }}
-            />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -200,109 +271,106 @@ export const CalendarioDisponibilidad = ({
             ) : detalleHorario && detalleHorario.length > 0 ? (
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-3">
-                  {detalleHorario.map((horario: any, idx: number) => (
-                    <Card
-                      key={idx}
-                      className={cn(
-                        "border-2 overflow-hidden hover:scale-[1.02] transition-all duration-200",
-                        getColorBadgeOcupacion(horario.porcentaje_ocupacion_global || 0)
-                      )}
-                    >
-                      <CardContent className="p-4 bg-gradient-to-br from-card/95 to-card">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                          {/* Información de Hora */}
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="p-3 rounded-xl bg-background/50 backdrop-blur-sm">
-                              <Clock className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                              <div className="font-bold text-lg">{horario.hora}</div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                                <Users className="h-3 w-3" />
-                                {horario.total_reservas || 0} reservas
+                  {detalleHorario.map((horario: any, idx: number) => {
+                    const porcentaje = horario.porcentaje_ocupacion_global || 0;
+                    return (
+                      <Card
+                        key={idx}
+                        className="border-2 overflow-hidden hover:scale-[1.02] transition-all duration-200"
+                      >
+                        <CardContent className="p-4 bg-gradient-to-br from-card/95 to-card">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            {/* Información de Hora */}
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="p-3 rounded-xl bg-background/50 backdrop-blur-sm border">
+                                <Clock className="h-6 w-6 text-primary" />
                               </div>
-                            </div>
-                          </div>
-
-                          {/* Estadísticas */}
-                          <div className="flex flex-wrap gap-3 items-center">
-                            <Badge 
-                              variant="outline" 
-                              className={cn(
-                                "px-4 py-2 font-bold text-sm border-2",
-                                getColorBadgeOcupacion(horario.porcentaje_ocupacion_global || 0)
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                {getOcupacionIcon(horario.porcentaje_ocupacion_global || 0)}
-                                {Math.round(horario.porcentaje_ocupacion_global || 0)}%
-                              </div>
-                            </Badge>
-                            
-                            <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
-                              <div className="text-xs text-muted-foreground">Comensales</div>
-                              <div className="font-bold text-lg flex items-center gap-1">
-                                <Users className="h-4 w-4" />
-                                {horario.total_comensales || 0}
-                              </div>
-                            </div>
-
-                            <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
-                              <div className="text-xs text-muted-foreground">Disponible</div>
-                              <div className="font-bold text-lg text-green-600 dark:text-green-400">
-                                {horario.capacidad_disponible || 0}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Barra de Progreso */}
-                        <div className="mt-4">
-                          <div className="w-full bg-muted/50 rounded-full h-3 overflow-hidden border">
-                            <div
-                              className={cn(
-                                "h-full transition-all duration-500 rounded-full",
-                                horario.porcentaje_ocupacion_global >= 90 ? "bg-gradient-to-r from-red-500 to-red-600" :
-                                horario.porcentaje_ocupacion_global >= 70 ? "bg-gradient-to-r from-orange-500 to-orange-600" :
-                                horario.porcentaje_ocupacion_global >= 50 ? "bg-gradient-to-r from-yellow-500 to-yellow-600" :
-                                "bg-gradient-to-r from-green-500 to-green-600"
-                              )}
-                              style={{ width: `${Math.min(horario.porcentaje_ocupacion_global || 0, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Espacios Individuales */}
-                        {horario.salas && horario.salas.length > 0 && (
-                          <div className="mt-4 pt-4 border-t border-border/50">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">Espacios</div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {horario.salas.map((sala: any, salaIdx: number) => (
-                                <div
-                                  key={salaIdx}
-                                  className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border hover:bg-muted/50 transition-colors"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium truncate">{sala.sala_nombre}</span>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                      <Users className="h-3 w-3" />
-                                      {sala.comensales_actuales}/{sala.capacidad_maxima}
-                                    </div>
-                                    <Badge variant="secondary" className="ml-2 shrink-0 text-xs">
-                                      {Math.round(sala.porcentaje_ocupacion_sala || 0)}%
-                                    </Badge>
-                                  </div>
+                              <div>
+                                <div className="font-bold text-lg">{horario.hora}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  {horario.total_reservas || 0} reservas
                                 </div>
-                              ))}
+                              </div>
+                            </div>
+
+                            {/* Estadísticas */}
+                            <div className="flex flex-wrap gap-3 items-center">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "px-4 py-2 font-bold text-sm border-2 text-white",
+                                  `bg-gradient-to-r ${getOcupacionColor(porcentaje)}`
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getOcupacionIcon(porcentaje)}
+                                  {Math.round(porcentaje)}%
+                                </div>
+                              </Badge>
+                              
+                              <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
+                                <div className="text-xs text-muted-foreground">Comensales</div>
+                                <div className="font-bold text-lg flex items-center gap-1">
+                                  <Users className="h-4 w-4" />
+                                  {horario.total_comensales || 0}
+                                </div>
+                              </div>
+
+                              <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
+                                <div className="text-xs text-muted-foreground">Disponible</div>
+                                <div className="font-bold text-lg text-green-600 dark:text-green-400">
+                                  {horario.capacidad_disponible || 0}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
+
+                          {/* Barra de Progreso */}
+                          <div className="mt-4">
+                            <div className="w-full bg-muted/50 rounded-full h-3 overflow-hidden border">
+                              <div
+                                className={cn(
+                                  "h-full transition-all duration-500 rounded-full",
+                                  `bg-gradient-to-r ${getOcupacionColor(porcentaje)}`
+                                )}
+                                style={{ width: `${Math.min(porcentaje, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Espacios Individuales */}
+                          {horario.salas && horario.salas.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-border/50">
+                              <div className="text-xs font-semibold text-muted-foreground mb-2">Espacios</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {horario.salas.map((sala: any, salaIdx: number) => (
+                                  <div
+                                    key={salaIdx}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border hover:bg-muted/50 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                                      <span className="text-sm font-medium truncate">{sala.sala_nombre}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Users className="h-3 w-3" />
+                                        {sala.comensales_actuales}/{sala.capacidad_maxima}
+                                      </div>
+                                      <Badge variant="secondary" className="ml-2 shrink-0 text-xs">
+                                        {Math.round(sala.porcentaje_ocupacion_sala || 0)}%
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             ) : (
