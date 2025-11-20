@@ -269,27 +269,51 @@ export const CalendarioDisponibilidad = ({
                 ))}
               </div>
             ) : detalleHorario && detalleHorario.length > 0 ? (
-              <ScrollArea className="h-[400px] pr-4">
-                <div className="space-y-3">
-                  {detalleHorario.map((horario: any, idx: number) => {
+              <ScrollArea className="h-[500px] pr-4">
+                <div className="space-y-4">
+                  {/* Filtrar solo turnos válidos */}
+                  {detalleHorario
+                    .filter((horario: any) => ["13:00", "15:00", "20:30", "22:00"].includes(horario.hora))
+                    .map((horario: any, idx: number) => {
                     const porcentaje = horario.porcentaje_ocupacion_global || 0;
+                    const esCena = horario.hora === "20:30" || horario.hora === "22:00";
+                    const turnoLabel = horario.hora === "13:00" ? "Primer turno - Comida" 
+                      : horario.hora === "15:00" ? "Segundo turno - Comida"
+                      : horario.hora === "20:30" ? "Primer turno - Cena"
+                      : "Segundo turno - Cena";
+                    
                     return (
                       <Card
                         key={idx}
-                        className="border-2 overflow-hidden hover:scale-[1.02] transition-all duration-200"
+                        className="border-2 overflow-hidden hover:shadow-lg transition-all duration-200 animate-fade-in"
                       >
-                        <CardContent className="p-4 bg-gradient-to-br from-card/95 to-card">
+                        <CardContent className="p-5 bg-gradient-to-br from-card via-card/95 to-background/5">
+                          {/* Etiqueta del turno */}
+                          <div className="mb-4">
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "px-3 py-1 text-xs font-semibold",
+                                esCena 
+                                  ? "bg-gradient-to-r from-purple-500/20 to-indigo-500/20 border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300"
+                                  : "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300"
+                              )}
+                            >
+                              {turnoLabel}
+                            </Badge>
+                          </div>
+
                           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             {/* Información de Hora */}
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="p-3 rounded-xl bg-background/50 backdrop-blur-sm border">
-                                <Clock className="h-6 w-6 text-primary" />
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/20">
+                                <Clock className="h-7 w-7 text-primary" />
                               </div>
                               <div>
-                                <div className="font-bold text-lg">{horario.hora}</div>
-                                <div className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  {horario.total_reservas || 0} reservas
+                                <div className="font-bold text-2xl">{horario.hora}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {horario.total_reservas || 0} reserva{(horario.total_reservas || 0) !== 1 ? 's' : ''}
                                 </div>
                               </div>
                             </div>
@@ -299,40 +323,45 @@ export const CalendarioDisponibilidad = ({
                               <Badge 
                                 variant="outline" 
                                 className={cn(
-                                  "px-4 py-2 font-bold text-sm border-2 text-white",
+                                  "px-5 py-3 font-bold text-base border-2 text-white shadow-lg",
                                   `bg-gradient-to-r ${getOcupacionColor(porcentaje)}`
                                 )}
                               >
                                 <div className="flex items-center gap-2">
                                   {getOcupacionIcon(porcentaje)}
-                                  {Math.round(porcentaje)}%
+                                  <span className="text-lg">{Math.round(porcentaje)}%</span>
                                 </div>
                               </Badge>
                               
-                              <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
-                                <div className="text-xs text-muted-foreground">Comensales</div>
-                                <div className="font-bold text-lg flex items-center gap-1">
-                                  <Users className="h-4 w-4" />
+                              <div className="text-center bg-gradient-to-br from-background to-background/50 backdrop-blur-sm rounded-xl px-4 py-3 border-2 shadow-sm">
+                                <div className="text-xs text-muted-foreground font-semibold mb-1">Comensales</div>
+                                <div className="font-bold text-xl flex items-center gap-1.5 text-primary">
+                                  <Users className="h-5 w-5" />
                                   {horario.total_comensales || 0}
                                 </div>
                               </div>
 
-                              <div className="text-right bg-background/50 backdrop-blur-sm rounded-lg px-3 py-2 border">
-                                <div className="text-xs text-muted-foreground">Disponible</div>
-                                <div className="font-bold text-lg text-green-600 dark:text-green-400">
+                              <div className="text-center bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm rounded-xl px-4 py-3 border-2 border-green-500/30 shadow-sm">
+                                <div className="text-xs text-muted-foreground font-semibold mb-1">Disponible</div>
+                                <div className="font-bold text-xl text-green-600 dark:text-green-400">
                                   {horario.capacidad_disponible || 0}
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* Barra de Progreso */}
-                          <div className="mt-4">
-                            <div className="w-full bg-muted/50 rounded-full h-3 overflow-hidden border">
+                          {/* Barra de Progreso Mejorada */}
+                          <div className="mt-5">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-semibold text-muted-foreground">Ocupación</span>
+                              <span className="text-xs font-bold">{Math.round(porcentaje)}%</span>
+                            </div>
+                            <div className="w-full bg-muted/50 rounded-full h-4 overflow-hidden border-2 shadow-inner">
                               <div
                                 className={cn(
-                                  "h-full transition-all duration-500 rounded-full",
-                                  `bg-gradient-to-r ${getOcupacionColor(porcentaje)}`
+                                  "h-full transition-all duration-700 rounded-full shadow-md",
+                                  `bg-gradient-to-r ${getOcupacionColor(porcentaje)}`,
+                                  "animate-pulse"
                                 )}
                                 style={{ width: `${Math.min(porcentaje, 100)}%` }}
                               />
@@ -341,9 +370,12 @@ export const CalendarioDisponibilidad = ({
 
                           {/* Espacios Individuales */}
                           {horario.salas && horario.salas.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-border/50">
-                              <div className="text-xs font-semibold text-muted-foreground mb-2">Espacios</div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="mt-5 pt-5 border-t-2 border-border/30">
+                              <div className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-primary" />
+                                Salas
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {horario.salas.map((sala: any, salaIdx: number) => (
                                   <div
                                     key={salaIdx}
