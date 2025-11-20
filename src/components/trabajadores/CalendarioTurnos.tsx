@@ -288,10 +288,10 @@ export const CalendarioTurnos = () => {
                   {trabajadoresDelDia.map((trabajador: any) => (
                     <div 
                       key={trabajador.id}
-                      className="flex-1 min-w-[200px] border-r p-3 text-center bg-gradient-to-b from-card to-muted/20"
+                      className="flex-1 min-w-[140px] border-r p-2 text-center bg-gradient-to-b from-card to-muted/20"
                     >
-                      <div className="font-semibold text-sm mb-1">{trabajador.nombre}</div>
-                      <Badge variant="secondary" className="text-xs font-normal">
+                      <div className="font-semibold text-xs mb-1">{trabajador.nombre}</div>
+                      <Badge variant="secondary" className="text-[10px] font-normal px-1 py-0">
                         {trabajador.puesto.replace('_', ' ')}
                       </Badge>
                     </div>
@@ -331,7 +331,7 @@ export const CalendarioTurnos = () => {
                     return (
                       <div 
                         key={trabajador.id}
-                        className="flex-1 min-w-[200px] border-r relative bg-card/50"
+                        className="flex-1 min-w-[140px] border-r relative bg-card/50"
                         style={{ height: `${HORAS_DIA.length * PIXELS_POR_HORA}px` }}
                       >
                         {/* Líneas de hora */}
@@ -356,37 +356,41 @@ export const CalendarioTurnos = () => {
                               key={turno.id}
                               onClick={() => handleTurnoClick(turno)}
                               className={cn(
-                                "absolute left-2 right-2 rounded-lg border-2 p-3 overflow-hidden cursor-pointer transition-all duration-200",
+                                "absolute left-1 right-1 rounded-lg border-2 p-1.5 overflow-hidden cursor-pointer transition-all duration-200",
                                 "hover:shadow-xl hover:scale-[1.02] hover:z-10",
                                 "backdrop-blur-sm",
                                 colorClass
                               )}
                               style={{ top: `${top}px`, height: `${height}px` }}
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="text-xs font-bold text-foreground">
+                              <div className="flex flex-col h-full text-foreground space-y-0.5">
+                                <div className="font-semibold text-[11px] truncate">
+                                  {turno.trabajador_nombre}
+                                </div>
+                                
+                                <div className="text-[9px] opacity-80 truncate">
+                                  {turno.puesto.replace('_', ' ')}
+                                </div>
+                                
+                                <div className="font-bold text-[10px]">
                                   {turno.hora_inicio} - {turno.hora_fin}
                                 </div>
-                                <Badge 
-                                  variant={ESTADOS_COLORS[turno.estado] as any}
-                                  className="text-xs px-2 py-0.5"
-                                >
-                                  {turno.estado}
-                                </Badge>
+                                
+                                <div className="flex items-center gap-1">
+                                  <Badge 
+                                    variant={ESTADOS_COLORS[turno.estado] as any}
+                                    className="text-[9px] px-1 py-0 h-auto"
+                                  >
+                                    {turno.estado}
+                                  </Badge>
+                                </div>
+                                
+                                {turno.notas && height > 60 && (
+                                  <div className="text-[9px] italic truncate opacity-75 mt-auto">
+                                    {turno.notas}
+                                  </div>
+                                )}
                               </div>
-                              
-                              {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
-                                <div className="flex items-center gap-1 text-xs font-medium text-foreground/90 mt-2 bg-background/40 px-2 py-1 rounded">
-                                  <span>📍</span>
-                                  <span className="truncate">{turno.salas_asignadas.join(", ")}</span>
-                                </div>
-                              )}
-                              
-                              {turno.notas && height > 80 && (
-                                <div className="text-xs font-medium text-foreground/80 mt-2 p-2 bg-background/60 rounded line-clamp-2 border-l-2 border-primary">
-                                  {turno.notas}
-                                </div>
-                              )}
                             </div>
                           );
                         })}
