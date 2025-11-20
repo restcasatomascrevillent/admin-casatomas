@@ -2,7 +2,7 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Percent } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +15,7 @@ import { VinoForm } from "@/components/carta/VinoForm";
 import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
+import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 
 export default function GestorCarta() {
   const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos } = usePlatos();
@@ -30,6 +31,7 @@ export default function GestorCarta() {
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
   const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
   const [dialogVinoOpen, setDialogVinoOpen] = useState(false);
+  const [dialogAjustePreciosOpen, setDialogAjustePreciosOpen] = useState(false);
 
   const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos;
 
@@ -99,7 +101,7 @@ export default function GestorCarta() {
               Gestiona el menú, bebidas y vinos de tu restaurante
             </p>
           </div>
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3 items-center flex-wrap">
             <ToggleGroup 
               type="single" 
               value={filtroEstado} 
@@ -116,6 +118,10 @@ export default function GestorCarta() {
                 Inactivos
               </ToggleGroupItem>
             </ToggleGroup>
+            <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
+              <Percent className="mr-2 h-4 w-4" />
+              Ajustar Precios
+            </Button>
             <Button onClick={handleAñadir}>
               <Plus className="mr-2 h-4 w-4" />
               Añadir
@@ -272,6 +278,11 @@ export default function GestorCarta() {
           open={dialogVinoOpen} 
           onOpenChange={setDialogVinoOpen}
           categoriaInicial={categoriaVinos}
+        />
+        
+        <AjustePreciosModal
+          open={dialogAjustePreciosOpen}
+          onOpenChange={setDialogAjustePreciosOpen}
         />
       </div>
     </DashboardLayout>
