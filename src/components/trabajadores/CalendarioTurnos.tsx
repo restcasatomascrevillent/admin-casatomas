@@ -147,7 +147,9 @@ export const CalendarioTurnos = () => {
 
   const handleCloseTurnoDialog = () => {
     setDialogTurnoAbierto(false);
-    setTurnoSeleccionado(null);
+    setTimeout(() => {
+      setTurnoSeleccionado(null);
+    }, 100);
   };
 
   return (
@@ -353,13 +355,13 @@ export const CalendarioTurnos = () => {
                               {turno.estado}
                             </Badge>
                             {turno.salas_asignadas && turno.salas_asignadas.length > 0 && (
-                              <div className="text-xs text-muted-foreground mt-1 truncate">
+                              <div className="text-xs font-medium text-foreground mt-1 truncate">
                                 📍 {turno.salas_asignadas.join(", ")}
                               </div>
                             )}
                             {turno.notas && height > 60 && (
-                              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {turno.notas}
+                              <div className="text-xs font-semibold text-foreground mt-2 line-clamp-2 bg-background/50 p-1 rounded">
+                                💬 {turno.notas}
                               </div>
                             )}
                           </div>

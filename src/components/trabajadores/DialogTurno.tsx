@@ -160,6 +160,8 @@ export const DialogTurno = ({
         });
       }
       
+      // Esperar un momento para que se actualice la UI antes de cerrar
+      await new Promise(resolve => setTimeout(resolve, 100));
       form.reset();
       onOpenChange(false);
     } catch (error) {
@@ -170,6 +172,7 @@ export const DialogTurno = ({
   const handleEliminar = async () => {
     if (turnoId && confirm("¿Estás seguro de eliminar este turno?")) {
       await eliminarMutation.mutateAsync(turnoId);
+      await new Promise(resolve => setTimeout(resolve, 100));
       onOpenChange(false);
     }
   };
