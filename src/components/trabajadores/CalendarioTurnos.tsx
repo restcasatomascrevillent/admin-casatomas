@@ -15,11 +15,22 @@ const HORAS_DIA = Array.from({ length: 17 }, (_, i) => i + 7); // 7:00 a 23:00
 const PIXELS_POR_HORA = 60;
 
 const TRABAJADOR_COLORS = [
-  'bg-primary/20 border-primary/40',
-  'bg-secondary/20 border-secondary/40', 
-  'bg-accent/20 border-accent/40',
-  'bg-destructive/20 border-destructive/40',
-  'bg-muted/40 border-muted-foreground/40',
+  "bg-blue-500/90 border-blue-600",
+  "bg-purple-500/90 border-purple-600",
+  "bg-pink-500/90 border-pink-600",
+  "bg-rose-500/90 border-rose-600",
+  "bg-orange-500/90 border-orange-600",
+  "bg-amber-500/90 border-amber-600",
+  "bg-yellow-500/90 border-yellow-600",
+  "bg-lime-500/90 border-lime-600",
+  "bg-green-500/90 border-green-600",
+  "bg-emerald-500/90 border-emerald-600",
+  "bg-teal-500/90 border-teal-600",
+  "bg-cyan-500/90 border-cyan-600",
+  "bg-sky-500/90 border-sky-600",
+  "bg-indigo-500/90 border-indigo-600",
+  "bg-violet-500/90 border-violet-600",
+  "bg-fuchsia-500/90 border-fuchsia-600",
 ];
 
 const getColorForTrabajador = (trabajadorId: string, trabajadoresIds: string[]) => {
@@ -63,6 +74,7 @@ export const CalendarioTurnos = () => {
   const [open, setOpen] = useState(false);
   const [dialogTurnoAbierto, setDialogTurnoAbierto] = useState(false);
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<any>(null);
+  const [filtroPuesto, setFiltroPuesto] = useState<string>("todos");
   const fechaSeleccionada = format(selectedDate, "yyyy-MM-dd");
   
   const { data: turnosMes } = useTurnosCompleta();
@@ -90,6 +102,16 @@ export const CalendarioTurnos = () => {
 
   // Obtener trabajadores únicos del día seleccionado
   const trabajadoresDelDia = turnos?.reduce((acc: any[], turno: any) => {
+    // Filtrar por puesto si hay un filtro activo
+    if (filtroPuesto !== "todos") {
+      const puestosCoinciden = 
+        (filtroPuesto === "cocina" && (turno.puesto === "cocinero" || turno.puesto === "ayudante_cocina")) ||
+        (filtroPuesto === "camareros" && (turno.puesto === "camarero" || turno.puesto === "ayudante_camarero")) ||
+        (filtroPuesto === "limpieza" && turno.puesto === "limpieza");
+      
+      if (!puestosCoinciden) return acc;
+    }
+
     if (!acc.find(t => t.id === turno.trabajador_id)) {
       acc.push({
         id: turno.trabajador_id,
@@ -131,15 +153,48 @@ export const CalendarioTurnos = () => {
   return (
     <>
       <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle>Vista Diaria</CardTitle>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleToday}>
-            Hoy
-          </Button>
-          <Button variant="outline" size="icon" onClick={handlePrevDay}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardTitle>Vista Diaria</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtros por puesto */}
+            <div className="flex gap-1">
+              <Button
+                variant={filtroPuesto === "todos" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFiltroPuesto("todos")}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={filtroPuesto === "cocina" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFiltroPuesto("cocina")}
+              >
+                Cocina
+              </Button>
+              <Button
+                variant={filtroPuesto === "camareros" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFiltroPuesto("camareros")}
+              >
+                Camareros
+              </Button>
+              <Button
+                variant={filtroPuesto === "limpieza" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFiltroPuesto("limpieza")}
+              >
+                Limpieza
+              </Button>
+            </div>
+
+            {/* Navegación de fechas */}
+            <Button variant="outline" size="sm" onClick={handleToday}>
+              Hoy
+            </Button>
+            <Button variant="outline" size="icon" onClick={handlePrevDay}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -194,11 +249,11 @@ export const CalendarioTurnos = () => {
               </div>
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="icon" onClick={handleNextDay}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
+            <Button variant="outline" size="icon" onClick={handleNextDay}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
       <CardContent>
         {isLoading ? (
           <p className="text-muted-foreground">Cargando turnos...</p>
@@ -242,9 +297,18 @@ export const CalendarioTurnos = () => {
 
                 {/* Columnas de trabajadores con turnos */}
                 {trabajadoresDelDia.map((trabajador: any) => {
-                  const turnosTrabajador = turnos.filter(
-                    (t: any) => t.trabajador_id === trabajador.id
-                  );
+                  const turnosTrabajador = turnos.filter((t: any) => {
+                    if (t.trabajador_id !== trabajador.id) return false;
+                    
+                    // Aplicar filtro de puesto
+                    if (filtroPuesto !== "todos") {
+                      if (filtroPuesto === "cocina" && t.puesto !== "cocinero" && t.puesto !== "ayudante_cocina") return false;
+                      if (filtroPuesto === "camareros" && t.puesto !== "camarero" && t.puesto !== "ayudante_camarero") return false;
+                      if (filtroPuesto === "limpieza" && t.puesto !== "limpieza") return false;
+                    }
+                    
+                    return true;
+                  });
 
                   return (
                     <div 
