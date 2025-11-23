@@ -606,7 +606,7 @@ export type Database = {
             foreignKeyName: "reservas_sala_id_fkey"
             columns: ["sala_id"]
             isOneToOne: false
-            referencedRelation: "salas"
+            referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
         ]
