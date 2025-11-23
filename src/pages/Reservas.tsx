@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { CheckCircle, XCircle, Clock, Plus, CalendarIcon } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { CalendarioDisponibilidad } from "@/components/reservas/CalendarioDisponibilidad";
-import { GenerarReservasFicticias } from "@/components/reservas/GenerarReservasFicticias";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -150,28 +149,25 @@ export default function Reservas() {
             <h2 className="text-3xl font-bold tracking-tight">Reservas</h2>
             <p className="text-muted-foreground">Gestiona las reservas del restaurante</p>
           </div>
-          <div className="flex gap-2">
-            <GenerarReservasFicticias />
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nueva Reserva
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Reserva</DialogTitle>
-                </DialogHeader>
-                <FormularioReserva
-                  onSuccess={() => {
-                    setOpenDialog(false);
-                    fetchReservations();
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
+          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Reserva
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Nueva Reserva</DialogTitle>
+              </DialogHeader>
+              <FormularioReserva
+                onSuccess={() => {
+                  setOpenDialog(false);
+                  fetchReservations();
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Tabs defaultValue="lista" className="w-full">
