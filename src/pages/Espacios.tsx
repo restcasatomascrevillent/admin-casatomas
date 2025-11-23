@@ -9,7 +9,6 @@ import {
   useEliminarEspacio,
 } from "@/hooks/useEspaciosReserva";
 import { EspacioForm } from "@/components/reservas/EspacioForm";
-import { GenerarEspaciosFicticios } from "@/components/reservas/GenerarEspaciosFicticios";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,13 +39,10 @@ export default function Espacios() {
               Configura los espacios disponibles para reservas de clientes
             </p>
           </div>
-          <div className="flex gap-2">
-            <GenerarEspaciosFicticios />
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Espacio
-            </Button>
-          </div>
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Espacio
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

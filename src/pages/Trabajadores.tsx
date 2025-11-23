@@ -8,11 +8,8 @@ import { ListaTrabajadores } from "@/components/trabajadores/ListaTrabajadores";
 import { FormularioTrabajador } from "@/components/trabajadores/FormularioTrabajador";
 import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
 import { CalendarioTurnosSemanal } from "@/components/trabajadores/CalendarioTurnosSemanal";
-import { GenerarTurnosFicticios } from "@/components/trabajadores/GenerarTurnosFicticios";
-import { GenerarAreasFicticias } from "@/components/trabajadores/GenerarAreasFicticias";
 import { AsignarAreasAutomaticamente } from "@/components/trabajadores/AsignarAreasAutomaticamente";
 import { DialogTurno } from "@/components/trabajadores/DialogTurno";
-import { GenerarDatosFicticios } from "@/components/trabajadores/GenerarDatosFicticios";
 import {
   Dialog,
   DialogContent,
@@ -53,9 +50,6 @@ export default function Trabajadores() {
             </p>
           </div>
           <div className="flex gap-2">
-            <GenerarDatosFicticios />
-            <GenerarTurnosFicticios />
-            <GenerarAreasFicticias />
             <AsignarAreasAutomaticamente />
             <Button
               variant="outline"
