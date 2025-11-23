@@ -382,7 +382,7 @@ export type Database = {
             foreignKeyName: "ocupacion_diaria_sala_id_fkey"
             columns: ["sala_id"]
             isOneToOne: false
-            referencedRelation: "salas"
+            referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
         ]
