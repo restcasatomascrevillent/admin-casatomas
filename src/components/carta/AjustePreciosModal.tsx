@@ -9,6 +9,7 @@ import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
 import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
 import { HistorialAjustesDialog } from "./HistorialAjustesDialog";
+import { AlertaCambioExtremoDialog } from "./AlertaCambioExtremoDialog";
 import { toast } from "sonner";
 import { History, Percent } from "lucide-react";
 
@@ -22,6 +23,10 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("todas");
   const [porcentaje, setPorcentaje] = useState<string>("");
   const [historialOpen, setHistorialOpen] = useState(false);
+  const [alertaExtremaOpen, setAlertaExtremaOpen] = useState(false);
+  const [datosAjustePendiente, setDatosAjustePendiente] = useState<any>(null);
+
+  const UMBRAL_ALERTA = 10; // Porcentaje para alertar
 
   const { platos, categorias: categoriasPlatos, actualizarPlato } = usePlatos();
   const { bebidas, categorias: categoriasBebidas, actualizarBebida } = useBebidas();
@@ -33,32 +38,8 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
     tipoCarta === "bebidas" ? categoriasBebidas :
     categoriasVinos;
 
-  const handleAplicar = async () => {
-    const porcentajeNum = parseFloat(porcentaje);
-    
-    if (isNaN(porcentajeNum)) {
-      toast.error("Introduce un porcentaje válido");
-      return;
-    }
-
+  const aplicarAjuste = async (porcentajeNum: number, itemsAActualizar: any[]) => {
     try {
-      let itemsAActualizar: any[] = [];
-
-      // Filtrar items según tipo y categoría
-      if (tipoCarta === "platos") {
-        itemsAActualizar = categoriaSeleccionada === "todas" 
-          ? platos || []
-          : platos?.filter(p => p.categoria === categoriaSeleccionada) || [];
-      } else if (tipoCarta === "bebidas") {
-        itemsAActualizar = categoriaSeleccionada === "todas"
-          ? bebidas || []
-          : bebidas?.filter(b => b.categoria === categoriaSeleccionada) || [];
-      } else {
-        itemsAActualizar = categoriaSeleccionada === "todas"
-          ? vinos || []
-          : vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
-      }
-
       // Preparar snapshot para historial
       const snapshot = itemsAActualizar.map((item) => {
         const precioActual = item.precio_eur || 0;
@@ -102,11 +83,59 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
       // Resetear formulario
       setPorcentaje("");
       setCategoriaSeleccionada("todas");
+      setDatosAjustePendiente(null);
       onOpenChange(false);
     } catch (error) {
       toast.error("Error al actualizar los precios");
       console.error(error);
     }
+  };
+
+  const handleAplicar = async () => {
+    const porcentajeNum = parseFloat(porcentaje);
+    
+    if (isNaN(porcentajeNum)) {
+      toast.error("Introduce un porcentaje válido");
+      return;
+    }
+
+    // Filtrar items según tipo y categoría
+    let itemsAActualizar: any[] = [];
+    if (tipoCarta === "platos") {
+      itemsAActualizar = categoriaSeleccionada === "todas" 
+        ? platos || []
+        : platos?.filter(p => p.categoria === categoriaSeleccionada) || [];
+    } else if (tipoCarta === "bebidas") {
+      itemsAActualizar = categoriaSeleccionada === "todas"
+        ? bebidas || []
+        : bebidas?.filter(b => b.categoria === categoriaSeleccionada) || [];
+    } else {
+      itemsAActualizar = categoriaSeleccionada === "todas"
+        ? vinos || []
+        : vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
+    }
+
+    if (itemsAActualizar.length === 0) {
+      toast.error("No hay items para ajustar en esta categoría");
+      return;
+    }
+
+    // Verificar si el cambio es extremo
+    if (Math.abs(porcentajeNum) >= UMBRAL_ALERTA) {
+      setDatosAjustePendiente({
+        porcentajeNum,
+        itemsAActualizar,
+      });
+      setAlertaExtremaOpen(true);
+    } else {
+      // Aplicar directamente si no es extremo
+      await aplicarAjuste(porcentajeNum, itemsAActualizar);
+    }
+  };
+
+  const confirmarAjusteExtremo = async () => {
+    if (!datosAjustePendiente) return;
+    await aplicarAjuste(datosAjustePendiente.porcentajeNum, datosAjustePendiente.itemsAActualizar);
   };
 
   return (
@@ -196,6 +225,16 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
       </DialogContent>
       
       <HistorialAjustesDialog open={historialOpen} onOpenChange={setHistorialOpen} />
+      
+      <AlertaCambioExtremoDialog
+        open={alertaExtremaOpen}
+        onOpenChange={setAlertaExtremaOpen}
+        porcentaje={parseFloat(porcentaje) || 0}
+        tipoCarta={tipoCarta}
+        categoria={categoriaSeleccionada}
+        itemsAfectados={datosAjustePendiente?.itemsAActualizar?.length || 0}
+        onConfirmar={confirmarAjusteExtremo}
+      />
     </Dialog>
   );
 }
