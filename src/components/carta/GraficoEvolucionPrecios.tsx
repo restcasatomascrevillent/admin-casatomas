@@ -1,16 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Button } from "@/components/ui/button";
 import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { TrendingUp, BarChart3, LineChart as LineChartIcon, Info } from "lucide-react";
 
 export function GraficoEvolucionPrecios() {
   const { historial } = useHistorialAjustes();
   const [tipoCartaSeleccionado, setTipoCartaSeleccionado] = useState<"platos" | "bebidas" | "vinos">("platos");
+  const [tipoGrafico, setTipoGrafico] = useState<"lineas" | "barras">("lineas");
 
   const datosGrafico = useMemo(() => {
     if (!historial || historial.length === 0) return [];
@@ -92,26 +95,81 @@ export function GraficoEvolucionPrecios() {
   return (
     <Card className="w-full">
       <CardHeader className="pb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Evolución de Precios Promedio
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Histórico de precios promedio por categoría
-            </CardDescription>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Evolución de Precios Promedio
+                </CardTitle>
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-80" align="start">
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold">Sobre este gráfico</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Este gráfico muestra la evolución del <strong>precio promedio</strong> de los productos 
+                        a lo largo del tiempo, agrupados por categoría.
+                      </p>
+                      <div className="space-y-1 text-xs">
+                        <p><strong>Eje X (horizontal):</strong> Fechas de los ajustes realizados</p>
+                        <p><strong>Eje Y (vertical):</strong> Precio promedio en euros (€)</p>
+                        <p><strong>Líneas/Barras de colores:</strong> Cada color representa una categoría diferente</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        💡 <strong>Tip:</strong> Pasa el cursor sobre los puntos para ver valores exactos
+                      </p>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              </div>
+              <CardDescription className="mt-1">
+                Histórico de precios promedio por categoría
+              </CardDescription>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={tipoCartaSeleccionado} onValueChange={(v: any) => setTipoCartaSeleccionado(v)}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="platos">Platos</SelectItem>
+                  <SelectItem value="bebidas">Bebidas</SelectItem>
+                  <SelectItem value="vinos">Vinos</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <ToggleGroup 
+                type="single" 
+                value={tipoGrafico} 
+                onValueChange={(value) => value && setTipoGrafico(value as "lineas" | "barras")}
+                className="border rounded-md"
+              >
+                <ToggleGroupItem 
+                  value="lineas" 
+                  aria-label="Vista de líneas"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground gap-2"
+                >
+                  <LineChartIcon className="h-4 w-4" />
+                  Líneas
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="barras" 
+                  aria-label="Vista de barras"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Barras
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </div>
-          <Select value={tipoCartaSeleccionado} onValueChange={(v: any) => setTipoCartaSeleccionado(v)}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="platos">Platos</SelectItem>
-              <SelectItem value="bebidas">Bebidas</SelectItem>
-              <SelectItem value="vinos">Vinos</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </CardHeader>
       <CardContent className="pb-6">
@@ -128,75 +186,143 @@ export function GraficoEvolucionPrecios() {
         ) : (
           <div className="w-full">
             <ResponsiveContainer width="100%" height={400}>
-              <LineChart 
-                data={datosGrafico}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="hsl(var(--border))" 
-                  opacity={0.3}
-                />
-                <XAxis 
-                  dataKey="fecha" 
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickMargin={8}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis 
-                  stroke="hsl(var(--muted-foreground))"
-                  fontSize={11}
-                  tickMargin={8}
-                  width={60}
-                  label={{ 
-                    value: 'Precio (€)', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { 
-                      textAnchor: 'middle',
-                      fill: 'hsl(var(--muted-foreground))',
-                      fontSize: 12
-                    }
-                  }}
-                />
-                <Tooltip 
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                  labelStyle={{
-                    color: "hsl(var(--popover-foreground))",
-                    fontWeight: "bold",
-                    marginBottom: "4px"
-                  }}
-                  formatter={(value: any) => [`${Number(value).toFixed(2)}€`, ""]}
-                  labelFormatter={(label) => `Fecha: ${label}`}
-                />
-                <Legend 
-                  wrapperStyle={{
-                    paddingTop: "20px"
-                  }}
-                  iconType="line"
-                />
-                {categorias.map((categoria, index) => (
-                  <Line
-                    key={categoria}
-                    type="monotone"
-                    dataKey={categoria}
-                    name={categoria}
-                    stroke={colores[index % colores.length]}
-                    strokeWidth={3}
-                    dot={{ r: 5, strokeWidth: 2, fill: "hsl(var(--background))" }}
-                    activeDot={{ r: 7, strokeWidth: 2 }}
-                    animationDuration={1000}
+              {tipoGrafico === "lineas" ? (
+                <LineChart 
+                  data={datosGrafico}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="hsl(var(--border))" 
+                    opacity={0.3}
                   />
-                ))}
-              </LineChart>
+                  <XAxis 
+                    dataKey="fecha" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickMargin={8}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickMargin={8}
+                    width={60}
+                    label={{ 
+                      value: 'Precio (€)', 
+                      angle: -90, 
+                      position: 'insideLeft',
+                      style: { 
+                        textAnchor: 'middle',
+                        fill: 'hsl(var(--muted-foreground))',
+                        fontSize: 12
+                      }
+                    }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                    labelStyle={{
+                      color: "hsl(var(--popover-foreground))",
+                      fontWeight: "bold",
+                      marginBottom: "4px"
+                    }}
+                    formatter={(value: any) => [`${Number(value).toFixed(2)}€`, ""]}
+                    labelFormatter={(label) => `Fecha: ${label}`}
+                  />
+                  <Legend 
+                    wrapperStyle={{
+                      paddingTop: "20px"
+                    }}
+                    iconType="line"
+                  />
+                  {categorias.map((categoria, index) => (
+                    <Line
+                      key={categoria}
+                      type="monotone"
+                      dataKey={categoria}
+                      name={categoria}
+                      stroke={colores[index % colores.length]}
+                      strokeWidth={3}
+                      dot={{ r: 5, strokeWidth: 2, fill: "hsl(var(--background))" }}
+                      activeDot={{ r: 7, strokeWidth: 2 }}
+                      animationDuration={1000}
+                    />
+                  ))}
+                </LineChart>
+              ) : (
+                <BarChart 
+                  data={datosGrafico}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    stroke="hsl(var(--border))" 
+                    opacity={0.3}
+                  />
+                  <XAxis 
+                    dataKey="fecha" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickMargin={8}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={11}
+                    tickMargin={8}
+                    width={60}
+                    label={{ 
+                      value: 'Precio (€)', 
+                      angle: -90, 
+                      position: 'insideLeft',
+                      style: { 
+                        textAnchor: 'middle',
+                        fill: 'hsl(var(--muted-foreground))',
+                        fontSize: 12
+                      }
+                    }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                    labelStyle={{
+                      color: "hsl(var(--popover-foreground))",
+                      fontWeight: "bold",
+                      marginBottom: "4px"
+                    }}
+                    formatter={(value: any) => [`${Number(value).toFixed(2)}€`, ""]}
+                    labelFormatter={(label) => `Fecha: ${label}`}
+                  />
+                  <Legend 
+                    wrapperStyle={{
+                      paddingTop: "20px"
+                    }}
+                  />
+                  {categorias.map((categoria, index) => (
+                    <Bar
+                      key={categoria}
+                      dataKey={categoria}
+                      name={categoria}
+                      fill={colores[index % colores.length]}
+                      radius={[4, 4, 0, 0]}
+                      animationDuration={1000}
+                    />
+                  ))}
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
         )}
