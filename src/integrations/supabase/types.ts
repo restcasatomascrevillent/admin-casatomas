@@ -300,6 +300,42 @@ export type Database = {
         }
         Relationships: []
       }
+      historial_ajustes_precios: {
+        Row: {
+          categoria: string
+          created_at: string
+          fecha: string
+          id: string
+          items_afectados: number
+          porcentaje: number
+          snapshot: Json
+          tipo_carta: string
+          user_id: string | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          items_afectados?: number
+          porcentaje: number
+          snapshot?: Json
+          tipo_carta: string
+          user_id?: string | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          items_afectados?: number
+          porcentaje?: number
+          snapshot?: Json
+          tipo_carta?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       imagenes_base64: {
         Row: {
           categoria: string | null
