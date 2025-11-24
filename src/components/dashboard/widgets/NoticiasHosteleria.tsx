@@ -1,72 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Newspaper, ExternalLink } from "lucide-react";
+import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface Noticia {
-  id: string;
-  titulo: string;
-  fuente: string;
-  fecha: string;
-  categoria: string;
-  enlace: string;
-}
-
-// Noticias de ejemplo - En producción estas vendrían de una API o RSS feed
-const NOTICIAS_EJEMPLO: Noticia[] = [
-  {
-    id: "1",
-    titulo: "Nuevas regulaciones laborales para el sector hostelero en 2025",
-    fuente: "Hostelería Digital",
-    fecha: "2024-11-20",
-    categoria: "Legislación",
-    enlace: "#",
-  },
-  {
-    id: "2",
-    titulo: "Tendencias gastronómicas: El auge de la cocina sostenible",
-    fuente: "Restauración News",
-    fecha: "2024-11-19",
-    categoria: "Tendencias",
-    enlace: "#",
-  },
-  {
-    id: "3",
-    titulo: "Tecnología en restaurantes: Sistemas de reservas con IA",
-    fuente: "HORECA Magazine",
-    fecha: "2024-11-18",
-    categoria: "Tecnología",
-    enlace: "#",
-  },
-  {
-    id: "4",
-    titulo: "Gestión de personal: Cómo reducir la rotación en hostelería",
-    fuente: "Gestión Restaurantes",
-    fecha: "2024-11-17",
-    categoria: "RRHH",
-    enlace: "#",
-  },
-  {
-    id: "5",
-    titulo: "Subvenciones para digitalización de restaurantes",
-    fuente: "Hostelería España",
-    fecha: "2024-11-16",
-    categoria: "Gestión",
-    enlace: "#",
-  },
-];
+import { useNoticiasHosteleria } from "@/hooks/useNoticiasHosteleria";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function NoticiasHosteleria() {
   const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
+  const { data: noticias, isLoading, refetch, isFetching } = useNoticiasHosteleria(filtroCategoria);
 
   const categorias = ["todas", "Tendencias", "Legislación", "Tecnología", "RRHH", "Gestión"];
-
-  const noticiasFiltradas =
-    filtroCategoria === "todas"
-      ? NOTICIAS_EJEMPLO
-      : NOTICIAS_EJEMPLO.filter((n) => n.categoria === filtroCategoria);
 
   const getCategoriaColor = (categoria: string) => {
     const colors: Record<string, string> = {
@@ -87,6 +32,15 @@ export function NoticiasHosteleria() {
             <Newspaper className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base font-medium">Noticias del Sector</CardTitle>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
         </div>
         <Tabs value={filtroCategoria} onValueChange={setFiltroCategoria} className="mt-3">
           <TabsList className="grid grid-cols-6 w-full">
@@ -99,10 +53,19 @@ export function NoticiasHosteleria() {
         </Tabs>
       </CardHeader>
       <CardContent className="space-y-3">
-        {noticiasFiltradas.length > 0 ? (
-          noticiasFiltradas.map((noticia) => (
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : noticias && noticias.length > 0 ? (
+          noticias.map((noticia, index) => (
             <div
-              key={noticia.id}
+              key={index}
               className="p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
             >
               <div className="space-y-2">
@@ -112,6 +75,9 @@ export function NoticiasHosteleria() {
                     {noticia.categoria}
                   </Badge>
                 </div>
+                {noticia.descripcion && (
+                  <p className="text-xs text-muted-foreground">{noticia.descripcion}</p>
+                )}
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <span>{noticia.fuente}</span>
@@ -141,3 +107,4 @@ export function NoticiasHosteleria() {
     </Card>
   );
 }
+
