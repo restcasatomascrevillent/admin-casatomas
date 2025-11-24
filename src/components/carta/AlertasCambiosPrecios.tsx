@@ -135,18 +135,23 @@ export function AlertasCambiosPrecios() {
         <Alert
           key={alerta.id}
           variant="destructive"
-          className="relative"
+          className="relative pr-12"
         >
           <AlertTriangle className="h-4 w-4" />
           <Button
             variant="ghost"
             size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0"
-            onClick={() => cerrarAlerta(alerta.id)}
+            className="absolute top-2 right-2 h-8 w-8 p-0 hover:bg-destructive-foreground/10 z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              cerrarAlerta(alerta.id);
+            }}
+            aria-label="Cerrar alerta"
           >
             <X className="h-4 w-4" />
           </Button>
-          <AlertTitle className="flex items-center gap-2">
+          <AlertTitle className="flex items-center gap-2 pr-8">
             Cambio extremo de precios detectado
             <Badge variant="outline">
               {alerta.porcentaje > 0 ? "+" : ""}{alerta.porcentaje}%
