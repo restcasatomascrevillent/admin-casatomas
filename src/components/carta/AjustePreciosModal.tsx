@@ -21,7 +21,9 @@ interface AjustePreciosModalProps {
 export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalProps) {
   const [tipoCarta, setTipoCarta] = useState<"platos" | "bebidas" | "vinos">("platos");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("todas");
+  const [itemSeleccionado, setItemSeleccionado] = useState<string>("todos");
   const [porcentaje, setPorcentaje] = useState<string>("");
+  const [precioExacto, setPrecioExacto] = useState<string>("");
   const [historialOpen, setHistorialOpen] = useState(false);
   const [alertaExtremaOpen, setAlertaExtremaOpen] = useState(false);
   const [datosAjustePendiente, setDatosAjustePendiente] = useState<any>(null);
@@ -37,6 +39,21 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
     tipoCarta === "platos" ? categoriasPlatos :
     tipoCarta === "bebidas" ? categoriasBebidas :
     categoriasVinos;
+
+  // Obtener items de la categoría seleccionada
+  const itemsCategoria = (() => {
+    if (categoriaSeleccionada === "todas") return [];
+    
+    if (tipoCarta === "platos") {
+      return platos?.filter(p => p.categoria === categoriaSeleccionada) || [];
+    } else if (tipoCarta === "bebidas") {
+      return bebidas?.filter(b => b.categoria === categoriaSeleccionada) || [];
+    } else {
+      return vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
+    }
+  })();
+
+  const esEdicionIndividual = itemSeleccionado !== "todos";
 
   const aplicarAjuste = async (porcentajeNum: number, itemsAActualizar: any[]) => {
     try {
@@ -92,44 +109,102 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
   };
 
   const handleAplicar = async () => {
-    const porcentajeNum = parseFloat(porcentaje);
-    
-    if (isNaN(porcentajeNum)) {
-      toast.error("Introduce un porcentaje válido");
-      return;
-    }
+    // Validar según el modo (individual o masivo)
+    if (esEdicionIndividual) {
+      // Modo individual: cambiar precio exacto
+      const precioNum = parseFloat(precioExacto);
+      
+      if (isNaN(precioNum) || precioNum < 0) {
+        toast.error("Introduce un precio válido");
+        return;
+      }
 
-    // Filtrar items según tipo y categoría
-    let itemsAActualizar: any[] = [];
-    if (tipoCarta === "platos") {
-      itemsAActualizar = categoriaSeleccionada === "todas" 
-        ? platos || []
-        : platos?.filter(p => p.categoria === categoriaSeleccionada) || [];
-    } else if (tipoCarta === "bebidas") {
-      itemsAActualizar = categoriaSeleccionada === "todas"
-        ? bebidas || []
-        : bebidas?.filter(b => b.categoria === categoriaSeleccionada) || [];
+      const itemAActualizar = itemsCategoria.find(i => i.id === itemSeleccionado);
+      if (!itemAActualizar) {
+        toast.error("Item no encontrado");
+        return;
+      }
+
+      try {
+        // Actualizar directamente el item con el precio exacto
+        if (tipoCarta === "platos") {
+          await actualizarPlato.mutateAsync({ id: itemAActualizar.id, precio_eur: precioNum });
+        } else if (tipoCarta === "bebidas") {
+          await actualizarBebida.mutateAsync({ id: itemAActualizar.id, precio_eur: precioNum });
+        } else {
+          await actualizarVino.mutateAsync({ id: itemAActualizar.id, precio_eur: precioNum });
+        }
+
+        // Guardar en historial
+        const precioAnterior = itemAActualizar.precio_eur || 0;
+        const porcentajeCambio = precioAnterior !== 0 
+          ? ((precioNum - precioAnterior) / precioAnterior) * 100 
+          : 0;
+
+        await guardarAjuste.mutateAsync({
+          tipo_carta: tipoCarta,
+          categoria: categoriaSeleccionada,
+          porcentaje: Number(porcentajeCambio.toFixed(2)),
+          items_afectados: 1,
+          snapshot: [{
+            id: itemAActualizar.id,
+            nombre: itemAActualizar.nombre || "Sin nombre",
+            precio_anterior: precioAnterior,
+            precio_nuevo: precioNum,
+          }],
+        });
+
+        toast.success(`Precio actualizado: ${itemAActualizar.nombre} → ${precioNum.toFixed(2)}€`);
+        
+        // Resetear formulario
+        setPrecioExacto("");
+        setItemSeleccionado("todos");
+        onOpenChange(false);
+      } catch (error) {
+        toast.error("Error al actualizar el precio");
+        console.error(error);
+      }
     } else {
-      itemsAActualizar = categoriaSeleccionada === "todas"
-        ? vinos || []
-        : vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
-    }
+      // Modo masivo: cambiar por porcentaje
+      const porcentajeNum = parseFloat(porcentaje);
+      
+      if (isNaN(porcentajeNum)) {
+        toast.error("Introduce un porcentaje válido");
+        return;
+      }
 
-    if (itemsAActualizar.length === 0) {
-      toast.error("No hay items para ajustar en esta categoría");
-      return;
-    }
+      // Filtrar items según tipo y categoría
+      let itemsAActualizar: any[] = [];
+      if (tipoCarta === "platos") {
+        itemsAActualizar = categoriaSeleccionada === "todas" 
+          ? platos || []
+          : platos?.filter(p => p.categoria === categoriaSeleccionada) || [];
+      } else if (tipoCarta === "bebidas") {
+        itemsAActualizar = categoriaSeleccionada === "todas"
+          ? bebidas || []
+          : bebidas?.filter(b => b.categoria === categoriaSeleccionada) || [];
+      } else {
+        itemsAActualizar = categoriaSeleccionada === "todas"
+          ? vinos || []
+          : vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
+      }
 
-    // Verificar si el cambio es extremo
-    if (Math.abs(porcentajeNum) >= UMBRAL_ALERTA) {
-      setDatosAjustePendiente({
-        porcentajeNum,
-        itemsAActualizar,
-      });
-      setAlertaExtremaOpen(true);
-    } else {
-      // Aplicar directamente si no es extremo
-      await aplicarAjuste(porcentajeNum, itemsAActualizar);
+      if (itemsAActualizar.length === 0) {
+        toast.error("No hay items para ajustar en esta categoría");
+        return;
+      }
+
+      // Verificar si el cambio es extremo
+      if (Math.abs(porcentajeNum) >= UMBRAL_ALERTA) {
+        setDatosAjustePendiente({
+          porcentajeNum,
+          itemsAActualizar,
+        });
+        setAlertaExtremaOpen(true);
+      } else {
+        // Aplicar directamente si no es extremo
+        await aplicarAjuste(porcentajeNum, itemsAActualizar);
+      }
     }
   };
 
@@ -154,6 +229,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
             <Select value={tipoCarta} onValueChange={(value: any) => {
               setTipoCarta(value);
               setCategoriaSeleccionada("todas");
+              setItemSeleccionado("todos");
             }}>
               <SelectTrigger id="tipo-carta">
                 <SelectValue />
@@ -168,7 +244,10 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
 
           <div className="space-y-2">
             <Label htmlFor="categoria">Categoría</Label>
-            <Select value={categoriaSeleccionada} onValueChange={setCategoriaSeleccionada}>
+            <Select value={categoriaSeleccionada} onValueChange={(value) => {
+              setCategoriaSeleccionada(value);
+              setItemSeleccionado("todos");
+            }}>
               <SelectTrigger id="categoria">
                 <SelectValue />
               </SelectTrigger>
@@ -183,24 +262,67 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="porcentaje">Porcentaje de Ajuste</Label>
-            <div className="relative">
-              <Input
-                id="porcentaje"
-                type="number"
-                step="0.1"
-                placeholder="Ej: 5 para subir 5%, -10 para bajar 10%"
-                value={porcentaje}
-                onChange={(e) => setPorcentaje(e.target.value)}
-                className="pr-10"
-              />
-              <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          {categoriaSeleccionada !== "todas" && itemsCategoria.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="item">Item a Modificar</Label>
+              <Select value={itemSeleccionado} onValueChange={setItemSeleccionado}>
+                <SelectTrigger id="item">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los items de esta categoría</SelectItem>
+                  {itemsCategoria.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.nombre} - {item.precio_eur?.toFixed(2) || "0.00"}€
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Valores positivos aumentan el precio, negativos lo reducen
-            </p>
-          </div>
+          )}
+
+          {esEdicionIndividual ? (
+            <div className="space-y-2">
+              <Label htmlFor="precio-exacto">Nuevo Precio (€)</Label>
+              <div className="relative">
+                <Input
+                  id="precio-exacto"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Ej: 12.50"
+                  value={precioExacto}
+                  onChange={(e) => setPrecioExacto(e.target.value)}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  €
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Introduce el precio exacto que quieres asignar a este item
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="porcentaje">Porcentaje de Ajuste</Label>
+              <div className="relative">
+                <Input
+                  id="porcentaje"
+                  type="number"
+                  step="0.1"
+                  placeholder="Ej: 5 para subir 5%, -10 para bajar 10%"
+                  value={porcentaje}
+                  onChange={(e) => setPorcentaje(e.target.value)}
+                  className="pr-10"
+                />
+                <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Valores positivos aumentan el precio, negativos lo reducen
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center gap-3">
@@ -217,8 +339,11 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleAplicar} disabled={!porcentaje}>
-              Aplicar Ajuste
+            <Button 
+              onClick={handleAplicar} 
+              disabled={esEdicionIndividual ? !precioExacto : !porcentaje}
+            >
+              {esEdicionIndividual ? "Actualizar Precio" : "Aplicar Ajuste"}
             </Button>
           </div>
         </div>
