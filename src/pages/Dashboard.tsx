@@ -14,6 +14,7 @@ import { NoShowsCancelaciones } from "@/components/dashboard/widgets/NoShowsCanc
 import { ResumenMarketing } from "@/components/dashboard/widgets/ResumenMarketing";
 import { ResenasRecientes } from "@/components/dashboard/widgets/ResenasRecientes";
 import { CampanasActivas } from "@/components/dashboard/widgets/CampanasActivas";
+import { NoticiasHosteleria } from "@/components/dashboard/widgets/NoticiasHosteleria";
 import { PersonalizarDashboard } from "@/components/dashboard/PersonalizarDashboard";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
@@ -32,6 +33,7 @@ const WIDGETS_DISPONIBLES = [
   { id: "resumen-marketing", nombre: "Resumen Marketing", component: ResumenMarketing },
   { id: "resenas", nombre: "Reseñas Recientes", component: ResenasRecientes },
   { id: "campanas", nombre: "Campañas Activas", component: CampanasActivas },
+  { id: "noticias", nombre: "Noticias del Sector", component: NoticiasHosteleria },
 ];
 
 const DEFAULT_ACTIVOS = [
@@ -39,8 +41,13 @@ const DEFAULT_ACTIVOS = [
   "horas-mensuales",
   "personas-activas",
   "reservas-hoy",
+  "no-shows",
   "distribucion-horas",
   "top-trabajadores",
+  "resumen-marketing",
+  "resenas",
+  "campanas",
+  "noticias",
 ];
 
 const DEFAULT_ORDEN = [
@@ -56,6 +63,7 @@ const DEFAULT_ORDEN = [
   "resumen-marketing",
   "resenas",
   "campanas",
+  "noticias",
 ];
 
 export default function Dashboard() {
