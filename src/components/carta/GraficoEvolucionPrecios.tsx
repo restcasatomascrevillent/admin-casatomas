@@ -70,13 +70,14 @@ export function GraficoEvolucionPrecios() {
   }, [datosGrafico]);
 
   const colores = [
-    "hsl(var(--primary))",
-    "hsl(var(--accent))",
-    "hsl(var(--secondary))",
-    "#8b5cf6",
-    "#ec4899",
-    "#10b981",
-    "#f59e0b",
+    "hsl(206, 11%, 25%)", // Primary
+    "hsl(38, 59%, 45%)", // Accent gold
+    "hsl(25, 13%, 55%)", // Secondary
+    "#8b5cf6", // Purple
+    "#ec4899", // Pink
+    "#10b981", // Green
+    "#f59e0b", // Orange
+    "#3b82f6", // Blue
   ];
 
   const getTipoCartaLabel = (tipo: string) => {
@@ -89,20 +90,20 @@ export function GraficoEvolucionPrecios() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card className="w-full">
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5 text-primary" />
               Evolución de Precios Promedio
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="mt-1">
               Histórico de precios promedio por categoría
             </CardDescription>
           </div>
           <Select value={tipoCartaSeleccionado} onValueChange={(v: any) => setTipoCartaSeleccionado(v)}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -113,46 +114,91 @@ export function GraficoEvolucionPrecios() {
           </Select>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-6">
         {datosGrafico.length === 0 ? (
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-            No hay datos de historial para {getTipoCartaLabel(tipoCartaSeleccionado).toLowerCase()}
+          <div className="h-[400px] flex flex-col items-center justify-center text-muted-foreground bg-muted/20 rounded-lg border-2 border-dashed">
+            <TrendingUp className="h-12 w-12 mb-4 opacity-50" />
+            <p className="text-center">
+              No hay datos de historial para {getTipoCartaLabel(tipoCartaSeleccionado).toLowerCase()}
+            </p>
+            <p className="text-sm text-center mt-2">
+              Realiza ajustes de precios para ver la evolución
+            </p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={datosGrafico}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="fecha" 
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-              />
-              <YAxis 
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                label={{ value: 'Precio Promedio (€)', angle: -90, position: 'insideLeft' }}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                }}
-              />
-              <Legend />
-              {categorias.map((categoria, index) => (
-                <Line
-                  key={categoria}
-                  type="monotone"
-                  dataKey={categoria}
-                  stroke={colores[index % colores.length]}
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                  activeDot={{ r: 6 }}
+          <div className="w-full">
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart 
+                data={datosGrafico}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="hsl(var(--border))" 
+                  opacity={0.3}
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                <XAxis 
+                  dataKey="fecha" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  tickMargin={8}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  tickMargin={8}
+                  width={60}
+                  label={{ 
+                    value: 'Precio (€)', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { 
+                      textAnchor: 'middle',
+                      fill: 'hsl(var(--muted-foreground))',
+                      fontSize: 12
+                    }
+                  }}
+                />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  labelStyle={{
+                    color: "hsl(var(--popover-foreground))",
+                    fontWeight: "bold",
+                    marginBottom: "4px"
+                  }}
+                  formatter={(value: any) => [`${Number(value).toFixed(2)}€`, ""]}
+                  labelFormatter={(label) => `Fecha: ${label}`}
+                />
+                <Legend 
+                  wrapperStyle={{
+                    paddingTop: "20px"
+                  }}
+                  iconType="line"
+                />
+                {categorias.map((categoria, index) => (
+                  <Line
+                    key={categoria}
+                    type="monotone"
+                    dataKey={categoria}
+                    name={categoria}
+                    stroke={colores[index % colores.length]}
+                    strokeWidth={3}
+                    dot={{ r: 5, strokeWidth: 2, fill: "hsl(var(--background))" }}
+                    activeDot={{ r: 7, strokeWidth: 2 }}
+                    animationDuration={1000}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>
