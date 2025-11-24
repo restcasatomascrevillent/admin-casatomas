@@ -28,7 +28,7 @@ interface Reservation {
   telefono: string;
   email: string | null;
   sala_id: string;
-  salas: {
+  espacios_reserva: {
     nombre: string;
   } | null;
 }
@@ -58,7 +58,7 @@ export default function Reservas() {
         telefono,
         email,
         sala_id,
-        salas!reservas_sala_id_fkey (nombre)
+        espacios_reserva!reservas_sala_id_fkey (nombre)
       `)
       .order("fecha", { ascending: true })
       .order("hora", { ascending: true });
@@ -292,7 +292,7 @@ export default function Reservas() {
                       {reservation.nombre || "Sin nombre"}
                     </TableCell>
                     <TableCell>{reservation.numero_comensales}</TableCell>
-                    <TableCell>{reservation.salas?.nombre || "-"}</TableCell>
+                    <TableCell>{reservation.espacios_reserva?.nombre || "-"}</TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
