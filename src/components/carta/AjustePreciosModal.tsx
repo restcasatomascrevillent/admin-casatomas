@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
+import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
+import { HistorialAjustesDialog } from "./HistorialAjustesDialog";
 import { toast } from "sonner";
-import { Percent } from "lucide-react";
+import { History, Percent } from "lucide-react";
 
 interface AjustePreciosModalProps {
   open: boolean;
@@ -19,10 +21,12 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
   const [tipoCarta, setTipoCarta] = useState<"platos" | "bebidas" | "vinos">("platos");
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>("todas");
   const [porcentaje, setPorcentaje] = useState<string>("");
+  const [historialOpen, setHistorialOpen] = useState(false);
 
   const { platos, categorias: categoriasPlatos, actualizarPlato } = usePlatos();
   const { bebidas, categorias: categoriasBebidas, actualizarBebida } = useBebidas();
   const { vinos, categorias: categoriasVinos, actualizarVino } = useVinos();
+  const { guardarAjuste } = useHistorialAjustes();
 
   const categoriasActuales = 
     tipoCarta === "platos" ? categoriasPlatos :
@@ -55,22 +59,41 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
           : vinos?.filter(v => v.categoria === categoriaSeleccionada) || [];
       }
 
-      // Aplicar ajuste a cada item
-      const actualizaciones = itemsAActualizar.map(async (item) => {
+      // Preparar snapshot para historial
+      const snapshot = itemsAActualizar.map((item) => {
         const precioActual = item.precio_eur || 0;
         const nuevoPrecio = precioActual * (1 + porcentajeNum / 100);
         const precioRedondeado = Math.round(nuevoPrecio * 100) / 100;
+        
+        return {
+          id: item.id,
+          nombre: item.nombre || "Sin nombre",
+          precio_anterior: precioActual,
+          precio_nuevo: precioRedondeado,
+        };
+      });
 
+      // Aplicar ajuste a cada item
+      const actualizaciones = snapshot.map(async (item) => {
         if (tipoCarta === "platos") {
-          return actualizarPlato.mutateAsync({ id: item.id, precio_eur: precioRedondeado });
+          return actualizarPlato.mutateAsync({ id: item.id, precio_eur: item.precio_nuevo });
         } else if (tipoCarta === "bebidas") {
-          return actualizarBebida.mutateAsync({ id: item.id, precio_eur: precioRedondeado });
+          return actualizarBebida.mutateAsync({ id: item.id, precio_eur: item.precio_nuevo });
         } else {
-          return actualizarVino.mutateAsync({ id: item.id, precio_eur: precioRedondeado });
+          return actualizarVino.mutateAsync({ id: item.id, precio_eur: item.precio_nuevo });
         }
       });
 
       await Promise.all(actualizaciones);
+
+      // Guardar en historial
+      await guardarAjuste.mutateAsync({
+        tipo_carta: tipoCarta,
+        categoria: categoriaSeleccionada,
+        porcentaje: porcentajeNum,
+        items_afectados: itemsAActualizar.length,
+        snapshot,
+      });
 
       toast.success(
         `Precios actualizados: ${itemsAActualizar.length} item(s) ajustados ${porcentajeNum > 0 ? '+' : ''}${porcentajeNum}%`
@@ -151,15 +174,28 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+        <div className="flex justify-between items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={() => setHistorialOpen(true)}
+            className="gap-2"
+          >
+            <History className="h-4 w-4" />
+            Ver Historial
           </Button>
-          <Button onClick={handleAplicar} disabled={!porcentaje}>
-            Aplicar Ajuste
-          </Button>
+          
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAplicar} disabled={!porcentaje}>
+              Aplicar Ajuste
+            </Button>
+          </div>
         </div>
       </DialogContent>
+      
+      <HistorialAjustesDialog open={historialOpen} onOpenChange={setHistorialOpen} />
     </Dialog>
   );
 }
