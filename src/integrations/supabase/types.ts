@@ -231,6 +231,48 @@ export type Database = {
         }
         Relationships: []
       }
+      config_google_places: {
+        Row: {
+          created_at: string | null
+          direccion: string | null
+          id: string
+          place_id: string
+          place_name: string
+          rating_promedio: number | null
+          telefono: string | null
+          total_resenas: number | null
+          ultima_sincronizacion: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          place_id: string
+          place_name: string
+          rating_promedio?: number | null
+          telefono?: string | null
+          total_resenas?: number | null
+          ultima_sincronizacion?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          place_id?: string
+          place_name?: string
+          rating_promedio?: number | null
+          telefono?: string | null
+          total_resenas?: number | null
+          ultima_sincronizacion?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       config_redes_sociales: {
         Row: {
           access_token: string | null
@@ -679,9 +721,13 @@ export type Database = {
           email: string | null
           estado: string | null
           fecha: string
+          fecha_respuesta: string | null
           fuente: string | null
+          google_rating: number | null
+          google_review_id: string | null
           id: string
           nombre_cliente: string
+          respuesta: string | null
           updated_at: string | null
           valoracion: number
         }
@@ -691,9 +737,13 @@ export type Database = {
           email?: string | null
           estado?: string | null
           fecha?: string
+          fecha_respuesta?: string | null
           fuente?: string | null
+          google_rating?: number | null
+          google_review_id?: string | null
           id?: string
           nombre_cliente: string
+          respuesta?: string | null
           updated_at?: string | null
           valoracion: number
         }
@@ -703,9 +753,13 @@ export type Database = {
           email?: string | null
           estado?: string | null
           fecha?: string
+          fecha_respuesta?: string | null
           fuente?: string | null
+          google_rating?: number | null
+          google_review_id?: string | null
           id?: string
           nombre_cliente?: string
+          respuesta?: string | null
           updated_at?: string | null
           valoracion?: number
         }

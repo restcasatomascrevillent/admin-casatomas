@@ -1,11 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Star } from "lucide-react";
+import { Star, RefreshCw } from "lucide-react";
 import { useResenasRecientes } from "@/hooks/useResenas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export function ResenasRecientes() {
-  const { data: resenas } = useResenasRecientes(5);
+  const { data: resenas, refetch } = useResenasRecientes(5);
+  const [syncing, setSyncing] = useState(false);
 
   const renderEstrellas = (valoracion: number) => {
     return (
@@ -22,10 +27,39 @@ export function ResenasRecientes() {
     );
   };
 
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { error } = await supabase.functions.invoke("sync-google-reviews");
+      
+      if (error) throw error;
+      
+      await refetch();
+      toast.success("Reseñas sincronizadas correctamente");
+    } catch (error) {
+      console.error("Error syncing reviews:", error);
+      toast.error("Error al sincronizar reseñas");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <Card className="col-span-2">
       <CardHeader>
-        <CardTitle className="text-base font-medium">Reseñas Recientes</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-medium">Reseñas Recientes</CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+            Sincronizar
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {resenas && resenas.length > 0 ? (
