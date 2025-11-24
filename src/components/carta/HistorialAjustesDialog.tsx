@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -5,6 +6,7 @@ import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
+import { ConfirmarRestauracionDialog } from "./ConfirmarRestauracionDialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { AlertCircle, RotateCcw, Trash2 } from "lucide-react";
@@ -18,17 +20,27 @@ interface HistorialAjustesDialogProps {
 }
 
 export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesDialogProps) {
+  const [ajusteSeleccionado, setAjusteSeleccionado] = useState<any>(null);
+  const [confirmarOpen, setConfirmarOpen] = useState(false);
+  
   const { historial, isLoading, eliminarAjuste } = useHistorialAjustes();
   const { actualizarPlato } = usePlatos();
   const { actualizarBebida } = useBebidas();
   const { actualizarVino } = useVinos();
 
-  const handleRestaurar = async (ajuste: any) => {
+  const handleAbrirConfirmacion = (ajuste: any) => {
+    setAjusteSeleccionado(ajuste);
+    setConfirmarOpen(true);
+  };
+
+  const handleRestaurar = async () => {
+    if (!ajusteSeleccionado) return;
+    
     try {
-      const actualizaciones = ajuste.snapshot.map(async (item: any) => {
-        if (ajuste.tipo_carta === "platos") {
+      const actualizaciones = ajusteSeleccionado.snapshot.map(async (item: any) => {
+        if (ajusteSeleccionado.tipo_carta === "platos") {
           return actualizarPlato.mutateAsync({ id: item.id, precio_eur: item.precio_anterior });
-        } else if (ajuste.tipo_carta === "bebidas") {
+        } else if (ajusteSeleccionado.tipo_carta === "bebidas") {
           return actualizarBebida.mutateAsync({ id: item.id, precio_eur: item.precio_anterior });
         } else {
           return actualizarVino.mutateAsync({ id: item.id, precio_eur: item.precio_anterior });
@@ -36,7 +48,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
       });
 
       await Promise.all(actualizaciones);
-      toast.success(`Precios restaurados a ${format(new Date(ajuste.fecha), "dd/MM/yyyy HH:mm", { locale: es })}`);
+      toast.success(`Precios restaurados a ${format(new Date(ajusteSeleccionado.fecha), "dd/MM/yyyy HH:mm", { locale: es })}`);
     } catch (error) {
       toast.error("Error al restaurar precios");
       console.error(error);
@@ -99,7 +111,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleRestaurar(ajuste)}
+                        onClick={() => handleAbrirConfirmacion(ajuste)}
                         className="gap-2"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -141,6 +153,13 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
           </ScrollArea>
         )}
       </DialogContent>
+      
+      <ConfirmarRestauracionDialog
+        open={confirmarOpen}
+        onOpenChange={setConfirmarOpen}
+        ajuste={ajusteSeleccionado}
+        onConfirm={handleRestaurar}
+      />
     </Dialog>
   );
 }
