@@ -186,6 +186,51 @@ export type Database = {
         }
         Relationships: []
       }
+      campanas_marketing: {
+        Row: {
+          canal: string
+          clics: number | null
+          created_at: string | null
+          estado: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          nombre: string
+          presupuesto: number | null
+          reservas_generadas: number | null
+          updated_at: string | null
+          visitas_web: number | null
+        }
+        Insert: {
+          canal: string
+          clics?: number | null
+          created_at?: string | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          nombre: string
+          presupuesto?: number | null
+          reservas_generadas?: number | null
+          updated_at?: string | null
+          visitas_web?: number | null
+        }
+        Update: {
+          canal?: string
+          clics?: number | null
+          created_at?: string | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          nombre?: string
+          presupuesto?: number | null
+          reservas_generadas?: number | null
+          updated_at?: string | null
+          visitas_web?: number | null
+        }
+        Relationships: []
+      }
       config_redes_sociales: {
         Row: {
           access_token: string | null
@@ -219,6 +264,39 @@ export type Database = {
           red_social?: string
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      dashboard_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          nombre_vista: string
+          orden_widgets: Json
+          updated_at: string | null
+          user_id: string
+          widgets_activos: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nombre_vista: string
+          orden_widgets?: Json
+          updated_at?: string | null
+          user_id: string
+          widgets_activos?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nombre_vista?: string
+          orden_widgets?: Json
+          updated_at?: string | null
+          user_id?: string
+          widgets_activos?: Json
         }
         Relationships: []
       }
@@ -593,6 +671,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      resenas: {
+        Row: {
+          comentario: string | null
+          created_at: string | null
+          email: string | null
+          estado: string | null
+          fecha: string
+          fuente: string | null
+          id: string
+          nombre_cliente: string
+          updated_at: string | null
+          valoracion: number
+        }
+        Insert: {
+          comentario?: string | null
+          created_at?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha?: string
+          fuente?: string | null
+          id?: string
+          nombre_cliente: string
+          updated_at?: string | null
+          valoracion: number
+        }
+        Update: {
+          comentario?: string | null
+          created_at?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha?: string
+          fuente?: string | null
+          id?: string
+          nombre_cliente?: string
+          updated_at?: string | null
+          valoracion?: number
+        }
+        Relationships: []
       }
       reservas: {
         Row: {
