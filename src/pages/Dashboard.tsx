@@ -104,13 +104,14 @@ export default function Dashboard() {
                 Vista general de la gestión del restaurante
               </p>
             </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <DashboardFilters />
             <Button variant="outline" size="sm" onClick={() => setPersonalizarOpen(true)}>
               <Settings className="h-4 w-4 mr-2" />
               Personalizar Dashboard
             </Button>
           </div>
-
-          <DashboardFilters />
+          </div>
 
           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {widgetsOrdenados.map((widget) => {
