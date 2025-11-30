@@ -82,13 +82,6 @@ export type Database = {
             foreignKeyName: "asignaciones_area_turno_id_fkey"
             columns: ["turno_id"]
             isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asignaciones_area_turno_id_fkey"
-            columns: ["turno_id"]
-            isOneToOne: false
             referencedRelation: "vista_turnos_con_areas"
             referencedColumns: ["id"]
           },
@@ -115,24 +108,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "asignaciones_sala_sala_id_fkey"
-            columns: ["sala_id"]
-            isOneToOne: false
-            referencedRelation: "salas"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "asignaciones_sala_turno_id_fkey"
             columns: ["turno_id"]
             isOneToOne: false
             referencedRelation: "turnos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "asignaciones_sala_turno_id_fkey"
-            columns: ["turno_id"]
-            isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
             referencedColumns: ["id"]
           },
           {
@@ -495,7 +474,7 @@ export type Database = {
       ocupacion_diaria: {
         Row: {
           created_at: string | null
-          espacio_id: string | null
+          espacio_id: string
           fecha: string
           hora: string | null
           id: string
@@ -506,7 +485,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          espacio_id?: string | null
+          espacio_id: string
           fecha: string
           hora?: string | null
           id?: string
@@ -517,7 +496,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          espacio_id?: string | null
+          espacio_id?: string
           fecha?: string
           hora?: string | null
           id?: string
@@ -685,24 +664,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "registro_horas_trabajador_id_fkey"
-            columns: ["trabajador_id"]
-            isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
-            referencedColumns: ["trabajador_id"]
-          },
-          {
             foreignKeyName: "registro_horas_turno_id_fkey"
             columns: ["turno_id"]
             isOneToOne: false
             referencedRelation: "turnos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "registro_horas_turno_id_fkey"
-            columns: ["turno_id"]
-            isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
             referencedColumns: ["id"]
           },
           {
@@ -818,39 +783,6 @@ export type Database = {
           },
         ]
       }
-      salas: {
-        Row: {
-          activa: boolean | null
-          capacidad_maxima: number
-          caracteristicas: Json | null
-          created_at: string | null
-          descripcion: string | null
-          id: string
-          nombre: string
-          updated_at: string | null
-        }
-        Insert: {
-          activa?: boolean | null
-          capacidad_maxima: number
-          caracteristicas?: Json | null
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre: string
-          updated_at?: string | null
-        }
-        Update: {
-          activa?: boolean | null
-          capacidad_maxima?: number
-          caracteristicas?: Json | null
-          created_at?: string | null
-          descripcion?: string | null
-          id?: string
-          nombre?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       trabajadores: {
         Row: {
           activo: boolean | null
@@ -940,13 +872,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trabajadores"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "turnos_trabajador_id_fkey"
-            columns: ["trabajador_id"]
-            isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
-            referencedColumns: ["trabajador_id"]
           },
         ]
       }
@@ -1046,22 +971,6 @@ export type Database = {
         }
         Relationships: []
       }
-      vista_turnos_completa: {
-        Row: {
-          estado: Database["public"]["Enums"]["estado_turno"] | null
-          fecha: string | null
-          hora_fin: string | null
-          hora_inicio: string | null
-          id: string | null
-          notas: string | null
-          puesto: Database["public"]["Enums"]["puesto_trabajo"] | null
-          salas_asignadas: string[] | null
-          salas_ids: string[] | null
-          trabajador_id: string | null
-          trabajador_nombre: string | null
-        }
-        Relationships: []
-      }
       vista_turnos_con_areas: {
         Row: {
           areas_asignadas: string[] | null
@@ -1085,13 +994,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trabajadores"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "turnos_trabajador_id_fkey"
-            columns: ["trabajador_id"]
-            isOneToOne: false
-            referencedRelation: "vista_turnos_completa"
-            referencedColumns: ["trabajador_id"]
           },
         ]
       }
