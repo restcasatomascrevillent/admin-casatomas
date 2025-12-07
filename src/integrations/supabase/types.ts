@@ -783,6 +783,24 @@ export type Database = {
           },
         ]
       }
+      scope_prices: {
+        Row: {
+          currency: string
+          scope_name: string
+          unit_price_cents: number
+        }
+        Insert: {
+          currency?: string
+          scope_name: string
+          unit_price_cents: number
+        }
+        Update: {
+          currency?: string
+          scope_name?: string
+          unit_price_cents?: number
+        }
+        Relationships: []
+      }
       trabajadores: {
         Row: {
           activo: boolean | null
@@ -874,6 +892,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      usage_events: {
+        Row: {
+          client_id: string
+          id: number
+          installation_id: string | null
+          metadata: Json | null
+          occurred_at: string
+          scope_name: string
+          status: string
+          total_price_cents: number
+          unit_price_cents: number
+          workflow_name: string | null
+        }
+        Insert: {
+          client_id: string
+          id?: number
+          installation_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          scope_name: string
+          status?: string
+          total_price_cents: number
+          unit_price_cents: number
+          workflow_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          id?: number
+          installation_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          scope_name?: string
+          status?: string
+          total_price_cents?: number
+          unit_price_cents?: number
+          workflow_name?: string | null
+        }
+        Relationships: []
       }
       Vinos: {
         Row: {
