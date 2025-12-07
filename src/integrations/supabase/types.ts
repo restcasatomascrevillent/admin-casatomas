@@ -87,6 +87,49 @@ export type Database = {
           },
         ]
       }
+      asignaciones_mesa: {
+        Row: {
+          created_at: string | null
+          id: string
+          mesa_id: string
+          reserva_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mesa_id: string
+          reserva_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mesa_id?: string
+          reserva_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_mesa_mesa_id_fkey"
+            columns: ["mesa_id"]
+            isOneToOne: false
+            referencedRelation: "mesas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "vista_reservas_pendientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asignaciones_sala: {
         Row: {
           created_at: string | null
@@ -471,6 +514,69 @@ export type Database = {
         }
         Relationships: []
       }
+      mesas: {
+        Row: {
+          activa: boolean | null
+          alto: number | null
+          ancho: number | null
+          capacidad: number
+          created_at: string | null
+          espacio_id: string
+          forma: string
+          id: string
+          nombre: string
+          pos_x: number | null
+          pos_y: number | null
+          rotacion: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activa?: boolean | null
+          alto?: number | null
+          ancho?: number | null
+          capacidad?: number
+          created_at?: string | null
+          espacio_id: string
+          forma?: string
+          id?: string
+          nombre: string
+          pos_x?: number | null
+          pos_y?: number | null
+          rotacion?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activa?: boolean | null
+          alto?: number | null
+          ancho?: number | null
+          capacidad?: number
+          created_at?: string | null
+          espacio_id?: string
+          forma?: string
+          id?: string
+          nombre?: string
+          pos_x?: number | null
+          pos_y?: number | null
+          rotacion?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mesas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mesas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+        ]
+      }
       ocupacion_diaria: {
         Row: {
           created_at: string | null
@@ -514,11 +620,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+          {
             foreignKeyName: "ocupacion_diaria_sala_id_fkey"
             columns: ["sala_id"]
             isOneToOne: false
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ocupacion_diaria_sala_id_fkey"
+            columns: ["sala_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+        ]
+      }
+      planos_espacio: {
+        Row: {
+          alto: number | null
+          ancho: number | null
+          configuracion: Json | null
+          created_at: string | null
+          espacio_id: string
+          id: string
+          metros_cuadrados: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          alto?: number | null
+          ancho?: number | null
+          configuracion?: Json | null
+          created_at?: string | null
+          espacio_id: string
+          id?: string
+          metros_cuadrados?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          alto?: number | null
+          ancho?: number | null
+          configuracion?: Json | null
+          created_at?: string | null
+          espacio_id?: string
+          id?: string
+          metros_cuadrados?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_espacio_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: true
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_espacio_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: true
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
           },
         ]
       }
@@ -781,6 +949,13 @@ export type Database = {
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reservas_sala_id_fkey"
+            columns: ["sala_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
         ]
       }
       scope_prices: {
@@ -1011,7 +1186,25 @@ export type Database = {
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
         ]
+      }
+      vista_ocupacion_hoy: {
+        Row: {
+          capacidad_maxima: number | null
+          espacio_id: string | null
+          espacio_nombre: string | null
+          porcentaje_ocupacion: number | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: []
       }
       vista_reservas_pendientes: {
         Row: {
