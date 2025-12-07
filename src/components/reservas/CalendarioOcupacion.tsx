@@ -234,11 +234,11 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
         </Card>
 
         {/* Panel de día seleccionado */}
-        <Card>
-          <CardContent className="p-4">
+        <Card className="h-fit max-h-[500px] flex flex-col">
+          <CardContent className="p-4 flex flex-col h-full overflow-hidden">
             {selectedDate ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col h-full overflow-hidden">
+                <div className="flex items-center gap-2 mb-4 flex-shrink-0">
                   <CalendarIcon className="h-5 w-5 text-primary" />
                   <h4 className="font-semibold">
                     {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
@@ -250,7 +250,7 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
                     No hay reservas para este día
                   </p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4 overflow-y-auto flex-1 pr-2">
                     {Object.entries(reservasDelDia).map(([espacioId, { espacio, reservas }]) => (
                       <div key={espacioId} className="space-y-2">
                         <Button
