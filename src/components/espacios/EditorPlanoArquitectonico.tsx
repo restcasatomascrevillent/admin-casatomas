@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Canvas as FabricCanvas, Rect, Circle, Line, Polygon, FabricObject } from "fabric";
+import { Canvas as FabricCanvas, Rect, Circle, Line, Polygon, FabricObject, PencilBrush, Path } from "fabric";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
 import { useMesas, useCrearMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Save,
@@ -25,7 +26,10 @@ import {
   Users,
   Download,
   Ruler,
-  RefreshCw
+  RefreshCw,
+  Pencil,
+  Wand2,
+  Loader2
 } from "lucide-react";
 
 interface EditorPlanoArquitectonicoProps {
@@ -34,7 +38,7 @@ interface EditorPlanoArquitectonicoProps {
   onBack: () => void;
 }
 
-type ToolType = "select" | "wall" | "rectangle" | "circle" | "polygon" | "mesa" | "silla" | "elemento";
+type ToolType = "select" | "wall" | "rectangle" | "circle" | "polygon" | "mesa" | "silla" | "elemento" | "freehand";
 
 interface ElementoDecorador {
   id: string;
@@ -57,6 +61,11 @@ export function EditorPlanoArquitectonico({
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
   const [showMeasurements, setShowMeasurements] = useState(true);
+  
+  // Estado para dibujo a mano alzada
+  const [freehandPath, setFreehandPath] = useState<Path | null>(null);
+  const [freehandPoints, setFreehandPoints] = useState<Array<{ x: number; y: number }>>([]);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
   
   // Escala: píxeles por metro (por defecto 100px = 1m)
   const [pixelsPerMeter, setPixelsPerMeter] = useState(100);
@@ -109,6 +118,130 @@ export function EditorPlanoArquitectonico({
       canvas.dispose();
     };
   }, []);
+
+  // Manejar modo de dibujo libre
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    if (activeTool === "freehand") {
+      fabricCanvas.isDrawingMode = true;
+      fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
+      fabricCanvas.freeDrawingBrush.color = "#ef4444";
+      fabricCanvas.freeDrawingBrush.width = 4;
+      
+      // Capturar el path cuando se termina de dibujar
+      const handlePathCreated = (e: any) => {
+        const path = e.path as Path;
+        if (path) {
+          // Extraer puntos del path
+          const pathData = path.path || [];
+          const points: Array<{ x: number; y: number }> = [];
+          
+          pathData.forEach((segment: any) => {
+            if (segment[0] === "M" || segment[0] === "L") {
+              points.push({ x: segment[1], y: segment[2] });
+            } else if (segment[0] === "Q") {
+              points.push({ x: segment[3], y: segment[4] });
+            }
+          });
+          
+          setFreehandPoints(points);
+          setFreehandPath(path);
+          
+          // Cambiar color del path para indicar que está listo
+          path.set({ stroke: "#f97316", strokeDashArray: [5, 5] });
+          fabricCanvas.renderAll();
+          
+          toast.info("Dibujo capturado. Pulsa 'Convertir con IA' para generar paredes.");
+        }
+      };
+
+      fabricCanvas.on("path:created", handlePathCreated);
+
+      return () => {
+        fabricCanvas.off("path:created", handlePathCreated);
+      };
+    } else {
+      fabricCanvas.isDrawingMode = false;
+    }
+  }, [fabricCanvas, activeTool]);
+
+  // Función para procesar el dibujo con IA
+  const processWithAI = useCallback(async () => {
+    if (freehandPoints.length < 10) {
+      toast.error("Dibuja un perímetro más completo primero");
+      return;
+    }
+
+    setIsProcessingAI(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("procesar-dibujo-perimetro", {
+        body: {
+          points: freehandPoints,
+          canvasWidth: canvasSize.width,
+          canvasHeight: canvasSize.height,
+          pixelsPerMeter,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Eliminar el dibujo a mano alzada
+      if (freehandPath && fabricCanvas) {
+        fabricCanvas.remove(freehandPath);
+        setFreehandPath(null);
+        setFreehandPoints([]);
+      }
+
+      // Añadir las paredes generadas por IA
+      if (data.walls && fabricCanvas) {
+        data.walls.forEach((wall: any, index: number) => {
+          const line = new Line([wall.x1, wall.y1, wall.x2, wall.y2], {
+            stroke: "#374151",
+            strokeWidth: 8,
+            selectable: true,
+            hasControls: true,
+          });
+          const wallId = `wall-ai-${Date.now()}-${index}`;
+          (line as any).customData = { 
+            tipo: "wall", 
+            id: wallId,
+            lengthMeters: wall.lengthMeters 
+          };
+          fabricCanvas.add(line);
+          setElementos(prev => [...prev, { id: wallId, tipo: "wall" }]);
+        });
+
+        fabricCanvas.renderAll();
+        
+        toast.success(
+          `Perímetro generado: ${data.walls.length} paredes, ${data.perimeter?.toFixed(1) || "?"} metros de perímetro, ${data.area?.toFixed(1) || "?"} m² de área`
+        );
+      }
+
+      setActiveTool("select");
+    } catch (error) {
+      console.error("Error processing with AI:", error);
+      toast.error(error instanceof Error ? error.message : "Error al procesar con IA");
+    } finally {
+      setIsProcessingAI(false);
+    }
+  }, [freehandPoints, freehandPath, fabricCanvas, canvasSize, pixelsPerMeter]);
+
+  // Limpiar dibujo a mano alzada
+  const clearFreehand = useCallback(() => {
+    if (freehandPath && fabricCanvas) {
+      fabricCanvas.remove(freehandPath);
+      setFreehandPath(null);
+      setFreehandPoints([]);
+      fabricCanvas.renderAll();
+    }
+  }, [freehandPath, fabricCanvas]);
 
   // Cargar configuración guardada
   useEffect(() => {
@@ -711,6 +844,46 @@ export function EditorPlanoArquitectonico({
                 <Move className="h-4 w-4" />
               </Button>
               <Separator orientation="vertical" className="h-8" />
+              
+              {/* Dibujo a mano alzada */}
+              <Button
+                variant={activeTool === "freehand" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTool("freehand")}
+                title="Dibujar perímetro a mano alzada"
+                className={activeTool === "freehand" ? "bg-orange-500 hover:bg-orange-600" : ""}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              {freehandPoints.length > 0 && (
+                <>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={processWithAI}
+                    disabled={isProcessingAI}
+                    title="Convertir dibujo en paredes rectas con IA"
+                    className="bg-purple-500 hover:bg-purple-600"
+                  >
+                    {isProcessingAI ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    <span className="ml-1 text-xs">IA</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFreehand}
+                    title="Borrar dibujo"
+                  >
+                    <Trash2 className="h-4 w-4 text-orange-500" />
+                  </Button>
+                </>
+              )}
+              
+              <Separator orientation="vertical" className="h-8" />
               <Button
                 variant="ghost"
                 size="sm"
@@ -743,6 +916,16 @@ export function EditorPlanoArquitectonico({
             {activeTool === "wall" && (
               <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
                 Arrastra para dibujar una pared. Las medidas se mostrarán automáticamente.
+              </div>
+            )}
+            
+            {activeTool === "freehand" && (
+              <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+                <strong>Modo perímetro:</strong> Dibuja el contorno del espacio a mano alzada. 
+                Luego pulsa el botón <Wand2 className="inline h-4 w-4" /> para convertirlo en paredes rectas con IA.
+                {freehandPoints.length > 0 && (
+                  <span className="ml-2 font-mono">({freehandPoints.length} puntos capturados)</span>
+                )}
               </div>
             )}
 
