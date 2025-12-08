@@ -22,9 +22,10 @@ import {
   Triangle,
   Armchair,
   Move,
-  RotateCw,
   Users,
-  Download
+  Download,
+  Ruler,
+  RefreshCw
 } from "lucide-react";
 
 interface EditorPlanoArquitectonicoProps {
@@ -55,6 +56,13 @@ export function EditorPlanoArquitectonico({
   const [wallStart, setWallStart] = useState<{ x: number; y: number } | null>(null);
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
+  const [showMeasurements, setShowMeasurements] = useState(true);
+  
+  // Escala: píxeles por metro (por defecto 100px = 1m)
+  const [pixelsPerMeter, setPixelsPerMeter] = useState(100);
+  
+  // Dimensiones reales del espacio en metros
+  const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
 
   // Configuración de nueva mesa
   const [newMesa, setNewMesa] = useState({
@@ -535,6 +543,55 @@ export function EditorPlanoArquitectonico({
     fabricCanvas.renderAll();
   }, [fabricCanvas, selectedObject, eliminarMesa]);
 
+  // Convertir píxeles a metros
+  const pixelsToMeters = useCallback((pixels: number) => {
+    return (pixels / pixelsPerMeter).toFixed(2);
+  }, [pixelsPerMeter]);
+
+  // Convertir metros a píxeles
+  const metersToPixels = useCallback((meters: number) => {
+    return Math.round(meters * pixelsPerMeter);
+  }, [pixelsPerMeter]);
+
+  // Calcular longitud de una línea/pared
+  const getWallLength = useCallback((x1: number, y1: number, x2: number, y2: number) => {
+    const pixels = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
+  }, [pixelsPerMeter]);
+
+  // Aplicar escala desde dimensiones reales
+  const applyRealDimensions = useCallback(() => {
+    const newWidth = metersToPixels(realDimensions.width);
+    const newHeight = metersToPixels(realDimensions.height);
+    setCanvasSize({ width: newWidth, height: newHeight });
+    if (fabricCanvas) {
+      fabricCanvas.setWidth(newWidth);
+      fabricCanvas.setHeight(newHeight);
+      fabricCanvas.renderAll();
+    }
+    toast.success(`Canvas ajustado a ${realDimensions.width}m x ${realDimensions.height}m`);
+  }, [realDimensions, metersToPixels, fabricCanvas]);
+
+  // Limpiar todo el canvas
+  const handleClearCanvas = useCallback(() => {
+    if (!fabricCanvas) return;
+    
+    // Eliminar todos los objetos excepto mesas (que se eliminan de la BD)
+    const objects = fabricCanvas.getObjects();
+    objects.forEach((obj) => {
+      const customData = (obj as any).customData;
+      if (customData?.tipo === "mesa" && customData.mesaId) {
+        eliminarMesa.mutate(customData.mesaId);
+      }
+      fabricCanvas.remove(obj);
+    });
+    
+    setElementos([]);
+    setSelectedObject(null);
+    fabricCanvas.renderAll();
+    toast.success("Canvas limpiado");
+  }, [fabricCanvas, eliminarMesa]);
+
   // Exportar imagen
   const handleExportImage = useCallback(() => {
     if (!fabricCanvas) return;
@@ -663,57 +720,202 @@ export function EditorPlanoArquitectonico({
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearCanvas}
+                title="Limpiar todo"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Separator orientation="vertical" className="h-8" />
+              <Button
+                variant={showMeasurements ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setShowMeasurements(!showMeasurements)}
+                title="Mostrar/ocultar medidas"
+              >
+                <Ruler className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Instrucciones */}
-            {activeTool === "wall" && wallStart && (
+            {activeTool === "wall" && (
               <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                Haz click en otro punto para completar la pared
+                Arrastra para dibujar una pared. Las medidas se mostrarán automáticamente.
               </div>
             )}
 
-            {/* Canvas */}
-            <div className="border-2 border-dashed border-border rounded-lg overflow-auto bg-white">
+            {/* Canvas con medidas */}
+            <div className="relative border-2 border-dashed border-border rounded-lg overflow-auto bg-white">
               <canvas ref={canvasRef} />
+              
+              {/* Regla horizontal (superior) */}
+              {showMeasurements && (
+                <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 border-b flex items-end pointer-events-none">
+                  {Array.from({ length: Math.ceil(canvasSize.width / pixelsPerMeter) + 1 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute flex flex-col items-center"
+                      style={{ left: i * pixelsPerMeter }}
+                    >
+                      <span className="text-[10px] text-muted-foreground font-mono">{i}m</span>
+                      <div className="w-px h-2 bg-muted-foreground/50" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Regla vertical (izquierda) */}
+              {showMeasurements && (
+                <div className="absolute top-6 left-0 bottom-0 w-6 bg-muted/80 border-r flex flex-col pointer-events-none">
+                  {Array.from({ length: Math.ceil(canvasSize.height / pixelsPerMeter) + 1 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute flex items-center"
+                      style={{ top: i * pixelsPerMeter }}
+                    >
+                      <div className="h-px w-2 bg-muted-foreground/50" />
+                      <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Indicador de tamaño total */}
+              {showMeasurements && (
+                <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
+                  {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+                </div>
+              )}
             </div>
 
-            {/* Configuración de tamaño */}
-            <div className="flex items-center gap-4 mt-4">
+            {/* Configuración de escala y tamaño */}
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg space-y-3">
               <div className="flex items-center gap-2">
-                <Label className="text-xs">Ancho:</Label>
-                <Input
-                  type="number"
-                  value={canvasSize.width}
-                  onChange={(e) => {
-                    const w = parseInt(e.target.value) || 800;
-                    setCanvasSize((prev) => ({ ...prev, width: w }));
-                    fabricCanvas?.setWidth(w);
-                  }}
-                  className="w-20 h-8"
-                />
+                <Ruler className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Escala y Dimensiones</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs">Alto:</Label>
-                <Input
-                  type="number"
-                  value={canvasSize.height}
-                  onChange={(e) => {
-                    const h = parseInt(e.target.value) || 600;
-                    setCanvasSize((prev) => ({ ...prev, height: h }));
-                    fabricCanvas?.setHeight(h);
-                  }}
-                  className="w-20 h-8"
-                />
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Escala (px/metro)</Label>
+                  <Input
+                    type="number"
+                    value={pixelsPerMeter}
+                    onChange={(e) => setPixelsPerMeter(parseInt(e.target.value) || 100)}
+                    min={10}
+                    max={500}
+                    className="h-8"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Badge variant="outline" className="text-xs">
+                    1m = {pixelsPerMeter}px
+                  </Badge>
+                </div>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {mesas.length} mesas configuradas
-              </span>
+
+              <Separator />
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs">Ancho (m)</Label>
+                  <Input
+                    type="number"
+                    value={realDimensions.width}
+                    onChange={(e) => setRealDimensions(prev => ({ ...prev, width: parseFloat(e.target.value) || 9 }))}
+                    step={0.5}
+                    min={1}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Alto (m)</Label>
+                  <Input
+                    type="number"
+                    value={realDimensions.height}
+                    onChange={(e) => setRealDimensions(prev => ({ ...prev, height: parseFloat(e.target.value) || 6 }))}
+                    step={0.5}
+                    min={1}
+                    className="h-8"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button size="sm" variant="secondary" onClick={applyRealDimensions} className="w-full h-8">
+                    Aplicar
+                  </Button>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                Canvas actual: {canvasSize.width}px × {canvasSize.height}px = {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Panel lateral */}
         <div className="space-y-4">
+          {/* Escala rápida */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Ruler className="h-4 w-4" />
+                Elemento Seleccionado
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {selectedObject ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <p className="font-medium capitalize">{(selectedObject as any).customData?.tipo || "elemento"}</p>
+                    </div>
+                    {(selectedObject as any).customData?.nombre && (
+                      <div>
+                        <span className="text-muted-foreground">Nombre:</span>
+                        <p className="font-medium">{(selectedObject as any).customData.nombre}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Mostrar dimensiones en metros */}
+                  <div className="p-2 bg-muted rounded">
+                    <p className="text-xs text-muted-foreground mb-1">Dimensiones:</p>
+                    {selectedObject instanceof Line ? (
+                      <p className="font-mono text-sm">
+                        Longitud: {getWallLength(
+                          (selectedObject as Line).x1 || 0,
+                          (selectedObject as Line).y1 || 0,
+                          (selectedObject as Line).x2 || 0,
+                          (selectedObject as Line).y2 || 0
+                        ).meters}m
+                      </p>
+                    ) : (
+                      <p className="font-mono text-sm">
+                        {pixelsToMeters(selectedObject.width || 0)}m × {pixelsToMeters(selectedObject.height || 0)}m
+                      </p>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteSelected}
+                    className="w-full mt-2"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </Button>
+                </>
+              ) : (
+              <p className="text-muted-foreground">Selecciona un elemento para ver sus medidas</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Añadir mesa */}
           <Card>
             <CardHeader className="pb-2">
@@ -763,7 +965,7 @@ export function EditorPlanoArquitectonico({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs">Ancho</Label>
+                  <Label className="text-xs">Ancho (cm)</Label>
                   <Input
                     type="number"
                     value={newMesa.ancho}
@@ -772,7 +974,7 @@ export function EditorPlanoArquitectonico({
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Alto</Label>
+                  <Label className="text-xs">Alto (cm)</Label>
                   <Input
                     type="number"
                     value={newMesa.alto}
