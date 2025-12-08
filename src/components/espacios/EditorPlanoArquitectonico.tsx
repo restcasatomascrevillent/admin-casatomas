@@ -61,6 +61,8 @@ export function EditorPlanoArquitectonico({
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
   const [showMeasurements, setShowMeasurements] = useState(true);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [viewScale, setViewScale] = useState(1);
   
   // Estado para dibujo a mano alzada
   const [freehandPath, setFreehandPath] = useState<Path | null>(null);
@@ -72,6 +74,26 @@ export function EditorPlanoArquitectonico({
   
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
+
+  // Calcular escala de visualización para que quepa en el contenedor
+  useEffect(() => {
+    const calculateViewScale = () => {
+      if (!canvasContainerRef.current) return;
+      
+      const containerWidth = canvasContainerRef.current.clientWidth - 40; // padding
+      const containerHeight = 500; // altura fija máxima
+      
+      const scaleX = containerWidth / canvasSize.width;
+      const scaleY = containerHeight / canvasSize.height;
+      
+      const newScale = Math.min(scaleX, scaleY, 1); // nunca más grande que 1
+      setViewScale(newScale);
+    };
+
+    calculateViewScale();
+    window.addEventListener("resize", calculateViewScale);
+    return () => window.removeEventListener("resize", calculateViewScale);
+  }, [canvasSize]);
 
   // Configuración de nueva mesa
   const [newMesa, setNewMesa] = useState({
@@ -929,46 +951,67 @@ export function EditorPlanoArquitectonico({
               </div>
             )}
 
-            {/* Canvas con medidas */}
-            <div className="relative border-2 border-dashed border-border rounded-lg overflow-auto bg-white">
-              <canvas ref={canvasRef} />
-              
-              {/* Regla horizontal (superior) */}
-              {showMeasurements && (
-                <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 border-b flex items-end pointer-events-none">
-                  {Array.from({ length: Math.ceil(canvasSize.width / pixelsPerMeter) + 1 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute flex flex-col items-center"
-                      style={{ left: i * pixelsPerMeter }}
-                    >
-                      <span className="text-[10px] text-muted-foreground font-mono">{i}m</span>
-                      <div className="w-px h-2 bg-muted-foreground/50" />
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Regla vertical (izquierda) */}
-              {showMeasurements && (
-                <div className="absolute top-6 left-0 bottom-0 w-6 bg-muted/80 border-r flex flex-col pointer-events-none">
-                  {Array.from({ length: Math.ceil(canvasSize.height / pixelsPerMeter) + 1 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute flex items-center"
-                      style={{ top: i * pixelsPerMeter }}
-                    >
-                      <div className="h-px w-2 bg-muted-foreground/50" />
-                      <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Canvas con medidas - Sin scroll, escalado automático */}
+            <div 
+              ref={canvasContainerRef}
+              className="relative border-2 border-dashed border-border rounded-lg bg-white flex items-center justify-center overflow-hidden"
+              style={{ minHeight: 400 }}
+            >
+              <div 
+                className="relative"
+                style={{ 
+                  transform: `scale(${viewScale})`,
+                  transformOrigin: "center center",
+                  width: canvasSize.width,
+                  height: canvasSize.height,
+                }}
+              >
+                <canvas ref={canvasRef} />
+                
+                {/* Regla horizontal (superior) */}
+                {showMeasurements && (
+                  <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 border-b flex items-end pointer-events-none">
+                    {Array.from({ length: Math.ceil(canvasSize.width / pixelsPerMeter) + 1 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute flex flex-col items-center"
+                        style={{ left: i * pixelsPerMeter }}
+                      >
+                        <span className="text-[10px] text-muted-foreground font-mono">{i}m</span>
+                        <div className="w-px h-2 bg-muted-foreground/50" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Regla vertical (izquierda) */}
+                {showMeasurements && (
+                  <div className="absolute top-6 left-0 bottom-0 w-6 bg-muted/80 border-r flex flex-col pointer-events-none">
+                    {Array.from({ length: Math.ceil(canvasSize.height / pixelsPerMeter) + 1 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="absolute flex items-center"
+                        style={{ top: i * pixelsPerMeter }}
+                      >
+                        <div className="h-px w-2 bg-muted-foreground/50" />
+                        <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-              {/* Indicador de tamaño total */}
-              {showMeasurements && (
-                <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
-                  {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+                {/* Indicador de tamaño total */}
+                {showMeasurements && (
+                  <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
+                    {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+                  </div>
+                )}
+              </div>
+              
+              {/* Indicador de escala de visualización */}
+              {viewScale < 1 && (
+                <div className="absolute top-2 right-2 px-2 py-1 bg-amber-100 border border-amber-300 rounded text-xs font-mono text-amber-800">
+                  Vista: {Math.round(viewScale * 100)}%
                 </div>
               )}
             </div>
