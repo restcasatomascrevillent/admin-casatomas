@@ -89,11 +89,13 @@ export function NoticiasHosteleria() {
                       })}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-6 px-2" asChild>
-                    <a href={noticia.enlace} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </Button>
+                  {noticia.enlace && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2" asChild>
+                      <a href={noticia.enlace} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
