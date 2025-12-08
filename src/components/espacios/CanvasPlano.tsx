@@ -133,15 +133,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       selection: true,
     });
 
-    // Grid snap size (0.25 metros = 25cm)
-    const gridSnapX = effectivePixelsPerMeterX * 0.25;
-    const gridSnapY = effectivePixelsPerMeterY * 0.25;
-
-    // Snap to grid function
-    const snapToGrid = (value: number, gridSize: number) => {
-      return Math.round(value / gridSize) * gridSize;
-    };
-
     // Event handlers
     canvas.on("selection:created", (e) => {
       const obj = e.selected?.[0];
@@ -161,17 +152,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     canvas.on("selection:cleared", () => {
       onSelectionChange(null);
-    });
-
-    // Snap to grid while moving objects
-    canvas.on("object:moving", (e) => {
-      const obj = e.target;
-      if (!obj || (obj as any).isGrid) return;
-      
-      obj.set({
-        left: snapToGrid(obj.left || 0, gridSnapX),
-        top: snapToGrid(obj.top || 0, gridSnapY),
-      });
     });
 
     canvas.on("object:modified", (e) => {
@@ -196,7 +176,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     return () => {
       canvas.dispose();
     };
-  }, [canvasWidth, canvasHeight, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
+  }, [canvasWidth, canvasHeight]);
 
   // Dibujar grid con estilo mejorado
   useEffect(() => {
