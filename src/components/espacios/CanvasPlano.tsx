@@ -122,7 +122,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     getCanvas: () => canvasRef.current
   }), [fabricCanvas]);
 
-  // Inicializar canvas
+  // Inicializar canvas - se recrea cuando cambian las dimensiones
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -177,13 +177,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       canvas.dispose();
     };
   }, [canvasWidth, canvasHeight]);
-  
-  // Actualizar tamaño del canvas cuando cambian las dimensiones
-  useEffect(() => {
-    if (!fabricCanvas) return;
-    fabricCanvas.setDimensions({ width: canvasWidth, height: canvasHeight });
-    fabricCanvas.renderAll();
-  }, [fabricCanvas, canvasWidth, canvasHeight]);
 
   // Dibujar grid con estilo mejorado
   useEffect(() => {
