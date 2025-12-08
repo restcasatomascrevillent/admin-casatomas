@@ -444,9 +444,12 @@ export function EditorPlanoArquitectonico({
     const handleMouseDown = (opt: any) => {
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const currentTool = activeToolRef.current;
+      
+      console.log("[Canvas] mouseDown - currentTool:", currentTool, "pointer:", pointer);
 
       // Dibujar pared arrastrando
       if (currentTool === "wall") {
+        console.log("[Canvas] Iniciando dibujo de pared");
         isDrawingWallRef.current = true;
         setIsDrawingWall(true);
         wallStartRef.current = { x: pointer.x, y: pointer.y };
@@ -465,6 +468,7 @@ export function EditorPlanoArquitectonico({
         previewLineRef.current = preview;
         setPreviewLine(preview);
         fabricCanvas.renderAll();
+        console.log("[Canvas] Preview line creada");
         return;
       }
 
