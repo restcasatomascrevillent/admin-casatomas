@@ -3,12 +3,14 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, MapPin, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Settings2 } from "lucide-react";
 import {
   useEspaciosReserva,
   useEliminarEspacio,
 } from "@/hooks/useEspaciosReserva";
+import { useMesas } from "@/hooks/useMesas";
 import { EspacioForm } from "@/components/reservas/EspacioForm";
+import { EditorPlanoArquitectonico } from "@/components/espacios/EditorPlanoArquitectonico";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,12 +24,32 @@ import {
 
 export default function Espacios() {
   const { data: espacios = [], isLoading } = useEspaciosReserva() as any;
+  const { data: todasMesas = [] } = useMesas();
 
   const [showForm, setShowForm] = useState(false);
   const [espacioEditando, setEspacioEditando] = useState<any>();
   const [espacioAEliminar, setEspacioAEliminar] = useState<string | null>(null);
+  const [espacioConfigurando, setEspacioConfigurando] = useState<{ id: string; nombre: string } | null>(null);
 
   const eliminarEspacio = useEliminarEspacio();
+
+  // Obtener cantidad de mesas por espacio
+  const getMesasCount = (espacioId: string) => {
+    return todasMesas.filter((m) => m.espacio_id === espacioId).length;
+  };
+
+  // Si estamos configurando un espacio, mostrar el editor
+  if (espacioConfigurando) {
+    return (
+      <DashboardLayout>
+        <EditorPlanoArquitectonico
+          espacioId={espacioConfigurando.id}
+          espacioNombre={espacioConfigurando.nombre}
+          onBack={() => setEspacioConfigurando(null)}
+        />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -51,55 +73,75 @@ export default function Espacios() {
           ) : espacios.length === 0 ? (
             <p className="text-sm text-muted-foreground col-span-full">No hay espacios creados</p>
           ) : (
-            espacios.map((espacio) => (
-              <Card key={espacio.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        {espacio.nombre}
-                        {espacio.activa ? (
-                          <Badge variant="default">Activo</Badge>
-                        ) : (
-                          <Badge variant="secondary">Inactivo</Badge>
-                        )}
-                      </CardTitle>
-                      <CardDescription className="mt-2">
-                        {espacio.descripcion || "Sin descripción"}
-                      </CardDescription>
+            espacios.map((espacio) => {
+              const mesasCount = getMesasCount(espacio.id);
+              
+              return (
+                <Card key={espacio.id} className="group">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          {espacio.nombre}
+                          {espacio.activa ? (
+                            <Badge variant="default">Activo</Badge>
+                          ) : (
+                            <Badge variant="secondary">Inactivo</Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="mt-2">
+                          {espacio.descripcion || "Sin descripción"}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEspacioEditando(espacio);
+                            setShowForm(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEspacioAEliminar(espacio.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Capacidad:</span>
+                          <span className="font-medium">{espacio.capacidad_maxima}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Mesas:</span>
+                          <Badge variant="outline">{mesasCount}</Badge>
+                        </div>
+                      </div>
+
+                      {/* Botón de configurar plano */}
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEspacioEditando(espacio);
-                          setShowForm(true);
-                        }}
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre })}
                       >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEspacioAEliminar(espacio.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        <Settings2 className="h-4 w-4 mr-2" />
+                        Configurar Plano y Mesas
                       </Button>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Capacidad:</span>
-                      <span className="font-medium">{espacio.capacidad_maxima} personas</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
 

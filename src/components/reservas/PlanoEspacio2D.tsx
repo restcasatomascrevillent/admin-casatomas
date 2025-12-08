@@ -13,12 +13,10 @@ import { useReservasHoyPorEspacio } from "@/hooks/useOcupacionHoy";
 import { 
   Plus, 
   Trash2, 
-  Save, 
   ArrowLeft, 
   Wand2, 
   FileDown,
   Move,
-  RotateCw,
   Users,
   Clock
 } from "lucide-react";
@@ -39,6 +37,22 @@ interface DragState {
   startY: number;
   offsetX: number;
   offsetY: number;
+}
+
+interface ElementoPlano {
+  id: string;
+  tipo: string;
+  left?: number;
+  top?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  points?: Array<{ x: number; y: number }>;
+  fill?: string;
 }
 
 export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: PlanoEspacio2DProps) {
@@ -71,10 +85,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const actualizarMesa = useActualizarMesa();
   const actualizarMesasSilent = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
-  const guardarPlano = useCrearOActualizarPlano();
 
   const canvasWidth = plano?.ancho || 800;
   const canvasHeight = plano?.alto || 600;
+  const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
 
   // Sincronizar mesas locales con datos del servidor
   useEffect(() => {
@@ -161,7 +175,6 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
   const handleExportPDF = async () => {
     toast.info("Preparando PDF...");
-    // Usar html2canvas + jspdf para exportar
     try {
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
@@ -183,11 +196,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // Título
       pdf.setFontSize(18);
       pdf.text(`${espacioNombre} - ${new Date().toLocaleDateString("es-ES")}`, 14, 15);
 
-      // Imagen del plano
       const imgWidth = pdfWidth - 28;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
@@ -234,6 +245,126 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     } catch (error) {
       console.error("Error al calcular distribución:", error);
       toast.error("Error al calcular distribución. Verifica que el servicio esté disponible.");
+    }
+  };
+
+  // Renderizar elemento del plano
+  const renderElementoPlano = (elem: ElementoPlano) => {
+    const baseStyle: React.CSSProperties = {
+      position: "absolute",
+      pointerEvents: "none",
+    };
+
+    switch (elem.tipo) {
+      case "wall":
+        if (elem.x1 !== undefined && elem.y1 !== undefined && elem.x2 !== undefined && elem.y2 !== undefined) {
+          const length = Math.sqrt(Math.pow(elem.x2 - elem.x1, 2) + Math.pow(elem.y2 - elem.y1, 2));
+          const angle = Math.atan2(elem.y2 - elem.y1, elem.x2 - elem.x1) * 180 / Math.PI;
+          return (
+            <div
+              key={elem.id}
+              style={{
+                ...baseStyle,
+                left: elem.x1,
+                top: elem.y1,
+                width: length,
+                height: 8,
+                backgroundColor: "#374151",
+                transform: `rotate(${angle}deg)`,
+                transformOrigin: "0 50%",
+              }}
+            />
+          );
+        }
+        return null;
+
+      case "rectangle":
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: elem.left,
+              top: elem.top,
+              width: elem.width,
+              height: elem.height,
+              backgroundColor: elem.fill || "#e2e8f0",
+              border: "2px solid #64748b",
+              borderRadius: 4,
+            }}
+          />
+        );
+
+      case "circle":
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: elem.left,
+              top: elem.top,
+              width: (elem.radius || 30) * 2,
+              height: (elem.radius || 30) * 2,
+              backgroundColor: elem.fill || "#e2e8f0",
+              border: "2px solid #64748b",
+              borderRadius: "50%",
+            }}
+          />
+        );
+
+      case "silla":
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: elem.left,
+              top: elem.top,
+              width: (elem.radius || 15) * 2,
+              height: (elem.radius || 15) * 2,
+              backgroundColor: "#fde68a",
+              border: "2px solid #d97706",
+              borderRadius: "50%",
+            }}
+          />
+        );
+
+      case "elemento":
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: elem.left,
+              top: elem.top,
+              width: elem.width || 40,
+              height: elem.height || 40,
+              backgroundColor: "#94a3b8",
+              border: "1px solid #475569",
+              borderRadius: 4,
+            }}
+          />
+        );
+
+      case "polygon":
+        // Polígonos se renderizarían con SVG, simplificado aquí
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: elem.left,
+              top: elem.top,
+              width: 60,
+              height: 60,
+              clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
+              backgroundColor: elem.fill || "#e2e8f0",
+            }}
+          />
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -301,6 +432,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               }}
             />
 
+            {/* Elementos del plano (paredes, decoración, etc.) */}
+            {elementosPlano.map((elem) => renderElementoPlano(elem))}
+
             {/* Mesas */}
             {localMesas.map((mesa) => {
               const reserva = getReservaAsignada(mesa.id);
@@ -347,12 +481,12 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             })}
 
             {/* Mensaje si no hay mesas */}
-            {localMesas.length === 0 && (
+            {localMesas.length === 0 && elementosPlano.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
                   <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay mesas configuradas</p>
-                  <p className="text-sm">Añade mesas usando el botón superior</p>
+                  <p>No hay configuración de plano</p>
+                  <p className="text-sm">Configura el plano desde la sección Espacios</p>
                 </div>
               </div>
             )}
