@@ -2,3 +2,6 @@ project_id = "jeamoczmbfsnwkfjxcyo"
 
 [functions.enviar-imagen-webhook]
 verify_jwt = false
+
+[functions.notify-reservation-change]
+verify_jwt = true

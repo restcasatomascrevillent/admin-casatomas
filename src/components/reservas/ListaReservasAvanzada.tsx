@@ -95,6 +95,10 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
   const updateReservationStatus = async (id: string, newStatus: string) => {
     setUpdatingId(id);
     try {
+      // Obtener datos actuales de la reserva antes de actualizar
+      const currentReservation = reservations.find(r => r.id === id);
+      const oldData = currentReservation ? { ...currentReservation, estado: currentReservation.estado } : null;
+
       const { error } = await supabase
         .from("reservas")
         .update({ estado: newStatus })
@@ -102,10 +106,22 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
 
       if (error) {
         toast.error("Error al actualizar estado");
-      } else {
-        toast.success("Estado actualizado correctamente");
-        fetchReservations();
+        return;
       }
+
+      toast.success("Estado actualizado correctamente");
+      
+      // Notificar al webhook de forma asíncrona (no bloqueante, solo una vez)
+      if (oldData) {
+        supabase.functions.invoke('notify-reservation-change', {
+          body: { 
+            oldData: { id, estado: oldData.estado },
+            newData: { id, estado: newStatus, ...currentReservation }
+          }
+        }).catch(err => console.error('Error notifying webhook:', err));
+      }
+      
+      fetchReservations();
     } finally {
       setUpdatingId(null);
     }
