@@ -71,8 +71,12 @@ export function EditorPlanoArquitectonico({
   const [freehandPoints, setFreehandPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   
-  // Escala: píxeles por metro (por defecto 100px = 1m)
-  const [pixelsPerMeter, setPixelsPerMeter] = useState(100);
+  // Escala: píxeles por metro en cada eje (pueden ser diferentes)
+  const [pixelsPerMeterX, setPixelsPerMeterX] = useState(CANVAS_WIDTH / 9); // ~88.89
+  const [pixelsPerMeterY, setPixelsPerMeterY] = useState(CANVAS_HEIGHT / 6); // ~83.33
+  
+  // Mantener compatibilidad con código existente (usar el promedio o el mínimo)
+  const pixelsPerMeter = Math.min(pixelsPerMeterX, pixelsPerMeterY);
   
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
@@ -252,8 +256,13 @@ export function EditorPlanoArquitectonico({
     if (!fabricCanvas || !plano) return;
 
     // Restaurar escala desde la configuración guardada
-    if (plano.configuracion?.pixelsPerMeter) {
-      setPixelsPerMeter(plano.configuracion.pixelsPerMeter);
+    if (plano.configuracion?.pixelsPerMeterX && plano.configuracion?.pixelsPerMeterY) {
+      setPixelsPerMeterX(plano.configuracion.pixelsPerMeterX);
+      setPixelsPerMeterY(plano.configuracion.pixelsPerMeterY);
+    } else if (plano.configuracion?.pixelsPerMeter) {
+      // Compatibilidad con configuración antigua
+      setPixelsPerMeterX(plano.configuracion.pixelsPerMeter);
+      setPixelsPerMeterY(plano.configuracion.pixelsPerMeter);
     }
     if (plano.configuracion?.realDimensions) {
       setRealDimensions(plano.configuracion.realDimensions);
@@ -624,9 +633,11 @@ export function EditorPlanoArquitectonico({
         alto: canvasSize.height,
         configuracion: {
           elementos: elementosCanvas,
-          pixelsPerMeter,
+          pixelsPerMeterX,
+          pixelsPerMeterY,
+          pixelsPerMeter, // Mantener para compatibilidad
           realDimensions,
-          version: 2,
+          version: 3,
         },
       });
 
@@ -699,15 +710,15 @@ export function EditorPlanoArquitectonico({
     return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
   }, [pixelsPerMeter]);
 
-  // Aplicar escala desde dimensiones reales (ajusta pixelsPerMeter, no el tamaño del canvas)
+  // Aplicar escala desde dimensiones reales (ajusta pixelsPerMeter para cada eje independientemente)
   const applyRealDimensions = useCallback(() => {
-    // Calcular la escala óptima para que el espacio quepa en el canvas
-    const scaleX = CANVAS_WIDTH / realDimensions.width;
-    const scaleY = CANVAS_HEIGHT / realDimensions.height;
-    const newPixelsPerMeter = Math.min(scaleX, scaleY);
+    // Calcular la escala para que el espacio ocupe todo el canvas en ambos ejes
+    const newPixelsPerMeterX = CANVAS_WIDTH / realDimensions.width;
+    const newPixelsPerMeterY = CANVAS_HEIGHT / realDimensions.height;
     
-    setPixelsPerMeter(Math.round(newPixelsPerMeter));
-    toast.success(`Escala ajustada: 1m = ${Math.round(newPixelsPerMeter)}px para ${realDimensions.width}m × ${realDimensions.height}m`);
+    setPixelsPerMeterX(newPixelsPerMeterX);
+    setPixelsPerMeterY(newPixelsPerMeterY);
+    toast.success(`Escala ajustada: ${realDimensions.width}m × ${realDimensions.height}m`);
   }, [realDimensions]);
 
   // Limpiar todo el canvas
@@ -945,11 +956,11 @@ export function EditorPlanoArquitectonico({
                 {/* Regla horizontal (superior) */}
                 {showMeasurements && (
                   <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 border-b flex items-end pointer-events-none">
-                    {Array.from({ length: Math.ceil(canvasSize.width / pixelsPerMeter) + 1 }).map((_, i) => (
+                    {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
                       <div
                         key={i}
                         className="absolute flex flex-col items-center"
-                        style={{ left: i * pixelsPerMeter }}
+                        style={{ left: i * pixelsPerMeterX }}
                       >
                         <span className="text-[10px] text-muted-foreground font-mono">{i}m</span>
                         <div className="w-px h-2 bg-muted-foreground/50" />
@@ -961,11 +972,11 @@ export function EditorPlanoArquitectonico({
                 {/* Regla vertical (izquierda) */}
                 {showMeasurements && (
                   <div className="absolute top-6 left-0 bottom-0 w-6 bg-muted/80 border-r flex flex-col pointer-events-none">
-                    {Array.from({ length: Math.ceil(canvasSize.height / pixelsPerMeter) + 1 }).map((_, i) => (
+                    {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
                       <div
                         key={i}
                         className="absolute flex items-center"
-                        style={{ top: i * pixelsPerMeter }}
+                        style={{ top: i * pixelsPerMeterY }}
                       >
                         <div className="h-px w-2 bg-muted-foreground/50" />
                         <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
@@ -990,26 +1001,9 @@ export function EditorPlanoArquitectonico({
                 <span className="text-sm font-medium">Escala y Dimensiones</span>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Escala (px/metro)</Label>
-                  <Input
-                    type="number"
-                    value={pixelsPerMeter}
-                    onChange={(e) => setPixelsPerMeter(parseInt(e.target.value) || 100)}
-                    min={10}
-                    max={500}
-                    className="h-8"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Badge variant="outline" className="text-xs">
-                    1m = {pixelsPerMeter}px
-                  </Badge>
-                </div>
+              <div className="text-xs text-muted-foreground mb-3">
+                Escala: {Math.round(pixelsPerMeterX)}px/m (ancho) × {Math.round(pixelsPerMeterY)}px/m (alto)
               </div>
-
-              <Separator />
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
@@ -1041,8 +1035,8 @@ export function EditorPlanoArquitectonico({
                 </div>
               </div>
 
-              <div className="text-xs text-muted-foreground">
-                Canvas actual: {canvasSize.width}px × {canvasSize.height}px = {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+              <div className="text-xs text-muted-foreground mt-2">
+                {realDimensions.width}m × {realDimensions.height}m representados en {canvasSize.width}px × {canvasSize.height}px
               </div>
             </div>
           </CardContent>
