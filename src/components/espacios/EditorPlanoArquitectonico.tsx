@@ -301,6 +301,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
           switch (elem.tipo) {
             case "wall":
               // Usar las coordenadas guardadas directamente
+              console.log('[LOAD] Wall:', { x1: elem.x1, y1: elem.y1, x2: elem.x2, y2: elem.y2 });
               obj = new Line([elem.x1 || 0, elem.y1 || 0, elem.x2 || 0, elem.y2 || 0], {
                 stroke: "#374151",
                 strokeWidth: 8,
@@ -747,33 +748,44 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       };
 
       if (obj instanceof Line) {
-        // Para líneas en Fabric.js v6, las coordenadas x1,y1,x2,y2 son relativas al centro
-        // Necesitamos calcular las coordenadas absolutas usando la matriz de transformación
+        // Para líneas en Fabric.js, necesitamos obtener las coordenadas absolutas de los extremos
         const line = obj as Line;
-        const matrix = line.calcTransformMatrix();
         
-        // Las coordenadas locales de la línea
-        const x1Local = line.x1 || 0;
-        const y1Local = line.y1 || 0;
-        const x2Local = line.x2 || 0;
-        const y2Local = line.y2 || 0;
+        // Usar getBoundingRect y aCoords para obtener posiciones reales
+        line.setCoords();
+        const coords = line.aCoords;
         
-        // Transformar puntos usando la matriz
-        // matrix = [a, b, c, d, e, f] donde:
-        // x' = a*x + c*y + e
-        // y' = b*x + d*y + f
-        const x1Abs = matrix[0] * x1Local + matrix[2] * y1Local + matrix[4];
-        const y1Abs = matrix[1] * x1Local + matrix[3] * y1Local + matrix[5];
-        const x2Abs = matrix[0] * x2Local + matrix[2] * y2Local + matrix[4];
-        const y2Abs = matrix[1] * x2Local + matrix[3] * y2Local + matrix[5];
-        
-        elementosCanvas.push({
-          ...base,
-          x1: Math.round(x1Abs),
-          y1: Math.round(y1Abs),
-          x2: Math.round(x2Abs),
-          y2: Math.round(y2Abs),
-        });
+        if (coords) {
+          // aCoords tiene tl, tr, bl, br - para líneas, tl y br son los extremos
+          // Pero esto no es exacto para líneas. Mejor calcular manualmente.
+          const centerX = line.left || 0;
+          const centerY = line.top || 0;
+          
+          // x1,y1,x2,y2 son relativos al centro del objeto
+          const halfWidth = (line.width || 0) / 2;
+          const halfHeight = (line.height || 0) / 2;
+          
+          // El centro de la línea está en (left, top)
+          // x1,y1 es relativo al centro, así que la posición absoluta es:
+          const x1Abs = centerX + (line.x1 || 0);
+          const y1Abs = centerY + (line.y1 || 0);
+          const x2Abs = centerX + (line.x2 || 0);
+          const y2Abs = centerY + (line.y2 || 0);
+          
+          console.log('[SAVE] Wall:', { 
+            centerX, centerY, 
+            x1: line.x1, y1: line.y1, x2: line.x2, y2: line.y2,
+            x1Abs, y1Abs, x2Abs, y2Abs 
+          });
+          
+          elementosCanvas.push({
+            ...base,
+            x1: Math.round(x1Abs),
+            y1: Math.round(y1Abs),
+            x2: Math.round(x2Abs),
+            y2: Math.round(y2Abs),
+          });
+        }
       } else if (obj instanceof Rect) {
         elementosCanvas.push({
           ...base,
