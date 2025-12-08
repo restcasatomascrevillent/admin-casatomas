@@ -29,7 +29,9 @@ import {
   RefreshCw,
   Pencil,
   Wand2,
-  Loader2
+  Loader2,
+  Copy,
+  Clipboard
 } from "lucide-react";
 
 interface EditorPlanoArquitectonicoProps {
@@ -81,14 +83,27 @@ export function EditorPlanoArquitectonico({
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
 
-  // Configuración de nueva mesa
+  // Configuración de nueva mesa (medidas en cm)
   const [newMesa, setNewMesa] = useState({
     nombre: "",
     capacidad: 4,
-    forma: "rectangular",
-    ancho: 80,
-    alto: 60,
+    forma: "rectangular" as "rectangular" | "circular" | "cuadrada",
+    largo: 120, // cm - para rectangular
+    ancho: 80,  // cm - para rectangular y cuadrada
+    diametro: 100, // cm - para circular
   });
+
+  // Estado para copiar/pegar mesas
+  const [copiedMesa, setCopiedMesa] = useState<{
+    nombre: string;
+    capacidad: number;
+    forma: string;
+    ancho: number;
+    alto: number;
+  } | null>(null);
+
+  // Estado para editar dimensiones de pared
+  const [wallLength, setWallLength] = useState<number>(0);
 
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
   const { data: mesas = [], isLoading: loadingMesas } = useMesas(espacioId);
@@ -653,6 +668,24 @@ export function EditorPlanoArquitectonico({
     }
   }, [fabricCanvas, espacioId, canvasSize, pixelsPerMeter, realDimensions, guardarPlano, actualizarMesas]);
 
+  // Calcular dimensiones de mesa según forma
+  const getMesaDimensions = useCallback(() => {
+    if (newMesa.forma === "circular") {
+      // Diámetro para circular - convertir a píxeles (cm a píxeles usando escala)
+      const pixelSize = (newMesa.diametro / 100) * pixelsPerMeter;
+      return { ancho: Math.round(pixelSize), alto: Math.round(pixelSize) };
+    } else if (newMesa.forma === "cuadrada") {
+      // Cuadrada usa solo ancho
+      const pixelSize = (newMesa.ancho / 100) * pixelsPerMeter;
+      return { ancho: Math.round(pixelSize), alto: Math.round(pixelSize) };
+    } else {
+      // Rectangular: largo x ancho
+      const pixelLargo = (newMesa.largo / 100) * pixelsPerMeter;
+      const pixelAncho = (newMesa.ancho / 100) * pixelsPerMeter;
+      return { ancho: Math.round(pixelLargo), alto: Math.round(pixelAncho) };
+    }
+  }, [newMesa, pixelsPerMeter]);
+
   // Añadir nueva mesa
   const handleAddMesa = async () => {
     if (!newMesa.nombre.trim()) {
@@ -660,23 +693,107 @@ export function EditorPlanoArquitectonico({
       return;
     }
 
+    const dimensions = getMesaDimensions();
+
     try {
       await crearMesa.mutateAsync({
         espacio_id: espacioId,
         nombre: newMesa.nombre,
         capacidad: newMesa.capacidad,
         forma: newMesa.forma,
-        ancho: newMesa.ancho,
-        alto: newMesa.alto,
+        ancho: dimensions.ancho,
+        alto: dimensions.alto,
         pos_x: 100,
         pos_y: 100,
       });
 
-      setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", ancho: 80, alto: 60 });
+      setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", largo: 120, ancho: 80, diametro: 100 });
     } catch (error) {
       console.error("Error al crear mesa:", error);
     }
   };
+
+  // Copiar mesa seleccionada
+  const handleCopyMesa = useCallback(() => {
+    if (!selectedObject) return;
+    const customData = (selectedObject as any).customData;
+    if (customData?.tipo !== "mesa") {
+      toast.error("Selecciona una mesa para copiar");
+      return;
+    }
+
+    setCopiedMesa({
+      nombre: customData.nombre || "Mesa copiada",
+      capacidad: customData.capacidad || 4,
+      forma: selectedObject instanceof Circle ? "circular" : "rectangular",
+      ancho: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : (selectedObject.width || 80),
+      alto: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : (selectedObject.height || 60),
+    });
+    toast.success("Mesa copiada al portapapeles");
+  }, [selectedObject]);
+
+  // Pegar mesa copiada
+  const handlePasteMesa = async () => {
+    if (!copiedMesa) {
+      toast.error("No hay mesa copiada");
+      return;
+    }
+
+    // Generar nombre único
+    const existingNames = mesas.map(m => m.nombre);
+    let newName = copiedMesa.nombre;
+    let counter = 1;
+    while (existingNames.includes(newName)) {
+      newName = `${copiedMesa.nombre} (${counter})`;
+      counter++;
+    }
+
+    try {
+      await crearMesa.mutateAsync({
+        espacio_id: espacioId,
+        nombre: newName,
+        capacidad: copiedMesa.capacidad,
+        forma: copiedMesa.forma,
+        ancho: copiedMesa.ancho,
+        alto: copiedMesa.alto,
+        pos_x: 150 + Math.random() * 50,
+        pos_y: 150 + Math.random() * 50,
+      });
+      toast.success(`Mesa "${newName}" pegada`);
+    } catch (error) {
+      console.error("Error al pegar mesa:", error);
+    }
+  };
+
+  // Actualizar longitud de pared seleccionada
+  const handleUpdateWallLength = useCallback(() => {
+    if (!fabricCanvas || !selectedObject || !(selectedObject instanceof Line)) return;
+    
+    const currentLine = selectedObject as Line;
+    const x1 = currentLine.x1 || 0;
+    const y1 = currentLine.y1 || 0;
+    const x2 = currentLine.x2 || 0;
+    const y2 = currentLine.y2 || 0;
+    
+    // Calcular ángulo actual
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    
+    // Nueva longitud en píxeles
+    const newLengthPixels = wallLength * pixelsPerMeter;
+    
+    // Calcular nuevo punto final manteniendo el ángulo
+    const newX2 = x1 + Math.cos(angle) * newLengthPixels;
+    const newY2 = y1 + Math.sin(angle) * newLengthPixels;
+    
+    currentLine.set({
+      x2: newX2,
+      y2: newY2,
+    });
+    
+    fabricCanvas.renderAll();
+    toast.success(`Pared ajustada a ${wallLength}m`);
+  }, [fabricCanvas, selectedObject, wallLength, pixelsPerMeter]);
+
 
   // Eliminar objeto seleccionado
   const handleDeleteSelected = useCallback(() => {
@@ -710,7 +827,19 @@ export function EditorPlanoArquitectonico({
     return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
   }, [pixelsPerMeter]);
 
-  // Aplicar escala desde dimensiones reales (ajusta pixelsPerMeter para cada eje independientemente)
+  // Efecto para actualizar wallLength cuando se selecciona una pared
+  useEffect(() => {
+    if (selectedObject instanceof Line) {
+      const length = getWallLength(
+        (selectedObject as Line).x1 || 0,
+        (selectedObject as Line).y1 || 0,
+        (selectedObject as Line).x2 || 0,
+        (selectedObject as Line).y2 || 0
+      );
+      setWallLength(parseFloat(length.meters));
+    }
+  }, [selectedObject, getWallLength]);
+
   const applyRealDimensions = useCallback(() => {
     // Calcular la escala para que el espacio ocupe todo el canvas en ambos ejes
     const newPixelsPerMeterX = CANVAS_WIDTH / realDimensions.width;
@@ -1076,34 +1205,57 @@ export function EditorPlanoArquitectonico({
                     )}
                   </div>
                   
-                  {/* Mostrar dimensiones en metros */}
-                  <div className="p-2 bg-muted rounded">
-                    <p className="text-xs text-muted-foreground mb-1">Dimensiones:</p>
-                    {selectedObject instanceof Line ? (
-                      <p className="font-mono text-sm">
-                        Longitud: {getWallLength(
-                          (selectedObject as Line).x1 || 0,
-                          (selectedObject as Line).y1 || 0,
-                          (selectedObject as Line).x2 || 0,
-                          (selectedObject as Line).y2 || 0
-                        ).meters}m
-                      </p>
-                    ) : (
+                  {/* Editar dimensiones según tipo */}
+                  {selectedObject instanceof Line ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Longitud de pared:</p>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={wallLength}
+                          onChange={(e) => setWallLength(parseFloat(e.target.value) || 0)}
+                          step={0.1}
+                          min={0.1}
+                          className="h-8"
+                        />
+                        <span className="flex items-center text-sm text-muted-foreground">m</span>
+                        <Button size="sm" variant="secondary" onClick={handleUpdateWallLength} className="h-8">
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-muted rounded">
+                      <p className="text-xs text-muted-foreground mb-1">Dimensiones:</p>
                       <p className="font-mono text-sm">
                         {pixelsToMeters(selectedObject.width || 0)}m × {pixelsToMeters(selectedObject.height || 0)}m
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteSelected}
-                    className="w-full mt-2"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </Button>
+                  <div className="flex gap-2">
+                    {/* Botón copiar si es mesa */}
+                    {(selectedObject as any).customData?.tipo === "mesa" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyMesa}
+                        className="flex-1"
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copiar
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteSelected}
+                      className="flex-1"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
                 </>
               ) : (
               <p className="text-muted-foreground">Selecciona un elemento para ver sus medidas</p>
@@ -1145,7 +1297,7 @@ export function EditorPlanoArquitectonico({
                   <Label className="text-xs">Forma</Label>
                   <Select
                     value={newMesa.forma}
-                    onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}
+                    onValueChange={(v) => setNewMesa({ ...newMesa, forma: v as "rectangular" | "circular" | "cuadrada" })}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue />
@@ -1158,30 +1310,67 @@ export function EditorPlanoArquitectonico({
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              
+              {/* Dimensiones según forma */}
+              {newMesa.forma === "circular" ? (
                 <div>
-                  <Label className="text-xs">Ancho (cm)</Label>
+                  <Label className="text-xs">Diámetro (cm)</Label>
+                  <Input
+                    type="number"
+                    value={newMesa.diametro}
+                    onChange={(e) => setNewMesa({ ...newMesa, diametro: parseInt(e.target.value) || 100 })}
+                    min={40}
+                    className="h-8"
+                  />
+                </div>
+              ) : newMesa.forma === "cuadrada" ? (
+                <div>
+                  <Label className="text-xs">Lado (cm)</Label>
                   <Input
                     type="number"
                     value={newMesa.ancho}
                     onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
+                    min={40}
                     className="h-8"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs">Alto (cm)</Label>
-                  <Input
-                    type="number"
-                    value={newMesa.alto}
-                    onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 60 })}
-                    className="h-8"
-                  />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Largo (cm)</Label>
+                    <Input
+                      type="number"
+                      value={newMesa.largo}
+                      onChange={(e) => setNewMesa({ ...newMesa, largo: parseInt(e.target.value) || 120 })}
+                      min={40}
+                      className="h-8"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Ancho (cm)</Label>
+                    <Input
+                      type="number"
+                      value={newMesa.ancho}
+                      onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
+                      min={40}
+                      className="h-8"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+              
               <Button size="sm" onClick={handleAddMesa} className="w-full" disabled={crearMesa.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
                 Añadir Mesa
               </Button>
+
+              {/* Copiar/Pegar mesas */}
+              {copiedMesa && (
+                <Button size="sm" variant="outline" onClick={handlePasteMesa} className="w-full">
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  Pegar "{copiedMesa.nombre}"
+                </Button>
+              )}
             </CardContent>
           </Card>
 
