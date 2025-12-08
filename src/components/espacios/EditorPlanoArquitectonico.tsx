@@ -62,17 +62,19 @@ export function EditorPlanoArquitectonico({
   const [canvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
-  const [wallStart, setWallStart] = useState<{ x: number; y: number } | null>(null);
+  const [wallPoints, setWallPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
   
   // Refs para mantener valores actualizados en los event handlers sin recrear listeners
   const isDrawingWallRef = useRef(false);
-  const wallStartRef = useRef<{ x: number; y: number } | null>(null);
+  const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const previewLineRef = useRef<Line | null>(null);
-  const activeToolRef = useRef<ToolType>(activeTool); // Inicializar con el estado actual
+  const activeToolRef = useRef<ToolType>(activeTool);
+  const lastClickTimeRef = useRef<number>(0);
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
   const [showMeasurements, setShowMeasurements] = useState(true);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const tempWallLinesRef = useRef<Line[]>([]);
   
   // Estado para dibujo a mano alzada
   const [freehandPath, setFreehandPath] = useState<Path | null>(null);
@@ -451,8 +453,8 @@ export function EditorPlanoArquitectonico({
   }, [isDrawingWall]);
   
   useEffect(() => {
-    wallStartRef.current = wallStart;
-  }, [wallStart]);
+    wallPointsRef.current = wallPoints;
+  }, [wallPoints]);
   
   useEffect(() => {
     previewLineRef.current = previewLine;
@@ -463,26 +465,126 @@ export function EditorPlanoArquitectonico({
     console.log("[EditorPlano] activeTool changed to:", activeTool);
   }, [activeTool]);
 
-  // Manejar dibujo de paredes arrastrando - usando refs para evitar recrear listeners
+  // Función para cancelar el dibujo de paredes
+  const cancelWallDrawing = useCallback(() => {
+    if (!fabricCanvas) return;
+    
+    // Eliminar línea de preview
+    if (previewLineRef.current) {
+      fabricCanvas.remove(previewLineRef.current);
+      previewLineRef.current = null;
+      setPreviewLine(null);
+    }
+    
+    // Eliminar líneas temporales
+    tempWallLinesRef.current.forEach(line => fabricCanvas.remove(line));
+    tempWallLinesRef.current = [];
+    
+    // Resetear estado
+    wallPointsRef.current = [];
+    setWallPoints([]);
+    isDrawingWallRef.current = false;
+    setIsDrawingWall(false);
+    
+    fabricCanvas.renderAll();
+  }, [fabricCanvas]);
+
+  // Función para finalizar el dibujo de paredes (convertir temporales en permanentes)
+  const finishWallDrawing = useCallback(() => {
+    if (!fabricCanvas) return;
+    
+    const points = wallPointsRef.current;
+    if (points.length < 2) {
+      cancelWallDrawing();
+      return;
+    }
+    
+    // Eliminar líneas temporales
+    tempWallLinesRef.current.forEach(line => fabricCanvas.remove(line));
+    tempWallLinesRef.current = [];
+    
+    // Eliminar línea de preview
+    if (previewLineRef.current) {
+      fabricCanvas.remove(previewLineRef.current);
+      previewLineRef.current = null;
+      setPreviewLine(null);
+    }
+    
+    // Crear paredes permanentes
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      
+      const wall = new Line([p1.x, p1.y, p2.x, p2.y], {
+        stroke: "#374151",
+        strokeWidth: 8,
+        selectable: true,
+        hasControls: true,
+      });
+      const wallId = `wall-${Date.now()}-${i}`;
+      (wall as any).customData = { tipo: "wall", id: wallId };
+      fabricCanvas.add(wall);
+      setElementos(prev => [...prev, { id: wallId, tipo: "wall" }]);
+    }
+    
+    // Resetear estado
+    wallPointsRef.current = [];
+    setWallPoints([]);
+    isDrawingWallRef.current = false;
+    setIsDrawingWall(false);
+    
+    fabricCanvas.renderAll();
+    toast.success(`Perímetro creado con ${points.length - 1} paredes`);
+  }, [fabricCanvas, cancelWallDrawing]);
+
+  // Manejar dibujo de paredes con clics - clic para esquinas, doble clic para terminar
   useEffect(() => {
     if (!fabricCanvas) return;
 
     const handleMouseDown = (opt: any) => {
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const currentTool = activeToolRef.current;
-      
-      console.log("[Canvas] mouseDown - tool:", currentTool, "at", pointer.x, pointer.y);
+      const now = Date.now();
+      const isDoubleClick = now - lastClickTimeRef.current < 300;
+      lastClickTimeRef.current = now;
 
-      // Dibujar pared arrastrando
+      // Dibujar pared con clics
       if (currentTool === "wall") {
-        console.log("[Canvas] Iniciando pared");
+        // Doble clic para terminar
+        if (isDoubleClick && wallPointsRef.current.length >= 2) {
+          finishWallDrawing();
+          return;
+        }
+        
+        const currentPoints = wallPointsRef.current;
+        const newPoint = { x: pointer.x, y: pointer.y };
+        
+        // Si hay puntos previos, crear línea temporal desde el último punto
+        if (currentPoints.length > 0) {
+          const lastPoint = currentPoints[currentPoints.length - 1];
+          const tempLine = new Line([lastPoint.x, lastPoint.y, newPoint.x, newPoint.y], {
+            stroke: "#374151",
+            strokeWidth: 8,
+            selectable: false,
+            evented: false,
+            opacity: 0.8,
+          });
+          fabricCanvas.add(tempLine);
+          tempWallLinesRef.current.push(tempLine);
+        }
+        
+        // Añadir punto
+        const updatedPoints = [...currentPoints, newPoint];
+        wallPointsRef.current = updatedPoints;
+        setWallPoints(updatedPoints);
         isDrawingWallRef.current = true;
         setIsDrawingWall(true);
-        wallStartRef.current = { x: pointer.x, y: pointer.y };
-        setWallStart({ x: pointer.x, y: pointer.y });
         
-        // Crear línea de preview
-        const preview = new Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+        // Crear/actualizar línea de preview
+        if (previewLineRef.current) {
+          fabricCanvas.remove(previewLineRef.current);
+        }
+        const preview = new Line([newPoint.x, newPoint.y, newPoint.x, newPoint.y], {
           stroke: "#374151",
           strokeWidth: 8,
           strokeDashArray: [10, 5],
@@ -493,7 +595,12 @@ export function EditorPlanoArquitectonico({
         fabricCanvas.add(preview);
         previewLineRef.current = preview;
         setPreviewLine(preview);
+        
         fabricCanvas.renderAll();
+        
+        if (currentPoints.length === 0) {
+          toast.info("Clic para añadir esquinas. Doble clic para terminar.");
+        }
         return;
       }
 
@@ -577,7 +684,7 @@ export function EditorPlanoArquitectonico({
     };
 
     const handleMouseMove = (opt: any) => {
-      if (!isDrawingWallRef.current || !wallStartRef.current || !previewLineRef.current) return;
+      if (!isDrawingWallRef.current || !previewLineRef.current) return;
 
       const pointer = fabricCanvas.getScenePoint(opt.e);
       
@@ -589,58 +696,14 @@ export function EditorPlanoArquitectonico({
       fabricCanvas.renderAll();
     };
 
-    const handleMouseUp = (opt: any) => {
-      if (!isDrawingWallRef.current || !wallStartRef.current) return;
-
-      const pointer = fabricCanvas.getScenePoint(opt.e);
-      const currentWallStart = wallStartRef.current;
-      
-      // Eliminar línea de preview
-      if (previewLineRef.current) {
-        fabricCanvas.remove(previewLineRef.current);
-        previewLineRef.current = null;
-        setPreviewLine(null);
-      }
-
-      // Solo crear pared si hay suficiente distancia
-      const distance = Math.sqrt(
-        Math.pow(pointer.x - currentWallStart.x, 2) + Math.pow(pointer.y - currentWallStart.y, 2)
-      );
-
-      if (distance > 20) {
-        const wall = new Line([currentWallStart.x, currentWallStart.y, pointer.x, pointer.y], {
-          stroke: "#374151",
-          strokeWidth: 8,
-          selectable: true,
-          hasControls: true,
-          originX: "left",
-          originY: "top",
-        });
-        // Mantener left/top en 0 para que las coordenadas sean absolutas
-        wall.set({ left: 0, top: 0 });
-        const wallId = `wall-${Date.now()}`;
-        (wall as any).customData = { tipo: "wall", id: wallId };
-        fabricCanvas.add(wall);
-        setElementos(prev => [...prev, { id: wallId, tipo: "wall" }]);
-      }
-
-      isDrawingWallRef.current = false;
-      setIsDrawingWall(false);
-      wallStartRef.current = null;
-      setWallStart(null);
-      fabricCanvas.renderAll();
-    };
-
     fabricCanvas.on("mouse:down", handleMouseDown);
     fabricCanvas.on("mouse:move", handleMouseMove);
-    fabricCanvas.on("mouse:up", handleMouseUp);
 
     return () => {
       fabricCanvas.off("mouse:down", handleMouseDown);
       fabricCanvas.off("mouse:move", handleMouseMove);
-      fabricCanvas.off("mouse:up", handleMouseUp);
     };
-  }, [fabricCanvas]); // Solo depende de fabricCanvas para no recrear listeners
+  }, [fabricCanvas, finishWallDrawing]);
 
   // Guardar plano
   const handleSave = useCallback(async () => {
@@ -1006,7 +1069,7 @@ export function EditorPlanoArquitectonico({
               <Button
                 variant={activeTool === "select" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => { setActiveTool("select"); setWallStart(null); }}
+                onClick={() => { setActiveTool("select"); cancelWallDrawing(); }}
               >
                 <MousePointer className="h-4 w-4" />
               </Button>
