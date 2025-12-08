@@ -537,6 +537,24 @@ export function EditorPlanoArquitectonico({
     toast.success(`Perímetro creado con ${points.length - 1} paredes`);
   }, [fabricCanvas, cancelWallDrawing]);
 
+  // Función para cerrar el perímetro (conectar último punto con el primero)
+  const closePerimeter = useCallback(() => {
+    if (!fabricCanvas) return;
+    
+    const points = wallPointsRef.current;
+    if (points.length < 3) {
+      toast.error("Necesitas al menos 3 puntos para cerrar un perímetro");
+      return;
+    }
+    
+    // Añadir el primer punto al final para cerrar
+    const closedPoints = [...points, points[0]];
+    wallPointsRef.current = closedPoints;
+    
+    // Llamar a finishWallDrawing con los puntos cerrados
+    finishWallDrawing();
+  }, [fabricCanvas, finishWallDrawing]);
+
   // Manejar dibujo de paredes con clics - clic para esquinas, doble clic para terminar
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -1078,10 +1096,40 @@ export function EditorPlanoArquitectonico({
                 variant={activeTool === "wall" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setActiveTool("wall")}
-                title="Dibujar pared"
+                title="Dibujar pared (clic para esquinas, doble clic para terminar)"
               >
                 <Minus className="h-4 w-4" />
               </Button>
+              {isDrawingWall && wallPoints.length >= 2 && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={finishWallDrawing}
+                    title="Terminar perímetro"
+                  >
+                    Terminar
+                  </Button>
+                  {wallPoints.length >= 3 && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={closePerimeter}
+                      title="Cerrar perímetro conectando con el inicio"
+                    >
+                      Cerrar
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={cancelWallDrawing}
+                    title="Cancelar dibujo"
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              )}
               <Button
                 variant={activeTool === "rectangle" ? "default" : "ghost"}
                 size="sm"
