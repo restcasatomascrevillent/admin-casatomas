@@ -15,7 +15,8 @@ import {
   Edit,
   Users,
   Calendar,
-  MapPin
+  MapPin,
+  Loader2
 } from "lucide-react";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,6 +49,7 @@ interface ListaReservasAvanzadaProps {
 export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaReservasAvanzadaProps) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,16 +93,21 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
   };
 
   const updateReservationStatus = async (id: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("reservas")
-      .update({ estado: newStatus })
-      .eq("id", id);
+    setUpdatingId(id);
+    try {
+      const { error } = await supabase
+        .from("reservas")
+        .update({ estado: newStatus })
+        .eq("id", id);
 
-    if (error) {
-      toast.error("Error al actualizar estado");
-    } else {
-      toast.success("Estado actualizado correctamente");
-      fetchReservations();
+      if (error) {
+        toast.error("Error al actualizar estado");
+      } else {
+        toast.success("Estado actualizado correctamente");
+        fetchReservations();
+      }
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -330,26 +337,41 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={updatingId === reservation.id}
                             onClick={() => updateReservationStatus(reservation.id, "verificada")}
                           >
-                            Verificar
+                            {updatingId === reservation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Verificar"
+                            )}
                           </Button>
                         )}
                         {reservation.estado === "verificada" && (
                           <Button
                             size="sm"
+                            disabled={updatingId === reservation.id}
                             onClick={() => updateReservationStatus(reservation.id, "confirmada")}
                           >
-                            Confirmar
+                            {updatingId === reservation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Confirmar"
+                            )}
                           </Button>
                         )}
                         {reservation.estado !== "cancelada" && (
                           <Button
                             size="sm"
                             variant="destructive"
+                            disabled={updatingId === reservation.id}
                             onClick={() => updateReservationStatus(reservation.id, "cancelada")}
                           >
-                            Cancelar
+                            {updatingId === reservation.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Cancelar"
+                            )}
                           </Button>
                         )}
                       </div>

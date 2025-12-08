@@ -1077,7 +1077,6 @@ export type Database = {
           occurred_at: string
           scope_name: string
           status: string
-          total_price_cents: number
           unit_price_cents: number
           workflow_name: string | null
         }
@@ -1089,7 +1088,6 @@ export type Database = {
           occurred_at?: string
           scope_name: string
           status?: string
-          total_price_cents: number
           unit_price_cents: number
           workflow_name?: string | null
         }
@@ -1101,7 +1099,6 @@ export type Database = {
           occurred_at?: string
           scope_name?: string
           status?: string
-          total_price_cents?: number
           unit_price_cents?: number
           workflow_name?: string | null
         }
