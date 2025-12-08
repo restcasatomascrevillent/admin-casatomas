@@ -229,9 +229,19 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
 
+  // Resetear flag de limpieza cuando cambia el planoConfig (cambio de espacio)
+  useEffect(() => {
+    wasCleared.current = false;
+  }, [planoConfig]);
+
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
     if (!fabricCanvas) return;
+    
+    // Si fue limpiado, no cargar elementos de planoConfig
+    if (wasCleared.current && elementosRef.current.length === 0) {
+      return;
+    }
 
     // Verificar qué elementos ya están en el canvas
     const elementosEnCanvas = new Set<string>();
@@ -242,10 +252,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Priorizar elementos del estado local, si no hay, usar planoConfig
+    // Priorizar elementos del estado local, si no hay y no fue limpiado, usar planoConfig
     const elementosACargar = elementosRef.current.length > 0 
       ? elementosRef.current 
-      : (planoConfig?.elementos || []);
+      : (wasCleared.current ? [] : (planoConfig?.elementos || []));
 
     elementosACargar.forEach((elem: any) => {
       // Saltar si ya está en el canvas
@@ -290,7 +300,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     });
 
     // Solo actualizar estado si cargamos desde planoConfig y el estado está vacío
-    if (elementosRef.current.length === 0 && planoConfig?.elementos?.length > 0) {
+    if (!wasCleared.current && elementosRef.current.length === 0 && planoConfig?.elementos?.length > 0) {
       onElementosChange(planoConfig.elementos.map((e: any) => ({ id: e.id, tipo: e.tipo, props: e.props || e })));
     }
     
@@ -452,10 +462,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useEffect(() => {
     if (!fabricCanvas) return;
     
-    // Si fue limpiado manualmente, no recargar mesas de BD
-    if (wasCleared.current) {
-      return;
-    }
+    // Si fue limpiado manualmente, no recargar mesas de BD, pero sí permitir el canvas
+    const skipDBMesas = wasCleared.current;
 
     const mesasEnCanvas = new Set<string>();
     fabricCanvas.getObjects().forEach((obj) => {
@@ -476,31 +484,33 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       mesasEnCanvas.add(mesa.id);
     });
 
-    // Luego cargar mesas de BD que no estén ya en el estado local
-    mesasDB?.forEach((mesa) => {
-      // Verificar si ya existe en el canvas O en el estado local
-      if (mesasEnCanvas.has(mesa.id)) return;
-      if (mesasLocales.some(m => m.id === mesa.id)) return;
+    // Luego cargar mesas de BD que no estén ya en el estado local (solo si no fue limpiado)
+    if (!skipDBMesas) {
+      mesasDB?.forEach((mesa) => {
+        // Verificar si ya existe en el canvas O en el estado local
+        if (mesasEnCanvas.has(mesa.id)) return;
+        if (mesasLocales.some(m => m.id === mesa.id)) return;
 
-      const mesaData = {
-        id: mesa.id,
-        nombre: mesa.nombre,
-        capacidad: mesa.capacidad,
-        forma: mesa.forma as "rectangular" | "circular",
-        ancho: mesa.ancho || 80,
-        alto: mesa.alto || 60,
-        posX: mesa.pos_x || 50,
-        posY: mesa.pos_y || 50,
-      };
+        const mesaData = {
+          id: mesa.id,
+          nombre: mesa.nombre,
+          capacidad: mesa.capacidad,
+          forma: mesa.forma as "rectangular" | "circular",
+          ancho: mesa.ancho || 80,
+          alto: mesa.alto || 60,
+          posX: mesa.pos_x || 50,
+          posY: mesa.pos_y || 50,
+        };
 
-      createMesaWithLabel(fabricCanvas, mesaData, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
-      mesasEnCanvas.add(mesa.id);
+        createMesaWithLabel(fabricCanvas, mesaData, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
+        mesasEnCanvas.add(mesa.id);
 
-      newMesasCanvas.push(mesaData);
-    });
+        newMesasCanvas.push(mesaData);
+      });
 
-    if (newMesasCanvas.length > 0) {
-      onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);
+      if (newMesasCanvas.length > 0) {
+        onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);
+      }
     }
 
     fabricCanvas.renderAll();
