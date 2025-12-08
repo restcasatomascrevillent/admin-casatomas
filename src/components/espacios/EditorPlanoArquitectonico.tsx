@@ -69,7 +69,7 @@ export function EditorPlanoArquitectonico({
   const isDrawingWallRef = useRef(false);
   const wallStartRef = useRef<{ x: number; y: number } | null>(null);
   const previewLineRef = useRef<Line | null>(null);
-  const activeToolRef = useRef<ToolType>("select");
+  const activeToolRef = useRef<ToolType>(activeTool); // Inicializar con el estado actual
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
   const [showMeasurements, setShowMeasurements] = useState(true);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -460,6 +460,7 @@ export function EditorPlanoArquitectonico({
   
   useEffect(() => {
     activeToolRef.current = activeTool;
+    console.log("[EditorPlano] activeTool changed to:", activeTool);
   }, [activeTool]);
 
   // Manejar dibujo de paredes arrastrando - usando refs para evitar recrear listeners
@@ -469,9 +470,12 @@ export function EditorPlanoArquitectonico({
     const handleMouseDown = (opt: any) => {
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const currentTool = activeToolRef.current;
+      
+      console.log("[Canvas] mouseDown - tool:", currentTool, "at", pointer.x, pointer.y);
 
       // Dibujar pared arrastrando
       if (currentTool === "wall") {
+        console.log("[Canvas] Iniciando pared");
         isDrawingWallRef.current = true;
         setIsDrawingWall(true);
         wallStartRef.current = { x: pointer.x, y: pointer.y };
