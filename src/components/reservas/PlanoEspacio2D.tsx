@@ -72,7 +72,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     nombre: "",
     capacidad: 4,
     forma: "rectangular",
-    ancho: 100,
+    ancho: 80,
     alto: 80,
   });
 
@@ -165,7 +165,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       pos_y: 50,
     });
 
-    setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", ancho: 100, alto: 80 });
+    setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", ancho: 80, alto: 80 });
     setShowAddMesa(false);
   };
 
