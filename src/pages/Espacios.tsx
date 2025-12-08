@@ -10,7 +10,7 @@ import {
 } from "@/hooks/useEspaciosReserva";
 import { useMesas } from "@/hooks/useMesas";
 import { EspacioForm } from "@/components/reservas/EspacioForm";
-import { EditorPlanoArquitectonico } from "@/components/espacios/EditorPlanoArquitectonico";
+import { EditorPlanoEspacio } from "@/components/espacios/EditorPlanoEspacio";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,7 +42,7 @@ export default function Espacios() {
   if (espacioConfigurando) {
     return (
       <DashboardLayout>
-        <EditorPlanoArquitectonico
+        <EditorPlanoEspacio
           espacioId={espacioConfigurando.id}
           espacioNombre={espacioConfigurando.nombre}
           onBack={() => setEspacioConfigurando(null)}
