@@ -50,7 +50,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [isSaving, setIsSaving] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +68,12 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   // Observar tamaño del contenedor
   useEffect(() => {
     if (!containerRef.current) return;
+    
+    // Obtener tamaño inicial inmediatamente
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setContainerSize({ width: rect.width, height: rect.height });
+    }
     
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -223,26 +229,28 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         {/* Canvas */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg"
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg min-w-0"
         >
-          <CanvasPlano
-            ref={canvasRef}
-            containerWidth={containerSize.width}
-            containerHeight={containerSize.height}
-            activeTool={activeTool}
-            elementos={elementos}
-            mesasCanvas={mesasCanvas}
-            mesasDB={mesas}
-            pixelsPerMeterX={pixelsPerMeterX}
-            pixelsPerMeterY={pixelsPerMeterY}
-            realDimensions={realDimensions}
-            planoConfig={plano?.configuracion}
-            selectedElement={selectedElement}
-            onElementosChange={setElementos}
-            onMesasChange={setMesasCanvas}
-            onSelectionChange={setSelectedElement}
-            onToolChange={setActiveTool}
-          />
+          {containerSize.width > 0 && containerSize.height > 0 && (
+            <CanvasPlano
+              ref={canvasRef}
+              containerWidth={containerSize.width}
+              containerHeight={containerSize.height}
+              activeTool={activeTool}
+              elementos={elementos}
+              mesasCanvas={mesasCanvas}
+              mesasDB={mesas}
+              pixelsPerMeterX={pixelsPerMeterX}
+              pixelsPerMeterY={pixelsPerMeterY}
+              realDimensions={realDimensions}
+              planoConfig={plano?.configuracion}
+              selectedElement={selectedElement}
+              onElementosChange={setElementos}
+              onMesasChange={setMesasCanvas}
+              onSelectionChange={setSelectedElement}
+              onToolChange={setActiveTool}
+            />
+          )}
         </div>
 
         {/* Panel lateral */}
