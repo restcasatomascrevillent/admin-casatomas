@@ -950,12 +950,11 @@ export function EditorPlanoArquitectonico({
               ref={canvasContainerRef}
               className="relative border-2 border-dashed border-border rounded-lg bg-white overflow-hidden"
             >
-              <div className="relative">
-                <canvas ref={canvasRef} />
-                
-                {/* Regla horizontal (superior) */}
+              {/* Contenedor con reglas externas al canvas */}
+              <div className="flex flex-col">
+                {/* Regla horizontal (superior) - fuera del canvas */}
                 {showMeasurements && (
-                  <div className="absolute top-0 left-0 right-0 h-6 bg-muted/80 border-b flex items-end pointer-events-none">
+                  <div className="relative h-6 bg-muted/80 border-b flex items-end pointer-events-none" style={{ marginLeft: 24 }}>
                     {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
                       <div
                         key={i}
@@ -969,28 +968,35 @@ export function EditorPlanoArquitectonico({
                   </div>
                 )}
                 
-                {/* Regla vertical (izquierda) */}
-                {showMeasurements && (
-                  <div className="absolute top-6 left-0 bottom-0 w-6 bg-muted/80 border-r flex flex-col pointer-events-none">
-                    {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute flex items-center"
-                        style={{ top: i * pixelsPerMeterY }}
-                      >
-                        <div className="h-px w-2 bg-muted-foreground/50" />
-                        <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
+                <div className="flex">
+                  {/* Regla vertical (izquierda) - fuera del canvas */}
+                  {showMeasurements && (
+                    <div className="relative w-6 bg-muted/80 border-r flex flex-col pointer-events-none" style={{ height: canvasSize.height }}>
+                      {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="absolute flex items-center"
+                          style={{ top: i * pixelsPerMeterY }}
+                        >
+                          <div className="h-px w-2 bg-muted-foreground/50" />
+                          <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Canvas de dibujo */}
+                  <div className="relative">
+                    <canvas ref={canvasRef} />
+                    
+                    {/* Indicador de dimensiones reales */}
+                    {showMeasurements && (
+                      <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
+                        {realDimensions.width}m × {realDimensions.height}m
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-
-                {/* Indicador de dimensiones reales */}
-                {showMeasurements && (
-                  <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
-                    {realDimensions.width}m × {realDimensions.height}m (1m = {pixelsPerMeter}px)
-                  </div>
-                )}
+                </div>
               </div>
             </div>
 
