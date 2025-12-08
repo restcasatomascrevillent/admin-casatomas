@@ -220,12 +220,28 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
 
-  // Cargar elementos guardados
+  // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
-    if (!fabricCanvas || !planoConfig?.elementos) return;
+    if (!fabricCanvas) return;
 
-    // Cargar elementos
-    planoConfig.elementos.forEach((elem: any) => {
+    // Verificar qué elementos ya están en el canvas
+    const elementosEnCanvas = new Set<string>();
+    fabricCanvas.getObjects().forEach((obj) => {
+      const customData = (obj as any).customData;
+      if (customData?.id && customData?.tipo !== "mesa") {
+        elementosEnCanvas.add(customData.id);
+      }
+    });
+
+    // Priorizar elementos del estado local, si no hay, usar planoConfig
+    const elementosACargar = elementosRef.current.length > 0 
+      ? elementosRef.current 
+      : (planoConfig?.elementos || []);
+
+    elementosACargar.forEach((elem: any) => {
+      // Saltar si ya está en el canvas
+      if (elementosEnCanvas.has(elem.id)) return;
+      
       let obj: FabricObject | null = null;
 
       switch (elem.tipo) {
@@ -273,13 +289,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    onElementosChange(planoConfig.elementos.map((e: any) => ({ id: e.id, tipo: e.tipo, props: e.props || e })));
+    // Solo actualizar estado si cargamos desde planoConfig y el estado está vacío
+    if (elementosRef.current.length === 0 && planoConfig?.elementos?.length > 0) {
+      onElementosChange(planoConfig.elementos.map((e: any) => ({ id: e.id, tipo: e.tipo, props: e.props || e })));
+    }
+    
     fabricCanvas.renderAll();
   }, [fabricCanvas, planoConfig]);
 
-  // Cargar mesas de la BD
+  // Cargar mesas (de BD o del estado local cuando el canvas se recrea)
   useEffect(() => {
-    if (!fabricCanvas || !mesasDB) return;
+    if (!fabricCanvas) return;
 
     const mesasEnCanvas = new Set<string>();
     fabricCanvas.getObjects().forEach((obj) => {
@@ -289,9 +309,68 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
+    // Combinar mesas de BD y del estado local
+    const mesasLocales = mesasCanvasRef.current;
     const newMesasCanvas: MesaCanvas[] = [];
 
-    mesasDB.forEach((mesa) => {
+    // Primero cargar mesas del estado local (tienen prioridad)
+    mesasLocales.forEach((mesa) => {
+      if (mesasEnCanvas.has(mesa.id)) return;
+
+      let obj: FabricObject;
+
+      if (mesa.forma === "circular") {
+        obj = new Circle({
+          left: mesa.posX,
+          top: mesa.posY,
+          radius: Math.min(mesa.ancho, mesa.alto) / 2,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
+      } else {
+        obj = new Rect({
+          left: mesa.posX,
+          top: mesa.posY,
+          width: mesa.ancho,
+          height: mesa.alto,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          rx: 6,
+          ry: 6,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
+      }
+
+      (obj as any).customData = {
+        tipo: "mesa",
+        id: mesa.id,
+        nombre: mesa.nombre,
+        capacidad: mesa.capacidad,
+      };
+
+      fabricCanvas.add(obj);
+      mesasEnCanvas.add(mesa.id);
+    });
+
+    // Luego cargar mesas de BD que no estén ya
+    mesasDB?.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return;
 
       let obj: FabricObject;
