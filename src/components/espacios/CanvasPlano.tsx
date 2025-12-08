@@ -759,14 +759,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     <div ref={containerRef} className="relative w-full h-full flex flex-col">
       {/* Regla horizontal */}
       <div 
-        className="h-8 bg-gradient-to-b from-muted/80 to-muted/40 backdrop-blur-sm flex items-end text-[10px] text-muted-foreground overflow-hidden border-b border-border/30 rounded-t-lg"
+        className="relative h-8 bg-gradient-to-b from-muted/80 to-muted/40 backdrop-blur-sm text-[10px] text-muted-foreground overflow-hidden border-b border-border/30 rounded-t-lg"
         style={{ marginLeft: RULER_SIZE }}
       >
         {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
           <div
             key={i}
             className="absolute flex flex-col items-center"
-            style={{ left: RULER_SIZE + i * effectivePixelsPerMeterX }}
+            style={{ left: i * effectivePixelsPerMeterX, transform: 'translateX(-50%)' }}
           >
             <span className="font-medium">{i}m</span>
             <div className="w-px h-2 bg-muted-foreground/40" />
@@ -777,14 +777,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       <div className="flex flex-1 min-h-0">
         {/* Regla vertical */}
         <div 
-          className="bg-gradient-to-r from-muted/80 to-muted/40 backdrop-blur-sm flex flex-col text-[10px] text-muted-foreground overflow-hidden border-r border-border/30 rounded-l-lg"
+          className="relative bg-gradient-to-r from-muted/80 to-muted/40 backdrop-blur-sm text-[10px] text-muted-foreground overflow-hidden border-r border-border/30 rounded-l-lg"
           style={{ width: RULER_SIZE }}
         >
           {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
             <div
               key={i}
               className="absolute flex items-center gap-1"
-              style={{ top: 32 + i * effectivePixelsPerMeterY }}
+              style={{ top: i * effectivePixelsPerMeterY, transform: 'translateY(-50%)' }}
             >
               <span className="w-7 text-right font-medium">{i}m</span>
               <div className="h-px w-2 bg-muted-foreground/40" />
