@@ -60,6 +60,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [wallPoints, setWallPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
+  const [currentWallLength, setCurrentWallLength] = useState<number>(0);
 
   // Refs para mantener valores actualizados en los event handlers sin recrear listeners
   const isDrawingWallRef = useRef(false);
@@ -481,6 +482,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
     setWallPoints([]);
     isDrawingWallRef.current = false;
     setIsDrawingWall(false);
+    setCurrentWallLength(0);
 
     fabricCanvas.renderAll();
   }, [fabricCanvas]);
@@ -528,6 +530,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
     setWallPoints([]);
     isDrawingWallRef.current = false;
     setIsDrawingWall(false);
+    setCurrentWallLength(0);
 
     fabricCanvas.renderAll();
     toast.success(`Perímetro creado con ${points.length - 1} paredes`);
@@ -707,6 +710,18 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
         x2: pointer.x,
         y2: pointer.y,
       });
+
+      // Calcular y mostrar longitud actual de la pared
+      const points = wallPointsRef.current;
+      if (points.length > 0) {
+        const lastPoint = points[points.length - 1];
+        const dx = pointer.x - lastPoint.x;
+        const dy = pointer.y - lastPoint.y;
+        const lengthPixels = Math.sqrt(dx * dx + dy * dy);
+        const lengthMeters = lengthPixels / Math.min(pixelsPerMeterX, pixelsPerMeterY);
+        setCurrentWallLength(Math.round(lengthMeters * 100) / 100);
+      }
+
       fabricCanvas.renderAll();
     };
 
@@ -1223,8 +1238,16 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
 
             {/* Instrucciones */}
             {activeTool === "wall" && (
-              <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-                Arrastra para dibujar una pared. Las medidas se mostrarán automáticamente.
+              <div className="mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800 flex items-center justify-between">
+                <span>
+                  <strong>Modo pared:</strong> Clic para añadir esquinas. Doble clic para terminar.
+                  {wallPoints.length > 0 && <span className="ml-2">({wallPoints.length} puntos)</span>}
+                </span>
+                {isDrawingWall && currentWallLength > 0 && (
+                  <span className="font-mono text-lg font-bold text-amber-900">
+                    {currentWallLength}m
+                  </span>
+                )}
               </div>
             )}
 
