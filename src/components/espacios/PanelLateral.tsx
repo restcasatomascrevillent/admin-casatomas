@@ -4,12 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Square, Circle, Users, Trash2 } from "lucide-react";
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PanelLateralProps {
   espacioId: string;
@@ -37,6 +46,7 @@ export function PanelLateral({
     ancho: 80,
     alto: 60,
   });
+  const [mesaToDelete, setMesaToDelete] = useState<{ id: string; nombre: string } | null>(null);
 
   const crearMesa = useCrearMesa();
   const eliminarMesa = useEliminarMesa();
@@ -48,7 +58,7 @@ export function PanelLateral({
     }
 
     try {
-      const result = await crearMesa.mutateAsync({
+      await crearMesa.mutateAsync({
         espacio_id: espacioId,
         nombre: newMesa.nombre,
         capacidad: newMesa.capacidad,
@@ -67,50 +77,46 @@ export function PanelLateral({
     }
   };
 
-  const handleDeleteMesa = async (mesaId: string) => {
-    if (!confirm("¿Eliminar esta mesa?")) return;
+  const handleDeleteMesa = async () => {
+    if (!mesaToDelete) return;
 
     try {
       // Si es una mesa temporal (no guardada), solo eliminarla del canvas
-      if (mesaId.startsWith("mesa-temp-")) {
-        onMesasChange(mesasCanvas.filter((m) => m.id !== mesaId));
+      if (mesaToDelete.id.startsWith("mesa-temp-")) {
+        onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
         onSelectionChange(null);
-        return;
+        toast.success("Mesa eliminada");
+      } else {
+        await eliminarMesa.mutateAsync(mesaToDelete.id);
+        onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
+        onSelectionChange(null);
       }
-
-      await eliminarMesa.mutateAsync(mesaId);
-      onMesasChange(mesasCanvas.filter((m) => m.id !== mesaId));
-      onSelectionChange(null);
     } catch (error) {
       console.error("Error al eliminar mesa:", error);
       toast.error("Error al eliminar la mesa");
+    } finally {
+      setMesaToDelete(null);
     }
-  };
-
-  // Convertir píxeles a metros
-  const pxToMeters = (px: number, axis: "x" | "y") => {
-    const ppm = axis === "x" ? pixelsPerMeterX : pixelsPerMeterY;
-    return (px / ppm).toFixed(2);
   };
 
   return (
     <div className="w-72 flex flex-col gap-4">
       {/* Panel de propiedades */}
       {selectedElement && (
-        <Card>
+        <Card className="border-2 border-primary/20 bg-primary/5">
           <CardHeader className="py-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              {selectedElement.tipo === "mesa" && <Square className="h-4 w-4" />}
-              {selectedElement.tipo === "wall" && <div className="w-4 h-1 bg-foreground rounded" />}
-              {selectedElement.tipo === "area" && <Square className="h-4 w-4 text-blue-500" />}
+              {selectedElement.tipo === "mesa" && <Square className="h-4 w-4 text-blue-500" />}
+              {selectedElement.tipo === "wall" && <div className="w-4 h-1 bg-gray-700 rounded" />}
+              {selectedElement.tipo === "area" && <Square className="h-4 w-4 text-blue-400" />}
               {selectedElement.tipo === "door" && <div className="w-4 h-2 bg-yellow-500 rounded" />}
-              Propiedades
+              Elemento seleccionado
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-sm">
               <span className="text-muted-foreground">Tipo:</span>{" "}
-              <Badge variant="outline" className="ml-2">
+              <Badge variant="secondary" className="ml-2">
                 {selectedElement.tipo === "mesa" && "Mesa"}
                 {selectedElement.tipo === "wall" && "Pared"}
                 {selectedElement.tipo === "area" && "Área"}
@@ -133,7 +139,7 @@ export function PanelLateral({
                   variant="destructive"
                   size="sm"
                   className="w-full"
-                  onClick={() => handleDeleteMesa(selectedElement.id)}
+                  onClick={() => setMesaToDelete({ id: selectedElement.id, nombre: selectedElement.nombre })}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Eliminar mesa
@@ -244,7 +250,11 @@ export function PanelLateral({
                 mesasCanvas.map((mesa) => (
                   <div
                     key={mesa.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer"
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
+                      selectedElement?.id === mesa.id 
+                        ? "bg-primary/10 border border-primary/30" 
+                        : "bg-muted/50 hover:bg-muted"
+                    }`}
                     onClick={() => onSelectionChange({ tipo: "mesa", ...mesa })}
                   >
                     <div className="flex items-center gap-2">
@@ -254,6 +264,9 @@ export function PanelLateral({
                         <Square className="h-4 w-4 text-blue-500" />
                       )}
                       <span className="text-sm font-medium">{mesa.nombre}</span>
+                      {mesa.id.startsWith("mesa-temp-") && (
+                        <Badge variant="outline" className="text-[10px] py-0">nuevo</Badge>
+                      )}
                     </div>
                     <Badge variant="outline" className="text-xs">
                       <Users className="h-3 w-3 mr-1" />
@@ -275,11 +288,11 @@ export function PanelLateral({
         <CardContent className="py-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-1 bg-gray-700 rounded" />
+              <div className="w-4 h-1.5 bg-gray-700 rounded-full" />
               <span>Pared</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-100 border border-blue-500 rounded" />
+              <div className="w-4 h-4 bg-blue-100 border-2 border-blue-500 rounded" />
               <span>Mesa</span>
             </div>
             <div className="flex items-center gap-2">
@@ -287,12 +300,30 @@ export function PanelLateral({
               <span>Área</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-2 bg-yellow-100 border border-yellow-500 rounded" />
+              <div className="w-4 h-2 bg-yellow-100 border border-yellow-600 rounded" />
               <span>Puerta</span>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de confirmación para eliminar mesa */}
+      <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta mesa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la mesa "{mesaToDelete?.nombre}". Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMesa} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
