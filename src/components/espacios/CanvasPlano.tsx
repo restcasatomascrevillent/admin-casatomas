@@ -96,6 +96,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     clearCanvas: () => {
       if (!fabricCanvas) return;
       
+      // Limpiar refs internos para evitar que se recarguen
+      elementosRef.current = [];
+      mesasCanvasRef.current = [];
+      wallPointsRef.current = [];
+      tempLinesRef.current = [];
+      
       // Eliminar todo excepto el grid
       const objectsToRemove = fabricCanvas.getObjects().filter(obj => !(obj as any).isGrid);
       objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
