@@ -92,9 +92,9 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
     nombre: "",
     capacidad: 4,
     forma: "rectangular" as "rectangular" | "circular" | "cuadrada",
-    largo: 120, // cm - para rectangular
+    largo: 80, // cm - para rectangular
     ancho: 80, // cm - para rectangular y cuadrada
-    diametro: 100, // cm - para circular
+    diametro: 150, // cm - para circular
   });
 
   // Estado para copiar/pegar mesas
@@ -856,7 +856,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
         pos_y: 100,
       });
 
-      setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", largo: 120, ancho: 80, diametro: 100 });
+      setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", largo: 80, ancho: 80, diametro: 150 });
     } catch (error) {
       console.error("Error al crear mesa:", error);
     }
