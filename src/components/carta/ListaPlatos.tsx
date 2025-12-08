@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { ChefHat, CheckCircle2, XCircle } from "lucide-react";
+import { ChefHat } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ListaPlatosProps {
   platos: Plato[];
@@ -33,7 +33,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         <div className="text-center">
           <ChefHat className="mx-auto h-12 w-12 text-muted-foreground" />
           <p className="mt-2 text-sm text-muted-foreground">
-            No hay platos en esta categoría. Haz clic en "Añadir Plato" para comenzar.
+            No hay platos en esta categoría. Haz clic en "Añadir" para comenzar.
           </p>
         </div>
       </div>
@@ -45,72 +45,74 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
       {platos.map((plato) => (
         <Card 
           key={plato.id} 
-          className={`relative transition-all duration-500 ease-in-out ${
+          className={cn(
+            "overflow-hidden transition-all duration-300",
             !plato.activado 
-              ? "opacity-60 bg-muted/50 scale-[0.98]" 
-              : "hover:shadow-md hover:scale-[1.02]"
-          }`}
+              ? "opacity-60 bg-muted/30" 
+              : "hover:shadow-lg"
+          )}
         >
-          <CardContent className="p-4">
-            {/* Toggle en la esquina superior derecha */}
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border transition-all duration-300 hover:shadow-md">
-              {plato.activado ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 animate-scale-in" />
-              ) : (
-                <XCircle className="h-4 w-4 text-muted-foreground animate-scale-in" />
-              )}
-              <Switch
-                checked={plato.activado || false}
-                onCheckedChange={(checked) => handleToggle(plato, checked)}
-                disabled={toggleActivado.isPending}
+          {plato.imagen_url && (
+            <div className="relative h-40 bg-muted">
+              <img 
+                src={plato.imagen_url} 
+                alt={plato.nombre || "Plato"} 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
             </div>
-
-            {plato.imagen_url && (
-              <div className="mb-3 rounded-md overflow-hidden">
-                <img 
-                  src={plato.imagen_url} 
-                  alt={plato.nombre || "Plato"} 
-                  className="w-full h-48 object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+          )}
+          
+          <CardContent className="p-4 space-y-3">
+            {/* Header con nombre y toggle */}
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
+                {plato.nombre}
+              </h3>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={cn(
+                  "text-xs font-medium",
+                  plato.activado ? "text-green-600" : "text-muted-foreground"
+                )}>
+                  {plato.activado ? "Activo" : "Inactivo"}
+                </span>
+                <Switch
+                  checked={plato.activado || false}
+                  onCheckedChange={(checked) => handleToggle(plato, checked)}
+                  disabled={toggleActivado.isPending}
+                  className="data-[state=checked]:bg-green-600"
                 />
               </div>
-            )}
+            </div>
             
-            <div className="space-y-3">
-              <div className="pr-20">
-                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
-                  {plato.nombre}
-                </h3>
-              </div>
-              
-              {plato.descripcion && (
-                <p className="text-sm text-muted-foreground line-clamp-2 break-words">
-                  {plato.descripcion}
-                </p>
-              )}
+            {plato.descripcion && (
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {plato.descripcion}
+              </p>
+            )}
 
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <span className="text-xl font-bold text-primary">
-                    {plato.precio_eur ? `${plato.precio_eur.toFixed(2)}€` : "N/A"}
-                  </span>
-                  {plato.unidad && (
-                    <span className="text-xs text-muted-foreground truncate">
-                      por {plato.unidad}
-                    </span>
-                  )}
-                </div>
+            {/* Precio y unidad */}
+            <div className="flex items-end justify-between pt-2 border-t">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-primary">
+                  {plato.precio_eur ? `${plato.precio_eur.toFixed(2)}` : "—"}
+                </span>
+                <span className="text-lg font-medium text-primary">€</span>
               </div>
-
-              {plato.alergenos_notas && (
-                <p className="text-xs text-muted-foreground italic line-clamp-2 break-words pt-2 border-t">
-                  {plato.alergenos_notas}
-                </p>
+              {plato.unidad && (
+                <span className="text-xs text-muted-foreground">
+                  por {plato.unidad}
+                </span>
               )}
             </div>
+
+            {plato.alergenos_notas && (
+              <p className="text-xs text-muted-foreground italic pt-2 border-t">
+                {plato.alergenos_notas}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}
