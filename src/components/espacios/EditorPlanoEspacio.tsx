@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Trash2 } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
@@ -50,28 +50,41 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [isSaving, setIsSaving] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   
   const canvasRef = useRef<CanvasPlanoRef>(null);
-  
-  // Dimensiones del canvas fijas
-  const CANVAS_WIDTH = 900;
-  const CANVAS_HEIGHT = 550;
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Escala: dimensiones reales en metros
   const [realDimensions, setRealDimensions] = useState({ width: 12, height: 8 });
-  const [pixelsPerMeterX, setPixelsPerMeterX] = useState(CANVAS_WIDTH / 12);
-  const [pixelsPerMeterY, setPixelsPerMeterY] = useState(CANVAS_HEIGHT / 8);
+  const pixelsPerMeterX = containerSize.width / realDimensions.width;
+  const pixelsPerMeterY = containerSize.height / realDimensions.height;
 
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
   const { data: mesas = [], isLoading: loadingMesas } = useMesas(espacioId);
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
 
+  // Observar tamaño del contenedor
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setContainerSize({ width, height });
+        }
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   // Aplicar nuevas dimensiones reales
   const handleApplyDimensions = useCallback((width: number, height: number) => {
     setRealDimensions({ width, height });
-    setPixelsPerMeterX(CANVAS_WIDTH / width);
-    setPixelsPerMeterY(CANVAS_HEIGHT / height);
     toast.success(`Escala aplicada: ${width}m × ${height}m`);
   }, []);
 
@@ -82,8 +95,8 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       // Guardar configuración del plano
       await guardarPlano.mutateAsync({
         espacio_id: espacioId,
-        ancho: CANVAS_WIDTH,
-        alto: CANVAS_HEIGHT,
+        ancho: containerSize.width,
+        alto: containerSize.height,
         metros_cuadrados: realDimensions.width * realDimensions.height,
         configuracion: {
           elementos,
@@ -113,11 +126,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     } finally {
       setIsSaving(false);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, pixelsPerMeterX, pixelsPerMeterY, guardarPlano, actualizarMesas]);
+  }, [espacioId, elementos, mesasCanvas, realDimensions, pixelsPerMeterX, pixelsPerMeterY, containerSize, guardarPlano, actualizarMesas]);
 
   // Exportar imagen
   const handleExport = useCallback(() => {
-    const canvas = document.querySelector("#plano-canvas") as HTMLCanvasElement;
+    const canvas = canvasRef.current?.getCanvas();
     if (canvas) {
       const link = document.createElement("a");
       link.download = `plano-${espacioNombre}.png`;
@@ -208,11 +221,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       {/* Main content */}
       <div className="flex gap-4 flex-1 min-h-0">
         {/* Canvas */}
-        <div className="flex-1 rounded-xl border-2 border-dashed border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 overflow-hidden shadow-inner">
+        <div 
+          ref={containerRef}
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg"
+        >
           <CanvasPlano
             ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
             activeTool={activeTool}
             elementos={elementos}
             mesasCanvas={mesasCanvas}

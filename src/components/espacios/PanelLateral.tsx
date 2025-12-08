@@ -41,11 +41,20 @@ export function PanelLateral({
 }: PanelLateralProps) {
   const [newMesa, setNewMesa] = useState({
     nombre: "",
-    capacidad: 4,
+    capacidad: 2,
     forma: "rectangular" as "rectangular" | "circular",
     ancho: 80,
-    alto: 60,
+    alto: 80,
   });
+  
+  // Actualizar dimensiones al cambiar forma
+  const handleFormaChange = (forma: "rectangular" | "circular") => {
+    if (forma === "circular") {
+      setNewMesa({ ...newMesa, forma, ancho: 150, alto: 150, capacidad: 6 });
+    } else {
+      setNewMesa({ ...newMesa, forma, ancho: 80, alto: 80, capacidad: 2 });
+    }
+  };
   const [mesaToDelete, setMesaToDelete] = useState<{ id: string; nombre: string } | null>(null);
 
   const crearMesa = useCrearMesa();
@@ -173,7 +182,7 @@ export function PanelLateral({
                   variant={newMesa.forma === "rectangular" ? "default" : "outline"}
                   size="sm"
                   className="flex-1"
-                  onClick={() => setNewMesa({ ...newMesa, forma: "rectangular" })}
+                  onClick={() => handleFormaChange("rectangular")}
                 >
                   <Square className="h-4 w-4" />
                 </Button>
@@ -181,7 +190,7 @@ export function PanelLateral({
                   variant={newMesa.forma === "circular" ? "default" : "outline"}
                   size="sm"
                   className="flex-1"
-                  onClick={() => setNewMesa({ ...newMesa, forma: "circular" })}
+                  onClick={() => handleFormaChange("circular")}
                 >
                   <Circle className="h-4 w-4" />
                 </Button>

@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject } from "fabric";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText } from "fabric";
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Check, X } from "lucide-react";
 
 interface CanvasPlanoProps {
-  width: number;
-  height: number;
+  containerWidth: number;
+  containerHeight: number;
   activeTool: ToolType;
   elementos: ElementoCanvas[];
   mesasCanvas: MesaCanvas[];
@@ -25,11 +28,12 @@ interface CanvasPlanoProps {
 export interface CanvasPlanoRef {
   clearCanvas: () => void;
   removeElement: (id: string) => void;
+  getCanvas: () => HTMLCanvasElement | null;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
-  width,
-  height,
+  containerWidth,
+  containerHeight,
   activeTool,
   elementos,
   mesasCanvas,
@@ -45,7 +49,27 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   onToolChange,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  
+  // Estado para medición en vivo
+  const [liveWallMeasure, setLiveWallMeasure] = useState<{
+    length: number;
+    x: number;
+    y: number;
+    inputValue: string;
+  } | null>(null);
+  const measureTextRef = useRef<FabricText | null>(null);
+  
+  // Dimensiones calculadas del canvas
+  const RULER_SIZE = 40;
+  const PADDING = 16;
+  const canvasWidth = Math.max(400, containerWidth - RULER_SIZE - PADDING * 2);
+  const canvasHeight = Math.max(300, containerHeight - RULER_SIZE - PADDING * 2);
+  
+  // Recalcular pixels por metro basado en tamaño del canvas
+  const effectivePixelsPerMeterX = canvasWidth / realDimensions.width;
+  const effectivePixelsPerMeterY = canvasHeight / realDimensions.height;
   
   // Refs para mantener valores actualizados en event handlers
   const activeToolRef = useRef(activeTool);
@@ -54,6 +78,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const tempLinesRef = useRef<Line[]>([]);
   const previewLineRef = useRef<Line | null>(null);
+  const pixelsPerMeterXRef = useRef(effectivePixelsPerMeterX);
+  const pixelsPerMeterYRef = useRef(effectivePixelsPerMeterY);
 
   // Sincronizar refs
   useEffect(() => {
@@ -67,6 +93,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useEffect(() => {
     mesasCanvasRef.current = mesasCanvas;
   }, [mesasCanvas]);
+  
+  useEffect(() => {
+    pixelsPerMeterXRef.current = effectivePixelsPerMeterX;
+    pixelsPerMeterYRef.current = effectivePixelsPerMeterY;
+  }, [effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
 
   // Exponer métodos al padre
   useImperativeHandle(ref, () => ({
@@ -87,7 +118,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         fabricCanvas.discardActiveObject();
         fabricCanvas.renderAll();
       }
-    }
+    },
+    getCanvas: () => canvasRef.current
   }), [fabricCanvas]);
 
   // Inicializar canvas
@@ -95,8 +127,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!canvasRef.current) return;
 
     const canvas = new FabricCanvas(canvasRef.current, {
-      width,
-      height,
+      width: canvasWidth,
+      height: canvasHeight,
       backgroundColor: "#ffffff",
       selection: true,
     });
@@ -144,7 +176,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     return () => {
       canvas.dispose();
     };
-  }, [width, height]);
+  }, [canvasWidth, canvasHeight]);
+  
+  // Actualizar tamaño del canvas cuando cambian las dimensiones
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    fabricCanvas.setDimensions({ width: canvasWidth, height: canvasHeight });
+    fabricCanvas.renderAll();
+  }, [fabricCanvas, canvasWidth, canvasHeight]);
 
   // Dibujar grid con estilo mejorado
   useEffect(() => {
@@ -164,9 +203,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     // Líneas verticales
     for (let i = 0; i <= realDimensions.width; i++) {
-      const x = i * pixelsPerMeterX;
+      const x = i * effectivePixelsPerMeterX;
       const isMajor = i % 5 === 0;
-      const line = new Line([x, 0, x, height], {
+      const line = new Line([x, 0, x, canvasHeight], {
         stroke: isMajor ? gridColorStrong : (i % 1 === 0 ? gridColorMedium : gridColorLight),
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
@@ -179,9 +218,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     // Líneas horizontales
     for (let i = 0; i <= realDimensions.height; i++) {
-      const y = i * pixelsPerMeterY;
+      const y = i * effectivePixelsPerMeterY;
       const isMajor = i % 5 === 0;
-      const line = new Line([0, y, width, y], {
+      const line = new Line([0, y, canvasWidth, y], {
         stroke: isMajor ? gridColorStrong : (i % 1 === 0 ? gridColorMedium : gridColorLight),
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
@@ -193,7 +232,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, pixelsPerMeterX, pixelsPerMeterY, realDimensions, width, height]);
+  }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
 
   // Cargar elementos guardados
   useEffect(() => {
@@ -426,6 +465,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (previewLineRef.current) {
       fabricCanvas.remove(previewLineRef.current);
     }
+    
+    // Limpiar texto de medida anterior
+    if (measureTextRef.current) {
+      fabricCanvas.remove(measureTextRef.current);
+    }
 
     const preview = new Line([lastPoint.x, lastPoint.y, x, y], {
       stroke: "#6b7280",
@@ -438,6 +482,44 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     previewLineRef.current = preview;
     fabricCanvas.add(preview);
+    
+    // Calcular longitud en metros
+    const dx = x - lastPoint.x;
+    const dy = y - lastPoint.y;
+    const lengthPx = Math.sqrt(dx * dx + dy * dy);
+    const lengthM = lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2);
+    
+    // Posición del texto (punto medio de la línea)
+    const midX = (lastPoint.x + x) / 2;
+    const midY = (lastPoint.y + y) / 2;
+    
+    // Crear texto con la medida
+    const measureText = new FabricText(`${lengthM.toFixed(2)}m`, {
+      left: midX,
+      top: midY - 20,
+      fontSize: 14,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "bold",
+      fill: "#1f2937",
+      backgroundColor: "rgba(255,255,255,0.9)",
+      padding: 4,
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+    });
+    
+    measureTextRef.current = measureText;
+    fabricCanvas.add(measureText);
+    
+    // Actualizar estado para mostrar input
+    setLiveWallMeasure({
+      length: lengthM,
+      x: midX,
+      y: midY,
+      inputValue: lengthM.toFixed(2),
+    });
+    
     fabricCanvas.renderAll();
   };
 
@@ -489,11 +571,44 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(previewLineRef.current);
       previewLineRef.current = null;
     }
+    if (measureTextRef.current) {
+      fabricCanvas.remove(measureTextRef.current);
+      measureTextRef.current = null;
+    }
     tempLinesRef.current = [];
     wallPointsRef.current = [];
+    setLiveWallMeasure(null);
 
     fabricCanvas.renderAll();
     onToolChange("select");
+  };
+  
+  // Aplicar medida personalizada desde input
+  const applyCustomMeasure = (newLengthM: number) => {
+    if (!fabricCanvas || !liveWallMeasure) return;
+    
+    const points = wallPointsRef.current;
+    if (points.length === 0) return;
+    
+    const lastPoint = points[points.length - 1];
+    const avgPixelsPerMeter = (pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2;
+    const newLengthPx = newLengthM * avgPixelsPerMeter;
+    
+    // Obtener el ángulo actual de la línea preview
+    if (previewLineRef.current) {
+      const x2 = previewLineRef.current.x2 || 0;
+      const y2 = previewLineRef.current.y2 || 0;
+      const dx = x2 - lastPoint.x;
+      const dy = y2 - lastPoint.y;
+      const angle = Math.atan2(dy, dx);
+      
+      // Calcular nuevo punto final
+      const newX = lastPoint.x + Math.cos(angle) * newLengthPx;
+      const newY = lastPoint.y + Math.sin(angle) * newLengthPx;
+      
+      // Actualizar preview
+      updatePreviewLine(newX, newY);
+    }
   };
 
   const cancelWallDrawing = () => {
@@ -504,8 +619,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(previewLineRef.current);
       previewLineRef.current = null;
     }
+    if (measureTextRef.current) {
+      fabricCanvas.remove(measureTextRef.current);
+      measureTextRef.current = null;
+    }
     tempLinesRef.current = [];
     wallPointsRef.current = [];
+    setLiveWallMeasure(null);
     fabricCanvas.renderAll();
   };
 
@@ -540,8 +660,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!fabricCanvas) return;
 
     const id = `mesa-temp-${Date.now()}`;
-    const ancho = 80;
-    const alto = forma === "circular" ? 80 : 60;
+    // Dimensiones estándar: 80x80cm rectangular, 150cm diámetro circular
+    const ancho = forma === "circular" ? 150 : 80;
+    const alto = forma === "circular" ? 150 : 80;
+    const capacidad = forma === "circular" ? 6 : 2;
 
     let obj: FabricObject;
 
@@ -591,7 +713,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       tipo: "mesa",
       id,
       nombre: mesaName,
-      capacidad: forma === "circular" ? 6 : 4,
+      capacidad,
       isNew: true,
     };
 
@@ -602,7 +724,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const newMesa: MesaCanvas = {
       id,
       nombre: mesaName,
-      capacidad: forma === "circular" ? 6 : 4,
+      capacidad,
       forma,
       ancho,
       alto,
@@ -641,14 +763,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   };
 
   return (
-    <div className="relative p-4">
+    <div ref={containerRef} className="relative w-full h-full flex flex-col">
       {/* Regla horizontal */}
-      <div className="absolute top-0 left-12 right-4 h-8 bg-gradient-to-b from-muted/80 to-muted/40 backdrop-blur-sm rounded-t-lg flex items-end text-[10px] text-muted-foreground overflow-hidden border-b border-border/30">
+      <div 
+        className="h-8 bg-gradient-to-b from-muted/80 to-muted/40 backdrop-blur-sm flex items-end text-[10px] text-muted-foreground overflow-hidden border-b border-border/30 rounded-t-lg"
+        style={{ marginLeft: RULER_SIZE }}
+      >
         {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
           <div
             key={i}
             className="absolute flex flex-col items-center"
-            style={{ left: i * pixelsPerMeterX }}
+            style={{ left: RULER_SIZE + i * effectivePixelsPerMeterX }}
           >
             <span className="font-medium">{i}m</span>
             <div className="w-px h-2 bg-muted-foreground/40" />
@@ -656,23 +781,71 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         ))}
       </div>
 
-      {/* Regla vertical */}
-      <div className="absolute top-8 left-0 bottom-4 w-10 bg-gradient-to-r from-muted/80 to-muted/40 backdrop-blur-sm rounded-l-lg flex flex-col text-[10px] text-muted-foreground overflow-hidden border-r border-border/30">
-        {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute flex items-center gap-1"
-            style={{ top: i * pixelsPerMeterY }}
-          >
-            <span className="w-7 text-right font-medium">{i}m</span>
-            <div className="h-px w-2 bg-muted-foreground/40" />
-          </div>
-        ))}
-      </div>
+      <div className="flex flex-1 min-h-0">
+        {/* Regla vertical */}
+        <div 
+          className="bg-gradient-to-r from-muted/80 to-muted/40 backdrop-blur-sm flex flex-col text-[10px] text-muted-foreground overflow-hidden border-r border-border/30 rounded-l-lg"
+          style={{ width: RULER_SIZE }}
+        >
+          {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute flex items-center gap-1"
+              style={{ top: 32 + i * effectivePixelsPerMeterY }}
+            >
+              <span className="w-7 text-right font-medium">{i}m</span>
+              <div className="h-px w-2 bg-muted-foreground/40" />
+            </div>
+          ))}
+        </div>
 
-      {/* Canvas container con sombra */}
-      <div className="ml-10 mt-8 rounded-lg overflow-hidden shadow-lg ring-1 ring-border/20">
-        <canvas ref={canvasRef} id="plano-canvas" className="block" />
+        {/* Canvas container */}
+        <div className="flex-1 relative rounded-br-lg overflow-hidden shadow-lg ring-1 ring-border/20 bg-white">
+          <canvas ref={canvasRef} id="plano-canvas" className="block" />
+          
+          {/* Input de medida en vivo para paredes */}
+          {liveWallMeasure && activeTool === "wall" && (
+            <div 
+              className="absolute z-10 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border p-1.5"
+              style={{ 
+                left: Math.min(liveWallMeasure.x, canvasWidth - 150), 
+                top: Math.max(liveWallMeasure.y - 50, 10) 
+              }}
+            >
+              <Input
+                type="number"
+                step="0.01"
+                min="0.1"
+                value={liveWallMeasure.inputValue}
+                onChange={(e) => setLiveWallMeasure({ ...liveWallMeasure, inputValue: e.target.value })}
+                className="w-20 h-7 text-sm text-center"
+                placeholder="m"
+              />
+              <span className="text-xs text-muted-foreground">m</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => {
+                  const val = parseFloat(liveWallMeasure.inputValue);
+                  if (!isNaN(val) && val > 0) {
+                    applyCustomMeasure(val);
+                  }
+                }}
+              >
+                <Check className="h-3 w-3 text-green-600" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={() => setLiveWallMeasure(null)}
+              >
+                <X className="h-3 w-3 text-red-500" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
