@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +12,6 @@ import {
   XCircle, 
   Clock, 
   Search, 
-  Edit,
   Users,
   Calendar,
   MapPin,
@@ -24,6 +23,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
 
 interface Reservation {
   id: string;
@@ -50,6 +50,8 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
+  const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
   
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -346,14 +348,12 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={updatingId === reservation.id}
-                            onClick={() => updateReservationStatus(reservation.id, "verificada")}
+                            onClick={() => {
+                              setSelectedReservaForVerification(reservation);
+                              setVerificacionModalOpen(true);
+                            }}
                           >
-                            {updatingId === reservation.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Verificar"
-                            )}
+                            Verificar
                           </Button>
                         )}
                         {reservation.estado === "verificada" && (
@@ -392,6 +392,13 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
           </Table>
         </CardContent>
       </Card>
+
+      <ModalVerificacionReserva
+        reserva={selectedReservaForVerification}
+        open={verificacionModalOpen}
+        onOpenChange={setVerificacionModalOpen}
+        onSuccess={fetchReservations}
+      />
     </div>
   );
 }
