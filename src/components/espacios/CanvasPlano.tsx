@@ -97,23 +97,42 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     clearCanvas: () => {
       if (!fabricCanvas) return;
       
-      // Eliminar todo excepto el grid
+      // Eliminar TODO excepto el grid - paredes, mesas, puertas, áreas, cotas, etiquetas
       const objectsToRemove = fabricCanvas.getObjects().filter(obj => !(obj as any).isGrid);
       objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
+      
+      // Limpiar refs internos
+      tempLinesRef.current = [];
+      wallPointsRef.current = [];
+      if (previewLineRef.current) {
+        previewLineRef.current = null;
+      }
+      if (measureTextRef.current) {
+        measureTextRef.current = null;
+      }
+      
+      // Limpiar estados
+      elementosRef.current = [];
+      mesasCanvasRef.current = [];
+      onElementosChange([]);
+      onMesasChange([]);
+      
       fabricCanvas.renderAll();
     },
     removeElement: (id: string) => {
       if (!fabricCanvas) return;
       
-      const obj = fabricCanvas.getObjects().find(o => (o as any).customData?.id === id);
-      if (obj) {
-        fabricCanvas.remove(obj);
-        fabricCanvas.discardActiveObject();
-        fabricCanvas.renderAll();
-      }
+      // Eliminar el objeto y sus etiquetas asociadas
+      const objectsToRemove = fabricCanvas.getObjects().filter(o => {
+        const customData = (o as any).customData;
+        return customData?.id === id || customData?.parentId === id;
+      });
+      objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
+      fabricCanvas.discardActiveObject();
+      fabricCanvas.renderAll();
     },
     getCanvas: () => canvasRef.current
-  }), [fabricCanvas]);
+  }), [fabricCanvas, onElementosChange, onMesasChange]);
 
   // Inicializar canvas - se recrea cuando cambian las dimensiones
   useEffect(() => {
@@ -243,10 +262,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (elementosEnCanvas.has(elem.id)) return;
       
       let obj: FabricObject | null = null;
+      const x1 = elem.props?.x1 || elem.x1 || 0;
+      const y1 = elem.props?.y1 || elem.y1 || 0;
+      const x2 = elem.props?.x2 || elem.x2 || 0;
+      const y2 = elem.props?.y2 || elem.y2 || 0;
 
       switch (elem.tipo) {
         case "wall":
-          obj = new Line([elem.props?.x1 || elem.x1 || 0, elem.props?.y1 || elem.y1 || 0, elem.props?.x2 || elem.x2 || 0, elem.props?.y2 || elem.y2 || 0], {
+          obj = new Line([x1, y1, x2, y2], {
             stroke: "#1f2937",
             strokeWidth: 10,
             strokeLineCap: "round",
@@ -286,6 +309,43 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (obj) {
         (obj as any).customData = { tipo: elem.tipo, id: elem.id };
         fabricCanvas.add(obj);
+        
+        // Añadir cota para paredes
+        if (elem.tipo === "wall") {
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const lengthPx = Math.sqrt(dx * dx + dy * dy);
+          const lengthM = roundTo5cm(lengthPx / ((effectivePixelsPerMeterX + effectivePixelsPerMeterY) / 2));
+          
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          
+          const offsetDistance = 18;
+          const perpAngle = (angle + 90) * (Math.PI / 180);
+          const offsetX = Math.cos(perpAngle) * offsetDistance;
+          const offsetY = Math.sin(perpAngle) * offsetDistance;
+          
+          const cotaText = new FabricText(`${lengthM.toFixed(2)}m`, {
+            left: midX + offsetX,
+            top: midY + offsetY,
+            fontSize: 11,
+            fontFamily: "system-ui, sans-serif",
+            fontWeight: "600",
+            fill: "#374151",
+            backgroundColor: "rgba(255,255,255,0.85)",
+            padding: 3,
+            selectable: false,
+            evented: false,
+            originX: "center",
+            originY: "center",
+            angle: angle > 90 || angle < -90 ? angle + 180 : angle,
+          });
+          
+          (cotaText as any).customData = { tipo: "cota", parentId: elem.id };
+          (cotaText as any).isCota = true;
+          fabricCanvas.add(cotaText);
+        }
       }
     });
 
@@ -295,7 +355,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     
     fabricCanvas.renderAll();
-  }, [fabricCanvas, planoConfig]);
+  }, [fabricCanvas, planoConfig, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
 
   // Cargar mesas (de BD o del estado local cuando el canvas se recrea)
   useEffect(() => {
@@ -312,6 +372,31 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     // Combinar mesas de BD y del estado local
     const mesasLocales = mesasCanvasRef.current;
     const newMesasCanvas: MesaCanvas[] = [];
+
+    // Función para añadir etiqueta de mesa
+    const addMesaLabel = (mesaId: string, nombre: string, ancho: number, alto: number, forma: string, posX: number, posY: number) => {
+      const anchoM = (ancho / effectivePixelsPerMeterX).toFixed(2);
+      const altoM = (alto / effectivePixelsPerMeterY).toFixed(2);
+      const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
+      
+      const label = new FabricText(`${nombre}\n${dimensionText}`, {
+        left: posX + ancho / 2,
+        top: posY + alto / 2,
+        fontSize: 10,
+        fontFamily: "system-ui, sans-serif",
+        fontWeight: "600",
+        fill: "#1e40af",
+        textAlign: "center",
+        selectable: false,
+        evented: false,
+        originX: "center",
+        originY: "center",
+      });
+      
+      (label as any).customData = { tipo: "mesa-label", parentId: mesaId };
+      (label as any).isMesaLabel = true;
+      fabricCanvas.add(label);
+    };
 
     // Primero cargar mesas del estado local (tienen prioridad)
     mesasLocales.forEach((mesa) => {
@@ -366,6 +451,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       };
 
       fabricCanvas.add(obj);
+      addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, mesa.posX, mesa.posY);
       mesasEnCanvas.add(mesa.id);
     });
 
@@ -373,13 +459,18 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     mesasDB?.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return;
 
+      const posX = mesa.pos_x || 50;
+      const posY = mesa.pos_y || 50;
+      const ancho = mesa.ancho || 80;
+      const alto = mesa.alto || 60;
+
       let obj: FabricObject;
 
       if (mesa.forma === "circular") {
         obj = new Circle({
-          left: mesa.pos_x || 50,
-          top: mesa.pos_y || 50,
-          radius: Math.min(mesa.ancho || 60, mesa.alto || 60) / 2,
+          left: posX,
+          top: posY,
+          radius: Math.min(ancho, alto) / 2,
           fill: "#dbeafe",
           stroke: "#2563eb",
           strokeWidth: 2,
@@ -394,10 +485,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         });
       } else {
         obj = new Rect({
-          left: mesa.pos_x || 50,
-          top: mesa.pos_y || 50,
-          width: mesa.ancho || 80,
-          height: mesa.alto || 60,
+          left: posX,
+          top: posY,
+          width: ancho,
+          height: alto,
           fill: "#dbeafe",
           stroke: "#2563eb",
           strokeWidth: 2,
@@ -422,16 +513,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       };
 
       fabricCanvas.add(obj);
+      addMesaLabel(mesa.id, mesa.nombre, ancho, alto, mesa.forma, posX, posY);
 
       newMesasCanvas.push({
         id: mesa.id,
         nombre: mesa.nombre,
         capacidad: mesa.capacidad,
         forma: mesa.forma as "rectangular" | "circular",
-        ancho: mesa.ancho || 80,
-        alto: mesa.alto || 60,
-        posX: mesa.pos_x || 50,
-        posY: mesa.pos_y || 50,
+        ancho,
+        alto,
+        posX,
+        posY,
       });
     });
 
@@ -440,7 +532,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, mesasDB]);
+  }, [fabricCanvas, mesasDB, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
 
   // Manejar clics según la herramienta activa
   useEffect(() => {
@@ -580,6 +672,49 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   };
 
+  // Función para crear cota (anotación de medida) en una pared
+  const createWallCota = (x1: number, y1: number, x2: number, y2: number, wallId: string) => {
+    if (!fabricCanvas) return;
+    
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthPx = Math.sqrt(dx * dx + dy * dy);
+    const lengthM = roundTo5cm(lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2));
+    
+    // Punto medio de la pared
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+    
+    // Calcular ángulo de la pared
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    
+    // Offset perpendicular para la cota
+    const offsetDistance = 18;
+    const perpAngle = (angle + 90) * (Math.PI / 180);
+    const offsetX = Math.cos(perpAngle) * offsetDistance;
+    const offsetY = Math.sin(perpAngle) * offsetDistance;
+    
+    const cotaText = new FabricText(`${lengthM.toFixed(2)}m`, {
+      left: midX + offsetX,
+      top: midY + offsetY,
+      fontSize: 11,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "600",
+      fill: "#374151",
+      backgroundColor: "rgba(255,255,255,0.85)",
+      padding: 3,
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+      angle: angle > 90 || angle < -90 ? angle + 180 : angle,
+    });
+    
+    (cotaText as any).customData = { tipo: "cota", parentId: wallId };
+    (cotaText as any).isCota = true;
+    fabricCanvas.add(cotaText);
+  };
+
   const finishWallDrawing = () => {
     if (!fabricCanvas) return;
 
@@ -594,7 +729,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(line);
     });
 
-    // Crear paredes permanentes
+    // Crear paredes permanentes con cotas
     const currentElementos = elementosRef.current;
     const newElementos: ElementoCanvas[] = [];
     for (let i = 0; i < points.length - 1; i++) {
@@ -608,6 +743,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       });
       (wall as any).customData = { tipo: "wall", id };
       fabricCanvas.add(wall);
+      
+      // Añadir cota a la pared
+      createWallCota(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, id);
       
       newElementos.push({
         id,
@@ -685,6 +823,34 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     onToolChange("select");
   };
 
+  // Función para crear etiqueta de mesa
+  const createMesaLabel = (mesaId: string, nombre: string, ancho: number, alto: number, forma: string, posX: number, posY: number) => {
+    if (!fabricCanvas) return;
+    
+    // Calcular dimensiones en metros
+    const anchoM = (ancho / pixelsPerMeterXRef.current).toFixed(2);
+    const altoM = (alto / pixelsPerMeterYRef.current).toFixed(2);
+    const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
+    
+    const label = new FabricText(`${nombre}\n${dimensionText}`, {
+      left: posX + ancho / 2,
+      top: posY + alto / 2,
+      fontSize: 10,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "600",
+      fill: "#1e40af",
+      textAlign: "center",
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+    });
+    
+    (label as any).customData = { tipo: "mesa-label", parentId: mesaId };
+    (label as any).isMesaLabel = true;
+    fabricCanvas.add(label);
+  };
+
   const handleMesaClick = (x: number, y: number, forma: "rectangular" | "circular") => {
     if (!fabricCanvas) return;
 
@@ -747,6 +913,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     fabricCanvas.add(obj);
+    
+    // Añadir etiqueta de la mesa
+    createMesaLabel(id, mesaName, ancho, alto, forma, x - ancho / 2, y - alto / 2);
+    
     fabricCanvas.setActiveObject(obj);
     fabricCanvas.renderAll();
 
