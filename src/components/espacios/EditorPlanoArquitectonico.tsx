@@ -747,35 +747,33 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       };
 
       if (obj instanceof Line) {
-        // Para líneas, guardar las coordenadas absolutas teniendo en cuenta la transformación
+        // Para líneas en Fabric.js v6, las coordenadas x1,y1,x2,y2 son relativas al centro
+        // Necesitamos calcular las coordenadas absolutas usando la matriz de transformación
         const line = obj as Line;
-        // Obtener el centro y dimensiones de la línea con transformación aplicada
-        const aCoords = line.aCoords;
-        if (aCoords) {
-          // Calcular los puntos extremos de la línea transformada
-          const left = line.left || 0;
-          const top = line.top || 0;
-          const x1 = (line.x1 || 0) + left;
-          const y1 = (line.y1 || 0) + top;
-          const x2 = (line.x2 || 0) + left;
-          const y2 = (line.y2 || 0) + top;
-          
-          elementosCanvas.push({
-            ...base,
-            x1,
-            y1,
-            x2,
-            y2,
-          });
-        } else {
-          elementosCanvas.push({
-            ...base,
-            x1: line.x1 || 0,
-            y1: line.y1 || 0,
-            x2: line.x2 || 0,
-            y2: line.y2 || 0,
-          });
-        }
+        const matrix = line.calcTransformMatrix();
+        
+        // Las coordenadas locales de la línea
+        const x1Local = line.x1 || 0;
+        const y1Local = line.y1 || 0;
+        const x2Local = line.x2 || 0;
+        const y2Local = line.y2 || 0;
+        
+        // Transformar puntos usando la matriz
+        // matrix = [a, b, c, d, e, f] donde:
+        // x' = a*x + c*y + e
+        // y' = b*x + d*y + f
+        const x1Abs = matrix[0] * x1Local + matrix[2] * y1Local + matrix[4];
+        const y1Abs = matrix[1] * x1Local + matrix[3] * y1Local + matrix[5];
+        const x2Abs = matrix[0] * x2Local + matrix[2] * y2Local + matrix[4];
+        const y2Abs = matrix[1] * x2Local + matrix[3] * y2Local + matrix[5];
+        
+        elementosCanvas.push({
+          ...base,
+          x1: Math.round(x1Abs),
+          y1: Math.round(y1Abs),
+          x2: Math.round(x2Abs),
+          y2: Math.round(y2Abs),
+        });
       } else if (obj instanceof Rect) {
         elementosCanvas.push({
           ...base,
