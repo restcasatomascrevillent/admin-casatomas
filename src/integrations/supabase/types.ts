@@ -577,6 +577,42 @@ export type Database = {
           },
         ]
       }
+      noticias_hosteleria: {
+        Row: {
+          categoria: string
+          created_at: string
+          descripcion: string | null
+          enlace: string
+          fecha: string
+          fuente: string
+          id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          descripcion?: string | null
+          enlace: string
+          fecha?: string
+          fuente: string
+          id?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          descripcion?: string | null
+          enlace?: string
+          fecha?: string
+          fuente?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ocupacion_diaria: {
         Row: {
           created_at: string | null
