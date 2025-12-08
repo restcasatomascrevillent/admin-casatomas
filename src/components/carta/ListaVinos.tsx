@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Wine, CheckCircle2, XCircle } from "lucide-react";
+import { Wine } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface ListaVinosProps {
   vinos: Vino[];
@@ -45,73 +45,78 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
       {vinos.map((vino) => (
         <Card 
           key={vino.id} 
-          className={`relative transition-all duration-500 ease-in-out ${
+          className={cn(
+            "overflow-hidden transition-all duration-300",
             !vino.activado 
-              ? "opacity-60 bg-muted/50 scale-[0.98]" 
-              : "hover:shadow-md hover:scale-[1.02]"
-          }`}
+              ? "opacity-60 bg-muted/30" 
+              : "hover:shadow-lg"
+          )}
         >
-          <CardContent className="p-4">
-            {/* Toggle en la esquina superior derecha */}
-            <div className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-sm border transition-all duration-300 hover:shadow-md">
-              {vino.activado ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600 animate-scale-in" />
-              ) : (
-                <XCircle className="h-4 w-4 text-muted-foreground animate-scale-in" />
-              )}
-              <Switch
-                checked={vino.activado || false}
-                onCheckedChange={(checked) => handleToggle(vino, checked)}
-                disabled={toggleActivado.isPending}
+          {vino.imagen_url && (
+            <div className="relative h-40 bg-muted">
+              <img 
+                src={vino.imagen_url} 
+                alt={vino.nombre || "Vino"} 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
             </div>
-
-            {vino.imagen_url && (
-              <div className="mb-3 rounded-md overflow-hidden">
-                <img 
-                  src={vino.imagen_url} 
-                  alt={vino.nombre || "Vino"} 
-                  className="w-full h-48 object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+          )}
+          
+          <CardContent className="p-4 space-y-3">
+            {/* Header con nombre y toggle */}
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
+                {vino.nombre}
+              </h3>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={cn(
+                  "text-xs font-medium",
+                  vino.activado ? "text-green-600" : "text-muted-foreground"
+                )}>
+                  {vino.activado ? "Activo" : "Inactivo"}
+                </span>
+                <Switch
+                  checked={vino.activado || false}
+                  onCheckedChange={(checked) => handleToggle(vino, checked)}
+                  disabled={toggleActivado.isPending}
+                  className="data-[state=checked]:bg-green-600"
                 />
               </div>
-            )}
-            
-            <div className="space-y-3">
-              <div className="pr-20">
-                <h3 className="font-semibold text-lg leading-tight line-clamp-2 break-words">
-                  {vino.nombre}
-                </h3>
-              </div>
-              
-              {vino.descripcion && (
-                <p className="text-sm text-muted-foreground line-clamp-2 break-words">
-                  {vino.descripcion}
-                </p>
-              )}
-
-              {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
-                <p className="text-xs text-muted-foreground line-clamp-1 break-all">
-                  {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
-                    .filter(Boolean)
-                    .join(" • ")}
-                </p>
-              )}
-
-              <div className="flex items-end justify-between gap-3">
-                <span className="text-xl font-bold text-primary">
-                  {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}€` : "N/A"}
-                </span>
-              </div>
-
-              {vino.alergenos_notas && (
-                <p className="text-xs text-muted-foreground italic line-clamp-2 break-words pt-2 border-t">
-                  {vino.alergenos_notas}
-                </p>
-              )}
             </div>
+            
+            {vino.descripcion && (
+              <p className="text-sm text-muted-foreground line-clamp-2">
+                {vino.descripcion}
+              </p>
+            )}
+
+            {/* Origen */}
+            {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
+              <p className="text-xs text-muted-foreground">
+                {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+
+            {/* Precio */}
+            <div className="flex items-end justify-between pt-2 border-t">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-primary">
+                  {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}` : "—"}
+                </span>
+                <span className="text-lg font-medium text-primary">€</span>
+              </div>
+            </div>
+
+            {vino.alergenos_notas && (
+              <p className="text-xs text-muted-foreground italic pt-2 border-t">
+                {vino.alergenos_notas}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}
