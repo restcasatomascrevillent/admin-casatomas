@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
-import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, Group } from "fabric";
+import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText } from "fabric";
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
+
 interface CanvasPlanoProps {
   containerWidth: number;
   containerHeight: number;
@@ -70,7 +71,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const tempLinesRef = useRef<Line[]>([]);
   const previewLineRef = useRef<Line | null>(null);
-  const wasCleared = useRef(false); // Flag para evitar recargar después de limpiar
   const pixelsPerMeterXRef = useRef(effectivePixelsPerMeterX);
   const pixelsPerMeterYRef = useRef(effectivePixelsPerMeterY);
 
@@ -96,15 +96,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useImperativeHandle(ref, () => ({
     clearCanvas: () => {
       if (!fabricCanvas) return;
-      
-      // Marcar que fue limpiado para evitar recargar mesas de BD
-      wasCleared.current = true;
-      
-      // Limpiar refs internos para evitar que se recarguen
-      elementosRef.current = [];
-      mesasCanvasRef.current = [];
-      wallPointsRef.current = [];
-      tempLinesRef.current = [];
       
       // Eliminar todo excepto el grid
       const objectsToRemove = fabricCanvas.getObjects().filter(obj => !(obj as any).isGrid);
@@ -229,19 +220,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
 
-  // Resetear flag de limpieza cuando cambia el planoConfig (cambio de espacio)
-  useEffect(() => {
-    wasCleared.current = false;
-  }, [planoConfig]);
-
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
     if (!fabricCanvas) return;
-    
-    // Si fue limpiado, no cargar elementos de planoConfig
-    if (wasCleared.current && elementosRef.current.length === 0) {
-      return;
-    }
 
     // Verificar qué elementos ya están en el canvas
     const elementosEnCanvas = new Set<string>();
@@ -252,21 +233,29 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Priorizar elementos del estado local, si no hay y no fue limpiado, usar planoConfig
+    // Priorizar elementos del estado local, si no hay, usar planoConfig
     const elementosACargar = elementosRef.current.length > 0 
       ? elementosRef.current 
-      : (wasCleared.current ? [] : (planoConfig?.elementos || []));
+      : (planoConfig?.elementos || []);
 
     elementosACargar.forEach((elem: any) => {
       // Saltar si ya está en el canvas
       if (elementosEnCanvas.has(elem.id)) return;
       
+      let obj: FabricObject | null = null;
+
       switch (elem.tipo) {
         case "wall":
-          createWallWithDimension(fabricCanvas, elem, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
+          obj = new Line([elem.props?.x1 || elem.x1 || 0, elem.props?.y1 || elem.y1 || 0, elem.props?.x2 || elem.x2 || 0, elem.props?.y2 || elem.y2 || 0], {
+            stroke: "#1f2937",
+            strokeWidth: 10,
+            strokeLineCap: "round",
+            selectable: true,
+            hasControls: true,
+          });
           break;
         case "area":
-          const area = new Rect({
+          obj = new Rect({
             left: elem.props?.left || elem.left,
             top: elem.props?.top || elem.top,
             width: elem.props?.width || elem.width,
@@ -278,11 +267,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             rx: 4,
             ry: 4,
           });
-          (area as any).customData = { tipo: elem.tipo, id: elem.id };
-          fabricCanvas.add(area);
           break;
         case "door":
-          const door = new Rect({
+          obj = new Rect({
             left: elem.props?.left || elem.left,
             top: elem.props?.top || elem.top,
             width: elem.props?.width || elem.width || 60,
@@ -293,177 +280,26 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             rx: 2,
             ry: 2,
           });
-          (door as any).customData = { tipo: elem.tipo, id: elem.id };
-          fabricCanvas.add(door);
           break;
+      }
+
+      if (obj) {
+        (obj as any).customData = { tipo: elem.tipo, id: elem.id };
+        fabricCanvas.add(obj);
       }
     });
 
     // Solo actualizar estado si cargamos desde planoConfig y el estado está vacío
-    if (!wasCleared.current && elementosRef.current.length === 0 && planoConfig?.elementos?.length > 0) {
+    if (elementosRef.current.length === 0 && planoConfig?.elementos?.length > 0) {
       onElementosChange(planoConfig.elementos.map((e: any) => ({ id: e.id, tipo: e.tipo, props: e.props || e })));
     }
     
     fabricCanvas.renderAll();
   }, [fabricCanvas, planoConfig]);
 
-  // Función helper para crear mesa con etiqueta
-  const createMesaWithLabel = (
-    canvas: FabricCanvas,
-    mesa: { id: string; nombre: string; capacidad: number; forma: string; ancho: number; alto: number; posX: number; posY: number },
-    pxPerMeterX: number,
-    pxPerMeterY: number
-  ) => {
-    // Convertir dimensiones de cm a metros para mostrar
-    const anchoM = (mesa.ancho / 100).toFixed(2);
-    const altoM = (mesa.alto / 100).toFixed(2);
-    const dimensionText = mesa.forma === "circular" 
-      ? `Ø${anchoM}m` 
-      : `${anchoM}x${altoM}m`;
-
-    let shape: FabricObject;
-
-    if (mesa.forma === "circular") {
-      shape = new Circle({
-        left: 0,
-        top: 0,
-        radius: mesa.ancho / 2,
-        fill: "#dbeafe",
-        stroke: "#2563eb",
-        strokeWidth: 2,
-        originX: "center",
-        originY: "center",
-      });
-    } else {
-      shape = new Rect({
-        left: -mesa.ancho / 2,
-        top: -mesa.alto / 2,
-        width: mesa.ancho,
-        height: mesa.alto,
-        fill: "#dbeafe",
-        stroke: "#2563eb",
-        strokeWidth: 2,
-        rx: 6,
-        ry: 6,
-        originX: "left",
-        originY: "top",
-      });
-    }
-
-    const nameLabel = new FabricText(mesa.nombre, {
-      left: 0,
-      top: -8,
-      fontSize: 11,
-      fontFamily: "system-ui, sans-serif",
-      fontWeight: "bold",
-      fill: "#1e40af",
-      originX: "center",
-      originY: "center",
-    });
-
-    const dimLabel = new FabricText(dimensionText, {
-      left: 0,
-      top: 8,
-      fontSize: 9,
-      fontFamily: "system-ui, sans-serif",
-      fill: "#64748b",
-      originX: "center",
-      originY: "center",
-    });
-
-    const group = new Group([shape, nameLabel, dimLabel], {
-      left: mesa.posX + mesa.ancho / 2,
-      top: mesa.posY + mesa.alto / 2,
-      originX: "center",
-      originY: "center",
-      shadow: {
-        color: "rgba(0,0,0,0.1)",
-        blur: 8,
-        offsetX: 2,
-        offsetY: 2,
-      } as any,
-    });
-
-    (group as any).customData = {
-      tipo: "mesa",
-      id: mesa.id,
-      nombre: mesa.nombre,
-      capacidad: mesa.capacidad,
-    };
-
-    canvas.add(group);
-  };
-
-  // Función helper para crear pared con cota
-  const createWallWithDimension = (
-    canvas: FabricCanvas,
-    elem: any,
-    pxPerMeterX: number,
-    pxPerMeterY: number
-  ) => {
-    const x1 = elem.props?.x1 || elem.x1 || 0;
-    const y1 = elem.props?.y1 || elem.y1 || 0;
-    const x2 = elem.props?.x2 || elem.x2 || 0;
-    const y2 = elem.props?.y2 || elem.y2 || 0;
-
-    const wall = new Line([x1, y1, x2, y2], {
-      stroke: "#1f2937",
-      strokeWidth: 10,
-      strokeLineCap: "round",
-      selectable: true,
-      hasControls: true,
-    });
-
-    // Calcular longitud en metros
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const lengthPx = Math.sqrt(dx * dx + dy * dy);
-    const avgPxPerMeter = (pxPerMeterX + pxPerMeterY) / 2;
-    const lengthM = roundTo5cm(lengthPx / avgPxPerMeter);
-
-    // Punto medio para la cota
-    const midX = (x1 + x2) / 2;
-    const midY = (y1 + y2) / 2;
-
-    // Calcular ángulo para orientar el texto
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    
-    // Offset perpendicular a la pared para la cota
-    const offsetDist = 18;
-    const perpAngle = (angle + 90) * (Math.PI / 180);
-    const offsetX = Math.cos(perpAngle) * offsetDist;
-    const offsetY = Math.sin(perpAngle) * offsetDist;
-
-    const dimText = new FabricText(`${lengthM.toFixed(2)}m`, {
-      left: midX + offsetX,
-      top: midY + offsetY,
-      fontSize: 10,
-      fontFamily: "system-ui, sans-serif",
-      fontWeight: "600",
-      fill: "#374151",
-      backgroundColor: "rgba(255,255,255,0.85)",
-      padding: 2,
-      originX: "center",
-      originY: "center",
-      angle: angle > 90 || angle < -90 ? angle + 180 : angle,
-      selectable: false,
-      evented: false,
-    });
-
-    (wall as any).customData = { tipo: "wall", id: elem.id };
-    (dimText as any).customData = { tipo: "wall-dim", wallId: elem.id };
-    (dimText as any).isWallDimension = true;
-
-    canvas.add(wall);
-    canvas.add(dimText);
-  };
-
   // Cargar mesas (de BD o del estado local cuando el canvas se recrea)
   useEffect(() => {
     if (!fabricCanvas) return;
-    
-    // Si fue limpiado manualmente, no recargar mesas de BD, pero sí permitir el canvas
-    const skipDBMesas = wasCleared.current;
 
     const mesasEnCanvas = new Set<string>();
     fabricCanvas.getObjects().forEach((obj) => {
@@ -480,41 +316,131 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     // Primero cargar mesas del estado local (tienen prioridad)
     mesasLocales.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return;
-      createMesaWithLabel(fabricCanvas, mesa, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
+
+      let obj: FabricObject;
+
+      if (mesa.forma === "circular") {
+        obj = new Circle({
+          left: mesa.posX,
+          top: mesa.posY,
+          radius: Math.min(mesa.ancho, mesa.alto) / 2,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
+      } else {
+        obj = new Rect({
+          left: mesa.posX,
+          top: mesa.posY,
+          width: mesa.ancho,
+          height: mesa.alto,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          rx: 6,
+          ry: 6,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
+      }
+
+      (obj as any).customData = {
+        tipo: "mesa",
+        id: mesa.id,
+        nombre: mesa.nombre,
+        capacidad: mesa.capacidad,
+      };
+
+      fabricCanvas.add(obj);
       mesasEnCanvas.add(mesa.id);
     });
 
-    // Luego cargar mesas de BD que no estén ya en el estado local (solo si no fue limpiado)
-    if (!skipDBMesas) {
-      mesasDB?.forEach((mesa) => {
-        // Verificar si ya existe en el canvas O en el estado local
-        if (mesasEnCanvas.has(mesa.id)) return;
-        if (mesasLocales.some(m => m.id === mesa.id)) return;
+    // Luego cargar mesas de BD que no estén ya
+    mesasDB?.forEach((mesa) => {
+      if (mesasEnCanvas.has(mesa.id)) return;
 
-        const mesaData = {
-          id: mesa.id,
-          nombre: mesa.nombre,
-          capacidad: mesa.capacidad,
-          forma: mesa.forma as "rectangular" | "circular",
-          ancho: mesa.ancho || 80,
-          alto: mesa.alto || 60,
-          posX: mesa.pos_x || 50,
-          posY: mesa.pos_y || 50,
-        };
+      let obj: FabricObject;
 
-        createMesaWithLabel(fabricCanvas, mesaData, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
-        mesasEnCanvas.add(mesa.id);
-
-        newMesasCanvas.push(mesaData);
-      });
-
-      if (newMesasCanvas.length > 0) {
-        onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);
+      if (mesa.forma === "circular") {
+        obj = new Circle({
+          left: mesa.pos_x || 50,
+          top: mesa.pos_y || 50,
+          radius: Math.min(mesa.ancho || 60, mesa.alto || 60) / 2,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
+      } else {
+        obj = new Rect({
+          left: mesa.pos_x || 50,
+          top: mesa.pos_y || 50,
+          width: mesa.ancho || 80,
+          height: mesa.alto || 60,
+          fill: "#dbeafe",
+          stroke: "#2563eb",
+          strokeWidth: 2,
+          rx: 6,
+          ry: 6,
+          originX: "left",
+          originY: "top",
+          shadow: {
+            color: "rgba(0,0,0,0.1)",
+            blur: 8,
+            offsetX: 2,
+            offsetY: 2,
+          } as any,
+        });
       }
+
+      (obj as any).customData = {
+        tipo: "mesa",
+        id: mesa.id,
+        nombre: mesa.nombre,
+        capacidad: mesa.capacidad,
+      };
+
+      fabricCanvas.add(obj);
+
+      newMesasCanvas.push({
+        id: mesa.id,
+        nombre: mesa.nombre,
+        capacidad: mesa.capacidad,
+        forma: mesa.forma as "rectangular" | "circular",
+        ancho: mesa.ancho || 80,
+        alto: mesa.alto || 60,
+        posX: mesa.pos_x || 50,
+        posY: mesa.pos_y || 50,
+      });
+    });
+
+    if (newMesasCanvas.length > 0) {
+      onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, mesasDB, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
+  }, [fabricCanvas, mesasDB]);
 
   // Manejar clics según la herramienta activa
   useEffect(() => {
@@ -668,24 +594,31 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(line);
     });
 
-    // Crear paredes permanentes con cotas
+    // Crear paredes permanentes
     const currentElementos = elementosRef.current;
     const newElementos: ElementoCanvas[] = [];
     for (let i = 0; i < points.length - 1; i++) {
       const id = `wall-${Date.now()}-${i}`;
-      const elem: ElementoCanvas = {
+      const wall = new Line([points[i].x, points[i].y, points[i + 1].x, points[i + 1].y], {
+        stroke: "#1f2937",
+        strokeWidth: 10,
+        strokeLineCap: "round",
+        selectable: true,
+        hasControls: true,
+      });
+      (wall as any).customData = { tipo: "wall", id };
+      fabricCanvas.add(wall);
+      
+      newElementos.push({
         id,
-        tipo: "wall" as const,
+        tipo: "wall",
         props: {
           x1: points[i].x,
           y1: points[i].y,
           x2: points[i + 1].x,
           y2: points[i + 1].y,
         },
-      };
-      
-      createWallWithDimension(fabricCanvas, elem, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
-      newElementos.push(elem);
+      });
     }
 
     onElementosChange([...currentElementos, ...newElementos]);
@@ -761,8 +694,61 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const alto = forma === "circular" ? 150 : 80;
     const capacidad = forma === "circular" ? 6 : 2;
 
+    let obj: FabricObject;
+
+    if (forma === "circular") {
+      obj = new Circle({
+        left: x - ancho / 2,
+        top: y - alto / 2,
+        radius: ancho / 2,
+        fill: "#dbeafe",
+        stroke: "#2563eb",
+        strokeWidth: 2,
+        originX: "left",
+        originY: "top",
+        shadow: {
+          color: "rgba(0,0,0,0.1)",
+          blur: 8,
+          offsetX: 2,
+          offsetY: 2,
+        } as any,
+      });
+    } else {
+      obj = new Rect({
+        left: x - ancho / 2,
+        top: y - alto / 2,
+        width: ancho,
+        height: alto,
+        fill: "#dbeafe",
+        stroke: "#2563eb",
+        strokeWidth: 2,
+        rx: 6,
+        ry: 6,
+        originX: "left",
+        originY: "top",
+        shadow: {
+          color: "rgba(0,0,0,0.1)",
+          blur: 8,
+          offsetX: 2,
+          offsetY: 2,
+        } as any,
+      });
+    }
+
     const currentMesas = mesasCanvasRef.current;
     const mesaName = `Mesa ${currentMesas.length + 1}`;
+
+    (obj as any).customData = {
+      tipo: "mesa",
+      id,
+      nombre: mesaName,
+      capacidad,
+      isNew: true,
+    };
+
+    fabricCanvas.add(obj);
+    fabricCanvas.setActiveObject(obj);
+    fabricCanvas.renderAll();
 
     const newMesa: MesaCanvas = {
       id,
@@ -774,9 +760,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       posX: x - ancho / 2,
       posY: y - alto / 2,
     };
-
-    createMesaWithLabel(fabricCanvas, newMesa, effectivePixelsPerMeterX, effectivePixelsPerMeterY);
-    fabricCanvas.renderAll();
 
     onMesasChange([...currentMesas, newMesa]);
     onToolChange("select");
