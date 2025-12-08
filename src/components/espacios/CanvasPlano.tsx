@@ -3,9 +3,6 @@ import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText } 
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
 
 interface CanvasPlanoProps {
   containerWidth: number;
@@ -52,14 +49,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   
-  // Estado para medición en vivo
-  const [liveWallMeasure, setLiveWallMeasure] = useState<{
-    length: number;
-    x: number;
-    y: number;
-    inputValue: string;
-  } | null>(null);
   const measureTextRef = useRef<FabricText | null>(null);
+  
+  // Función para redondear a 5cm (0.05m)
+  const roundTo5cm = (meters: number) => Math.round(meters * 20) / 20;
   
   // Dimensiones calculadas del canvas
   const RULER_SIZE = 40;
@@ -476,11 +469,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     previewLineRef.current = preview;
     fabricCanvas.add(preview);
     
-    // Calcular longitud en metros
+    // Calcular longitud en metros (redondeada a 5cm)
     const dx = x - lastPoint.x;
     const dy = y - lastPoint.y;
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
-    const lengthM = lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2);
+    const lengthM = roundTo5cm(lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2));
     
     // Posición del texto (punto medio de la línea)
     const midX = (lastPoint.x + x) / 2;
@@ -504,14 +497,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     measureTextRef.current = measureText;
     fabricCanvas.add(measureText);
-    
-    // Actualizar estado para mostrar input
-    setLiveWallMeasure({
-      length: lengthM,
-      x: midX,
-      y: midY,
-      inputValue: lengthM.toFixed(2),
-    });
     
     fabricCanvas.renderAll();
   };
@@ -570,39 +555,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     tempLinesRef.current = [];
     wallPointsRef.current = [];
-    setLiveWallMeasure(null);
 
     fabricCanvas.renderAll();
     onToolChange("select");
   };
   
-  // Aplicar medida personalizada desde input
-  const applyCustomMeasure = (newLengthM: number) => {
-    if (!fabricCanvas || !liveWallMeasure) return;
-    
-    const points = wallPointsRef.current;
-    if (points.length === 0) return;
-    
-    const lastPoint = points[points.length - 1];
-    const avgPixelsPerMeter = (pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2;
-    const newLengthPx = newLengthM * avgPixelsPerMeter;
-    
-    // Obtener el ángulo actual de la línea preview
-    if (previewLineRef.current) {
-      const x2 = previewLineRef.current.x2 || 0;
-      const y2 = previewLineRef.current.y2 || 0;
-      const dx = x2 - lastPoint.x;
-      const dy = y2 - lastPoint.y;
-      const angle = Math.atan2(dy, dx);
-      
-      // Calcular nuevo punto final
-      const newX = lastPoint.x + Math.cos(angle) * newLengthPx;
-      const newY = lastPoint.y + Math.sin(angle) * newLengthPx;
-      
-      // Actualizar preview
-      updatePreviewLine(newX, newY);
-    }
-  };
 
   const cancelWallDrawing = () => {
     if (!fabricCanvas) return;
@@ -618,7 +575,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     tempLinesRef.current = [];
     wallPointsRef.current = [];
-    setLiveWallMeasure(null);
+    
     fabricCanvas.renderAll();
   };
 
@@ -796,48 +753,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         <div className="flex-1 relative rounded-br-lg overflow-hidden shadow-lg ring-1 ring-border/20 bg-white">
           <canvas ref={canvasRef} id="plano-canvas" className="block" />
           
-          {/* Input de medida en vivo para paredes */}
-          {liveWallMeasure && activeTool === "wall" && (
-            <div 
-              className="absolute z-10 flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border p-1.5"
-              style={{ 
-                left: Math.min(liveWallMeasure.x, canvasWidth - 150), 
-                top: Math.max(liveWallMeasure.y - 50, 10) 
-              }}
-            >
-              <Input
-                type="number"
-                step="0.01"
-                min="0.1"
-                value={liveWallMeasure.inputValue}
-                onChange={(e) => setLiveWallMeasure({ ...liveWallMeasure, inputValue: e.target.value })}
-                className="w-20 h-7 text-sm text-center"
-                placeholder="m"
-              />
-              <span className="text-xs text-muted-foreground">m</span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={() => {
-                  const val = parseFloat(liveWallMeasure.inputValue);
-                  if (!isNaN(val) && val > 0) {
-                    applyCustomMeasure(val);
-                  }
-                }}
-              >
-                <Check className="h-3 w-3 text-green-600" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                onClick={() => setLiveWallMeasure(null)}
-              >
-                <X className="h-3 w-3 text-red-500" />
-              </Button>
-            </div>
-          )}
         </div>
       </div>
     </div>
