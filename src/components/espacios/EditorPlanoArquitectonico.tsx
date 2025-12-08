@@ -91,7 +91,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   // Configuración de nueva mesa (medidas en cm)
   const [newMesa, setNewMesa] = useState({
     nombre: "",
-    capacidad: 4,
+    capacidad: 2, // Default para rectangular
     forma: "rectangular" as "rectangular" | "circular" | "cuadrada",
     largo: 80, // cm - para rectangular
     ancho: 80, // cm - para rectangular y cuadrada
@@ -300,18 +300,13 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
 
           switch (elem.tipo) {
             case "wall":
-              obj = new Line([elem.x1, elem.y1, elem.x2, elem.y2], {
+              // Usar las coordenadas guardadas directamente
+              obj = new Line([elem.x1 || 0, elem.y1 || 0, elem.x2 || 0, elem.y2 || 0], {
                 stroke: "#374151",
                 strokeWidth: 8,
                 selectable: true,
                 hasControls: true,
-                originX: "left",
-                originY: "top",
               });
-              // Posicionar en 0,0 para que las coordenadas x1,y1,x2,y2 sean absolutas
-              if (obj) {
-                obj.set({ left: 0, top: 0 });
-              }
               break;
             case "rectangle":
               obj = new Rect({
@@ -752,21 +747,35 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       };
 
       if (obj instanceof Line) {
-        // Para líneas, guardar las coordenadas absolutas calculando la posición real
+        // Para líneas, guardar las coordenadas absolutas teniendo en cuenta la transformación
         const line = obj as Line;
-        const matrix = line.calcTransformMatrix();
-        const x1Abs = line.x1 || 0;
-        const y1Abs = line.y1 || 0;
-        const x2Abs = line.x2 || 0;
-        const y2Abs = line.y2 || 0;
-
-        elementosCanvas.push({
-          ...base,
-          x1: x1Abs,
-          y1: y1Abs,
-          x2: x2Abs,
-          y2: y2Abs,
-        });
+        // Obtener el centro y dimensiones de la línea con transformación aplicada
+        const aCoords = line.aCoords;
+        if (aCoords) {
+          // Calcular los puntos extremos de la línea transformada
+          const left = line.left || 0;
+          const top = line.top || 0;
+          const x1 = (line.x1 || 0) + left;
+          const y1 = (line.y1 || 0) + top;
+          const x2 = (line.x2 || 0) + left;
+          const y2 = (line.y2 || 0) + top;
+          
+          elementosCanvas.push({
+            ...base,
+            x1,
+            y1,
+            x2,
+            y2,
+          });
+        } else {
+          elementosCanvas.push({
+            ...base,
+            x1: line.x1 || 0,
+            y1: line.y1 || 0,
+            x2: line.x2 || 0,
+            y2: line.y2 || 0,
+          });
+        }
       } else if (obj instanceof Rect) {
         elementosCanvas.push({
           ...base,
@@ -871,7 +880,8 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
         pos_y: 100,
       });
 
-      setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", largo: 80, ancho: 80, diametro: 150 });
+      // Reset con capacidad según forma actual
+      setNewMesa({ nombre: "", capacidad: newMesa.forma === "circular" ? 6 : 2, forma: newMesa.forma, largo: 80, ancho: 80, diametro: 150 });
     } catch (error) {
       console.error("Error al crear mesa:", error);
     }
@@ -1469,9 +1479,11 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
                   <Label className="text-xs">Forma</Label>
                   <Select
                     value={newMesa.forma}
-                    onValueChange={(v) =>
-                      setNewMesa({ ...newMesa, forma: v as "rectangular" | "circular" | "cuadrada" })
-                    }
+                    onValueChange={(v) => {
+                      const forma = v as "rectangular" | "circular" | "cuadrada";
+                      const capacidad = forma === "circular" ? 6 : 2;
+                      setNewMesa({ ...newMesa, forma, capacidad });
+                    }}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue />
