@@ -6,10 +6,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMesas, useCrearMesa, useActualizarMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
-import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
-import { useAsignacionesMesa, AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
+import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
+import { useAsignacionesMesa, useCrearAsignacion, useEliminarAsignacion, AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
 import { useReservasHoyPorEspacio } from "@/hooks/useOcupacionHoy";
+import { 
+  DndContext, 
+  DragEndEvent, 
+  DragStartEvent,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  useDroppable,
+  useDraggable
+} from "@dnd-kit/core";
 import { 
   Plus, 
   Trash2, 
@@ -18,7 +31,13 @@ import {
   FileDown,
   Move,
   Users,
-  Clock
+  Clock,
+  Phone,
+  X,
+  GripVertical,
+  Utensils,
+  AlertCircle,
+  CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -55,11 +74,185 @@ interface ElementoPlano {
   fill?: string;
 }
 
+interface Reserva {
+  id: string;
+  nombre: string;
+  hora: string;
+  numero_comensales: number;
+  estado: string;
+  telefono?: string;
+}
+
+// Componente para reserva arrastrable
+function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigned: boolean }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `reserva-${reserva.id}`,
+    data: { type: "reserva", reserva },
+    disabled: isAssigned,
+  });
+
+  const estadoColor = {
+    confirmada: "bg-green-500/20 border-green-500 text-green-700",
+    pendiente: "bg-yellow-500/20 border-yellow-500 text-yellow-700",
+    cancelada: "bg-red-500/20 border-red-500 text-red-700",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing",
+        isAssigned 
+          ? "bg-muted/50 border-muted opacity-60" 
+          : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
+        isDragging && "opacity-50 scale-95",
+        !isAssigned && "hover:shadow-md hover:scale-[1.02]"
+      )}
+    >
+      <div className={cn(
+        "p-2 rounded-md",
+        isAssigned ? "bg-muted" : "bg-background/50"
+      )}>
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-sm truncate">{reserva.nombre}</p>
+          {isAssigned && (
+            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {reserva.hora}
+          </span>
+          <span className="flex items-center gap-1">
+            <Users className="h-3 w-3" />
+            {reserva.numero_comensales}
+          </span>
+        </div>
+      </div>
+      <Badge 
+        variant="outline" 
+        className={cn(
+          "text-[10px] flex-shrink-0",
+          isAssigned && "bg-green-100 text-green-700 border-green-300"
+        )}
+      >
+        {isAssigned ? "Asignada" : reserva.estado}
+      </Badge>
+    </div>
+  );
+}
+
+// Componente para mesa con drop zone
+function DroppableMesa({ 
+  mesa, 
+  reserva, 
+  isSelected, 
+  isDragging,
+  onMouseDown,
+  onClick,
+  onRemoveAssignment,
+  isDropTarget
+}: { 
+  mesa: Mesa; 
+  reserva?: AsignacionConDetalles;
+  isSelected: boolean;
+  isDragging: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onClick: () => void;
+  onRemoveAssignment?: () => void;
+  isDropTarget: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `mesa-${mesa.id}`,
+    data: { type: "mesa", mesa },
+  });
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            ref={setNodeRef}
+            className={cn(
+              "absolute cursor-move transition-all duration-200",
+              "flex flex-col items-center justify-center text-center",
+              "border-2 shadow-sm",
+              mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
+              isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
+              isDragging ? "shadow-lg scale-105 z-50" : "",
+              reserva ? "bg-primary/20 border-primary" : "bg-white",
+              isOver && "ring-4 ring-green-400 border-green-500 scale-110 z-40",
+              isDropTarget && !reserva && "animate-pulse border-dashed border-green-400"
+            )}
+            style={{
+              left: mesa.pos_x,
+              top: mesa.pos_y,
+              width: mesa.ancho,
+              height: mesa.alto,
+              transform: `rotate(${mesa.rotacion}deg)`,
+            }}
+            onMouseDown={onMouseDown}
+            onClick={onClick}
+          >
+            <span className="font-bold text-xs truncate w-full px-1">{mesa.nombre}</span>
+            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Users className="h-2.5 w-2.5" />
+              <span>{mesa.capacidad}</span>
+            </div>
+
+            {reserva && (
+              <>
+                <div className="absolute -top-2 -right-2 z-10">
+                  <Badge className="text-[9px] px-1.5 py-0.5 bg-primary shadow-sm">
+                    {reserva.reservas.nombre?.split(" ")[0]}
+                  </Badge>
+                </div>
+                {onRemoveAssignment && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveAssignment();
+                    }}
+                    className="absolute -top-1 -left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-sm hover:scale-110 transition-transform z-10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="space-y-1">
+            <p className="font-semibold">{mesa.nombre}</p>
+            <p className="text-xs">Capacidad: {mesa.capacidad} personas</p>
+            {reserva && (
+              <div className="pt-1 border-t border-border mt-1">
+                <p className="text-xs font-medium">{reserva.reservas.nombre}</p>
+                <p className="text-xs text-muted-foreground">
+                  {reserva.reservas.hora} · {reserva.reservas.numero_comensales} pax
+                </p>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: PlanoEspacio2DProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [showAddMesa, setShowAddMesa] = useState(false);
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
+  const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     mesaId: null,
@@ -76,17 +269,29 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     alto: 80,
   });
 
+  const fechaActual = fecha || new Date().toISOString().split("T")[0];
+
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
-  const { data: asignaciones } = useAsignacionesMesa(fecha || new Date().toISOString().split("T")[0], espacioId);
+  const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(fechaActual, espacioId);
   const { data: reservasHoy } = useReservasHoyPorEspacio(espacioId);
 
   const crearMesa = useCrearMesa();
-  const actualizarMesa = useActualizarMesa();
   const actualizarMesasSilent = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
+  const crearAsignacion = useCrearAsignacion();
+  const eliminarAsignacion = useEliminarAsignacion();
 
-  // Canvas usa dimensiones fijas como el editor (800x500), ya que los elementos se guardan en esas coordenadas
+  // Sensors para dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Canvas usa dimensiones fijas como el editor
   const canvasWidth = 800;
   const canvasHeight = 500;
   const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
@@ -98,14 +303,67 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   }, [mesas]);
 
+  // Verificar si una reserva está asignada
+  const isReservaAsignada = useCallback((reservaId: string): boolean => {
+    return asignaciones?.some((a) => a.reserva_id === reservaId) || false;
+  }, [asignaciones]);
+
   // Obtener reserva asignada a una mesa
   const getReservaAsignada = useCallback((mesaId: string): AsignacionConDetalles | undefined => {
     return asignaciones?.find((a) => a.mesa_id === mesaId);
   }, [asignaciones]);
 
-  // Handlers de arrastre
+  // Handlers para drag & drop de reservas
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    if (active.data.current?.type === "reserva") {
+      setActiveReserva(active.data.current.reserva);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveReserva(null);
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (activeData?.type === "reserva" && overData?.type === "mesa") {
+      const reserva = activeData.reserva as Reserva;
+      const mesa = overData.mesa as Mesa;
+
+      // Verificar capacidad
+      if (reserva.numero_comensales > mesa.capacidad) {
+        toast.warning(`La mesa ${mesa.nombre} solo tiene capacidad para ${mesa.capacidad} personas`);
+        return;
+      }
+
+      // Verificar si la mesa ya tiene asignación
+      const asignacionExistente = getReservaAsignada(mesa.id);
+      if (asignacionExistente) {
+        toast.error(`La mesa ${mesa.nombre} ya tiene una reserva asignada`);
+        return;
+      }
+
+      try {
+        await crearAsignacion.mutateAsync({
+          reserva_id: reserva.id,
+          mesa_id: mesa.id,
+        });
+        toast.success(`${reserva.nombre} asignado a ${mesa.nombre}`);
+        refetchAsignaciones();
+      } catch (error) {
+        console.error("Error al asignar:", error);
+      }
+    }
+  };
+
+  // Handlers de arrastre de mesas
   const handleMouseDown = useCallback((e: React.MouseEvent, mesa: Mesa) => {
     e.preventDefault();
+    e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -147,6 +405,16 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
     setDragState({ isDragging: false, mesaId: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   }, [dragState, localMesas, actualizarMesasSilent]);
+
+  const handleRemoveAssignment = async (asignacionId: string) => {
+    try {
+      await eliminarAsignacion.mutateAsync(asignacionId);
+      toast.success("Asignación eliminada");
+      refetchAsignaciones();
+    } catch (error) {
+      console.error("Error al eliminar asignación:", error);
+    }
+  };
 
   const handleAddMesa = async () => {
     if (!newMesa.nombre.trim()) {
@@ -198,14 +466,14 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
       pdf.setFontSize(18);
-      pdf.text(`${espacioNombre} - ${new Date().toLocaleDateString("es-ES")}`, 14, 15);
+      pdf.text(`${espacioNombre} - ${new Date(fechaActual).toLocaleDateString("es-ES")}`, 14, 15);
 
       const imgWidth = pdfWidth - 28;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       pdf.addImage(imgData, "PNG", 14, 25, imgWidth, Math.min(imgHeight, pdfHeight - 40));
 
-      pdf.save(`plano-${espacioNombre}-${new Date().toISOString().split("T")[0]}.pdf`);
+      pdf.save(`plano-${espacioNombre}-${fechaActual}.pdf`);
       toast.success("PDF exportado correctamente");
     } catch (error) {
       console.error("Error al exportar PDF:", error);
@@ -227,7 +495,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           },
           body: JSON.stringify({
             espacioId,
-            fecha: fecha || new Date().toISOString().split("T")[0],
+            fecha: fechaActual,
             mesas: localMesas,
             reservas: reservasHoy,
           }),
@@ -242,6 +510,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       
       if (result.asignaciones) {
         toast.success(`${result.asignaciones.length} mesas asignadas automáticamente`);
+        refetchAsignaciones();
       }
     } catch (error) {
       console.error("Error al calcular distribución:", error);
@@ -348,7 +617,6 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "polygon":
-        // Polígonos se renderizarían con SVG, simplificado aquí
         return (
           <div
             key={elem.id}
@@ -369,6 +637,12 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   };
 
+  // Estadísticas
+  const reservasPendientes = reservasHoy?.filter((r: any) => !isReservaAsignada(r.id)) || [];
+  const reservasAsignadas = reservasHoy?.filter((r: any) => isReservaAsignada(r.id)) || [];
+  const mesasOcupadas = asignaciones?.length || 0;
+  const mesasLibres = localMesas.length - mesasOcupadas;
+
   if (loadingMesas) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -378,292 +652,375 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={onBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
-          </Button>
-          <div>
-            <h3 className="text-xl font-bold">{espacioNombre}</h3>
-            <p className="text-sm text-muted-foreground">
-              {localMesas.length} mesas · {fecha || new Date().toLocaleDateString("es-ES")}
-            </p>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Button>
+            <div>
+              <h3 className="text-xl font-bold">{espacioNombre}</h3>
+              <p className="text-sm text-muted-foreground">
+                {new Date(fechaActual).toLocaleDateString("es-ES", { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setShowAddMesa(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Mesa
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleCalcularDistribucion}>
+              <Wand2 className="mr-2 h-4 w-4" />
+              Auto-asignar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <FileDown className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowAddMesa(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Añadir Mesa
-          </Button>
-          <Button variant="outline" onClick={handleCalcularDistribucion}>
-            <Wand2 className="mr-2 h-4 w-4" />
-            IA Distribución
-          </Button>
-          <Button variant="outline" onClick={handleExportPDF}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Exportar PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Canvas del plano */}
-      <Card>
-        <CardContent className="p-4">
-          <div
-            ref={canvasRef}
-            className="relative bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg overflow-hidden"
-            style={{ width: canvasWidth, height: canvasHeight, maxWidth: "100%" }}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
-            {/* Grid de fondo */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                backgroundImage: `
-                  linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
-                  linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)
-                `,
-                backgroundSize: "50px 50px",
-              }}
-            />
-
-            {/* Elementos del plano (paredes, decoración, etc.) */}
-            {elementosPlano.map((elem) => renderElementoPlano(elem))}
-
-            {/* Mesas */}
-            {localMesas.map((mesa) => {
-              const reserva = getReservaAsignada(mesa.id);
-              const isSelected = selectedMesa?.id === mesa.id;
-              const isDragging = dragState.mesaId === mesa.id;
-
-              return (
-                <div
-                  key={mesa.id}
-                  className={cn(
-                    "absolute cursor-move transition-shadow",
-                    "flex flex-col items-center justify-center text-center p-2",
-                    "border-2 shadow-sm hover:shadow-md",
-                    mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
-                    isSelected ? "border-primary ring-2 ring-primary/30" : "border-slate-300",
-                    isDragging ? "shadow-lg scale-105 z-50" : "",
-                    reserva ? "bg-primary/20 border-primary" : "bg-white"
-                  )}
-                  style={{
-                    left: mesa.pos_x,
-                    top: mesa.pos_y,
-                    width: mesa.ancho,
-                    height: mesa.alto,
-                    transform: `rotate(${mesa.rotacion}deg)`,
-                  }}
-                  onMouseDown={(e) => handleMouseDown(e, mesa)}
-                  onClick={() => setSelectedMesa(mesa)}
-                >
-                  <span className="font-medium text-xs truncate w-full">{mesa.nombre}</span>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Users className="h-3 w-3" />
-                    <span>{mesa.capacidad}</span>
-                  </div>
-
-                  {reserva && (
-                    <div className="absolute -top-1 -right-1">
-                      <Badge className="text-[10px] px-1 py-0 bg-primary">
-                        {reserva.reservas.nombre?.split(" ")[0]}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Mensaje si no hay mesas */}
-            {localMesas.length === 0 && elementosPlano.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay configuración de plano</p>
-                  <p className="text-sm">Configura el plano desde la sección Espacios</p>
-                </div>
+        {/* Stats bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-blue-100">
+                <Utensils className="h-4 w-4 text-blue-600" />
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Mesas</p>
+                <p className="text-lg font-bold">{localMesas.length}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-green-100">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Mesas Ocupadas</p>
+                <p className="text-lg font-bold">{mesasOcupadas}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-yellow-100">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Por Asignar</p>
+                <p className="text-lg font-bold">{reservasPendientes.length}</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-primary/10">
+                <Users className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Comensales</p>
+                <p className="text-lg font-bold">
+                  {reservasHoy?.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0) || 0}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
 
-      {/* Panel lateral con detalles */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Mesa seleccionada */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Mesa Seleccionada</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {selectedMesa ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Nombre</p>
-                    <p className="font-medium">{selectedMesa.nombre}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Capacidad</p>
-                    <p className="font-medium">{selectedMesa.capacidad} personas</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Forma</p>
-                    <p className="font-medium capitalize">{selectedMesa.forma}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Dimensiones</p>
-                    <p className="font-medium">{selectedMesa.ancho}x{selectedMesa.alto}px</p>
-                  </div>
-                </div>
+        {/* Main content */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_350px]">
+          {/* Canvas del plano */}
+          <Card>
+            <CardContent className="p-4">
+              <div
+                ref={canvasRef}
+                className="relative bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg overflow-hidden mx-auto"
+                style={{ width: canvasWidth, height: canvasHeight, maxWidth: "100%" }}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+              >
+                {/* Grid de fondo */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
+                      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)
+                    `,
+                    backgroundSize: "50px 50px",
+                  }}
+                />
 
-                {getReservaAsignada(selectedMesa.id) && (
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <p className="font-medium text-sm mb-1">Reserva Asignada:</p>
-                    <div className="text-sm space-y-1">
-                      <p><span className="text-muted-foreground">Cliente:</span> {getReservaAsignada(selectedMesa.id)?.reservas.nombre}</p>
-                      <p><span className="text-muted-foreground">Hora:</span> {getReservaAsignada(selectedMesa.id)?.reservas.hora}</p>
-                      <p><span className="text-muted-foreground">Personas:</span> {getReservaAsignada(selectedMesa.id)?.reservas.numero_comensales}</p>
+                {/* Elementos del plano (paredes, decoración, etc.) */}
+                {elementosPlano.map((elem) => renderElementoPlano(elem))}
+
+                {/* Mesas */}
+                {localMesas.map((mesa) => {
+                  const reserva = getReservaAsignada(mesa.id);
+                  const isSelected = selectedMesa?.id === mesa.id;
+                  const isDragging = dragState.mesaId === mesa.id;
+
+                  return (
+                    <DroppableMesa
+                      key={mesa.id}
+                      mesa={mesa}
+                      reserva={reserva}
+                      isSelected={isSelected}
+                      isDragging={isDragging}
+                      onMouseDown={(e) => handleMouseDown(e, mesa)}
+                      onClick={() => setSelectedMesa(mesa)}
+                      onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
+                      isDropTarget={!!activeReserva}
+                    />
+                  );
+                })}
+
+                {/* Mensaje si no hay mesas */}
+                {localMesas.length === 0 && elementosPlano.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No hay configuración de plano</p>
+                      <p className="text-sm">Configura el plano desde la sección Espacios</p>
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
 
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleDeleteMesa(selectedMesa.id)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar Mesa
+          {/* Panel lateral */}
+          <div className="space-y-4">
+            {/* Mesa seleccionada */}
+            {selectedMesa && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{selectedMesa.nombre}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setSelectedMesa(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Capacidad</p>
+                      <p className="font-medium">{selectedMesa.capacidad} pax</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Forma</p>
+                      <p className="font-medium capitalize">{selectedMesa.forma}</p>
+                    </div>
+                  </div>
+
+                  {getReservaAsignada(selectedMesa.id) && (
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <p className="font-medium text-sm mb-2">Reserva Asignada</p>
+                      <div className="text-sm space-y-1">
+                        <p className="font-semibold">{getReservaAsignada(selectedMesa.id)?.reservas.nombre}</p>
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {getReservaAsignada(selectedMesa.id)?.reservas.hora}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {getReservaAsignada(selectedMesa.id)?.reservas.numero_comensales}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleDeleteMesa(selectedMesa.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar Mesa
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Reservas */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Utensils className="h-5 w-5" />
+                  Reservas de Hoy
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!reservasHoy?.length ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">
+                    No hay reservas para hoy
+                  </p>
+                ) : (
+                  <ScrollArea className="h-[400px] pr-4">
+                    <div className="space-y-2">
+                      {/* Pendientes primero */}
+                      {reservasPendientes.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                            Por asignar ({reservasPendientes.length})
+                          </p>
+                          <div className="space-y-2">
+                            {reservasPendientes.map((r: any) => (
+                              <DraggableReserva
+                                key={r.id}
+                                reserva={r}
+                                isAssigned={false}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Asignadas */}
+                      {reservasAsignadas.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                            Asignadas ({reservasAsignadas.length})
+                          </p>
+                          <div className="space-y-2">
+                            {reservasAsignadas.map((r: any) => (
+                              <DraggableReserva
+                                key={r.id}
+                                reserva={r}
+                                isAssigned={true}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeReserva && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border-2 border-primary bg-background shadow-xl">
+              <Users className="h-4 w-4 text-primary" />
+              <div>
+                <p className="font-semibold text-sm">{activeReserva.nombre}</p>
+                <p className="text-xs text-muted-foreground">
+                  {activeReserva.hora} · {activeReserva.numero_comensales} pax
+                </p>
+              </div>
+            </div>
+          )}
+        </DragOverlay>
+
+        {/* Dialog para añadir mesa */}
+        <Dialog open={showAddMesa} onOpenChange={setShowAddMesa}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Añadir Nueva Mesa</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Nombre</Label>
+                <Input
+                  value={newMesa.nombre}
+                  onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
+                  placeholder="Ej: Mesa 1, Terraza A..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Capacidad</Label>
+                  <Input
+                    type="number"
+                    value={newMesa.capacidad}
+                    onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 4 })}
+                    min={1}
+                    max={20}
+                  />
+                </div>
+                <div>
+                  <Label>Forma</Label>
+                  <Select
+                    value={newMesa.forma}
+                    onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rectangular">Rectangular</SelectItem>
+                      <SelectItem value="circular">Circular</SelectItem>
+                      <SelectItem value="cuadrada">Cuadrada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Ancho (px)</Label>
+                  <Input
+                    type="number"
+                    value={newMesa.ancho}
+                    onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 100 })}
+                    min={50}
+                    max={300}
+                  />
+                </div>
+                <div>
+                  <Label>Alto (px)</Label>
+                  <Input
+                    type="number"
+                    value={newMesa.alto}
+                    onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 80 })}
+                    min={50}
+                    max={300}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddMesa(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleAddMesa} disabled={crearMesa.isPending}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear Mesa
                 </Button>
               </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                Selecciona una mesa del plano para ver sus detalles
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Reservas de hoy */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Reservas de Hoy</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!reservasHoy?.length ? (
-              <p className="text-muted-foreground text-sm">No hay reservas para hoy</p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {reservasHoy.map((r: any) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center justify-between p-2 bg-muted/50 rounded-lg text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">{r.nombre}</p>
-                      <p className="text-muted-foreground flex items-center gap-2">
-                        <Clock className="h-3 w-3" />
-                        {r.hora}
-                        <Users className="h-3 w-3 ml-2" />
-                        {r.numero_comensales}
-                      </p>
-                    </div>
-                    <Badge variant={r.estado === "confirmada" ? "default" : "secondary"}>
-                      {r.estado}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Dialog para añadir mesa */}
-      <Dialog open={showAddMesa} onOpenChange={setShowAddMesa}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Añadir Nueva Mesa</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Nombre</Label>
-              <Input
-                value={newMesa.nombre}
-                onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
-                placeholder="Ej: Mesa 1, Terraza A..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Capacidad</Label>
-                <Input
-                  type="number"
-                  value={newMesa.capacidad}
-                  onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 4 })}
-                  min={1}
-                  max={20}
-                />
-              </div>
-              <div>
-                <Label>Forma</Label>
-                <Select
-                  value={newMesa.forma}
-                  onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rectangular">Rectangular</SelectItem>
-                    <SelectItem value="circular">Circular</SelectItem>
-                    <SelectItem value="cuadrada">Cuadrada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Ancho (px)</Label>
-                <Input
-                  type="number"
-                  value={newMesa.ancho}
-                  onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 100 })}
-                  min={50}
-                  max={300}
-                />
-              </div>
-              <div>
-                <Label>Alto (px)</Label>
-                <Input
-                  type="number"
-                  value={newMesa.alto}
-                  onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 80 })}
-                  min={50}
-                  max={300}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAddMesa(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleAddMesa} disabled={crearMesa.isPending}>
-                <Plus className="mr-2 h-4 w-4" />
-                Crear Mesa
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </DndContext>
   );
 }
