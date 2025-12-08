@@ -31,7 +31,7 @@ import {
   Wand2,
   Loader2,
   Copy,
-  Clipboard
+  Clipboard,
 } from "lucide-react";
 
 interface EditorPlanoArquitectonicoProps {
@@ -48,11 +48,7 @@ interface ElementoDecorador {
   fabricObjectId?: string;
 }
 
-export function EditorPlanoArquitectonico({ 
-  espacioId, 
-  espacioNombre, 
-  onBack 
-}: EditorPlanoArquitectonicoProps) {
+export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: EditorPlanoArquitectonicoProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>("select");
@@ -64,7 +60,7 @@ export function EditorPlanoArquitectonico({
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [wallPoints, setWallPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [previewLine, setPreviewLine] = useState<Line | null>(null);
-  
+
   // Refs para mantener valores actualizados en los event handlers sin recrear listeners
   const isDrawingWallRef = useRef(false);
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
@@ -75,19 +71,19 @@ export function EditorPlanoArquitectonico({
   const [showMeasurements, setShowMeasurements] = useState(true);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const tempWallLinesRef = useRef<Line[]>([]);
-  
+
   // Estado para dibujo a mano alzada
   const [freehandPath, setFreehandPath] = useState<Path | null>(null);
   const [freehandPoints, setFreehandPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  
+
   // Escala: píxeles por metro en cada eje (pueden ser diferentes)
   const [pixelsPerMeterX, setPixelsPerMeterX] = useState(CANVAS_WIDTH / 9); // ~88.89
   const [pixelsPerMeterY, setPixelsPerMeterY] = useState(CANVAS_HEIGHT / 6); // ~83.33
-  
+
   // Mantener compatibilidad con código existente (usar el promedio o el mínimo)
   const pixelsPerMeter = Math.min(pixelsPerMeterX, pixelsPerMeterY);
-  
+
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
 
@@ -97,7 +93,7 @@ export function EditorPlanoArquitectonico({
     capacidad: 4,
     forma: "rectangular" as "rectangular" | "circular" | "cuadrada",
     largo: 120, // cm - para rectangular
-    ancho: 80,  // cm - para rectangular y cuadrada
+    ancho: 80, // cm - para rectangular y cuadrada
     diametro: 100, // cm - para circular
   });
 
@@ -159,7 +155,7 @@ export function EditorPlanoArquitectonico({
       fabricCanvas.freeDrawingBrush = new PencilBrush(fabricCanvas);
       fabricCanvas.freeDrawingBrush.color = "#ef4444";
       fabricCanvas.freeDrawingBrush.width = 4;
-      
+
       // Capturar el path cuando se termina de dibujar
       const handlePathCreated = (e: any) => {
         const path = e.path as Path;
@@ -167,7 +163,7 @@ export function EditorPlanoArquitectonico({
           // Extraer puntos del path
           const pathData = path.path || [];
           const points: Array<{ x: number; y: number }> = [];
-          
+
           pathData.forEach((segment: any) => {
             if (segment[0] === "M" || segment[0] === "L") {
               points.push({ x: segment[1], y: segment[2] });
@@ -175,14 +171,14 @@ export function EditorPlanoArquitectonico({
               points.push({ x: segment[3], y: segment[4] });
             }
           });
-          
+
           setFreehandPoints(points);
           setFreehandPath(path);
-          
+
           // Cambiar color del path para indicar que está listo
           path.set({ stroke: "#f97316", strokeDashArray: [5, 5] });
           fabricCanvas.renderAll();
-          
+
           toast.info("Dibujo capturado. Pulsa 'Convertir con IA' para generar paredes.");
         }
       };
@@ -205,7 +201,7 @@ export function EditorPlanoArquitectonico({
     }
 
     setIsProcessingAI(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke("procesar-dibujo-perimetro", {
         body: {
@@ -242,19 +238,19 @@ export function EditorPlanoArquitectonico({
           });
           line.set({ left: 0, top: 0 });
           const wallId = `wall-ai-${Date.now()}-${index}`;
-          (line as any).customData = { 
-            tipo: "wall", 
+          (line as any).customData = {
+            tipo: "wall",
             id: wallId,
-            lengthMeters: wall.lengthMeters 
+            lengthMeters: wall.lengthMeters,
           };
           fabricCanvas.add(line);
-          setElementos(prev => [...prev, { id: wallId, tipo: "wall" }]);
+          setElementos((prev) => [...prev, { id: wallId, tipo: "wall" }]);
         });
 
         fabricCanvas.renderAll();
-        
+
         toast.success(
-          `Perímetro generado: ${data.walls.length} paredes, ${data.perimeter?.toFixed(1) || "?"} metros de perímetro, ${data.area?.toFixed(1) || "?"} m² de área`
+          `Perímetro generado: ${data.walls.length} paredes, ${data.perimeter?.toFixed(1) || "?"} metros de perímetro, ${data.area?.toFixed(1) || "?"} m² de área`,
         );
       }
 
@@ -379,7 +375,7 @@ export function EditorPlanoArquitectonico({
 
   // Renderizar mesas desde la base de datos - solo una vez al cargar
   const mesasRenderedRef = useRef<Set<string>>(new Set());
-  
+
   useEffect(() => {
     if (!fabricCanvas || loadingMesas || !mesas) return;
 
@@ -395,7 +391,7 @@ export function EditorPlanoArquitectonico({
     // Solo añadir mesas nuevas, no eliminar ni recrear las existentes
     mesas.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return; // Ya existe en canvas
-      
+
       let obj: FabricObject;
 
       if (mesa.forma === "circular") {
@@ -425,18 +421,18 @@ export function EditorPlanoArquitectonico({
         });
       }
 
-      (obj as any).customData = { 
-        tipo: "mesa", 
-        mesaId: mesa.id, 
+      (obj as any).customData = {
+        tipo: "mesa",
+        mesaId: mesa.id,
         nombre: mesa.nombre,
-        capacidad: mesa.capacidad 
+        capacidad: mesa.capacidad,
       };
 
       fabricCanvas.add(obj);
     });
 
     // Eliminar mesas del canvas que ya no existen en la BD
-    const mesaIds = new Set(mesas.map(m => m.id));
+    const mesaIds = new Set(mesas.map((m) => m.id));
     fabricCanvas.getObjects().forEach((obj) => {
       const customData = (obj as any).customData;
       if (customData?.tipo === "mesa" && customData.mesaId && !mesaIds.has(customData.mesaId)) {
@@ -451,15 +447,15 @@ export function EditorPlanoArquitectonico({
   useEffect(() => {
     isDrawingWallRef.current = isDrawingWall;
   }, [isDrawingWall]);
-  
+
   useEffect(() => {
     wallPointsRef.current = wallPoints;
   }, [wallPoints]);
-  
+
   useEffect(() => {
     previewLineRef.current = previewLine;
   }, [previewLine]);
-  
+
   useEffect(() => {
     activeToolRef.current = activeTool;
     console.log("[EditorPlano] activeTool changed to:", activeTool);
@@ -468,53 +464,53 @@ export function EditorPlanoArquitectonico({
   // Función para cancelar el dibujo de paredes
   const cancelWallDrawing = useCallback(() => {
     if (!fabricCanvas) return;
-    
+
     // Eliminar línea de preview
     if (previewLineRef.current) {
       fabricCanvas.remove(previewLineRef.current);
       previewLineRef.current = null;
       setPreviewLine(null);
     }
-    
+
     // Eliminar líneas temporales
-    tempWallLinesRef.current.forEach(line => fabricCanvas.remove(line));
+    tempWallLinesRef.current.forEach((line) => fabricCanvas.remove(line));
     tempWallLinesRef.current = [];
-    
+
     // Resetear estado
     wallPointsRef.current = [];
     setWallPoints([]);
     isDrawingWallRef.current = false;
     setIsDrawingWall(false);
-    
+
     fabricCanvas.renderAll();
   }, [fabricCanvas]);
 
   // Función para finalizar el dibujo de paredes (convertir temporales en permanentes)
   const finishWallDrawing = useCallback(() => {
     if (!fabricCanvas) return;
-    
+
     const points = wallPointsRef.current;
     if (points.length < 2) {
       cancelWallDrawing();
       return;
     }
-    
+
     // Eliminar líneas temporales
-    tempWallLinesRef.current.forEach(line => fabricCanvas.remove(line));
+    tempWallLinesRef.current.forEach((line) => fabricCanvas.remove(line));
     tempWallLinesRef.current = [];
-    
+
     // Eliminar línea de preview
     if (previewLineRef.current) {
       fabricCanvas.remove(previewLineRef.current);
       previewLineRef.current = null;
       setPreviewLine(null);
     }
-    
+
     // Crear paredes permanentes
     for (let i = 0; i < points.length - 1; i++) {
       const p1 = points[i];
       const p2 = points[i + 1];
-      
+
       const wall = new Line([p1.x, p1.y, p2.x, p2.y], {
         stroke: "#374151",
         strokeWidth: 8,
@@ -524,15 +520,15 @@ export function EditorPlanoArquitectonico({
       const wallId = `wall-${Date.now()}-${i}`;
       (wall as any).customData = { tipo: "wall", id: wallId };
       fabricCanvas.add(wall);
-      setElementos(prev => [...prev, { id: wallId, tipo: "wall" }]);
+      setElementos((prev) => [...prev, { id: wallId, tipo: "wall" }]);
     }
-    
+
     // Resetear estado
     wallPointsRef.current = [];
     setWallPoints([]);
     isDrawingWallRef.current = false;
     setIsDrawingWall(false);
-    
+
     fabricCanvas.renderAll();
     toast.success(`Perímetro creado con ${points.length - 1} paredes`);
   }, [fabricCanvas, cancelWallDrawing]);
@@ -540,17 +536,17 @@ export function EditorPlanoArquitectonico({
   // Función para cerrar el perímetro (conectar último punto con el primero)
   const closePerimeter = useCallback(() => {
     if (!fabricCanvas) return;
-    
+
     const points = wallPointsRef.current;
     if (points.length < 3) {
       toast.error("Necesitas al menos 3 puntos para cerrar un perímetro");
       return;
     }
-    
+
     // Añadir el primer punto al final para cerrar
     const closedPoints = [...points, points[0]];
     wallPointsRef.current = closedPoints;
-    
+
     // Llamar a finishWallDrawing con los puntos cerrados
     finishWallDrawing();
   }, [fabricCanvas, finishWallDrawing]);
@@ -573,10 +569,10 @@ export function EditorPlanoArquitectonico({
           finishWallDrawing();
           return;
         }
-        
+
         const currentPoints = wallPointsRef.current;
         const newPoint = { x: pointer.x, y: pointer.y };
-        
+
         // Si hay puntos previos, crear línea temporal desde el último punto
         if (currentPoints.length > 0) {
           const lastPoint = currentPoints[currentPoints.length - 1];
@@ -590,14 +586,14 @@ export function EditorPlanoArquitectonico({
           fabricCanvas.add(tempLine);
           tempWallLinesRef.current.push(tempLine);
         }
-        
+
         // Añadir punto
         const updatedPoints = [...currentPoints, newPoint];
         wallPointsRef.current = updatedPoints;
         setWallPoints(updatedPoints);
         isDrawingWallRef.current = true;
         setIsDrawingWall(true);
-        
+
         // Crear/actualizar línea de preview
         if (previewLineRef.current) {
           fabricCanvas.remove(previewLineRef.current);
@@ -613,9 +609,9 @@ export function EditorPlanoArquitectonico({
         fabricCanvas.add(preview);
         previewLineRef.current = preview;
         setPreviewLine(preview);
-        
+
         fabricCanvas.renderAll();
-        
+
         if (currentPoints.length === 0) {
           toast.info("Clic para añadir esquinas. Doble clic para terminar.");
         }
@@ -637,7 +633,7 @@ export function EditorPlanoArquitectonico({
         });
         (rect as any).customData = { tipo: "rectangle", id: `rect-${Date.now()}` };
         fabricCanvas.add(rect);
-        setElementos(prev => [...prev, { id: `rect-${Date.now()}`, tipo: "rectangle" }]);
+        setElementos((prev) => [...prev, { id: `rect-${Date.now()}`, tipo: "rectangle" }]);
         setActiveTool("select");
       } else if (currentTool === "circle") {
         const circle = new Circle({
@@ -650,7 +646,7 @@ export function EditorPlanoArquitectonico({
         });
         (circle as any).customData = { tipo: "circle", id: `circle-${Date.now()}` };
         fabricCanvas.add(circle);
-        setElementos(prev => [...prev, { id: `circle-${Date.now()}`, tipo: "circle" }]);
+        setElementos((prev) => [...prev, { id: `circle-${Date.now()}`, tipo: "circle" }]);
         setActiveTool("select");
       } else if (currentTool === "polygon") {
         const points = [
@@ -667,7 +663,7 @@ export function EditorPlanoArquitectonico({
         });
         (polygon as any).customData = { tipo: "polygon", id: `polygon-${Date.now()}` };
         fabricCanvas.add(polygon);
-        setElementos(prev => [...prev, { id: `polygon-${Date.now()}`, tipo: "polygon" }]);
+        setElementos((prev) => [...prev, { id: `polygon-${Date.now()}`, tipo: "polygon" }]);
         setActiveTool("select");
       } else if (currentTool === "silla") {
         const silla = new Circle({
@@ -680,7 +676,7 @@ export function EditorPlanoArquitectonico({
         });
         (silla as any).customData = { tipo: "silla", id: `silla-${Date.now()}` };
         fabricCanvas.add(silla);
-        setElementos(prev => [...prev, { id: `silla-${Date.now()}`, tipo: "silla" }]);
+        setElementos((prev) => [...prev, { id: `silla-${Date.now()}`, tipo: "silla" }]);
       } else if (currentTool === "elemento") {
         const elem = new Rect({
           left: pointer.x - 20,
@@ -695,7 +691,7 @@ export function EditorPlanoArquitectonico({
         });
         (elem as any).customData = { tipo: "elemento", id: `elem-${Date.now()}` };
         fabricCanvas.add(elem);
-        setElementos(prev => [...prev, { id: `elem-${Date.now()}`, tipo: "elemento" }]);
+        setElementos((prev) => [...prev, { id: `elem-${Date.now()}`, tipo: "elemento" }]);
       }
 
       fabricCanvas.renderAll();
@@ -705,7 +701,7 @@ export function EditorPlanoArquitectonico({
       if (!isDrawingWallRef.current || !previewLineRef.current) return;
 
       const pointer = fabricCanvas.getScenePoint(opt.e);
-      
+
       // Actualizar la línea de preview
       previewLineRef.current.set({
         x2: pointer.x,
@@ -744,11 +740,11 @@ export function EditorPlanoArquitectonico({
         // Para líneas, guardar las coordenadas absolutas calculando la posición real
         const line = obj as Line;
         const matrix = line.calcTransformMatrix();
-        const x1Abs = (line.x1 || 0);
-        const y1Abs = (line.y1 || 0);
-        const x2Abs = (line.x2 || 0);
-        const y2Abs = (line.y2 || 0);
-        
+        const x1Abs = line.x1 || 0;
+        const y1Abs = line.y1 || 0;
+        const x2Abs = line.x2 || 0;
+        const y2Abs = line.y2 || 0;
+
         elementosCanvas.push({
           ...base,
           x1: x1Abs,
@@ -787,8 +783,8 @@ export function EditorPlanoArquitectonico({
           id: customData.mesaId,
           pos_x: Math.round(obj.left || 0),
           pos_y: Math.round(obj.top || 0),
-          ancho: Math.round(obj instanceof Circle ? (obj.radius || 40) * 2 : (obj.width || 80)),
-          alto: Math.round(obj instanceof Circle ? (obj.radius || 40) * 2 : (obj.height || 60)),
+          ancho: Math.round(obj instanceof Circle ? (obj.radius || 40) * 2 : obj.width || 80),
+          alto: Math.round(obj instanceof Circle ? (obj.radius || 40) * 2 : obj.height || 60),
         });
       }
     });
@@ -879,8 +875,8 @@ export function EditorPlanoArquitectonico({
       nombre: customData.nombre || "Mesa copiada",
       capacidad: customData.capacidad || 4,
       forma: selectedObject instanceof Circle ? "circular" : "rectangular",
-      ancho: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : (selectedObject.width || 80),
-      alto: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : (selectedObject.height || 60),
+      ancho: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : selectedObject.width || 80,
+      alto: selectedObject instanceof Circle ? (selectedObject.radius || 40) * 2 : selectedObject.height || 60,
     });
     toast.success("Mesa copiada al portapapeles");
   }, [selectedObject]);
@@ -893,7 +889,7 @@ export function EditorPlanoArquitectonico({
     }
 
     // Generar nombre único
-    const existingNames = mesas.map(m => m.nombre);
+    const existingNames = mesas.map((m) => m.nombre);
     let newName = copiedMesa.nombre;
     let counter = 1;
     while (existingNames.includes(newName)) {
@@ -921,39 +917,38 @@ export function EditorPlanoArquitectonico({
   // Actualizar longitud de pared seleccionada
   const handleUpdateWallLength = useCallback(() => {
     if (!fabricCanvas || !selectedObject || !(selectedObject instanceof Line)) return;
-    
+
     const currentLine = selectedObject as Line;
     const x1 = currentLine.x1 || 0;
     const y1 = currentLine.y1 || 0;
     const x2 = currentLine.x2 || 0;
     const y2 = currentLine.y2 || 0;
-    
+
     // Calcular ángulo actual
     const angle = Math.atan2(y2 - y1, x2 - x1);
-    
+
     // Nueva longitud en píxeles
     const newLengthPixels = wallLength * pixelsPerMeter;
-    
+
     // Calcular nuevo punto final manteniendo el ángulo
     const newX2 = x1 + Math.cos(angle) * newLengthPixels;
     const newY2 = y1 + Math.sin(angle) * newLengthPixels;
-    
+
     currentLine.set({
       x2: newX2,
       y2: newY2,
     });
-    
+
     fabricCanvas.renderAll();
     toast.success(`Pared ajustada a ${wallLength}m`);
   }, [fabricCanvas, selectedObject, wallLength, pixelsPerMeter]);
-
 
   // Eliminar objeto seleccionado
   const handleDeleteSelected = useCallback(() => {
     if (!fabricCanvas || !selectedObject) return;
 
     const customData = (selectedObject as any).customData;
-    
+
     // Si es una mesa, eliminar de la base de datos
     if (customData?.tipo === "mesa" && customData.mesaId) {
       eliminarMesa.mutate(customData.mesaId);
@@ -965,20 +960,29 @@ export function EditorPlanoArquitectonico({
   }, [fabricCanvas, selectedObject, eliminarMesa]);
 
   // Convertir píxeles a metros
-  const pixelsToMeters = useCallback((pixels: number) => {
-    return (pixels / pixelsPerMeter).toFixed(2);
-  }, [pixelsPerMeter]);
+  const pixelsToMeters = useCallback(
+    (pixels: number) => {
+      return (pixels / pixelsPerMeter).toFixed(2);
+    },
+    [pixelsPerMeter],
+  );
 
   // Convertir metros a píxeles
-  const metersToPixels = useCallback((meters: number) => {
-    return Math.round(meters * pixelsPerMeter);
-  }, [pixelsPerMeter]);
+  const metersToPixels = useCallback(
+    (meters: number) => {
+      return Math.round(meters * pixelsPerMeter);
+    },
+    [pixelsPerMeter],
+  );
 
   // Calcular longitud de una línea/pared
-  const getWallLength = useCallback((x1: number, y1: number, x2: number, y2: number) => {
-    const pixels = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-    return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
-  }, [pixelsPerMeter]);
+  const getWallLength = useCallback(
+    (x1: number, y1: number, x2: number, y2: number) => {
+      const pixels = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
+    },
+    [pixelsPerMeter],
+  );
 
   // Efecto para actualizar wallLength cuando se selecciona una pared
   useEffect(() => {
@@ -987,7 +991,7 @@ export function EditorPlanoArquitectonico({
         (selectedObject as Line).x1 || 0,
         (selectedObject as Line).y1 || 0,
         (selectedObject as Line).x2 || 0,
-        (selectedObject as Line).y2 || 0
+        (selectedObject as Line).y2 || 0,
       );
       setWallLength(parseFloat(length.meters));
     }
@@ -997,7 +1001,7 @@ export function EditorPlanoArquitectonico({
     // Calcular la escala para que el espacio ocupe todo el canvas en ambos ejes
     const newPixelsPerMeterX = CANVAS_WIDTH / realDimensions.width;
     const newPixelsPerMeterY = CANVAS_HEIGHT / realDimensions.height;
-    
+
     setPixelsPerMeterX(newPixelsPerMeterX);
     setPixelsPerMeterY(newPixelsPerMeterY);
     toast.success(`Escala ajustada: ${realDimensions.width}m × ${realDimensions.height}m`);
@@ -1006,7 +1010,7 @@ export function EditorPlanoArquitectonico({
   // Limpiar todo el canvas
   const handleClearCanvas = useCallback(() => {
     if (!fabricCanvas) return;
-    
+
     // Eliminar todos los objetos excepto mesas (que se eliminan de la BD)
     const objects = fabricCanvas.getObjects();
     objects.forEach((obj) => {
@@ -1016,7 +1020,7 @@ export function EditorPlanoArquitectonico({
       }
       fabricCanvas.remove(obj);
     });
-    
+
     setElementos([]);
     setSelectedObject(null);
     fabricCanvas.renderAll();
@@ -1060,9 +1064,7 @@ export function EditorPlanoArquitectonico({
           </Button>
           <div>
             <h3 className="text-xl font-bold">Configurar: {espacioNombre}</h3>
-            <p className="text-sm text-muted-foreground">
-              Dibuja paredes, añade mesas y elementos decorativos
-            </p>
+            <p className="text-sm text-muted-foreground">Dibuja paredes, añade mesas y elementos decorativos</p>
           </div>
         </div>
 
@@ -1087,7 +1089,10 @@ export function EditorPlanoArquitectonico({
               <Button
                 variant={activeTool === "select" ? "default" : "ghost"}
                 size="sm"
-                onClick={() => { setActiveTool("select"); cancelWallDrawing(); }}
+                onClick={() => {
+                  setActiveTool("select");
+                  cancelWallDrawing();
+                }}
               >
                 <MousePointer className="h-4 w-4" />
               </Button>
@@ -1102,12 +1107,7 @@ export function EditorPlanoArquitectonico({
               </Button>
               {isDrawingWall && wallPoints.length >= 2 && (
                 <>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={finishWallDrawing}
-                    title="Terminar perímetro"
-                  >
+                  <Button variant="secondary" size="sm" onClick={finishWallDrawing} title="Terminar perímetro">
                     Terminar
                   </Button>
                   {wallPoints.length >= 3 && (
@@ -1120,12 +1120,7 @@ export function EditorPlanoArquitectonico({
                       Cerrar
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={cancelWallDrawing}
-                    title="Cancelar dibujo"
-                  >
+                  <Button variant="ghost" size="sm" onClick={cancelWallDrawing} title="Cancelar dibujo">
                     Cancelar
                   </Button>
                 </>
@@ -1172,7 +1167,7 @@ export function EditorPlanoArquitectonico({
                 <Move className="h-4 w-4" />
               </Button>
               <Separator orientation="vertical" className="h-8" />
-              
+
               {/* Dibujo a mano alzada */}
               <Button
                 variant={activeTool === "freehand" ? "default" : "ghost"}
@@ -1193,24 +1188,15 @@ export function EditorPlanoArquitectonico({
                     title="Convertir dibujo en paredes rectas con IA"
                     className="bg-purple-500 hover:bg-purple-600"
                   >
-                    {isProcessingAI ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-4 w-4" />
-                    )}
+                    {isProcessingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                     <span className="ml-1 text-xs">IA</span>
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearFreehand}
-                    title="Borrar dibujo"
-                  >
+                  <Button variant="ghost" size="sm" onClick={clearFreehand} title="Borrar dibujo">
                     <Trash2 className="h-4 w-4 text-orange-500" />
                   </Button>
                 </>
               )}
-              
+
               <Separator orientation="vertical" className="h-8" />
               <Button
                 variant="ghost"
@@ -1221,12 +1207,7 @@ export function EditorPlanoArquitectonico({
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearCanvas}
-                title="Limpiar todo"
-              >
+              <Button variant="ghost" size="sm" onClick={handleClearCanvas} title="Limpiar todo">
                 <RefreshCw className="h-4 w-4" />
               </Button>
               <Separator orientation="vertical" className="h-8" />
@@ -1246,11 +1227,11 @@ export function EditorPlanoArquitectonico({
                 Arrastra para dibujar una pared. Las medidas se mostrarán automáticamente.
               </div>
             )}
-            
+
             {activeTool === "freehand" && (
               <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
-                <strong>Modo perímetro:</strong> Dibuja el contorno del espacio a mano alzada. 
-                Luego pulsa el botón <Wand2 className="inline h-4 w-4" /> para convertirlo en paredes rectas con IA.
+                <strong>Modo perímetro:</strong> Dibuja el contorno del espacio a mano alzada. Luego pulsa el botón{" "}
+                <Wand2 className="inline h-4 w-4" /> para convertirlo en paredes rectas con IA.
                 {freehandPoints.length > 0 && (
                   <span className="ml-2 font-mono">({freehandPoints.length} puntos capturados)</span>
                 )}
@@ -1258,51 +1239,43 @@ export function EditorPlanoArquitectonico({
             )}
 
             {/* Canvas con medidas - Tamaño fijo, escala ajustable */}
-            <div 
+            <div
               ref={canvasContainerRef}
               className="relative border-2 border-dashed border-border rounded-lg bg-white overflow-hidden"
             >
               {/* Contenedor con reglas externas al canvas */}
               <div className="flex flex-col">
                 {/* Regla horizontal (superior) - fuera del canvas */}
-                <div 
-                  className="relative h-6 bg-muted/80 border-b flex items-end pointer-events-none" 
-                  style={{ marginLeft: showMeasurements ? 24 : 0, visibility: showMeasurements ? 'visible' : 'hidden' }}
+                <div
+                  className="relative h-6 bg-muted/80 border-b flex items-end pointer-events-none"
+                  style={{ marginLeft: showMeasurements ? 24 : 0, visibility: showMeasurements ? "visible" : "hidden" }}
                 >
                   {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute flex flex-col items-center"
-                      style={{ left: i * pixelsPerMeterX }}
-                    >
+                    <div key={i} className="absolute flex flex-col items-center" style={{ left: i * pixelsPerMeterX }}>
                       <span className="text-[10px] text-muted-foreground font-mono">{i}m</span>
                       <div className="w-px h-2 bg-muted-foreground/50" />
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="flex">
                   {/* Regla vertical (izquierda) - fuera del canvas */}
-                  <div 
-                    className="relative w-6 bg-muted/80 border-r flex flex-col pointer-events-none" 
-                    style={{ height: canvasSize.height, visibility: showMeasurements ? 'visible' : 'hidden' }}
+                  <div
+                    className="relative w-6 bg-muted/80 border-r flex flex-col pointer-events-none"
+                    style={{ height: canvasSize.height, visibility: showMeasurements ? "visible" : "hidden" }}
                   >
                     {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="absolute flex items-center"
-                        style={{ top: i * pixelsPerMeterY }}
-                      >
+                      <div key={i} className="absolute flex items-center" style={{ top: i * pixelsPerMeterY }}>
                         <div className="h-px w-2 bg-muted-foreground/50" />
                         <span className="text-[10px] text-muted-foreground font-mono ml-1">{i}m</span>
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Canvas de dibujo - dimensiones explícitas */}
                   <div className="relative" style={{ width: canvasSize.width, height: canvasSize.height }}>
                     <canvas ref={canvasRef} />
-                    
+
                     {/* Indicador de dimensiones reales */}
                     {showMeasurements && (
                       <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
@@ -1320,7 +1293,7 @@ export function EditorPlanoArquitectonico({
                 <Ruler className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Escala y Dimensiones</span>
               </div>
-              
+
               <div className="text-xs text-muted-foreground mb-3">
                 Escala: {Math.round(pixelsPerMeterX)}px/m (ancho) × {Math.round(pixelsPerMeterY)}px/m (alto)
               </div>
@@ -1331,7 +1304,7 @@ export function EditorPlanoArquitectonico({
                   <Input
                     type="number"
                     value={realDimensions.width}
-                    onChange={(e) => setRealDimensions(prev => ({ ...prev, width: parseFloat(e.target.value) || 9 }))}
+                    onChange={(e) => setRealDimensions((prev) => ({ ...prev, width: parseFloat(e.target.value) || 9 }))}
                     step={0.5}
                     min={1}
                     className="h-8"
@@ -1342,7 +1315,9 @@ export function EditorPlanoArquitectonico({
                   <Input
                     type="number"
                     value={realDimensions.height}
-                    onChange={(e) => setRealDimensions(prev => ({ ...prev, height: parseFloat(e.target.value) || 6 }))}
+                    onChange={(e) =>
+                      setRealDimensions((prev) => ({ ...prev, height: parseFloat(e.target.value) || 6 }))
+                    }
                     step={0.5}
                     min={1}
                     className="h-8"
@@ -1356,7 +1331,8 @@ export function EditorPlanoArquitectonico({
               </div>
 
               <div className="text-xs text-muted-foreground mt-2">
-                {realDimensions.width}m × {realDimensions.height}m representados en {canvasSize.width}px × {canvasSize.height}px
+                {realDimensions.width}m × {realDimensions.height}m representados en {canvasSize.width}px ×{" "}
+                {canvasSize.height}px
               </div>
             </div>
           </CardContent>
@@ -1387,7 +1363,7 @@ export function EditorPlanoArquitectonico({
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Editar dimensiones según tipo */}
                   {selectedObject instanceof Line ? (
                     <div className="space-y-2">
@@ -1419,29 +1395,19 @@ export function EditorPlanoArquitectonico({
                   <div className="flex gap-2">
                     {/* Botón copiar si es mesa */}
                     {(selectedObject as any).customData?.tipo === "mesa" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCopyMesa}
-                        className="flex-1"
-                      >
+                      <Button variant="outline" size="sm" onClick={handleCopyMesa} className="flex-1">
                         <Copy className="mr-2 h-4 w-4" />
                         Copiar
                       </Button>
                     )}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleDeleteSelected}
-                      className="flex-1"
-                    >
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="flex-1">
                       <Trash2 className="mr-2 h-4 w-4" />
                       Eliminar
                     </Button>
                   </div>
                 </>
               ) : (
-              <p className="text-muted-foreground">Selecciona un elemento para ver sus medidas</p>
+                <p className="text-muted-foreground">Selecciona un elemento para ver sus medidas</p>
               )}
             </CardContent>
           </Card>
@@ -1480,7 +1446,9 @@ export function EditorPlanoArquitectonico({
                   <Label className="text-xs">Forma</Label>
                   <Select
                     value={newMesa.forma}
-                    onValueChange={(v) => setNewMesa({ ...newMesa, forma: v as "rectangular" | "circular" | "cuadrada" })}
+                    onValueChange={(v) =>
+                      setNewMesa({ ...newMesa, forma: v as "rectangular" | "circular" | "cuadrada" })
+                    }
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue />
@@ -1493,7 +1461,7 @@ export function EditorPlanoArquitectonico({
                   </Select>
                 </div>
               </div>
-              
+
               {/* Dimensiones según forma */}
               {newMesa.forma === "circular" ? (
                 <div>
@@ -1524,7 +1492,7 @@ export function EditorPlanoArquitectonico({
                     <Input
                       type="number"
                       value={newMesa.largo}
-                      onChange={(e) => setNewMesa({ ...newMesa, largo: parseInt(e.target.value) || 120 })}
+                      onChange={(e) => setNewMesa({ ...newMesa, largo: parseInt(e.target.value) || 80 })}
                       min={40}
                       className="h-8"
                     />
@@ -1541,7 +1509,7 @@ export function EditorPlanoArquitectonico({
                   </div>
                 </div>
               )}
-              
+
               <Button size="sm" onClick={handleAddMesa} className="w-full" disabled={crearMesa.isPending}>
                 <Plus className="mr-2 h-4 w-4" />
                 Añadir Mesa
@@ -1568,10 +1536,7 @@ export function EditorPlanoArquitectonico({
               ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {mesas.map((mesa) => (
-                    <div
-                      key={mesa.id}
-                      className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                    >
+                    <div key={mesa.id} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">
                           <Users className="h-3 w-3 mr-1" />
@@ -1607,16 +1572,10 @@ export function EditorPlanoArquitectonico({
                 </p>
                 {(selectedObject as any).customData?.nombre && (
                   <p>
-                    <span className="text-muted-foreground">Nombre:</span>{" "}
-                    {(selectedObject as any).customData.nombre}
+                    <span className="text-muted-foreground">Nombre:</span> {(selectedObject as any).customData.nombre}
                   </p>
                 )}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleDeleteSelected}
-                  className="w-full mt-2"
-                >
+                <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="w-full mt-2">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar
                 </Button>
