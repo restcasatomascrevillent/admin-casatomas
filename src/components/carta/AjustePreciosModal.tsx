@@ -55,13 +55,20 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
 
   const esEdicionIndividual = itemSeleccionado !== "todos";
 
+  // Función para redondear a .00 o .50
+  const redondearPrecioBonito = (precio: number): number => {
+    // Redondear al .50 más cercano
+    return Math.round(precio * 2) / 2;
+  };
+
   const aplicarAjuste = async (porcentajeNum: number, itemsAActualizar: any[]) => {
     try {
       // Preparar snapshot para historial
       const snapshot = itemsAActualizar.map((item) => {
         const precioActual = item.precio_eur || 0;
         const nuevoPrecio = precioActual * (1 + porcentajeNum / 100);
-        const precioRedondeado = Math.round(nuevoPrecio * 100) / 100;
+        // Redondear a .00 o .50
+        const precioRedondeado = redondearPrecioBonito(nuevoPrecio);
         
         return {
           id: item.id,
@@ -194,17 +201,12 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
         return;
       }
 
-      // Verificar si el cambio es extremo
-      if (Math.abs(porcentajeNum) >= UMBRAL_ALERTA) {
-        setDatosAjustePendiente({
-          porcentajeNum,
-          itemsAActualizar,
-        });
-        setAlertaExtremaOpen(true);
-      } else {
-        // Aplicar directamente si no es extremo
-        await aplicarAjuste(porcentajeNum, itemsAActualizar);
-      }
+      // Siempre pedir confirmación antes de aplicar
+      setDatosAjustePendiente({
+        porcentajeNum,
+        itemsAActualizar,
+      });
+      setAlertaExtremaOpen(true);
     }
   };
 

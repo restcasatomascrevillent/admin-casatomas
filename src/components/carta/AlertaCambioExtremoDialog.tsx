@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface AlertaCambioExtremoDialogProps {
@@ -32,6 +32,8 @@ export function AlertaCambioExtremoDialog({
     return labels[tipo] || tipo;
   };
 
+  const UMBRAL_ALERTA = 10;
+  const esExtremo = Math.abs(porcentaje) >= UMBRAL_ALERTA;
   const esAumentoExtremo = porcentaje > 15;
   const esReduccionExtrema = porcentaje < -15;
   const esExtremoMuyAlto = Math.abs(porcentaje) > 25;
@@ -40,77 +42,83 @@ export function AlertaCambioExtremoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-warning">
-            <AlertTriangle className="h-5 w-5" />
-            Cambio de Precio Extremo Detectado
+          <DialogTitle className="flex items-center gap-2">
+            {esExtremo ? (
+              <AlertTriangle className="h-5 w-5 text-warning" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+            )}
+            Confirmar Ajuste de Precios
           </DialogTitle>
           <DialogDescription>
-            Estás a punto de realizar un ajuste de precios significativo
+            {esExtremo 
+              ? "Este cambio supera el umbral recomendado. Por favor, confirma que deseas continuar."
+              : "Revisa los detalles antes de aplicar el cambio."
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <Alert variant={esExtremoMuyAlto ? "destructive" : "default"} className="border-warning">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>¡Atención! Cambio inusual de precios</AlertTitle>
-            <AlertDescription className="space-y-2 mt-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span>Ajuste propuesto:</span>
-                <Badge variant={porcentaje > 0 ? "destructive" : "secondary"} className="text-base">
-                  {porcentaje > 0 ? "+" : ""}{porcentaje}%
-                </Badge>
-              </div>
-              
-              <div className="pt-2 space-y-1 text-sm">
-                <p><strong>Tipo:</strong> {getTipoCartaLabel(tipoCarta)}</p>
-                <p><strong>Categoría:</strong> {categoria === "todas" ? "Todas las categorías" : categoria}</p>
-                <p><strong>Items afectados:</strong> {itemsAfectados} productos</p>
-              </div>
-            </AlertDescription>
-          </Alert>
+          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Ajuste:</span>
+              <Badge variant={porcentaje > 0 ? "destructive" : "secondary"} className="text-base">
+                {porcentaje > 0 ? "+" : ""}{porcentaje}%
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Tipo:</span>
+              <span className="font-medium">{getTipoCartaLabel(tipoCarta)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Categoría:</span>
+              <span className="font-medium">{categoria === "todas" ? "Todas" : categoria}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Items afectados:</span>
+              <span className="font-medium">{itemsAfectados} productos</span>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm text-muted-foreground">Redondeo:</span>
+              <span className="text-xs text-muted-foreground">
+                Los precios se ajustarán a .00 o .50
+              </span>
+            </div>
+          </div>
 
           {esExtremoMuyAlto && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>¡Advertencia!</AlertTitle>
               <AlertDescription>
-                <strong>¡Advertencia crítica!</strong> Un ajuste mayor al 25% puede impactar significativamente
-                en tus ventas y la percepción de los clientes. Por favor, revisa cuidadosamente esta decisión.
+                Un ajuste mayor al 25% puede impactar significativamente
+                en tus ventas y la percepción de los clientes.
               </AlertDescription>
             </Alert>
           )}
 
           {esAumentoExtremo && !esExtremoMuyAlto && (
             <Alert>
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Un aumento considerable de precios puede afectar la demanda. Asegúrate de que este cambio
-                esté justificado por el coste de los productos o cambios en el mercado.
+                Un aumento de más del 15% puede afectar la demanda. Verifica que esté justificado.
               </AlertDescription>
             </Alert>
           )}
 
           {esReduccionExtrema && !esExtremoMuyAlto && (
             <Alert>
+              <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Una reducción considerable de precios puede afectar tus márgenes de beneficio. Verifica que
-                este ajuste sea sostenible para tu negocio.
+                Una reducción de más del 15% puede afectar tus márgenes de beneficio.
               </AlertDescription>
             </Alert>
           )}
-
-          <div className="bg-muted/50 rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">Recomendaciones:</p>
-            <ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
-              <li>Revisa el impacto en cada producto individualmente</li>
-              <li>Considera hacer cambios graduales en lugar de un ajuste único</li>
-              <li>Verifica que los nuevos precios sean competitivos</li>
-              <li>Comunica los cambios a tu equipo antes de aplicarlos</li>
-            </ul>
-          </div>
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
-            Cancelar y Revisar
+            Cancelar
           </Button>
           <Button 
             onClick={() => {

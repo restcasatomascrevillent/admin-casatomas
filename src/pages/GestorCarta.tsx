@@ -16,7 +16,7 @@ import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
-import { AlertasCambiosPrecios } from "@/components/carta/AlertasCambiosPrecios";
+
 
 export default function GestorCarta() {
   const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos } = usePlatos();
@@ -95,7 +95,7 @@ export default function GestorCarta() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <AlertasCambiosPrecios />
+        
         
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div>
