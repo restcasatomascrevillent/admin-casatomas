@@ -54,7 +54,10 @@ export function EditorPlanoArquitectonico({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>("select");
-  const [canvasSize, setCanvasSize] = useState({ width: 900, height: 600 });
+  // Tamaño fijo del canvas en píxeles (no cambia)
+  const CANVAS_WIDTH = 800;
+  const CANVAS_HEIGHT = 500;
+  const [canvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [wallStart, setWallStart] = useState<{ x: number; y: number } | null>(null);
@@ -62,7 +65,6 @@ export function EditorPlanoArquitectonico({
   const [elementos, setElementos] = useState<ElementoDecorador[]>([]);
   const [showMeasurements, setShowMeasurements] = useState(true);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const [viewScale, setViewScale] = useState(1);
   
   // Estado para dibujo a mano alzada
   const [freehandPath, setFreehandPath] = useState<Path | null>(null);
@@ -74,26 +76,6 @@ export function EditorPlanoArquitectonico({
   
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
-
-  // Calcular escala de visualización para que quepa en el contenedor
-  useEffect(() => {
-    const calculateViewScale = () => {
-      if (!canvasContainerRef.current) return;
-      
-      const containerWidth = canvasContainerRef.current.clientWidth - 40; // padding
-      const containerHeight = 500; // altura fija máxima
-      
-      const scaleX = containerWidth / canvasSize.width;
-      const scaleY = containerHeight / canvasSize.height;
-      
-      const newScale = Math.min(scaleX, scaleY, 1); // nunca más grande que 1
-      setViewScale(newScale);
-    };
-
-    calculateViewScale();
-    window.addEventListener("resize", calculateViewScale);
-    return () => window.removeEventListener("resize", calculateViewScale);
-  }, [canvasSize]);
 
   // Configuración de nueva mesa
   const [newMesa, setNewMesa] = useState({
@@ -269,11 +251,12 @@ export function EditorPlanoArquitectonico({
   useEffect(() => {
     if (!fabricCanvas || !plano) return;
 
-    // Restaurar tamaño del canvas
-    if (plano.ancho && plano.alto) {
-      setCanvasSize({ width: plano.ancho, height: plano.alto });
-      fabricCanvas.setWidth(plano.ancho);
-      fabricCanvas.setHeight(plano.alto);
+    // Restaurar escala desde la configuración guardada
+    if (plano.configuracion?.pixelsPerMeter) {
+      setPixelsPerMeter(plano.configuracion.pixelsPerMeter);
+    }
+    if (plano.configuracion?.realDimensions) {
+      setRealDimensions(plano.configuracion.realDimensions);
     }
 
     // Restaurar elementos del plano (paredes, elementos decorativos)
@@ -634,14 +617,16 @@ export function EditorPlanoArquitectonico({
     });
 
     try {
-      // Guardar plano
+      // Guardar plano con escala y dimensiones
       await guardarPlano.mutateAsync({
         espacio_id: espacioId,
         ancho: canvasSize.width,
         alto: canvasSize.height,
         configuracion: {
           elementos: elementosCanvas,
-          version: 1,
+          pixelsPerMeter,
+          realDimensions,
+          version: 2,
         },
       });
 
@@ -655,7 +640,7 @@ export function EditorPlanoArquitectonico({
       console.error("Error al guardar:", error);
       toast.error("Error al guardar el plano");
     }
-  }, [fabricCanvas, espacioId, canvasSize, guardarPlano, actualizarMesas]);
+  }, [fabricCanvas, espacioId, canvasSize, pixelsPerMeter, realDimensions, guardarPlano, actualizarMesas]);
 
   // Añadir nueva mesa
   const handleAddMesa = async () => {
@@ -714,18 +699,16 @@ export function EditorPlanoArquitectonico({
     return { pixels, meters: (pixels / pixelsPerMeter).toFixed(2) };
   }, [pixelsPerMeter]);
 
-  // Aplicar escala desde dimensiones reales
+  // Aplicar escala desde dimensiones reales (ajusta pixelsPerMeter, no el tamaño del canvas)
   const applyRealDimensions = useCallback(() => {
-    const newWidth = metersToPixels(realDimensions.width);
-    const newHeight = metersToPixels(realDimensions.height);
-    setCanvasSize({ width: newWidth, height: newHeight });
-    if (fabricCanvas) {
-      fabricCanvas.setWidth(newWidth);
-      fabricCanvas.setHeight(newHeight);
-      fabricCanvas.renderAll();
-    }
-    toast.success(`Canvas ajustado a ${realDimensions.width}m x ${realDimensions.height}m`);
-  }, [realDimensions, metersToPixels, fabricCanvas]);
+    // Calcular la escala óptima para que el espacio quepa en el canvas
+    const scaleX = CANVAS_WIDTH / realDimensions.width;
+    const scaleY = CANVAS_HEIGHT / realDimensions.height;
+    const newPixelsPerMeter = Math.min(scaleX, scaleY);
+    
+    setPixelsPerMeter(Math.round(newPixelsPerMeter));
+    toast.success(`Escala ajustada: 1m = ${Math.round(newPixelsPerMeter)}px para ${realDimensions.width}m × ${realDimensions.height}m`);
+  }, [realDimensions]);
 
   // Limpiar todo el canvas
   const handleClearCanvas = useCallback(() => {
@@ -951,21 +934,12 @@ export function EditorPlanoArquitectonico({
               </div>
             )}
 
-            {/* Canvas con medidas - Sin scroll, escalado automático */}
+            {/* Canvas con medidas - Tamaño fijo, escala ajustable */}
             <div 
               ref={canvasContainerRef}
-              className="relative border-2 border-dashed border-border rounded-lg bg-white flex items-center justify-center overflow-hidden"
-              style={{ minHeight: 400 }}
+              className="relative border-2 border-dashed border-border rounded-lg bg-white overflow-hidden"
             >
-              <div 
-                className="relative"
-                style={{ 
-                  transform: `scale(${viewScale})`,
-                  transformOrigin: "center center",
-                  width: canvasSize.width,
-                  height: canvasSize.height,
-                }}
-              >
+              <div className="relative">
                 <canvas ref={canvasRef} />
                 
                 {/* Regla horizontal (superior) */}
@@ -1000,20 +974,13 @@ export function EditorPlanoArquitectonico({
                   </div>
                 )}
 
-                {/* Indicador de tamaño total */}
+                {/* Indicador de dimensiones reales */}
                 {showMeasurements && (
                   <div className="absolute bottom-2 right-2 px-2 py-1 bg-background/90 border rounded text-xs font-mono">
-                    {pixelsToMeters(canvasSize.width)}m × {pixelsToMeters(canvasSize.height)}m
+                    {realDimensions.width}m × {realDimensions.height}m (1m = {pixelsPerMeter}px)
                   </div>
                 )}
               </div>
-              
-              {/* Indicador de escala de visualización */}
-              {viewScale < 1 && (
-                <div className="absolute top-2 right-2 px-2 py-1 bg-amber-100 border border-amber-300 rounded text-xs font-mono text-amber-800">
-                  Vista: {Math.round(viewScale * 100)}%
-                </div>
-              )}
             </div>
 
             {/* Configuración de escala y tamaño */}
