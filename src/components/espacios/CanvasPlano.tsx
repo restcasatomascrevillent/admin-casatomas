@@ -70,6 +70,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const tempLinesRef = useRef<Line[]>([]);
   const previewLineRef = useRef<Line | null>(null);
+  const wasCleared = useRef(false); // Flag para evitar recargar después de limpiar
   const pixelsPerMeterXRef = useRef(effectivePixelsPerMeterX);
   const pixelsPerMeterYRef = useRef(effectivePixelsPerMeterY);
 
@@ -95,6 +96,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useImperativeHandle(ref, () => ({
     clearCanvas: () => {
       if (!fabricCanvas) return;
+      
+      // Marcar que fue limpiado para evitar recargar mesas de BD
+      wasCleared.current = true;
       
       // Limpiar refs internos para evitar que se recarguen
       elementosRef.current = [];
@@ -447,6 +451,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   // Cargar mesas (de BD o del estado local cuando el canvas se recrea)
   useEffect(() => {
     if (!fabricCanvas) return;
+    
+    // Si fue limpiado manualmente, no recargar mesas de BD
+    if (wasCleared.current) {
+      return;
+    }
 
     const mesasEnCanvas = new Set<string>();
     fabricCanvas.getObjects().forEach((obj) => {
