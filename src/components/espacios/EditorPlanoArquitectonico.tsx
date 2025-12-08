@@ -249,7 +249,8 @@ export function EditorPlanoArquitectonico({
     const handleMouseDown = (opt: any) => {
       if (activeTool === "select") return;
 
-      const pointer = fabricCanvas.getViewportPoint(opt.e);
+      // Obtener coordenadas del click
+      const pointer = fabricCanvas.getScenePoint(opt.e);
 
       if (activeTool === "wall") {
         if (!wallStart) {
@@ -268,8 +269,8 @@ export function EditorPlanoArquitectonico({
         }
       } else if (activeTool === "rectangle") {
         const rect = new Rect({
-          left: pointer.x,
-          top: pointer.y,
+          left: pointer.x - 50,
+          top: pointer.y - 40,
           width: 100,
           height: 80,
           fill: "#e2e8f0",
@@ -282,8 +283,8 @@ export function EditorPlanoArquitectonico({
         setActiveTool("select");
       } else if (activeTool === "circle") {
         const circle = new Circle({
-          left: pointer.x,
-          top: pointer.y,
+          left: pointer.x - 50,
+          top: pointer.y - 50,
           radius: 50,
           fill: "#e2e8f0",
           stroke: "#64748b",
@@ -294,15 +295,14 @@ export function EditorPlanoArquitectonico({
         setElementos(prev => [...prev, { id: `circle-${Date.now()}`, tipo: "circle" }]);
         setActiveTool("select");
       } else if (activeTool === "polygon") {
-        // Triángulo/esquina
         const points = [
           { x: 0, y: 60 },
           { x: 30, y: 0 },
           { x: 60, y: 60 },
         ];
         const polygon = new Polygon(points, {
-          left: pointer.x,
-          top: pointer.y,
+          left: pointer.x - 30,
+          top: pointer.y - 30,
           fill: "#e2e8f0",
           stroke: "#64748b",
           strokeWidth: 2,
@@ -313,8 +313,8 @@ export function EditorPlanoArquitectonico({
         setActiveTool("select");
       } else if (activeTool === "silla") {
         const silla = new Circle({
-          left: pointer.x,
-          top: pointer.y,
+          left: pointer.x - 15,
+          top: pointer.y - 15,
           radius: 15,
           fill: "#fde68a",
           stroke: "#d97706",
@@ -325,8 +325,8 @@ export function EditorPlanoArquitectonico({
         setElementos(prev => [...prev, { id: `silla-${Date.now()}`, tipo: "silla" }]);
       } else if (activeTool === "elemento") {
         const elem = new Rect({
-          left: pointer.x,
-          top: pointer.y,
+          left: pointer.x - 20,
+          top: pointer.y - 20,
           width: 40,
           height: 40,
           fill: "#94a3b8",
