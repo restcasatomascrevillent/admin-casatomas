@@ -86,8 +86,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const actualizarMesasSilent = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
 
-  const canvasWidth = plano?.ancho || 800;
-  const canvasHeight = plano?.alto || 600;
+  // Canvas usa dimensiones fijas como el editor (800x500), ya que los elementos se guardan en esas coordenadas
+  const canvasWidth = 800;
+  const canvasHeight = 500;
   const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
 
   // Sincronizar mesas locales con datos del servidor

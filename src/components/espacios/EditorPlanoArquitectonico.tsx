@@ -235,7 +235,10 @@ export function EditorPlanoArquitectonico({
             strokeWidth: 8,
             selectable: true,
             hasControls: true,
+            originX: "left",
+            originY: "top",
           });
+          line.set({ left: 0, top: 0 });
           const wallId = `wall-ai-${Date.now()}-${index}`;
           (line as any).customData = { 
             tipo: "wall", 
@@ -303,7 +306,13 @@ export function EditorPlanoArquitectonico({
                 strokeWidth: 8,
                 selectable: true,
                 hasControls: true,
+                originX: "left",
+                originY: "top",
               });
+              // Posicionar en 0,0 para que las coordenadas x1,y1,x2,y2 sean absolutas
+              if (obj) {
+                obj.set({ left: 0, top: 0 });
+              }
               break;
             case "rectangle":
               obj = new Rect({
@@ -366,20 +375,25 @@ export function EditorPlanoArquitectonico({
     fabricCanvas.renderAll();
   }, [fabricCanvas, plano]);
 
-  // Renderizar mesas desde la base de datos
+  // Renderizar mesas desde la base de datos - solo una vez al cargar
+  const mesasRenderedRef = useRef<Set<string>>(new Set());
+  
   useEffect(() => {
-    if (!fabricCanvas || loadingMesas) return;
+    if (!fabricCanvas || loadingMesas || !mesas) return;
 
-    // Eliminar mesas anteriores del canvas
-    const objects = fabricCanvas.getObjects();
-    objects.forEach((obj) => {
-      if ((obj as any).customData?.tipo === "mesa") {
-        fabricCanvas.remove(obj);
+    // Encontrar mesas nuevas que no están en el canvas
+    const mesasEnCanvas = new Set<string>();
+    fabricCanvas.getObjects().forEach((obj) => {
+      const customData = (obj as any).customData;
+      if (customData?.tipo === "mesa" && customData.mesaId) {
+        mesasEnCanvas.add(customData.mesaId);
       }
     });
 
-    // Añadir mesas
+    // Solo añadir mesas nuevas, no eliminar ni recrear las existentes
     mesas.forEach((mesa) => {
+      if (mesasEnCanvas.has(mesa.id)) return; // Ya existe en canvas
+      
       let obj: FabricObject;
 
       if (mesa.forma === "circular") {
@@ -404,6 +418,8 @@ export function EditorPlanoArquitectonico({
           strokeWidth: 2,
           rx: 6,
           ry: 6,
+          originX: "left",
+          originY: "top",
         });
       }
 
@@ -415,6 +431,15 @@ export function EditorPlanoArquitectonico({
       };
 
       fabricCanvas.add(obj);
+    });
+
+    // Eliminar mesas del canvas que ya no existen en la BD
+    const mesaIds = new Set(mesas.map(m => m.id));
+    fabricCanvas.getObjects().forEach((obj) => {
+      const customData = (obj as any).customData;
+      if (customData?.tipo === "mesa" && customData.mesaId && !mesaIds.has(customData.mesaId)) {
+        fabricCanvas.remove(obj);
+      }
     });
 
     fabricCanvas.renderAll();
@@ -444,12 +469,9 @@ export function EditorPlanoArquitectonico({
     const handleMouseDown = (opt: any) => {
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const currentTool = activeToolRef.current;
-      
-      console.log("[Canvas] mouseDown - currentTool:", currentTool, "pointer:", pointer);
 
       // Dibujar pared arrastrando
       if (currentTool === "wall") {
-        console.log("[Canvas] Iniciando dibujo de pared");
         isDrawingWallRef.current = true;
         setIsDrawingWall(true);
         wallStartRef.current = { x: pointer.x, y: pointer.y };
@@ -468,7 +490,6 @@ export function EditorPlanoArquitectonico({
         previewLineRef.current = preview;
         setPreviewLine(preview);
         fabricCanvas.renderAll();
-        console.log("[Canvas] Preview line creada");
         return;
       }
 
@@ -588,7 +609,11 @@ export function EditorPlanoArquitectonico({
           strokeWidth: 8,
           selectable: true,
           hasControls: true,
+          originX: "left",
+          originY: "top",
         });
+        // Mantener left/top en 0 para que las coordenadas sean absolutas
+        wall.set({ left: 0, top: 0 });
         const wallId = `wall-${Date.now()}`;
         (wall as any).customData = { tipo: "wall", id: wallId };
         fabricCanvas.add(wall);
@@ -631,12 +656,20 @@ export function EditorPlanoArquitectonico({
       };
 
       if (obj instanceof Line) {
+        // Para líneas, guardar las coordenadas absolutas calculando la posición real
+        const line = obj as Line;
+        const matrix = line.calcTransformMatrix();
+        const x1Abs = (line.x1 || 0);
+        const y1Abs = (line.y1 || 0);
+        const x2Abs = (line.x2 || 0);
+        const y2Abs = (line.y2 || 0);
+        
         elementosCanvas.push({
           ...base,
-          x1: (obj as Line).x1,
-          y1: (obj as Line).y1,
-          x2: (obj as Line).x2,
-          y2: (obj as Line).y2,
+          x1: x1Abs,
+          y1: y1Abs,
+          x2: x2Abs,
+          y2: y2Abs,
         });
       } else if (obj instanceof Rect) {
         elementosCanvas.push({
