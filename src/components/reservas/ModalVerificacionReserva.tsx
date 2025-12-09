@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,9 +71,9 @@ export function ModalVerificacionReserva({
   const [salaId, setSalaId] = useState("");
   const [notas, setNotas] = useState("");
 
-  // Sync form state when reserva changes
-  const initializeForm = () => {
-    if (reserva) {
+  // Initialize form when modal opens with reserva data
+  useEffect(() => {
+    if (open && reserva) {
       setNombre(reserva.nombre || "");
       setTelefono(reserva.telefono || "");
       setEmail(reserva.email || "");
@@ -83,15 +83,7 @@ export function ModalVerificacionReserva({
       setSalaId(reserva.sala_id || "");
       setNotas(reserva.notas_cliente || "");
     }
-  };
-
-  // Initialize when modal opens
-  const handleOpenChange = (isOpen: boolean) => {
-    if (isOpen && reserva) {
-      initializeForm();
-    }
-    onOpenChange(isOpen);
-  };
+  }, [open, reserva]);
 
   const handleVerificar = async () => {
     if (!reserva) return;
@@ -143,7 +135,7 @@ export function ModalVerificacionReserva({
   if (!reserva) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Verificar Reserva</DialogTitle>
