@@ -14,6 +14,7 @@ import GestorCarta from "./pages/GestorCarta";
 import GestionWeb from "./pages/GestionWeb";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
+import Facturas from "./pages/Facturas";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Marketing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/facturas"
+            element={
+              <ProtectedRoute>
+                <Facturas />
               </ProtectedRoute>
             }
           />

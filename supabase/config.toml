@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.notify-reservation-change]
 verify_jwt = true
+
+[functions.procesar-factura]
+verify_jwt = false
