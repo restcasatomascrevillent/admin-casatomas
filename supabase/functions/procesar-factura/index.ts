@@ -8,6 +8,7 @@ const corsHeaders = {
 // URL del webhook donde se enviarán las facturas
 const WEBHOOK_URL = 'https://n8npersonal.miguelbenito.space/webhook-test/d96678f4-7da1-42bd-9499-a1142767a833';
 
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -25,16 +26,34 @@ serve(async (req) => {
       fecha: payload.fecha,
     });
 
-    // Enviar al webhook
+    // Crear FormData para enviar el archivo
+    const formData = new FormData();
+    
+    // Convertir base64 a Blob y añadir al FormData
+    if (payload.archivo?.contenido_base64) {
+      const binaryString = atob(payload.archivo.contenido_base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes.buffer], { type: payload.archivo.tipo });
+      formData.append('file', blob, payload.archivo.nombre);
+    }
+    
+    // Añadir metadatos adicionales
+    formData.append('tipo', payload.tipo || 'factura');
+    formData.append('fecha', payload.fecha || new Date().toISOString());
+    formData.append('nombre_archivo', payload.archivo?.nombre || 'archivo');
+    formData.append('tipo_archivo', payload.archivo?.tipo || 'application/octet-stream');
+    formData.append('size', String(payload.archivo?.size || 0));
+
+    // Enviar al webhook como multipart/form-data
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      body: formData,
       signal: controller.signal,
     });
 
