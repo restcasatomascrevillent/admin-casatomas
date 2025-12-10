@@ -577,6 +577,78 @@ export type Database = {
           },
         ]
       }
+      new: {
+        Row: {
+          activado: boolean | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          contiene_carne: boolean | null
+          contiene_gluten: boolean | null
+          contiene_huevo: boolean | null
+          contiene_lacteos: boolean | null
+          contiene_lactosa: boolean | null
+          contiene_marisco: boolean | null
+          contiene_pescado: boolean | null
+          created_at: string | null
+          descripcion: string | null
+          id: string | null
+          imagen_url: string | null
+          nombre: string | null
+          orden: string | null
+          precio_eur: number | null
+          unidad: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          contiene_carne?: boolean | null
+          contiene_gluten?: boolean | null
+          contiene_huevo?: boolean | null
+          contiene_lacteos?: boolean | null
+          contiene_lactosa?: boolean | null
+          contiene_marisco?: boolean | null
+          contiene_pescado?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string | null
+          imagen_url?: string | null
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          contiene_carne?: boolean | null
+          contiene_gluten?: boolean | null
+          contiene_huevo?: boolean | null
+          contiene_lacteos?: boolean | null
+          contiene_lactosa?: boolean | null
+          contiene_marisco?: boolean | null
+          contiene_pescado?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string | null
+          imagen_url?: string | null
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       noticias_hosteleria: {
         Row: {
           categoria: string
