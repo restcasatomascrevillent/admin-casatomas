@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,7 @@ interface ArchivoFactura {
 export function SubidaFacturas() {
   const [archivos, setArchivos] = useState<ArchivoFactura[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [instruccionesExtraccion, setInstruccionesExtraccion] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -117,6 +119,7 @@ export function SubidaFacturas() {
         tipo: "facturas",
         archivos: archivosPayload,
         fecha: new Date().toISOString(),
+        instrucciones: instruccionesExtraccion.trim() || "Extraer todos los datos relevantes de la factura",
       };
 
       const { data, error } = await supabase.functions.invoke('procesar-factura', {
@@ -134,11 +137,12 @@ export function SubidaFacturas() {
         description: `Se han enviado ${archivos.length} factura(s) correctamente`,
       });
 
-      // Limpiar archivos
+      // Limpiar archivos e instrucciones
       archivos.forEach(a => {
         if (a.preview) URL.revokeObjectURL(a.preview);
       });
       setArchivos([]);
+      setInstruccionesExtraccion("");
 
     } catch (error) {
       console.error('Error al enviar facturas:', error);
@@ -199,6 +203,22 @@ export function SubidaFacturas() {
             className="hidden"
             onChange={handleFileChange}
           />
+        </div>
+
+        {/* Campo de instrucciones de extracción */}
+        <div className="space-y-2">
+          <Label htmlFor="instrucciones">¿Qué datos quieres extraer?</Label>
+          <Textarea
+            id="instrucciones"
+            placeholder="Ej: Extraer nombre del proveedor, CIF, fecha, importe total, IVA, productos con sus precios..."
+            value={instruccionesExtraccion}
+            onChange={(e) => setInstruccionesExtraccion(e.target.value)}
+            disabled={isSubmitting}
+            className="min-h-[80px]"
+          />
+          <p className="text-xs text-muted-foreground">
+            Describe qué información necesitas extraer de las facturas
+          </p>
         </div>
 
         {/* Lista de archivos */}
