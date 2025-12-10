@@ -100,30 +100,34 @@ export function SubidaFacturas() {
     setIsSubmitting(true);
 
     try {
-      for (const archivo of archivos) {
-        const base64 = await convertirABase64(archivo.file);
-        
-        const payload = {
-          tipo: "factura",
-          archivo: {
+      // Convertir todos los archivos a base64
+      const archivosPayload = await Promise.all(
+        archivos.map(async (archivo) => {
+          const base64 = await convertirABase64(archivo.file);
+          return {
             nombre: archivo.nombre,
             tipo: archivo.file.type,
             size: archivo.file.size,
             contenido_base64: base64,
-          },
-          fecha: new Date().toISOString(),
-        };
+          };
+        })
+      );
 
-        const { data, error } = await supabase.functions.invoke('procesar-factura', {
-          body: payload,
-        });
+      const payload = {
+        tipo: "facturas",
+        archivos: archivosPayload,
+        fecha: new Date().toISOString(),
+      };
 
-        if (error) {
-          throw new Error(error.message);
-        }
+      const { data, error } = await supabase.functions.invoke('procesar-factura', {
+        body: payload,
+      });
 
-        console.log('Factura enviada:', archivo.nombre, data);
+      if (error) {
+        throw new Error(error.message);
       }
+
+      console.log('Facturas enviadas:', data);
 
       toast({
         title: "Facturas enviadas",
