@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // URL del webhook donde se enviarán las facturas
-const WEBHOOK_URL = 'https://n8npersonal.miguelbenito.space/webhook/facturas';
+const WEBHOOK_URL = 'https://n8npersonal.miguelbenito.space/webhook-test/d96678f4-7da1-42bd-9499-a1142767a833';
 
 serve(async (req) => {
   // Handle CORS preflight requests
