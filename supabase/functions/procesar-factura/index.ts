@@ -8,7 +8,6 @@ const corsHeaders = {
 // URL del webhook donde se enviarán las facturas
 const WEBHOOK_URL = 'https://n8npersonal.miguelbenito.space/webhook-test/d96678f4-7da1-42bd-9499-a1142767a833';
 
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,19 +17,47 @@ serve(async (req) => {
   try {
     const payload = await req.json();
 
-    console.log('Recibida factura para procesar:', {
+    console.log('Recibida petición para procesar:', {
       tipo: payload.tipo,
-      archivo_nombre: payload.archivo?.nombre,
-      archivo_tipo: payload.archivo?.tipo,
-      archivo_size: payload.archivo?.size,
+      num_archivos: payload.archivos?.length || 1,
       fecha: payload.fecha,
     });
 
-    // Crear FormData para enviar el archivo
+    // Crear FormData para enviar los archivos
     const formData = new FormData();
     
-    // Convertir base64 a Blob y añadir al FormData
-    if (payload.archivo?.contenido_base64) {
+    // Añadir metadatos generales
+    formData.append('tipo', payload.tipo || 'facturas');
+    formData.append('fecha', payload.fecha || new Date().toISOString());
+
+    // Procesar múltiples archivos (nuevo formato)
+    if (payload.archivos && Array.isArray(payload.archivos)) {
+      formData.append('num_archivos', String(payload.archivos.length));
+      
+      for (let i = 0; i < payload.archivos.length; i++) {
+        const archivo = payload.archivos[i];
+        
+        if (archivo.contenido_base64) {
+          const binaryString = atob(archivo.contenido_base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let j = 0; j < binaryString.length; j++) {
+            bytes[j] = binaryString.charCodeAt(j);
+          }
+          const blob = new Blob([bytes.buffer], { type: archivo.tipo });
+          formData.append('file', blob, archivo.nombre);
+        }
+        
+        console.log(`Archivo ${i + 1}:`, {
+          nombre: archivo.nombre,
+          tipo: archivo.tipo,
+          size: archivo.size,
+        });
+      }
+    } 
+    // Compatibilidad con formato antiguo (un solo archivo)
+    else if (payload.archivo?.contenido_base64) {
+      formData.append('num_archivos', '1');
+      
       const binaryString = atob(payload.archivo.contenido_base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -38,14 +65,13 @@ serve(async (req) => {
       }
       const blob = new Blob([bytes.buffer], { type: payload.archivo.tipo });
       formData.append('file', blob, payload.archivo.nombre);
+      
+      console.log('Archivo único:', {
+        nombre: payload.archivo.nombre,
+        tipo: payload.archivo.tipo,
+        size: payload.archivo.size,
+      });
     }
-    
-    // Añadir metadatos adicionales
-    formData.append('tipo', payload.tipo || 'factura');
-    formData.append('fecha', payload.fecha || new Date().toISOString());
-    formData.append('nombre_archivo', payload.archivo?.nombre || 'archivo');
-    formData.append('tipo_archivo', payload.archivo?.tipo || 'application/octet-stream');
-    formData.append('size', String(payload.archivo?.size || 0));
 
     // Enviar al webhook como multipart/form-data
     const controller = new AbortController();
@@ -71,7 +97,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Factura enviada correctamente',
+        message: 'Facturas enviadas correctamente',
         status: response.status,
         webhookResponse,
       }),
@@ -81,7 +107,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error procesando factura:', error);
+    console.error('Error procesando facturas:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     
