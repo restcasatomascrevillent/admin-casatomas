@@ -774,8 +774,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     if (points.length > 0) {
       const lastPoint = points[points.length - 1];
+      
+      // Calcular ángulo para color de nivel
+      const dx = x - lastPoint.x;
+      const dy = y - lastPoint.y;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const levelColor = getWallLevelColor(angle);
+      
       const line = new Line([lastPoint.x, lastPoint.y, x, y], {
-        stroke: "#1f2937",
+        stroke: levelColor, // Color según nivel de la pared
         strokeWidth: 10,
         strokeLineCap: "round",
         selectable: false,
@@ -807,8 +814,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(measureTextRef.current);
     }
 
+    // Calcular ángulo para color de nivel en tiempo real
+    const dx = x - lastPoint.x;
+    const dy = y - lastPoint.y;
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const levelColor = getWallLevelColor(angle);
+
     const preview = new Line([lastPoint.x, lastPoint.y, x, y], {
-      stroke: "#6b7280",
+      stroke: levelColor, // Color dinámico según nivel
       strokeWidth: 6,
       strokeDashArray: [8, 4],
       strokeLineCap: "round",
@@ -819,9 +832,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     previewLineRef.current = preview;
     fabricCanvas.add(preview);
     
-    // Calcular longitud en metros (redondeada a 5cm)
-    const dx = x - lastPoint.x;
-    const dy = y - lastPoint.y;
+    // Calcular longitud en metros (redondeada a 5cm) - reutilizar dx/dy calculados arriba
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
     const lengthM = roundTo5cm(lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2));
     
