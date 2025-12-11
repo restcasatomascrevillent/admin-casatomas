@@ -919,19 +919,29 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(line);
     });
 
-    // Crear paredes permanentes con cotas y color de nivel
+    // Crear paredes permanentes con cotas y color de nivel - filtrar paredes de longitud 0
     const currentElementos = elementosRef.current;
     const newElementos: ElementoCanvas[] = [];
     for (let i = 0; i < points.length - 1; i++) {
-      const id = `wall-${Date.now()}-${i}`;
       const x1 = points[i].x;
       const y1 = points[i].y;
       const x2 = points[i + 1].x;
       const y2 = points[i + 1].y;
       
-      // Calcular ángulo para determinar color de nivel
+      // Calcular longitud de la pared
       const dx = x2 - x1;
       const dy = y2 - y1;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      
+      // Solo crear paredes con longitud significativa (más de 5 píxeles)
+      if (length < 5) {
+        console.log('[SKIP] Pared muy corta ignorada:', length, 'px');
+        continue;
+      }
+      
+      const id = `wall-${Date.now()}-${i}`;
+      
+      // Calcular ángulo para determinar color de nivel
       const angle = Math.atan2(dy, dx) * (180 / Math.PI);
       const levelColor = getWallLevelColor(angle);
       

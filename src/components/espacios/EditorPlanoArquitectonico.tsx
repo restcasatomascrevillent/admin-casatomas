@@ -504,10 +504,22 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       setPreviewLine(null);
     }
 
-    // Crear paredes permanentes
+    // Crear paredes permanentes - filtrar paredes de longitud 0
+    let paredesCreadas = 0;
     for (let i = 0; i < points.length - 1; i++) {
       const p1 = points[i];
       const p2 = points[i + 1];
+      
+      // Calcular longitud de la pared
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      
+      // Solo crear paredes con longitud significativa (más de 5 píxeles)
+      if (length < 5) {
+        console.log('[SKIP] Pared muy corta ignorada:', length, 'px');
+        continue;
+      }
 
       const wall = new Line([p1.x, p1.y, p2.x, p2.y], {
         stroke: "#374151",
@@ -519,6 +531,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       (wall as any).customData = { tipo: "wall", id: wallId };
       fabricCanvas.add(wall);
       setElementos((prev) => [...prev, { id: wallId, tipo: "wall" }]);
+      paredesCreadas++;
     }
 
     // Resetear estado
@@ -529,7 +542,9 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
     setCurrentWallLength(0);
 
     fabricCanvas.renderAll();
-    toast.success(`Perímetro creado con ${points.length - 1} paredes`);
+    if (paredesCreadas > 0) {
+      toast.success(`Perímetro creado con ${paredesCreadas} paredes`);
+    }
   }, [fabricCanvas, cancelWallDrawing]);
 
   // Función para cerrar el perímetro (conectar último punto con el primero)
