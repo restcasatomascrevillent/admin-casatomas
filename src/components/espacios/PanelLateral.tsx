@@ -294,12 +294,8 @@ export function PanelLateral({
         <CardHeader className="py-2">
           <CardTitle className="text-xs text-muted-foreground">Leyenda</CardTitle>
         </CardHeader>
-        <CardContent className="py-2">
+        <CardContent className="py-2 space-y-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-1.5 bg-gray-700 rounded-full" />
-              <span>Pared</span>
-            </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-100 border-2 border-blue-500 rounded" />
               <span>Mesa</span>
@@ -311,6 +307,29 @@ export function PanelLateral({
             <div className="flex items-center gap-2">
               <div className="w-4 h-2 bg-yellow-100 border border-yellow-600 rounded" />
               <span>Puerta</span>
+            </div>
+          </div>
+          
+          {/* Leyenda de niveles de paredes */}
+          <div className="border-t pt-2">
+            <p className="text-xs text-muted-foreground mb-2">Nivel de paredes:</p>
+            <div className="grid grid-cols-2 gap-1.5 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-1.5 bg-green-500 rounded-full" />
+                <span>Recta</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-1.5 bg-yellow-500 rounded-full" />
+                <span>Leve desvío</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-1.5 bg-orange-500 rounded-full" />
+                <span>Desviada</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-1.5 bg-red-500 rounded-full" />
+                <span>Muy desviada</span>
+              </div>
             </div>
           </div>
         </CardContent>
