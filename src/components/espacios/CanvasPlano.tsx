@@ -591,9 +591,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // Asegurar un mínimo legible
       finalFontSize = Math.max(5, finalFontSize);
       
+      // Calcular centro según tipo de forma
+      let centerX: number;
+      let centerY: number;
+      
+      if (forma === "circular") {
+        const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
+        centerX = posX + radiusPixels;
+        centerY = posY + radiusPixels;
+      } else {
+        centerX = posX + anchoPixels / 2;
+        centerY = posY + altoPixels / 2;
+      }
+      
       const label = new FabricText(`${nombre}\n${dimensionText}`, {
-        left: posX + anchoPixels / 2,
-        top: posY + altoPixels / 2,
+        left: centerX,
+        top: centerY,
         fontSize: finalFontSize,
         fontFamily: "system-ui, sans-serif",
         fontWeight: "600",
