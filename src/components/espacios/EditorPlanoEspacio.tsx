@@ -238,11 +238,12 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       />
 
       {/* Main content */}
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* Canvas */}
+      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+        {/* Canvas - ocupa todo el espacio disponible */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg"
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg min-h-[400px]"
+          style={{ height: '100%' }}
         >
           <CanvasPlano
             ref={canvasRef}

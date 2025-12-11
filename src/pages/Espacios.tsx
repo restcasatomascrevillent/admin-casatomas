@@ -44,15 +44,17 @@ export default function Espacios() {
     refetchMesas(); // Refrescar conteo de mesas
   };
 
-  // Si estamos configurando un espacio, mostrar el editor
+  // Si estamos configurando un espacio, mostrar el editor a pantalla completa
   if (espacioConfigurando) {
     return (
       <DashboardLayout>
-        <EditorPlanoEspacio
-          espacioId={espacioConfigurando.id}
-          espacioNombre={espacioConfigurando.nombre}
-          onBack={handleBackFromEditor}
-        />
+        <div className="h-[calc(100vh-120px)] flex flex-col">
+          <EditorPlanoEspacio
+            espacioId={espacioConfigurando.id}
+            espacioNombre={espacioConfigurando.nombre}
+            onBack={handleBackFromEditor}
+          />
+        </div>
       </DashboardLayout>
     );
   }
