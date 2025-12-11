@@ -447,6 +447,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           strokeWidth: 2,
           originX: "left",
           originY: "top",
+          hasControls: false, // Solo mover, no redimensionar
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
           shadow: {
             color: "rgba(0,0,0,0.1)",
             blur: 8,
@@ -467,6 +471,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           ry: 6,
           originX: "left",
           originY: "top",
+          hasControls: false, // Solo mover, no redimensionar
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
           shadow: {
             color: "rgba(0,0,0,0.1)",
             blur: 8,
@@ -515,6 +523,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           strokeWidth: 2,
           originX: "left",
           originY: "top",
+          hasControls: false, // Solo mover, no redimensionar
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
           shadow: {
             color: "rgba(0,0,0,0.1)",
             blur: 8,
@@ -535,6 +547,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           ry: 6,
           originX: "left",
           originY: "top",
+          hasControls: false, // Solo mover, no redimensionar
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
           shadow: {
             color: "rgba(0,0,0,0.1)",
             blur: 8,
