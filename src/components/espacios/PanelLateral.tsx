@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Square, Circle, Users, Trash2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List } from "lucide-react";
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
 import { toast } from "sonner";
@@ -47,6 +48,11 @@ export function PanelLateral({
     alto: 80,
   });
   
+  // Estados para secciones colapsables
+  const [openAddMesa, setOpenAddMesa] = useState(true);
+  const [openMesasList, setOpenMesasList] = useState(true);
+  const [openLeyenda, setOpenLeyenda] = useState(false);
+  
   // Actualizar dimensiones al cambiar forma
   const handleFormaChange = (forma: "rectangular" | "circular") => {
     if (forma === "circular") {
@@ -78,10 +84,15 @@ export function PanelLateral({
         pos_y: 100,
       });
 
+      setNewMesa({
+        nombre: "",
+        capacidad: 2,
+        forma: "rectangular",
+        ancho: 80,
+        alto: 80,
+      });
       toast.success(`Mesa "${newMesa.nombre}" creada`);
-      setNewMesa({ ...newMesa, nombre: "" });
     } catch (error) {
-      console.error("Error al crear mesa:", error);
       toast.error("Error al crear la mesa");
     }
   };
@@ -90,12 +101,12 @@ export function PanelLateral({
     if (!mesaToDelete) return;
 
     try {
-      // Si es una mesa temporal (no guardada), solo eliminarla del canvas
+      // Si es una mesa temporal, solo quitarla del estado local
       if (mesaToDelete.id.startsWith("mesa-temp-")) {
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
         onSelectionChange(null);
-        toast.success("Mesa eliminada");
       } else {
+        // Eliminar de la base de datos
         await eliminarMesa.mutateAsync(mesaToDelete.id);
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
         onSelectionChange(null);
@@ -109,23 +120,20 @@ export function PanelLateral({
   };
 
   return (
-    <div className="w-72 flex flex-col gap-4 max-h-full overflow-y-auto pr-1">
-      {/* Panel de propiedades */}
+    <div className="w-72 flex flex-col gap-2 max-h-full overflow-y-auto pr-1">
+      {/* Panel de propiedades - siempre visible cuando hay selección */}
       {selectedElement && (
         <Card className="border-2 border-primary/20 bg-primary/5">
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm flex items-center gap-2">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
               {selectedElement.tipo === "mesa" && <Square className="h-4 w-4 text-blue-500" />}
               {selectedElement.tipo === "wall" && <div className="w-4 h-1 bg-gray-700 rounded" />}
               {selectedElement.tipo === "area" && <Square className="h-4 w-4 text-blue-400" />}
               {selectedElement.tipo === "door" && <div className="w-4 h-2 bg-yellow-500 rounded" />}
-              Elemento seleccionado
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Tipo:</span>{" "}
-              <Badge variant="secondary" className="ml-2">
+              Seleccionado
+            </div>
+            <div className="text-xs">
+              <Badge variant="secondary">
                 {selectedElement.tipo === "mesa" && "Mesa"}
                 {selectedElement.tipo === "wall" && "Pared"}
                 {selectedElement.tipo === "area" && "Área"}
@@ -135,205 +143,233 @@ export function PanelLateral({
 
             {selectedElement.tipo === "mesa" && (
               <>
-                <div className="text-sm">
+                <div className="text-xs">
                   <span className="text-muted-foreground">Nombre:</span>{" "}
                   <span className="font-medium">{selectedElement.nombre}</span>
                 </div>
-                <div className="text-sm flex items-center gap-1">
+                <div className="text-xs flex items-center gap-1">
                   <Users className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Capacidad:</span>{" "}
-                  <span className="font-medium">{selectedElement.capacidad} personas</span>
+                  <span>{selectedElement.capacidad} personas</span>
                 </div>
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="w-full"
+                  className="w-full h-7 text-xs"
                   onClick={() => setMesaToDelete({ id: selectedElement.id, nombre: selectedElement.nombre })}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar mesa
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Eliminar
                 </Button>
               </>
             )}
-          </CardContent>
+          </div>
         </Card>
       )}
 
-      {/* Añadir mesa */}
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Añadir Mesa</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <Label className="text-xs">Nombre</Label>
-            <Input
-              placeholder="Ej: Mesa 1"
-              value={newMesa.nombre}
-              onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label className="text-xs">Forma</Label>
-              <div className="flex gap-1">
-                <Button
-                  variant={newMesa.forma === "rectangular" ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleFormaChange("rectangular")}
-                >
-                  <Square className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={newMesa.forma === "circular" ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => handleFormaChange("circular")}
-                >
-                  <Circle className="h-4 w-4" />
-                </Button>
+      {/* Añadir mesa - colapsable */}
+      <Collapsible open={openAddMesa} onOpenChange={setOpenAddMesa}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Plus className="h-4 w-4" />
+                Añadir Mesa
               </div>
+              {openAddMesa ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Capacidad</Label>
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={newMesa.capacidad}
-                onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 1 })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label className="text-xs">Ancho (cm)</Label>
-              <Input
-                type="number"
-                min={30}
-                max={300}
-                value={newMesa.ancho}
-                onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
-              />
-            </div>
-            {newMesa.forma === "rectangular" && (
-              <div className="space-y-2">
-                <Label className="text-xs">Largo (cm)</Label>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Nombre</Label>
                 <Input
-                  type="number"
-                  min={30}
-                  max={300}
-                  value={newMesa.alto}
-                  onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 60 })}
+                  placeholder="Ej: Mesa 1"
+                  value={newMesa.nombre}
+                  onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
+                  className="h-8"
                 />
               </div>
-            )}
-          </div>
 
-          <Button className="w-full" onClick={handleAddMesa} disabled={crearMesa.isPending}>
-            <Plus className="h-4 w-4 mr-2" />
-            {crearMesa.isPending ? "Creando..." : "Crear Mesa"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Lista de mesas */}
-      <Card className="flex-1 min-h-0">
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm flex items-center justify-between">
-            <span>Mesas del espacio</span>
-            <Badge variant="secondary">{mesasCanvas.length}</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-48">
-            <div className="p-3 space-y-2">
-              {mesasCanvas.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  No hay mesas. Añade una desde el formulario o haz clic en el canvas.
-                </p>
-              ) : (
-                mesasCanvas.map((mesa) => (
-                  <div
-                    key={mesa.id}
-                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors ${
-                      selectedElement?.id === mesa.id 
-                        ? "bg-primary/10 border border-primary/30" 
-                        : "bg-muted/50 hover:bg-muted"
-                    }`}
-                    onClick={() => onSelectionChange({ tipo: "mesa", ...mesa })}
-                  >
-                    <div className="flex items-center gap-2">
-                      {mesa.forma === "circular" ? (
-                        <Circle className="h-4 w-4 text-blue-500" />
-                      ) : (
-                        <Square className="h-4 w-4 text-blue-500" />
-                      )}
-                      <span className="text-sm font-medium">{mesa.nombre}</span>
-                      {mesa.id.startsWith("mesa-temp-") && (
-                        <Badge variant="outline" className="text-[10px] py-0">nuevo</Badge>
-                      )}
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      <Users className="h-3 w-3 mr-1" />
-                      {mesa.capacidad}
-                    </Badge>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Forma</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={newMesa.forma === "rectangular" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 h-7"
+                      onClick={() => handleFormaChange("rectangular")}
+                    >
+                      <Square className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant={newMesa.forma === "circular" ? "default" : "outline"}
+                      size="sm"
+                      className="flex-1 h-7"
+                      onClick={() => handleFormaChange("circular")}
+                    >
+                      <Circle className="h-3 w-3" />
+                    </Button>
                   </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Capacidad</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={newMesa.capacidad}
+                    onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 1 })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
 
-      {/* Leyenda */}
-      <Card>
-        <CardHeader className="py-2">
-          <CardTitle className="text-xs text-muted-foreground">Leyenda</CardTitle>
-        </CardHeader>
-        <CardContent className="py-2 space-y-3">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-100 border-2 border-blue-500 rounded" />
-              <span>Mesa</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-500/10 border border-blue-500 border-dashed rounded" />
-              <span>Área</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-2 bg-yellow-100 border border-yellow-600 rounded" />
-              <span>Puerta</span>
-            </div>
-          </div>
-          
-          {/* Leyenda de niveles de paredes */}
-          <div className="border-t pt-2">
-            <p className="text-xs text-muted-foreground mb-2">Nivel de paredes:</p>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-1.5 bg-green-500 rounded-full" />
-                <span>Recta (0°)</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Ancho (cm)</Label>
+                  <Input
+                    type="number"
+                    min={30}
+                    max={300}
+                    value={newMesa.ancho}
+                    onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
+                    className="h-8"
+                  />
+                </div>
+                {newMesa.forma === "rectangular" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Largo (cm)</Label>
+                    <Input
+                      type="number"
+                      min={30}
+                      max={300}
+                      value={newMesa.alto}
+                      onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 60 })}
+                      className="h-8"
+                    />
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-1.5 bg-yellow-500 rounded-full" />
-                <span>Casi recta (&lt;1°)</span>
+
+              <Button className="w-full h-8 text-xs" onClick={handleAddMesa} disabled={crearMesa.isPending}>
+                <Plus className="h-3 w-3 mr-1" />
+                {crearMesa.isPending ? "Creando..." : "Crear Mesa"}
+              </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Lista de mesas - colapsable */}
+      <Collapsible open={openMesasList} onOpenChange={setOpenMesasList}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <List className="h-4 w-4" />
+                Mesas
+                <Badge variant="secondary" className="text-xs">{mesasCanvas.length}</Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-1.5 bg-orange-500 rounded-full" />
-                <span>Desviada (1-3°)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-1.5 bg-red-500 rounded-full" />
-                <span>Muy desviada (&gt;3°)</span>
-              </div>
+              {openMesasList ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="p-0">
+              <ScrollArea className="max-h-32">
+                <div className="p-2 space-y-1">
+                  {mesasCanvas.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      No hay mesas
+                    </p>
+                  ) : (
+                    mesasCanvas.map((mesa) => (
+                      <div
+                        key={mesa.id}
+                        className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors text-xs ${
+                          selectedElement?.id === mesa.id 
+                            ? "bg-primary/10 border border-primary/30" 
+                            : "bg-muted/50 hover:bg-muted"
+                        }`}
+                        onClick={() => onSelectionChange({ tipo: "mesa", ...mesa })}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {mesa.forma === "circular" ? (
+                            <Circle className="h-3 w-3 text-blue-500" />
+                          ) : (
+                            <Square className="h-3 w-3 text-blue-500" />
+                          )}
+                          <span className="font-medium">{mesa.nombre}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] py-0 h-5">
+                          <Users className="h-2.5 w-2.5 mr-0.5" />
+                          {mesa.capacidad}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Leyenda - colapsable, cerrado por defecto */}
+      <Collapsible open={openLeyenda} onOpenChange={setOpenLeyenda}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Info className="h-4 w-4" />
+                Leyenda
+              </div>
+              {openLeyenda ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-100 border-2 border-blue-500 rounded" />
+                  <span>Mesa</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-500/10 border border-blue-500 border-dashed rounded" />
+                  <span>Área</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-2 bg-yellow-100 border border-yellow-600 rounded" />
+                  <span>Puerta</span>
+                </div>
+              </div>
+              
+              {/* Leyenda de niveles de paredes */}
+              <div className="border-t pt-2">
+                <p className="text-xs text-muted-foreground mb-1.5">Nivel de paredes:</p>
+                <div className="grid grid-cols-2 gap-1 text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1 bg-green-500 rounded-full" />
+                    <span>Recta (0°)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1 bg-yellow-500 rounded-full" />
+                    <span>Casi (&lt;1°)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1 bg-orange-500 rounded-full" />
+                    <span>Desviada (1-3°)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-1 bg-red-500 rounded-full" />
+                    <span>Muy (&gt;3°)</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Dialog de confirmación para eliminar mesa */}
       <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
