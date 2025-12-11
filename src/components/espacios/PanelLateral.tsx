@@ -80,8 +80,8 @@ export function PanelLateral({
         forma: newMesa.forma,
         ancho: newMesa.ancho,
         alto: newMesa.forma === "circular" ? newMesa.ancho : newMesa.alto,
-        pos_x: 100,
-        pos_y: 100,
+        pos_x: 1, // Posición inicial en metros
+        pos_y: 1, // Posición inicial en metros
       });
 
       setNewMesa({

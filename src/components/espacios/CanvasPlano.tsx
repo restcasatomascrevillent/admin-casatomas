@@ -323,8 +323,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       const customData = (obj as any).customData;
       if (customData?.tipo === "mesa") {
-        const newPosX = obj.left || 0;
-        const newPosY = obj.top || 0;
+        const newPosXPixels = obj.left || 0;
+        const newPosYPixels = obj.top || 0;
+        
+        // Convertir de píxeles a metros para guardar
+        const newPosXMeters = newPosXPixels / pixelsPerMeterXRef.current;
+        const newPosYMeters = newPosYPixels / pixelsPerMeterYRef.current;
         
         // Actualizar la etiqueta asociada a esta mesa
         canvas.getObjects().forEach((labelObj) => {
@@ -336,20 +340,20 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
               const anchoPixels = mesa.ancho / 100 * pixelsPerMeterXRef.current;
               const altoPixels = mesa.alto / 100 * pixelsPerMeterYRef.current;
               labelObj.set({
-                left: newPosX + anchoPixels / 2,
-                top: newPosY + altoPixels / 2,
+                left: newPosXPixels + anchoPixels / 2,
+                top: newPosYPixels + altoPixels / 2,
               });
             }
           }
         });
         canvas.renderAll();
         
-        // Actualizar estado
+        // Actualizar estado guardando posición en METROS
         const currentMesas = mesasCanvasRef.current;
         onMesasChange(
           currentMesas.map((m) =>
             m.id === customData.id
-              ? { ...m, posX: newPosX, posY: newPosY }
+              ? { ...m, posX: newPosXMeters, posY: newPosYMeters }
               : m
           )
         );
@@ -576,19 +580,18 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const newMesasCanvas: MesaCanvas[] = [];
 
     // Función para añadir etiqueta de mesa
-    // NOTA: ancho/alto vienen en cm desde la BBDD, convertimos a metros dividiendo /100
-    const addMesaLabel = (mesaId: string, nombre: string, anchoCm: number, altoCm: number, forma: string, posX: number, posY: number) => {
+    // NOTA: ancho/alto vienen en cm, posX/posY en PÍXELES (ya convertidos)
+    const addMesaLabel = (mesaId: string, nombre: string, anchoCm: number, altoCm: number, forma: string, posXPixels: number, posYPixels: number) => {
       const anchoM = (anchoCm / 100).toFixed(2);
       const altoM = (altoCm / 100).toFixed(2);
       const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
       
-      // Calcular el centro visual de la mesa en píxeles
+      // Calcular dimensiones en píxeles para el label
       const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
       const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
       
-      // Calcular tamaño de fuente que quepa dentro de la mesa (más agresivo)
+      // Calcular tamaño de fuente que quepa dentro de la mesa
       const minDimension = Math.min(anchoPixels, altoPixels);
-      // Reducir el tamaño de fuente proporcionalmente al espacio disponible
       const fontSize = Math.max(6, Math.min(10, minDimension / 8));
       
       // Crear texto temporal para medir
@@ -600,8 +603,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       // Si el texto es más ancho que la mesa, reducir más el tamaño
       let finalFontSize = fontSize;
-      const maxWidth = anchoPixels * 0.85; // 85% del ancho de la mesa
-      const maxHeight = altoPixels * 0.85; // 85% del alto de la mesa
+      const maxWidth = anchoPixels * 0.85;
+      const maxHeight = altoPixels * 0.85;
       
       if (tempLabel.width && tempLabel.width > maxWidth) {
         finalFontSize = finalFontSize * (maxWidth / tempLabel.width);
@@ -610,7 +613,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         finalFontSize = Math.min(finalFontSize, finalFontSize * (maxHeight / tempLabel.height));
       }
       
-      // Asegurar un mínimo legible
       finalFontSize = Math.max(5, finalFontSize);
       
       // Calcular centro según tipo de forma
@@ -619,11 +621,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       if (forma === "circular") {
         const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-        centerX = posX + radiusPixels;
-        centerY = posY + radiusPixels;
+        centerX = posXPixels + radiusPixels;
+        centerY = posYPixels + radiusPixels;
       } else {
-        centerX = posX + anchoPixels / 2;
-        centerY = posY + altoPixels / 2;
+        centerX = posXPixels + anchoPixels / 2;
+        centerY = posYPixels + altoPixels / 2;
       }
       
       const label = new FabricText(`${nombre}\n${dimensionText}`, {
@@ -646,11 +648,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     // Primero cargar mesas del estado local (tienen prioridad)
-    // NOTA: mesa.ancho y mesa.alto están en cm, los convertimos a píxeles
+    // NOTA: mesa.posX/posY están en METROS, hay que convertir a píxeles
     mesasLocales.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return;
 
-      // Convertir cm a píxeles
+      // Convertir posición de metros a píxeles
+      const posXPixels = mesa.posX * effectivePixelsPerMeterX;
+      const posYPixels = mesa.posY * effectivePixelsPerMeterY;
+      
+      // Convertir cm a píxeles para dimensiones
       const anchoPixels = mesa.ancho / 100 * effectivePixelsPerMeterX;
       const altoPixels = mesa.alto / 100 * effectivePixelsPerMeterY;
 
@@ -659,15 +665,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (mesa.forma === "circular") {
         const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
         obj = new Circle({
-          left: mesa.posX,
-          top: mesa.posY,
+          left: posXPixels,
+          top: posYPixels,
           radius: radiusPixels,
           fill: "#dbeafe",
           stroke: "#2563eb",
           strokeWidth: 2,
           originX: "left",
           originY: "top",
-          hasControls: false, // Solo mover, no redimensionar
+          hasControls: false,
           lockScalingX: true,
           lockScalingY: true,
           lockRotation: true,
@@ -680,8 +686,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         });
       } else {
         obj = new Rect({
-          left: mesa.posX,
-          top: mesa.posY,
+          left: posXPixels,
+          top: posYPixels,
           width: anchoPixels,
           height: altoPixels,
           fill: "#dbeafe",
@@ -691,7 +697,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           ry: 6,
           originX: "left",
           originY: "top",
-          hasControls: false, // Solo mover, no redimensionar
+          hasControls: false,
           lockScalingX: true,
           lockScalingY: true,
           lockRotation: true,
@@ -712,21 +718,26 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       };
 
       fabricCanvas.add(obj);
-      addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, mesa.posX, mesa.posY);
+      addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
       mesasEnCanvas.add(mesa.id);
     });
 
     // Luego cargar mesas de BD que no estén ya
-    // NOTA: ancho/alto en BBDD están en cm
+    // NOTA: pos_x/pos_y en BBDD están en METROS, ancho/alto en CM
     mesasDB?.forEach((mesa) => {
       if (mesasEnCanvas.has(mesa.id)) return;
 
-      const posX = mesa.pos_x || 50;
-      const posY = mesa.pos_y || 50;
+      // Las posiciones vienen en metros desde la BD
+      const posXMeters = mesa.pos_x || 0.5;
+      const posYMeters = mesa.pos_y || 0.5;
       const anchoCm = mesa.ancho || 80;
-      const altoCm = mesa.alto || 60;
+      const altoCm = mesa.alto || 80;
 
-      // Convertir cm a píxeles
+      // Convertir posición de metros a píxeles
+      const posXPixels = posXMeters * effectivePixelsPerMeterX;
+      const posYPixels = posYMeters * effectivePixelsPerMeterY;
+      
+      // Convertir cm a píxeles para dimensiones
       const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
       const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
 
@@ -735,15 +746,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (mesa.forma === "circular") {
         const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
         obj = new Circle({
-          left: posX,
-          top: posY,
+          left: posXPixels,
+          top: posYPixels,
           radius: radiusPixels,
           fill: "#dbeafe",
           stroke: "#2563eb",
           strokeWidth: 2,
           originX: "left",
           originY: "top",
-          hasControls: false, // Solo mover, no redimensionar
+          hasControls: false,
           lockScalingX: true,
           lockScalingY: true,
           lockRotation: true,
@@ -756,8 +767,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         });
       } else {
         obj = new Rect({
-          left: posX,
-          top: posY,
+          left: posXPixels,
+          top: posYPixels,
           width: anchoPixels,
           height: altoPixels,
           fill: "#dbeafe",
@@ -767,7 +778,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           ry: 6,
           originX: "left",
           originY: "top",
-          hasControls: false, // Solo mover, no redimensionar
+          hasControls: false,
           lockScalingX: true,
           lockScalingY: true,
           lockRotation: true,
@@ -788,8 +799,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       };
 
       fabricCanvas.add(obj);
-      addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posX, posY);
+      addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels);
 
+      // Guardar en estado local en METROS
       newMesasCanvas.push({
         id: mesa.id,
         nombre: mesa.nombre,
@@ -797,8 +809,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         forma: mesa.forma as "rectangular" | "circular",
         ancho: anchoCm,
         alto: altoCm,
-        posX,
-        posY,
+        posX: posXMeters,
+        posY: posYMeters,
       });
     });
 
@@ -1125,19 +1137,40 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     onToolChange("select");
   };
 
-  // Función para crear etiqueta de mesa
-  const createMesaLabel = (mesaId: string, nombre: string, ancho: number, alto: number, forma: string, posX: number, posY: number) => {
+  // Función para crear etiqueta de mesa (anchoCm/altoCm en cm, posXPixels/posYPixels en píxeles)
+  const createMesaLabel = (mesaId: string, nombre: string, anchoCm: number, altoCm: number, forma: string, posXPixels: number, posYPixels: number) => {
     if (!fabricCanvas) return;
     
-    // Calcular dimensiones en metros
-    const anchoM = (ancho / pixelsPerMeterXRef.current).toFixed(2);
-    const altoM = (alto / pixelsPerMeterYRef.current).toFixed(2);
+    // Calcular dimensiones en metros para mostrar
+    const anchoM = (anchoCm / 100).toFixed(2);
+    const altoM = (altoCm / 100).toFixed(2);
     const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
     
+    // Calcular dimensiones en píxeles
+    const anchoPixels = anchoCm / 100 * pixelsPerMeterXRef.current;
+    const altoPixels = altoCm / 100 * pixelsPerMeterYRef.current;
+    
+    // Calcular tamaño de fuente que quepa
+    const minDimension = Math.min(anchoPixels, altoPixels);
+    const finalFontSize = Math.max(5, Math.min(10, minDimension / 8));
+    
+    // Centro de la mesa
+    let centerX: number;
+    let centerY: number;
+    
+    if (forma === "circular") {
+      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
+      centerX = posXPixels + radiusPixels;
+      centerY = posYPixels + radiusPixels;
+    } else {
+      centerX = posXPixels + anchoPixels / 2;
+      centerY = posYPixels + altoPixels / 2;
+    }
+    
     const label = new FabricText(`${nombre}\n${dimensionText}`, {
-      left: posX + ancho / 2,
-      top: posY + alto / 2,
-      fontSize: 10,
+      left: centerX,
+      top: centerY,
+      fontSize: finalFontSize,
       fontFamily: "system-ui, sans-serif",
       fontWeight: "600",
       fill: "#1e40af",
@@ -1157,23 +1190,40 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!fabricCanvas) return;
 
     const id = `mesa-temp-${Date.now()}`;
-    // Dimensiones estándar: 80x80cm rectangular, 150cm diámetro circular
-    const ancho = forma === "circular" ? 150 : 80;
-    const alto = forma === "circular" ? 150 : 80;
+    // Dimensiones estándar en CM: 80x80cm rectangular, 150cm diámetro circular
+    const anchoCm = forma === "circular" ? 150 : 80;
+    const altoCm = forma === "circular" ? 150 : 80;
     const capacidad = forma === "circular" ? 6 : 2;
+
+    // Convertir cm a píxeles para renderizar
+    const anchoPixels = anchoCm / 100 * pixelsPerMeterXRef.current;
+    const altoPixels = altoCm / 100 * pixelsPerMeterYRef.current;
+    
+    // Posición en píxeles (centrado en el clic)
+    const posXPixels = x - anchoPixels / 2;
+    const posYPixels = y - altoPixels / 2;
+    
+    // Posición en metros para guardar
+    const posXMeters = posXPixels / pixelsPerMeterXRef.current;
+    const posYMeters = posYPixels / pixelsPerMeterYRef.current;
 
     let obj: FabricObject;
 
     if (forma === "circular") {
+      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
       obj = new Circle({
-        left: x - ancho / 2,
-        top: y - alto / 2,
-        radius: ancho / 2,
+        left: posXPixels,
+        top: posYPixels,
+        radius: radiusPixels,
         fill: "#dbeafe",
         stroke: "#2563eb",
         strokeWidth: 2,
         originX: "left",
         originY: "top",
+        hasControls: false,
+        lockScalingX: true,
+        lockScalingY: true,
+        lockRotation: true,
         shadow: {
           color: "rgba(0,0,0,0.1)",
           blur: 8,
@@ -1183,10 +1233,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       });
     } else {
       obj = new Rect({
-        left: x - ancho / 2,
-        top: y - alto / 2,
-        width: ancho,
-        height: alto,
+        left: posXPixels,
+        top: posYPixels,
+        width: anchoPixels,
+        height: altoPixels,
         fill: "#dbeafe",
         stroke: "#2563eb",
         strokeWidth: 2,
@@ -1194,6 +1244,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         ry: 6,
         originX: "left",
         originY: "top",
+        hasControls: false,
+        lockScalingX: true,
+        lockScalingY: true,
+        lockRotation: true,
         shadow: {
           color: "rgba(0,0,0,0.1)",
           blur: 8,
@@ -1216,21 +1270,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     fabricCanvas.add(obj);
     
-    // Añadir etiqueta de la mesa
-    createMesaLabel(id, mesaName, ancho, alto, forma, x - ancho / 2, y - alto / 2);
+    // Añadir etiqueta de la mesa (pasando cm y píxeles)
+    createMesaLabel(id, mesaName, anchoCm, altoCm, forma, posXPixels, posYPixels);
     
     fabricCanvas.setActiveObject(obj);
     fabricCanvas.renderAll();
 
+    // Guardar en estado con posición en METROS y dimensiones en CM
     const newMesa: MesaCanvas = {
       id,
       nombre: mesaName,
       capacidad,
       forma,
-      ancho,
-      alto,
-      posX: x - ancho / 2,
-      posY: y - alto / 2,
+      ancho: anchoCm,
+      alto: altoCm,
+      posX: posXMeters,
+      posY: posYMeters,
     };
 
     onMesasChange([...currentMesas, newMesa]);
