@@ -11,6 +11,7 @@ interface CanvasPlanoProps {
   mesasCanvas: MesaCanvas[];
   mesasDB: Mesa[];
   realDimensions: { width: number; height: number };
+  containerSize: { width: number; height: number };
   planoConfig: any;
   selectedElement: any;
   initialZoom?: number;
@@ -36,6 +37,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   mesasCanvas,
   mesasDB,
   realDimensions,
+  containerSize,
   planoConfig,
   selectedElement,
   initialZoom = 1,
@@ -57,10 +59,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   // Función para redondear a 5cm (0.05m)
   const roundTo5cm = (meters: number) => Math.round(meters * 20) / 20;
   
-  // Dimensiones FIJAS del canvas basadas en metros reales y escala fija
+  // Dimensiones lógicas del plano (para el grid y los objetos)
   const RULER_SIZE = 40;
-  const canvasWidth = realDimensions.width * pixelsPerMeter;
-  const canvasHeight = realDimensions.height * pixelsPerMeter;
+  const logicalWidth = realDimensions.width * pixelsPerMeter;
+  const logicalHeight = realDimensions.height * pixelsPerMeter;
+  
+  // El canvas usa el tamaño del contenedor para llenar todo el espacio
+  const canvasWidth = containerSize.width > 0 ? containerSize.width : logicalWidth;
+  const canvasHeight = containerSize.height > 0 ? containerSize.height : logicalHeight;
   
   // Refs para mantener valores actualizados en event handlers
   const activeToolRef = useRef(activeTool);
@@ -207,7 +213,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       verticalAlignments.forEach(({ moving, target }) => {
         if (Math.abs(moving - target) < SNAP_THRESHOLD) {
-          const guide = new Line([target, 0, target, canvasHeight], {
+          const guide = new Line([target, 0, target, logicalHeight], {
             stroke: "#3b82f6",
             strokeWidth: 1,
             strokeDashArray: [5, 5],
@@ -231,7 +237,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       horizontalAlignments.forEach(({ moving, target }) => {
         if (Math.abs(moving - target) < SNAP_THRESHOLD) {
-          const guide = new Line([0, target, canvasWidth, target], {
+          const guide = new Line([0, target, logicalWidth, target], {
             stroke: "#3b82f6",
             strokeWidth: 1,
             strokeDashArray: [5, 5],
@@ -301,8 +307,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         // Mantener dentro de los límites del canvas
         if (newPosX < 0) newPosX = 0;
         if (newPosY < 0) newPosY = 0;
-        if (newPosX + objWidth > canvasWidth) newPosX = canvasWidth - objWidth;
-        if (newPosY + objHeight > canvasHeight) newPosY = canvasHeight - objHeight;
+        if (newPosX + objWidth > logicalWidth) newPosX = logicalWidth - objWidth;
+        if (newPosY + objHeight > logicalHeight) newPosY = logicalHeight - objHeight;
         
         obj.set({ left: newPosX, top: newPosY });
         
@@ -497,9 +503,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Calcular el área real del espacio en píxeles (escala FIJA)
-    const realWidth = canvasWidth;
-    const realHeight = canvasHeight;
+    // Usar las dimensiones lógicas del plano (no del canvas)
+    const realWidth = logicalWidth;
+    const realHeight = logicalHeight;
 
     // Colores del grid
     const gridColorMedium = "#e2e8f0";
@@ -554,7 +560,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.sendObjectToBack(border);
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, pixelsPerMeter, realDimensions, canvasWidth, canvasHeight]);
+  }, [fabricCanvas, pixelsPerMeter, realDimensions, logicalWidth, logicalHeight]);
 
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
