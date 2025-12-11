@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
 import { useMesas, useActualizarMesasSilent } from "@/hooks/useMesas";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,8 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [isSaving, setIsSaving] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,34 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
 
+  // Medir el contenedor
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setContainerSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Calcular zoom para ajustar al contenedor
+  const canvasRealWidth = realDimensions.width * PIXELS_PER_METER;
+  const canvasRealHeight = realDimensions.height * PIXELS_PER_METER;
+  
+  const fitZoom = Math.min(
+    (containerSize.width - 40) / canvasRealWidth,
+    (containerSize.height - 40) / canvasRealHeight,
+    1 // No hacer zoom mayor a 1
+  );
+
   // Cargar dimensiones guardadas del plano
   useEffect(() => {
     if (plano?.configuracion?.realDimensions) {
@@ -75,6 +105,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       // Si hay un pixelsPerMeter guardado, podemos usarlo, pero por ahora usamos el fijo
     }
   }, [plano]);
+
+  // Auto-ajustar zoom cuando cambian las dimensiones o el contenedor
+  useEffect(() => {
+    setZoomLevel(fitZoom);
+  }, [fitZoom]);
 
   // Aplicar nuevas dimensiones reales
   const handleApplyDimensions = useCallback((width: number, height: number) => {
@@ -205,6 +240,38 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Controles de zoom */}
+          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7"
+              onClick={() => setZoomLevel(Math.max(0.25, zoomLevel - 0.1))}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-medium w-12 text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7"
+              onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.1))}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7"
+              onClick={() => setZoomLevel(fitZoom)}
+              title="Ajustar al espacio"
+            >
+              <Maximize className="h-4 w-4" />
+            </Button>
+          </div>
+          
           <Button variant="outline" size="sm" onClick={handleExport} className="rounded-lg">
             <Download className="h-4 w-4 mr-2" />
             Exportar
@@ -235,27 +302,34 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       {/* Main content */}
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Canvas - con scroll si es más grande que el contenedor */}
+        {/* Canvas - con zoom visual */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-auto shadow-lg min-h-[400px]"
-          style={{ height: '100%' }}
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-auto shadow-lg min-h-[400px] flex items-center justify-center"
         >
-          <CanvasPlano
-            ref={canvasRef}
-            pixelsPerMeter={PIXELS_PER_METER}
-            activeTool={activeTool}
-            elementos={elementos}
-            mesasCanvas={mesasCanvas}
-            mesasDB={mesas}
-            realDimensions={realDimensions}
-            planoConfig={plano?.configuracion}
-            selectedElement={selectedElement}
-            onElementosChange={setElementos}
-            onMesasChange={setMesasCanvas}
-            onSelectionChange={setSelectedElement}
-            onToolChange={setActiveTool}
-          />
+          <div 
+            style={{ 
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.15s ease-out'
+            }}
+          >
+            <CanvasPlano
+              ref={canvasRef}
+              pixelsPerMeter={PIXELS_PER_METER}
+              activeTool={activeTool}
+              elementos={elementos}
+              mesasCanvas={mesasCanvas}
+              mesasDB={mesas}
+              realDimensions={realDimensions}
+              planoConfig={plano?.configuracion}
+              selectedElement={selectedElement}
+              onElementosChange={setElementos}
+              onMesasChange={setMesasCanvas}
+              onSelectionChange={setSelectedElement}
+              onToolChange={setActiveTool}
+            />
+          </div>
         </div>
 
         {/* Panel lateral */}
