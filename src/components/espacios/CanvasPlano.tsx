@@ -73,6 +73,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const previewLineRef = useRef<Line | null>(null);
   const pixelsPerMeterXRef = useRef(effectivePixelsPerMeterX);
   const pixelsPerMeterYRef = useRef(effectivePixelsPerMeterY);
+  const alignmentGuidesRef = useRef<Line[]>([]); // Guías de alineación
 
   // Sincronizar refs
   useEffect(() => {
@@ -134,6 +135,110 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     getCanvas: () => canvasRef.current
   }), [fabricCanvas, onElementosChange, onMesasChange]);
 
+  // Función para obtener color de nivel según ángulo de pared
+  const getWallLevelColor = (angle: number): string => {
+    // Normalizar ángulo a 0-90 (considerando simetría)
+    const normalizedAngle = Math.abs(angle % 90);
+    const deviation = Math.min(normalizedAngle, 90 - normalizedAngle);
+    
+    // Verde: desviación < 2°, Amarillo: 2-5°, Naranja: 5-10°, Rojo: > 10°
+    if (deviation < 2) return "#22c55e"; // Verde
+    if (deviation < 5) return "#eab308"; // Amarillo
+    if (deviation < 10) return "#f97316"; // Naranja
+    return "#ef4444"; // Rojo
+  };
+
+  // Función para limpiar guías de alineación
+  const clearAlignmentGuides = (canvas: FabricCanvas) => {
+    alignmentGuidesRef.current.forEach(guide => canvas.remove(guide));
+    alignmentGuidesRef.current = [];
+  };
+
+  // Función para mostrar guías de alineación
+  const showAlignmentGuides = (canvas: FabricCanvas, movingObj: FabricObject) => {
+    clearAlignmentGuides(canvas);
+    
+    const customData = (movingObj as any).customData;
+    if (customData?.tipo !== "mesa") return;
+    
+    const movingLeft = movingObj.left || 0;
+    const movingTop = movingObj.top || 0;
+    const movingWidth = (movingObj as any).width || (movingObj as any).radius * 2 || 0;
+    const movingHeight = (movingObj as any).height || (movingObj as any).radius * 2 || 0;
+    
+    const movingRight = movingLeft + movingWidth;
+    const movingBottom = movingTop + movingHeight;
+    const movingCenterX = movingLeft + movingWidth / 2;
+    const movingCenterY = movingTop + movingHeight / 2;
+    
+    const SNAP_THRESHOLD = 8; // píxeles de tolerancia
+    
+    canvas.getObjects().forEach(obj => {
+      const objData = (obj as any).customData;
+      if (!objData || objData.tipo !== "mesa" || objData.id === customData.id) return;
+      
+      const objLeft = obj.left || 0;
+      const objTop = obj.top || 0;
+      const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
+      const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
+      
+      const objRight = objLeft + objWidth;
+      const objBottom = objTop + objHeight;
+      const objCenterX = objLeft + objWidth / 2;
+      const objCenterY = objTop + objHeight / 2;
+      
+      // Alineación vertical (bordes izquierdo, derecho, centro)
+      const verticalAlignments = [
+        { moving: movingLeft, target: objLeft, label: "left-left" },
+        { moving: movingLeft, target: objRight, label: "left-right" },
+        { moving: movingRight, target: objLeft, label: "right-left" },
+        { moving: movingRight, target: objRight, label: "right-right" },
+        { moving: movingCenterX, target: objCenterX, label: "center-center" },
+      ];
+      
+      verticalAlignments.forEach(({ moving, target }) => {
+        if (Math.abs(moving - target) < SNAP_THRESHOLD) {
+          const guide = new Line([target, 0, target, canvasHeight], {
+            stroke: "#3b82f6",
+            strokeWidth: 1,
+            strokeDashArray: [5, 5],
+            selectable: false,
+            evented: false,
+          });
+          (guide as any).isAlignmentGuide = true;
+          alignmentGuidesRef.current.push(guide);
+          canvas.add(guide);
+        }
+      });
+      
+      // Alineación horizontal (bordes superior, inferior, centro)
+      const horizontalAlignments = [
+        { moving: movingTop, target: objTop, label: "top-top" },
+        { moving: movingTop, target: objBottom, label: "top-bottom" },
+        { moving: movingBottom, target: objTop, label: "bottom-top" },
+        { moving: movingBottom, target: objBottom, label: "bottom-bottom" },
+        { moving: movingCenterY, target: objCenterY, label: "center-center" },
+      ];
+      
+      horizontalAlignments.forEach(({ moving, target }) => {
+        if (Math.abs(moving - target) < SNAP_THRESHOLD) {
+          const guide = new Line([0, target, canvasWidth, target], {
+            stroke: "#3b82f6",
+            strokeWidth: 1,
+            strokeDashArray: [5, 5],
+            selectable: false,
+            evented: false,
+          });
+          (guide as any).isAlignmentGuide = true;
+          alignmentGuidesRef.current.push(guide);
+          canvas.add(guide);
+        }
+      });
+    });
+    
+    canvas.renderAll();
+  };
+
   // Inicializar canvas - se recrea cuando cambian las dimensiones
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -164,11 +269,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     canvas.on("selection:cleared", () => {
       onSelectionChange(null);
+      clearAlignmentGuides(canvas);
+    });
+
+    // Mostrar guías mientras se mueve
+    canvas.on("object:moving", (e) => {
+      const obj = e.target;
+      if (obj) {
+        showAlignmentGuides(canvas, obj);
+      }
     });
 
     canvas.on("object:modified", (e) => {
       const obj = e.target;
       if (!obj) return;
+      
+      // Limpiar guías de alineación
+      clearAlignmentGuides(canvas);
       
       const customData = (obj as any).customData;
       if (customData?.tipo === "mesa") {
@@ -290,15 +407,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const y2 = elem.props?.y2 || elem.y2 || 0;
 
       switch (elem.tipo) {
-        case "wall":
+        case "wall": {
+          // Calcular ángulo para determinar color de nivel
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const levelColor = getWallLevelColor(angle);
+          
           obj = new Line([x1, y1, x2, y2], {
-            stroke: "#1f2937",
+            stroke: levelColor, // Color según nivel
             strokeWidth: 10,
             strokeLineCap: "round",
             selectable: true,
             hasControls: true,
           });
           break;
+        }
         case "area":
           obj = new Rect({
             left: elem.props?.left || elem.left,
@@ -784,13 +908,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(line);
     });
 
-    // Crear paredes permanentes con cotas
+    // Crear paredes permanentes con cotas y color de nivel
     const currentElementos = elementosRef.current;
     const newElementos: ElementoCanvas[] = [];
     for (let i = 0; i < points.length - 1; i++) {
       const id = `wall-${Date.now()}-${i}`;
-      const wall = new Line([points[i].x, points[i].y, points[i + 1].x, points[i + 1].y], {
-        stroke: "#1f2937",
+      const x1 = points[i].x;
+      const y1 = points[i].y;
+      const x2 = points[i + 1].x;
+      const y2 = points[i + 1].y;
+      
+      // Calcular ángulo para determinar color de nivel
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const levelColor = getWallLevelColor(angle);
+      
+      const wall = new Line([x1, y1, x2, y2], {
+        stroke: levelColor, // Color según nivel
         strokeWidth: 10,
         strokeLineCap: "round",
         selectable: true,
@@ -800,17 +935,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(wall);
       
       // Añadir cota a la pared
-      createWallCota(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, id);
+      createWallCota(x1, y1, x2, y2, id);
       
       newElementos.push({
         id,
         tipo: "wall",
-        props: {
-          x1: points[i].x,
-          y1: points[i].y,
-          x2: points[i + 1].x,
-          y2: points[i + 1].y,
-        },
+        props: { x1, y1, x2, y2 },
       });
     }
 
