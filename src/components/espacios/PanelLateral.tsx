@@ -316,19 +316,19 @@ export function PanelLateral({
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-1.5 bg-green-500 rounded-full" />
-                <span>Recta</span>
+                <span>Recta (&lt;0.5°)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-1.5 bg-yellow-500 rounded-full" />
-                <span>Leve desvío</span>
+                <span>Casi recta (0.5-2°)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-1.5 bg-orange-500 rounded-full" />
-                <span>Desviada</span>
+                <span>Desviada (2-5°)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-1.5 bg-red-500 rounded-full" />
-                <span>Muy desviada</span>
+                <span>Muy desviada (&gt;5°)</span>
               </div>
             </div>
           </div>
