@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Trash2 } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
 import { useMesas, useActualizarMesasSilent } from "@/hooks/useMesas";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
@@ -61,7 +62,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const pixelsPerMeterY = containerSize.height / realDimensions.height;
 
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
-  const { data: mesas = [], isLoading: loadingMesas } = useMesas(espacioId);
+  const { data: mesas = [], isLoading: loadingMesas, refetch: refetchMesas } = useMesas(espacioId);
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
 
@@ -140,15 +141,33 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     }
   }, [espacioNombre]);
 
-  // Limpiar canvas
-  const handleClear = useCallback(() => {
-    setElementos([]);
-    setMesasCanvas([]);
-    setSelectedElement(null);
-    canvasRef.current?.clearCanvas();
-    setShowClearDialog(false);
-    toast.info("Plano limpiado");
-  }, []);
+  // Limpiar canvas (incluyendo mesas de la BBDD)
+  const handleClear = useCallback(async () => {
+    try {
+      // Eliminar todas las mesas del espacio de la BBDD
+      const { error } = await supabase
+        .from("mesas")
+        .delete()
+        .eq("espacio_id", espacioId);
+      
+      if (error) throw error;
+      
+      // Limpiar estado local
+      setElementos([]);
+      setMesasCanvas([]);
+      setSelectedElement(null);
+      canvasRef.current?.clearCanvas();
+      
+      // Refrescar datos
+      refetchMesas();
+      
+      setShowClearDialog(false);
+      toast.success("Plano y mesas eliminados correctamente");
+    } catch (error) {
+      console.error("Error al limpiar:", error);
+      toast.error("Error al eliminar las mesas");
+    }
+  }, [espacioId, refetchMesas]);
 
   // Eliminar elemento seleccionado
   const handleDeleteSelected = useCallback(() => {
@@ -269,8 +288,8 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           <AlertDialogHeader>
             <AlertDialogTitle>¿Limpiar todo el plano?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará todos los elementos del plano (paredes, áreas, puertas y mesas temporales). 
-              Las mesas guardadas en la base de datos no se eliminarán.
+              Esta acción eliminará TODOS los elementos del plano incluyendo paredes, áreas, puertas y 
+              <strong> todas las mesas guardadas en la base de datos</strong>. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
