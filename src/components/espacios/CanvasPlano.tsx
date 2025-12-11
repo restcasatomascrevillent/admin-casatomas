@@ -363,7 +363,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [canvasWidth, canvasHeight]);
 
-  // Dibujar grid con estilo mejorado
+  // Dibujar grid con estilo mejorado - adaptado al espacio real
   useEffect(() => {
     if (!fabricCanvas) return;
 
@@ -374,17 +374,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
+    // Calcular el área real del espacio en píxeles
+    const realWidth = realDimensions.width * effectivePixelsPerMeterX;
+    const realHeight = realDimensions.height * effectivePixelsPerMeterY;
+
     // Colores del grid
     const gridColorLight = "#f1f5f9";
     const gridColorMedium = "#e2e8f0";
     const gridColorStrong = "#cbd5e1";
     
-    // Líneas verticales
+    // Líneas verticales - solo dentro del espacio real
     for (let i = 0; i <= realDimensions.width; i++) {
       const x = i * effectivePixelsPerMeterX;
+      if (x > realWidth) break;
       const isMajor = i % 5 === 0;
-      const line = new Line([x, 0, x, canvasHeight], {
-        stroke: isMajor ? gridColorStrong : (i % 1 === 0 ? gridColorMedium : gridColorLight),
+      const line = new Line([x, 0, x, realHeight], {
+        stroke: isMajor ? gridColorStrong : gridColorMedium,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -394,12 +399,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.sendObjectToBack(line);
     }
 
-    // Líneas horizontales
+    // Líneas horizontales - solo dentro del espacio real
     for (let i = 0; i <= realDimensions.height; i++) {
       const y = i * effectivePixelsPerMeterY;
+      if (y > realHeight) break;
       const isMajor = i % 5 === 0;
-      const line = new Line([0, y, canvasWidth, y], {
-        stroke: isMajor ? gridColorStrong : (i % 1 === 0 ? gridColorMedium : gridColorLight),
+      const line = new Line([0, y, realWidth, y], {
+        stroke: isMajor ? gridColorStrong : gridColorMedium,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -408,6 +414,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(line);
       fabricCanvas.sendObjectToBack(line);
     }
+
+    // Dibujar borde del espacio real
+    const border = new Rect({
+      left: 0,
+      top: 0,
+      width: realWidth,
+      height: realHeight,
+      fill: "transparent",
+      stroke: "#94a3b8",
+      strokeWidth: 2,
+      selectable: false,
+      evented: false,
+    });
+    (border as any).isGrid = true;
+    fabricCanvas.add(border);
+    fabricCanvas.sendObjectToBack(border);
 
     fabricCanvas.renderAll();
   }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
