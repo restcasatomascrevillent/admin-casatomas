@@ -141,11 +141,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const normalizedAngle = Math.abs(angle % 90);
     const deviation = Math.min(normalizedAngle, 90 - normalizedAngle);
     
-    // Verde: desviación < 2°, Amarillo: 2-5°, Naranja: 5-10°, Rojo: > 10°
-    if (deviation < 2) return "#22c55e"; // Verde
-    if (deviation < 5) return "#eab308"; // Amarillo
-    if (deviation < 10) return "#f97316"; // Naranja
-    return "#ef4444"; // Rojo
+    // Verde: solo totalmente recto (<0.5°), Amarillo: 0.5-2°, Naranja: 2-5°, Rojo: > 5°
+    if (deviation < 0.5) return "#22c55e"; // Verde - totalmente recto
+    if (deviation < 2) return "#eab308"; // Amarillo - casi recto
+    if (deviation < 5) return "#f97316"; // Naranja - desviado
+    return "#ef4444"; // Rojo - muy desviado
   };
 
   // Función para limpiar guías de alineación
