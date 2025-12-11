@@ -95,13 +95,12 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     (containerSize.height - 40) / canvasRealHeight
   );
 
-  // Cargar dimensiones guardadas del plano
+  // Cargar dimensiones guardadas del plano (prioridad: columnas dedicadas, fallback: configuracion)
   useEffect(() => {
-    if (plano?.configuracion?.realDimensions) {
+    if (plano?.ancho_metros && plano?.alto_metros) {
+      setRealDimensions({ width: plano.ancho_metros, height: plano.alto_metros });
+    } else if (plano?.configuracion?.realDimensions) {
       setRealDimensions(plano.configuracion.realDimensions);
-    }
-    if (plano?.configuracion?.pixelsPerMeter) {
-      // Si hay un pixelsPerMeter guardado, podemos usarlo, pero por ahora usamos el fijo
     }
   }, [plano]);
 
@@ -124,11 +123,13 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       const canvasWidth = realDimensions.width * PIXELS_PER_METER;
       const canvasHeight = realDimensions.height * PIXELS_PER_METER;
       
-      // Guardar configuración del plano
+      // Guardar configuración del plano con dimensiones reales en metros
       await guardarPlano.mutateAsync({
         espacio_id: espacioId,
         ancho: canvasWidth,
         alto: canvasHeight,
+        ancho_metros: realDimensions.width,
+        alto_metros: realDimensions.height,
         metros_cuadrados: realDimensions.width * realDimensions.height,
         configuracion: {
           elementos,

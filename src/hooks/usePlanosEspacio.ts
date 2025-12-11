@@ -7,6 +7,8 @@ export interface PlanoEspacio {
   espacio_id: string;
   ancho: number;
   alto: number;
+  ancho_metros: number | null;
+  alto_metros: number | null;
   metros_cuadrados: number | null;
   configuracion: Record<string, any>;
   created_at: string;

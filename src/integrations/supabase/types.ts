@@ -753,7 +753,9 @@ export type Database = {
       planos_espacio: {
         Row: {
           alto: number | null
+          alto_metros: number | null
           ancho: number | null
+          ancho_metros: number | null
           configuracion: Json | null
           created_at: string | null
           espacio_id: string
@@ -763,7 +765,9 @@ export type Database = {
         }
         Insert: {
           alto?: number | null
+          alto_metros?: number | null
           ancho?: number | null
+          ancho_metros?: number | null
           configuracion?: Json | null
           created_at?: string | null
           espacio_id: string
@@ -773,7 +777,9 @@ export type Database = {
         }
         Update: {
           alto?: number | null
+          alto_metros?: number | null
           ancho?: number | null
+          ancho_metros?: number | null
           configuracion?: Json | null
           created_at?: string | null
           espacio_id?: string
