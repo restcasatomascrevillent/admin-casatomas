@@ -170,7 +170,7 @@ export function PanelLateral({
       <Collapsible open={openAddMesa} onOpenChange={setOpenAddMesa}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+            <div className="flex items-center justify-between p-3 cursor-pointer">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Plus className="h-4 w-4" />
                 Añadir Mesa
@@ -265,7 +265,7 @@ export function PanelLateral({
       <Collapsible open={openMesasList} onOpenChange={setOpenMesasList}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+            <div className="flex items-center justify-between p-3 cursor-pointer">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <List className="h-4 w-4" />
                 Mesas
@@ -319,7 +319,7 @@ export function PanelLateral({
       <Collapsible open={openLeyenda} onOpenChange={setOpenLeyenda}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 rounded-t-lg">
+            <div className="flex items-center justify-between p-3 cursor-pointer">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Info className="h-4 w-4" />
                 Leyenda
