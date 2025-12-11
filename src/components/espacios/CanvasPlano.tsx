@@ -5,14 +5,11 @@ import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
 
 interface CanvasPlanoProps {
-  containerWidth: number;
-  containerHeight: number;
+  pixelsPerMeter: number;
   activeTool: ToolType;
   elementos: ElementoCanvas[];
   mesasCanvas: MesaCanvas[];
   mesasDB: Mesa[];
-  pixelsPerMeterX: number;
-  pixelsPerMeterY: number;
   realDimensions: { width: number; height: number };
   planoConfig: any;
   selectedElement: any;
@@ -29,14 +26,11 @@ export interface CanvasPlanoRef {
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
-  containerWidth,
-  containerHeight,
+  pixelsPerMeter,
   activeTool,
   elementos,
   mesasCanvas,
   mesasDB,
-  pixelsPerMeterX,
-  pixelsPerMeterY,
   realDimensions,
   planoConfig,
   selectedElement,
@@ -54,15 +48,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   // Función para redondear a 5cm (0.05m)
   const roundTo5cm = (meters: number) => Math.round(meters * 20) / 20;
   
-  // Dimensiones calculadas del canvas
+  // Dimensiones FIJAS del canvas basadas en metros reales y escala fija
   const RULER_SIZE = 40;
-  const PADDING = 16;
-  const canvasWidth = Math.max(400, containerWidth - RULER_SIZE - PADDING * 2);
-  const canvasHeight = Math.max(300, containerHeight - RULER_SIZE - PADDING * 2);
-  
-  // Recalcular pixels por metro basado en tamaño del canvas
-  const effectivePixelsPerMeterX = canvasWidth / realDimensions.width;
-  const effectivePixelsPerMeterY = canvasHeight / realDimensions.height;
+  const canvasWidth = realDimensions.width * pixelsPerMeter;
+  const canvasHeight = realDimensions.height * pixelsPerMeter;
   
   // Refs para mantener valores actualizados en event handlers
   const activeToolRef = useRef(activeTool);
@@ -71,8 +60,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const tempLinesRef = useRef<Line[]>([]);
   const previewLineRef = useRef<Line | null>(null);
-  const pixelsPerMeterXRef = useRef(effectivePixelsPerMeterX);
-  const pixelsPerMeterYRef = useRef(effectivePixelsPerMeterY);
+  const pixelsPerMeterRef = useRef(pixelsPerMeter);
   const alignmentGuidesRef = useRef<Line[]>([]); // Guías de alineación
 
   // Sincronizar refs
@@ -89,9 +77,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   }, [mesasCanvas]);
   
   useEffect(() => {
-    pixelsPerMeterXRef.current = effectivePixelsPerMeterX;
-    pixelsPerMeterYRef.current = effectivePixelsPerMeterY;
-  }, [effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
+    pixelsPerMeterRef.current = pixelsPerMeter;
+  }, [pixelsPerMeter]);
 
   // Exponer métodos al padre
   useImperativeHandle(ref, () => ({
@@ -302,8 +289,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
             const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
             if (mesa) {
-              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterXRef.current;
-              const altoPixels = mesa.alto / 100 * pixelsPerMeterYRef.current;
+              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
               labelObj.set({
                 left: newPosX + anchoPixels / 2,
                 top: newPosY + altoPixels / 2,
@@ -327,8 +314,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const newPosYPixels = obj.top || 0;
         
         // Convertir de píxeles a metros para guardar
-        const newPosXMeters = newPosXPixels / pixelsPerMeterXRef.current;
-        const newPosYMeters = newPosYPixels / pixelsPerMeterYRef.current;
+        const newPosXMeters = newPosXPixels / pixelsPerMeterRef.current;
+        const newPosYMeters = newPosYPixels / pixelsPerMeterRef.current;
         
         // Actualizar la etiqueta asociada a esta mesa
         canvas.getObjects().forEach((labelObj) => {
@@ -337,8 +324,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             // Obtener dimensiones de la mesa para centrar la etiqueta
             const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
             if (mesa) {
-              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterXRef.current;
-              const altoPixels = mesa.alto / 100 * pixelsPerMeterYRef.current;
+              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
               labelObj.set({
                 left: newPosXPixels + anchoPixels / 2,
                 top: newPosYPixels + altoPixels / 2,
@@ -378,18 +365,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Calcular el área real del espacio en píxeles
-    const realWidth = realDimensions.width * effectivePixelsPerMeterX;
-    const realHeight = realDimensions.height * effectivePixelsPerMeterY;
+    // Calcular el área real del espacio en píxeles (escala FIJA)
+    const realWidth = canvasWidth;
+    const realHeight = canvasHeight;
 
     // Colores del grid
-    const gridColorLight = "#f1f5f9";
     const gridColorMedium = "#e2e8f0";
     const gridColorStrong = "#cbd5e1";
     
     // Líneas verticales - solo dentro del espacio real
     for (let i = 0; i <= realDimensions.width; i++) {
-      const x = i * effectivePixelsPerMeterX;
+      const x = i * pixelsPerMeter;
       if (x > realWidth) break;
       const isMajor = i % 5 === 0;
       const line = new Line([x, 0, x, realHeight], {
@@ -405,7 +391,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     // Líneas horizontales - solo dentro del espacio real
     for (let i = 0; i <= realDimensions.height; i++) {
-      const y = i * effectivePixelsPerMeterY;
+      const y = i * pixelsPerMeter;
       if (y > realHeight) break;
       const isMajor = i % 5 === 0;
       const line = new Line([0, y, realWidth, y], {
@@ -436,7 +422,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.sendObjectToBack(border);
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, effectivePixelsPerMeterX, effectivePixelsPerMeterY, realDimensions, canvasWidth, canvasHeight]);
+  }, [fabricCanvas, pixelsPerMeter, realDimensions, canvasWidth, canvasHeight]);
 
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
@@ -521,7 +507,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           const dx = x2 - x1;
           const dy = y2 - y1;
           const lengthPx = Math.sqrt(dx * dx + dy * dy);
-          const lengthM = roundTo5cm(lengthPx / ((effectivePixelsPerMeterX + effectivePixelsPerMeterY) / 2));
+          const lengthM = roundTo5cm(lengthPx / pixelsPerMeter);
           
           const midX = (x1 + x2) / 2;
           const midY = (y1 + y2) / 2;
@@ -561,7 +547,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     
     fabricCanvas.renderAll();
-  }, [fabricCanvas, planoConfig, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
+  }, [fabricCanvas, planoConfig, pixelsPerMeter]);
 
   // Cargar mesas (de BD o del estado local cuando el canvas se recrea)
   useEffect(() => {
@@ -587,8 +573,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
       
       // Calcular dimensiones en píxeles para el label
-      const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
-      const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
+      const anchoPixels = anchoCm / 100 * pixelsPerMeter;
+      const altoPixels = altoCm / 100 * pixelsPerMeter;
       
       // Calcular tamaño de fuente que quepa dentro de la mesa
       const minDimension = Math.min(anchoPixels, altoPixels);
@@ -653,12 +639,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (mesasEnCanvas.has(mesa.id)) return;
 
       // Convertir posición de metros a píxeles
-      const posXPixels = mesa.posX * effectivePixelsPerMeterX;
-      const posYPixels = mesa.posY * effectivePixelsPerMeterY;
+      const posXPixels = mesa.posX * pixelsPerMeter;
+      const posYPixels = mesa.posY * pixelsPerMeter;
       
       // Convertir cm a píxeles para dimensiones
-      const anchoPixels = mesa.ancho / 100 * effectivePixelsPerMeterX;
-      const altoPixels = mesa.alto / 100 * effectivePixelsPerMeterY;
+      const anchoPixels = mesa.ancho / 100 * pixelsPerMeter;
+      const altoPixels = mesa.alto / 100 * pixelsPerMeter;
 
       let obj: FabricObject;
 
@@ -734,12 +720,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const altoCm = mesa.alto || 80;
 
       // Convertir posición de metros a píxeles
-      const posXPixels = posXMeters * effectivePixelsPerMeterX;
-      const posYPixels = posYMeters * effectivePixelsPerMeterY;
+      const posXPixels = posXMeters * pixelsPerMeter;
+      const posYPixels = posYMeters * pixelsPerMeter;
       
       // Convertir cm a píxeles para dimensiones
-      const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
-      const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
+      const anchoPixels = anchoCm / 100 * pixelsPerMeter;
+      const altoPixels = altoCm / 100 * pixelsPerMeter;
 
       let obj: FabricObject;
 
@@ -819,7 +805,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, mesasDB, effectivePixelsPerMeterX, effectivePixelsPerMeterY]);
+  }, [fabricCanvas, mesasDB, pixelsPerMeter]);
 
   // Manejar clics según la herramienta activa
   useEffect(() => {
@@ -942,7 +928,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     // Calcular longitud en metros (redondeada a 5cm) - reutilizar dx/dy calculados arriba
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
-    const lengthM = roundTo5cm(lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2));
+    const lengthM = roundTo5cm(lengthPx / pixelsPerMeterRef.current);
     
     // Posición del texto (punto medio de la línea)
     const midX = (lastPoint.x + x) / 2;
@@ -977,7 +963,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const dx = x2 - x1;
     const dy = y2 - y1;
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
-    const lengthM = roundTo5cm(lengthPx / ((pixelsPerMeterXRef.current + pixelsPerMeterYRef.current) / 2));
+    const lengthM = roundTo5cm(lengthPx / pixelsPerMeterRef.current);
     
     // Punto medio de la pared
     const midX = (x1 + x2) / 2;
@@ -1147,8 +1133,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
     
     // Calcular dimensiones en píxeles
-    const anchoPixels = anchoCm / 100 * pixelsPerMeterXRef.current;
-    const altoPixels = altoCm / 100 * pixelsPerMeterYRef.current;
+    const anchoPixels = anchoCm / 100 * pixelsPerMeterRef.current;
+    const altoPixels = altoCm / 100 * pixelsPerMeterRef.current;
     
     // Calcular tamaño de fuente que quepa
     const minDimension = Math.min(anchoPixels, altoPixels);
@@ -1196,16 +1182,16 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const capacidad = forma === "circular" ? 6 : 2;
 
     // Convertir cm a píxeles para renderizar
-    const anchoPixels = anchoCm / 100 * pixelsPerMeterXRef.current;
-    const altoPixels = altoCm / 100 * pixelsPerMeterYRef.current;
+    const anchoPixels = anchoCm / 100 * pixelsPerMeterRef.current;
+    const altoPixels = altoCm / 100 * pixelsPerMeterRef.current;
     
     // Posición en píxeles (centrado en el clic)
     const posXPixels = x - anchoPixels / 2;
     const posYPixels = y - altoPixels / 2;
     
     // Posición en metros para guardar
-    const posXMeters = posXPixels / pixelsPerMeterXRef.current;
-    const posYMeters = posYPixels / pixelsPerMeterYRef.current;
+    const posXMeters = posXPixels / pixelsPerMeterRef.current;
+    const posYMeters = posYPixels / pixelsPerMeterRef.current;
 
     let obj: FabricObject;
 
@@ -1329,7 +1315,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           <div
             key={i}
             className="absolute flex flex-col items-center"
-            style={{ left: i * effectivePixelsPerMeterX, transform: 'translateX(-50%)' }}
+            style={{ left: i * pixelsPerMeter, transform: 'translateX(-50%)' }}
           >
             <span className="font-medium">{i}m</span>
             <div className="w-px h-2 bg-muted-foreground/40" />
@@ -1347,7 +1333,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             <div
               key={i}
               className="absolute flex items-center gap-1"
-              style={{ top: i * effectivePixelsPerMeterY, transform: 'translateY(-50%)' }}
+              style={{ top: i * pixelsPerMeter, transform: 'translateY(-50%)' }}
             >
               <span className="w-7 text-right font-medium">{i}m</span>
               <div className="h-px w-2 bg-muted-foreground/40" />
