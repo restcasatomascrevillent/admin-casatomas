@@ -51,37 +51,30 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [isSaving, setIsSaving] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
+  // Escala FIJA: 50 píxeles por metro (no cambia con el tamaño del contenedor)
+  const PIXELS_PER_METER = 50;
+  
   // Escala: dimensiones reales en metros
   const [realDimensions, setRealDimensions] = useState({ width: 12, height: 8 });
-  const pixelsPerMeterX = containerSize.width / realDimensions.width;
-  const pixelsPerMeterY = containerSize.height / realDimensions.height;
 
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
   const { data: mesas = [], isLoading: loadingMesas, refetch: refetchMesas } = useMesas(espacioId);
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
 
-  // Observar tamaño del contenedor
+  // Cargar dimensiones guardadas del plano
   useEffect(() => {
-    if (!containerRef.current) return;
-    
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width > 0 && height > 0) {
-          setContainerSize({ width, height });
-        }
-      }
-    });
-    
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
-  }, []);
+    if (plano?.configuracion?.realDimensions) {
+      setRealDimensions(plano.configuracion.realDimensions);
+    }
+    if (plano?.configuracion?.pixelsPerMeter) {
+      // Si hay un pixelsPerMeter guardado, podemos usarlo, pero por ahora usamos el fijo
+    }
+  }, [plano]);
 
   // Aplicar nuevas dimensiones reales
   const handleApplyDimensions = useCallback((width: number, height: number) => {
@@ -93,16 +86,19 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     try {
+      // Calcular tamaño del canvas en píxeles
+      const canvasWidth = realDimensions.width * PIXELS_PER_METER;
+      const canvasHeight = realDimensions.height * PIXELS_PER_METER;
+      
       // Guardar configuración del plano
       await guardarPlano.mutateAsync({
         espacio_id: espacioId,
-        ancho: containerSize.width,
-        alto: containerSize.height,
+        ancho: canvasWidth,
+        alto: canvasHeight,
         metros_cuadrados: realDimensions.width * realDimensions.height,
         configuracion: {
           elementos,
-          pixelsPerMeterX,
-          pixelsPerMeterY,
+          pixelsPerMeter: PIXELS_PER_METER,
           realDimensions,
         },
       });
@@ -127,7 +123,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     } finally {
       setIsSaving(false);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, pixelsPerMeterX, pixelsPerMeterY, containerSize, guardarPlano, actualizarMesas]);
+  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas]);
 
   // Exportar imagen
   const handleExport = useCallback(() => {
@@ -239,22 +235,19 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       {/* Main content */}
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Canvas - ocupa todo el espacio disponible */}
+        {/* Canvas - con scroll si es más grande que el contenedor */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg min-h-[400px]"
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-auto shadow-lg min-h-[400px]"
           style={{ height: '100%' }}
         >
           <CanvasPlano
             ref={canvasRef}
-            containerWidth={containerSize.width}
-            containerHeight={containerSize.height}
+            pixelsPerMeter={PIXELS_PER_METER}
             activeTool={activeTool}
             elementos={elementos}
             mesasCanvas={mesasCanvas}
             mesasDB={mesas}
-            pixelsPerMeterX={pixelsPerMeterX}
-            pixelsPerMeterY={pixelsPerMeterY}
             realDimensions={realDimensions}
             planoConfig={plano?.configuracion}
             selectedElement={selectedElement}
@@ -270,8 +263,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           espacioId={espacioId}
           selectedElement={selectedElement}
           mesasCanvas={mesasCanvas}
-          pixelsPerMeterX={pixelsPerMeterX}
-          pixelsPerMeterY={pixelsPerMeterY}
+          pixelsPerMeter={PIXELS_PER_METER}
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
         />

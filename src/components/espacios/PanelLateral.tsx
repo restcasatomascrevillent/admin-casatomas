@@ -25,8 +25,7 @@ interface PanelLateralProps {
   espacioId: string;
   selectedElement: any;
   mesasCanvas: MesaCanvas[];
-  pixelsPerMeterX: number;
-  pixelsPerMeterY: number;
+  pixelsPerMeter: number;
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
 }
@@ -35,8 +34,7 @@ export function PanelLateral({
   espacioId,
   selectedElement,
   mesasCanvas,
-  pixelsPerMeterX,
-  pixelsPerMeterY,
+  pixelsPerMeter,
   onMesasChange,
   onSelectionChange,
 }: PanelLateralProps) {
