@@ -86,14 +86,13 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular zoom para ajustar al contenedor
+  // Calcular zoom para ajustar al contenedor (sin límite máximo)
   const canvasRealWidth = realDimensions.width * PIXELS_PER_METER;
   const canvasRealHeight = realDimensions.height * PIXELS_PER_METER;
   
   const fitZoom = Math.min(
     (containerSize.width - 40) / canvasRealWidth,
-    (containerSize.height - 40) / canvasRealHeight,
-    1 // No hacer zoom mayor a 1
+    (containerSize.height - 40) / canvasRealHeight
   );
 
   // Cargar dimensiones guardadas del plano
