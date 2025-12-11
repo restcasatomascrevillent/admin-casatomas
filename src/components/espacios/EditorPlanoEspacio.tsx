@@ -245,7 +245,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
               variant="ghost" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoomLevel(Math.max(0.25, zoomLevel - 0.1))}
+              onClick={() => {
+                const newZoom = Math.max(0.25, zoomLevel / 1.15);
+                canvasRef.current?.setZoom(newZoom);
+                setZoomLevel(newZoom);
+              }}
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -256,7 +260,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
               variant="ghost" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoomLevel(Math.min(2, zoomLevel + 0.1))}
+              onClick={() => {
+                const newZoom = Math.min(3, zoomLevel * 1.15);
+                canvasRef.current?.setZoom(newZoom);
+                setZoomLevel(newZoom);
+              }}
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -264,7 +272,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
               variant="ghost" 
               size="icon" 
               className="h-7 w-7"
-              onClick={() => setZoomLevel(fitZoom)}
+              onClick={() => {
+                canvasRef.current?.resetView();
+                setZoomLevel(fitZoom);
+              }}
               title="Ajustar al espacio"
             >
               <Maximize className="h-4 w-4" />
@@ -301,33 +312,31 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       {/* Main content */}
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Canvas - con zoom visual */}
+        {/* Canvas - zoom nativo de Fabric.js */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-auto shadow-lg min-h-[400px] flex items-center justify-center"
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg min-h-[400px] relative"
         >
-          <div 
-            style={{ 
-              transform: `scale(${zoomLevel})`,
-              transformOrigin: 'center center',
-              transition: 'transform 0.15s ease-out'
-            }}
-          >
-            <CanvasPlano
-              ref={canvasRef}
-              pixelsPerMeter={PIXELS_PER_METER}
-              activeTool={activeTool}
-              elementos={elementos}
-              mesasCanvas={mesasCanvas}
-              mesasDB={mesas}
-              realDimensions={realDimensions}
-              planoConfig={plano?.configuracion}
-              selectedElement={selectedElement}
-              onElementosChange={setElementos}
-              onMesasChange={setMesasCanvas}
-              onSelectionChange={setSelectedElement}
-              onToolChange={setActiveTool}
-            />
+          <CanvasPlano
+            ref={canvasRef}
+            pixelsPerMeter={PIXELS_PER_METER}
+            activeTool={activeTool}
+            elementos={elementos}
+            mesasCanvas={mesasCanvas}
+            mesasDB={mesas}
+            realDimensions={realDimensions}
+            planoConfig={plano?.configuracion}
+            selectedElement={selectedElement}
+            initialZoom={fitZoom}
+            onElementosChange={setElementos}
+            onMesasChange={setMesasCanvas}
+            onSelectionChange={setSelectedElement}
+            onToolChange={setActiveTool}
+            onZoomChange={setZoomLevel}
+          />
+          {/* Indicador de modo pan */}
+          <div className="absolute bottom-3 left-3 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
+            🖱️ Rueda: Zoom • Espacio + Arrastrar: Mover
           </div>
         </div>
 
