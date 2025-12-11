@@ -159,7 +159,8 @@ export default function Espacios() {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. Se eliminará permanentemente el espacio.
+                Esta acción no se puede deshacer. Se eliminará permanentemente el espacio, 
+                incluyendo todas sus mesas y la configuración del plano.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
