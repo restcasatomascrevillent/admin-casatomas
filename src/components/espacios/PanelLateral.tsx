@@ -109,7 +109,7 @@ export function PanelLateral({
   };
 
   return (
-    <div className="w-72 flex flex-col gap-4">
+    <div className="w-72 flex flex-col gap-4 max-h-full overflow-y-auto pr-1">
       {/* Panel de propiedades */}
       {selectedElement && (
         <Card className="border-2 border-primary/20 bg-primary/5">
