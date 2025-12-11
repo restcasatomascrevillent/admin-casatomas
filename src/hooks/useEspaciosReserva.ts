@@ -80,8 +80,25 @@ export const useEliminarEspacio = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      // 1. Eliminar todas las mesas del espacio
+      const { error: errorMesas } = await supabase
+        .from("mesas")
+        .delete()
+        .eq("espacio_id", id);
+      
+      if (errorMesas) throw new Error("Error al eliminar mesas: " + errorMesas.message);
+
+      // 2. Eliminar el plano del espacio
+      const { error: errorPlano } = await supabase
+        .from("planos_espacio")
+        .delete()
+        .eq("espacio_id", id);
+      
+      if (errorPlano) throw new Error("Error al eliminar plano: " + errorPlano.message);
+
+      // 3. Finalmente eliminar el espacio
       const { error } = await supabase
-        .from("espacios_reserva" as any)
+        .from("espacios_reserva")
         .delete()
         .eq("id", id);
       
@@ -89,7 +106,9 @@ export const useEliminarEspacio = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["espacios_reserva"] });
-      toast.success("Espacio eliminado correctamente");
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["planos_espacio"] });
+      toast.success("Espacio y todos sus elementos eliminados correctamente");
     },
     onError: (error: Error) => {
       toast.error("Error al eliminar espacio: " + error.message);
