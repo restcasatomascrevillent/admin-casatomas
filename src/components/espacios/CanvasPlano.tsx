@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
-import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText } from "fabric";
+import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, Point } from "fabric";
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
@@ -13,16 +13,20 @@ interface CanvasPlanoProps {
   realDimensions: { width: number; height: number };
   planoConfig: any;
   selectedElement: any;
+  initialZoom?: number;
   onElementosChange: (elementos: ElementoCanvas[]) => void;
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
   onToolChange: (tool: ToolType) => void;
+  onZoomChange?: (zoom: number) => void;
 }
 
 export interface CanvasPlanoRef {
   clearCanvas: () => void;
   removeElement: (id: string) => void;
   getCanvas: () => HTMLCanvasElement | null;
+  setZoom: (zoom: number) => void;
+  resetView: () => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -34,14 +38,19 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   realDimensions,
   planoConfig,
   selectedElement,
+  initialZoom = 1,
   onElementosChange,
   onMesasChange,
   onSelectionChange,
   onToolChange,
+  onZoomChange,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const spacePressed = useRef(false);
+  const lastPanPos = useRef({ x: 0, y: 0 });
   
   const measureTextRef = useRef<FabricText | null>(null);
   
@@ -119,8 +128,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
     },
-    getCanvas: () => canvasRef.current
-  }), [fabricCanvas, onElementosChange, onMesasChange]);
+    getCanvas: () => canvasRef.current,
+    setZoom: (zoom: number) => {
+      if (!fabricCanvas) return;
+      const clampedZoom = Math.max(0.25, Math.min(3, zoom));
+      fabricCanvas.setZoom(clampedZoom);
+      fabricCanvas.renderAll();
+      onZoomChange?.(clampedZoom);
+    },
+    resetView: () => {
+      if (!fabricCanvas) return;
+      fabricCanvas.setViewportTransform([initialZoom, 0, 0, initialZoom, 0, 0]);
+      fabricCanvas.renderAll();
+      onZoomChange?.(initialZoom);
+    }
+  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange]);
 
   // Función para obtener color de nivel según ángulo de pared
   const getWallLevelColor = (angle: number): string => {
@@ -349,10 +371,120 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     setFabricCanvas(canvas);
 
+    // Aplicar zoom inicial
+    if (initialZoom !== 1) {
+      canvas.setZoom(initialZoom);
+    }
+
     return () => {
       canvas.dispose();
     };
   }, [canvasWidth, canvasHeight]);
+
+  // Zoom con rueda del ratón
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const handleWheel = (opt: any) => {
+      const e = opt.e as WheelEvent;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const delta = e.deltaY;
+      let zoom = fabricCanvas.getZoom();
+      zoom *= 0.999 ** delta;
+      
+      // Limitar zoom entre 0.25x y 3x
+      if (zoom > 3) zoom = 3;
+      if (zoom < 0.25) zoom = 0.25;
+      
+      // Zoom hacia el punto del cursor
+      fabricCanvas.zoomToPoint(new Point(e.offsetX, e.offsetY), zoom);
+      onZoomChange?.(zoom);
+    };
+
+    fabricCanvas.on('mouse:wheel', handleWheel);
+    return () => {
+      fabricCanvas.off('mouse:wheel', handleWheel);
+    };
+  }, [fabricCanvas, onZoomChange]);
+
+  // Pan con Espacio + click
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !spacePressed.current) {
+        e.preventDefault();
+        spacePressed.current = true;
+        fabricCanvas.defaultCursor = 'grab';
+        fabricCanvas.hoverCursor = 'grab';
+        fabricCanvas.selection = false;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spacePressed.current = false;
+        setIsPanning(false);
+        fabricCanvas.defaultCursor = 'default';
+        fabricCanvas.hoverCursor = 'move';
+        fabricCanvas.selection = true;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [fabricCanvas]);
+
+  // Eventos de mouse para pan
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const handleMouseDownPan = (opt: any) => {
+      if (spacePressed.current) {
+        setIsPanning(true);
+        fabricCanvas.defaultCursor = 'grabbing';
+        lastPanPos.current = { x: opt.e.clientX, y: opt.e.clientY };
+      }
+    };
+
+    const handleMouseMovePan = (opt: any) => {
+      if (isPanning && spacePressed.current) {
+        const vpt = fabricCanvas.viewportTransform;
+        if (vpt) {
+          vpt[4] += opt.e.clientX - lastPanPos.current.x;
+          vpt[5] += opt.e.clientY - lastPanPos.current.y;
+          fabricCanvas.requestRenderAll();
+          lastPanPos.current = { x: opt.e.clientX, y: opt.e.clientY };
+        }
+      }
+    };
+
+    const handleMouseUpPan = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        if (spacePressed.current) {
+          fabricCanvas.defaultCursor = 'grab';
+        }
+      }
+    };
+
+    fabricCanvas.on('mouse:down', handleMouseDownPan);
+    fabricCanvas.on('mouse:move', handleMouseMovePan);
+    fabricCanvas.on('mouse:up', handleMouseUpPan);
+    
+    return () => {
+      fabricCanvas.off('mouse:down', handleMouseDownPan);
+      fabricCanvas.off('mouse:move', handleMouseMovePan);
+      fabricCanvas.off('mouse:up', handleMouseUpPan);
+    };
+  }, [fabricCanvas, isPanning]);
 
   // Dibujar grid con estilo mejorado - adaptado al espacio real
   useEffect(() => {
