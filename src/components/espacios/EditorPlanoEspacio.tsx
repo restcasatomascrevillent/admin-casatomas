@@ -325,6 +325,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             mesasCanvas={mesasCanvas}
             mesasDB={mesas}
             realDimensions={realDimensions}
+            containerSize={containerSize}
             planoConfig={plano?.configuracion}
             selectedElement={selectedElement}
             initialZoom={fitZoom}
