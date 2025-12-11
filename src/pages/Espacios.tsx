@@ -24,7 +24,7 @@ import {
 
 export default function Espacios() {
   const { data: espacios = [], isLoading } = useEspaciosReserva() as any;
-  const { data: todasMesas = [] } = useMesas();
+  const { data: todasMesas = [], refetch: refetchMesas } = useMesas();
 
   const [showForm, setShowForm] = useState(false);
   const [espacioEditando, setEspacioEditando] = useState<any>();
@@ -38,6 +38,12 @@ export default function Espacios() {
     return todasMesas.filter((m) => m.espacio_id === espacioId).length;
   };
 
+  // Callback para volver del editor - refrescar datos
+  const handleBackFromEditor = () => {
+    setEspacioConfigurando(null);
+    refetchMesas(); // Refrescar conteo de mesas
+  };
+
   // Si estamos configurando un espacio, mostrar el editor
   if (espacioConfigurando) {
     return (
@@ -45,7 +51,7 @@ export default function Espacios() {
         <EditorPlanoEspacio
           espacioId={espacioConfigurando.id}
           espacioNombre={espacioConfigurando.nombre}
-          onBack={() => setEspacioConfigurando(null)}
+          onBack={handleBackFromEditor}
         />
       </DashboardLayout>
     );

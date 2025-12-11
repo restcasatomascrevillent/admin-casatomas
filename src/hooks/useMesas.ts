@@ -33,7 +33,7 @@ export interface MesaInput {
 
 export function useMesas(espacioId?: string) {
   return useQuery({
-    queryKey: ["mesas", espacioId],
+    queryKey: espacioId ? ["mesas", espacioId] : ["mesas"],
     queryFn: async () => {
       let query = supabase
         .from("mesas")
@@ -49,7 +49,7 @@ export function useMesas(espacioId?: string) {
       if (error) throw error;
       return data as Mesa[];
     },
-    enabled: true,
+    staleTime: 0, // Siempre considerar datos como stale para refetch
   });
 }
 
