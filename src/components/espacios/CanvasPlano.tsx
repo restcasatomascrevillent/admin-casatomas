@@ -564,14 +564,37 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
       const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
       
-      // Calcular tamaño de fuente adaptado al tamaño de la mesa
+      // Calcular tamaño de fuente que quepa dentro de la mesa (más agresivo)
       const minDimension = Math.min(anchoPixels, altoPixels);
-      const fontSize = Math.max(8, Math.min(12, minDimension / 6));
+      // Reducir el tamaño de fuente proporcionalmente al espacio disponible
+      const fontSize = Math.max(6, Math.min(10, minDimension / 8));
+      
+      // Crear texto temporal para medir
+      const tempLabel = new FabricText(`${nombre}\n${dimensionText}`, {
+        fontSize: fontSize,
+        fontFamily: "system-ui, sans-serif",
+        fontWeight: "600",
+      });
+      
+      // Si el texto es más ancho que la mesa, reducir más el tamaño
+      let finalFontSize = fontSize;
+      const maxWidth = anchoPixels * 0.85; // 85% del ancho de la mesa
+      const maxHeight = altoPixels * 0.85; // 85% del alto de la mesa
+      
+      if (tempLabel.width && tempLabel.width > maxWidth) {
+        finalFontSize = finalFontSize * (maxWidth / tempLabel.width);
+      }
+      if (tempLabel.height && tempLabel.height > maxHeight) {
+        finalFontSize = Math.min(finalFontSize, finalFontSize * (maxHeight / tempLabel.height));
+      }
+      
+      // Asegurar un mínimo legible
+      finalFontSize = Math.max(5, finalFontSize);
       
       const label = new FabricText(`${nombre}\n${dimensionText}`, {
         left: posX + anchoPixels / 2,
         top: posY + altoPixels / 2,
-        fontSize: fontSize,
+        fontSize: finalFontSize,
         fontFamily: "system-ui, sans-serif",
         fontWeight: "600",
         fill: "#1e40af",
