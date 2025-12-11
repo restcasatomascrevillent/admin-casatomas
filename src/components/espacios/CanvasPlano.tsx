@@ -272,11 +272,45 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       clearAlignmentGuides(canvas);
     });
 
-    // Mostrar guías mientras se mueve
+    // Mostrar guías y mover etiqueta mientras se mueve la mesa
     canvas.on("object:moving", (e) => {
       const obj = e.target;
-      if (obj) {
-        showAlignmentGuides(canvas, obj);
+      if (!obj) return;
+      
+      showAlignmentGuides(canvas, obj);
+      
+      // Mover la etiqueta junto con la mesa en tiempo real
+      const customData = (obj as any).customData;
+      if (customData?.tipo === "mesa") {
+        // Limitar posición dentro del canvas
+        const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
+        const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
+        
+        let newPosX = obj.left || 0;
+        let newPosY = obj.top || 0;
+        
+        // Mantener dentro de los límites del canvas
+        if (newPosX < 0) newPosX = 0;
+        if (newPosY < 0) newPosY = 0;
+        if (newPosX + objWidth > canvasWidth) newPosX = canvasWidth - objWidth;
+        if (newPosY + objHeight > canvasHeight) newPosY = canvasHeight - objHeight;
+        
+        obj.set({ left: newPosX, top: newPosY });
+        
+        canvas.getObjects().forEach((labelObj) => {
+          const labelData = (labelObj as any).customData;
+          if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
+            const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+            if (mesa) {
+              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterXRef.current;
+              const altoPixels = mesa.alto / 100 * pixelsPerMeterYRef.current;
+              labelObj.set({
+                left: newPosX + anchoPixels / 2,
+                top: newPosY + altoPixels / 2,
+              });
+            }
+          }
+        });
       }
     });
 
@@ -530,10 +564,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const anchoPixels = anchoCm / 100 * effectivePixelsPerMeterX;
       const altoPixels = altoCm / 100 * effectivePixelsPerMeterY;
       
+      // Calcular tamaño de fuente adaptado al tamaño de la mesa
+      const minDimension = Math.min(anchoPixels, altoPixels);
+      const fontSize = Math.max(8, Math.min(12, minDimension / 6));
+      
       const label = new FabricText(`${nombre}\n${dimensionText}`, {
         left: posX + anchoPixels / 2,
         top: posY + altoPixels / 2,
-        fontSize: 10,
+        fontSize: fontSize,
         fontFamily: "system-ui, sans-serif",
         fontWeight: "600",
         fill: "#1e40af",
