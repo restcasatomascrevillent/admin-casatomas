@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
 import { PanelLateral } from "./PanelLateral";
-import { ConfiguracionEscala } from "./ConfiguracionEscala";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -353,11 +352,6 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         />
       </div>
 
-      {/* Configuración de escala */}
-      <ConfiguracionEscala
-        realDimensions={realDimensions}
-        onApply={handleApplyDimensions}
-      />
 
       {/* Dialog de confirmación para limpiar */}
       <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
