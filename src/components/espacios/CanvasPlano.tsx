@@ -60,7 +60,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const roundTo5cm = (meters: number) => Math.round(meters * 20) / 20;
   
   // Dimensiones lógicas del plano (para el grid y los objetos)
-  const RULER_SIZE = 40;
   const logicalWidth = realDimensions.width * pixelsPerMeter;
   const logicalHeight = realDimensions.height * pixelsPerMeter;
   
@@ -1443,48 +1442,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full flex flex-col">
-      {/* Regla horizontal */}
-      <div 
-        className="relative h-8 bg-gradient-to-b from-muted/80 to-muted/40 backdrop-blur-sm text-[10px] text-muted-foreground overflow-hidden border-b border-border/30 rounded-t-lg"
-        style={{ marginLeft: RULER_SIZE }}
-      >
-        {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute flex flex-col items-center"
-            style={{ left: i * pixelsPerMeter, transform: 'translateX(-50%)' }}
-          >
-            <span className="font-medium">{i}m</span>
-            <div className="w-px h-2 bg-muted-foreground/40" />
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-1 min-h-0">
-        {/* Regla vertical */}
-        <div 
-          className="relative bg-gradient-to-r from-muted/80 to-muted/40 backdrop-blur-sm text-[10px] text-muted-foreground overflow-hidden border-r border-border/30 rounded-l-lg"
-          style={{ width: RULER_SIZE }}
-        >
-          {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute flex items-center gap-1"
-              style={{ top: i * pixelsPerMeter, transform: 'translateY(-50%)' }}
-            >
-              <span className="w-7 text-right font-medium">{i}m</span>
-              <div className="h-px w-2 bg-muted-foreground/40" />
-            </div>
-          ))}
-        </div>
-
-        {/* Canvas container */}
-        <div className="flex-1 relative rounded-br-lg overflow-hidden shadow-lg ring-1 ring-border/20 bg-white">
-          <canvas ref={canvasRef} id="plano-canvas" className="block" />
-          
-        </div>
-      </div>
+    <div ref={containerRef} className="relative w-full h-full rounded-lg overflow-hidden shadow-lg ring-1 ring-border/20 bg-white">
+      <canvas ref={canvasRef} id="plano-canvas" className="block" />
     </div>
   );
 });
