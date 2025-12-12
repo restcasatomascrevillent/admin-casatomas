@@ -78,6 +78,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const previewLineRef = useRef<Line | null>(null);
   const pixelsPerMeterRef = useRef(pixelsPerMeter);
   const alignmentGuidesRef = useRef<Line[]>([]); // Guías de alineación
+  const mesasInitializedRef = useRef(false); // Para controlar si las mesas ya fueron cargadas inicialmente
 
   // Sincronizar refs
   useEffect(() => {
@@ -1229,6 +1230,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     // Combinar mesas de BD y del estado local
     const mesasLocales = mesasCanvasRef.current;
     const newMesasCanvas: MesaCanvas[] = [];
+    
+    // Solo cargar mesas de BD en la inicialización (cuando mesasLocales está vacío)
+    const shouldLoadFromDB = !mesasInitializedRef.current && mesasLocales.length === 0;
 
     // Función para añadir etiqueta de mesa
     // NOTA: ancho/alto vienen en cm, posX/posY en PÍXELES (ya convertidos)
@@ -1410,10 +1414,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       mesasEnCanvas.add(mesa.id);
     });
 
-    // Luego cargar mesas de BD que no estén ya
+    // Luego cargar mesas de BD que no estén ya (solo en inicialización)
     // NOTA: pos_x/pos_y en BBDD están en METROS, ancho/alto en CM
-    mesasDB?.forEach((mesa) => {
-      if (mesasEnCanvas.has(mesa.id)) return;
+    if (shouldLoadFromDB) {
+      mesasDB?.forEach((mesa) => {
+        if (mesasEnCanvas.has(mesa.id)) return;
 
       // Las posiciones vienen en metros desde la BD
       const posXMeters = mesa.pos_x || 0.5;
@@ -1539,7 +1544,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         isMerged: isMerged,
         originalMesas: mesa.original_mesas || undefined,
       });
-    });
+      });
+      
+      mesasInitializedRef.current = true;
+    }
 
     if (newMesasCanvas.length > 0) {
       onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);
