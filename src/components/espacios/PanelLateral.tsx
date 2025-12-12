@@ -29,6 +29,7 @@ interface PanelLateralProps {
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
   onUnmergeMesa?: (mesaId: string) => void;
+  onRemoveElement?: (id: string) => void;
 }
 
 export function PanelLateral({
@@ -39,6 +40,7 @@ export function PanelLateral({
   onMesasChange,
   onSelectionChange,
   onUnmergeMesa,
+  onRemoveElement,
 }: PanelLateralProps) {
   const [newMesa, setNewMesa] = useState({
     nombre: "",
@@ -102,13 +104,15 @@ export function PanelLateral({
 
     try {
       // Si es una mesa temporal, solo quitarla del estado local
-      if (mesaToDelete.id.startsWith("mesa-temp-")) {
+      if (mesaToDelete.id.startsWith("mesa-temp-") || mesaToDelete.id.startsWith("mesa-grupo-")) {
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
+        onRemoveElement?.(mesaToDelete.id);
         onSelectionChange(null);
       } else {
         // Eliminar de la base de datos
         await eliminarMesa.mutateAsync(mesaToDelete.id);
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
+        onRemoveElement?.(mesaToDelete.id);
         onSelectionChange(null);
       }
     } catch (error) {
@@ -294,7 +298,7 @@ export function PanelLateral({
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="p-0">
-              <ScrollArea className="max-h-32">
+              <ScrollArea className="h-40">
                 <div className="p-2 space-y-1">
                   {mesasCanvas.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-2">

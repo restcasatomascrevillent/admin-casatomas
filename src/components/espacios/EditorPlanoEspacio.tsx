@@ -419,6 +419,9 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             canvasRef.current?.unmergeMesa(mesaId);
             setSelectedElement(null);
           }}
+          onRemoveElement={(id) => {
+            canvasRef.current?.removeElement(id);
+          }}
         />
       </div>
 
