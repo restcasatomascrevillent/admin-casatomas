@@ -491,7 +491,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [fabricCanvas, isPanning]);
 
-  // Dibujar grid con estilo mejorado - adaptado al espacio real
+  // Dibujar grid infinito que cubre todo el espacio visible
   useEffect(() => {
     if (!fabricCanvas) return;
 
@@ -502,21 +502,31 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Usar las dimensiones lógicas del plano (no del canvas)
-    const realWidth = logicalWidth;
-    const realHeight = logicalHeight;
+    // Extensión del grid más allá del área visible (para pan sin bordes)
+    const gridExtension = 5000; // píxeles de extensión en cada dirección
+    const gridStartX = -gridExtension;
+    const gridStartY = -gridExtension;
+    const gridEndX = Math.max(logicalWidth, canvasWidth) + gridExtension;
+    const gridEndY = Math.max(logicalHeight, canvasHeight) + gridExtension;
 
     // Colores del grid
+    const gridColorLight = "#f1f5f9";
     const gridColorMedium = "#e2e8f0";
     const gridColorStrong = "#cbd5e1";
     
-    // Líneas verticales - solo dentro del espacio real
-    for (let i = 0; i <= realDimensions.width; i++) {
+    // Calcular líneas desde el inicio negativo hasta el final extendido
+    const startMeterX = Math.floor(gridStartX / pixelsPerMeter);
+    const endMeterX = Math.ceil(gridEndX / pixelsPerMeter);
+    const startMeterY = Math.floor(gridStartY / pixelsPerMeter);
+    const endMeterY = Math.ceil(gridEndY / pixelsPerMeter);
+    
+    // Líneas verticales - grid infinito
+    for (let i = startMeterX; i <= endMeterX; i++) {
       const x = i * pixelsPerMeter;
-      if (x > realWidth) break;
       const isMajor = i % 5 === 0;
-      const line = new Line([x, 0, x, realHeight], {
-        stroke: isMajor ? gridColorStrong : gridColorMedium,
+      const isInsidePlan = i >= 0 && i <= realDimensions.width;
+      const line = new Line([x, gridStartY, x, gridEndY], {
+        stroke: isInsidePlan ? (isMajor ? gridColorStrong : gridColorMedium) : gridColorLight,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -526,13 +536,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.sendObjectToBack(line);
     }
 
-    // Líneas horizontales - solo dentro del espacio real
-    for (let i = 0; i <= realDimensions.height; i++) {
+    // Líneas horizontales - grid infinito
+    for (let i = startMeterY; i <= endMeterY; i++) {
       const y = i * pixelsPerMeter;
-      if (y > realHeight) break;
       const isMajor = i % 5 === 0;
-      const line = new Line([0, y, realWidth, y], {
-        stroke: isMajor ? gridColorStrong : gridColorMedium,
+      const isInsidePlan = i >= 0 && i <= realDimensions.height;
+      const line = new Line([gridStartX, y, gridEndX, y], {
+        stroke: isInsidePlan ? (isMajor ? gridColorStrong : gridColorMedium) : gridColorLight,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -542,24 +552,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.sendObjectToBack(line);
     }
 
-    // Dibujar borde del espacio real
+    // Dibujar borde del espacio real (área de trabajo)
     const border = new Rect({
       left: 0,
       top: 0,
-      width: realWidth,
-      height: realHeight,
-      fill: "transparent",
-      stroke: "#94a3b8",
+      width: logicalWidth,
+      height: logicalHeight,
+      fill: "rgba(255, 255, 255, 0.5)",
+      stroke: "#3b82f6",
       strokeWidth: 2,
       selectable: false,
       evented: false,
     });
     (border as any).isGrid = true;
     fabricCanvas.add(border);
-    fabricCanvas.sendObjectToBack(border);
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, pixelsPerMeter, realDimensions, logicalWidth, logicalHeight]);
+  }, [fabricCanvas, pixelsPerMeter, realDimensions, logicalWidth, logicalHeight, canvasWidth, canvasHeight]);
 
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
