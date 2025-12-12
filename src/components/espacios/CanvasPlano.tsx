@@ -683,7 +683,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [fabricCanvas, isPanning]);
 
-  // Dibujar grid infinito que cubre todo el espacio visible
+  // Dibujar grid que cubre todo el espacio visible del canvas
   useEffect(() => {
     if (!fabricCanvas) return;
 
@@ -698,11 +698,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const gridExtension = 5000; // píxeles de extensión en cada dirección
     const gridStartX = -gridExtension;
     const gridStartY = -gridExtension;
-    const gridEndX = Math.max(logicalWidth, canvasWidth) + gridExtension;
-    const gridEndY = Math.max(logicalHeight, canvasHeight) + gridExtension;
+    const gridEndX = canvasWidth + gridExtension;
+    const gridEndY = canvasHeight + gridExtension;
 
-    // Colores del grid
-    const gridColorLight = "#f1f5f9";
+    // Colores del grid - uniformes para todo el canvas
     const gridColorMedium = "#e2e8f0";
     const gridColorStrong = "#cbd5e1";
     
@@ -712,13 +711,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const startMeterY = Math.floor(gridStartY / pixelsPerMeter);
     const endMeterY = Math.ceil(gridEndY / pixelsPerMeter);
     
-    // Líneas verticales - grid infinito
+    // Líneas verticales - grid uniforme
     for (let i = startMeterX; i <= endMeterX; i++) {
       const x = i * pixelsPerMeter;
       const isMajor = i % 5 === 0;
-      const isInsidePlan = i >= 0 && i <= realDimensions.width;
       const line = new Line([x, gridStartY, x, gridEndY], {
-        stroke: isInsidePlan ? (isMajor ? gridColorStrong : gridColorMedium) : gridColorLight,
+        stroke: isMajor ? gridColorStrong : gridColorMedium,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -728,13 +726,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.sendObjectToBack(line);
     }
 
-    // Líneas horizontales - grid infinito
+    // Líneas horizontales - grid uniforme
     for (let i = startMeterY; i <= endMeterY; i++) {
       const y = i * pixelsPerMeter;
       const isMajor = i % 5 === 0;
-      const isInsidePlan = i >= 0 && i <= realDimensions.height;
       const line = new Line([gridStartX, y, gridEndX, y], {
-        stroke: isInsidePlan ? (isMajor ? gridColorStrong : gridColorMedium) : gridColorLight,
+        stroke: isMajor ? gridColorStrong : gridColorMedium,
         strokeWidth: isMajor ? 1.5 : 0.5,
         selectable: false,
         evented: false,
@@ -745,7 +742,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
 
     fabricCanvas.renderAll();
-  }, [fabricCanvas, pixelsPerMeter, realDimensions, logicalWidth, logicalHeight, canvasWidth, canvasHeight]);
+  }, [fabricCanvas, pixelsPerMeter, canvasWidth, canvasHeight]);
 
   // Cargar elementos (de planoConfig al inicio, o del estado local cuando el canvas se recrea)
   useEffect(() => {
