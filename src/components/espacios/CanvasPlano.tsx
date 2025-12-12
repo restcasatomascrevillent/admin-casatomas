@@ -578,6 +578,16 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [canvasWidth, canvasHeight]);
 
+  // Redimensionar canvas cuando cambia el contenedor
+  useEffect(() => {
+    if (!fabricCanvas || containerSize.width === 0 || containerSize.height === 0) return;
+    
+    // Actualizar dimensiones del canvas de Fabric
+    fabricCanvas.setWidth(containerSize.width);
+    fabricCanvas.setHeight(containerSize.height);
+    fabricCanvas.renderAll();
+  }, [fabricCanvas, containerSize.width, containerSize.height]);
+
   // Zoom con rueda del ratón
   useEffect(() => {
     if (!fabricCanvas) return;
@@ -1625,8 +1635,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full rounded-lg overflow-hidden shadow-lg ring-1 ring-border/20 bg-white">
-      <canvas ref={canvasRef} id="plano-canvas" className="block" />
+    <div ref={containerRef} className="absolute inset-0 w-full h-full overflow-hidden bg-white">
+      <canvas ref={canvasRef} id="plano-canvas" className="block w-full h-full" />
     </div>
   );
 });
