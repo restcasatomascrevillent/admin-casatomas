@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List } from "lucide-react";
+import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink } from "lucide-react";
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ interface PanelLateralProps {
   pixelsPerMeter: number;
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
+  onUnmergeMesa?: (mesaId: string) => void;
 }
 
 export function PanelLateral({
@@ -37,6 +38,7 @@ export function PanelLateral({
   pixelsPerMeter,
   onMesasChange,
   onSelectionChange,
+  onUnmergeMesa,
 }: PanelLateralProps) {
   const [newMesa, setNewMesa] = useState({
     nombre: "",
@@ -149,15 +151,33 @@ export function PanelLateral({
                   <Users className="h-3 w-3 text-muted-foreground" />
                   <span>{selectedElement.capacidad} personas</span>
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="w-full h-7 text-xs"
-                  onClick={() => setMesaToDelete({ id: selectedElement.id, nombre: selectedElement.nombre })}
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Eliminar
-                </Button>
+                {selectedElement.isMerged && (
+                  <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700">
+                    Mesa agrupada
+                  </Badge>
+                )}
+                <div className="flex gap-1">
+                  {selectedElement.isMerged && onUnmergeMesa && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-7 text-xs border-orange-300 text-orange-600 hover:bg-orange-50"
+                      onClick={() => onUnmergeMesa(selectedElement.id)}
+                    >
+                      <Unlink className="h-3 w-3 mr-1" />
+                      Desagrupar
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className={`h-7 text-xs ${selectedElement.isMerged ? 'flex-1' : 'w-full'}`}
+                    onClick={() => setMesaToDelete({ id: selectedElement.id, nombre: selectedElement.nombre })}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Eliminar
+                  </Button>
+                </div>
               </>
             )}
           </div>

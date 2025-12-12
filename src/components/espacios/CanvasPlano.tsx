@@ -29,6 +29,7 @@ export interface CanvasPlanoRef {
   getCanvas: () => HTMLCanvasElement | null;
   setZoom: (zoom: number) => void;
   resetView: () => void;
+  unmergeMesa: (mesaId: string) => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -147,6 +148,147 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.setViewportTransform([initialZoom, 0, 0, initialZoom, 0, 0]);
       fabricCanvas.renderAll();
       onZoomChange?.(initialZoom);
+    },
+    unmergeMesa: (mesaId: string) => {
+      if (!fabricCanvas) return;
+      
+      const mesaAgrupada = mesasCanvasRef.current.find(m => m.id === mesaId);
+      if (!mesaAgrupada || !mesaAgrupada.isMerged || !mesaAgrupada.originalMesas) return;
+      
+      // Eliminar la mesa agrupada del canvas
+      const objectsToRemove = fabricCanvas.getObjects().filter(o => {
+        const customData = (o as any).customData;
+        return customData?.id === mesaId || customData?.parentId === mesaId;
+      });
+      objectsToRemove.forEach(obj => fabricCanvas.remove(obj));
+      
+      // Recrear las mesas originales
+      const baseX = mesaAgrupada.posX * pixelsPerMeterRef.current;
+      const baseY = mesaAgrupada.posY * pixelsPerMeterRef.current;
+      
+      const newMesas: typeof mesasCanvasRef.current = [];
+      let offsetX = 0;
+      
+      mesaAgrupada.originalMesas.forEach((originalMesa, index) => {
+        const anchoPixels = originalMesa.ancho / 100 * pixelsPerMeterRef.current;
+        const altoPixels = originalMesa.alto / 100 * pixelsPerMeterRef.current;
+        
+        const posXPixels = baseX + offsetX;
+        const posYPixels = baseY;
+        
+        let obj: FabricObject;
+        
+        if (originalMesa.forma === "circular") {
+          const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
+          obj = new Circle({
+            left: posXPixels,
+            top: posYPixels,
+            radius: radiusPixels,
+            fill: "#dbeafe",
+            stroke: "#2563eb",
+            strokeWidth: 2,
+            originX: "left",
+            originY: "top",
+            hasControls: false,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            shadow: {
+              color: "rgba(0,0,0,0.1)",
+              blur: 8,
+              offsetX: 2,
+              offsetY: 2,
+            } as any,
+          });
+        } else {
+          obj = new Rect({
+            left: posXPixels,
+            top: posYPixels,
+            width: anchoPixels,
+            height: altoPixels,
+            fill: "#dbeafe",
+            stroke: "#2563eb",
+            strokeWidth: 2,
+            rx: 6,
+            ry: 6,
+            originX: "left",
+            originY: "top",
+            hasControls: false,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            shadow: {
+              color: "rgba(0,0,0,0.1)",
+              blur: 8,
+              offsetX: 2,
+              offsetY: 2,
+            } as any,
+          });
+        }
+        
+        const newId = `mesa-temp-${Date.now()}-${index}`;
+        
+        (obj as any).customData = {
+          tipo: "mesa",
+          id: newId,
+          nombre: originalMesa.nombre,
+          capacidad: originalMesa.capacidad,
+        };
+        
+        fabricCanvas.add(obj);
+        
+        // Crear etiqueta
+        const anchoM = (originalMesa.ancho / 100).toFixed(2);
+        const altoM = (originalMesa.alto / 100).toFixed(2);
+        const dimensionText = originalMesa.forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
+        
+        const centerX = posXPixels + anchoPixels / 2;
+        const centerY = posYPixels + altoPixels / 2;
+        
+        const minDimension = Math.min(anchoPixels, altoPixels);
+        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
+        
+        const label = new FabricText(`${originalMesa.nombre}\n${dimensionText}`, {
+          left: centerX,
+          top: centerY,
+          fontSize: fontSize,
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: "600",
+          fill: "#1e40af",
+          textAlign: "center",
+          selectable: false,
+          evented: false,
+          originX: "center",
+          originY: "center",
+        });
+        
+        (label as any).customData = { tipo: "mesa-label", parentId: newId };
+        (label as any).isMesaLabel = true;
+        fabricCanvas.add(label);
+        
+        // Añadir al array de nuevas mesas
+        newMesas.push({
+          id: newId,
+          nombre: originalMesa.nombre,
+          capacidad: originalMesa.capacidad,
+          forma: originalMesa.forma,
+          ancho: originalMesa.ancho,
+          alto: originalMesa.alto,
+          posX: posXPixels / pixelsPerMeterRef.current,
+          posY: posYPixels / pixelsPerMeterRef.current,
+        });
+        
+        offsetX += anchoPixels + 20; // Separar las mesas un poco
+      });
+      
+      // Actualizar estado
+      const updatedMesas = mesasCanvasRef.current
+        .filter(m => m.id !== mesaId)
+        .concat(newMesas);
+      
+      onMesasChange(updatedMesas);
+      fabricCanvas.discardActiveObject();
+      fabricCanvas.renderAll();
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange]);
 
@@ -342,6 +484,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const newPosXMeters = newPosX / pixelsPerMeterRef.current;
     const newPosYMeters = newPosY / pixelsPerMeterRef.current;
 
+    // Guardar datos originales de las mesas para poder desagrupar
+    const originalMesasData = [
+      { id: mesa1.id, nombre: mesa1.nombre, capacidad: mesa1.capacidad, forma: mesa1.forma, ancho: mesa1.ancho, alto: mesa1.alto },
+      { id: mesa2.id, nombre: mesa2.nombre, capacidad: mesa2.capacidad, forma: mesa2.forma, ancho: mesa2.ancho, alto: mesa2.alto },
+    ];
+
     const updatedMesas = mesasCanvasRef.current
       .filter(m => m.id !== movedData.id && m.id !== mergeData.id)
       .concat({
@@ -353,6 +501,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         alto: newAlto,
         posX: newPosXMeters,
         posY: newPosYMeters,
+        isMerged: true,
+        originalMesas: originalMesasData,
       });
 
     onMesasChange(updatedMesas);
