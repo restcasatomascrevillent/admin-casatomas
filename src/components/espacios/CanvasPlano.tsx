@@ -552,21 +552,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.sendObjectToBack(line);
     }
 
-    // Dibujar borde del espacio real (área de trabajo)
-    const border = new Rect({
-      left: 0,
-      top: 0,
-      width: logicalWidth,
-      height: logicalHeight,
-      fill: "rgba(255, 255, 255, 0.5)",
-      stroke: "#3b82f6",
-      strokeWidth: 2,
-      selectable: false,
-      evented: false,
-    });
-    (border as any).isGrid = true;
-    fabricCanvas.add(border);
-
     fabricCanvas.renderAll();
   }, [fabricCanvas, pixelsPerMeter, realDimensions, logicalWidth, logicalHeight, canvasWidth, canvasHeight]);
 
