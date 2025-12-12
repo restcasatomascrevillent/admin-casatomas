@@ -578,15 +578,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [canvasWidth, canvasHeight]);
 
-  // Redimensionar canvas cuando cambia el contenedor
-  useEffect(() => {
-    if (!fabricCanvas || containerSize.width === 0 || containerSize.height === 0) return;
-    
-    // Actualizar dimensiones del canvas de Fabric
-    fabricCanvas.setWidth(containerSize.width);
-    fabricCanvas.setHeight(containerSize.height);
-    fabricCanvas.renderAll();
-  }, [fabricCanvas, containerSize.width, containerSize.height]);
 
   // Zoom con rueda del ratón
   useEffect(() => {
