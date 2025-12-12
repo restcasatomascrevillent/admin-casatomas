@@ -1,6 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Json } from "@/integrations/supabase/types";
+
+export interface OriginalMesaData {
+  id: string;
+  nombre: string;
+  capacidad: number;
+  forma: "rectangular" | "circular";
+  ancho: number;
+  alto: number;
+}
 
 export interface Mesa {
   id: string;
@@ -14,6 +24,8 @@ export interface Mesa {
   pos_y: number;
   rotacion: number;
   activa: boolean;
+  is_merged: boolean;
+  original_mesas: OriginalMesaData[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +41,8 @@ export interface MesaInput {
   pos_y?: number;
   rotacion?: number;
   activa?: boolean;
+  is_merged?: boolean;
+  original_mesas?: Json | null;
 }
 
 export function useMesas(espacioId?: string) {
@@ -47,7 +61,12 @@ export function useMesas(espacioId?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Mesa[];
+      
+      // Convertir original_mesas de Json a OriginalMesaData[]
+      return (data || []).map(mesa => ({
+        ...mesa,
+        original_mesas: mesa.original_mesas as unknown as OriginalMesaData[] | null,
+      })) as Mesa[];
     },
     staleTime: 0, // Siempre considerar datos como stale para refetch
   });
@@ -82,9 +101,14 @@ export function useActualizarMesa() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Mesa> & { id: string }) => {
+      // Convertir original_mesas a Json para Supabase
+      const dbUpdates = {
+        ...updates,
+        original_mesas: updates.original_mesas as unknown as Json | null,
+      };
       const { data, error } = await supabase
         .from("mesas")
-        .update(updates)
+        .update(dbUpdates)
         .eq("id", id)
         .select()
         .single();
@@ -106,9 +130,14 @@ export function useActualizarMesasSilent() {
 
   return useMutation({
     mutationFn: async (mesas: Array<Partial<Mesa> & { id: string }>) => {
-      const updates = mesas.map(({ id, ...data }) =>
-        supabase.from("mesas").update(data).eq("id", id)
-      );
+      const updates = mesas.map(({ id, ...data }) => {
+        // Convertir original_mesas a Json para Supabase
+        const dbData = {
+          ...data,
+          original_mesas: data.original_mesas as unknown as Json | null,
+        };
+        return supabase.from("mesas").update(dbData).eq("id", id);
+      });
       await Promise.all(updates);
     },
     onSuccess: () => {
