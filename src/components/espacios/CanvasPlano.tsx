@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
+import * as fabric from "fabric";
 import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, Point } from "fabric";
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
@@ -168,8 +169,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     alignmentGuidesRef.current = [];
   };
 
-  // Función para mostrar guías de alineación
-  const showAlignmentGuides = (canvas: FabricCanvas, movingObj: FabricObject) => {
+  // Función para mostrar guías de alineación y hacer auto-snap
+  const showAlignmentGuides = (canvas: FabricCanvas, movingObj: FabricObject, applySnap: boolean = false) => {
     clearAlignmentGuides(canvas);
     
     const customData = (movingObj as any).customData;
@@ -185,7 +186,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const movingCenterX = movingLeft + movingWidth / 2;
     const movingCenterY = movingTop + movingHeight / 2;
     
-    const SNAP_THRESHOLD = 8; // píxeles de tolerancia
+    const SNAP_THRESHOLD = 12; // píxeles de tolerancia para snapping
+    
+    let snapX: number | null = null;
+    let snapY: number | null = null;
+    let snapXOffset = 0;
+    let snapYOffset = 0;
     
     canvas.getObjects().forEach(obj => {
       const objData = (obj as any).customData;
@@ -203,15 +209,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       // Alineación vertical (bordes izquierdo, derecho, centro)
       const verticalAlignments = [
-        { moving: movingLeft, target: objLeft, label: "left-left" },
-        { moving: movingLeft, target: objRight, label: "left-right" },
-        { moving: movingRight, target: objLeft, label: "right-left" },
-        { moving: movingRight, target: objRight, label: "right-right" },
-        { moving: movingCenterX, target: objCenterX, label: "center-center" },
+        { moving: movingLeft, target: objLeft, offset: objLeft - movingLeft },
+        { moving: movingLeft, target: objRight, offset: objRight - movingLeft },
+        { moving: movingRight, target: objLeft, offset: objLeft - movingRight },
+        { moving: movingRight, target: objRight, offset: objRight - movingRight },
+        { moving: movingCenterX, target: objCenterX, offset: objCenterX - movingCenterX },
       ];
       
-      verticalAlignments.forEach(({ moving, target }) => {
+      verticalAlignments.forEach(({ moving, target, offset }) => {
         if (Math.abs(moving - target) < SNAP_THRESHOLD) {
+          // Guardar el snap más cercano
+          if (snapX === null || Math.abs(offset) < Math.abs(snapXOffset)) {
+            snapX = target;
+            snapXOffset = offset;
+          }
+          
           const guide = new Line([target, 0, target, logicalHeight], {
             stroke: "#3b82f6",
             strokeWidth: 1,
@@ -227,15 +239,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       // Alineación horizontal (bordes superior, inferior, centro)
       const horizontalAlignments = [
-        { moving: movingTop, target: objTop, label: "top-top" },
-        { moving: movingTop, target: objBottom, label: "top-bottom" },
-        { moving: movingBottom, target: objTop, label: "bottom-top" },
-        { moving: movingBottom, target: objBottom, label: "bottom-bottom" },
-        { moving: movingCenterY, target: objCenterY, label: "center-center" },
+        { moving: movingTop, target: objTop, offset: objTop - movingTop },
+        { moving: movingTop, target: objBottom, offset: objBottom - movingTop },
+        { moving: movingBottom, target: objTop, offset: objTop - movingBottom },
+        { moving: movingBottom, target: objBottom, offset: objBottom - movingBottom },
+        { moving: movingCenterY, target: objCenterY, offset: objCenterY - movingCenterY },
       ];
       
-      horizontalAlignments.forEach(({ moving, target }) => {
+      horizontalAlignments.forEach(({ moving, target, offset }) => {
         if (Math.abs(moving - target) < SNAP_THRESHOLD) {
+          // Guardar el snap más cercano
+          if (snapY === null || Math.abs(offset) < Math.abs(snapYOffset)) {
+            snapY = target;
+            snapYOffset = offset;
+          }
+          
           const guide = new Line([0, target, logicalWidth, target], {
             stroke: "#3b82f6",
             strokeWidth: 1,
@@ -249,6 +267,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         }
       });
     });
+    
+    // Aplicar auto-snap si está habilitado
+    if (applySnap) {
+      let newLeft = movingLeft;
+      let newTop = movingTop;
+      
+      if (snapXOffset !== 0 && Math.abs(snapXOffset) < SNAP_THRESHOLD) {
+        newLeft = movingLeft + snapXOffset;
+      }
+      if (snapYOffset !== 0 && Math.abs(snapYOffset) < SNAP_THRESHOLD) {
+        newTop = movingTop + snapYOffset;
+      }
+      
+      if (newLeft !== movingLeft || newTop !== movingTop) {
+        movingObj.set({ left: newLeft, top: newTop });
+      }
+    }
     
     canvas.renderAll();
   };
@@ -264,9 +299,33 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       selection: true,
     });
 
-    // Event handlers
+    // Event handlers - Limitar selección a máximo 2 elementos
+    const limitSelection = (selected: FabricObject[]) => {
+      // Filtrar solo mesas de la selección
+      const mesas = selected.filter(obj => (obj as any).customData?.tipo === "mesa");
+      
+      if (mesas.length > 2) {
+        // Mantener solo las 2 primeras mesas seleccionadas
+        const mesasToKeep = mesas.slice(0, 2);
+        canvas.discardActiveObject();
+        
+        if (mesasToKeep.length === 1) {
+          canvas.setActiveObject(mesasToKeep[0]);
+        } else if (mesasToKeep.length === 2) {
+          const sel = new (fabric as any).ActiveSelection(mesasToKeep, { canvas });
+          canvas.setActiveObject(sel);
+        }
+        canvas.renderAll();
+        return true; // Indica que se modificó la selección
+      }
+      return false;
+    };
+    
     canvas.on("selection:created", (e) => {
-      const obj = e.selected?.[0];
+      const selected = e.selected || [];
+      if (limitSelection(selected)) return;
+      
+      const obj = selected[0];
       if (obj) {
         const customData = (obj as any).customData;
         onSelectionChange(customData || null);
@@ -274,7 +333,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     });
 
     canvas.on("selection:updated", (e) => {
-      const obj = e.selected?.[0];
+      const selected = e.selected || [];
+      if (limitSelection(selected)) return;
+      
+      const obj = selected[0];
       if (obj) {
         const customData = (obj as any).customData;
         onSelectionChange(customData || null);
@@ -460,9 +522,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         
         canvas.renderAll();
       } else {
-        // Es un objeto individual
+        // Es un objeto individual - aplicar auto-snap antes de guardar
         const customData = (target as any).customData;
         if (customData?.tipo === "mesa") {
+          // Aplicar auto-snap al soltar
+          showAlignmentGuides(canvas, target, true);
+          clearAlignmentGuides(canvas);
+          
           const newPosXPixels = target.left || 0;
           const newPosYPixels = target.top || 0;
           
