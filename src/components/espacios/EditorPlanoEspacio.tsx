@@ -146,8 +146,24 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         },
       });
 
-      // Actualizar posiciones de mesas (solo las que no son temporales)
-      const mesasToUpdate = mesasCanvas.filter(m => !m.id.startsWith('mesa-temp-') && !m.id.startsWith('mesa-grupo-'));
+      // Recopilar IDs de mesas originales que forman parte de mesas fusionadas
+      const idsOriginalesFusionadas = new Set<string>();
+      mesasCanvas.forEach(m => {
+        if (m.isMerged && m.originalMesas) {
+          m.originalMesas.forEach(orig => {
+            if (!orig.id.startsWith('mesa-temp-')) {
+              idsOriginalesFusionadas.add(orig.id);
+            }
+          });
+        }
+      });
+
+      // Actualizar posiciones de mesas (solo las que no son temporales, no agrupadas nuevas, y no son originales de fusiones)
+      const mesasToUpdate = mesasCanvas.filter(m => 
+        !m.id.startsWith('mesa-temp-') && 
+        !m.id.startsWith('mesa-grupo-') &&
+        !idsOriginalesFusionadas.has(m.id)
+      );
       if (mesasToUpdate.length > 0) {
         const updates = mesasToUpdate.map((mesa) => ({
           id: mesa.id,
@@ -161,18 +177,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         await actualizarMesas.mutateAsync(updates);
       }
 
+      // Eliminar mesas originales que ahora forman parte de mesas fusionadas
+      for (const originalId of idsOriginalesFusionadas) {
+        await supabase.from('mesas').delete().eq('id', originalId);
+      }
+
       // Crear mesas agrupadas nuevas (las que empiezan con mesa-grupo-)
       const mesasGrupoNuevas = mesasCanvas.filter(m => m.id.startsWith('mesa-grupo-'));
       for (const mesaGrupo of mesasGrupoNuevas) {
-        // Primero eliminar las mesas originales de la BD si existen
-        if (mesaGrupo.originalMesas) {
-          for (const original of mesaGrupo.originalMesas) {
-            if (!original.id.startsWith('mesa-temp-')) {
-              await supabase.from('mesas').delete().eq('id', original.id);
-            }
-          }
-        }
-        
         // Crear la nueva mesa agrupada
         const { data: nuevaMesa, error } = await supabase
           .from('mesas')
