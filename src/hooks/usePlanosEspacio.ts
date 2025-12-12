@@ -9,6 +9,7 @@ export interface PlanoEspacio {
   alto: number;
   ancho_metros: number | null;
   alto_metros: number | null;
+  pixels_per_meter: number | null;
   metros_cuadrados: number | null;
   configuracion: Record<string, any>;
   created_at: string;

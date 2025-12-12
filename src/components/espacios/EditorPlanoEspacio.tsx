@@ -130,10 +130,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         alto: canvasHeight,
         ancho_metros: realDimensions.width,
         alto_metros: realDimensions.height,
+        pixels_per_meter: PIXELS_PER_METER,
         metros_cuadrados: realDimensions.width * realDimensions.height,
         configuracion: {
           elementos,
-          pixelsPerMeter: PIXELS_PER_METER,
           realDimensions,
         },
       });
