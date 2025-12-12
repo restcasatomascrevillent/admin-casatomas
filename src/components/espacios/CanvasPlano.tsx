@@ -1312,6 +1312,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const altoPixels = mesa.alto / 100 * pixelsPerMeter;
 
       let obj: FabricObject;
+      
+      // Colores según si es mesa agrupada o normal
+      const fillColor = mesa.isMerged ? "#bbf7d0" : "#dbeafe";
+      const strokeColor = mesa.isMerged ? "#16a34a" : "#2563eb";
+      const labelColor = mesa.isMerged ? "#166534" : "#1e40af";
 
       if (mesa.forma === "circular") {
         const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
@@ -1319,8 +1324,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           left: posXPixels,
           top: posYPixels,
           radius: radiusPixels,
-          fill: "#dbeafe",
-          stroke: "#2563eb",
+          fill: fillColor,
+          stroke: strokeColor,
           strokeWidth: 2,
           originX: "left",
           originY: "top",
@@ -1341,8 +1346,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           top: posYPixels,
           width: anchoPixels,
           height: altoPixels,
-          fill: "#dbeafe",
-          stroke: "#2563eb",
+          fill: fillColor,
+          stroke: strokeColor,
           strokeWidth: 2,
           rx: 6,
           ry: 6,
@@ -1366,10 +1371,42 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         id: mesa.id,
         nombre: mesa.nombre,
         capacidad: mesa.capacidad,
+        isMerged: mesa.isMerged || false,
+        originalMesas: mesa.originalMesas || null,
       };
 
       fabricCanvas.add(obj);
-      addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
+      
+      // Etiqueta con estilo diferente para mesas agrupadas
+      if (mesa.isMerged) {
+        const anchoM = (mesa.ancho / 100).toFixed(2);
+        const altoM = (mesa.alto / 100).toFixed(2);
+        const dimensionText = `${anchoM}x${altoM}m`;
+        const centerX = posXPixels + anchoPixels / 2;
+        const centerY = posYPixels + altoPixels / 2;
+        const minDimension = Math.min(anchoPixels, altoPixels);
+        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
+        
+        const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
+          left: centerX,
+          top: centerY,
+          fontSize: fontSize,
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: "600",
+          fill: labelColor,
+          textAlign: "center",
+          selectable: false,
+          evented: false,
+          originX: "center",
+          originY: "center",
+        });
+        (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
+        (label as any).isMesaLabel = true;
+        fabricCanvas.add(label);
+      } else {
+        addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
+      }
+      
       mesasEnCanvas.add(mesa.id);
     });
 
@@ -1392,6 +1429,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const anchoPixels = anchoCm / 100 * pixelsPerMeter;
       const altoPixels = altoCm / 100 * pixelsPerMeter;
 
+      // Colores según si es mesa agrupada o normal
+      const isMerged = mesa.is_merged || false;
+      const fillColor = isMerged ? "#bbf7d0" : "#dbeafe";
+      const strokeColor = isMerged ? "#16a34a" : "#2563eb";
+      const labelColor = isMerged ? "#166534" : "#1e40af";
+
       let obj: FabricObject;
 
       if (mesa.forma === "circular") {
@@ -1400,8 +1443,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           left: posXPixels,
           top: posYPixels,
           radius: radiusPixels,
-          fill: "#dbeafe",
-          stroke: "#2563eb",
+          fill: fillColor,
+          stroke: strokeColor,
           strokeWidth: 2,
           originX: "left",
           originY: "top",
@@ -1422,8 +1465,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           top: posYPixels,
           width: anchoPixels,
           height: altoPixels,
-          fill: "#dbeafe",
-          stroke: "#2563eb",
+          fill: fillColor,
+          stroke: strokeColor,
           strokeWidth: 2,
           rx: 6,
           ry: 6,
@@ -1447,10 +1490,41 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         id: mesa.id,
         nombre: mesa.nombre,
         capacidad: mesa.capacidad,
+        isMerged: isMerged,
+        originalMesas: mesa.original_mesas || null,
       };
 
       fabricCanvas.add(obj);
-      addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels);
+      
+      // Etiqueta con estilo diferente para mesas agrupadas
+      if (isMerged) {
+        const anchoM = (anchoCm / 100).toFixed(2);
+        const altoM = (altoCm / 100).toFixed(2);
+        const dimensionText = `${anchoM}x${altoM}m`;
+        const centerX = posXPixels + anchoPixels / 2;
+        const centerY = posYPixels + altoPixels / 2;
+        const minDimension = Math.min(anchoPixels, altoPixels);
+        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
+        
+        const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
+          left: centerX,
+          top: centerY,
+          fontSize: fontSize,
+          fontFamily: "system-ui, sans-serif",
+          fontWeight: "600",
+          fill: labelColor,
+          textAlign: "center",
+          selectable: false,
+          evented: false,
+          originX: "center",
+          originY: "center",
+        });
+        (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
+        (label as any).isMesaLabel = true;
+        fabricCanvas.add(label);
+      } else {
+        addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels);
+      }
 
       // Guardar en estado local en METROS
       newMesasCanvas.push({
@@ -1462,6 +1536,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         alto: altoCm,
         posX: posXMeters,
         posY: posYMeters,
+        isMerged: isMerged,
+        originalMesas: mesa.original_mesas || undefined,
       });
     });
 

@@ -147,7 +147,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       });
 
       // Actualizar posiciones de mesas (solo las que no son temporales)
-      const mesasToUpdate = mesasCanvas.filter(m => !m.id.startsWith('mesa-temp-'));
+      const mesasToUpdate = mesasCanvas.filter(m => !m.id.startsWith('mesa-temp-') && !m.id.startsWith('mesa-grupo-'));
       if (mesasToUpdate.length > 0) {
         const updates = mesasToUpdate.map((mesa) => ({
           id: mesa.id,
@@ -155,18 +155,63 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           pos_y: mesa.posY,
           ancho: mesa.ancho,
           alto: mesa.alto,
+          is_merged: mesa.isMerged || false,
+          original_mesas: mesa.originalMesas || null,
         }));
         await actualizarMesas.mutateAsync(updates);
       }
 
+      // Crear mesas agrupadas nuevas (las que empiezan con mesa-grupo-)
+      const mesasGrupoNuevas = mesasCanvas.filter(m => m.id.startsWith('mesa-grupo-'));
+      for (const mesaGrupo of mesasGrupoNuevas) {
+        // Primero eliminar las mesas originales de la BD si existen
+        if (mesaGrupo.originalMesas) {
+          for (const original of mesaGrupo.originalMesas) {
+            if (!original.id.startsWith('mesa-temp-')) {
+              await supabase.from('mesas').delete().eq('id', original.id);
+            }
+          }
+        }
+        
+        // Crear la nueva mesa agrupada
+        const { data: nuevaMesa, error } = await supabase
+          .from('mesas')
+          .insert({
+            espacio_id: espacioId,
+            nombre: mesaGrupo.nombre,
+            capacidad: mesaGrupo.capacidad,
+            forma: mesaGrupo.forma,
+            ancho: mesaGrupo.ancho,
+            alto: mesaGrupo.alto,
+            pos_x: mesaGrupo.posX,
+            pos_y: mesaGrupo.posY,
+            is_merged: true,
+            original_mesas: mesaGrupo.originalMesas as any,
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Actualizar el ID en el estado local
+        if (nuevaMesa) {
+          setMesasCanvas(prev => prev.map(m => 
+            m.id === mesaGrupo.id 
+              ? { ...m, id: nuevaMesa.id }
+              : m
+          ));
+        }
+      }
+
       toast.success("Plano guardado correctamente");
+      refetchMesas();
     } catch (error) {
       console.error("Error al guardar:", error);
       toast.error("Error al guardar el plano");
     } finally {
       setIsSaving(false);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas]);
+  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas, refetchMesas]);
 
   // Exportar imagen
   const handleExport = useCallback(() => {

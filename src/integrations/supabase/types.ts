@@ -596,7 +596,9 @@ export type Database = {
           espacio_id: string
           forma: string
           id: string
+          is_merged: boolean | null
           nombre: string
+          original_mesas: Json | null
           pos_x: number | null
           pos_y: number | null
           rotacion: number | null
@@ -611,7 +613,9 @@ export type Database = {
           espacio_id: string
           forma?: string
           id?: string
+          is_merged?: boolean | null
           nombre: string
+          original_mesas?: Json | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null
@@ -626,7 +630,9 @@ export type Database = {
           espacio_id?: string
           forma?: string
           id?: string
+          is_merged?: boolean | null
           nombre?: string
+          original_mesas?: Json | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null
