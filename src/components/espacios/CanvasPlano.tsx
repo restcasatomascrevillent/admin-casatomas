@@ -286,91 +286,185 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       clearAlignmentGuides(canvas);
     });
 
-    // Mostrar guías y mover etiqueta mientras se mueve la mesa
+    // Función helper para actualizar posición de una mesa y su etiqueta durante el movimiento
+    const updateMesaPositionDuringMove = (mesaObj: FabricObject) => {
+      const customData = (mesaObj as any).customData;
+      if (customData?.tipo !== "mesa") return;
+      
+      // Limitar posición dentro del canvas
+      const objWidth = (mesaObj as any).width || (mesaObj as any).radius * 2 || 0;
+      const objHeight = (mesaObj as any).height || (mesaObj as any).radius * 2 || 0;
+      
+      let newPosX = mesaObj.left || 0;
+      let newPosY = mesaObj.top || 0;
+      
+      // Mantener dentro de los límites del canvas
+      if (newPosX < 0) newPosX = 0;
+      if (newPosY < 0) newPosY = 0;
+      if (newPosX + objWidth > logicalWidth) newPosX = logicalWidth - objWidth;
+      if (newPosY + objHeight > logicalHeight) newPosY = logicalHeight - objHeight;
+      
+      mesaObj.set({ left: newPosX, top: newPosY });
+      
+      // Actualizar etiqueta asociada
+      canvas.getObjects().forEach((labelObj) => {
+        const labelData = (labelObj as any).customData;
+        if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
+          const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+          if (mesa) {
+            const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+            const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+            labelObj.set({
+              left: newPosX + anchoPixels / 2,
+              top: newPosY + altoPixels / 2,
+            });
+          }
+        }
+      });
+    };
+
+    // Mostrar guías y mover etiquetas mientras se mueven las mesas
     canvas.on("object:moving", (e) => {
-      const obj = e.target;
-      if (!obj) return;
+      const target = e.target;
+      if (!target) return;
       
-      showAlignmentGuides(canvas, obj);
+      showAlignmentGuides(canvas, target);
       
-      // Mover la etiqueta junto con la mesa en tiempo real
-      const customData = (obj as any).customData;
-      if (customData?.tipo === "mesa") {
-        // Limitar posición dentro del canvas
-        const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
-        const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
+      // Verificar si es una selección múltiple (ActiveSelection)
+      if ((target as any).type === "activeSelection" || (target as any)._objects) {
+        // Es una selección múltiple - iterar sobre todos los objetos
+        const activeSelection = target as any;
+        const objects = activeSelection._objects || [];
         
-        let newPosX = obj.left || 0;
-        let newPosY = obj.top || 0;
-        
-        // Mantener dentro de los límites del canvas
-        if (newPosX < 0) newPosX = 0;
-        if (newPosY < 0) newPosY = 0;
-        if (newPosX + objWidth > logicalWidth) newPosX = logicalWidth - objWidth;
-        if (newPosY + objHeight > logicalHeight) newPosY = logicalHeight - objHeight;
-        
-        obj.set({ left: newPosX, top: newPosY });
-        
-        canvas.getObjects().forEach((labelObj) => {
-          const labelData = (labelObj as any).customData;
-          if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-            const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-            if (mesa) {
-              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
-              labelObj.set({
-                left: newPosX + anchoPixels / 2,
-                top: newPosY + altoPixels / 2,
-              });
-            }
+        objects.forEach((obj: FabricObject) => {
+          // Para ActiveSelection, las posiciones son relativas al grupo
+          // Necesitamos calcular la posición absoluta
+          const matrix = obj.calcTransformMatrix();
+          const absoluteLeft = matrix[4];
+          const absoluteTop = matrix[5];
+          
+          // Temporalmente establecer posición absoluta para actualizar etiquetas
+          const customData = (obj as any).customData;
+          if (customData?.tipo === "mesa") {
+            canvas.getObjects().forEach((labelObj) => {
+              const labelData = (labelObj as any).customData;
+              if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
+                const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+                if (mesa) {
+                  const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+                  const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+                  labelObj.set({
+                    left: absoluteLeft + anchoPixels / 2,
+                    top: absoluteTop + altoPixels / 2,
+                  });
+                }
+              }
+            });
           }
         });
+      } else {
+        // Es un objeto individual
+        updateMesaPositionDuringMove(target);
       }
     });
 
     canvas.on("object:modified", (e) => {
-      const obj = e.target;
-      if (!obj) return;
+      const target = e.target;
+      if (!target) return;
       
       // Limpiar guías de alineación
       clearAlignmentGuides(canvas);
       
-      const customData = (obj as any).customData;
-      if (customData?.tipo === "mesa") {
-        const newPosXPixels = obj.left || 0;
-        const newPosYPixels = obj.top || 0;
+      // Verificar si es una selección múltiple (ActiveSelection)
+      if ((target as any).type === "activeSelection" || (target as any)._objects) {
+        const activeSelection = target as any;
+        const objects = activeSelection._objects || [];
         
-        // Convertir de píxeles a metros para guardar
-        const newPosXMeters = newPosXPixels / pixelsPerMeterRef.current;
-        const newPosYMeters = newPosYPixels / pixelsPerMeterRef.current;
+        // Recopilar actualizaciones de todas las mesas
+        const updates: Array<{ id: string; posX: number; posY: number }> = [];
         
-        // Actualizar la etiqueta asociada a esta mesa
-        canvas.getObjects().forEach((labelObj) => {
-          const labelData = (labelObj as any).customData;
-          if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-            // Obtener dimensiones de la mesa para centrar la etiqueta
-            const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-            if (mesa) {
-              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
-              labelObj.set({
-                left: newPosXPixels + anchoPixels / 2,
-                top: newPosYPixels + altoPixels / 2,
-              });
-            }
+        objects.forEach((obj: FabricObject) => {
+          const customData = (obj as any).customData;
+          if (customData?.tipo === "mesa") {
+            // Para ActiveSelection, calcular posición absoluta
+            const matrix = obj.calcTransformMatrix();
+            const absoluteLeft = matrix[4];
+            const absoluteTop = matrix[5];
+            
+            // Convertir de píxeles a metros para guardar
+            const newPosXMeters = absoluteLeft / pixelsPerMeterRef.current;
+            const newPosYMeters = absoluteTop / pixelsPerMeterRef.current;
+            
+            updates.push({ id: customData.id, posX: newPosXMeters, posY: newPosYMeters });
+            
+            // Actualizar etiqueta
+            canvas.getObjects().forEach((labelObj) => {
+              const labelData = (labelObj as any).customData;
+              if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
+                const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+                if (mesa) {
+                  const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+                  const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+                  labelObj.set({
+                    left: absoluteLeft + anchoPixels / 2,
+                    top: absoluteTop + altoPixels / 2,
+                  });
+                }
+              }
+            });
           }
         });
-        canvas.renderAll();
         
-        // Actualizar estado guardando posición en METROS
-        const currentMesas = mesasCanvasRef.current;
-        onMesasChange(
-          currentMesas.map((m) =>
-            m.id === customData.id
-              ? { ...m, posX: newPosXMeters, posY: newPosYMeters }
-              : m
-          )
-        );
+        // Aplicar todas las actualizaciones al estado
+        if (updates.length > 0) {
+          const currentMesas = mesasCanvasRef.current;
+          onMesasChange(
+            currentMesas.map((m) => {
+              const update = updates.find(u => u.id === m.id);
+              return update ? { ...m, posX: update.posX, posY: update.posY } : m;
+            })
+          );
+        }
+        
+        canvas.renderAll();
+      } else {
+        // Es un objeto individual
+        const customData = (target as any).customData;
+        if (customData?.tipo === "mesa") {
+          const newPosXPixels = target.left || 0;
+          const newPosYPixels = target.top || 0;
+          
+          // Convertir de píxeles a metros para guardar
+          const newPosXMeters = newPosXPixels / pixelsPerMeterRef.current;
+          const newPosYMeters = newPosYPixels / pixelsPerMeterRef.current;
+          
+          // Actualizar la etiqueta asociada a esta mesa
+          canvas.getObjects().forEach((labelObj) => {
+            const labelData = (labelObj as any).customData;
+            if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
+              const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+              if (mesa) {
+                const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+                const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+                labelObj.set({
+                  left: newPosXPixels + anchoPixels / 2,
+                  top: newPosYPixels + altoPixels / 2,
+                });
+              }
+            }
+          });
+          canvas.renderAll();
+          
+          // Actualizar estado guardando posición en METROS
+          const currentMesas = mesasCanvasRef.current;
+          onMesasChange(
+            currentMesas.map((m) =>
+              m.id === customData.id
+                ? { ...m, posX: newPosXMeters, posY: newPosYMeters }
+                : m
+            )
+          );
+        }
       }
     });
 
