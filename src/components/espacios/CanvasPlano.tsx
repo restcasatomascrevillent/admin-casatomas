@@ -169,6 +169,197 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     alignmentGuidesRef.current = [];
   };
 
+  // Función para detectar y agrupar mesas cercanas
+  const checkAndMergeTables = (canvas: FabricCanvas, movedMesa: FabricObject) => {
+    const movedData = (movedMesa as any).customData;
+    if (movedData?.tipo !== "mesa") return;
+
+    const MERGE_THRESHOLD = 15; // píxeles de proximidad para fusionar
+
+    const movedLeft = movedMesa.left || 0;
+    const movedTop = movedMesa.top || 0;
+    const movedWidth = (movedMesa as any).width || (movedMesa as any).radius * 2 || 0;
+    const movedHeight = (movedMesa as any).height || (movedMesa as any).radius * 2 || 0;
+    const movedRight = movedLeft + movedWidth;
+    const movedBottom = movedTop + movedHeight;
+
+    // Buscar mesa cercana con la que fusionar
+    let mesaToMerge: FabricObject | null = null;
+    let mergeDirection: "horizontal" | "vertical" | null = null;
+
+    canvas.getObjects().forEach(obj => {
+      const objData = (obj as any).customData;
+      if (!objData || objData.tipo !== "mesa" || objData.id === movedData.id) return;
+
+      const objLeft = obj.left || 0;
+      const objTop = obj.top || 0;
+      const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
+      const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
+      const objRight = objLeft + objWidth;
+      const objBottom = objTop + objHeight;
+
+      // Verificar si están adyacentes horizontalmente (lado a lado)
+      const horizontallyAdjacent = 
+        Math.abs(movedRight - objLeft) < MERGE_THRESHOLD || 
+        Math.abs(movedLeft - objRight) < MERGE_THRESHOLD;
+      
+      const verticalOverlap = 
+        (movedTop < objBottom && movedBottom > objTop);
+
+      // Verificar si están adyacentes verticalmente (uno encima del otro)
+      const verticallyAdjacent = 
+        Math.abs(movedBottom - objTop) < MERGE_THRESHOLD || 
+        Math.abs(movedTop - objBottom) < MERGE_THRESHOLD;
+      
+      const horizontalOverlap = 
+        (movedLeft < objRight && movedRight > objLeft);
+
+      if (horizontallyAdjacent && verticalOverlap) {
+        mesaToMerge = obj;
+        mergeDirection = "horizontal";
+      } else if (verticallyAdjacent && horizontalOverlap) {
+        mesaToMerge = obj;
+        mergeDirection = "vertical";
+      }
+    });
+
+    if (!mesaToMerge || !mergeDirection) return;
+
+    const mergeData = (mesaToMerge as any).customData;
+    
+    // Obtener datos de ambas mesas
+    const mesa1 = mesasCanvasRef.current.find(m => m.id === movedData.id);
+    const mesa2 = mesasCanvasRef.current.find(m => m.id === mergeData.id);
+    
+    if (!mesa1 || !mesa2) return;
+
+    // Calcular nuevas dimensiones y capacidad
+    const newCapacidad = mesa1.capacidad + mesa2.capacidad;
+    let newAncho = mesa1.ancho;
+    let newAlto = mesa1.alto;
+    
+    if (mergeDirection === "horizontal") {
+      newAncho = mesa1.ancho + mesa2.ancho;
+      newAlto = Math.max(mesa1.alto, mesa2.alto);
+    } else {
+      newAncho = Math.max(mesa1.ancho, mesa2.ancho);
+      newAlto = mesa1.alto + mesa2.alto;
+    }
+
+    // Calcular nueva posición (esquina superior izquierda del grupo)
+    const mergedLeft = mesaToMerge.left || 0;
+    const mergedTop = mesaToMerge.top || 0;
+    
+    const newPosX = Math.min(movedLeft, mergedLeft);
+    const newPosY = Math.min(movedTop, mergedTop);
+
+    // Nuevo nombre combinado
+    const newNombre = `${mesa1.nombre}+${mesa2.nombre}`;
+    const newId = `mesa-grupo-${Date.now()}`;
+
+    // Eliminar ambas mesas del canvas
+    canvas.remove(movedMesa);
+    canvas.remove(mesaToMerge);
+
+    // Eliminar etiquetas asociadas
+    canvas.getObjects().forEach(obj => {
+      const labelData = (obj as any).customData;
+      if (labelData?.tipo === "mesa-label" && 
+          (labelData?.parentId === movedData.id || labelData?.parentId === mergeData.id)) {
+        canvas.remove(obj);
+      }
+    });
+
+    // Crear nueva mesa fusionada
+    const newAnchoPixels = newAncho / 100 * pixelsPerMeterRef.current;
+    const newAltoPixels = newAlto / 100 * pixelsPerMeterRef.current;
+
+    const newMesa = new Rect({
+      left: newPosX,
+      top: newPosY,
+      width: newAnchoPixels,
+      height: newAltoPixels,
+      fill: "#bbf7d0", // Verde claro para indicar mesa agrupada
+      stroke: "#16a34a",
+      strokeWidth: 2,
+      rx: 6,
+      ry: 6,
+      originX: "left",
+      originY: "top",
+      hasControls: false,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      shadow: {
+        color: "rgba(0,0,0,0.1)",
+        blur: 8,
+        offsetX: 2,
+        offsetY: 2,
+      } as any,
+    });
+
+    (newMesa as any).customData = {
+      tipo: "mesa",
+      id: newId,
+      nombre: newNombre,
+      capacidad: newCapacidad,
+      isMerged: true,
+      originalMesas: [movedData.id, mergeData.id],
+    };
+
+    canvas.add(newMesa);
+
+    // Crear etiqueta para la nueva mesa
+    const anchoM = (newAncho / 100).toFixed(2);
+    const altoM = (newAlto / 100).toFixed(2);
+    const dimensionText = `${anchoM}x${altoM}m`;
+    
+    const centerX = newPosX + newAnchoPixels / 2;
+    const centerY = newPosY + newAltoPixels / 2;
+    
+    const minDimension = Math.min(newAnchoPixels, newAltoPixels);
+    const fontSize = Math.max(5, Math.min(10, minDimension / 8));
+
+    const label = new FabricText(`${newNombre} (${newCapacidad}p)\n${dimensionText}`, {
+      left: centerX,
+      top: centerY,
+      fontSize: fontSize,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "600",
+      fill: "#166534",
+      textAlign: "center",
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+    });
+    
+    (label as any).customData = { tipo: "mesa-label", parentId: newId };
+    (label as any).isMesaLabel = true;
+    canvas.add(label);
+
+    // Actualizar estado - eliminar las dos mesas antiguas y añadir la nueva
+    const newPosXMeters = newPosX / pixelsPerMeterRef.current;
+    const newPosYMeters = newPosY / pixelsPerMeterRef.current;
+
+    const updatedMesas = mesasCanvasRef.current
+      .filter(m => m.id !== movedData.id && m.id !== mergeData.id)
+      .concat({
+        id: newId,
+        nombre: newNombre,
+        capacidad: newCapacidad,
+        forma: "rectangular" as const,
+        ancho: newAncho,
+        alto: newAlto,
+        posX: newPosXMeters,
+        posY: newPosYMeters,
+      });
+
+    onMesasChange(updatedMesas);
+    canvas.setActiveObject(newMesa);
+    canvas.renderAll();
+  };
+
   // Función para mostrar guías de alineación y hacer auto-snap
   const showAlignmentGuides = (canvas: FabricCanvas, movingObj: FabricObject, applySnap: boolean = false) => {
     clearAlignmentGuides(canvas);
@@ -562,6 +753,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
                 : m
             )
           );
+          
+          // Verificar si se puede fusionar con otra mesa cercana
+          setTimeout(() => checkAndMergeTables(canvas, target), 50);
         }
       }
     });
