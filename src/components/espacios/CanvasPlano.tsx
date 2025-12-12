@@ -336,32 +336,54 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const activeSelection = target as any;
         const objects = activeSelection._objects || [];
         
+        // Obtener la posición del grupo
+        const groupLeft = activeSelection.left || 0;
+        const groupTop = activeSelection.top || 0;
+        
         objects.forEach((obj: FabricObject) => {
-          // Para ActiveSelection, las posiciones son relativas al grupo
-          // Necesitamos calcular la posición absoluta
-          const matrix = obj.calcTransformMatrix();
-          const absoluteLeft = matrix[4];
-          const absoluteTop = matrix[5];
-          
-          // Temporalmente establecer posición absoluta para actualizar etiquetas
           const customData = (obj as any).customData;
           if (customData?.tipo === "mesa") {
-            canvas.getObjects().forEach((labelObj) => {
-              const labelData = (labelObj as any).customData;
-              if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-                const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-                if (mesa) {
-                  const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-                  const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+            // Calcular posición absoluta: posición del grupo + offset del objeto dentro del grupo
+            // Los objetos dentro del grupo tienen posiciones relativas a su centro
+            const objLeft = obj.left || 0;
+            const objTop = obj.top || 0;
+            const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
+            const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
+            
+            // La posición absoluta es: centro del grupo + offset del objeto
+            const absoluteLeft = groupLeft + objLeft;
+            const absoluteTop = groupTop + objTop;
+            
+            const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+            if (mesa) {
+              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+              
+              // Calcular centro de la mesa para la etiqueta
+              let centerX: number;
+              let centerY: number;
+              
+              if (mesa.forma === "circular") {
+                centerX = absoluteLeft + anchoPixels / 2;
+                centerY = absoluteTop + altoPixels / 2;
+              } else {
+                centerX = absoluteLeft + anchoPixels / 2;
+                centerY = absoluteTop + altoPixels / 2;
+              }
+              
+              canvas.getObjects().forEach((labelObj) => {
+                const labelData = (labelObj as any).customData;
+                if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
                   labelObj.set({
-                    left: absoluteLeft + anchoPixels / 2,
-                    top: absoluteTop + altoPixels / 2,
+                    left: centerX,
+                    top: centerY,
                   });
                 }
-              }
-            });
+              });
+            }
           }
         });
+        canvas.renderAll();
       } else {
         // Es un objeto individual
         updateMesaPositionDuringMove(target);
@@ -380,16 +402,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const activeSelection = target as any;
         const objects = activeSelection._objects || [];
         
+        // Obtener la posición del grupo
+        const groupLeft = activeSelection.left || 0;
+        const groupTop = activeSelection.top || 0;
+        
         // Recopilar actualizaciones de todas las mesas
         const updates: Array<{ id: string; posX: number; posY: number }> = [];
         
         objects.forEach((obj: FabricObject) => {
           const customData = (obj as any).customData;
           if (customData?.tipo === "mesa") {
-            // Para ActiveSelection, calcular posición absoluta
-            const matrix = obj.calcTransformMatrix();
-            const absoluteLeft = matrix[4];
-            const absoluteTop = matrix[5];
+            // Calcular posición absoluta usando el offset del grupo
+            const objLeft = obj.left || 0;
+            const objTop = obj.top || 0;
+            
+            const absoluteLeft = groupLeft + objLeft;
+            const absoluteTop = groupTop + objTop;
             
             // Convertir de píxeles a metros para guardar
             const newPosXMeters = absoluteLeft / pixelsPerMeterRef.current;
@@ -398,20 +426,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             updates.push({ id: customData.id, posX: newPosXMeters, posY: newPosYMeters });
             
             // Actualizar etiqueta
-            canvas.getObjects().forEach((labelObj) => {
-              const labelData = (labelObj as any).customData;
-              if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-                const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-                if (mesa) {
-                  const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-                  const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+            const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+            if (mesa) {
+              const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
+              const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
+              
+              const centerX = absoluteLeft + anchoPixels / 2;
+              const centerY = absoluteTop + altoPixels / 2;
+              
+              canvas.getObjects().forEach((labelObj) => {
+                const labelData = (labelObj as any).customData;
+                if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
                   labelObj.set({
-                    left: absoluteLeft + anchoPixels / 2,
-                    top: absoluteTop + altoPixels / 2,
+                    left: centerX,
+                    top: centerY,
                   });
                 }
-              }
-            });
+              });
+            }
           }
         });
         
