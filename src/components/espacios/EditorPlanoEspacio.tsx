@@ -34,6 +34,15 @@ export interface MesaCanvas {
   alto: number;
   posX: number;
   posY: number;
+  isMerged?: boolean;
+  originalMesas?: Array<{
+    id: string;
+    nombre: string;
+    capacidad: number;
+    forma: "rectangular" | "circular";
+    ancho: number;
+    alto: number;
+  }>;
 }
 
 export interface ElementoCanvas {
@@ -349,6 +358,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           pixelsPerMeter={PIXELS_PER_METER}
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
+          onUnmergeMesa={(mesaId) => {
+            canvasRef.current?.unmergeMesa(mesaId);
+            setSelectedElement(null);
+          }}
         />
       </div>
 
