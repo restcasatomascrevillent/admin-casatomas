@@ -147,10 +147,11 @@ export function SubidaFacturas() {
 
       // Verificar si el webhook respondió correctamente
       if (data?.success) {
-        // Extraer el campo text de la respuesta
-        const textoExtraido = typeof data.webhookResponse === 'string' 
-          ? data.webhookResponse 
-          : data.webhookResponse?.text || data.webhookResponse?.message || '';
+        // Extraer el campo text del content del output
+        const textoExtraido = data.webhookResponse?.output?.[0]?.content?.[0]?.text || 
+          data.webhookResponse?.text || 
+          data.webhookResponse?.message || 
+          '';
 
         // Guardar los datos extraídos para mostrarlos
         setDatosExtraidos({
