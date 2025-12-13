@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface ArchivoFactura {
   file: File;
@@ -20,9 +19,8 @@ interface ArchivoFactura {
 interface DatosExtraidos {
   success: boolean;
   archivos: string[];
-  datos: Record<string, unknown> | Record<string, unknown>[];
+  texto: string;
   timestamp: string;
-  rawResponse?: unknown;
 }
 
 export function SubidaFacturas() {
@@ -30,7 +28,6 @@ export function SubidaFacturas() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [instruccionesExtraccion, setInstruccionesExtraccion] = useState("");
   const [datosExtraidos, setDatosExtraidos] = useState<DatosExtraidos | null>(null);
-  const [showRawResponse, setShowRawResponse] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -150,13 +147,17 @@ export function SubidaFacturas() {
 
       // Verificar si el webhook respondió correctamente
       if (data?.success) {
+        // Extraer el campo text de la respuesta
+        const textoExtraido = typeof data.webhookResponse === 'string' 
+          ? data.webhookResponse 
+          : data.webhookResponse?.text || data.webhookResponse?.message || '';
+
         // Guardar los datos extraídos para mostrarlos
         setDatosExtraidos({
           success: true,
           archivos: nombresArchivos,
-          datos: data.webhookResponse || {},
+          texto: textoExtraido,
           timestamp: new Date().toISOString(),
-          rawResponse: data,
         });
 
         toast({
@@ -186,54 +187,6 @@ export function SubidaFacturas() {
     }
   };
 
-  const renderDatosExtraidos = (datos: unknown, nivel = 0): React.ReactNode => {
-    if (datos === null || datos === undefined) {
-      return <span className="text-muted-foreground italic">Sin datos</span>;
-    }
-
-    if (typeof datos === 'string' || typeof datos === 'number' || typeof datos === 'boolean') {
-      return <span className="text-foreground">{String(datos)}</span>;
-    }
-
-    if (Array.isArray(datos)) {
-      if (datos.length === 0) {
-        return <span className="text-muted-foreground italic">Lista vacía</span>;
-      }
-      return (
-        <div className="space-y-2">
-          {datos.map((item, index) => (
-            <div key={index} className="pl-3 border-l-2 border-muted">
-              <span className="text-xs text-muted-foreground">#{index + 1}</span>
-              <div>{renderDatosExtraidos(item, nivel + 1)}</div>
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    if (typeof datos === 'object') {
-      const entries = Object.entries(datos as Record<string, unknown>);
-      if (entries.length === 0) {
-        return <span className="text-muted-foreground italic">Objeto vacío</span>;
-      }
-      return (
-        <div className="space-y-1">
-          {entries.map(([key, value]) => (
-            <div key={key} className={nivel > 0 ? "pl-3" : ""}>
-              <span className="font-medium text-primary capitalize">{key.replace(/_/g, ' ')}: </span>
-              {typeof value === 'object' ? (
-                <div className="mt-1">{renderDatosExtraidos(value, nivel + 1)}</div>
-              ) : (
-                renderDatosExtraidos(value, nivel + 1)
-              )}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    return <span>{String(datos)}</span>;
-  };
 
   return (
     <div className="space-y-6">
@@ -389,29 +342,8 @@ export function SubidaFacturas() {
           </CardHeader>
           <CardContent className="space-y-4">
             <ScrollArea className="h-[400px] rounded-md border p-4">
-              {renderDatosExtraidos(datosExtraidos.datos)}
+              <p className="text-sm whitespace-pre-wrap">{datosExtraidos.texto || "Sin datos extraídos"}</p>
             </ScrollArea>
-
-            {/* Mostrar respuesta raw (colapsable) */}
-            <Collapsible open={showRawResponse} onOpenChange={setShowRawResponse}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="w-full justify-between">
-                  <span className="text-xs text-muted-foreground">Ver respuesta completa (JSON)</span>
-                  {showRawResponse ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <ScrollArea className="h-[200px] mt-2">
-                  <pre className="text-xs bg-muted p-3 rounded-md overflow-x-auto">
-                    {JSON.stringify(datosExtraidos.rawResponse, null, 2)}
-                  </pre>
-                </ScrollArea>
-              </CollapsibleContent>
-            </Collapsible>
 
             <Button 
               variant="outline" 
