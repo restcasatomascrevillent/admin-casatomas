@@ -132,17 +132,22 @@ export function SubidaFacturas() {
 
       console.log('Facturas enviadas:', data);
 
-      toast({
-        title: "Facturas enviadas",
-        description: `Se han enviado ${archivos.length} factura(s) correctamente`,
-      });
+      // Verificar si el webhook respondió correctamente
+      if (data?.success) {
+        toast({
+          title: "Facturas procesadas",
+          description: data.webhookResponse?.message || `Se han procesado ${archivos.length} factura(s) correctamente`,
+        });
 
-      // Limpiar archivos e instrucciones
-      archivos.forEach(a => {
-        if (a.preview) URL.revokeObjectURL(a.preview);
-      });
-      setArchivos([]);
-      setInstruccionesExtraccion("");
+        // Limpiar archivos e instrucciones solo si fue exitoso
+        archivos.forEach(a => {
+          if (a.preview) URL.revokeObjectURL(a.preview);
+        });
+        setArchivos([]);
+        setInstruccionesExtraccion("");
+      } else {
+        throw new Error(data?.error || "Error al procesar las facturas");
+      }
 
     } catch (error) {
       console.error('Error al enviar facturas:', error);
