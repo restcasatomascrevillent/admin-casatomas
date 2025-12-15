@@ -2070,8 +2070,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   };
 
   return (
-    <div ref={containerRef} className="absolute inset-0 w-full h-full overflow-hidden bg-white">
-      <canvas ref={canvasRef} id="plano-canvas" className="block w-full h-full" />
+    <div ref={containerRef} className="absolute inset-0 w-full h-full overflow-hidden">
+      <canvas ref={canvasRef} id="plano-canvas" className="block" />
     </div>
   );
 });
