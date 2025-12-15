@@ -377,11 +377,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       />
 
       {/* Main content */}
-      <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex gap-4 flex-1 min-h-0">
         {/* Canvas - zoom nativo de Fabric.js */}
         <div 
           ref={containerRef}
-          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden shadow-lg min-h-[400px] relative"
+          className="flex-1 rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-lg relative"
         >
           <CanvasPlano
             ref={canvasRef}
