@@ -861,56 +861,58 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.style.backgroundColor = reserva ? "#bbf7d0" : "#e5e7eb";
         mesaDiv.style.border = "2px solid #6b7280";
         mesaDiv.style.borderRadius = mesa.forma === "circular" ? "50%" : "8px";
-        mesaDiv.style.display = "flex";
-        mesaDiv.style.alignItems = "center";
-        mesaDiv.style.justifyContent = "center";
-        mesaDiv.style.textAlign = "center";
         mesaDiv.style.boxSizing = "border-box";
-        
-        // Create text span for proper centering
-        const textSpan = document.createElement("span");
-        textSpan.style.fontSize = "11px";
-        textSpan.style.fontWeight = "600";
-        textSpan.style.color = "#1f2937";
-        textSpan.style.lineHeight = "1";
-        textSpan.style.textAlign = "center";
-        textSpan.textContent = mesa.nombre;
-        mesaDiv.appendChild(textSpan);
         contentDiv.appendChild(mesaDiv);
+        
+        // Create text label with absolute centering (works better with html2canvas)
+        const textLabel = document.createElement("div");
+        textLabel.style.position = "absolute";
+        textLabel.style.left = `${posXPixels + anchoPixels / 2}px`;
+        textLabel.style.top = `${posYPixels + altoPixels / 2}px`;
+        textLabel.style.transform = "translate(-50%, -50%)";
+        textLabel.style.fontSize = "11px";
+        textLabel.style.fontWeight = "600";
+        textLabel.style.color = "#1f2937";
+        textLabel.style.textAlign = "center";
+        textLabel.style.whiteSpace = "nowrap";
+        textLabel.textContent = mesa.nombre;
+        contentDiv.appendChild(textLabel);
 
-        // Add reservation card if assigned - improved styling
+        // Add reservation card if assigned - using margin-left for centering instead of transform
         if (reserva) {
+          const cardWidth = 100; // approximate width
           const cardDiv = document.createElement("div");
           cardDiv.style.position = "absolute";
-          cardDiv.style.left = `${posXPixels + anchoPixels / 2}px`;
-          cardDiv.style.top = `${posYPixels - 45}px`;
-          cardDiv.style.transform = "translateX(-50%)";
+          cardDiv.style.left = `${posXPixels + anchoPixels / 2 - cardWidth / 2}px`;
+          cardDiv.style.top = `${posYPixels - 50}px`;
+          cardDiv.style.width = `${cardWidth}px`;
           cardDiv.style.backgroundColor = "#16a34a";
           cardDiv.style.color = "white";
-          cardDiv.style.padding = "6px 10px";
+          cardDiv.style.padding = "6px 8px";
           cardDiv.style.borderRadius = "8px";
-          cardDiv.style.fontSize = "11px";
-          cardDiv.style.fontWeight = "600";
-          cardDiv.style.whiteSpace = "nowrap";
           cardDiv.style.boxShadow = "0 4px 6px rgba(0,0,0,0.15)";
-          cardDiv.style.textAlign = "center";
-          cardDiv.style.lineHeight = "1.3";
-          cardDiv.style.minWidth = "80px";
-          
-          // Create structured content
-          const nameSpan = document.createElement("div");
-          nameSpan.style.fontWeight = "700";
-          nameSpan.style.fontSize = "12px";
-          nameSpan.textContent = reserva.reservas.nombre || "Sin nombre";
-          
-          const infoSpan = document.createElement("div");
-          infoSpan.style.fontSize = "10px";
-          infoSpan.style.opacity = "0.9";
-          infoSpan.textContent = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
-          
-          cardDiv.appendChild(nameSpan);
-          cardDiv.appendChild(infoSpan);
+          cardDiv.style.boxSizing = "border-box";
           contentDiv.appendChild(cardDiv);
+          
+          // Name centered
+          const nameDiv = document.createElement("div");
+          nameDiv.style.fontWeight = "700";
+          nameDiv.style.fontSize = "11px";
+          nameDiv.style.textAlign = "center";
+          nameDiv.style.whiteSpace = "nowrap";
+          nameDiv.style.overflow = "hidden";
+          nameDiv.style.textOverflow = "ellipsis";
+          nameDiv.textContent = reserva.reservas.nombre || "Sin nombre";
+          cardDiv.appendChild(nameDiv);
+          
+          // Info centered
+          const infoDiv = document.createElement("div");
+          infoDiv.style.fontSize = "9px";
+          infoDiv.style.textAlign = "center";
+          infoDiv.style.opacity = "0.9";
+          infoDiv.style.marginTop = "2px";
+          infoDiv.textContent = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
+          cardDiv.appendChild(infoDiv);
         }
       });
 
