@@ -323,11 +323,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular escala para ajustar el canvas al contenedor
+  // Calcular escala para ajustar el canvas al contenedor (sin límite máximo)
   const scale = Math.min(
     (containerSize.width - 32) / canvasWidth,
-    (containerSize.height - 32) / canvasHeight,
-    1 // No escalar más grande que el original
+    (containerSize.height - 32) / canvasHeight
   );
 
   // Sincronizar mesas locales con datos del servidor
@@ -738,7 +737,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4 h-[calc(100vh-220px)]">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
@@ -826,13 +825,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         </div>
 
         {/* Main content */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_350px]">
+        <div className="grid gap-4 lg:grid-cols-[1fr_350px] flex-1 min-h-0">
           {/* Canvas del plano */}
-          <Card className="overflow-hidden">
-            <CardContent className="p-4">
+          <Card className="overflow-hidden flex flex-col">
+            <CardContent className="p-4 flex-1 flex flex-col min-h-0">
               <div 
                 ref={containerRef}
-                className="relative w-full h-[500px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden"
+                className="relative w-full flex-1 min-h-[400px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden"
               >
                 <div
                   ref={canvasRef}
