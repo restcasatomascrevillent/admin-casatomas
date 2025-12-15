@@ -733,25 +733,102 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
 
-      if (!canvasRef.current) return;
+      // Create a temporary container with all elements at 1:1 scale
+      const tempContainer = document.createElement("div");
+      tempContainer.style.position = "fixed";
+      tempContainer.style.left = "-9999px";
+      tempContainer.style.top = "0";
+      tempContainer.style.width = `${contentBounds.width}px`;
+      tempContainer.style.height = `${contentBounds.height}px`;
+      tempContainer.style.backgroundColor = "#ffffff";
+      tempContainer.style.overflow = "visible";
+      document.body.appendChild(tempContainer);
 
-      // Reset zoom and pan for clean capture
-      const originalTransform = canvasRef.current.style.transform;
-      canvasRef.current.style.transform = 'none';
+      // Create inner content div
+      const contentDiv = document.createElement("div");
+      contentDiv.style.position = "relative";
+      contentDiv.style.width = "100%";
+      contentDiv.style.height = "100%";
+      tempContainer.appendChild(contentDiv);
 
-      const canvas = await html2canvas(canvasRef.current, {
+      // Render grid
+      const gridSize = 50;
+      for (let x = 0; x <= contentBounds.width; x += gridSize) {
+        const line = document.createElement("div");
+        line.style.position = "absolute";
+        line.style.left = `${x}px`;
+        line.style.top = "0";
+        line.style.width = "1px";
+        line.style.height = "100%";
+        line.style.backgroundColor = "#e5e7eb";
+        contentDiv.appendChild(line);
+      }
+      for (let y = 0; y <= contentBounds.height; y += gridSize) {
+        const line = document.createElement("div");
+        line.style.position = "absolute";
+        line.style.left = "0";
+        line.style.top = `${y}px`;
+        line.style.width = "100%";
+        line.style.height = "1px";
+        line.style.backgroundColor = "#e5e7eb";
+        contentDiv.appendChild(line);
+      }
+
+      // Render mesas
+      localMesas.forEach((mesa) => {
+        const reserva = getReservaAsignada(mesa.id);
+        const posXPixels = (mesa.pos_x || 0) * PIXELS_PER_METER - offsetX;
+        const posYPixels = (mesa.pos_y || 0) * PIXELS_PER_METER - offsetY;
+        const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER;
+        const altoPixels = ((mesa.alto || 80) / 100) * PIXELS_PER_METER;
+
+        const mesaDiv = document.createElement("div");
+        mesaDiv.style.position = "absolute";
+        mesaDiv.style.left = `${posXPixels}px`;
+        mesaDiv.style.top = `${posYPixels}px`;
+        mesaDiv.style.width = `${anchoPixels}px`;
+        mesaDiv.style.height = `${altoPixels}px`;
+        mesaDiv.style.backgroundColor = reserva ? "#bbf7d0" : "#e5e7eb";
+        mesaDiv.style.border = "2px solid #6b7280";
+        mesaDiv.style.borderRadius = mesa.forma === "circular" ? "50%" : "8px";
+        mesaDiv.style.display = "flex";
+        mesaDiv.style.alignItems = "center";
+        mesaDiv.style.justifyContent = "center";
+        mesaDiv.style.fontSize = "12px";
+        mesaDiv.style.fontWeight = "bold";
+        mesaDiv.style.color = "#374151";
+        mesaDiv.textContent = mesa.nombre;
+        contentDiv.appendChild(mesaDiv);
+
+        // Add reservation card if assigned
+        if (reserva) {
+          const cardDiv = document.createElement("div");
+          cardDiv.style.position = "absolute";
+          cardDiv.style.left = `${posXPixels + anchoPixels / 2}px`;
+          cardDiv.style.top = `${posYPixels - 35}px`;
+          cardDiv.style.transform = "translateX(-50%)";
+          cardDiv.style.backgroundColor = "#22c55e";
+          cardDiv.style.color = "white";
+          cardDiv.style.padding = "4px 8px";
+          cardDiv.style.borderRadius = "6px";
+          cardDiv.style.fontSize = "10px";
+          cardDiv.style.fontWeight = "bold";
+          cardDiv.style.whiteSpace = "nowrap";
+          cardDiv.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+          cardDiv.textContent = `${reserva.reservas.nombre} - ${reserva.reservas.hora} (${reserva.reservas.numero_comensales}p)`;
+          contentDiv.appendChild(cardDiv);
+        }
+      });
+
+      const canvas = await html2canvas(tempContainer, {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
-        allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: canvasRef.current.scrollWidth,
-        windowHeight: canvasRef.current.scrollHeight,
+        logging: false,
       });
 
-      // Restore original transform
-      canvasRef.current.style.transform = originalTransform;
+      // Clean up
+      document.body.removeChild(tempContainer);
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
