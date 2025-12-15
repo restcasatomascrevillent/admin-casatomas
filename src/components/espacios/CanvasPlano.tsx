@@ -1411,12 +1411,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       mesasEnCanvas.add(mesa.id);
     });
 
-    // Cargar mesas de BD que no estén ya en el canvas ni en el estado local
+    // Cargar mesas de BD SOLO en la inicialización (primera carga)
     // NOTA: pos_x/pos_y en BBDD están en METROS, ancho/alto en CM
-    const mesasLocalesIds = new Set(mesasLocales.map(m => m.id));
-    mesasDB?.forEach((mesa) => {
-      // Saltar si ya está en el canvas o en el estado local
-      if (mesasEnCanvas.has(mesa.id) || mesasLocalesIds.has(mesa.id)) return;
+    const shouldLoadFromDB = !mesasInitializedRef.current;
+    
+    if (shouldLoadFromDB) {
+      const mesasLocalesIds = new Set(mesasLocales.map(m => m.id));
+      mesasDB?.forEach((mesa) => {
+        // Saltar si ya está en el canvas o en el estado local
+        if (mesasEnCanvas.has(mesa.id) || mesasLocalesIds.has(mesa.id)) return;
 
       // Las posiciones vienen en metros desde la BD
       const posXMeters = mesa.pos_x || 0.5;
@@ -1542,9 +1545,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         isMerged: isMerged,
         originalMesas: mesa.original_mesas || undefined,
       });
-    });
+      });
     
-    mesasInitializedRef.current = true;
+      mesasInitializedRef.current = true;
+    }
 
     if (newMesasCanvas.length > 0) {
       onMesasChange([...mesasCanvasRef.current, ...newMesasCanvas]);

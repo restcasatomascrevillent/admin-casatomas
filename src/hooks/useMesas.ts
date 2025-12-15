@@ -87,7 +87,6 @@ export function useCrearMesa() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      toast.success("Mesa creada correctamente");
     },
     onError: (error) => {
       toast.error("Error al crear mesa");
