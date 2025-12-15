@@ -176,9 +176,8 @@ function DroppableMesa({
 
   // Calcular tamaño de fuente dinámico basado en dimensiones de la mesa
   const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
-  const fontSize = Math.max(8, Math.min(14, minDimension * 0.18));
-  const iconSize = Math.max(8, Math.min(12, minDimension * 0.14));
-  const showCapacity = minDimension > 35;
+  const fontSize = Math.max(9, Math.min(14, minDimension * 0.2));
+  const iconSize = Math.max(8, Math.min(12, minDimension * 0.15));
 
   return (
     <TooltipProvider>
@@ -219,15 +218,13 @@ function DroppableMesa({
             >
               {mesa.nombre}
             </span>
-            {showCapacity && (
-              <div 
-                className="flex items-center gap-0.5 text-muted-foreground mt-0.5"
-                style={{ fontSize: `${iconSize}px` }}
-              >
-                <Users style={{ width: iconSize, height: iconSize }} />
-                <span>{mesa.capacidad}</span>
-              </div>
-            )}
+            <div 
+              className="flex items-center gap-0.5 text-muted-foreground"
+              style={{ fontSize: `${iconSize}px`, marginTop: 1 }}
+            >
+              <Users style={{ width: iconSize, height: iconSize }} />
+              <span>{mesa.capacidad}</span>
+            </div>
 
             {reserva && (
               <>
