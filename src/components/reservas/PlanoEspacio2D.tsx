@@ -852,7 +852,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER;
         const altoPixels = ((mesa.alto || 80) / 100) * PIXELS_PER_METER;
 
-        // Mesa container with flexbox for text centering (html2canvas compatible)
+        // Mesa shape (without text - html2canvas has issues with flexbox)
         const mesaDiv = document.createElement("div");
         mesaDiv.style.position = "absolute";
         mesaDiv.style.left = `${posXPixels}px`;
@@ -863,27 +863,32 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.style.border = "2px solid #6b7280";
         mesaDiv.style.borderRadius = mesa.forma === "circular" ? "50%" : "8px";
         mesaDiv.style.boxSizing = "border-box";
-        mesaDiv.style.display = "flex";
-        mesaDiv.style.alignItems = "center";
-        mesaDiv.style.justifyContent = "center";
+        contentDiv.appendChild(mesaDiv);
         
-        // Text label inside mesa for proper centering
+        // Text label - positioned manually at center using calculated offsets
         const textLabel = document.createElement("div");
+        const textWidth = mesa.nombre.length * 7; // Approximate text width
+        const textHeight = 14; // Approximate text height
+        textLabel.style.position = "absolute";
+        textLabel.style.left = `${posXPixels + (anchoPixels - textWidth) / 2}px`;
+        textLabel.style.top = `${posYPixels + (altoPixels - textHeight) / 2}px`;
+        textLabel.style.width = `${textWidth}px`;
+        textLabel.style.height = `${textHeight}px`;
         textLabel.style.fontSize = "11px";
         textLabel.style.fontWeight = "600";
         textLabel.style.color = "#1f2937";
         textLabel.style.textAlign = "center";
-        textLabel.style.lineHeight = "1";
+        textLabel.style.lineHeight = `${textHeight}px`;
         textLabel.textContent = mesa.nombre;
-        mesaDiv.appendChild(textLabel);
-        contentDiv.appendChild(mesaDiv);
+        contentDiv.appendChild(textLabel);
 
-        // Add reservation card if assigned - calculate position manually without transform
+        // Add reservation card if assigned
         if (reserva) {
           const cardWidth = 100;
           const cardHeight = 42;
           const centerX = posXPixels + anchoPixels / 2;
           
+          // Card background
           const cardDiv = document.createElement("div");
           cardDiv.style.position = "absolute";
           cardDiv.style.left = `${centerX - cardWidth / 2}px`;
@@ -891,40 +896,44 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           cardDiv.style.width = `${cardWidth}px`;
           cardDiv.style.height = `${cardHeight}px`;
           cardDiv.style.backgroundColor = "#16a34a";
-          cardDiv.style.color = "white";
           cardDiv.style.borderRadius = "8px";
           cardDiv.style.boxShadow = "0 4px 6px rgba(0,0,0,0.15)";
           cardDiv.style.boxSizing = "border-box";
-          cardDiv.style.display = "flex";
-          cardDiv.style.flexDirection = "column";
-          cardDiv.style.alignItems = "center";
-          cardDiv.style.justifyContent = "center";
-          cardDiv.style.padding = "4px 6px";
+          contentDiv.appendChild(cardDiv);
           
-          // Name centered
+          // Name - manually centered
+          const nameText = reserva.reservas.nombre || "Sin nombre";
+          const nameWidth = Math.min(nameText.length * 7, 90);
           const nameDiv = document.createElement("div");
+          nameDiv.style.position = "absolute";
+          nameDiv.style.left = `${centerX - nameWidth / 2}px`;
+          nameDiv.style.top = `${posYPixels - cardHeight - 8 + 6}px`;
+          nameDiv.style.width = `${nameWidth}px`;
           nameDiv.style.fontWeight = "700";
           nameDiv.style.fontSize = "11px";
+          nameDiv.style.color = "white";
           nameDiv.style.textAlign = "center";
-          nameDiv.style.lineHeight = "1.2";
-          nameDiv.style.maxWidth = "90px";
+          nameDiv.style.lineHeight = "14px";
           nameDiv.style.overflow = "hidden";
-          nameDiv.style.textOverflow = "ellipsis";
           nameDiv.style.whiteSpace = "nowrap";
-          nameDiv.textContent = reserva.reservas.nombre || "Sin nombre";
-          cardDiv.appendChild(nameDiv);
+          nameDiv.style.textOverflow = "ellipsis";
+          nameDiv.textContent = nameText;
+          contentDiv.appendChild(nameDiv);
           
-          // Info centered
+          // Info - manually centered
+          const infoText = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
+          const infoWidth = 90;
           const infoDiv = document.createElement("div");
+          infoDiv.style.position = "absolute";
+          infoDiv.style.left = `${centerX - infoWidth / 2}px`;
+          infoDiv.style.top = `${posYPixels - cardHeight - 8 + 22}px`;
+          infoDiv.style.width = `${infoWidth}px`;
           infoDiv.style.fontSize = "9px";
+          infoDiv.style.color = "rgba(255,255,255,0.9)";
           infoDiv.style.textAlign = "center";
-          infoDiv.style.lineHeight = "1.2";
-          infoDiv.style.opacity = "0.9";
-          infoDiv.style.marginTop = "2px";
-          infoDiv.textContent = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
-          cardDiv.appendChild(infoDiv);
-          
-          contentDiv.appendChild(cardDiv);
+          infoDiv.style.lineHeight = "12px";
+          infoDiv.textContent = infoText;
+          contentDiv.appendChild(infoDiv);
         }
       });
 
