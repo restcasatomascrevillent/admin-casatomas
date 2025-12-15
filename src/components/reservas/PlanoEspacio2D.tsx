@@ -737,101 +737,70 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex flex-col gap-4 h-[calc(100vh-220px)]">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
+      <div className="flex flex-col gap-2 h-[calc(100vh-140px)]">
+        {/* Header compacto */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="mr-1 h-4 w-4" />
               Volver
             </Button>
             <div>
-              <h3 className="text-xl font-bold">{espacioNombre}</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-lg font-bold leading-tight">{espacioNombre}</h3>
+              <p className="text-xs text-muted-foreground">
                 {new Date(fechaActual).toLocaleDateString("es-ES", { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                  weekday: 'short', 
+                  day: 'numeric',
+                  month: 'short'
                 })}
               </p>
             </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setShowAddMesa(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Mesa
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleCalcularDistribucion}>
-              <Wand2 className="mr-2 h-4 w-4" />
-              Auto-asignar
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
-              <FileDown className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
+          {/* Stats inline con botones */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1">
+                <Utensils className="h-3.5 w-3.5 text-blue-600" />
+                <span className="font-medium">{localMesas.length}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                <span className="font-medium">{mesasOcupadas}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5 text-yellow-600" />
+                <span className="font-medium">{reservasPendientes.length}</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <span className="font-medium">
+                  {reservasHoy?.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0) || 0}
+                </span>
+              </span>
+            </div>
+            <div className="flex gap-1">
+              <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setShowAddMesa(true)}>
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleCalcularDistribucion}>
+                <Wand2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 px-2" onClick={handleExportPDF}>
+                <FileDown className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-blue-100">
-                <Utensils className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Mesas</p>
-                <p className="text-lg font-bold">{localMesas.length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-green-100">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Mesas Ocupadas</p>
-                <p className="text-lg font-bold">{mesasOcupadas}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-yellow-100">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Por Asignar</p>
-                <p className="text-lg font-bold">{reservasPendientes.length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-primary/10">
-                <Users className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Comensales</p>
-                <p className="text-lg font-bold">
-                  {reservasHoy?.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0) || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
         {/* Main content */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_350px] flex-1 min-h-0">
+        <div className="grid gap-2 lg:grid-cols-[1fr_300px] flex-1 min-h-0">
           {/* Canvas del plano */}
           <Card className="overflow-hidden flex flex-col">
-            <CardContent className="p-4 flex-1 flex flex-col min-h-0">
+            <CardContent className="p-2 flex-1 flex flex-col min-h-0">
               <div 
                 ref={containerRef}
-                className="relative w-full flex-1 min-h-[400px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden"
+                className="relative w-full flex-1 min-h-[300px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded overflow-hidden"
               >
                 <div
                   ref={canvasRef}
