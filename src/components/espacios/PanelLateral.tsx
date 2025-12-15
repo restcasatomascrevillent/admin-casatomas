@@ -75,7 +75,7 @@ export function PanelLateral({
     }
 
     try {
-      await crearMesa.mutateAsync({
+      const result = await crearMesa.mutateAsync({
         espacio_id: espacioId,
         nombre: newMesa.nombre,
         capacidad: newMesa.capacidad,
@@ -86,6 +86,21 @@ export function PanelLateral({
         pos_y: 1, // Posición inicial en metros
       });
 
+      // Añadir inmediatamente al estado local para que aparezca en el canvas
+      if (result) {
+        const nuevaMesa: MesaCanvas = {
+          id: result.id,
+          nombre: result.nombre,
+          capacidad: result.capacidad,
+          forma: result.forma as "rectangular" | "circular",
+          ancho: result.ancho || newMesa.ancho,
+          alto: result.alto || (newMesa.forma === "circular" ? newMesa.ancho : newMesa.alto),
+          posX: result.pos_x || 1,
+          posY: result.pos_y || 1,
+        };
+        onMesasChange([...mesasCanvas, nuevaMesa]);
+      }
+
       setNewMesa({
         nombre: "",
         capacidad: 2,
@@ -93,7 +108,6 @@ export function PanelLateral({
         ancho: 80,
         alto: 80,
       });
-      toast.success(`Mesa "${newMesa.nombre}" creada`);
     } catch (error) {
       toast.error("Error al crear la mesa");
     }
