@@ -305,6 +305,56 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   
   const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
 
+  // Calcular bounding box del contenido real (paredes, elementos y mesas)
+  const contentBounds = (() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    // Incluir elementos del plano
+    elementosPlano.forEach((elem) => {
+      const props = elem.props || elem;
+      
+      if (elem.tipo === "wall" && props.x1 !== undefined) {
+        minX = Math.min(minX, props.x1, props.x2);
+        minY = Math.min(minY, props.y1, props.y2);
+        maxX = Math.max(maxX, props.x1, props.x2);
+        maxY = Math.max(maxY, props.y1, props.y2);
+      } else if (props.left !== undefined && props.top !== undefined) {
+        const w = props.width || props.radius * 2 || 100;
+        const h = props.height || props.radius * 2 || 100;
+        minX = Math.min(minX, props.left);
+        minY = Math.min(minY, props.top);
+        maxX = Math.max(maxX, props.left + w);
+        maxY = Math.max(maxY, props.top + h);
+      }
+    });
+    
+    // Incluir mesas (convertir de metros a pixels)
+    localMesas.forEach((mesa) => {
+      const x = (mesa.pos_x || 0) * PIXELS_PER_METER;
+      const y = (mesa.pos_y || 0) * PIXELS_PER_METER;
+      const w = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER;
+      const h = ((mesa.alto || 80) / 100) * PIXELS_PER_METER;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    });
+    
+    // Si no hay contenido, usar todo el canvas
+    if (minX === Infinity) {
+      return { minX: 0, minY: 0, maxX: canvasWidth, maxY: canvasHeight, width: canvasWidth, height: canvasHeight };
+    }
+    
+    // Añadir padding
+    const padding = 20;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(canvasWidth, maxX + padding);
+    maxY = Math.min(canvasHeight, maxY + padding);
+    
+    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+  })();
+
   // Medir el contenedor para escalar responsivamente
   useEffect(() => {
     if (!containerRef.current) return;
@@ -323,11 +373,15 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular escala para ajustar el canvas al contenedor (sin límite máximo)
+  // Calcular escala basándose en el bounding box del contenido
   const scale = Math.min(
-    (containerSize.width - 32) / canvasWidth,
-    (containerSize.height - 32) / canvasHeight
+    (containerSize.width - 32) / contentBounds.width,
+    (containerSize.height - 32) / contentBounds.height
   );
+  
+  // Offset para centrar el contenido
+  const offsetX = contentBounds.minX;
+  const offsetY = contentBounds.minY;
 
   // Sincronizar mesas locales con datos del servidor
   useEffect(() => {
@@ -577,8 +631,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               key={elem.id}
               style={{
                 ...baseStyle,
-                left: x1 * scale,
-                top: y1 * scale,
+                left: (x1 - offsetX) * scale,
+                top: (y1 - offsetY) * scale,
                 width: length * scale,
                 height: 6 * scale,
                 backgroundColor: "#374151",
@@ -592,8 +646,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
       case "rectangle":
       case "area":
-        const rectLeft = (props.left || elem.left || 0) * scale;
-        const rectTop = (props.top || elem.top || 0) * scale;
+        const rectLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const rectTop = ((props.top || elem.top || 0) - offsetY) * scale;
         const rectWidth = (props.width || elem.width || 100) * scale;
         const rectHeight = (props.height || elem.height || 100) * scale;
         return (
@@ -613,8 +667,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "circle":
-        const circleLeft = (props.left || elem.left || 0) * scale;
-        const circleTop = (props.top || elem.top || 0) * scale;
+        const circleLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const circleTop = ((props.top || elem.top || 0) - offsetY) * scale;
         const radius = (props.radius || elem.radius || 30) * scale;
         return (
           <div
@@ -633,8 +687,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "door":
-        const doorLeft = (props.left || elem.left || 0) * scale;
-        const doorTop = (props.top || elem.top || 0) * scale;
+        const doorLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const doorTop = ((props.top || elem.top || 0) - offsetY) * scale;
         const doorWidth = (props.width || elem.width || 70) * scale;
         const doorHeight = (props.height || elem.height || 12) * scale;
         return (
@@ -654,8 +708,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "silla":
-        const sillaLeft = (props.left || elem.left || 0) * scale;
-        const sillaTop = (props.top || elem.top || 0) * scale;
+        const sillaLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const sillaTop = ((props.top || elem.top || 0) - offsetY) * scale;
         const sillaRadius = (props.radius || elem.radius || 15) * scale;
         return (
           <div
@@ -674,8 +728,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "elemento":
-        const elemLeft = (props.left || elem.left || 0) * scale;
-        const elemTop = (props.top || elem.top || 0) * scale;
+        const elemLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const elemTop = ((props.top || elem.top || 0) - offsetY) * scale;
         const elemWidth = (props.width || elem.width || 40) * scale;
         const elemHeight = (props.height || elem.height || 40) * scale;
         return (
@@ -695,8 +749,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "polygon":
-        const polyLeft = (props.left || elem.left || 0) * scale;
-        const polyTop = (props.top || elem.top || 0) * scale;
+        const polyLeft = ((props.left || elem.left || 0) - offsetX) * scale;
+        const polyTop = ((props.top || elem.top || 0) - offsetY) * scale;
         return (
           <div
             key={elem.id}
@@ -837,8 +891,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   ref={canvasRef}
                   className="relative bg-white dark:bg-slate-900 border border-border rounded-lg shadow-inner overflow-hidden flex-shrink-0"
                   style={{ 
-                    width: canvasWidth * scale, 
-                    height: canvasHeight * scale,
+                    width: contentBounds.width * scale, 
+                    height: contentBounds.height * scale,
                   }}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
@@ -865,9 +919,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                     const isSelected = selectedMesa?.id === mesa.id;
                     const isDragging = dragState.mesaId === mesa.id;
                     
-                    // Convertir posición de metros a píxeles y aplicar escala
-                    const posXPixels = (mesa.pos_x || 0) * PIXELS_PER_METER * scale;
-                    const posYPixels = (mesa.pos_y || 0) * PIXELS_PER_METER * scale;
+                    // Convertir posición de metros a píxeles, restar offset y aplicar escala
+                    const posXPixels = ((mesa.pos_x || 0) * PIXELS_PER_METER - offsetX) * scale;
+                    const posYPixels = ((mesa.pos_y || 0) * PIXELS_PER_METER - offsetY) * scale;
                     // Dimensiones en cm convertidas a píxeles y escaladas
                     const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER * scale;
                     const altoPixels = ((mesa.alto || 80) / 100) * PIXELS_PER_METER * scale;
