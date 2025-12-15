@@ -10,6 +10,7 @@ import { CalendarioTurnos } from "@/components/trabajadores/CalendarioTurnos";
 import { CalendarioTurnosSemanal } from "@/components/trabajadores/CalendarioTurnosSemanal";
 import { AsignarAreasAutomaticamente } from "@/components/trabajadores/AsignarAreasAutomaticamente";
 import { DialogTurno } from "@/components/trabajadores/DialogTurno";
+import { GenerarTurnosFicticios } from "@/components/trabajadores/GenerarTurnosFicticios";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ export default function Trabajadores() {
             </p>
           </div>
           <div className="flex gap-2">
+            <GenerarTurnosFicticios />
             <AsignarAreasAutomaticamente />
             <Button
               variant="outline"
