@@ -735,10 +735,23 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
       if (!canvasRef.current) return;
 
+      // Reset zoom and pan for clean capture
+      const originalTransform = canvasRef.current.style.transform;
+      canvasRef.current.style.transform = 'none';
+
       const canvas = await html2canvas(canvasRef.current, {
         backgroundColor: "#ffffff",
         scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: canvasRef.current.scrollWidth,
+        windowHeight: canvasRef.current.scrollHeight,
       });
+
+      // Restore original transform
+      canvasRef.current.style.transform = originalTransform;
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF({
@@ -749,14 +762,119 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 14;
 
+      // Header
       pdf.setFontSize(18);
-      pdf.text(`${espacioNombre} - ${new Date(fechaActual).toLocaleDateString("es-ES")}`, 14, 15);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`${espacioNombre}`, margin, 15);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Fecha: ${new Date(fechaActual).toLocaleDateString("es-ES", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, margin, 22);
 
-      const imgWidth = pdfWidth - 28;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Floor plan image - fit properly
+      const maxImgWidth = pdfWidth - (margin * 2);
+      const maxImgHeight = 90; // Fixed height for floor plan
+      const imgRatio = canvas.width / canvas.height;
+      let imgWidth = maxImgWidth;
+      let imgHeight = imgWidth / imgRatio;
+      
+      if (imgHeight > maxImgHeight) {
+        imgHeight = maxImgHeight;
+        imgWidth = imgHeight * imgRatio;
+      }
 
-      pdf.addImage(imgData, "PNG", 14, 25, imgWidth, Math.min(imgHeight, pdfHeight - 40));
+      const imgX = (pdfWidth - imgWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, 28, imgWidth, imgHeight);
+
+      // Reservations list
+      const tableStartY = 28 + imgHeight + 10;
+      
+      // Get all reservations with assignments
+      const reservasAsignadas = asignaciones?.map(a => {
+        const mesa = localMesas.find(m => m.id === a.mesa_id);
+        return {
+          nombre: a.reservas.nombre || "Sin nombre",
+          hora: a.reservas.hora,
+          comensales: a.reservas.numero_comensales,
+          mesa: mesa?.nombre || "Sin mesa",
+          notas: "",
+        };
+      }) || [];
+
+      const reservasSinAsignar = reservasHoy?.filter(
+        r => !asignaciones?.some(a => a.reserva_id === r.id)
+      ).map(r => ({
+        nombre: r.nombre || "Sin nombre",
+        hora: r.hora,
+        comensales: r.numero_comensales,
+        mesa: "Sin asignar",
+        notas: "",
+      })) || [];
+
+      const todasReservas = [...reservasAsignadas, ...reservasSinAsignar].sort((a, b) => a.hora.localeCompare(b.hora));
+
+      if (todasReservas.length > 0) {
+        pdf.setFontSize(14);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Reservas del día", margin, tableStartY);
+
+        // Table header
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        const colWidths = [30, 50, 25, 40, pdfWidth - margin * 2 - 145];
+        const headers = ["Hora", "Cliente", "Personas", "Mesa", "Notas"];
+        let xPos = margin;
+        const headerY = tableStartY + 8;
+        
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(margin, headerY - 4, pdfWidth - margin * 2, 7, "F");
+        
+        headers.forEach((header, i) => {
+          pdf.text(header, xPos + 2, headerY);
+          xPos += colWidths[i];
+        });
+
+        // Table rows
+        pdf.setFont("helvetica", "normal");
+        let rowY = headerY + 8;
+        
+        todasReservas.forEach((reserva, index) => {
+          if (rowY > pdfHeight - 15) {
+            pdf.addPage();
+            rowY = 20;
+          }
+
+          // Alternate row background
+          if (index % 2 === 0) {
+            pdf.setFillColor(250, 250, 250);
+            pdf.rect(margin, rowY - 4, pdfWidth - margin * 2, 7, "F");
+          }
+
+          xPos = margin;
+          const rowData = [
+            reserva.hora,
+            reserva.nombre.substring(0, 25),
+            String(reserva.comensales),
+            reserva.mesa,
+            reserva.notas.substring(0, 40) + (reserva.notas.length > 40 ? "..." : ""),
+          ];
+          
+          rowData.forEach((cell, i) => {
+            pdf.text(cell, xPos + 2, rowY);
+            xPos += colWidths[i];
+          });
+          
+          rowY += 7;
+        });
+
+        // Summary
+        pdf.setFont("helvetica", "bold");
+        pdf.text(`Total: ${todasReservas.length} reservas - ${todasReservas.reduce((acc, r) => acc + r.comensales, 0)} comensales`, margin, rowY + 5);
+      } else {
+        pdf.setFontSize(12);
+        pdf.text("No hay reservas para este día", margin, tableStartY);
+      }
 
       pdf.save(`plano-${espacioNombre}-${fechaActual}.pdf`);
       toast.success("PDF exportado correctamente");
