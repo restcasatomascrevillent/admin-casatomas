@@ -249,10 +249,12 @@ function DroppableMesa({
 
 export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: PlanoEspacio2DProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [showAddMesa, setShowAddMesa] = useState(false);
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     mesaId: null,
@@ -291,10 +293,41 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     })
   );
 
-  // Canvas usa dimensiones fijas como el editor
-  const canvasWidth = 800;
-  const canvasHeight = 500;
+  // Obtener dimensiones y escala del plano guardado
+  const PIXELS_PER_METER = plano?.pixels_per_meter || 50;
+  const realWidth = plano?.ancho_metros || 12;
+  const realHeight = plano?.alto_metros || 8;
+  
+  // Canvas lógico basado en las dimensiones reales del plano
+  const canvasWidth = realWidth * PIXELS_PER_METER;
+  const canvasHeight = realHeight * PIXELS_PER_METER;
+  
   const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
+
+  // Medir el contenedor para escalar responsivamente
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setContainerSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height
+        });
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Calcular escala para ajustar el canvas al contenedor
+  const scale = Math.min(
+    (containerSize.width - 32) / canvasWidth,
+    (containerSize.height - 32) / canvasHeight,
+    1 // No escalar más grande que el original
+  );
 
   // Sincronizar mesas locales con datos del servidor
   useEffect(() => {
@@ -380,21 +413,22 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragState.isDragging || !dragState.mesaId) return;
 
-    const deltaX = e.clientX - dragState.startX;
-    const deltaY = e.clientY - dragState.startY;
+    // Delta en píxeles de pantalla, convertido a metros considerando la escala
+    const deltaX = (e.clientX - dragState.startX) / (PIXELS_PER_METER * scale);
+    const deltaY = (e.clientY - dragState.startY) / (PIXELS_PER_METER * scale);
 
     setLocalMesas((prev) =>
       prev.map((m) =>
         m.id === dragState.mesaId
           ? {
               ...m,
-              pos_x: Math.max(0, Math.min(canvasWidth - m.ancho, dragState.offsetX + deltaX)),
-              pos_y: Math.max(0, Math.min(canvasHeight - m.alto, dragState.offsetY + deltaY)),
+              pos_x: Math.max(0, Math.min(realWidth - (m.ancho || 80) / 100, dragState.offsetX + deltaX)),
+              pos_y: Math.max(0, Math.min(realHeight - (m.alto || 80) / 100, dragState.offsetY + deltaY)),
             }
           : m
       )
     );
-  }, [dragState, canvasWidth, canvasHeight]);
+  }, [dragState, PIXELS_PER_METER, scale, realWidth, realHeight]);
 
   const handleMouseUp = useCallback(() => {
     if (dragState.isDragging && dragState.mesaId) {
@@ -747,62 +781,91 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         {/* Main content */}
         <div className="grid gap-4 lg:grid-cols-[1fr_350px]">
           {/* Canvas del plano */}
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-4">
-              <div
-                ref={canvasRef}
-                className="relative bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg overflow-hidden mx-auto"
-                style={{ width: canvasWidth, height: canvasHeight, maxWidth: "100%" }}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+              <div 
+                ref={containerRef}
+                className="relative w-full h-[500px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden"
               >
-                {/* Grid de fondo */}
                 <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    backgroundImage: `
-                      linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
-                      linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px)
-                    `,
-                    backgroundSize: "50px 50px",
+                  ref={canvasRef}
+                  className="relative bg-white dark:bg-slate-900 border border-border rounded-lg shadow-inner overflow-hidden"
+                  style={{ 
+                    width: canvasWidth * scale, 
+                    height: canvasHeight * scale,
+                    transform: `scale(1)`,
                   }}
-                />
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                >
+                  {/* Grid de fondo - escala según pixelsPerMeter */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: `
+                        linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+                        linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px)
+                      `,
+                      backgroundSize: `${PIXELS_PER_METER * scale}px ${PIXELS_PER_METER * scale}px`,
+                    }}
+                  />
 
-                {/* Elementos del plano (paredes, decoración, etc.) */}
-                {elementosPlano.map((elem) => renderElementoPlano(elem))}
-
-                {/* Mesas */}
-                {localMesas.map((mesa) => {
-                  const reserva = getReservaAsignada(mesa.id);
-                  const isSelected = selectedMesa?.id === mesa.id;
-                  const isDragging = dragState.mesaId === mesa.id;
-
-                  return (
-                    <DroppableMesa
-                      key={mesa.id}
-                      mesa={mesa}
-                      reserva={reserva}
-                      isSelected={isSelected}
-                      isDragging={isDragging}
-                      onMouseDown={(e) => handleMouseDown(e, mesa)}
-                      onClick={() => setSelectedMesa(mesa)}
-                      onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
-                      isDropTarget={!!activeReserva}
-                    />
-                  );
-                })}
-
-                {/* Mensaje si no hay mesas */}
-                {localMesas.length === 0 && elementosPlano.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                    <div className="text-center">
-                      <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay configuración de plano</p>
-                      <p className="text-sm">Configura el plano desde la sección Espacios</p>
-                    </div>
+                  {/* Elementos del plano (paredes, decoración, etc.) */}
+                  <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
+                    {elementosPlano.map((elem) => renderElementoPlano(elem))}
                   </div>
-                )}
+
+                  {/* Mesas - posicionadas según pos_x/pos_y en metros */}
+                  {localMesas.map((mesa) => {
+                    const reserva = getReservaAsignada(mesa.id);
+                    const isSelected = selectedMesa?.id === mesa.id;
+                    const isDragging = dragState.mesaId === mesa.id;
+                    
+                    // Convertir posición de metros a píxeles y aplicar escala
+                    const posXPixels = (mesa.pos_x || 0) * PIXELS_PER_METER * scale;
+                    const posYPixels = (mesa.pos_y || 0) * PIXELS_PER_METER * scale;
+                    // Dimensiones en cm convertidas a píxeles y escaladas
+                    const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER * scale;
+                    const altoPixels = ((mesa.alto || 80) / 100) * PIXELS_PER_METER * scale;
+
+                    return (
+                      <DroppableMesa
+                        key={mesa.id}
+                        mesa={{
+                          ...mesa,
+                          pos_x: posXPixels,
+                          pos_y: posYPixels,
+                          ancho: anchoPixels,
+                          alto: altoPixels,
+                        }}
+                        reserva={reserva}
+                        isSelected={isSelected}
+                        isDragging={isDragging}
+                        onMouseDown={(e) => handleMouseDown(e, mesa)}
+                        onClick={() => setSelectedMesa(mesa)}
+                        onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
+                        isDropTarget={!!activeReserva}
+                      />
+                    );
+                  })}
+
+                  {/* Mensaje si no hay mesas */}
+                  {localMesas.length === 0 && elementosPlano.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                      <div className="text-center">
+                        <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>No hay configuración de plano</p>
+                        <p className="text-sm">Configura el plano desde la sección Espacios</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Indicador de dimensiones */}
+                <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
+                  {realWidth}m × {realHeight}m
+                </div>
               </div>
             </CardContent>
           </Card>
