@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { generarTurnosManualmente } from "@/scripts/generarTurnos";
+import { generarTurnosDiciembreEnero } from "@/scripts/generarTurnos";
 
 export const GenerarTurnosFicticios = () => {
   const [generando, setGenerando] = useState(false);
@@ -12,8 +12,8 @@ export const GenerarTurnosFicticios = () => {
   const generarTurnos = async () => {
     try {
       setGenerando(true);
-      await generarTurnosManualmente();
-      toast.success("Turnos generados correctamente");
+      const resultado = await generarTurnosDiciembreEnero();
+      toast.success(`${resultado.total} turnos generados para Dic 2025 - Ene 2026`);
       queryClient.invalidateQueries({ queryKey: ["turnos"] });
       queryClient.invalidateQueries({ queryKey: ["vista_turnos_completa"] });
     } catch (error: any) {
@@ -33,12 +33,12 @@ export const GenerarTurnosFicticios = () => {
       {generando ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Generando...
+          Generando turnos...
         </>
       ) : (
         <>
           <Calendar className="mr-2 h-4 w-4" />
-          Generar Turnos
+          Generar Turnos Dic-Ene
         </>
       )}
     </Button>
