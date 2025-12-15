@@ -72,6 +72,7 @@ interface ElementoPlano {
   y2?: number;
   points?: Array<{ x: number; y: number }>;
   fill?: string;
+  props?: Record<string, any>;
 }
 
 interface Reserva {
@@ -559,20 +560,28 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       pointerEvents: "none",
     };
 
+    // Las propiedades pueden estar en elem directamente o en elem.props
+    const props = elem.props || elem;
+
     switch (elem.tipo) {
       case "wall":
-        if (elem.x1 !== undefined && elem.y1 !== undefined && elem.x2 !== undefined && elem.y2 !== undefined) {
-          const length = Math.sqrt(Math.pow(elem.x2 - elem.x1, 2) + Math.pow(elem.y2 - elem.y1, 2));
-          const angle = Math.atan2(elem.y2 - elem.y1, elem.x2 - elem.x1) * 180 / Math.PI;
+        const x1 = props.x1;
+        const y1 = props.y1;
+        const x2 = props.x2;
+        const y2 = props.y2;
+        
+        if (x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined) {
+          const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+          const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
           return (
             <div
               key={elem.id}
               style={{
                 ...baseStyle,
-                left: elem.x1,
-                top: elem.y1,
-                width: length,
-                height: 8,
+                left: x1 * scale,
+                top: y1 * scale,
+                width: length * scale,
+                height: 6 * scale,
                 backgroundColor: "#374151",
                 transform: `rotate(${angle}deg)`,
                 transformOrigin: "0 50%",
@@ -583,85 +592,123 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         return null;
 
       case "rectangle":
+      case "area":
+        const rectLeft = (props.left || elem.left || 0) * scale;
+        const rectTop = (props.top || elem.top || 0) * scale;
+        const rectWidth = (props.width || elem.width || 100) * scale;
+        const rectHeight = (props.height || elem.height || 100) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elem.left,
-              top: elem.top,
-              width: elem.width,
-              height: elem.height,
-              backgroundColor: elem.fill || "#e2e8f0",
-              border: "2px solid #64748b",
-              borderRadius: 4,
+              left: rectLeft,
+              top: rectTop,
+              width: rectWidth,
+              height: rectHeight,
+              backgroundColor: props.fill || elem.fill || "rgba(226, 232, 240, 0.5)",
+              border: `${2 * scale}px solid #64748b`,
+              borderRadius: 4 * scale,
             }}
           />
         );
 
       case "circle":
+        const circleLeft = (props.left || elem.left || 0) * scale;
+        const circleTop = (props.top || elem.top || 0) * scale;
+        const radius = (props.radius || elem.radius || 30) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elem.left,
-              top: elem.top,
-              width: (elem.radius || 30) * 2,
-              height: (elem.radius || 30) * 2,
-              backgroundColor: elem.fill || "#e2e8f0",
-              border: "2px solid #64748b",
+              left: circleLeft,
+              top: circleTop,
+              width: radius * 2,
+              height: radius * 2,
+              backgroundColor: props.fill || elem.fill || "#e2e8f0",
+              border: `${2 * scale}px solid #64748b`,
               borderRadius: "50%",
             }}
           />
         );
 
-      case "silla":
+      case "door":
+        const doorLeft = (props.left || elem.left || 0) * scale;
+        const doorTop = (props.top || elem.top || 0) * scale;
+        const doorWidth = (props.width || elem.width || 70) * scale;
+        const doorHeight = (props.height || elem.height || 12) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elem.left,
-              top: elem.top,
-              width: (elem.radius || 15) * 2,
-              height: (elem.radius || 15) * 2,
+              left: doorLeft,
+              top: doorTop,
+              width: doorWidth,
+              height: doorHeight,
+              backgroundColor: "#fef3c7",
+              border: `${2 * scale}px solid #d97706`,
+              borderRadius: 2 * scale,
+            }}
+          />
+        );
+
+      case "silla":
+        const sillaLeft = (props.left || elem.left || 0) * scale;
+        const sillaTop = (props.top || elem.top || 0) * scale;
+        const sillaRadius = (props.radius || elem.radius || 15) * scale;
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: sillaLeft,
+              top: sillaTop,
+              width: sillaRadius * 2,
+              height: sillaRadius * 2,
               backgroundColor: "#fde68a",
-              border: "2px solid #d97706",
+              border: `${2 * scale}px solid #d97706`,
               borderRadius: "50%",
             }}
           />
         );
 
       case "elemento":
+        const elemLeft = (props.left || elem.left || 0) * scale;
+        const elemTop = (props.top || elem.top || 0) * scale;
+        const elemWidth = (props.width || elem.width || 40) * scale;
+        const elemHeight = (props.height || elem.height || 40) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elem.left,
-              top: elem.top,
-              width: elem.width || 40,
-              height: elem.height || 40,
+              left: elemLeft,
+              top: elemTop,
+              width: elemWidth,
+              height: elemHeight,
               backgroundColor: "#94a3b8",
-              border: "1px solid #475569",
-              borderRadius: 4,
+              border: `${1 * scale}px solid #475569`,
+              borderRadius: 4 * scale,
             }}
           />
         );
 
       case "polygon":
+        const polyLeft = (props.left || elem.left || 0) * scale;
+        const polyTop = (props.top || elem.top || 0) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elem.left,
-              top: elem.top,
-              width: 60,
-              height: 60,
+              left: polyLeft,
+              top: polyTop,
+              width: 60 * scale,
+              height: 60 * scale,
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
-              backgroundColor: elem.fill || "#e2e8f0",
+              backgroundColor: props.fill || elem.fill || "#e2e8f0",
             }}
           />
         );
@@ -812,9 +859,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   />
 
                   {/* Elementos del plano (paredes, decoración, etc.) */}
-                  <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                    {elementosPlano.map((elem) => renderElementoPlano(elem))}
-                  </div>
+                  {elementosPlano.map((elem) => renderElementoPlano(elem))}
 
                   {/* Mesas - posicionadas según pos_x/pos_y en metros */}
                   {localMesas.map((mesa) => {
