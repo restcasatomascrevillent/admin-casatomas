@@ -296,6 +296,17 @@ function DroppableMesa({
                     maxWidth: Math.max(120, (mesa.ancho || 60) * 1.5),
                   }}
                 >
+                  {onRemoveAssignment && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveAssignment();
+                      }}
+                      className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                   <p className="font-semibold text-[11px] leading-tight truncate text-center">
                     {reserva.reservas.nombre}
                   </p>
@@ -311,24 +322,6 @@ function DroppableMesa({
                     </span>
                   </div>
                 </div>
-                {/* Indicador visual en la mesa */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <Utensils 
-                    className="text-primary/40" 
-                    style={{ width: minDimension * 0.35, height: minDimension * 0.35 }}
-                  />
-                </div>
-                {onRemoveAssignment && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveAssignment();
-                    }}
-                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
               </>
             )}
           </div>
