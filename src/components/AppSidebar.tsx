@@ -79,10 +79,10 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <Button
           variant="ghost"
-          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
           onClick={() => signOut()}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-4 w-4 shrink-0" />
           {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
         </Button>
       </SidebarFooter>
