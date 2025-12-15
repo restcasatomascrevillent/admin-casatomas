@@ -107,12 +107,12 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
       {...listeners}
       {...attributes}
       className={cn(
-        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 cursor-grab active:cursor-grabbing",
+        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-colors duration-150 cursor-grab active:cursor-grabbing",
         isAssigned 
           ? "bg-muted/50 border-muted opacity-60" 
           : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
-        isDragging && "opacity-50 scale-95",
-        !isAssigned && "hover:shadow-lg hover:scale-[1.02] hover:border-primary/50 hover:bg-accent/50"
+        isDragging && "opacity-50",
+        !isAssigned && "hover:shadow-md hover:border-primary/50 hover:bg-accent/30"
       )}
     >
       <div className={cn(
@@ -161,7 +161,8 @@ function DroppableMesa({
   onMouseDown,
   onClick,
   onRemoveAssignment,
-  isDropTarget
+  isDropTarget,
+  draggingReserva,
 }: { 
   mesa: Mesa; 
   reserva?: AsignacionConDetalles;
@@ -171,6 +172,7 @@ function DroppableMesa({
   onClick: () => void;
   onRemoveAssignment?: () => void;
   isDropTarget: boolean;
+  draggingReserva?: Reserva | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `mesa-${mesa.id}`,
@@ -181,6 +183,42 @@ function DroppableMesa({
   const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
   const fontSize = Math.max(9, Math.min(14, minDimension * 0.2));
   const iconSize = Math.max(8, Math.min(12, minDimension * 0.15));
+
+  // Lógica de compatibilidad
+  const getCompatibility = () => {
+    if (!draggingReserva || reserva) return null;
+    
+    const comensales = draggingReserva.numero_comensales;
+    const capacidad = mesa.capacidad;
+    
+    if (comensales > capacidad) {
+      return { type: 'incompatible', message: `Excede capacidad (${comensales}>${capacidad})` };
+    } else if (comensales === capacidad) {
+      return { type: 'perfect', message: 'Capacidad exacta' };
+    } else if (comensales >= capacidad - 1) {
+      return { type: 'good', message: 'Buena opción' };
+    } else {
+      return { type: 'oversized', message: `Mesa grande (${capacidad - comensales} extra)` };
+    }
+  };
+
+  const compatibility = getCompatibility();
+
+  const getCompatibilityStyles = () => {
+    if (!compatibility) return '';
+    switch (compatibility.type) {
+      case 'incompatible':
+        return 'ring-2 ring-red-400 border-red-400 opacity-50';
+      case 'perfect':
+        return 'ring-2 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/30';
+      case 'good':
+        return 'ring-2 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/20';
+      case 'oversized':
+        return 'ring-1 ring-yellow-400 border-yellow-400 opacity-70';
+      default:
+        return '';
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -196,8 +234,10 @@ function DroppableMesa({
               isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
               isDragging ? "shadow-lg scale-105 z-50" : "",
               reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
-              isOver && "ring-4 ring-green-400 border-green-500 scale-110 z-40",
-              isDropTarget && !reserva && "animate-pulse border-dashed border-green-400"
+              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 scale-105 z-40",
+              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 scale-105 z-40",
+              isDropTarget && !reserva && "border-dashed",
+              draggingReserva && !reserva && getCompatibilityStyles()
             )}
             style={{
               left: mesa.pos_x,
@@ -229,6 +269,24 @@ function DroppableMesa({
               <span>{mesa.capacidad}</span>
             </div>
 
+            {/* Indicador de compatibilidad */}
+            {compatibility && !reserva && (
+              <div 
+                className={cn(
+                  "absolute -bottom-1 left-1/2 -translate-x-1/2 px-1 py-0.5 rounded text-[8px] font-medium whitespace-nowrap shadow-sm",
+                  compatibility.type === 'perfect' && "bg-green-500 text-white",
+                  compatibility.type === 'good' && "bg-blue-500 text-white",
+                  compatibility.type === 'oversized' && "bg-yellow-500 text-white",
+                  compatibility.type === 'incompatible' && "bg-red-500 text-white"
+                )}
+              >
+                {compatibility.type === 'perfect' && '✓'}
+                {compatibility.type === 'good' && '○'}
+                {compatibility.type === 'oversized' && '+'}
+                {compatibility.type === 'incompatible' && '✗'}
+              </div>
+            )}
+
             {reserva && (
               <>
                 <div className="absolute -top-2 -right-2 z-10">
@@ -257,6 +315,17 @@ function DroppableMesa({
           <div className="space-y-1">
             <p className="font-semibold">{mesa.nombre}</p>
             <p className="text-xs">Capacidad: {mesa.capacidad} personas</p>
+            {compatibility && (
+              <p className={cn(
+                "text-xs font-medium",
+                compatibility.type === 'perfect' && "text-green-600",
+                compatibility.type === 'good' && "text-blue-600",
+                compatibility.type === 'oversized' && "text-yellow-600",
+                compatibility.type === 'incompatible' && "text-red-600"
+              )}>
+                {compatibility.message}
+              </p>
+            )}
             {reserva && (
               <div className="pt-1 border-t border-border mt-1">
                 <p className="text-xs font-medium">{reserva.reservas.nombre}</p>
@@ -1071,6 +1140,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                         onClick={() => setSelectedMesa(mesa)}
                         onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
                         isDropTarget={!!activeReserva}
+                        draggingReserva={activeReserva}
                       />
                     );
                   })}
