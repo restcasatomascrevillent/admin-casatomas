@@ -13,6 +13,7 @@ import {
   Circle,
   DoorOpen,
   Trash2,
+  Ruler,
 } from "lucide-react";
 
 export type ToolType = "select" | "wall" | "area" | "mesa-rect" | "mesa-circular" | "door";
@@ -22,6 +23,8 @@ interface ToolbarDibujoProps {
   onToolChange: (tool: ToolType) => void;
   onDeleteSelected: () => void;
   hasSelection: boolean;
+  showMeasurements?: boolean;
+  onToggleMeasurements?: () => void;
 }
 
 interface ToolButton {
@@ -40,7 +43,14 @@ const tools: ToolButton[] = [
   { id: "door", icon: <DoorOpen className="h-4 w-4" />, label: "Puerta", shortcut: "D" },
 ];
 
-export function ToolbarDibujo({ activeTool, onToolChange, onDeleteSelected, hasSelection }: ToolbarDibujoProps) {
+export function ToolbarDibujo({ 
+  activeTool, 
+  onToolChange, 
+  onDeleteSelected, 
+  hasSelection,
+  showMeasurements = true,
+  onToggleMeasurements,
+}: ToolbarDibujoProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex items-center gap-1 bg-card rounded-lg border p-2">
@@ -63,6 +73,24 @@ export function ToolbarDibujo({ activeTool, onToolChange, onDeleteSelected, hasS
         ))}
 
         <Separator orientation="vertical" className="h-6 mx-2" />
+
+        {onToggleMeasurements && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={showMeasurements ? "secondary" : "ghost"}
+                size="sm"
+                onClick={onToggleMeasurements}
+                className="h-9 w-9 p-0"
+              >
+                <Ruler className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{showMeasurements ? "Ocultar medidas" : "Mostrar medidas"}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         <Tooltip>
           <TooltipTrigger asChild>

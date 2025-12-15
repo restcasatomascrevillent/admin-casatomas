@@ -61,6 +61,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
+  const [showMeasurements, setShowMeasurements] = useState(true);
   
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -374,6 +375,8 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         onToolChange={setActiveTool}
         onDeleteSelected={() => selectedElement ? setShowDeleteDialog(true) : null}
         hasSelection={!!selectedElement}
+        showMeasurements={showMeasurements}
+        onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
       />
 
       {/* Main content */}
@@ -395,6 +398,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             planoConfig={plano?.configuracion}
             selectedElement={selectedElement}
             initialZoom={fitZoom}
+            showMeasurements={showMeasurements}
             onElementosChange={setElementos}
             onMesasChange={setMesasCanvas}
             onSelectionChange={setSelectedElement}
