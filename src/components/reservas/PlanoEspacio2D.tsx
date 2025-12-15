@@ -370,16 +370,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       return { minX: 0, minY: 0, maxX: canvasWidth, maxY: canvasHeight, width: canvasWidth, height: canvasHeight };
     }
     
-    // Añadir padding proporcional al tamaño del contenido
-    const contentWidth = maxX - minX;
-    const contentHeight = maxY - minY;
-    const paddingX = Math.max(30, contentWidth * 0.05);
-    const paddingY = Math.max(30, contentHeight * 0.05);
+    // Añadir padding de exactamente 1 cuadro de grid (1 metro = PIXELS_PER_METER)
+    const gridPadding = PIXELS_PER_METER;
     
-    minX = Math.max(0, minX - paddingX);
-    minY = Math.max(0, minY - paddingY);
-    maxX = Math.min(canvasWidth, maxX + paddingX);
-    maxY = Math.min(canvasHeight, maxY + paddingY);
+    minX = Math.max(0, minX - gridPadding);
+    minY = Math.max(0, minY - gridPadding);
+    maxX = Math.min(canvasWidth, maxX + gridPadding);
+    maxY = Math.min(canvasHeight, maxY + gridPadding);
     
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   }, [elementosPlano, localMesas, PIXELS_PER_METER, canvasWidth, canvasHeight]);
@@ -941,11 +938,19 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             <CardContent className="p-4 flex-1 flex flex-col min-h-0">
               <div 
                 ref={containerRef}
-                className="relative w-full flex-1 min-h-[400px] flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden"
+                className="relative w-full flex-1 min-h-[400px] flex items-center justify-center rounded-lg overflow-hidden"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+                    linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px)
+                  `,
+                  backgroundSize: `${PIXELS_PER_METER * scale}px ${PIXELS_PER_METER * scale}px`,
+                  backgroundColor: 'hsl(var(--muted) / 0.3)',
+                }}
               >
                 <div
                   ref={canvasRef}
-                  className="relative bg-white dark:bg-slate-900 border border-border rounded-lg shadow-inner overflow-hidden flex-shrink-0"
+                  className="relative bg-background/80 backdrop-blur-sm rounded-lg shadow-inner overflow-hidden flex-shrink-0"
                   style={{ 
                     width: contentBounds.width * scale, 
                     height: contentBounds.height * scale,
@@ -954,17 +959,6 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   onMouseUp={handleMouseUp}
                   onMouseLeave={handleMouseUp}
                 >
-                  {/* Grid de fondo - escala según pixelsPerMeter */}
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
-                        linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px)
-                      `,
-                      backgroundSize: `${PIXELS_PER_METER * scale}px ${PIXELS_PER_METER * scale}px`,
-                    }}
-                  />
 
                   {/* Elementos del plano (paredes, decoración, etc.) */}
                   {elementosPlano.map((elem) => renderElementoPlano(elem))}
