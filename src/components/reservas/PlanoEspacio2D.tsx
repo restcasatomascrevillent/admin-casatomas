@@ -836,11 +836,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               >
                 <div
                   ref={canvasRef}
-                  className="relative bg-white dark:bg-slate-900 border border-border rounded-lg shadow-inner overflow-hidden"
+                  className="relative bg-white dark:bg-slate-900 border border-border rounded-lg shadow-inner overflow-hidden flex-shrink-0"
                   style={{ 
                     width: canvasWidth * scale, 
                     height: canvasHeight * scale,
-                    transform: `scale(1)`,
                   }}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
