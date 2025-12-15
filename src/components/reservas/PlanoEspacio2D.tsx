@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -305,8 +305,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   
   const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
 
-  // Calcular bounding box del contenido real (paredes, elementos y mesas)
-  const contentBounds = (() => {
+  // Calcular bounding box del contenido real (paredes, elementos y mesas) - memoizado
+  const contentBounds = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
     // Incluir elementos del plano
@@ -345,15 +345,19 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       return { minX: 0, minY: 0, maxX: canvasWidth, maxY: canvasHeight, width: canvasWidth, height: canvasHeight };
     }
     
-    // Añadir padding
-    const padding = 20;
-    minX = Math.max(0, minX - padding);
-    minY = Math.max(0, minY - padding);
-    maxX = Math.min(canvasWidth, maxX + padding);
-    maxY = Math.min(canvasHeight, maxY + padding);
+    // Añadir padding proporcional al tamaño del contenido
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    const paddingX = Math.max(30, contentWidth * 0.05);
+    const paddingY = Math.max(30, contentHeight * 0.05);
+    
+    minX = Math.max(0, minX - paddingX);
+    minY = Math.max(0, minY - paddingY);
+    maxX = Math.min(canvasWidth, maxX + paddingX);
+    maxY = Math.min(canvasHeight, maxY + paddingY);
     
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
-  })();
+  }, [elementosPlano, localMesas, PIXELS_PER_METER, canvasWidth, canvasHeight]);
 
   // Medir el contenedor para escalar responsivamente
   useEffect(() => {
@@ -373,11 +377,20 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular escala basándose en el bounding box del contenido
-  const scale = Math.min(
-    (containerSize.width - 32) / contentBounds.width,
-    (containerSize.height - 32) / contentBounds.height
-  );
+  // Calcular escala basándose en el bounding box del contenido - auto-zoom responsivo
+  const scale = useMemo(() => {
+    if (containerSize.width <= 0 || containerSize.height <= 0) return 1;
+    if (contentBounds.width <= 0 || contentBounds.height <= 0) return 1;
+    
+    const padding = 32;
+    const availableWidth = containerSize.width - padding;
+    const availableHeight = containerSize.height - padding;
+    
+    return Math.min(
+      availableWidth / contentBounds.width,
+      availableHeight / contentBounds.height
+    );
+  }, [containerSize.width, containerSize.height, contentBounds.width, contentBounds.height]);
   
   // Offset para centrar el contenido
   const offsetX = contentBounds.minX;
