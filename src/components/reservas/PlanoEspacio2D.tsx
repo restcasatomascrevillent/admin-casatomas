@@ -281,6 +281,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [manualZoom, setManualZoom] = useState<number | null>(null); // null = auto-zoom
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     mesaId: null,
@@ -430,6 +434,62 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
   const handleResetZoom = useCallback(() => {
     setManualZoom(null);
+    setPanOffset({ x: 0, y: 0 });
+  }, []);
+
+  // Zoom con rueda del ratón
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const currentScale = manualZoom !== null ? manualZoom : autoScale;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.min(Math.max(currentScale * delta, 0.2), 5);
+    setManualZoom(newScale);
+  }, [manualZoom, autoScale]);
+
+  // Handlers para pan con Espacio + click
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isSpacePressed) {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
+    };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+        setIsPanning(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isSpacePressed]);
+
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    if (isSpacePressed) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    }
+  }, [isSpacePressed, panOffset]);
+
+  const handlePanMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning && isSpacePressed) {
+      setPanOffset({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+    }
+  }, [isPanning, isSpacePressed, panStart]);
+
+  const handlePanEnd = useCallback(() => {
+    setIsPanning(false);
   }, []);
   
   // Offset para centrar el contenido
@@ -938,17 +998,33 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             <CardContent className="p-0 flex-1 flex flex-col min-h-0">
               <div 
                 ref={containerRef}
-                className="relative w-full flex-1 min-h-[400px] overflow-hidden"
+                className={cn(
+                  "relative w-full flex-1 min-h-[400px] overflow-hidden",
+                  isSpacePressed && "cursor-grab",
+                  isPanning && "cursor-grabbing"
+                )}
                 style={{
                   backgroundImage: `
                     linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
                     linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
                   `,
                   backgroundSize: `${PIXELS_PER_METER * scale}px ${PIXELS_PER_METER * scale}px`,
+                  backgroundPosition: `${panOffset.x}px ${panOffset.y}px`,
                 }}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+                onWheel={handleWheel}
+                onMouseDown={handlePanStart}
+                onMouseMove={(e) => {
+                  handlePanMove(e);
+                  if (!isPanning) handleMouseMove(e);
+                }}
+                onMouseUp={(e) => {
+                  handlePanEnd();
+                  handleMouseUp();
+                }}
+                onMouseLeave={() => {
+                  handlePanEnd();
+                  handleMouseUp();
+                }}
               >
                 <div
                   ref={canvasRef}
@@ -956,8 +1032,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   style={{ 
                     width: contentBounds.width * scale, 
                     height: contentBounds.height * scale,
-                    left: '50%',
-                    top: '50%',
+                    left: `calc(50% + ${panOffset.x}px)`,
+                    top: `calc(50% + ${panOffset.y}px)`,
                     transform: 'translate(-50%, -50%)',
                   }}
                 >
