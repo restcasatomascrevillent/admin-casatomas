@@ -107,34 +107,34 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
       {...listeners}
       {...attributes}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing",
+        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200 cursor-grab active:cursor-grabbing",
         isAssigned 
           ? "bg-muted/50 border-muted opacity-60" 
           : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
         isDragging && "opacity-50 scale-95",
-        !isAssigned && "hover:shadow-md hover:scale-[1.02]"
+        !isAssigned && "hover:shadow-lg hover:scale-[1.02] hover:border-primary/50 hover:bg-accent/50"
       )}
     >
       <div className={cn(
-        "p-2 rounded-md",
+        "p-1.5 sm:p-2 rounded-md flex-shrink-0",
         isAssigned ? "bg-muted" : "bg-background/50"
       )}>
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <GripVertical className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold text-sm truncate">{reserva.nombre}</p>
+      <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <p className="font-semibold text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{reserva.nombre}</p>
           {isAssigned && (
-            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
+        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+          <span className="flex items-center gap-0.5 sm:gap-1">
+            <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             {reserva.hora}
           </span>
-          <span className="flex items-center gap-1">
-            <Users className="h-3 w-3" />
+          <span className="flex items-center gap-0.5 sm:gap-1">
+            <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             {reserva.numero_comensales}
           </span>
         </div>
@@ -142,8 +142,8 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
       <Badge 
         variant="outline" 
         className={cn(
-          "text-[10px] flex-shrink-0",
-          isAssigned && "bg-green-100 text-green-700 border-green-300"
+          "text-[9px] sm:text-[10px] flex-shrink-0 px-1.5 sm:px-2",
+          isAssigned && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700"
         )}
       >
         {isAssigned ? "Asignada" : reserva.estado}
@@ -992,7 +992,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         </div>
 
         {/* Main content */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_350px] flex-1 min-h-0">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_350px] flex-1 min-h-0">
           {/* Canvas del plano */}
           <Card className="overflow-hidden flex flex-col">
             <CardContent className="p-0 flex-1 flex flex-col min-h-0">
@@ -1205,7 +1205,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                     No hay reservas para hoy
                   </p>
                 ) : (
-                  <ScrollArea className="h-[400px] pr-4">
+                  <ScrollArea className="h-[250px] sm:h-[300px] lg:h-[400px] pr-2 sm:pr-4">
                     <div className="space-y-2">
                       {/* Pendientes primero */}
                       {reservasPendientes.length > 0 && (
