@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, BarChart3, Users, MapPin, BookOpen, Globe, Megaphone, Receipt } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, BarChart3, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -82,6 +82,7 @@ export function AppSidebar() {
           className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={() => signOut()}
         >
+          <LogOut className="h-4 w-4" />
           {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
         </Button>
       </SidebarFooter>
