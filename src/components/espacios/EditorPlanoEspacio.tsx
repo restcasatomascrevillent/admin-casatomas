@@ -283,14 +283,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
   if (loadingPlano || loadingMesas) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-[calc(100vh-120px)] gap-4">
       {/* Header */}
       <div className="flex items-center justify-between bg-gradient-to-r from-card to-card/80 rounded-xl p-4 border shadow-sm">
         <div className="flex items-center gap-4">
