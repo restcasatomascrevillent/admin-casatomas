@@ -16,6 +16,7 @@ interface CanvasPlanoProps {
   planoConfig: any;
   selectedElement: any;
   initialZoom?: number;
+  showMeasurements?: boolean;
   onElementosChange: (elementos: ElementoCanvas[]) => void;
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
@@ -43,6 +44,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   planoConfig,
   selectedElement,
   initialZoom = 1,
+  showMeasurements = true,
   onElementosChange,
   onMesasChange,
   onSelectionChange,
@@ -96,6 +98,19 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useEffect(() => {
     pixelsPerMeterRef.current = pixelsPerMeter;
   }, [pixelsPerMeter]);
+
+  // Mostrar/ocultar cotas (medidas de paredes) cuando cambie showMeasurements
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    
+    fabricCanvas.getObjects().forEach((obj) => {
+      if ((obj as any).isCota) {
+        obj.visible = showMeasurements;
+      }
+    });
+    
+    fabricCanvas.renderAll();
+  }, [showMeasurements, fabricCanvas]);
 
   // Exponer métodos al padre
   useImperativeHandle(ref, () => ({
