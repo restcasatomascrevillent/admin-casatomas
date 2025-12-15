@@ -774,6 +774,76 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         contentDiv.appendChild(line);
       }
 
+      // Render architectural elements (walls, areas, doors, etc.)
+      elementosPlano.forEach((elem) => {
+        const props = elem.props || elem;
+        const elemDiv = document.createElement("div");
+        elemDiv.style.position = "absolute";
+        
+        switch (elem.tipo) {
+          case "wall":
+            const x1 = props.x1 ?? 0;
+            const y1 = props.y1 ?? 0;
+            const x2 = props.x2 ?? 0;
+            const y2 = props.y2 ?? 0;
+            const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            elemDiv.style.left = `${x1 - offsetX}px`;
+            elemDiv.style.top = `${y1 - offsetY}px`;
+            elemDiv.style.width = `${length}px`;
+            elemDiv.style.height = "6px";
+            elemDiv.style.backgroundColor = "#374151";
+            elemDiv.style.transform = `rotate(${angle}deg)`;
+            elemDiv.style.transformOrigin = "0 50%";
+            break;
+            
+          case "rectangle":
+          case "area":
+            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
+            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
+            elemDiv.style.width = `${props.width || elem.width || 100}px`;
+            elemDiv.style.height = `${props.height || elem.height || 100}px`;
+            elemDiv.style.backgroundColor = props.fill || elem.fill || "rgba(226, 232, 240, 0.5)";
+            elemDiv.style.border = "2px solid #64748b";
+            elemDiv.style.borderRadius = "4px";
+            break;
+            
+          case "circle":
+            const radius = props.radius || elem.radius || 30;
+            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
+            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
+            elemDiv.style.width = `${radius * 2}px`;
+            elemDiv.style.height = `${radius * 2}px`;
+            elemDiv.style.backgroundColor = props.fill || elem.fill || "#e2e8f0";
+            elemDiv.style.border = "2px solid #64748b";
+            elemDiv.style.borderRadius = "50%";
+            break;
+            
+          case "door":
+            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
+            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
+            elemDiv.style.width = `${props.width || elem.width || 70}px`;
+            elemDiv.style.height = `${props.height || elem.height || 12}px`;
+            elemDiv.style.backgroundColor = "#fef3c7";
+            elemDiv.style.border = "2px solid #d97706";
+            elemDiv.style.borderRadius = "2px";
+            break;
+            
+          case "window":
+            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
+            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
+            elemDiv.style.width = `${props.width || elem.width || 60}px`;
+            elemDiv.style.height = `${props.height || elem.height || 8}px`;
+            elemDiv.style.backgroundColor = "#bfdbfe";
+            elemDiv.style.border = "2px solid #3b82f6";
+            break;
+            
+          default:
+            return;
+        }
+        contentDiv.appendChild(elemDiv);
+      });
+
       // Render mesas
       localMesas.forEach((mesa) => {
         const reserva = getReservaAsignada(mesa.id);
@@ -794,28 +864,44 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.style.display = "flex";
         mesaDiv.style.alignItems = "center";
         mesaDiv.style.justifyContent = "center";
-        mesaDiv.style.fontSize = "12px";
-        mesaDiv.style.fontWeight = "bold";
-        mesaDiv.style.color = "#374151";
+        mesaDiv.style.fontSize = "11px";
+        mesaDiv.style.fontWeight = "600";
+        mesaDiv.style.color = "#1f2937";
         mesaDiv.textContent = mesa.nombre;
         contentDiv.appendChild(mesaDiv);
 
-        // Add reservation card if assigned
+        // Add reservation card if assigned - improved styling
         if (reserva) {
           const cardDiv = document.createElement("div");
           cardDiv.style.position = "absolute";
           cardDiv.style.left = `${posXPixels + anchoPixels / 2}px`;
-          cardDiv.style.top = `${posYPixels - 35}px`;
+          cardDiv.style.top = `${posYPixels - 45}px`;
           cardDiv.style.transform = "translateX(-50%)";
-          cardDiv.style.backgroundColor = "#22c55e";
+          cardDiv.style.backgroundColor = "#16a34a";
           cardDiv.style.color = "white";
-          cardDiv.style.padding = "4px 8px";
-          cardDiv.style.borderRadius = "6px";
-          cardDiv.style.fontSize = "10px";
-          cardDiv.style.fontWeight = "bold";
+          cardDiv.style.padding = "6px 10px";
+          cardDiv.style.borderRadius = "8px";
+          cardDiv.style.fontSize = "11px";
+          cardDiv.style.fontWeight = "600";
           cardDiv.style.whiteSpace = "nowrap";
-          cardDiv.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
-          cardDiv.textContent = `${reserva.reservas.nombre} - ${reserva.reservas.hora} (${reserva.reservas.numero_comensales}p)`;
+          cardDiv.style.boxShadow = "0 4px 6px rgba(0,0,0,0.15)";
+          cardDiv.style.textAlign = "center";
+          cardDiv.style.lineHeight = "1.3";
+          cardDiv.style.minWidth = "80px";
+          
+          // Create structured content
+          const nameSpan = document.createElement("div");
+          nameSpan.style.fontWeight = "700";
+          nameSpan.style.fontSize = "12px";
+          nameSpan.textContent = reserva.reservas.nombre || "Sin nombre";
+          
+          const infoSpan = document.createElement("div");
+          infoSpan.style.fontSize = "10px";
+          infoSpan.style.opacity = "0.9";
+          infoSpan.textContent = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
+          
+          cardDiv.appendChild(nameSpan);
+          cardDiv.appendChild(infoSpan);
           contentDiv.appendChild(cardDiv);
         }
       });
