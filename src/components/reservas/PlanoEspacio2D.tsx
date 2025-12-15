@@ -935,29 +935,31 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         <div className="grid gap-4 lg:grid-cols-[1fr_350px] flex-1 min-h-0">
           {/* Canvas del plano */}
           <Card className="overflow-hidden flex flex-col">
-            <CardContent className="p-4 flex-1 flex flex-col min-h-0">
+            <CardContent className="p-0 flex-1 flex flex-col min-h-0">
               <div 
                 ref={containerRef}
-                className="relative w-full flex-1 min-h-[400px] flex items-center justify-center rounded-lg overflow-hidden"
+                className="relative w-full flex-1 min-h-[400px] overflow-hidden"
                 style={{
                   backgroundImage: `
-                    linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
-                    linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px)
+                    linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px),
+                    linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)
                   `,
                   backgroundSize: `${PIXELS_PER_METER * scale}px ${PIXELS_PER_METER * scale}px`,
-                  backgroundColor: 'hsl(var(--muted) / 0.3)',
                 }}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
               >
                 <div
                   ref={canvasRef}
-                  className="relative bg-background/80 backdrop-blur-sm rounded-lg shadow-inner overflow-hidden flex-shrink-0"
+                  className="absolute"
                   style={{ 
                     width: contentBounds.width * scale, 
                     height: contentBounds.height * scale,
+                    left: '50%',
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
                   }}
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
                 >
 
                   {/* Elementos del plano (paredes, decoración, etc.) */}
