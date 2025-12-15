@@ -864,10 +864,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.style.display = "flex";
         mesaDiv.style.alignItems = "center";
         mesaDiv.style.justifyContent = "center";
-        mesaDiv.style.fontSize = "11px";
-        mesaDiv.style.fontWeight = "600";
-        mesaDiv.style.color = "#1f2937";
-        mesaDiv.textContent = mesa.nombre;
+        mesaDiv.style.textAlign = "center";
+        mesaDiv.style.boxSizing = "border-box";
+        
+        // Create text span for proper centering
+        const textSpan = document.createElement("span");
+        textSpan.style.fontSize = "11px";
+        textSpan.style.fontWeight = "600";
+        textSpan.style.color = "#1f2937";
+        textSpan.style.lineHeight = "1";
+        textSpan.style.textAlign = "center";
+        textSpan.textContent = mesa.nombre;
+        mesaDiv.appendChild(textSpan);
         contentDiv.appendChild(mesaDiv);
 
         // Add reservation card if assigned - improved styling
