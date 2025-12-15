@@ -174,6 +174,12 @@ function DroppableMesa({
     data: { type: "mesa", mesa },
   });
 
+  // Calcular tamaño de fuente dinámico basado en dimensiones de la mesa
+  const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
+  const fontSize = Math.max(8, Math.min(14, minDimension * 0.18));
+  const iconSize = Math.max(8, Math.min(12, minDimension * 0.14));
+  const showCapacity = minDimension > 35;
+
   return (
     <TooltipProvider>
       <Tooltip>
@@ -182,12 +188,12 @@ function DroppableMesa({
             ref={setNodeRef}
             className={cn(
               "absolute cursor-move transition-all duration-200",
-              "flex flex-col items-center justify-center text-center",
+              "flex flex-col items-center justify-center text-center overflow-hidden",
               "border-2 shadow-sm",
               mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
               isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
               isDragging ? "shadow-lg scale-105 z-50" : "",
-              reserva ? "bg-primary/20 border-primary" : "bg-white",
+              reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
               isOver && "ring-4 ring-green-400 border-green-500 scale-110 z-40",
               isDropTarget && !reserva && "animate-pulse border-dashed border-green-400"
             )}
@@ -197,20 +203,38 @@ function DroppableMesa({
               width: mesa.ancho,
               height: mesa.alto,
               transform: `rotate(${mesa.rotacion}deg)`,
+              padding: Math.max(2, minDimension * 0.05),
             }}
             onMouseDown={onMouseDown}
             onClick={onClick}
           >
-            <span className="font-bold text-xs truncate w-full px-1">{mesa.nombre}</span>
-            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-              <Users className="h-2.5 w-2.5" />
-              <span>{mesa.capacidad}</span>
-            </div>
+            <span 
+              className="font-bold leading-tight text-center break-words"
+              style={{ 
+                fontSize: `${fontSize}px`,
+                maxWidth: '100%',
+                wordBreak: 'break-word',
+                lineHeight: 1.1,
+              }}
+            >
+              {mesa.nombre}
+            </span>
+            {showCapacity && (
+              <div 
+                className="flex items-center gap-0.5 text-muted-foreground mt-0.5"
+                style={{ fontSize: `${iconSize}px` }}
+              >
+                <Users style={{ width: iconSize, height: iconSize }} />
+                <span>{mesa.capacidad}</span>
+              </div>
+            )}
 
             {reserva && (
               <>
                 <div className="absolute -top-2 -right-2 z-10">
-                  <Badge className="text-[9px] px-1.5 py-0.5 bg-primary shadow-sm">
+                  <Badge 
+                    className="text-[9px] px-1.5 py-0.5 bg-primary shadow-sm whitespace-nowrap"
+                  >
                     {reserva.reservas.nombre?.split(" ")[0]}
                   </Badge>
                 </div>
