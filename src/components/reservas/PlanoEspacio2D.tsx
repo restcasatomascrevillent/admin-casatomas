@@ -289,12 +289,34 @@ function DroppableMesa({
 
             {reserva && (
               <>
-                <div className="absolute -top-2 -right-2 z-10">
-                  <Badge 
-                    className="text-[9px] px-1.5 py-0.5 bg-primary shadow-sm whitespace-nowrap"
-                  >
-                    {reserva.reservas.nombre?.split(" ")[0]}
-                  </Badge>
+                {/* Tarjeta de reserva asignada */}
+                <div 
+                  className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max"
+                  style={{ 
+                    maxWidth: Math.max(120, (mesa.ancho || 60) * 1.5),
+                  }}
+                >
+                  <p className="font-semibold text-[11px] leading-tight truncate text-center">
+                    {reserva.reservas.nombre}
+                  </p>
+                  <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90">
+                    <span className="flex items-center gap-0.5">
+                      <Clock className="h-2.5 w-2.5" />
+                      {reserva.reservas.hora}
+                    </span>
+                    <span>·</span>
+                    <span className="flex items-center gap-0.5">
+                      <Users className="h-2.5 w-2.5" />
+                      {reserva.reservas.numero_comensales}
+                    </span>
+                  </div>
+                </div>
+                {/* Indicador visual en la mesa */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <Utensils 
+                    className="text-primary/40" 
+                    style={{ width: minDimension * 0.35, height: minDimension * 0.35 }}
+                  />
                 </div>
                 {onRemoveAssignment && (
                   <button
@@ -302,7 +324,7 @@ function DroppableMesa({
                       e.stopPropagation();
                       onRemoveAssignment();
                     }}
-                    className="absolute -top-1 -left-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-sm hover:scale-110 transition-transform z-10"
+                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
                   >
                     <X className="h-3 w-3" />
                   </button>
