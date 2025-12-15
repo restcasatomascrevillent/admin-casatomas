@@ -37,7 +37,10 @@ import {
   GripVertical,
   Utensils,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  ZoomIn,
+  ZoomOut,
+  Maximize2
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -277,6 +280,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
+  const [manualZoom, setManualZoom] = useState<number | null>(null); // null = auto-zoom
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     mesaId: null,
@@ -398,8 +402,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular escala basándose en el bounding box del contenido - auto-zoom responsivo
-  const scale = useMemo(() => {
+  // Calcular escala base (auto-zoom)
+  const autoScale = useMemo(() => {
     if (containerSize.width <= 0 || containerSize.height <= 0) return 1;
     if (contentBounds.width <= 0 || contentBounds.height <= 0) return 1;
     
@@ -412,6 +416,24 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       availableHeight / contentBounds.height
     );
   }, [containerSize.width, containerSize.height, contentBounds.width, contentBounds.height]);
+
+  // Usar zoom manual si está activo, sino auto-zoom
+  const scale = manualZoom !== null ? manualZoom : autoScale;
+
+  // Controles de zoom
+  const handleZoomIn = useCallback(() => {
+    const currentScale = manualZoom !== null ? manualZoom : autoScale;
+    setManualZoom(Math.min(currentScale * 1.25, 5));
+  }, [manualZoom, autoScale]);
+
+  const handleZoomOut = useCallback(() => {
+    const currentScale = manualZoom !== null ? manualZoom : autoScale;
+    setManualZoom(Math.max(currentScale * 0.8, 0.2));
+  }, [manualZoom, autoScale]);
+
+  const handleResetZoom = useCallback(() => {
+    setManualZoom(null);
+  }, []);
   
   // Offset para centrar el contenido
   const offsetX = contentBounds.minX;
@@ -993,6 +1015,40 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   )}
                 </div>
                 
+                {/* Controles de zoom */}
+                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-background/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={handleZoomOut}
+                    title="Alejar"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-xs font-medium min-w-[40px] text-center">
+                    {Math.round(scale * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={handleZoomIn}
+                    title="Acercar"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={handleResetZoom}
+                    title="Ajustar automáticamente"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
                 {/* Indicador de dimensiones */}
                 <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
                   {realWidth}m × {realHeight}m
