@@ -228,7 +228,7 @@ function DroppableMesa({
             ref={setNodeRef}
             className={cn(
               "absolute cursor-move transition-all duration-200",
-              "flex flex-col items-center justify-center text-center overflow-hidden",
+              "flex flex-col items-center justify-center text-center",
               "border-2 shadow-sm",
               mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
               isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
