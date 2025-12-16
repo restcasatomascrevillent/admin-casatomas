@@ -23,15 +23,32 @@ export function useDashboardStats(startDate: Date, endDate: Date) {
         .gte("fecha", start)
         .lte("fecha", end);
 
-      // Fetch turnos
+      // Fetch turnos with worker info
       const { data: turnosData } = await supabase
         .from("turnos")
         .select("*, trabajadores(nombre, apellidos, puesto)")
         .gte("fecha", start)
         .lte("fecha", end);
 
+      // Calculate hours from turnos if registro_horas is empty
+      const horasFromTurnos = (turnosData || []).map((turno: any) => {
+        const [horaInicioH, horaInicioM] = turno.hora_inicio.split(':').map(Number);
+        const [horaFinH, horaFinM] = turno.hora_fin.split(':').map(Number);
+        const horasTrabajadas = (horaFinH + horaFinM / 60) - (horaInicioH + horaInicioM / 60);
+        
+        return {
+          id: turno.id,
+          trabajador_id: turno.trabajador_id,
+          fecha: turno.fecha,
+          hora_entrada: turno.hora_inicio,
+          hora_salida: turno.hora_fin,
+          horas_trabajadas: horasTrabajadas > 0 ? horasTrabajadas : horasTrabajadas + 24,
+          trabajadores: turno.trabajadores,
+        };
+      });
+
       return {
-        horas: horasData || [],
+        horas: horasData && horasData.length > 0 ? horasData : horasFromTurnos,
         reservas: reservasData || [],
         turnos: turnosData || [],
       };
@@ -44,16 +61,43 @@ export function useActiveStaff() {
     queryKey: ["active-staff"],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
+      const now = new Date();
+      const currentTime = format(now, "HH:mm:ss");
       
-      const { data } = await supabase
+      // First try registro_horas for actual clocked-in staff
+      const { data: registroData } = await supabase
         .from("registro_horas")
         .select("*, trabajadores(nombre, apellidos, puesto), turnos(hora_inicio, hora_fin)")
         .eq("fecha", today)
         .is("hora_salida", null);
 
-      return data || [];
+      if (registroData && registroData.length > 0) {
+        return registroData;
+      }
+
+      // Fallback to turnos - get today's scheduled shifts
+      const { data: turnosData } = await supabase
+        .from("turnos")
+        .select("*, trabajadores(nombre, apellidos, puesto)")
+        .eq("fecha", today)
+        .lte("hora_inicio", currentTime)
+        .gte("hora_fin", currentTime);
+
+      // Transform turnos to match expected format
+      return (turnosData || []).map((turno: any) => ({
+        id: turno.id,
+        trabajador_id: turno.trabajador_id,
+        fecha: turno.fecha,
+        hora_entrada: turno.hora_inicio,
+        hora_salida: null,
+        trabajadores: turno.trabajadores,
+        turnos: {
+          hora_inicio: turno.hora_inicio,
+          hora_fin: turno.hora_fin,
+        },
+      }));
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 60000,
   });
 }
 
