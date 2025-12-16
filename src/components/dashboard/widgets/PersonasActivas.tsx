@@ -47,7 +47,7 @@ export function PersonasActivas() {
                       {trabajador?.nombre} {trabajador?.apellidos}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {trabajador?.puesto} · Entrada: {format(new Date(staff.hora_entrada), "HH:mm")}
+                      {trabajador?.puesto} · Entrada: {typeof staff.hora_entrada === 'string' && staff.hora_entrada.includes(':') ? staff.hora_entrada.substring(0, 5) : format(new Date(staff.hora_entrada), "HH:mm")}
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs">
