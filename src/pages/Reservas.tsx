@@ -10,6 +10,7 @@ import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
+import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 
 export default function Reservas() {
@@ -68,10 +69,11 @@ export default function Reservas() {
         </div>
 
         <Tabs defaultValue="hoy" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
             <TabsTrigger value="lista">Lista de Reservas</TabsTrigger>
             <TabsTrigger value="calendario">Calendario</TabsTrigger>
+            <TabsTrigger value="blacklist">Lista Negra</TabsTrigger>
           </TabsList>
 
           <TabsContent value="hoy" className="space-y-6 mt-6">
@@ -84,6 +86,10 @@ export default function Reservas() {
 
           <TabsContent value="calendario" className="space-y-6 mt-6">
             <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
+          </TabsContent>
+
+          <TabsContent value="blacklist" className="space-y-6 mt-6">
+            <GestionBlacklist />
           </TabsContent>
         </Tabs>
       </div>
