@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { AlertTriangle, CheckCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, ShieldBan } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import { verificarDisponibilidadSala } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre es requerido"),
@@ -53,6 +54,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     mensaje: string;
   } | null>(null);
   const [verificando, setVerificando] = useState(false);
+  const [blacklistEntry, setBlacklistEntry] = useState<BlacklistEntry | null>(null);
+  const verificarBlacklist = useVerificarBlacklist();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -73,8 +76,35 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   // Verificar disponibilidad automáticamente cuando cambian los campos relevantes (ya manejado arriba)
   // Código antiguo eliminado
 
+  // Verificar blacklist cuando cambian email o teléfono
+  const watchedEmail = form.watch("email");
+  const watchedTelefono = form.watch("telefono");
+
+  useEffect(() => {
+    const checkBlacklist = async () => {
+      if (watchedEmail || watchedTelefono) {
+        const result = await verificarBlacklist.mutateAsync({
+          email: watchedEmail,
+          telefono: watchedTelefono,
+        });
+        setBlacklistEntry(result);
+      } else {
+        setBlacklistEntry(null);
+      }
+    };
+
+    const timeout = setTimeout(checkBlacklist, 500);
+    return () => clearTimeout(timeout);
+  }, [watchedEmail, watchedTelefono]);
+
   const onSubmit = async (values: FormValues) => {
     try {
+      // Verificar blacklist antes de crear
+      const blacklisted = await verificarBlacklist.mutateAsync({
+        email: values.email,
+        telefono: values.telefono,
+      });
+
       const { error } = await supabase.from("reservas" as any).insert({
         nombre: values.nombre,
         telefono: values.telefono,
@@ -84,12 +114,19 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         sala_id: values.sala_id,
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente || null,
-        estado: "pendiente",
+        estado: blacklisted ? "rechazada" : "pendiente",
+        en_blacklist: !!blacklisted,
       });
 
       if (error) throw error;
 
-      toast.success("¡Reserva creada exitosamente!");
+      if (blacklisted) {
+        // TODO: Aquí se enviaría un email diferente para usuarios en blacklist
+        toast.info("Reserva registrada para revisión");
+      } else {
+        toast.success("¡Reserva creada exitosamente!");
+      }
+      
       form.reset();
 
       if (isPublic) {
@@ -189,6 +226,16 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             </FormItem>
           )}
         />
+
+        {blacklistEntry && !isPublic && (
+          <Alert variant="destructive">
+            <ShieldBan className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Cliente en lista negra:</strong> {blacklistEntry.nombre || "Sin nombre"} 
+              {blacklistEntry.motivo && ` - ${blacklistEntry.motivo}`}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {disponibilidadInfo && (
           <Alert variant={disponibilidadInfo.disponible ? "default" : "destructive"}>

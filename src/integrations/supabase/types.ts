@@ -280,6 +280,36 @@ export type Database = {
         }
         Relationships: []
       }
+      blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          motivo: string | null
+          nombre: string | null
+          tipo: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          nombre?: string | null
+          tipo: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          nombre?: string | null
+          tipo?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       campanas_marketing: {
         Row: {
           canal: string
@@ -1025,6 +1055,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
+          en_blacklist: boolean | null
           estado: string
           fecha: string
           hora: string
@@ -1039,6 +1070,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
+          en_blacklist?: boolean | null
           estado?: string
           fecha: string
           hora: string
@@ -1053,6 +1085,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email?: string | null
+          en_blacklist?: boolean | null
           estado?: string
           fecha?: string
           hora?: string
