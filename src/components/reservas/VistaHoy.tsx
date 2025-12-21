@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import { Users, CalendarCheck, TrendingUp, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -10,8 +16,38 @@ interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
 }
 
+const ESTADOS_RESERVA = {
+  pendiente: { label: "Pendiente", color: "bg-yellow-500" },
+  verificada: { label: "Verificada", color: "bg-blue-500" },
+  confirmada: { label: "Confirmada", color: "bg-green-500" },
+  cancelada: { label: "Cancelada", color: "bg-red-500" },
+  rechazada: { label: "Rechazada", color: "bg-destructive" },
+  completada: { label: "Completada", color: "bg-primary" },
+  "no-show": { label: "No Show", color: "bg-gray-500" },
+};
+
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const { data: resumen, isLoading } = useResumenOcupacionHoy();
+  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+
+  const hoy = format(new Date(), "yyyy-MM-dd");
+
+  const { data: reservasHoy, isLoading: loadingReservas } = useQuery({
+    queryKey: ["reservas-hoy", hoy],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservas")
+        .select(`
+          *,
+          espacios_reserva:sala_id (nombre)
+        `)
+        .eq("fecha", hoy)
+        .order("hora", { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+  });
 
   if (isLoading) {
     return (
@@ -192,6 +228,133 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                 </Card>
               ))}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lista de reservas del día */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Reservas de Hoy
+            </CardTitle>
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar por estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los estados</SelectItem>
+                {Object.entries(ESTADOS_RESERVA).map(([key, { label }]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingReservas ? (
+            <div className="text-center py-8 text-muted-foreground">Cargando reservas...</div>
+          ) : !reservasHoy?.length ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CalendarCheck className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No hay reservas para hoy</p>
+            </div>
+          ) : (
+            <>
+              {(() => {
+                const reservasFiltradas = filtroEstado === "todos" 
+                  ? reservasHoy 
+                  : reservasHoy.filter(r => r.estado === filtroEstado);
+
+                if (!reservasFiltradas.length) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No hay reservas con estado "{ESTADOS_RESERVA[filtroEstado as keyof typeof ESTADOS_RESERVA]?.label}"
+                    </div>
+                  );
+                }
+
+                return (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Hora</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Contacto</TableHead>
+                        <TableHead>Comensales</TableHead>
+                        <TableHead>Sala</TableHead>
+                        <TableHead>Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reservasFiltradas.map((reserva) => {
+                        const estadoInfo = ESTADOS_RESERVA[reserva.estado as keyof typeof ESTADOS_RESERVA] || { label: reserva.estado, color: "bg-gray-500" };
+                        return (
+                          <TableRow key={reserva.id} className={cn(reserva.en_blacklist && "bg-destructive/5")}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono font-medium">
+                                  {typeof reserva.hora === 'string' ? reserva.hora.substring(0, 5) : reserva.hora}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
+                                {reserva.en_blacklist && (
+                                  <span title="En lista negra">
+                                    <ShieldBan className="h-4 w-4 text-destructive" />
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                                {reserva.telefono && (
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {reserva.telefono}
+                                  </div>
+                                )}
+                                {reserva.email && (
+                                  <div className="flex items-center gap-1">
+                                    <Mail className="h-3 w-3" />
+                                    {reserva.email}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-4 w-4 text-muted-foreground" />
+                                {reserva.numero_comensales}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {(reserva.espacios_reserva as any)?.nombre || "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-white", estadoInfo.color)}>
+                                {estadoInfo.label}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                );
+              })()}
+              <div className="mt-4 text-sm text-muted-foreground text-center">
+                {filtroEstado === "todos" 
+                  ? `${reservasHoy.length} reservas en total`
+                  : `${reservasHoy.filter(r => r.estado === filtroEstado).length} de ${reservasHoy.length} reservas`
+                }
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
