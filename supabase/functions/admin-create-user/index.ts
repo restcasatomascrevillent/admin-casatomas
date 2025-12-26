@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface CreateUserRequest {
-  email: string;
+  username: string;
   password: string;
   role: "admin" | "manager" | "staff";
   permissions: Array<{
@@ -82,14 +82,21 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: CreateUserRequest = await req.json();
-    const { email, password, role, permissions } = body;
-
-    console.log("Creating user:", email, "with role:", role);
+    const { username, password, role, permissions } = body;
 
     // Validate input
-    if (!email || !password) {
+    if (!username || !password) {
       return new Response(
-        JSON.stringify({ error: "Email y contraseña son requeridos" }),
+        JSON.stringify({ error: "Nombre de usuario y contraseña son requeridos" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate username format (letters, numbers, dots, underscores)
+    const usernameRegex = /^[a-zA-Z0-9._]+$/;
+    if (!usernameRegex.test(username)) {
+      return new Response(
+        JSON.stringify({ error: "El nombre de usuario solo puede contener letras, números, puntos y guiones bajos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -101,11 +108,19 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Generate internal email from username
+    const internalEmail = `${username.toLowerCase()}@staff.local`;
+
+    console.log("Creating user:", username, "with internal email:", internalEmail, "role:", role);
+
     // Create user with admin API
     const { data: newUserData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: internalEmail,
       password,
-      email_confirm: true, // Auto-confirm email
+      email_confirm: true,
+      user_metadata: {
+        display_name: username,
+      },
     });
 
     if (createError) {
@@ -165,6 +180,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         userId: newUserId, 
+        username: username,
         email: newUserData.user.email 
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
