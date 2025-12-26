@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.procesar-factura]
 verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = false
