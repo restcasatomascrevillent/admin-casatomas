@@ -217,12 +217,25 @@ export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaRe
               />
             </div>
 
+            {/* Botón Hoy */}
+            <Button
+              variant={dateFilter && dateFilter.toDateString() === new Date().toDateString() ? "default" : "outline"}
+              size="default"
+              onClick={() => setDateFilter(new Date())}
+            >
+              Hoy
+            </Button>
+
             {/* Filtro de fecha */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="min-w-[150px]">
                   <Calendar className="mr-2 h-4 w-4" />
-                  {dateFilter ? format(dateFilter, "d MMM yyyy", { locale: es }) : "Fecha"}
+                  {dateFilter 
+                    ? (dateFilter.toDateString() === new Date().toDateString() 
+                        ? "Hoy" 
+                        : format(dateFilter, "d MMM yyyy", { locale: es }))
+                    : "Fecha"}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
