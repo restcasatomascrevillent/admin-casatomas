@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useUsersManagement } from "@/hooks/useUsersManagement";
 import { SECTIONS, AppRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +24,6 @@ import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function InvitarUsuario() {
-  const { assignRoleToNewUser, setAllPermissions } = useUsersManagement();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AppRole>("staff");
@@ -87,49 +85,36 @@ export function InvitarUsuario() {
 
     setLoading(true);
     try {
-      // Crear usuario con Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
-      });
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Debes estar autenticado para crear usuarios");
+        return;
+      }
 
-      if (authError) {
-        if (authError.message.includes("already registered")) {
-          toast.error("Este email ya está registrado");
-        } else {
-          throw authError;
+      // Call edge function to create user
+      const response = await fetch(
+        "https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/admin-create-user",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            role,
+            permissions,
+          }),
         }
-        return;
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Error al crear el usuario");
       }
-
-      if (!authData.user) {
-        toast.error("Error al crear el usuario");
-        return;
-      }
-
-      // Asignar rol
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: authData.user.id, role });
-
-      if (roleError) throw roleError;
-
-      // Asignar permisos
-      const permissionsToInsert = permissions.map((p) => ({
-        user_id: authData.user!.id,
-        section_key: p.section_key,
-        can_view: p.can_view,
-        can_edit: p.can_edit,
-      }));
-
-      const { error: permError } = await supabase
-        .from("user_permissions")
-        .insert(permissionsToInsert);
-
-      if (permError) throw permError;
 
       toast.success("Usuario creado correctamente");
       
