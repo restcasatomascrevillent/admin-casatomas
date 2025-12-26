@@ -24,7 +24,7 @@ import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function InvitarUsuario() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AppRole>("staff");
   const [loading, setLoading] = useState(false);
@@ -73,8 +73,15 @@ export function InvitarUsuario() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
-      toast.error("Email y contraseña son requeridos");
+    if (!username || !password) {
+      toast.error("Nombre de usuario y contraseña son requeridos");
+      return;
+    }
+
+    // Validate username format
+    const usernameRegex = /^[a-zA-Z0-9._]+$/;
+    if (!usernameRegex.test(username)) {
+      toast.error("El nombre de usuario solo puede contener letras, números, puntos y guiones bajos");
       return;
     }
 
@@ -102,7 +109,7 @@ export function InvitarUsuario() {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            email,
+            username,
             password,
             role,
             permissions,
@@ -119,7 +126,7 @@ export function InvitarUsuario() {
       toast.success("Usuario creado correctamente");
       
       // Reset form
-      setEmail("");
+      setUsername("");
       setPassword("");
       setRole("staff");
       setPermissions(
@@ -141,15 +148,18 @@ export function InvitarUsuario() {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="username">Nombre de Usuario</Label>
           <Input
-            id="email"
-            type="email"
-            placeholder="usuario@restaurante.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="username"
+            type="text"
+            placeholder="ej: maria.garcia"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
+          <p className="text-xs text-muted-foreground">
+            Solo letras, números, puntos y guiones bajos
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Contraseña</Label>

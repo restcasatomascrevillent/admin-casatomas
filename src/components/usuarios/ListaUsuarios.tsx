@@ -130,7 +130,11 @@ export function ListaUsuarios() {
                     ) : (
                       <User className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <span className="font-medium">{user.email || user.id.slice(0, 8) + "..."}</span>
+                    <span className="font-medium">
+                      {user.email?.endsWith("@staff.local") 
+                        ? user.email.replace("@staff.local", "") 
+                        : user.email || user.id.slice(0, 8) + "..."}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -178,9 +182,11 @@ export function ListaUsuarios() {
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
-                              <DialogTitle className="flex items-center gap-2">
+                            <DialogTitle className="flex items-center gap-2">
                                 <Shield className="h-5 w-5" />
-                                Permisos de {selectedUser?.email || selectedUser?.id.slice(0, 8)}
+                                Permisos de {selectedUser?.email?.endsWith("@staff.local") 
+                                  ? selectedUser.email.replace("@staff.local", "") 
+                                  : selectedUser?.email || selectedUser?.id.slice(0, 8)}
                               </DialogTitle>
                               <DialogDescription>
                                 Configura qué secciones puede ver y editar este usuario

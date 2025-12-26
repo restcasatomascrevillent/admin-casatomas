@@ -32,7 +32,11 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
+    // If no @ in login, assume it's a username and append @staff.local
+    const loginIdentifier = loginEmail.includes("@") 
+      ? loginEmail 
+      : `${loginEmail}@staff.local`;
+    const { error } = await signIn(loginIdentifier, loginPassword);
     if (!error) {
       navigate("/dashboard");
     }
@@ -82,15 +86,18 @@ export default function Auth() {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">Email o Usuario</Label>
                     <Input
                       id="login-email"
-                      type="email"
-                      placeholder="tu@email.com"
+                      type="text"
+                      placeholder="tu@email.com o nombre.usuario"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Empleados: usa solo tu nombre de usuario
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Contraseña</Label>
