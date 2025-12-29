@@ -40,7 +40,9 @@ export function usePlatos() {
       const { data, error } = await supabase
         .from("Platos")
         .select("*")
-        .order("orden", { ascending: true });
+        // Orden estable: si hay orden duplicado o null, evitamos reordenamientos al refrescar
+        .order("orden", { ascending: true })
+        .order("id", { ascending: true });
 
       if (error) throw error;
       return data as Plato[];
