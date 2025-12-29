@@ -2,7 +2,8 @@ import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Percent } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Loader2, Percent, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,6 +29,7 @@ export default function GestorCarta() {
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
+  const [busqueda, setBusqueda] = useState<string>("");
   
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
   const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
@@ -57,20 +59,39 @@ export default function GestorCarta() {
     return items;
   };
 
-  const getPlatosPorCategoria = (categoria: string) => {
-    const platosFiltrados = platos?.filter((p) => p.categoria === categoria) || [];
-    return filtrarPorEstado(platosFiltrados);
+  const filtrarPorBusqueda = <T extends { nombre: string | null; descripcion?: string | null }>(items: T[]): T[] => {
+    if (!busqueda.trim()) return items;
+    const termino = busqueda.toLowerCase().trim();
+    return items.filter((item) => 
+      item.nombre?.toLowerCase().includes(termino) ||
+      item.descripcion?.toLowerCase().includes(termino)
+    );
   };
 
-  const getBebidasPorCategoria = (categoria: string) => {
-    const bebidasFiltradas = bebidas?.filter((b) => b.categoria === categoria) || [];
-    return filtrarPorEstado(bebidasFiltradas);
+  const getPlatosFiltrados = () => {
+    const todosFiltrados = filtrarPorBusqueda(filtrarPorEstado(platos || []));
+    if (busqueda.trim()) {
+      return todosFiltrados; // Mostrar todos si hay búsqueda
+    }
+    return todosFiltrados.filter((p) => p.categoria === categoriaPlatos);
   };
 
-  const getVinosPorCategoria = (categoria: string) => {
-    const vinosFiltrados = vinos?.filter((v) => v.categoria === categoria) || [];
-    return filtrarPorEstado(vinosFiltrados);
+  const getBebidasFiltradas = () => {
+    const todosFiltradas = filtrarPorBusqueda(filtrarPorEstado(bebidas || []));
+    if (busqueda.trim()) {
+      return todosFiltradas;
+    }
+    return todosFiltradas.filter((b) => b.categoria === categoriaBebidas);
   };
+
+  const getVinosFiltrados = () => {
+    const todosFiltrados = filtrarPorBusqueda(filtrarPorEstado(vinos || []));
+    if (busqueda.trim()) {
+      return todosFiltrados;
+    }
+    return todosFiltrados.filter((v) => v.categoria === categoriaVinos);
+  };
+
 
   const handleAñadir = () => {
     if (seccionActiva === "platos") {
@@ -132,6 +153,17 @@ export default function GestorCarta() {
           </div>
         </div>
 
+        {/* Buscador */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o descripción..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
         <Tabs 
           defaultValue="platos" 
           className="w-full"
@@ -178,7 +210,7 @@ export default function GestorCarta() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ListaPlatos platos={getPlatosPorCategoria(categoriaPlatos)} />
+                  <ListaPlatos platos={getPlatosFiltrados()} />
                 </CardContent>
               </Card>
             )}
@@ -219,7 +251,7 @@ export default function GestorCarta() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ListaBebidas bebidas={getBebidasPorCategoria(categoriaBebidas)} />
+                  <ListaBebidas bebidas={getBebidasFiltradas()} />
                 </CardContent>
               </Card>
             )}
@@ -260,7 +292,7 @@ export default function GestorCarta() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ListaVinos vinos={getVinosPorCategoria(categoriaVinos)} />
+                  <ListaVinos vinos={getVinosFiltrados()} />
                 </CardContent>
               </Card>
             )}
