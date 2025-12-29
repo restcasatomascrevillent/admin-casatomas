@@ -109,7 +109,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             )}>
               <div className="flex items-center gap-2">
                 <ChefHat className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Activo</span>
+                <span className="text-sm text-muted-foreground">{plato.activado ? "Activo" : "Inactivo"}</span>
               </div>
               <Switch
                 checked={plato.activado || false}
