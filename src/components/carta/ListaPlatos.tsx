@@ -81,7 +81,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
           )}
           
           <CardContent className="p-4 space-y-3">
-            {/* Header con nombre y toggle */}
+            {/* Header con nombre y toggle expandido */}
             <div className="flex items-start justify-between gap-3">
               <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                 {plato.nombre}
@@ -89,30 +89,30 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <span className={cn(
                   "text-xs font-medium",
-                  plato.activado ? "text-green-600" : "text-muted-foreground"
+                  plato.expanded ? "text-blue-600" : "text-muted-foreground"
                 )}>
-                  {plato.activado ? "Activo" : "Inactivo"}
+                  {plato.expanded ? "Expandido" : "Normal"}
                 </span>
                 <Switch
-                  checked={plato.activado || false}
-                  onCheckedChange={(checked) => handleToggle(plato, checked)}
-                  disabled={toggleActivado.isPending}
-                  className="data-[state=checked]:bg-green-600"
+                  checked={plato.expanded || false}
+                  onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
+                  disabled={toggleExpanded.isPending}
+                  className="data-[state=checked]:bg-blue-600"
                 />
               </div>
             </div>
 
-            {/* Toggle Expandido */}
+            {/* Toggle Activo */}
             <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
               <div className="flex items-center gap-2">
-                <Maximize2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Expandido</span>
+                <ChefHat className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Activo</span>
               </div>
               <Switch
-                checked={plato.expanded || false}
-                onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
-                disabled={toggleExpanded.isPending}
-                className="data-[state=checked]:bg-blue-600"
+                checked={plato.activado || false}
+                onCheckedChange={(checked) => handleToggle(plato, checked)}
+                disabled={toggleActivado.isPending}
+                className="data-[state=checked]:bg-green-600"
               />
             </div>
             
