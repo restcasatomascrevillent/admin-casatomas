@@ -852,6 +852,7 @@ export type Database = {
           categoria: string | null
           created_at: string | null
           descripcion: string | null
+          expanded: boolean | null
           id: string
           imagen_url: string | null
           nombre: string | null
@@ -868,6 +869,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           descripcion?: string | null
+          expanded?: boolean | null
           id: string
           imagen_url?: string | null
           nombre?: string | null
@@ -884,6 +886,7 @@ export type Database = {
           categoria?: string | null
           created_at?: string | null
           descripcion?: string | null
+          expanded?: boolean | null
           id?: string
           imagen_url?: string | null
           nombre?: string | null
