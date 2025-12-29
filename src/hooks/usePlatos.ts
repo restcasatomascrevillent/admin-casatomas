@@ -14,6 +14,7 @@ export interface Plato {
   alergenos_notas: string | null;
   orden: string | null;
   activado: boolean | null;
+  expanded: boolean | null;
   imagen_url: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -48,11 +49,13 @@ export function usePlatos() {
 
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
+      const isNovedades = nuevoPlato.categoria === "Novedades del día";
       const { data, error } = await supabase
         .from("Platos")
         .insert([{
           ...nuevoPlato,
           activado: true,
+          expanded: isNovedades,
           id: crypto.randomUUID(),
         }])
         .select()
@@ -130,6 +133,24 @@ export function usePlatos() {
     },
   });
 
+  const toggleExpanded = useMutation({
+    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
+      const { error } = await supabase
+        .from("Platos")
+        .update({ expanded })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar el estado de expandido");
+      console.error(error);
+    },
+  });
+
   const categorias = platos
     ? Array.from(new Set(platos.map((p) => p.categoria).filter(Boolean)))
     : [];
@@ -142,5 +163,6 @@ export function usePlatos() {
     actualizarPlato,
     eliminarPlato,
     toggleActivado,
+    toggleExpanded,
   };
 }

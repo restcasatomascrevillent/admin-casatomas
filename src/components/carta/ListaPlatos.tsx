@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { ChefHat } from "lucide-react";
+import { ChefHat, Maximize2 } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ interface ListaPlatosProps {
 }
 
 export function ListaPlatos({ platos }: ListaPlatosProps) {
-  const { toggleActivado } = usePlatos();
+  const { toggleActivado, toggleExpanded } = usePlatos();
 
   const handleToggle = (plato: Plato, checked: boolean) => {
     toggleActivado.mutate(
@@ -21,6 +21,21 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             checked 
               ? `${plato.nombre} está ahora activo` 
               : `${plato.nombre} está ahora inactivo`
+          );
+        },
+      }
+    );
+  };
+
+  const handleToggleExpanded = (plato: Plato, checked: boolean) => {
+    toggleExpanded.mutate(
+      { id: plato.id, expanded: checked },
+      {
+        onSuccess: () => {
+          toast.success(
+            checked 
+              ? `${plato.nombre} se mostrará expandido` 
+              : `${plato.nombre} se mostrará normal`
           );
         },
       }
@@ -85,6 +100,20 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                   className="data-[state=checked]:bg-green-600"
                 />
               </div>
+            </div>
+
+            {/* Toggle Expandido */}
+            <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
+              <div className="flex items-center gap-2">
+                <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Expandido</span>
+              </div>
+              <Switch
+                checked={plato.expanded || false}
+                onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
+                disabled={toggleExpanded.isPending}
+                className="data-[state=checked]:bg-blue-600"
+              />
             </div>
             
             {plato.descripcion && (
