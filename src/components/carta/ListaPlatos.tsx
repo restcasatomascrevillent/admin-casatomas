@@ -61,10 +61,8 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         <Card 
           key={plato.id} 
           className={cn(
-            "overflow-hidden transition-all duration-300",
-            !plato.activado 
-              ? "opacity-60 bg-muted/30" 
-              : "hover:shadow-lg"
+            "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
+            !plato.activado && "opacity-60"
           )}
         >
           {plato.imagen_url && (
