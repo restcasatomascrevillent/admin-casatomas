@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Loader2, Percent, Search, X } from "lucide-react";
+import { Plus, Loader2, Percent, Search, X, Maximize2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +20,7 @@ import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 
 
 export default function GestorCarta() {
-  const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos } = usePlatos();
+  const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos, expandirTodos } = usePlatos();
   const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas } = useBebidas();
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
 
@@ -204,18 +204,35 @@ export default function GestorCarta() {
                         Gestiona los platos de tu carta
                       </CardDescription>
                     </div>
-                    <Select value={categoriaPlatos} onValueChange={setCategoriaPlatos}>
-                      <SelectTrigger className="w-full sm:w-[280px] bg-background">
-                        <SelectValue placeholder="Selecciona categoría" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover z-50">
-                        {categoriasPlatos.map((categoria) => (
-                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
-                            {categoria}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const platosFiltrados = getPlatosFiltrados();
+                          const ids = platosFiltrados.map(p => p.id);
+                          if (ids.length > 0) {
+                            expandirTodos.mutate(ids);
+                          }
+                        }}
+                        disabled={expandirTodos.isPending}
+                      >
+                        <Maximize2 className="mr-2 h-4 w-4" />
+                        Expandir fotos
+                      </Button>
+                      <Select value={categoriaPlatos} onValueChange={setCategoriaPlatos}>
+                        <SelectTrigger className="w-full sm:w-[280px] bg-background">
+                          <SelectValue placeholder="Selecciona categoría" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover z-50">
+                          {categoriasPlatos.map((categoria) => (
+                            <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                              {categoria}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
