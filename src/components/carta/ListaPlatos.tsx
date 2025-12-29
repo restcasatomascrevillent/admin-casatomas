@@ -103,7 +103,10 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             </div>
 
             {/* Toggle Activo */}
-            <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-md">
+            <div className={cn(
+              "flex items-center justify-between py-2 px-3 rounded-md",
+              plato.activado ? "bg-green-100 dark:bg-green-950/30" : "bg-red-100 dark:bg-red-950/30"
+            )}>
               <div className="flex items-center gap-2">
                 <ChefHat className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Activo</span>
