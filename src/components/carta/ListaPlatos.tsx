@@ -85,11 +85,8 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 {plato.nombre}
               </h3>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={cn(
-                  "text-xs font-medium",
-                  plato.expanded ? "text-blue-600" : "text-muted-foreground"
-                )}>
-                  {plato.expanded ? "Foto expandida" : "Normal"}
+                <span className="text-xs font-medium text-muted-foreground">
+                  Foto expandida
                 </span>
                 <Switch
                   checked={plato.expanded || false}
