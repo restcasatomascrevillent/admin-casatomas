@@ -172,6 +172,25 @@ export function usePlatos() {
     },
   });
 
+  const contraerTodos = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from("Platos")
+        .update({ expanded: false })
+        .in("id", ids);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platos"] });
+      toast.success("Todas las fotos contraídas");
+    },
+    onError: (error) => {
+      toast.error("Error al contraer las fotos");
+      console.error(error);
+    },
+  });
+
   const categorias = platos
     ? Array.from(new Set(platos.map((p) => p.categoria).filter(Boolean)))
     : [];
@@ -186,5 +205,6 @@ export function usePlatos() {
     toggleActivado,
     toggleExpanded,
     expandirTodos,
+    contraerTodos,
   };
 }
