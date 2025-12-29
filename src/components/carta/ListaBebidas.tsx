@@ -46,10 +46,8 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
         <Card 
           key={bebida.id} 
           className={cn(
-            "overflow-hidden transition-all duration-300",
-            !bebida.activado 
-              ? "opacity-60 bg-muted/30" 
-              : "hover:shadow-lg"
+            "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
+            !bebida.activado && "opacity-60"
           )}
         >
           {bebida.imagen_url && (
@@ -66,25 +64,28 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
           )}
           
           <CardContent className="p-4 space-y-3">
-            {/* Header con nombre y toggle */}
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
-                {bebida.nombre}
-              </h3>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className={cn(
-                  "text-xs font-medium",
-                  bebida.activado ? "text-green-600" : "text-muted-foreground"
-                )}>
-                  {bebida.activado ? "Activo" : "Inactivo"}
-                </span>
-                <Switch
-                  checked={bebida.activado || false}
-                  onCheckedChange={(checked) => handleToggle(bebida, checked)}
-                  disabled={toggleActivado.isPending}
-                  className="data-[state=checked]:bg-green-600"
-                />
+            {/* Header con nombre */}
+            <h3 className="font-semibold text-base leading-tight">
+              {bebida.nombre}
+            </h3>
+
+            {/* Toggle Activo */}
+            <div className={cn(
+              "flex items-center justify-between py-2 px-3 rounded-md",
+              bebida.activado
+                ? "bg-status-confirmed/10 dark:bg-status-confirmed/20"
+                : "bg-destructive/10 dark:bg-destructive/20"
+            )}>
+              <div className="flex items-center gap-2">
+                <GlassWater className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{bebida.activado ? "Activo" : "Inactivo"}</span>
               </div>
+              <Switch
+                checked={bebida.activado || false}
+                onCheckedChange={(checked) => handleToggle(bebida, checked)}
+                disabled={toggleActivado.isPending}
+                className="data-[state=checked]:bg-green-600"
+              />
             </div>
             
             {bebida.descripcion && (
