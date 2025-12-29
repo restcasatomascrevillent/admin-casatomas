@@ -89,7 +89,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                   "text-xs font-medium",
                   plato.expanded ? "text-blue-600" : "text-muted-foreground"
                 )}>
-                  {plato.expanded ? "Expandido" : "Normal"}
+                  {plato.expanded ? "Foto expandida" : "Normal"}
                 </span>
                 <Switch
                   checked={plato.expanded || false}
