@@ -89,8 +89,18 @@ interface Reserva {
   telefono?: string;
 }
 
-// Componente para reserva arrastrable
-function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigned: boolean }) {
+// Componente para reserva arrastrable y clickeable
+function DraggableReserva({ 
+  reserva, 
+  isAssigned,
+  isSelectedForClick,
+  onClickSelect,
+}: { 
+  reserva: Reserva; 
+  isAssigned: boolean;
+  isSelectedForClick?: boolean;
+  onClickSelect?: (reserva: Reserva) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `reserva-${reserva.id}`,
     data: { type: "reserva", reserva },
@@ -103,18 +113,28 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
     cancelada: "bg-red-500/20 border-red-500 text-red-700 dark:text-red-400",
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Solo activar click si no es drag
+    if (!isDragging && !isAssigned && onClickSelect) {
+      e.stopPropagation();
+      onClickSelect(reserva);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
       className={cn(
         "group flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200",
         isAssigned 
           ? "bg-muted/50 border-muted opacity-60 cursor-not-allowed" 
           : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
         isDragging && "opacity-30 scale-95 shadow-inner",
-        !isAssigned && "cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-primary hover:bg-accent/40 hover:scale-[1.02]"
+        !isAssigned && "cursor-pointer hover:shadow-lg hover:border-primary hover:bg-accent/40 hover:scale-[1.02]",
+        isSelectedForClick && "ring-4 ring-primary border-primary bg-primary/20 scale-[1.03] shadow-xl"
       )}
       style={{
         touchAction: isAssigned ? 'auto' : 'none',
@@ -122,11 +142,13 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
     >
       <div className={cn(
         "p-1.5 sm:p-2 rounded-md flex-shrink-0 transition-all duration-200",
-        isAssigned ? "bg-muted" : "bg-background/50 group-hover:bg-primary/20 group-hover:scale-110"
+        isAssigned ? "bg-muted" : "bg-background/50 group-hover:bg-primary/20 group-hover:scale-110",
+        isSelectedForClick && "bg-primary/30"
       )}>
         <GripVertical className={cn(
           "h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground transition-colors",
-          !isAssigned && "group-hover:text-primary"
+          !isAssigned && "group-hover:text-primary",
+          isSelectedForClick && "text-primary"
         )} />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
@@ -134,6 +156,11 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
           <p className="font-semibold text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{reserva.nombre}</p>
           {isAssigned && (
             <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+          )}
+          {isSelectedForClick && (
+            <Badge className="bg-primary text-primary-foreground text-[8px] px-1 py-0">
+              Seleccionada
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
@@ -171,6 +198,8 @@ function DroppableMesa({
   onRemoveAssignment,
   isDropTarget,
   draggingReserva,
+  selectedReservaForClick,
+  onClickAssign,
 }: { 
   mesa: Mesa; 
   reserva?: AsignacionConDetalles;
@@ -181,6 +210,8 @@ function DroppableMesa({
   onRemoveAssignment?: () => void;
   isDropTarget: boolean;
   draggingReserva?: Reserva | null;
+  selectedReservaForClick?: Reserva | null;
+  onClickAssign?: (mesa: Mesa) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `mesa-${mesa.id}`,
@@ -192,11 +223,14 @@ function DroppableMesa({
   const fontSize = Math.max(9, Math.min(14, minDimension * 0.2));
   const iconSize = Math.max(8, Math.min(12, minDimension * 0.15));
 
+  // Usar reserva seleccionada por click O por drag
+  const activeReservaForCompatibility = draggingReserva || selectedReservaForClick;
+
   // Lógica de compatibilidad
   const getCompatibility = () => {
-    if (!draggingReserva || reserva) return null;
+    if (!activeReservaForCompatibility || reserva) return null;
     
-    const comensales = draggingReserva.numero_comensales;
+    const comensales = activeReservaForCompatibility.numero_comensales;
     const capacidad = mesa.capacidad;
     
     if (comensales > capacidad) {
@@ -211,6 +245,7 @@ function DroppableMesa({
   };
 
   const compatibility = getCompatibility();
+  const canAcceptClick = selectedReservaForClick && !reserva && compatibility?.type !== 'incompatible';
 
   const getCompatibilityStyles = () => {
     if (!compatibility) return '';
@@ -218,13 +253,22 @@ function DroppableMesa({
       case 'incompatible':
         return 'ring-2 ring-red-400 border-red-400 opacity-40 grayscale';
       case 'perfect':
-        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 animate-pulse';
+        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 animate-pulse cursor-pointer';
       case 'good':
-        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20';
+        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20 cursor-pointer';
       case 'oversized':
-        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20';
+        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20 cursor-pointer';
       default:
         return '';
+    }
+  };
+
+  const handleMesaClick = (e: React.MouseEvent) => {
+    if (canAcceptClick && onClickAssign) {
+      e.stopPropagation();
+      onClickAssign(mesa);
+    } else {
+      onClick();
     }
   };
 
@@ -235,7 +279,7 @@ function DroppableMesa({
           <div
             ref={setNodeRef}
             className={cn(
-              "absolute cursor-move transition-all duration-300 ease-out",
+              "absolute transition-all duration-300 ease-out",
               "flex flex-col items-center justify-center text-center",
               "border-2 shadow-sm",
               mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
@@ -245,7 +289,8 @@ function DroppableMesa({
               isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 scale-110 z-40 shadow-2xl shadow-green-500/40",
               isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 scale-95 z-40 opacity-50",
               isDropTarget && !reserva && "border-dashed",
-              draggingReserva && !reserva && getCompatibilityStyles()
+              activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
+              canAcceptClick ? "cursor-pointer" : "cursor-move"
             )}
             style={{
               left: mesa.pos_x,
@@ -256,7 +301,7 @@ function DroppableMesa({
               padding: Math.max(2, minDimension * 0.05),
             }}
             onMouseDown={onMouseDown}
-            onClick={onClick}
+            onClick={handleMesaClick}
           >
             <span 
               className="font-bold leading-tight text-center break-words"
@@ -369,6 +414,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const [showAddMesa, setShowAddMesa] = useState(false);
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
+  const [selectedReservaForClick, setSelectedReservaForClick] = useState<Reserva | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [manualZoom, setManualZoom] = useState<number | null>(null); // null = auto-zoom
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -655,6 +701,47 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       }
     }
   };
+
+  // Handler para seleccionar reserva por click
+  const handleClickSelectReserva = useCallback((reserva: Reserva) => {
+    if (selectedReservaForClick?.id === reserva.id) {
+      // Deseleccionar si ya está seleccionada
+      setSelectedReservaForClick(null);
+    } else {
+      setSelectedReservaForClick(reserva);
+      toast.info(`Ahora haz click en una mesa para asignar "${reserva.nombre}"`);
+    }
+  }, [selectedReservaForClick]);
+
+  // Handler para asignar reserva por click en mesa
+  const handleClickAssignToMesa = useCallback(async (mesa: Mesa) => {
+    if (!selectedReservaForClick) return;
+
+    // Verificar capacidad
+    if (selectedReservaForClick.numero_comensales > mesa.capacidad) {
+      toast.warning(`La mesa ${mesa.nombre} solo tiene capacidad para ${mesa.capacidad} personas`);
+      return;
+    }
+
+    // Verificar si la mesa ya tiene asignación
+    const asignacionExistente = getReservaAsignada(mesa.id);
+    if (asignacionExistente) {
+      toast.error(`La mesa ${mesa.nombre} ya tiene una reserva asignada`);
+      return;
+    }
+
+    try {
+      await crearAsignacion.mutateAsync({
+        reserva_id: selectedReservaForClick.id,
+        mesa_id: mesa.id,
+      });
+      toast.success(`${selectedReservaForClick.nombre} asignado a ${mesa.nombre}`);
+      setSelectedReservaForClick(null);
+      refetchAsignaciones();
+    } catch (error) {
+      console.error("Error al asignar:", error);
+    }
+  }, [selectedReservaForClick, getReservaAsignada, crearAsignacion, refetchAsignaciones]);
 
   // Handlers de arrastre de mesas
   const handleMouseDown = useCallback((e: React.MouseEvent, mesa: Mesa) => {
@@ -1447,8 +1534,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                         onMouseDown={(e) => handleMouseDown(e, mesa)}
                         onClick={() => setSelectedMesa(mesa)}
                         onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
-                        isDropTarget={!!activeReserva}
+                        isDropTarget={!!activeReserva || !!selectedReservaForClick}
                         draggingReserva={activeReserva}
+                        selectedReservaForClick={selectedReservaForClick}
+                        onClickAssign={handleClickAssignToMesa}
                       />
                     );
                   })}
@@ -1466,10 +1555,20 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
                   {/* Indicador de drop zone cuando se arrastra */}
                   {activeReserva && localMesas.length > 0 && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg animate-bounce">
-                      <span className="flex items-center gap-2">
-                        <Move className="h-4 w-4" />
-                        Suelta sobre una mesa verde o azul
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-lg">
+                      <span className="flex items-center gap-1.5">
+                        <Move className="h-3 w-3" />
+                        Suelta en mesa verde o azul
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Indicador cuando hay reserva seleccionada por click */}
+                  {selectedReservaForClick && !activeReserva && localMesas.length > 0 && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-medium shadow-lg animate-pulse">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Click en una mesa para asignar "{selectedReservaForClick.nombre}"
                       </span>
                     </div>
                   )}
@@ -1603,19 +1702,35 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                               Por asignar ({reservasPendientes.length})
                             </p>
                           </div>
-                          {/* Instrucción de drag */}
+                          {/* Instrucción de asignación */}
                           <div className="mb-3 p-2 rounded-lg bg-primary/10 border border-primary/20">
                             <p className="text-[11px] text-primary flex items-center gap-1.5">
                               <Move className="h-3 w-3" />
-                              Arrastra una reserva al plano para asignarla
+                              Click en una reserva y luego en una mesa, o arrastra directamente
                             </p>
                           </div>
+                          {/* Botón cancelar selección */}
+                          {selectedReservaForClick && (
+                            <div className="mb-3">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full text-xs"
+                                onClick={() => setSelectedReservaForClick(null)}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Cancelar selección
+                              </Button>
+                            </div>
+                          )}
                           <div className="space-y-2">
                             {reservasPendientes.map((r: any) => (
                               <DraggableReserva
                                 key={r.id}
                                 reserva={r}
                                 isAssigned={false}
+                                isSelectedForClick={selectedReservaForClick?.id === r.id}
+                                onClickSelect={handleClickSelectReserva}
                               />
                             ))}
                           </div>
@@ -1647,32 +1762,16 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           </div>
         </div>
 
-        {/* Drag overlay - mejorado con animación y más visual */}
+        {/* Drag overlay - compacto para ver mejor las mesas */}
         <DragOverlay dropAnimation={{
-          duration: 200,
+          duration: 150,
           easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
         }}>
           {activeReserva && (
-            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-background/95 backdrop-blur-sm shadow-2xl transform rotate-2 scale-105">
-              <div className="p-2 rounded-lg bg-primary/20">
-                <Users className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="font-bold text-sm">{activeReserva.nombre}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {activeReserva.hora}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {activeReserva.numero_comensales} pax
-                  </span>
-                </div>
-              </div>
-              <div className="ml-2 px-2 py-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold animate-pulse">
-                Suelta sobre una mesa
-              </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border-2 border-primary bg-primary text-primary-foreground shadow-xl transform -rotate-1 scale-90 opacity-90">
+              <Users className="h-3 w-3" />
+              <span className="font-bold text-xs truncate max-w-[80px]">{activeReserva.nombre}</span>
+              <span className="text-[10px] opacity-80">{activeReserva.numero_comensales}p</span>
             </div>
           )}
         </DragOverlay>
