@@ -247,13 +247,17 @@ function DroppableMesa({
   const compatibility = getCompatibility();
   const canAcceptClick = selectedReservaForClick && !reserva && compatibility?.type !== 'incompatible';
 
+  // Escala de ampliación cuando está en hover durante drag
+  const hoverScale = isOver && compatibility?.type !== 'incompatible' ? 1.4 : 1;
+  const hoverZIndex = isOver ? 100 : (isSelected ? 30 : isDragging ? 50 : 10);
+
   const getCompatibilityStyles = () => {
     if (!compatibility) return '';
     switch (compatibility.type) {
       case 'incompatible':
         return 'ring-2 ring-red-400 border-red-400 opacity-40 grayscale';
       case 'perfect':
-        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 animate-pulse cursor-pointer';
+        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 cursor-pointer';
       case 'good':
         return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20 cursor-pointer';
       case 'oversized':
@@ -279,15 +283,14 @@ function DroppableMesa({
           <div
             ref={setNodeRef}
             className={cn(
-              "absolute transition-all duration-300 ease-out",
-              "flex flex-col items-center justify-center text-center",
+              "absolute flex flex-col items-center justify-center text-center",
               "border-2 shadow-sm",
               mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
-              isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
-              isDragging ? "shadow-xl scale-110 z-50" : "",
+              isSelected ? "border-primary ring-2 ring-primary/30" : "border-slate-300",
+              isDragging ? "shadow-xl" : "",
               reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
-              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 scale-110 z-40 shadow-2xl shadow-green-500/40",
-              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 scale-95 z-40 opacity-50",
+              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 shadow-2xl shadow-green-500/40",
+              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 opacity-50",
               isDropTarget && !reserva && "border-dashed",
               activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
               canAcceptClick ? "cursor-pointer" : "cursor-move"
@@ -297,8 +300,11 @@ function DroppableMesa({
               top: mesa.pos_y,
               width: mesa.ancho,
               height: mesa.alto,
-              transform: `rotate(${mesa.rotacion}deg)`,
+              transform: `rotate(${mesa.rotacion}deg) scale(${hoverScale})`,
+              transformOrigin: 'center center',
+              zIndex: hoverZIndex,
               padding: Math.max(2, minDimension * 0.05),
+              transition: 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, z-index 0ms',
             }}
             onMouseDown={onMouseDown}
             onClick={handleMesaClick}
@@ -1678,84 +1684,132 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               </Card>
             )}
 
-            {/* Reservas */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Utensils className="h-5 w-5" />
-                  Reservas de Hoy
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!reservasHoy?.length ? (
-                  <p className="text-muted-foreground text-sm text-center py-8">
-                    No hay reservas para hoy
-                  </p>
-                ) : (
-                  <ScrollArea className="h-[250px] sm:h-[300px] lg:h-[400px] pr-2 sm:pr-4">
-                    <div className="space-y-2">
-                      {/* Pendientes primero */}
-                      {reservasPendientes.length > 0 && (
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                              Por asignar ({reservasPendientes.length})
-                            </p>
-                          </div>
-                          {/* Instrucción de asignación */}
-                          <div className="mb-3 p-2 rounded-lg bg-primary/10 border border-primary/20">
-                            <p className="text-[11px] text-primary flex items-center gap-1.5">
-                              <Move className="h-3 w-3" />
-                              Click en una reserva y luego en una mesa, o arrastra directamente
-                            </p>
-                          </div>
-                          {/* Botón cancelar selección */}
-                          {selectedReservaForClick && (
-                            <div className="mb-3">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="w-full text-xs"
-                                onClick={() => setSelectedReservaForClick(null)}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                Cancelar selección
-                              </Button>
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            {reservasPendientes.map((r: any) => (
-                              <DraggableReserva
-                                key={r.id}
-                                reserva={r}
-                                isAssigned={false}
-                                isSelectedForClick={selectedReservaForClick?.id === r.id}
-                                onClickSelect={handleClickSelectReserva}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Asignadas */}
-                      {reservasAsignadas.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                            Asignadas ({reservasAsignadas.length})
-                          </p>
-                          <div className="space-y-2">
-                            {reservasAsignadas.map((r: any) => (
-                              <DraggableReserva
-                                key={r.id}
-                                reserva={r}
-                                isAssigned={true}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
+            {/* Reservas - Panel mejorado */}
+            <Card className="flex flex-col overflow-hidden">
+              <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary/5 to-transparent">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-primary/10">
+                      <Utensils className="h-4 w-4 text-primary" />
                     </div>
-                  </ScrollArea>
+                    Reservas
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {reservasHoy?.length || 0} total
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 flex-1 flex flex-col min-h-0">
+                {!reservasHoy?.length ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+                    <div className="p-3 rounded-full bg-muted mb-3">
+                      <Utensils className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium">Sin reservas hoy</p>
+                    <p className="text-muted-foreground text-xs">Las reservas aparecerán aquí</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Instrucciones de uso */}
+                    <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-green-950/30 border-b">
+                      <div className="flex items-start gap-2">
+                        <div className="p-1 rounded bg-blue-100 dark:bg-blue-900/50 mt-0.5">
+                          <Move className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-medium text-foreground">Cómo asignar:</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            1. Click en reserva → Click en mesa
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            2. O arrastra directamente al plano
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botón cancelar selección */}
+                    {selectedReservaForClick && (
+                      <div className="px-3 py-2 bg-primary/10 border-b border-primary/20">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full text-xs h-7 border-primary/30 hover:bg-primary/20"
+                          onClick={() => setSelectedReservaForClick(null)}
+                        >
+                          <X className="h-3 w-3 mr-1.5" />
+                          Cancelar selección de "{selectedReservaForClick.nombre}"
+                        </Button>
+                      </div>
+                    )}
+
+                    <ScrollArea className="flex-1">
+                      <div className="p-3 space-y-4">
+                        {/* Pendientes primero */}
+                        {reservasPendientes.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                                <div className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                                <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide">
+                                  Por asignar
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                {reservasPendientes.length}
+                              </Badge>
+                            </div>
+                            <div className="space-y-1.5">
+                              {reservasPendientes.map((r: any) => (
+                                <DraggableReserva
+                                  key={r.id}
+                                  reserva={r}
+                                  isAssigned={false}
+                                  isSelectedForClick={selectedReservaForClick?.id === r.id}
+                                  onClickSelect={handleClickSelectReserva}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Separador visual */}
+                        {reservasPendientes.length > 0 && reservasAsignadas.length > 0 && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-border" />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Asignadas */}
+                        {reservasAsignadas.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30">
+                                <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
+                                  Asignadas
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="text-[10px] h-5 border-green-300 text-green-700 dark:text-green-400">
+                                {reservasAsignadas.length}
+                              </Badge>
+                            </div>
+                            <div className="space-y-1.5">
+                              {reservasAsignadas.map((r: any) => (
+                                <DraggableReserva
+                                  key={r.id}
+                                  reserva={r}
+                                  isAssigned={true}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
                 )}
               </CardContent>
             </Card>
