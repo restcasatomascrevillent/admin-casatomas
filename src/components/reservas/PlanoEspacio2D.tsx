@@ -234,22 +234,27 @@ function DroppableMesa({
     const capacidad = mesa.capacidad;
     
     if (comensales > capacidad) {
-      return { type: 'incompatible', message: `Excede capacidad (${comensales}>${capacidad})`, icon: '✗' };
+      return { type: 'incompatible', message: 'No cabe', icon: '✗' };
     } else if (comensales === capacidad) {
       return { type: 'perfect', message: '¡Perfecta!', icon: '✓' };
     } else if (comensales >= capacidad - 1) {
-      return { type: 'good', message: 'Buena opción', icon: '○' };
+      return { type: 'good', message: 'Buena', icon: '○' };
     } else {
-      return { type: 'oversized', message: `+${capacidad - comensales} extra`, icon: '+' };
+      return { type: 'oversized', message: 'Grande', icon: '+' };
     }
   };
 
   const compatibility = getCompatibility();
   const canAcceptClick = selectedReservaForClick && !reserva && compatibility?.type !== 'incompatible';
 
-  // Escala de ampliación cuando está en hover durante drag
-  const hoverScale = isOver && compatibility?.type !== 'incompatible' ? 1.4 : 1;
+  // Escala de ampliación cuando está en hover durante drag - más grande para mesas pequeñas
+  const baseScale = minDimension < 40 ? 1.8 : minDimension < 60 ? 1.5 : 1.3;
+  const hoverScale = isOver && compatibility?.type !== 'incompatible' ? baseScale : 1;
   const hoverZIndex = isOver ? 100 : (isSelected ? 30 : isDragging ? 50 : 10);
+
+  // Área de detección extendida para mesas pequeñas (mínimo 40px)
+  const minHitArea = 40;
+  const hitAreaPadding = Math.max(0, (minHitArea - Math.min(mesa.ancho || 60, mesa.alto || 60)) / 2);
 
   const getCompatibilityStyles = () => {
     if (!compatibility) return '';
@@ -277,139 +282,149 @@ function DroppableMesa({
   };
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            ref={setNodeRef}
-            className={cn(
-              "absolute flex flex-col items-center justify-center text-center",
-              "border-2 shadow-sm",
-              mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
-              isSelected ? "border-primary ring-2 ring-primary/30" : "border-slate-300",
-              isDragging ? "shadow-xl" : "",
-              reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
-              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 shadow-2xl shadow-green-500/40",
-              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 opacity-50",
-              isDropTarget && !reserva && "border-dashed",
-              activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
-              canAcceptClick ? "cursor-pointer" : "cursor-move"
-            )}
-            style={{
-              left: mesa.pos_x,
-              top: mesa.pos_y,
-              width: mesa.ancho,
-              height: mesa.alto,
-              transform: `rotate(${mesa.rotacion}deg) scale(${hoverScale})`,
-              transformOrigin: 'center center',
-              zIndex: hoverZIndex,
-              padding: Math.max(2, minDimension * 0.05),
-              transition: 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease, z-index 0ms',
-            }}
-            onMouseDown={onMouseDown}
-            onClick={handleMesaClick}
-          >
-            <span 
-              className="font-bold leading-tight text-center break-words"
-              style={{ 
-                fontSize: `${fontSize}px`,
-                maxWidth: '100%',
-                wordBreak: 'break-word',
-                lineHeight: 1.1,
+    <div
+      ref={setNodeRef}
+      className="absolute"
+      style={{
+        left: (mesa.pos_x || 0) - hitAreaPadding,
+        top: (mesa.pos_y || 0) - hitAreaPadding,
+        width: (mesa.ancho || 60) + hitAreaPadding * 2,
+        height: (mesa.alto || 60) + hitAreaPadding * 2,
+        zIndex: hoverZIndex,
+      }}
+    >
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                "absolute flex flex-col items-center justify-center text-center",
+                "border-2 shadow-sm",
+                mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
+                isSelected ? "border-primary ring-2 ring-primary/30" : "border-slate-300",
+                isDragging ? "shadow-xl" : "",
+                reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
+                isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 shadow-2xl shadow-green-500/40",
+                isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 opacity-50",
+                isDropTarget && !reserva && "border-dashed",
+                activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
+                canAcceptClick ? "cursor-pointer" : "cursor-move"
+              )}
+              style={{
+                left: hitAreaPadding,
+                top: hitAreaPadding,
+                width: mesa.ancho,
+                height: mesa.alto,
+                transform: `rotate(${mesa.rotacion}deg) scale(${hoverScale})`,
+                transformOrigin: 'center center',
+                padding: Math.max(2, minDimension * 0.05),
+                transition: 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease',
               }}
+              onMouseDown={onMouseDown}
+              onClick={handleMesaClick}
             >
-              {mesa.nombre}
-            </span>
-            <div 
-              className="flex items-center gap-0.5 text-muted-foreground"
-              style={{ fontSize: `${iconSize}px`, marginTop: 1 }}
-            >
-              <Users style={{ width: iconSize, height: iconSize }} />
-              <span>{mesa.capacidad}</span>
-            </div>
-
-            {/* Indicador de compatibilidad */}
-            {compatibility && !reserva && (
-              <div 
-                className={cn(
-                  "absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap shadow-md transition-all duration-200",
-                  compatibility.type === 'perfect' && "bg-green-500 text-white scale-110",
-                  compatibility.type === 'good' && "bg-blue-500 text-white",
-                  compatibility.type === 'oversized' && "bg-yellow-500 text-white",
-                  compatibility.type === 'incompatible' && "bg-red-500 text-white",
-                  isOver && compatibility.type !== 'incompatible' && "scale-125 -bottom-3"
-                )}
+              <span 
+                className="font-bold leading-tight text-center break-words"
+                style={{ 
+                  fontSize: `${fontSize}px`,
+                  maxWidth: '100%',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.1,
+                }}
               >
-                {compatibility.icon} {isOver && compatibility.message}
+                {mesa.nombre}
+              </span>
+              <div 
+                className="flex items-center gap-0.5 text-muted-foreground"
+                style={{ fontSize: `${iconSize}px`, marginTop: 1 }}
+              >
+                <Users style={{ width: iconSize, height: iconSize }} />
+                <span>{mesa.capacidad}</span>
               </div>
-            )}
-
-            {reserva && (
-              <>
-                {/* Tarjeta de reserva asignada */}
-                <div 
-                  className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max"
-                  style={{ 
-                    maxWidth: Math.max(120, (mesa.ancho || 60) * 1.5),
-                  }}
-                >
-                  {onRemoveAssignment && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemoveAssignment();
-                      }}
-                      className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  )}
-                  <p className="font-semibold text-[11px] leading-tight truncate text-center">
-                    {reserva.reservas.nombre}
-                  </p>
-                  <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90">
-                    <span className="flex items-center gap-0.5">
-                      <Clock className="h-2.5 w-2.5" />
-                      {reserva.reservas.hora}
-                    </span>
-                    <span>·</span>
-                    <span className="flex items-center gap-0.5">
-                      <Users className="h-2.5 w-2.5" />
-                      {reserva.reservas.numero_comensales}
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="space-y-1">
-            <p className="font-semibold">{mesa.nombre}</p>
-            <p className="text-xs">Capacidad: {mesa.capacidad} personas</p>
-            {compatibility && (
-              <p className={cn(
-                "text-xs font-medium",
-                compatibility.type === 'perfect' && "text-green-600",
-                compatibility.type === 'good' && "text-blue-600",
-                compatibility.type === 'oversized' && "text-yellow-600",
-                compatibility.type === 'incompatible' && "text-red-600"
-              )}>
-                {compatibility.message}
-              </p>
-            )}
-            {reserva && (
-              <div className="pt-1 border-t border-border mt-1">
-                <p className="text-xs font-medium">{reserva.reservas.nombre}</p>
-                <p className="text-xs text-muted-foreground">
-                  {reserva.reservas.hora} · {reserva.reservas.numero_comensales} pax
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="space-y-1">
+              <p className="font-semibold">{mesa.nombre}</p>
+              <p className="text-xs">Capacidad: {mesa.capacidad} personas</p>
+              {compatibility && (
+                <p className={cn(
+                  "text-xs font-medium",
+                  compatibility.type === 'perfect' && "text-green-600",
+                  compatibility.type === 'good' && "text-blue-600",
+                  compatibility.type === 'oversized' && "text-yellow-600",
+                  compatibility.type === 'incompatible' && "text-red-600"
+                )}>
+                  {compatibility.message}
                 </p>
-              </div>
-            )}
+              )}
+              {reserva && (
+                <div className="pt-1 border-t border-border mt-1">
+                  <p className="text-xs font-medium">{reserva.reservas.nombre}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {reserva.reservas.hora} · {reserva.reservas.numero_comensales} pax
+                  </p>
+                </div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      {/* Indicador de compatibilidad - fuera de la mesa para no interferir */}
+      {compatibility && !reserva && isOver && compatibility.type !== 'incompatible' && (
+        <div 
+          className={cn(
+            "absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap shadow-lg z-50 animate-in fade-in zoom-in-95 duration-150",
+            compatibility.type === 'perfect' && "bg-green-500 text-white",
+            compatibility.type === 'good' && "bg-blue-500 text-white",
+            compatibility.type === 'oversized' && "bg-yellow-500 text-white",
+          )}
+          style={{
+            top: -28,
+          }}
+        >
+          {compatibility.icon} {compatibility.message}
+        </div>
+      )}
+
+      {/* Tarjeta de reserva asignada */}
+      {reserva && (
+        <div 
+          className="absolute left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max"
+          style={{ 
+            top: -28,
+            maxWidth: Math.max(120, (mesa.ancho || 60) * 1.5),
+          }}
+        >
+          {onRemoveAssignment && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveAssignment();
+              }}
+              className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          )}
+          <p className="font-semibold text-[11px] leading-tight truncate text-center">
+            {reserva.reservas.nombre}
+          </p>
+          <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90">
+            <span className="flex items-center gap-0.5">
+              <Clock className="h-2.5 w-2.5" />
+              {reserva.reservas.hora}
+            </span>
+            <span>·</span>
+            <span className="flex items-center gap-0.5">
+              <Users className="h-2.5 w-2.5" />
+              {reserva.reservas.numero_comensales}
+            </span>
           </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1710,22 +1725,26 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col min-h-0">
-                    {/* Instrucciones de uso */}
-                    <div className="px-3 py-2 bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-green-950/30 border-b">
-                      <div className="flex items-start gap-2">
-                        <div className="p-1 rounded bg-blue-100 dark:bg-blue-900/50 mt-0.5">
-                          <Move className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                    {/* Instrucciones de uso - más estéticas */}
+                    <div className="px-3 py-2.5 bg-muted/50 border-b">
+                      <div className="flex gap-3">
+                        <div className="flex-1 flex items-center gap-2 p-2 rounded-lg bg-background border border-border/50">
+                          <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            <span className="font-medium text-foreground">Click</span> en reserva
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[11px] font-medium text-foreground">Cómo asignar:</p>
-                          <p className="text-[10px] text-muted-foreground">
-                            1. Click en reserva → Click en mesa
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            2. O arrastra directamente al plano
-                          </p>
+                        <div className="flex items-center text-muted-foreground">→</div>
+                        <div className="flex-1 flex items-center gap-2 p-2 rounded-lg bg-background border border-border/50">
+                          <div className="flex items-center justify-center h-5 w-5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold">2</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            <span className="font-medium text-foreground">Click</span> en mesa
+                          </div>
                         </div>
                       </div>
+                      <p className="text-[9px] text-muted-foreground text-center mt-1.5">
+                        O arrastra directamente al plano
+                      </p>
                     </div>
 
                     {/* Botón cancelar selección */}
@@ -1738,7 +1757,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                           onClick={() => setSelectedReservaForClick(null)}
                         >
                           <X className="h-3 w-3 mr-1.5" />
-                          Cancelar selección de "{selectedReservaForClick.nombre}"
+                          Cancelar selección
                         </Button>
                       </div>
                     )}
