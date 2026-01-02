@@ -16,12 +16,14 @@ import {
   DndContext, 
   DragEndEvent, 
   DragStartEvent,
+  DragOverEvent,
   DragOverlay,
   useSensor,
   useSensors,
   PointerSensor,
+  TouchSensor,
   useDroppable,
-  useDraggable
+  useDraggable,
 } from "@dnd-kit/core";
 import { 
   Plus, 
@@ -96,9 +98,9 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
   });
 
   const estadoColor = {
-    confirmada: "bg-green-500/20 border-green-500 text-green-700",
-    pendiente: "bg-yellow-500/20 border-yellow-500 text-yellow-700",
-    cancelada: "bg-red-500/20 border-red-500 text-red-700",
+    confirmada: "bg-green-500/20 border-green-500 text-green-700 dark:text-green-400",
+    pendiente: "bg-yellow-500/20 border-yellow-500 text-yellow-700 dark:text-yellow-400",
+    cancelada: "bg-red-500/20 border-red-500 text-red-700 dark:text-red-400",
   };
 
   return (
@@ -107,19 +109,25 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
       {...listeners}
       {...attributes}
       className={cn(
-        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-colors duration-150 cursor-grab active:cursor-grabbing",
+        "group flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200",
         isAssigned 
-          ? "bg-muted/50 border-muted opacity-60" 
+          ? "bg-muted/50 border-muted opacity-60 cursor-not-allowed" 
           : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
-        isDragging && "opacity-50",
-        !isAssigned && "hover:shadow-md hover:border-primary/50 hover:bg-accent/30"
+        isDragging && "opacity-30 scale-95 shadow-inner",
+        !isAssigned && "cursor-grab active:cursor-grabbing hover:shadow-lg hover:border-primary hover:bg-accent/40 hover:scale-[1.02]"
       )}
+      style={{
+        touchAction: isAssigned ? 'auto' : 'none',
+      }}
     >
       <div className={cn(
-        "p-1.5 sm:p-2 rounded-md flex-shrink-0",
-        isAssigned ? "bg-muted" : "bg-background/50"
+        "p-1.5 sm:p-2 rounded-md flex-shrink-0 transition-all duration-200",
+        isAssigned ? "bg-muted" : "bg-background/50 group-hover:bg-primary/20 group-hover:scale-110"
       )}>
-        <GripVertical className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+        <GripVertical className={cn(
+          "h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground transition-colors",
+          !isAssigned && "group-hover:text-primary"
+        )} />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -142,7 +150,7 @@ function DraggableReserva({ reserva, isAssigned }: { reserva: Reserva; isAssigne
       <Badge 
         variant="outline" 
         className={cn(
-          "text-[9px] sm:text-[10px] flex-shrink-0 px-1.5 sm:px-2",
+          "text-[9px] sm:text-[10px] flex-shrink-0 px-1.5 sm:px-2 transition-colors",
           isAssigned && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700"
         )}
       >
@@ -192,13 +200,13 @@ function DroppableMesa({
     const capacidad = mesa.capacidad;
     
     if (comensales > capacidad) {
-      return { type: 'incompatible', message: `Excede capacidad (${comensales}>${capacidad})` };
+      return { type: 'incompatible', message: `Excede capacidad (${comensales}>${capacidad})`, icon: '✗' };
     } else if (comensales === capacidad) {
-      return { type: 'perfect', message: 'Capacidad exacta' };
+      return { type: 'perfect', message: '¡Perfecta!', icon: '✓' };
     } else if (comensales >= capacidad - 1) {
-      return { type: 'good', message: 'Buena opción' };
+      return { type: 'good', message: 'Buena opción', icon: '○' };
     } else {
-      return { type: 'oversized', message: `Mesa grande (${capacidad - comensales} extra)` };
+      return { type: 'oversized', message: `+${capacidad - comensales} extra`, icon: '+' };
     }
   };
 
@@ -208,13 +216,13 @@ function DroppableMesa({
     if (!compatibility) return '';
     switch (compatibility.type) {
       case 'incompatible':
-        return 'ring-2 ring-red-400 border-red-400 opacity-50';
+        return 'ring-2 ring-red-400 border-red-400 opacity-40 grayscale';
       case 'perfect':
-        return 'ring-2 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/30';
+        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 animate-pulse';
       case 'good':
-        return 'ring-2 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/20';
+        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20';
       case 'oversized':
-        return 'ring-1 ring-yellow-400 border-yellow-400 opacity-70';
+        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20';
       default:
         return '';
     }
@@ -227,15 +235,15 @@ function DroppableMesa({
           <div
             ref={setNodeRef}
             className={cn(
-              "absolute cursor-move transition-all duration-200",
+              "absolute cursor-move transition-all duration-300 ease-out",
               "flex flex-col items-center justify-center text-center",
               "border-2 shadow-sm",
               mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
               isSelected ? "border-primary ring-2 ring-primary/30 z-30" : "border-slate-300",
-              isDragging ? "shadow-lg scale-105 z-50" : "",
+              isDragging ? "shadow-xl scale-110 z-50" : "",
               reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
-              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 scale-105 z-40",
-              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 scale-105 z-40",
+              isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 scale-110 z-40 shadow-2xl shadow-green-500/40",
+              isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 scale-95 z-40 opacity-50",
               isDropTarget && !reserva && "border-dashed",
               draggingReserva && !reserva && getCompatibilityStyles()
             )}
@@ -273,17 +281,15 @@ function DroppableMesa({
             {compatibility && !reserva && (
               <div 
                 className={cn(
-                  "absolute -bottom-1 left-1/2 -translate-x-1/2 px-1 py-0.5 rounded text-[8px] font-medium whitespace-nowrap shadow-sm",
-                  compatibility.type === 'perfect' && "bg-green-500 text-white",
+                  "absolute -bottom-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap shadow-md transition-all duration-200",
+                  compatibility.type === 'perfect' && "bg-green-500 text-white scale-110",
                   compatibility.type === 'good' && "bg-blue-500 text-white",
                   compatibility.type === 'oversized' && "bg-yellow-500 text-white",
-                  compatibility.type === 'incompatible' && "bg-red-500 text-white"
+                  compatibility.type === 'incompatible' && "bg-red-500 text-white",
+                  isOver && compatibility.type !== 'incompatible' && "scale-125 -bottom-3"
                 )}
               >
-                {compatibility.type === 'perfect' && '✓'}
-                {compatibility.type === 'good' && '○'}
-                {compatibility.type === 'oversized' && '+'}
-                {compatibility.type === 'incompatible' && '✗'}
+                {compatibility.icon} {isOver && compatibility.message}
               </div>
             )}
 
@@ -398,11 +404,17 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const crearAsignacion = useCrearAsignacion();
   const eliminarAsignacion = useEliminarAsignacion();
 
-  // Sensors para dnd-kit
+  // Sensors para dnd-kit - mejorados para touch y pointer
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5, // Más sensible
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
       },
     })
   );
@@ -1451,6 +1463,16 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                       </div>
                     </div>
                   )}
+
+                  {/* Indicador de drop zone cuando se arrastra */}
+                  {activeReserva && localMesas.length > 0 && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg animate-bounce">
+                      <span className="flex items-center gap-2">
+                        <Move className="h-4 w-4" />
+                        Suelta sobre una mesa verde o azul
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Controles de zoom */}
@@ -1576,9 +1598,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                       {/* Pendientes primero */}
                       {reservasPendientes.length > 0 && (
                         <div className="mb-4">
-                          <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
-                            Por asignar ({reservasPendientes.length})
-                          </p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Por asignar ({reservasPendientes.length})
+                            </p>
+                          </div>
+                          {/* Instrucción de drag */}
+                          <div className="mb-3 p-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <p className="text-[11px] text-primary flex items-center gap-1.5">
+                              <Move className="h-3 w-3" />
+                              Arrastra una reserva al plano para asignarla
+                            </p>
+                          </div>
                           <div className="space-y-2">
                             {reservasPendientes.map((r: any) => (
                               <DraggableReserva
@@ -1616,16 +1647,31 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           </div>
         </div>
 
-        {/* Drag overlay */}
-        <DragOverlay>
+        {/* Drag overlay - mejorado con animación y más visual */}
+        <DragOverlay dropAnimation={{
+          duration: 200,
+          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+        }}>
           {activeReserva && (
-            <div className="flex items-center gap-3 p-3 rounded-lg border-2 border-primary bg-background shadow-xl">
-              <Users className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-background/95 backdrop-blur-sm shadow-2xl transform rotate-2 scale-105">
+              <div className="p-2 rounded-lg bg-primary/20">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
               <div>
-                <p className="font-semibold text-sm">{activeReserva.nombre}</p>
-                <p className="text-xs text-muted-foreground">
-                  {activeReserva.hora} · {activeReserva.numero_comensales} pax
-                </p>
+                <p className="font-bold text-sm">{activeReserva.nombre}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {activeReserva.hora}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    {activeReserva.numero_comensales} pax
+                  </span>
+                </div>
+              </div>
+              <div className="ml-2 px-2 py-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold animate-pulse">
+                Suelta sobre una mesa
               </div>
             </div>
           )}
