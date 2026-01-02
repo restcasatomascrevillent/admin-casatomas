@@ -1,16 +1,28 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Wine } from "lucide-react";
+import { Wine, Trash2 } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ListaVinosProps {
   vinos: Vino[];
 }
 
 export function ListaVinos({ vinos }: ListaVinosProps) {
-  const { toggleActivado } = useVinos();
+  const { toggleActivado, eliminarVino } = useVinos();
 
   const handleToggle = (vino: Vino, checked: boolean) => {
     toggleActivado.mutate(
@@ -118,6 +130,37 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 {vino.alergenos_notas}
               </p>
             )}
+
+            {/* Botón eliminar */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Eliminar vino?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará permanentemente "{vino.nombre}" de la carta. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => eliminarVino.mutate(vino.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Eliminar
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       ))}
