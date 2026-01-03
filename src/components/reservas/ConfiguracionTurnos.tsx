@@ -39,7 +39,7 @@ const formSchema = z.object({
   hora_inicio: z.string().min(1, "La hora de inicio es requerida"),
   hora_fin: z.string().min(1, "La hora de fin es requerida"),
   intervalo_base_minutos: z.number().min(15).max(60),
-  umbral_apertura_secundario: z.number().min(50).max(95),
+  umbral_apertura_secundario: z.number().min(0).max(100),
   dias_semana: z.array(z.number()).min(1, "Selecciona al menos un día"),
   activo: z.boolean(),
   espacio_id: z.string().nullable(),
