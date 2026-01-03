@@ -444,6 +444,7 @@ export type Database = {
           id: string
           intervalo_base_minutos: number
           nombre_periodo: string
+          ocultar_primario_si_secundario: boolean
           umbral_apertura_secundario: number
           updated_at: string
         }
@@ -457,6 +458,7 @@ export type Database = {
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo: string
+          ocultar_primario_si_secundario?: boolean
           umbral_apertura_secundario?: number
           updated_at?: string
         }
@@ -470,6 +472,7 @@ export type Database = {
           id?: string
           intervalo_base_minutos?: number
           nombre_periodo?: string
+          ocultar_primario_si_secundario?: boolean
           umbral_apertura_secundario?: number
           updated_at?: string
         }

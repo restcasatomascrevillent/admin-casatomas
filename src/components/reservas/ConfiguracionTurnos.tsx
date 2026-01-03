@@ -43,6 +43,7 @@ const formSchema = z.object({
   dias_semana: z.array(z.number()).min(1, "Selecciona al menos un día"),
   activo: z.boolean(),
   espacio_id: z.string().nullable(),
+  ocultar_primario_si_secundario: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -68,6 +69,7 @@ export function ConfiguracionTurnos() {
       dias_semana: [0, 1, 2, 3, 4, 5, 6],
       activo: true,
       espacio_id: null,
+      ocultar_primario_si_secundario: false,
     },
   });
 
@@ -82,6 +84,7 @@ export function ConfiguracionTurnos() {
       dias_semana: [0, 1, 2, 3, 4, 5, 6],
       activo: true,
       espacio_id: null,
+      ocultar_primario_si_secundario: false,
     });
     setDialogOpen(true);
   };
@@ -97,6 +100,7 @@ export function ConfiguracionTurnos() {
       dias_semana: config.dias_semana,
       activo: config.activo,
       espacio_id: config.espacio_id,
+      ocultar_primario_si_secundario: config.ocultar_primario_si_secundario,
     });
     setDialogOpen(true);
   };
@@ -119,6 +123,7 @@ export function ConfiguracionTurnos() {
           dias_semana: values.dias_semana,
           activo: values.activo,
           espacio_id: values.espacio_id,
+          ocultar_primario_si_secundario: values.ocultar_primario_si_secundario,
         });
         toast.success("Configuración creada");
       }
@@ -351,6 +356,24 @@ export function ConfiguracionTurnos() {
 
                 <FormField
                   control={form.control}
+                  name="ocultar_primario_si_secundario"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Ocultar turno primario al abrir secundario</FormLabel>
+                        <FormDescription>
+                          Si está activo, cuando se abra un turno intermedio (ej: 13:15), el turno primario (13:00) dejará de mostrarse
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="activo"
                   render={({ field }) => (
                     <FormItem className="flex items-center justify-between rounded-lg border p-3">
@@ -449,6 +472,12 @@ export function ConfiguracionTurnos() {
                 <Badge variant="secondary" className="gap-1">
                   <TrendingUp className="h-3 w-3" />
                   {config.umbral_apertura_secundario}%
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Ocultar primario:</span>
+                <Badge variant={config.ocultar_primario_si_secundario ? "default" : "outline"}>
+                  {config.ocultar_primario_si_secundario ? "Sí" : "No"}
                 </Badge>
               </div>
               <div className="flex flex-wrap gap-1 pt-2">

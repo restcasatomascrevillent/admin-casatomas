@@ -274,6 +274,8 @@ export const generarTurnosDinamicos = async (
 
     // Cache para ocupación de turnos primarios (para decidir si abrir secundarios)
     const ocupacionTurnosPrimarios: Record<string, number> = {};
+    // Set para rastrear qué turnos primarios deben ocultarse
+    const turnosPrimariosAOcultar = new Set<string>();
 
     // Primera pasada: generar todos los turnos primarios y obtener su ocupación
     let tempHour = currentHour;
@@ -293,7 +295,13 @@ export const generarTurnosDinamicos = async (
       if (esTurnoPrimario) {
         const horaFormateada = `${tempHour.toString().padStart(2, "0")}:${tempMin.toString().padStart(2, "0")}`;
         const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
-        ocupacionTurnosPrimarios[horaFormateada] = (ocupacion.comensalesActuales / capacidadMaxima) * 100;
+        const porcentaje = (ocupacion.comensalesActuales / capacidadMaxima) * 100;
+        ocupacionTurnosPrimarios[horaFormateada] = porcentaje;
+        
+        // Si la configuración indica ocultar primarios y la ocupación supera el umbral
+        if (config.ocultar_primario_si_secundario && porcentaje >= config.umbral_apertura_secundario) {
+          turnosPrimariosAOcultar.add(horaFormateada);
+        }
       }
 
       tempMin += 15;
@@ -318,18 +326,20 @@ export const generarTurnosDinamicos = async (
       const esTurnoPrimario = currentMin % config.intervalo_base_minutos === 0;
 
       if (esTurnoPrimario) {
-        // Turno primario - siempre se añade
-        const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
-        
-        turnos.push({
-          hora: horaFormateada,
-          disponible: ocupacion.disponible,
-          capacidadDisponible: ocupacion.capacidadDisponible,
-          capacidadMaxima: ocupacion.capacidadMaxima,
-          comensalesActuales: ocupacion.comensalesActuales,
-          esTurnoSecundario: false,
-          porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
-        });
+        // Turno primario - solo se añade si no está en la lista de ocultos
+        if (!turnosPrimariosAOcultar.has(horaFormateada)) {
+          const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
+          
+          turnos.push({
+            hora: horaFormateada,
+            disponible: ocupacion.disponible,
+            capacidadDisponible: ocupacion.capacidadDisponible,
+            capacidadMaxima: ocupacion.capacidadMaxima,
+            comensalesActuales: ocupacion.comensalesActuales,
+            esTurnoSecundario: false,
+            porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
+          });
+        }
       } else {
         // Turno secundario - solo se añade si el turno primario anterior tiene alta ocupación
         const minutosTurnoPrimario = Math.floor(currentMin / config.intervalo_base_minutos) * config.intervalo_base_minutos;
