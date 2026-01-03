@@ -11,6 +11,7 @@ export interface ConfiguracionTurno {
   dias_semana: number[];
   activo: boolean;
   espacio_id: string | null;
+  ocultar_primario_si_secundario: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +25,7 @@ export interface ConfiguracionTurnoInsert {
   dias_semana?: number[];
   activo?: boolean;
   espacio_id?: string | null;
+  ocultar_primario_si_secundario?: boolean;
 }
 
 export interface ConfiguracionTurnoUpdate extends Partial<ConfiguracionTurnoInsert> {
