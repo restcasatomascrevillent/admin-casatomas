@@ -268,14 +268,14 @@ export function ConfiguracionTurnos() {
                         Umbral de ocupación para abrir turno intermedio: {field.value}%
                       </FormLabel>
                       <FormControl>
-                        <Slider
-                          value={[field.value]}
-                          onValueChange={(v) => field.onChange(v[0])}
-                          min={50}
-                          max={95}
-                          step={5}
-                          className="mt-2"
-                        />
+                              <Slider
+                                value={[field.value]}
+                                onValueChange={(v) => field.onChange(v[0])}
+                                min={0}
+                                max={100}
+                                step={5}
+                                className="mt-2"
+                              />
                       </FormControl>
                       <FormDescription>
                         Cuando un turno primario alcance este % de ocupación, se abrirá el turno +15min
