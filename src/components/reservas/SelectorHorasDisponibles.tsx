@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Clock, Users } from "lucide-react";
+import { Clock, Users, TrendingUp, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { obtenerHorasDisponibles, verificarDisponibilidadSala } from "@/hooks/useDisponibilidad";
+import { generarTurnosDinamicos, TurnoDinamico } from "@/hooks/useDisponibilidad";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Progress } from "@/components/ui/progress";
 
 interface SelectorHorasDisponiblesProps {
   fecha: Date;
@@ -15,57 +17,33 @@ interface SelectorHorasDisponiblesProps {
   horaSeleccionada?: string;
 }
 
-interface HoraDisponibilidad {
-  hora: string;
-  disponible: boolean;
-  capacidadDisponible: number;
-  capacidadMaxima: number;
-}
-
 export const SelectorHorasDisponibles = ({
   fecha,
   salaId,
   onSeleccionarHora,
   horaSeleccionada,
 }: SelectorHorasDisponiblesProps) => {
-  const [horasDisponibilidad, setHorasDisponibilidad] = useState<HoraDisponibilidad[]>([]);
+  const [turnos, setTurnos] = useState<TurnoDinamico[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    const cargarHorasDisponibilidad = async () => {
+    const cargarTurnosDinamicos = async () => {
       setCargando(true);
       try {
         const fechaStr = format(fecha, "yyyy-MM-dd");
-        const todasLasHoras: HoraDisponibilidad[] = [];
-
-        // Solo 4 turnos específicos: 2 de comida y 2 de cena
-        const turnosDisponibles = ["13:00", "15:00", "20:30", "22:00"];
-
-        for (const hora of turnosDisponibles) {
-          const disponibilidad = await verificarDisponibilidadSala(
-            fechaStr,
-            hora,
-            salaId
-          );
-
-          todasLasHoras.push({
-            hora,
-            disponible: disponibilidad.disponible,
-            capacidadDisponible: disponibilidad.capacidadDisponible,
-            capacidadMaxima: disponibilidad.capacidadMaxima,
-          });
-        }
-
-        setHorasDisponibilidad(todasLasHoras);
+        const diaSemana = fecha.getDay();
+        
+        const turnosGenerados = await generarTurnosDinamicos(fechaStr, salaId, diaSemana);
+        setTurnos(turnosGenerados);
       } catch (error) {
-        console.error("Error cargando disponibilidad:", error);
+        console.error("Error cargando turnos dinámicos:", error);
       } finally {
         setCargando(false);
       }
     };
 
     if (fecha && salaId) {
-      cargarHorasDisponibilidad();
+      cargarTurnosDinamicos();
     }
   }, [fecha, salaId]);
 
@@ -80,8 +58,8 @@ export const SelectorHorasDisponibles = ({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
         </CardContent>
@@ -89,7 +67,84 @@ export const SelectorHorasDisponibles = ({
     );
   }
 
-  const horasDisponiblesCount = horasDisponibilidad.filter(h => h.disponible).length;
+  const turnosDisponibles = turnos.filter(t => t.disponible);
+  const turnosSecundarios = turnos.filter(t => t.esTurnoSecundario);
+
+  // Agrupar turnos por periodo (comida/cena basado en la hora)
+  const turnosComida = turnos.filter(t => {
+    const [hora] = t.hora.split(":").map(Number);
+    return hora >= 12 && hora < 18;
+  });
+  
+  const turnosCena = turnos.filter(t => {
+    const [hora] = t.hora.split(":").map(Number);
+    return hora >= 18 || hora < 4;
+  });
+
+  const renderTurno = (turno: TurnoDinamico) => (
+    <TooltipProvider key={turno.hora}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant={horaSeleccionada === turno.hora ? "default" : "outline"}
+            disabled={!turno.disponible}
+            onClick={() => onSeleccionarHora(turno.hora)}
+            className={`h-auto flex flex-col items-center py-3 relative ${
+              turno.esTurnoSecundario 
+                ? "border-dashed border-primary/50 bg-primary/5" 
+                : ""
+            }`}
+          >
+            {turno.esTurnoSecundario && (
+              <Badge 
+                variant="secondary" 
+                className="absolute -top-2 -right-2 text-[10px] px-1.5 py-0.5 gap-0.5"
+              >
+                <Sparkles className="h-2.5 w-2.5" />
+                +15
+              </Badge>
+            )}
+            <div className="flex items-center gap-1">
+              {turno.esTurnoSecundario ? (
+                <TrendingUp className="h-4 w-4 text-primary" />
+              ) : (
+                <Clock className="h-4 w-4" />
+              )}
+            </div>
+            <span className="font-semibold text-lg">{turno.hora}</span>
+            {turno.disponible && (
+              <>
+                <span className="text-xs opacity-70 flex items-center gap-1 mt-1">
+                  <Users className="h-3 w-3" />
+                  {turno.capacidadDisponible}/{turno.capacidadMaxima}
+                </span>
+                <Progress 
+                  value={turno.porcentajeOcupacion} 
+                  className="h-1 w-full mt-1.5"
+                />
+              </>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {turno.esTurnoSecundario ? (
+            <p className="text-sm">
+              <span className="font-medium">Turno extra</span>
+              <br />
+              {turno.motivoApertura}
+            </p>
+          ) : (
+            <p className="text-sm">
+              {turno.disponible 
+                ? `${turno.capacidadDisponible} plazas disponibles`
+                : "Sin disponibilidad"
+              }
+            </p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
   return (
     <Card>
@@ -101,39 +156,64 @@ export const SelectorHorasDisponibles = ({
               {format(fecha, "EEEE, d 'de' MMMM", { locale: es })}
             </CardDescription>
           </div>
-          <Badge variant={horasDisponiblesCount > 0 ? "default" : "secondary"}>
-            {horasDisponiblesCount} horarios disponibles
-          </Badge>
+          <div className="flex items-center gap-2">
+            {turnosSecundarios.length > 0 && (
+              <Badge variant="outline" className="gap-1">
+                <TrendingUp className="h-3 w-3" />
+                {turnosSecundarios.length} extra
+              </Badge>
+            )}
+            <Badge variant={turnosDisponibles.length > 0 ? "default" : "secondary"}>
+              {turnosDisponibles.length} disponibles
+            </Badge>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        {horasDisponiblesCount === 0 ? (
+      <CardContent className="space-y-6">
+        {turnos.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
             <p>No hay horarios disponibles para este día</p>
             <p className="text-sm mt-1">Selecciona otro día</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-            {horasDisponibilidad.map((hora) => (
-              <Button
-                key={hora.hora}
-                variant={horaSeleccionada === hora.hora ? "default" : "outline"}
-                disabled={!hora.disponible}
-                onClick={() => onSeleccionarHora(hora.hora)}
-                className="h-auto flex flex-col items-center py-3"
-              >
-                 <Clock className="h-4 w-4 mb-1" />
-                <span className="font-semibold">{hora.hora}</span>
-                {hora.disponible && (
-                  <span className="text-xs opacity-70 flex items-center gap-1 mt-1">
-                    <Users className="h-3 w-3" />
-                    {hora.capacidadDisponible}/{hora.capacidadMaxima}
-                  </span>
-                )}
-              </Button>
-            ))}
-          </div>
+          <>
+            {/* Turnos de Comida */}
+            {turnosComida.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  Comida
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  {turnosComida.map(renderTurno)}
+                </div>
+              </div>
+            )}
+
+            {/* Turnos de Cena */}
+            {turnosCena.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                  Cena
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  {turnosCena.map(renderTurno)}
+                </div>
+              </div>
+            )}
+
+            {/* Leyenda */}
+            {turnosSecundarios.length > 0 && (
+              <div className="pt-3 border-t">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Sparkles className="h-3 w-3" />
+                  Los turnos marcados con <Badge variant="secondary" className="text-[10px] px-1 py-0">+15</Badge> se han abierto por alta demanda
+                </p>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

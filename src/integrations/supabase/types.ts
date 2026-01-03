@@ -433,6 +433,63 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracion_turnos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          dias_semana: number[]
+          espacio_id: string | null
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          intervalo_base_minutos: number
+          nombre_periodo: string
+          umbral_apertura_secundario: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          dias_semana?: number[]
+          espacio_id?: string | null
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          intervalo_base_minutos?: number
+          nombre_periodo: string
+          umbral_apertura_secundario?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          dias_semana?: number[]
+          espacio_id?: string | null
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          intervalo_base_minutos?: number
+          nombre_periodo?: string
+          umbral_apertura_secundario?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracion_turnos_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracion_turnos_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+        ]
+      }
       dashboard_config: {
         Row: {
           created_at: string | null
