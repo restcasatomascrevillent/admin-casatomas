@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ConfiguracionTurno } from "./useConfiguracionTurnos";
 
 export interface DisponibilidadSala {
   fecha: string;
@@ -27,6 +28,17 @@ export interface DisponibilidadHora {
   }[];
   capacidad_total_disponible: number;
   porcentaje_ocupacion_global: number;
+}
+
+export interface TurnoDinamico {
+  hora: string;
+  disponible: boolean;
+  capacidadDisponible: number;
+  capacidadMaxima: number;
+  comensalesActuales: number;
+  esTurnoSecundario: boolean;
+  motivoApertura?: string;
+  porcentajeOcupacion: number;
 }
 
 export const useDisponibilidadPorFecha = (fecha: string) => {
@@ -75,7 +87,7 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
           
           const ocupacionHora = ocupacion?.filter((o: any) => o.hora === hora) || [];
           
-          const salasPorHora = espacios.map((espacio) => {
+          const salasPorHora = espacios.map((espacio: any) => {
             const ocupEspacio = ocupacionHora.filter((o: any) => o.espacio_id === espacio.id);
             const comensales = ocupEspacio.reduce((sum: number, o: any) => sum + o.total_comensales, 0);
             const capacidadDisponible = Math.max(0, espacio.capacidad_maxima - comensales);
@@ -91,9 +103,9 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
             };
           });
 
-          const capacidadTotalDisp = salasPorHora.reduce((sum, s) => sum + s.capacidad_disponible, 0);
-          const totalCapacidad = salasPorHora.reduce((sum, s) => sum + s.capacidad_maxima, 0);
-          const totalComensales = salasPorHora.reduce((sum, s) => sum + s.comensales_actuales, 0);
+          const capacidadTotalDisp = salasPorHora.reduce((sum: number, s: any) => sum + s.capacidad_disponible, 0);
+          const totalCapacidad = salasPorHora.reduce((sum: number, s: any) => sum + s.capacidad_maxima, 0);
+          const totalComensales = salasPorHora.reduce((sum: number, s: any) => sum + s.comensales_actuales, 0);
 
           horarios.push({
             hora,
@@ -143,16 +155,7 @@ export const verificarDisponibilidadSala = async (
     .single() as any;
 
   if (!sala) {
-    // Intenta buscar en salas si no lo encuentra en espacios
-    const { data: salaData } = await supabase
-      .from("salas" as any)
-      .select("capacidad_maxima")
-      .eq("id", salaId)
-      .single() as any;
-    
-    if (!salaData) throw new Error("Sala/Espacio no encontrado");
-    
-    return verificarCapacidadDisponible(fecha, hora, salaId, salaData.capacidad_maxima);
+    throw new Error("Sala/Espacio no encontrado");
   }
 
   return verificarCapacidadDisponible(fecha, hora, salaId, sala.capacidad_maxima);
@@ -188,31 +191,200 @@ const verificarCapacidadDisponible = async (
   };
 };
 
+// Función para obtener configuración de turnos
+const obtenerConfiguracionTurnos = async (espacioId: string | null): Promise<ConfiguracionTurno[]> => {
+  const { data, error } = await supabase
+    .from("configuracion_turnos")
+    .select("*")
+    .eq("activo", true)
+    .order("hora_inicio", { ascending: true });
+  
+  if (error) throw error;
+  if (!data) return [];
+  
+  // Cast manual ya que la tabla no está en los types generados aún
+  const configuraciones = data as unknown as ConfiguracionTurno[];
+  
+  // Priorizar configuraciones específicas sobre globales
+  if (espacioId) {
+    const especificas = configuraciones.filter(c => c.espacio_id === espacioId);
+    const globales = configuraciones.filter(c => c.espacio_id === null);
+    return especificas.length > 0 ? especificas : globales;
+  }
+  
+  return configuraciones.filter(c => c.espacio_id === null);
+};
+
+// Nueva función para generar turnos dinámicos
+export const generarTurnosDinamicos = async (
+  fecha: string,
+  salaId: string,
+  diaSemana: number
+): Promise<TurnoDinamico[]> => {
+  // Obtener configuración de turnos
+  const configuraciones = await obtenerConfiguracionTurnos(salaId);
+  
+  // Obtener capacidad del espacio
+  const { data: sala } = await supabase
+    .from("espacios_reserva" as any)
+    .select("capacidad_maxima")
+    .eq("id", salaId)
+    .single() as any;
+
+  if (!sala) throw new Error("Sala no encontrada");
+
+  const capacidadMaxima = sala.capacidad_maxima;
+  const turnos: TurnoDinamico[] = [];
+
+  // Si no hay configuración, usar valores por defecto
+  if (!configuraciones || configuraciones.length === 0) {
+    const turnosPorDefecto = ["13:00", "15:00", "20:30", "22:00"];
+    for (const hora of turnosPorDefecto) {
+      const ocupacion = await verificarCapacidadDisponible(fecha, hora, salaId, capacidadMaxima);
+      turnos.push({
+        hora,
+        disponible: ocupacion.disponible,
+        capacidadDisponible: ocupacion.capacidadDisponible,
+        capacidadMaxima: ocupacion.capacidadMaxima,
+        comensalesActuales: ocupacion.comensalesActuales,
+        esTurnoSecundario: false,
+        porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
+      });
+    }
+    return turnos;
+  }
+
+  // Procesar cada configuración de periodo
+  for (const config of configuraciones) {
+    // Verificar si el periodo aplica para este día
+    if (!config.dias_semana.includes(diaSemana) || !config.activo) {
+      continue;
+    }
+
+    const [horaInicio, minInicio] = config.hora_inicio.split(":").map(Number);
+    const [horaFin, minFin] = config.hora_fin.split(":").map(Number);
+
+    let currentHour = horaInicio;
+    let currentMin = minInicio;
+
+    // Manejar periodos que cruzan medianoche
+    const finEnMinutos = horaFin * 60 + minFin;
+    const inicioEnMinutos = horaInicio * 60 + minInicio;
+    const cruzaMedianoche = finEnMinutos <= inicioEnMinutos;
+
+    // Cache para ocupación de turnos primarios (para decidir si abrir secundarios)
+    const ocupacionTurnosPrimarios: Record<string, number> = {};
+
+    // Primera pasada: generar todos los turnos primarios y obtener su ocupación
+    let tempHour = currentHour;
+    let tempMin = currentMin;
+
+    while (true) {
+      const tempEnMinutos = tempHour * 60 + tempMin;
+      
+      if (cruzaMedianoche) {
+        if (tempHour >= horaFin && tempHour < horaInicio && tempEnMinutos >= finEnMinutos) break;
+      } else {
+        if (tempEnMinutos >= finEnMinutos) break;
+      }
+
+      const esTurnoPrimario = tempMin % config.intervalo_base_minutos === 0;
+      
+      if (esTurnoPrimario) {
+        const horaFormateada = `${tempHour.toString().padStart(2, "0")}:${tempMin.toString().padStart(2, "0")}`;
+        const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
+        ocupacionTurnosPrimarios[horaFormateada] = (ocupacion.comensalesActuales / capacidadMaxima) * 100;
+      }
+
+      tempMin += 15;
+      if (tempMin >= 60) {
+        tempMin = 0;
+        tempHour += 1;
+        if (tempHour >= 24) tempHour = 0;
+      }
+    }
+
+    // Segunda pasada: generar turnos incluyendo secundarios si aplica
+    while (true) {
+      const currentEnMinutos = currentHour * 60 + currentMin;
+      
+      if (cruzaMedianoche) {
+        if (currentHour >= horaFin && currentHour < horaInicio && currentEnMinutos >= finEnMinutos) break;
+      } else {
+        if (currentEnMinutos >= finEnMinutos) break;
+      }
+
+      const horaFormateada = `${currentHour.toString().padStart(2, "0")}:${currentMin.toString().padStart(2, "0")}`;
+      const esTurnoPrimario = currentMin % config.intervalo_base_minutos === 0;
+
+      if (esTurnoPrimario) {
+        // Turno primario - siempre se añade
+        const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
+        
+        turnos.push({
+          hora: horaFormateada,
+          disponible: ocupacion.disponible,
+          capacidadDisponible: ocupacion.capacidadDisponible,
+          capacidadMaxima: ocupacion.capacidadMaxima,
+          comensalesActuales: ocupacion.comensalesActuales,
+          esTurnoSecundario: false,
+          porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
+        });
+      } else {
+        // Turno secundario - solo se añade si el turno primario anterior tiene alta ocupación
+        const minutosTurnoPrimario = Math.floor(currentMin / config.intervalo_base_minutos) * config.intervalo_base_minutos;
+        const horaTurnoPrimario = `${currentHour.toString().padStart(2, "0")}:${minutosTurnoPrimario.toString().padStart(2, "0")}`;
+        
+        const ocupacionPrimario = ocupacionTurnosPrimarios[horaTurnoPrimario];
+        
+        if (ocupacionPrimario !== undefined && ocupacionPrimario >= config.umbral_apertura_secundario) {
+          const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
+          
+          turnos.push({
+            hora: horaFormateada,
+            disponible: ocupacion.disponible,
+            capacidadDisponible: ocupacion.capacidadDisponible,
+            capacidadMaxima: ocupacion.capacidadMaxima,
+            comensalesActuales: ocupacion.comensalesActuales,
+            esTurnoSecundario: true,
+            motivoApertura: `Alta demanda en ${horaTurnoPrimario} (${Math.round(ocupacionPrimario)}%)`,
+            porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
+          });
+        }
+      }
+
+      // Avanzar 15 minutos
+      currentMin += 15;
+      if (currentMin >= 60) {
+        currentMin = 0;
+        currentHour += 1;
+        if (currentHour >= 24) currentHour = 0;
+      }
+    }
+  }
+
+  // Ordenar por hora y eliminar duplicados
+  const turnosUnicos = turnos.reduce((acc, turno) => {
+    if (!acc.find(t => t.hora === turno.hora)) {
+      acc.push(turno);
+    }
+    return acc;
+  }, [] as TurnoDinamico[]);
+
+  return turnosUnicos.sort((a, b) => a.hora.localeCompare(b.hora));
+};
+
 // Obtener horas disponibles para una fecha y sala específica (basado en capacidad)
 export const obtenerHorasDisponibles = async (
   fecha: string,
   salaId: string
 ) => {
-  const horasDisponibles: string[] = [];
+  const fechaObj = new Date(fecha);
+  const diaSemana = fechaObj.getDay();
   
-  // Generar todas las horas posibles (8:00 - 23:30)
-  for (let h = 8; h <= 23; h++) {
-    for (let m = 0; m < 60; m += 30) {
-      const hora = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-      
-      const disponibilidad = await verificarDisponibilidadSala(
-        fecha,
-        hora,
-        salaId
-      );
-      
-      if (disponibilidad.disponible) {
-        horasDisponibles.push(hora);
-      }
-    }
-  }
+  const turnos = await generarTurnosDinamicos(fecha, salaId, diaSemana);
   
-  return horasDisponibles;
+  return turnos.filter(t => t.disponible).map(t => t.hora);
 };
 
 // Mantener compatibilidad con código existente (espacio)

@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
@@ -11,13 +11,17 @@ import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanza
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
+import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function Reservas() {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
 
   const { data: espacios } = useEspaciosReserva();
+  const { role } = useUserRole();
+  const isAdmin = role === "admin";
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -69,11 +73,17 @@ export default function Reservas() {
         </div>
 
         <Tabs defaultValue="hoy" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
             <TabsTrigger value="lista">Lista de Reservas</TabsTrigger>
             <TabsTrigger value="calendario">Calendario</TabsTrigger>
             <TabsTrigger value="blacklist">Lista Negra</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="configuracion" className="gap-1">
+                <Settings className="h-4 w-4" />
+                Configuración
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="hoy" className="space-y-6 mt-6">
@@ -91,6 +101,12 @@ export default function Reservas() {
           <TabsContent value="blacklist" className="space-y-6 mt-6">
             <GestionBlacklist />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="configuracion" className="space-y-6 mt-6">
+              <ConfiguracionTurnos />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </DashboardLayout>
