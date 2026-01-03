@@ -178,6 +178,7 @@ export type Database = {
           orden: number | null
           precio_eur: number | null
           tamano: string | null
+          traducciones: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -191,6 +192,7 @@ export type Database = {
           orden?: number | null
           precio_eur?: number | null
           tamano?: string | null
+          traducciones?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -204,6 +206,7 @@ export type Database = {
           orden?: number | null
           precio_eur?: number | null
           tamano?: string | null
+          traducciones?: Json | null
           updated_at?: string | null
         }
         Relationships: []
@@ -918,6 +921,7 @@ export type Database = {
           nombre: string | null
           orden: string | null
           precio_eur: number | null
+          traducciones: Json | null
           unidad: string | null
           updated_at: string | null
         }
@@ -935,6 +939,7 @@ export type Database = {
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
+          traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
         }
@@ -952,6 +957,7 @@ export type Database = {
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
+          traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
         }
@@ -1389,6 +1395,7 @@ export type Database = {
           nombre: string | null
           orden: string | null
           precio_eur: number | null
+          traducciones: Json | null
           ubicacion_pais: string | null
           ubicacion_region: string | null
           updated_at: string | null
@@ -1407,6 +1414,7 @@ export type Database = {
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
+          traducciones?: Json | null
           ubicacion_pais?: string | null
           ubicacion_region?: string | null
           updated_at?: string | null
@@ -1425,6 +1433,7 @@ export type Database = {
           nombre?: string | null
           orden?: string | null
           precio_eur?: number | null
+          traducciones?: Json | null
           ubicacion_pais?: string | null
           ubicacion_region?: string | null
           updated_at?: string | null
