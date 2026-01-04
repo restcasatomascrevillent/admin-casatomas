@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface Bebida {
   id: string;
@@ -23,6 +24,7 @@ export interface NuevaBebida {
   descripcion?: string;
   tamano?: string;
   orden?: number;
+  traducciones?: Json;
 }
 
 export function useBebidas() {

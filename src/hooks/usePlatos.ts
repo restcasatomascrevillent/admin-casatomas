@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 export interface Plato {
   id: string;
@@ -29,6 +30,7 @@ export interface NuevoPlato {
   alergenos_oficiales?: any;
   alergenos_notas?: string;
   orden?: string;
+  traducciones?: Json;
 }
 
 export function usePlatos() {
