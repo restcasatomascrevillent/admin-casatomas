@@ -11,7 +11,7 @@ import { Upload, Loader2, X, CheckCircle2, Eye } from "lucide-react";
 import { usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-
+import { useQueryClient } from "@tanstack/react-query";
 const formSchema = z.object({
   tipo: z.enum(["platos", "novedades", "web"]),
   categoria: z.string().optional(),
@@ -23,6 +23,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function SubidaImagenes() {
   const { platos, categorias } = usePlatos();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -131,6 +132,22 @@ export function SubidaImagenes() {
 
       if (uploadError) {
         throw new Error(`Error al subir a Supabase Storage: ${uploadError.message}`);
+      }
+
+      // Obtener la URL pública y actualizar el campo imagen_url en la tabla correspondiente
+      const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+
+      if (values.tipo === "platos") {
+        const { error: updateError } = await supabase
+          .from("Platos")
+          .update({ imagen_url: urlData.publicUrl })
+          .eq("id", values.item_id);
+
+        if (updateError) {
+          console.warn("Error actualizando imagen_url en Platos:", updateError);
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["platos"] });
+        }
       }
 
       toast.success("Imagen guardada correctamente en Supabase Storage");
