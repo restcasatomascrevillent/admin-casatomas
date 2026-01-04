@@ -54,10 +54,34 @@ export function usePlatos() {
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
       const isNovedades = nuevoPlato.categoria === "Novedades del día";
+      
+      // Mapear traducciones a columnas específicas
+      const traduccionesData: Record<string, string | null> = {};
+      if (nuevoPlato.traducciones && typeof nuevoPlato.traducciones === 'object') {
+        const trad = nuevoPlato.traducciones as Record<string, Record<string, string>>;
+        
+        // Inglés
+        if (trad['traduccion ingles']) {
+          traduccionesData.nombre_en = trad['traduccion ingles'].nombre || null;
+          traduccionesData.descripcion_en = trad['traduccion ingles'].descripcion || null;
+          traduccionesData.categoria_en = trad['traduccion ingles'].categoria || null;
+          traduccionesData.alergenos_en = trad['traduccion ingles'].alergenos || null;
+        }
+        
+        // Francés
+        if (trad['traduccion_fr']) {
+          traduccionesData.nombre_fr = trad['traduccion_fr'].nombre || null;
+          traduccionesData.descripcion_fr = trad['traduccion_fr'].descripcion || null;
+          traduccionesData.categoria_fr = trad['traduccion_fr']['catégorie'] || trad['traduccion_fr'].categoria || null;
+          traduccionesData.alergenos_fr = trad['traduccion_fr'].allergenes || null;
+        }
+      }
+      
       const { data, error } = await supabase
         .from("Platos")
         .insert([{
           ...nuevoPlato,
+          ...traduccionesData,
           activado: true,
           expanded: isNovedades,
           id: crypto.randomUUID(),
