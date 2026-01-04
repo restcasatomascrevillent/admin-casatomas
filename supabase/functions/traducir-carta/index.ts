@@ -14,9 +14,23 @@ serve(async (req) => {
   }
 
   try {
-    const { nombre, descripcion, categoria, tipo } = await req.json();
+    const requestBody = await req.json();
+    const { 
+      nombre, 
+      descripcion, 
+      categoria, 
+      tipo,
+      // Platos
+      alergenos,
+      // Bebidas
+      tamano,
+      // Vinos
+      ubicacion_pais,
+      ubicacion_region,
+      alergenos_notas,
+    } = requestBody;
 
-    console.log('Received translation request:', { nombre, descripcion, categoria, tipo });
+    console.log('Received translation request:', requestBody);
 
     if (!nombre) {
       return new Response(
@@ -25,21 +39,33 @@ serve(async (req) => {
       );
     }
 
+    // Build payload with all translatable fields
+    const webhookPayload: Record<string, unknown> = {
+      nombre: nombre || '',
+      descripcion: descripcion || '',
+      categoria: categoria || '',
+      tipo: tipo || 'plato',
+    };
+
+    // Add type-specific fields
+    if (alergenos !== undefined) webhookPayload.alergenos = alergenos;
+    if (tamano !== undefined) webhookPayload.tamano = tamano;
+    if (ubicacion_pais !== undefined) webhookPayload.ubicacion_pais = ubicacion_pais;
+    if (ubicacion_region !== undefined) webhookPayload.ubicacion_region = ubicacion_region;
+    if (alergenos_notas !== undefined) webhookPayload.alergenos_notas = alergenos_notas;
+
     // Send to n8n webhook
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    console.log('Sending to webhook:', webhookPayload);
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        nombre: nombre || '',
-        descripcion: descripcion || '',
-        categoria: categoria || '',
-        tipo: tipo || 'plato',
-      }),
+      body: JSON.stringify(webhookPayload),
       signal: controller.signal,
     });
 
