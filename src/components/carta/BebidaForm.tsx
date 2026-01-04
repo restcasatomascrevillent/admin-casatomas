@@ -73,6 +73,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
+          tamano: values.tamano || '',
           tipo: 'bebida',
         },
       });
