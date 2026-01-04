@@ -150,6 +150,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
+          alergenos_notas: values.alergenos_notas || '',
           tipo: 'plato',
         },
       });
