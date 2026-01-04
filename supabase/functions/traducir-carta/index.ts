@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook-test/5eca0d6c-7077-45bc-959c-2d597180eefa";
+const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/5eca0d6c-7077-45bc-959c-2d597180eefa";
 
 serve(async (req) => {
   // Handle CORS preflight requests
