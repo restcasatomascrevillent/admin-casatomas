@@ -79,6 +79,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
+          tipo: 'vino',
         },
       });
 
