@@ -145,12 +145,15 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
 
     setIsTranslating(true);
     try {
+      // Combinar alérgenos oficiales seleccionados + personalizados
+      const todosAlergenos = [...alergenosSeleccionados, ...alergenosPersonalizados];
+      
       const { data, error } = await supabase.functions.invoke('traducir-carta', {
         body: {
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
-          alergenos_notas: values.alergenos_notas || '',
+          alergenos: todosAlergenos,
           tipo: 'plato',
         },
       });
