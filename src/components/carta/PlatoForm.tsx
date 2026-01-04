@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Globe, Loader2, Camera, X } from "lucide-react";
+import { Globe, Loader2, Camera, X, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -29,10 +29,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
+
+// Alérgenos oficiales de la UE
+const ALERGENOS_OFICIALES = [
+  { id: "gluten", label: "Gluten", emoji: "🌾" },
+  { id: "crustaceos", label: "Crustáceos", emoji: "🦐" },
+  { id: "huevo", label: "Huevo", emoji: "🥚" },
+  { id: "pescado", label: "Pescado", emoji: "🐟" },
+  { id: "cacahuetes", label: "Cacahuetes", emoji: "🥜" },
+  { id: "frutos_cascara", label: "Frutos de cáscara", emoji: "🌰" },
+  { id: "lacteos", label: "Lácteos", emoji: "🥛" },
+  { id: "apio", label: "Apio", emoji: "🌱" },
+  { id: "mostaza", label: "Mostaza", emoji: "🟡" },
+  { id: "sesamo", label: "Sésamo", emoji: "🌻" },
+  { id: "sulfitos", label: "Sulfitos", emoji: "🧪" },
+  { id: "altramuces", label: "Altramuces", emoji: "🫘" },
+  { id: "moluscos", label: "Moluscos", emoji: "🦑" },
+  { id: "soja", label: "Soja", emoji: "🫛" },
+];
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -58,6 +77,11 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estado para alérgenos
+  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
+  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
+  const [nuevoAlergeno, setNuevoAlergeno] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -70,6 +94,26 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       alergenos_notas: "",
     },
   });
+
+  const toggleAlergeno = (id: string) => {
+    setAlergenosSeleccionados(prev => 
+      prev.includes(id) 
+        ? prev.filter(a => a !== id)
+        : [...prev, id]
+    );
+  };
+
+  const addAlergenoPersonalizado = () => {
+    const trimmed = nuevoAlergeno.trim();
+    if (trimmed && !alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados(prev => [...prev, trimmed]);
+      setNuevoAlergeno("");
+    }
+  };
+
+  const removeAlergenoPersonalizado = (alergeno: string) => {
+    setAlergenosPersonalizados(prev => prev.filter(a => a !== alergeno));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,6 +170,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsUploading(true);
     try {
+      // Combinar alérgenos oficiales seleccionados + personalizados
+      const todosAlergenos = [...alergenosSeleccionados, ...alergenosPersonalizados];
+      
       // 1. Crear el plato primero
       const platoData: NuevoPlato = {
         nombre: values.nombre,
@@ -134,6 +181,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         descripcion: values.descripcion,
         unidad: values.unidad,
         alergenos_notas: values.alergenos_notas,
+        alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
         ...(traducciones && { traducciones }),
       };
       
@@ -176,6 +224,8 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       form.reset();
       setTraducciones(null);
       clearImage();
+      setAlergenosSeleccionados([]);
+      setAlergenosPersonalizados([]);
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating plato:', error);
@@ -323,16 +373,94 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               </div>
             </div>
 
+            {/* Selector de Alérgenos */}
+            <div className="space-y-3">
+              <FormLabel>Alérgenos</FormLabel>
+              
+              {/* Grid de alérgenos oficiales */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {ALERGENOS_OFICIALES.map((alergeno) => {
+                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
+                  return (
+                    <button
+                      key={alergeno.id}
+                      type="button"
+                      onClick={() => toggleAlergeno(alergeno.id)}
+                      className={`
+                        flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium
+                        transition-all duration-200 border
+                        ${isSelected 
+                          ? "bg-primary text-primary-foreground border-primary" 
+                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                        }
+                      `}
+                    >
+                      <span>{alergeno.emoji}</span>
+                      <span className="truncate">{alergeno.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Añadir alérgeno personalizado */}
+              <div className="flex gap-2">
+                <Input
+                  value={nuevoAlergeno}
+                  onChange={(e) => setNuevoAlergeno(e.target.value)}
+                  placeholder="Añadir alérgeno personalizado..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAlergenoPersonalizado();
+                    }
+                  }}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon"
+                  onClick={addAlergenoPersonalizado}
+                  disabled={!nuevoAlergeno.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              {/* Lista de alérgenos personalizados */}
+              {alergenosPersonalizados.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {alergenosPersonalizados.map((alergeno) => (
+                    <Badge 
+                      key={alergeno} 
+                      variant="secondary"
+                      className="gap-1 pr-1"
+                    >
+                      {alergeno}
+                      <button
+                        type="button"
+                        onClick={() => removeAlergenoPersonalizado(alergeno)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="alergenos_notas"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Alérgenos / Notas</FormLabel>
+                  <FormLabel>Notas adicionales</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Información sobre alérgenos"
+                      placeholder="Ej: Puede contener trazas de..."
                       className="resize-none"
+                      rows={2}
                       {...field}
                     />
                   </FormControl>
