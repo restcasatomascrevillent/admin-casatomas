@@ -159,13 +159,28 @@ export function useVinos() {
   });
 
   const categorias = vinos
-    ? Array.from(new Set(vinos.map((v) => v.categoria).filter(Boolean)))
+    ? Array.from(new Set(vinos.map((v) => v.categoria).filter(Boolean))) as string[]
+    : [];
+
+  const denominaciones = vinos
+    ? Array.from(new Set(vinos.map((v) => v.denominacion_origen).filter(Boolean))) as string[]
+    : [];
+
+  const regiones = vinos
+    ? Array.from(new Set(vinos.map((v) => v.ubicacion_region).filter(Boolean))) as string[]
+    : [];
+
+  const paises = vinos
+    ? Array.from(new Set(vinos.map((v) => v.ubicacion_pais).filter(Boolean))) as string[]
     : [];
 
   return {
     vinos,
     isLoading,
     categorias,
+    denominaciones,
+    regiones,
+    paises,
     crearVino,
     actualizarVino,
     eliminarVino,

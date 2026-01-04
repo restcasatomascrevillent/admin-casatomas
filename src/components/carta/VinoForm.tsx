@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useVinos, NuevoVino } from "@/hooks/useVinos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,7 +46,7 @@ interface VinoFormProps {
 }
 
 export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps) {
-  const { crearVino, actualizarVino } = useVinos();
+  const { crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -216,7 +217,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                 <FormItem>
                   <FormLabel>Categoría</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ej: Tinto, Blanco, Rosado..." {...field} />
+                    <ComboboxCreatable
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={categorias}
+                      placeholder="Selecciona o crea categoría..."
+                      emptyText="No hay categorías"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -305,7 +312,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   <FormItem>
                     <FormLabel>D.O.</FormLabel>
                     <FormControl>
-                      <Input placeholder="Denominación" {...field} />
+                      <ComboboxCreatable
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        options={denominaciones}
+                        placeholder="Selecciona D.O..."
+                        emptyText="No hay denominaciones"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -319,7 +332,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   <FormItem>
                     <FormLabel>Región</FormLabel>
                     <FormControl>
-                      <Input placeholder="Región" {...field} />
+                      <ComboboxCreatable
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        options={regiones}
+                        placeholder="Selecciona región..."
+                        emptyText="No hay regiones"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -333,7 +352,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   <FormItem>
                     <FormLabel>País</FormLabel>
                     <FormControl>
-                      <Input placeholder="País" {...field} />
+                      <ComboboxCreatable
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        options={paises}
+                        placeholder="Selecciona país..."
+                        emptyText="No hay países"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
