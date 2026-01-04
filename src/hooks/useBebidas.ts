@@ -45,10 +45,31 @@ export function useBebidas() {
 
   const crearBebida = useMutation({
     mutationFn: async (nuevaBebida: NuevaBebida) => {
+      // Mapear traducciones a columnas específicas
+      const traduccionesData: Record<string, string | null> = {};
+      if (nuevaBebida.traducciones && typeof nuevaBebida.traducciones === 'object') {
+        const trad = nuevaBebida.traducciones as Record<string, Record<string, string>>;
+        
+        // Inglés
+        if (trad['traduccion ingles']) {
+          traduccionesData.nombre_en = trad['traduccion ingles'].nombre || null;
+          traduccionesData.descripcion_en = trad['traduccion ingles'].descripcion || null;
+          traduccionesData.categoria_en = trad['traduccion ingles'].categoria || null;
+        }
+        
+        // Francés
+        if (trad['traduccion_fr']) {
+          traduccionesData.nombre_fr = trad['traduccion_fr'].nombre || null;
+          traduccionesData.descripcion_fr = trad['traduccion_fr'].descripcion || null;
+          traduccionesData.categoria_fr = trad['traduccion_fr']['catégorie'] || trad['traduccion_fr'].categoria || null;
+        }
+      }
+
       const { data, error } = await supabase
         .from("Bebidas")
         .insert([{
           ...nuevaBebida,
+          ...traduccionesData,
           activado: true,
           id: crypto.randomUUID(),
         }])
