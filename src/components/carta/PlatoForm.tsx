@@ -341,6 +341,41 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               )}
             />
 
+            {/* Mostrar traducciones */}
+            {traducciones && typeof traducciones === 'object' && (
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3 border">
+                <p className="text-sm font-medium text-muted-foreground">Traducciones generadas:</p>
+                
+                {/* Inglés */}
+                {(traducciones as Record<string, unknown>)['traduccion ingles'] && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-blue-600">🇬🇧 English</p>
+                    <div className="text-sm pl-2 border-l-2 border-blue-400">
+                      <p><span className="text-muted-foreground">Name:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.nombre}</p>
+                      {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.descripcion && (
+                        <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.descripcion}</p>
+                      )}
+                      <p><span className="text-muted-foreground">Category:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.categoria}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Francés */}
+                {(traducciones as Record<string, unknown>)['traduccion_fr'] && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-red-600">🇫🇷 Français</p>
+                    <div className="text-sm pl-2 border-l-2 border-red-400">
+                      <p><span className="text-muted-foreground">Nom:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.nombre}</p>
+                      {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.descripcion && (
+                        <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.descripcion}</p>
+                      )}
+                      <p><span className="text-muted-foreground">Catégorie:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.['catégorie'] || ((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.categoria}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-between gap-2">
               <Button
                 type="button"
