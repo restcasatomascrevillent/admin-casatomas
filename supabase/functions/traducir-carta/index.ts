@@ -14,9 +14,9 @@ serve(async (req) => {
   }
 
   try {
-    const { nombre, descripcion, categoria } = await req.json();
+    const { nombre, descripcion, categoria, tipo } = await req.json();
 
-    console.log('Received translation request:', { nombre, descripcion, categoria });
+    console.log('Received translation request:', { nombre, descripcion, categoria, tipo });
 
     if (!nombre) {
       return new Response(
@@ -38,6 +38,7 @@ serve(async (req) => {
         nombre: nombre || '',
         descripcion: descripcion || '',
         categoria: categoria || '',
+        tipo: tipo || 'plato',
       }),
       signal: controller.signal,
     });

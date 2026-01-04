@@ -106,6 +106,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
+          tipo: 'plato',
         },
       });
 
