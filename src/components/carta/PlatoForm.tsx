@@ -488,6 +488,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                         <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.descripcion}</p>
                       )}
                       <p><span className="text-muted-foreground">Category:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.categoria}</p>
+                      {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.alergenos && (
+                        <p><span className="text-muted-foreground">Allergens:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.alergenos}</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -502,6 +505,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                         <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.descripcion}</p>
                       )}
                       <p><span className="text-muted-foreground">Catégorie:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.['catégorie'] || ((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.categoria}</p>
+                      {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.allergenes && (
+                        <p><span className="text-muted-foreground">Allergènes:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.allergenes}</p>
+                      )}
                     </div>
                   </div>
                 )}
