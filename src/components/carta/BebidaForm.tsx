@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Globe, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -38,6 +43,8 @@ interface BebidaFormProps {
 
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
   const { crearBebida } = useBebidas();
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [traducciones, setTraducciones] = useState<Json | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,9 +58,50 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     },
   });
 
+  const handleTranslate = async () => {
+    const values = form.getValues();
+    
+    if (!values.nombre) {
+      toast.error("Introduce el nombre antes de traducir");
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('traducir-carta', {
+        body: {
+          nombre: values.nombre,
+          descripcion: values.descripcion || '',
+          categoria: values.categoria || '',
+        },
+      });
+
+      if (error) throw error;
+
+      console.log('Translation response:', data);
+      setTraducciones(data);
+      toast.success("Traducción completada");
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast.error("Error al traducir");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await crearBebida.mutateAsync(values as NuevaBebida);
+    const bebidaData: NuevaBebida = {
+      nombre: values.nombre,
+      categoria: values.categoria,
+      precio_eur: values.precio_eur,
+      descripcion: values.descripcion,
+      tamano: values.tamano,
+      ...(traducciones && { traducciones }),
+    };
+    
+    await crearBebida.mutateAsync(bebidaData);
     form.reset();
+    setTraducciones(null);
     onOpenChange(false);
   };
 
@@ -159,17 +207,39 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
               )}
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-between gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={handleTranslate}
+                disabled={isTranslating || !form.watch("nombre")}
               >
-                Cancelar
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Traduciendo...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="mr-2 h-4 w-4" />
+                    Traducir
+                    {traducciones && " ✓"}
+                  </>
+                )}
               </Button>
-              <Button type="submit" disabled={crearBebida.isPending}>
-                {crearBebida.isPending ? "Guardando..." : "Guardar Bebida"}
-              </Button>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={crearBebida.isPending}>
+                  {crearBebida.isPending ? "Guardando..." : "Guardar Bebida"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>

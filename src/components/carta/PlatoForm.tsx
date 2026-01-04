@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Globe, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +29,9 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Json } from "@/integrations/supabase/types";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -46,6 +51,8 @@ interface PlatoFormProps {
 
 export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
   const { crearPlato } = usePlatos();
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [traducciones, setTraducciones] = useState<Json | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,9 +67,51 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
     },
   });
 
+  const handleTranslate = async () => {
+    const values = form.getValues();
+    
+    if (!values.nombre) {
+      toast.error("Introduce el nombre antes de traducir");
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('traducir-carta', {
+        body: {
+          nombre: values.nombre,
+          descripcion: values.descripcion || '',
+          categoria: values.categoria || '',
+        },
+      });
+
+      if (error) throw error;
+
+      console.log('Translation response:', data);
+      setTraducciones(data);
+      toast.success("Traducción completada");
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast.error("Error al traducir");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await crearPlato.mutateAsync(values as NuevoPlato);
+    const platoData: NuevoPlato = {
+      nombre: values.nombre,
+      categoria: values.categoria,
+      precio_eur: values.precio_eur,
+      descripcion: values.descripcion,
+      unidad: values.unidad,
+      alergenos_notas: values.alergenos_notas,
+      ...(traducciones && { traducciones }),
+    };
+    
+    await crearPlato.mutateAsync(platoData);
     form.reset();
+    setTraducciones(null);
     onOpenChange(false);
   };
 
@@ -197,17 +246,39 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               )}
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-between gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={handleTranslate}
+                disabled={isTranslating || !form.watch("nombre")}
               >
-                Cancelar
+                {isTranslating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Traduciendo...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="mr-2 h-4 w-4" />
+                    Traducir
+                    {traducciones && " ✓"}
+                  </>
+                )}
               </Button>
-              <Button type="submit" disabled={crearPlato.isPending}>
-                {crearPlato.isPending ? "Guardando..." : "Guardar Plato"}
-              </Button>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={crearPlato.isPending}>
+                  {crearPlato.isPending ? "Guardando..." : "Guardar Plato"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>
