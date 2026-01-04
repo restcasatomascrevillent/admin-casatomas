@@ -64,6 +64,8 @@ export function useVinos() {
           traduccionesData.descripcion_en = trad['traduccion ingles'].descripcion || null;
           traduccionesData.categoria_en = trad['traduccion ingles'].categoria || null;
           traduccionesData.alergenos_en = trad['traduccion ingles'].alergenos_notas || null;
+          traduccionesData.ubicacion_pais_en = trad['traduccion ingles'].ubicacion_pais || null;
+          traduccionesData.ubicacion_region_en = trad['traduccion ingles'].ubicacion_region || null;
         }
         
         // Francés
@@ -72,6 +74,8 @@ export function useVinos() {
           traduccionesData.descripcion_fr = trad['traduccion_fr'].descripcion || null;
           traduccionesData.categoria_fr = trad['traduccion_fr']['catégorie'] || trad['traduccion_fr'].categoria || null;
           traduccionesData.alergenos_fr = trad['traduccion_fr'].allergenes_notes || trad['traduccion_fr'].alergenos_notas || null;
+          traduccionesData.ubicacion_pais_fr = trad['traduccion_fr'].ubicacion_pais || trad['traduccion_fr']['pays'] || null;
+          traduccionesData.ubicacion_region_fr = trad['traduccion_fr'].ubicacion_region || trad['traduccion_fr']['région'] || null;
         }
       }
 
