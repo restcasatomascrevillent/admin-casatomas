@@ -338,6 +338,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     autoFit: () => {
       if (!fabricCanvas) return;
 
+      // Usar dimensiones reales del canvas de Fabric (no el estado de React)
+      const viewportW = fabricCanvas.getWidth();
+      const viewportH = fabricCanvas.getHeight();
+
+      if (viewportW <= 0 || viewportH <= 0) return;
+
       // Objetos a considerar: solo geometría (no grid/guías/labels/cotas ni elementos temporales)
       const objects = fabricCanvas
         .getObjects()
@@ -354,34 +360,45 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
       if (objects.length === 0) {
         fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-        fabricCanvas.renderAll();
+        fabricCanvas.calcOffset();
+        fabricCanvas.requestRenderAll();
         onZoomChange?.(1);
         return;
       }
 
-      // Medir bounds en coordenadas absolutas: ponemos el viewport neutro temporalmente
-      const prevVpt = (fabricCanvas.viewportTransform?.slice() as number[]) || [1, 0, 0, 1, 0, 0];
-      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-
-      // Importante: actualizar coords antes de medir
-      objects.forEach((o) => o.setCoords());
-
+      // Calcular bounding box usando getCoords() que devuelve coordenadas de escena
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
       let maxY = -Infinity;
 
       objects.forEach((obj) => {
-        const r = obj.getBoundingRect(); // con VPT identidad, esto ya está en coords de escena
-        minX = Math.min(minX, r.left);
-        minY = Math.min(minY, r.top);
-        maxX = Math.max(maxX, r.left + r.width);
-        maxY = Math.max(maxY, r.top + r.height);
+        obj.setCoords();
+        
+        // Para líneas, usar x1/y1/x2/y2
+        if (obj.type === 'line') {
+          const line = obj as Line;
+          const x1 = (line.x1 || 0) + (line.left || 0);
+          const y1 = (line.y1 || 0) + (line.top || 0);
+          const x2 = (line.x2 || 0) + (line.left || 0);
+          const y2 = (line.y2 || 0) + (line.top || 0);
+          minX = Math.min(minX, x1, x2);
+          minY = Math.min(minY, y1, y2);
+          maxX = Math.max(maxX, x1, x2);
+          maxY = Math.max(maxY, y1, y2);
+        } else {
+          // Para otros objetos, usar getCoords que da las 4 esquinas en coords de escena
+          const coords = obj.getCoords();
+          coords.forEach((point) => {
+            minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.y);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+          });
+        }
       });
 
       if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
-        fabricCanvas.renderAll();
         return;
       }
 
@@ -397,21 +414,20 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const contentCenterX = minX + contentWidth / 2;
       const contentCenterY = minY + contentHeight / 2;
 
-      const zoomX = canvasWidth / contentWidth;
-      const zoomY = canvasHeight / contentHeight;
-      const targetZoom = Math.max(0.25, Math.min(3, zoomX, zoomY));
+      const zoomX = viewportW / contentWidth;
+      const zoomY = viewportH / contentHeight;
+      const targetZoom = Math.max(0.25, Math.min(3, Math.min(zoomX, zoomY)));
 
-      const canvasCenterX = canvasWidth / 2;
-      const canvasCenterY = canvasHeight / 2;
-      const offsetX = canvasCenterX - contentCenterX * targetZoom;
-      const offsetY = canvasCenterY - contentCenterY * targetZoom;
+      const offsetX = viewportW / 2 - contentCenterX * targetZoom;
+      const offsetY = viewportH / 2 - contentCenterY * targetZoom;
 
-      // Aplicar el viewport final
+      // Aplicar el viewport final de forma atómica
       fabricCanvas.setViewportTransform([targetZoom, 0, 0, targetZoom, offsetX, offsetY]);
-      fabricCanvas.renderAll();
+      fabricCanvas.calcOffset();
+      fabricCanvas.requestRenderAll();
       onZoomChange?.(targetZoom);
     }
-  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
+  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange]);
 
   // Función para obtener color de nivel según ángulo de pared
   const getWallLevelColor = (angle: number): string => {
