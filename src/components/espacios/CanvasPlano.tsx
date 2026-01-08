@@ -337,90 +337,79 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     },
     autoFit: () => {
       if (!fabricCanvas) return;
-      
-      // Obtener todos los objetos dibujados (excepto grid, guías, labels y cotas)
-      const objects = fabricCanvas.getObjects().filter(obj => 
-        !(obj as any).isGrid && 
-        !(obj as any).isAlignmentGuide &&
-        !(obj as any).isMesaLabel &&
-        !(obj as any).isCota
-      );
-      
+
+      // Objetos a considerar: solo geometría (no grid/guías/labels/cotas ni elementos temporales)
+      const objects = fabricCanvas
+        .getObjects()
+        .filter(
+          (obj) =>
+            !(obj as any).isGrid &&
+            !(obj as any).isAlignmentGuide &&
+            !(obj as any).isMesaLabel &&
+            !(obj as any).isCota &&
+            !(obj as any).isTemp &&
+            obj !== previewLineRef.current &&
+            obj !== measureTextRef.current
+        );
+
       if (objects.length === 0) {
-        // Si no hay objetos, resetear vista
         fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
         fabricCanvas.renderAll();
         onZoomChange?.(1);
         return;
       }
-      
-      // Primero resetear el viewport para obtener coordenadas absolutas
-      const currentVpt = fabricCanvas.viewportTransform?.slice() || [1, 0, 0, 1, 0, 0];
+
+      // Medir bounds en coordenadas absolutas: ponemos el viewport neutro temporalmente
+      const prevVpt = (fabricCanvas.viewportTransform?.slice() as number[]) || [1, 0, 0, 1, 0, 0];
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      
-      // Calcular bounding box de todos los objetos usando coordenadas absolutas
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      
-      objects.forEach(obj => {
-        // Usar las propiedades directas del objeto para coordenadas absolutas
-        const left = obj.left || 0;
-        const top = obj.top || 0;
-        
-        // Para líneas (paredes), usar x1, y1, x2, y2
-        if ((obj as any).x1 !== undefined) {
-          const line = obj as any;
-          minX = Math.min(minX, line.x1, line.x2);
-          minY = Math.min(minY, line.y1, line.y2);
-          maxX = Math.max(maxX, line.x1, line.x2);
-          maxY = Math.max(maxY, line.y1, line.y2);
-        } else {
-          // Para rectángulos y círculos
-          const width = (obj as any).width || (obj as any).radius * 2 || 0;
-          const height = (obj as any).height || (obj as any).radius * 2 || 0;
-          
-          minX = Math.min(minX, left);
-          minY = Math.min(minY, top);
-          maxX = Math.max(maxX, left + width);
-          maxY = Math.max(maxY, top + height);
-        }
+
+      // Importante: actualizar coords antes de medir
+      objects.forEach((o) => o.setCoords());
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      objects.forEach((obj) => {
+        const r = obj.getBoundingRect(); // con VPT identidad, esto ya está en coords de escena
+        minX = Math.min(minX, r.left);
+        minY = Math.min(minY, r.top);
+        maxX = Math.max(maxX, r.left + r.width);
+        maxY = Math.max(maxY, r.top + r.height);
       });
-      
-      // Verificar que tenemos bounds válidos
+
       if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-        // Restaurar viewport anterior si no hay bounds válidos
-        fabricCanvas.setViewportTransform(currentVpt as any);
+        fabricCanvas.setViewportTransform(prevVpt as any);
         fabricCanvas.renderAll();
         return;
       }
-      
-      // Añadir padding
-      const padding = 60;
+
+      // Padding visual (en px de escena)
+      const padding = 80;
       minX -= padding;
       minY -= padding;
       maxX += padding;
       maxY += padding;
-      
-      const contentWidth = maxX - minX;
-      const contentHeight = maxY - minY;
+
+      const contentWidth = Math.max(1, maxX - minX);
+      const contentHeight = Math.max(1, maxY - minY);
       const contentCenterX = minX + contentWidth / 2;
       const contentCenterY = minY + contentHeight / 2;
-      
-      // Calcular zoom para que quepa todo
+
       const zoomX = canvasWidth / contentWidth;
       const zoomY = canvasHeight / contentHeight;
-      const zoom = Math.min(zoomX, zoomY, 3); // Limitar a 3x máximo
-      const clampedZoom = Math.max(0.25, zoom);
-      
-      // Calcular offset para centrar
+      const targetZoom = Math.max(0.25, Math.min(3, zoomX, zoomY));
+
       const canvasCenterX = canvasWidth / 2;
       const canvasCenterY = canvasHeight / 2;
-      const offsetX = canvasCenterX - contentCenterX * clampedZoom;
-      const offsetY = canvasCenterY - contentCenterY * clampedZoom;
-      
-      // Aplicar transformación
-      fabricCanvas.setViewportTransform([clampedZoom, 0, 0, clampedZoom, offsetX, offsetY]);
+      const offsetX = canvasCenterX - contentCenterX * targetZoom;
+      const offsetY = canvasCenterY - contentCenterY * targetZoom;
+
+      // Aplicar el viewport final
+      fabricCanvas.setViewportTransform([targetZoom, 0, 0, targetZoom, offsetX, offsetY]);
       fabricCanvas.renderAll();
-      onZoomChange?.(clampedZoom);
+      onZoomChange?.(targetZoom);
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
 
