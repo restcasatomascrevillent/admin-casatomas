@@ -377,6 +377,9 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         hasSelection={!!selectedElement}
         showMeasurements={showMeasurements}
         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
+        onAutoFit={() => {
+          canvasRef.current?.autoFit();
+        }}
       />
 
       {/* Main content */}

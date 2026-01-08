@@ -31,6 +31,7 @@ export interface CanvasPlanoRef {
   setZoom: (zoom: number) => void;
   resetView: () => void;
   unmergeMesa: (mesaId: string) => void;
+  autoFit: () => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -333,8 +334,65 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       onMesasChange(updatedMesas);
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
+    },
+    autoFit: () => {
+      if (!fabricCanvas) return;
+      
+      // Obtener todos los objetos dibujados (excepto grid y guías)
+      const objects = fabricCanvas.getObjects().filter(obj => 
+        !(obj as any).isGrid && 
+        !(obj as any).isAlignmentGuide
+      );
+      
+      if (objects.length === 0) {
+        // Si no hay objetos, resetear vista
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        fabricCanvas.renderAll();
+        onZoomChange?.(1);
+        return;
+      }
+      
+      // Calcular bounding box de todos los objetos
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      
+      objects.forEach(obj => {
+        const bounds = obj.getBoundingRect();
+        minX = Math.min(minX, bounds.left);
+        minY = Math.min(minY, bounds.top);
+        maxX = Math.max(maxX, bounds.left + bounds.width);
+        maxY = Math.max(maxY, bounds.top + bounds.height);
+      });
+      
+      // Añadir padding
+      const padding = 50;
+      minX -= padding;
+      minY -= padding;
+      maxX += padding;
+      maxY += padding;
+      
+      const contentWidth = maxX - minX;
+      const contentHeight = maxY - minY;
+      const contentCenterX = minX + contentWidth / 2;
+      const contentCenterY = minY + contentHeight / 2;
+      
+      // Calcular zoom para que quepa todo
+      const zoomX = canvasWidth / contentWidth;
+      const zoomY = canvasHeight / contentHeight;
+      const zoom = Math.min(zoomX, zoomY, 3); // Limitar a 3x máximo
+      const clampedZoom = Math.max(0.25, zoom);
+      
+      // Calcular offset para centrar
+      const canvasCenterX = canvasWidth / 2;
+      const canvasCenterY = canvasHeight / 2;
+      const offsetX = canvasCenterX - contentCenterX * clampedZoom;
+      const offsetY = canvasCenterY - contentCenterY * clampedZoom;
+      
+      // Aplicar transformación
+      fabricCanvas.setViewportTransform([clampedZoom, 0, 0, clampedZoom, offsetX, offsetY]);
+      fabricCanvas.renderAll();
+      onZoomChange?.(clampedZoom);
     }
-  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange]);
+  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
 
   // Función para obtener color de nivel según ángulo de pared
   const getWallLevelColor = (angle: number): string => {
