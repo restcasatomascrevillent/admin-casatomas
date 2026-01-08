@@ -1605,7 +1605,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!fabricCanvas) return;
 
     const handleMouseDown = (opt: any) => {
-      const pointer = fabricCanvas.getViewportPoint(opt.e);
+      // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
+      const pointer = fabricCanvas.getScenePoint(opt.e);
       const tool = activeToolRef.current;
 
       if (tool === "wall") {
@@ -1624,7 +1625,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const handleMouseMove = (opt: any) => {
       if (activeToolRef.current !== "wall" || wallPointsRef.current.length === 0) return;
       
-      const pointer = fabricCanvas.getViewportPoint(opt.e);
+      // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
+      const pointer = fabricCanvas.getScenePoint(opt.e);
       updatePreviewLine(pointer.x, pointer.y);
     };
 
