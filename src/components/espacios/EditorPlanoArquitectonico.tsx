@@ -52,10 +52,10 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>("select");
-  // Tamaño fijo del canvas en píxeles (no cambia)
-  const CANVAS_WIDTH = 800;
-  const CANVAS_HEIGHT = 500;
-  const [canvasSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
+  
+  // Tamaño dinámico del canvas basado en el contenedor
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 500 });
+  
   const [selectedObject, setSelectedObject] = useState<FabricObject | null>(null);
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [wallPoints, setWallPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -78,15 +78,15 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   const [freehandPoints, setFreehandPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
 
-  // Escala: píxeles por metro en cada eje (pueden ser diferentes)
-  const [pixelsPerMeterX, setPixelsPerMeterX] = useState(CANVAS_WIDTH / 9); // ~88.89
-  const [pixelsPerMeterY, setPixelsPerMeterY] = useState(CANVAS_HEIGHT / 6); // ~83.33
-
-  // Mantener compatibilidad con código existente (usar el promedio o el mínimo)
-  const pixelsPerMeter = Math.min(pixelsPerMeterX, pixelsPerMeterY);
-
   // Dimensiones reales del espacio en metros
   const [realDimensions, setRealDimensions] = useState({ width: 9, height: 6 });
+
+  // Escala: píxeles por metro en cada eje (calculados dinámicamente)
+  const pixelsPerMeterX = canvasSize.width / realDimensions.width;
+  const pixelsPerMeterY = canvasSize.height / realDimensions.height;
+
+  // Mantener compatibilidad con código existente (usar el mínimo)
+  const pixelsPerMeter = Math.min(pixelsPerMeterX, pixelsPerMeterY);
 
   // Configuración de nueva mesa (medidas en cm)
   const [newMesa, setNewMesa] = useState({
@@ -117,6 +117,32 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   const actualizarMesas = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
 
+  // ResizeObserver para hacer el canvas responsivo
+  useEffect(() => {
+    if (!canvasContainerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          // Descontar espacio para las reglas si están visibles
+          const rulerOffset = 24;
+          const newWidth = Math.floor(width - rulerOffset);
+          const newHeight = Math.floor(Math.max(height - rulerOffset, 400)); // Mínimo 400px de alto
+          if (newWidth > 100 && newHeight > 100) {
+            setCanvasSize({ width: newWidth, height: newHeight });
+          }
+        }
+      }
+    });
+
+    resizeObserver.observe(canvasContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   // Inicializar canvas
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -146,6 +172,17 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
       canvas.dispose();
     };
   }, []);
+
+  // Redimensionar canvas cuando cambia el tamaño
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    
+    fabricCanvas.setDimensions({
+      width: canvasSize.width,
+      height: canvasSize.height,
+    });
+    fabricCanvas.renderAll();
+  }, [fabricCanvas, canvasSize]);
 
   // Manejar modo de dibujo libre
   useEffect(() => {
@@ -278,15 +315,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   useEffect(() => {
     if (!fabricCanvas || !plano) return;
 
-    // Restaurar escala desde la configuración guardada
-    if (plano.configuracion?.pixelsPerMeterX && plano.configuracion?.pixelsPerMeterY) {
-      setPixelsPerMeterX(plano.configuracion.pixelsPerMeterX);
-      setPixelsPerMeterY(plano.configuracion.pixelsPerMeterY);
-    } else if (plano.configuracion?.pixelsPerMeter) {
-      // Compatibilidad con configuración antigua
-      setPixelsPerMeterX(plano.configuracion.pixelsPerMeter);
-      setPixelsPerMeterY(plano.configuracion.pixelsPerMeter);
-    }
+    // Restaurar dimensiones reales desde la configuración guardada
     if (plano.configuracion?.realDimensions) {
       setRealDimensions(plano.configuracion.realDimensions);
     }
@@ -1048,12 +1077,7 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   }, [selectedObject, getWallLength]);
 
   const applyRealDimensions = useCallback(() => {
-    // Calcular la escala para que el espacio ocupe todo el canvas en ambos ejes
-    const newPixelsPerMeterX = CANVAS_WIDTH / realDimensions.width;
-    const newPixelsPerMeterY = CANVAS_HEIGHT / realDimensions.height;
-
-    setPixelsPerMeterX(newPixelsPerMeterX);
-    setPixelsPerMeterY(newPixelsPerMeterY);
+    // La escala se recalcula automáticamente cuando cambian las dimensiones reales
     toast.success(`Escala ajustada: ${realDimensions.width}m × ${realDimensions.height}m`);
   }, [realDimensions]);
 
@@ -1104,9 +1128,9 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full min-h-[calc(100vh-200px)]">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={onBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -1130,10 +1154,10 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_300px] flex-1">
         {/* Canvas principal */}
-        <Card>
-          <CardContent className="p-4">
+        <Card className="flex flex-col">
+          <CardContent className="p-4 flex flex-col flex-1">
             {/* Barra de herramientas */}
             <div className="flex flex-wrap gap-2 mb-4 p-2 bg-muted rounded-lg">
               <Button
@@ -1296,16 +1320,16 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
               </div>
             )}
 
-            {/* Canvas con medidas - Tamaño fijo, escala ajustable */}
+            {/* Canvas con medidas - Tamaño responsivo */}
             <div
               ref={canvasContainerRef}
-              className="relative border-2 border-dashed border-border rounded-lg bg-white overflow-hidden"
+              className="relative border-2 border-dashed border-border rounded-lg bg-white overflow-hidden flex-1 min-h-[500px]"
             >
               {/* Contenedor con reglas externas al canvas */}
-              <div className="flex flex-col">
+              <div className="flex flex-col h-full">
                 {/* Regla horizontal (superior) - fuera del canvas */}
                 <div
-                  className="relative h-6 bg-muted/80 border-b flex items-end pointer-events-none"
+                  className="relative h-6 bg-muted/80 border-b flex items-end pointer-events-none flex-shrink-0"
                   style={{ marginLeft: showMeasurements ? 24 : 0, visibility: showMeasurements ? "visible" : "hidden" }}
                 >
                   {Array.from({ length: Math.ceil(realDimensions.width) + 1 }).map((_, i) => (
@@ -1316,11 +1340,11 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
                   ))}
                 </div>
 
-                <div className="flex">
+                <div className="flex flex-1">
                   {/* Regla vertical (izquierda) - fuera del canvas */}
                   <div
-                    className="relative w-6 bg-muted/80 border-r flex flex-col pointer-events-none"
-                    style={{ height: canvasSize.height, visibility: showMeasurements ? "visible" : "hidden" }}
+                    className="relative w-6 bg-muted/80 border-r flex flex-col pointer-events-none flex-shrink-0"
+                    style={{ visibility: showMeasurements ? "visible" : "hidden" }}
                   >
                     {Array.from({ length: Math.ceil(realDimensions.height) + 1 }).map((_, i) => (
                       <div key={i} className="absolute flex items-center" style={{ top: i * pixelsPerMeterY }}>
@@ -1330,8 +1354,8 @@ export function EditorPlanoArquitectonico({ espacioId, espacioNombre, onBack }: 
                     ))}
                   </div>
 
-                  {/* Canvas de dibujo - dimensiones explícitas */}
-                  <div className="relative" style={{ width: canvasSize.width, height: canvasSize.height }}>
+                  {/* Canvas de dibujo - ocupa todo el espacio disponible */}
+                  <div className="relative flex-1">
                     <canvas ref={canvasRef} />
 
                     {/* Indicador de dimensiones reales */}
