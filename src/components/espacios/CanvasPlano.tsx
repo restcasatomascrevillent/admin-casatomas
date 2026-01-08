@@ -338,10 +338,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     autoFit: () => {
       if (!fabricCanvas) return;
       
-      // Obtener todos los objetos dibujados (excepto grid y guías)
+      // Obtener todos los objetos dibujados (excepto grid, guías, labels y cotas)
       const objects = fabricCanvas.getObjects().filter(obj => 
         !(obj as any).isGrid && 
-        !(obj as any).isAlignmentGuide
+        !(obj as any).isAlignmentGuide &&
+        !(obj as any).isMesaLabel &&
+        !(obj as any).isCota
       );
       
       if (objects.length === 0) {
@@ -352,19 +354,47 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         return;
       }
       
-      // Calcular bounding box de todos los objetos
+      // Primero resetear el viewport para obtener coordenadas absolutas
+      const currentVpt = fabricCanvas.viewportTransform?.slice() || [1, 0, 0, 1, 0, 0];
+      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      
+      // Calcular bounding box de todos los objetos usando coordenadas absolutas
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       
       objects.forEach(obj => {
-        const bounds = obj.getBoundingRect();
-        minX = Math.min(minX, bounds.left);
-        minY = Math.min(minY, bounds.top);
-        maxX = Math.max(maxX, bounds.left + bounds.width);
-        maxY = Math.max(maxY, bounds.top + bounds.height);
+        // Usar las propiedades directas del objeto para coordenadas absolutas
+        const left = obj.left || 0;
+        const top = obj.top || 0;
+        
+        // Para líneas (paredes), usar x1, y1, x2, y2
+        if ((obj as any).x1 !== undefined) {
+          const line = obj as any;
+          minX = Math.min(minX, line.x1, line.x2);
+          minY = Math.min(minY, line.y1, line.y2);
+          maxX = Math.max(maxX, line.x1, line.x2);
+          maxY = Math.max(maxY, line.y1, line.y2);
+        } else {
+          // Para rectángulos y círculos
+          const width = (obj as any).width || (obj as any).radius * 2 || 0;
+          const height = (obj as any).height || (obj as any).radius * 2 || 0;
+          
+          minX = Math.min(minX, left);
+          minY = Math.min(minY, top);
+          maxX = Math.max(maxX, left + width);
+          maxY = Math.max(maxY, top + height);
+        }
       });
       
+      // Verificar que tenemos bounds válidos
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+        // Restaurar viewport anterior si no hay bounds válidos
+        fabricCanvas.setViewportTransform(currentVpt as any);
+        fabricCanvas.renderAll();
+        return;
+      }
+      
       // Añadir padding
-      const padding = 50;
+      const padding = 60;
       minX -= padding;
       minY -= padding;
       maxX += padding;
