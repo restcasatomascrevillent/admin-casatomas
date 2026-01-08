@@ -67,9 +67,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const logicalWidth = realDimensions.width * pixelsPerMeter;
   const logicalHeight = realDimensions.height * pixelsPerMeter;
   
-  // El canvas usa el tamaño del contenedor para llenar todo el espacio
-  const canvasWidth = containerSize.width > 0 ? containerSize.width : logicalWidth;
-  const canvasHeight = containerSize.height > 0 ? containerSize.height : logicalHeight;
+  // Estado interno para el tamaño real del canvas basado en el contenedor
+  const [internalSize, setInternalSize] = useState({ width: 800, height: 500 });
+  
+  // El canvas usa el tamaño interno del contenedor para llenar todo el espacio
+  const canvasWidth = internalSize.width > 0 ? internalSize.width : (containerSize.width > 0 ? containerSize.width : logicalWidth);
+  const canvasHeight = internalSize.height > 0 ? internalSize.height : (containerSize.height > 0 ? containerSize.height : logicalHeight);
   
   // Refs para mantener valores actualizados en event handlers
   const activeToolRef = useRef(activeTool);
@@ -98,6 +101,31 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useEffect(() => {
     pixelsPerMeterRef.current = pixelsPerMeter;
   }, [pixelsPerMeter]);
+
+  // ResizeObserver para que el canvas ocupe todo el contenedor
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        if (width > 50 && height > 50) {
+          setInternalSize({ width: Math.floor(width), height: Math.floor(height) });
+        }
+      }
+    });
+    
+    resizeObserver.observe(containerRef.current);
+    
+    // Medir inmediatamente
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width > 50 && rect.height > 50) {
+      setInternalSize({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+    }
+    
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Mostrar/ocultar cotas (medidas de paredes) cuando cambie showMeasurements
   useEffect(() => {
