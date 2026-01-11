@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, BarChart3, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -27,7 +27,6 @@ const menuItems: { title: string; url: string; icon: React.ComponentType<any>; s
   { title: "Gestión Web", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
   { title: "Marketing", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
-  { title: "Análisis", url: "/analisis", icon: BarChart3, sectionKey: "analisis" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
 ];
 

@@ -8,7 +8,6 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
 import Espacios from "./pages/Espacios";
-import Analisis from "./pages/Analisis";
 import Trabajadores from "./pages/Trabajadores";
 import GestorCarta from "./pages/GestorCarta";
 import GestionWeb from "./pages/GestionWeb";
@@ -56,14 +55,6 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Espacios />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analisis"
-            element={
-              <ProtectedRoute>
-                <Analisis />
               </ProtectedRoute>
             }
           />
