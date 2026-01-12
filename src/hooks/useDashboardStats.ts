@@ -110,7 +110,8 @@ export function useTodayReservations() {
       const { data } = await supabase
         .from("reservas")
         .select("*, espacios_reserva(nombre, capacidad_maxima)")
-        .eq("fecha", today);
+        .eq("fecha", today)
+        .neq("estado", "cancelada");
 
       return data || [];
     },
