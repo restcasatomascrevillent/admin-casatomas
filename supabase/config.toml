@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.traducir-carta]
 verify_jwt = false
+
+[functions.enviar-newsletter]
+verify_jwt = false
