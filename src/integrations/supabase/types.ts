@@ -766,6 +766,60 @@ export type Database = {
           },
         ]
       }
+      newsletter_envios: {
+        Row: {
+          asunto: string
+          created_at: string
+          enviado_por: string | null
+          id: string
+          mensaje: string
+          total_destinatarios: number
+        }
+        Insert: {
+          asunto: string
+          created_at?: string
+          enviado_por?: string | null
+          id?: string
+          mensaje: string
+          total_destinatarios?: number
+        }
+        Update: {
+          asunto?: string
+          created_at?: string
+          enviado_por?: string | null
+          id?: string
+          mensaje?: string
+          total_destinatarios?: number
+        }
+        Relationships: []
+      }
+      newsletter_suscriptores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          email: string
+          id: string
+          nombre: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          nombre?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          nombre?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       noticias_hosteleria: {
         Row: {
           categoria: string

@@ -5,13 +5,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Users, FileText } from "lucide-react";
+import { Send, Users, FileText, Loader2 } from "lucide-react";
+import { useNewsletterSuscriptores, useNewsletterEnvios } from "@/hooks/useNewsletterSuscriptores";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function GestionCorreos() {
   const { toast } = useToast();
   const [asunto, setAsunto] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const { totalSuscriptores, isLoading: loadingSuscriptores } = useNewsletterSuscriptores();
+  const { envios, isLoading: loadingEnvios, refetch: refetchEnvios } = useNewsletterEnvios();
 
   const handleEnviarCorreo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,18 +33,56 @@ export function GestionCorreos() {
       return;
     }
 
+    if (totalSuscriptores === 0) {
+      toast({
+        title: "Sin suscriptores",
+        description: "No hay suscriptores activos para enviar el newsletter",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simular envío
-    setTimeout(() => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        "https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/enviar-newsletter",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ asunto, mensaje }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Error al enviar el newsletter");
+      }
+
       toast({
-        title: "Correo enviado",
-        description: "El correo se ha enviado correctamente a todos los suscriptores",
+        title: "Newsletter enviado",
+        description: `Se envió correctamente a ${result.enviados} suscriptores${result.errores > 0 ? `. ${result.errores} fallos.` : ""}`,
       });
+      
       setAsunto("");
       setMensaje("");
+      refetchEnvios();
+    } catch (error: any) {
+      console.error("Error enviando newsletter:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo enviar el newsletter",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -48,7 +94,7 @@ export function GestionCorreos() {
             Enviar Newsletter
           </CardTitle>
           <CardDescription>
-            Crea y envía correos a tus suscriptores con las últimas novedades
+            Envía correos a todos los clientes que han realizado reservas
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -60,6 +106,7 @@ export function GestionCorreos() {
                 placeholder="Ej: Nuevos platos de temporada"
                 value={asunto}
                 onChange={(e) => setAsunto(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             
@@ -72,12 +119,22 @@ export function GestionCorreos() {
                 onChange={(e) => setMensaje(e.target.value)}
                 rows={10}
                 className="resize-none"
+                disabled={isLoading}
               />
             </div>
 
-            <Button type="submit" disabled={isLoading} className="w-full">
-              <Send className="mr-2 h-4 w-4" />
-              {isLoading ? "Enviando..." : "Enviar Newsletter"}
+            <Button type="submit" disabled={isLoading || totalSuscriptores === 0} className="w-full">
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Enviar a {totalSuscriptores} suscriptores
+                </>
+              )}
             </Button>
           </form>
         </CardContent>
@@ -93,9 +150,13 @@ export function GestionCorreos() {
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <p className="text-4xl font-bold text-primary">1,247</p>
+              {loadingSuscriptores ? (
+                <Skeleton className="h-10 w-20 mx-auto" />
+              ) : (
+                <p className="text-4xl font-bold text-primary">{totalSuscriptores}</p>
+              )}
               <p className="text-sm text-muted-foreground mt-1">
-                suscriptores activos
+                emails de clientes con reservas
               </p>
             </div>
           </CardContent>
@@ -105,24 +166,35 @@ export function GestionCorreos() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <FileText className="h-5 w-5 text-primary" />
-              Últimas Campañas
+              Últimos Envíos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="border-l-4 border-primary pl-3">
-                <p className="font-medium text-sm">Menú de Navidad</p>
-                <p className="text-xs text-muted-foreground">Hace 3 días</p>
+            {loadingEnvios ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
               </div>
-              <div className="border-l-4 border-muted pl-3">
-                <p className="font-medium text-sm">Oferta Especial</p>
-                <p className="text-xs text-muted-foreground">Hace 1 semana</p>
+            ) : envios.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Aún no has enviado ningún newsletter
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {envios.map((envio, index) => (
+                  <div 
+                    key={envio.id} 
+                    className={`border-l-4 pl-3 ${index === 0 ? "border-primary" : "border-muted"}`}
+                  >
+                    <p className="font-medium text-sm truncate">{envio.asunto}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(envio.created_at), { addSuffix: true, locale: es })} 
+                      {" · "}{envio.total_destinatarios} destinatarios
+                    </p>
+                  </div>
+                ))}
               </div>
-              <div className="border-l-4 border-muted pl-3">
-                <p className="font-medium text-sm">Nuevo Chef</p>
-                <p className="text-xs text-muted-foreground">Hace 2 semanas</p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
