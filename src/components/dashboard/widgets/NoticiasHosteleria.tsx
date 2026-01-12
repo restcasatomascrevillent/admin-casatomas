@@ -25,27 +25,27 @@ export function NoticiasHosteleria() {
   };
 
   return (
-    <Card className="col-span-full lg:col-span-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Newspaper className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base font-medium">Noticias del Sector</CardTitle>
+    <Card>
+      <CardHeader className="pb-2 sm:pb-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Newspaper className="h-4 w-4 text-muted-foreground shrink-0" />
+            <CardTitle className="text-sm sm:text-base font-medium truncate">Noticias del Sector</CardTitle>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="gap-2"
+            className="shrink-0 h-8 w-8 p-0"
           >
             <RefreshCw className={`h-3 w-3 ${isFetching ? "animate-spin" : ""}`} />
           </Button>
         </div>
-        <Tabs value={filtroCategoria} onValueChange={setFiltroCategoria} className="mt-3">
-          <TabsList className="grid grid-cols-6 w-full">
+        <Tabs value={filtroCategoria} onValueChange={setFiltroCategoria} className="mt-2 sm:mt-3">
+          <TabsList className="flex flex-wrap gap-1 h-auto p-1 sm:grid sm:grid-cols-6 sm:gap-0">
             {categorias.map((cat) => (
-              <TabsTrigger key={cat} value={cat} className="text-xs capitalize">
+              <TabsTrigger key={cat} value={cat} className="text-[10px] sm:text-xs capitalize px-2 py-1 sm:px-3 sm:py-1.5">
                 {cat}
               </TabsTrigger>
             ))}

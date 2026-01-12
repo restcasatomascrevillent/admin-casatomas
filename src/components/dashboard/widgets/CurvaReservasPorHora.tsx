@@ -34,14 +34,14 @@ export function CurvaReservasPorHora() {
   const datos = calcularReservasPorHora();
 
   return (
-    <Card className="col-span-2">
-      <CardHeader>
-        <CardTitle className="text-base font-medium">Curva de Reservas por Hora</CardTitle>
+    <Card>
+      <CardHeader className="pb-2 sm:pb-4">
+        <CardTitle className="text-sm sm:text-base font-medium">Curva de Reservas por Hora</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-2 sm:px-6">
         {datos.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={datos}>
+          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
+            <LineChart data={datos} margin={{ left: -20, right: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="hora"
