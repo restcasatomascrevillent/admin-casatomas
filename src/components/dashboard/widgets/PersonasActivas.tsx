@@ -1,9 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, ChefHat, ConciergeBell, Clock } from "lucide-react";
+import { Users, ChefHat, ConciergeBell } from "lucide-react";
 import { useActiveStaff } from "@/hooks/useDashboardStats";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function PersonasActivas() {
   const { data: activeStaff } = useActiveStaff();
@@ -22,17 +19,6 @@ export function PersonasActivas() {
     const puesto = (s.trabajadores as any)?.puesto;
     return !["cocinero", "ayudante_cocina", "camarero", "ayudante_camarero"].includes(puesto);
   }) || [];
-
-  const getInitials = (nombre: string, apellidos: string) => {
-    return `${nombre?.charAt(0) || ""}${apellidos?.charAt(0) || ""}`.toUpperCase();
-  };
-
-  const formatHora = (hora: string | Date) => {
-    if (typeof hora === 'string' && hora.includes(':')) {
-      return hora.substring(0, 5);
-    }
-    return format(new Date(hora), "HH:mm");
-  };
 
   return (
     <Card className="h-full">
@@ -70,46 +56,6 @@ export function PersonasActivas() {
           <p className="text-xs text-muted-foreground">Total trabajando ahora</p>
         </div>
 
-        {activeStaff && activeStaff.length > 0 && (
-          <div className="pt-3 border-t space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Personal en turno
-            </p>
-            <div className="space-y-2 max-h-[180px] overflow-y-auto">
-              {activeStaff.slice(0, 6).map((staff) => {
-                const trabajador = staff.trabajadores as any;
-                const turno = staff.turnos as any;
-                return (
-                  <div key={staff.id} className="flex items-center gap-3 bg-muted/50 p-2 rounded">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                        {getInitials(trabajador?.nombre, trabajador?.apellidos)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">
-                        {trabajador?.nombre} {trabajador?.apellidos}
-                      </div>
-                      <div className="text-xs text-muted-foreground capitalize">
-                        {trabajador?.puesto?.replace("_", " ")}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-xs">
-                        {formatHora(staff.hora_entrada)}
-                      </Badge>
-                      {turno && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          hasta {turno.hora_fin?.substring(0, 5)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

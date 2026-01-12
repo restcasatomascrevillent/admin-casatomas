@@ -1,15 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarCheck, Clock, Users, TrendingUp, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon } from "lucide-react";
+import { CalendarCheck, Clock, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon } from "lucide-react";
 import { useTodayReservations } from "@/hooks/useDashboardStats";
-import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function ReservasHoy() {
   const { data: reservas } = useTodayReservations();
-  const { data: ocupacion } = useResumenOcupacionHoy();
 
   const ahora = new Date();
   const horaActual = ahora.getHours();
@@ -55,19 +52,6 @@ export function ReservasHoy() {
     const diffMs = horaReserva.getTime() - ahora.getTime();
     return diffMs > 0 && diffMs <= 2 * 60 * 60 * 1000;
   }).slice(0, 4) || [];
-
-  // Color según ocupación
-  const getOcupacionColor = (porcentaje: number) => {
-    if (porcentaje < 50) return "bg-green-500";
-    if (porcentaje < 80) return "bg-amber-500";
-    return "bg-red-500";
-  };
-
-  const getOcupacionBg = (porcentaje: number) => {
-    if (porcentaje < 50) return "bg-green-500/20";
-    if (porcentaje < 80) return "bg-amber-500/20";
-    return "bg-red-500/20";
-  };
 
   return (
     <Card className="h-full">
@@ -176,33 +160,6 @@ export function ReservasHoy() {
             <p className="text-[10px] text-muted-foreground">Pendientes</p>
           </div>
         </div>
-
-        {/* Ocupación por Sala */}
-        {ocupacion && ocupacion.espacios && ocupacion.espacios.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <TrendingUp className="h-3 w-3" /> Ocupación por espacio
-            </p>
-            <div className="space-y-1.5">
-              {ocupacion.espacios.slice(0, 4).map((espacio) => (
-                <div key={espacio.espacio_id} className="flex items-center gap-2">
-                  <span className="text-xs w-20 truncate" title={espacio.espacio_nombre}>
-                    {espacio.espacio_nombre}
-                  </span>
-                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${getOcupacionColor(espacio.porcentaje_ocupacion)} transition-all`}
-                      style={{ width: `${Math.min(100, espacio.porcentaje_ocupacion)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-medium w-10 text-right">
-                    {espacio.porcentaje_ocupacion}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Próximas Reservas */}
         {proximasReservas.length > 0 && (
