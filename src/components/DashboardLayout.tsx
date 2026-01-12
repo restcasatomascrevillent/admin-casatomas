@@ -12,12 +12,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
         <AppSidebar />
         <div className="flex-1 flex flex-col overflow-x-hidden">
-          <header className="h-16 border-b border-border bg-card flex items-center px-6 sticky top-0 z-50 w-full">
-            <SidebarTrigger className="mr-4" />
-            <div className="flex items-center justify-between w-full">
-              <div>
-                <h1 className="text-xl font-semibold text-foreground">Gestión del Restaurante</h1>
-                <p className="text-sm text-muted-foreground">
+          <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full">
+            <SidebarTrigger className="mr-2 sm:mr-4 shrink-0" />
+            <div className="flex items-center justify-between w-full min-w-0">
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-xl font-semibold text-foreground truncate">Gestión del Restaurante</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {new Date().toLocaleDateString("es-ES", {
                     weekday: "long",
                     year: "numeric",
@@ -28,7 +28,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">{children}</main>
         </div>
       </div>
     </SidebarProvider>

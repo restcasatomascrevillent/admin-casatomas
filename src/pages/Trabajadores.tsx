@@ -43,26 +43,28 @@ export default function Trabajadores() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Gestión de Personal</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Personal</h1>
+            <p className="text-sm text-muted-foreground">
               Administra trabajadores, turnos y horarios
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <GenerarTurnosFicticios />
             <AsignarAreasAutomaticamente />
             <Button
               variant="outline"
+              size="sm"
+              className="sm:size-default"
               onClick={() => setDialogTurnoAbierto(true)}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Crear Turno
+              <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <span className="hidden xs:inline">Crear</span> Turno
             </Button>
-            <Button onClick={handleNuevoTrabajador}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Trabajador
+            <Button size="sm" className="sm:size-default" onClick={handleNuevoTrabajador}>
+              <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <span className="hidden xs:inline">Nuevo</span> Trabajador
             </Button>
           </div>
         </div>

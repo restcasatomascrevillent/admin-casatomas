@@ -45,10 +45,10 @@ export function ResenasRecientes() {
   };
 
   return (
-    <Card className="col-span-2">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium">Reseñas Recientes</CardTitle>
+    <Card>
+      <CardHeader className="pb-2 sm:pb-4">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm sm:text-base font-medium">Reseñas Recientes</CardTitle>
           <Button
             variant="ghost"
             size="sm"

@@ -13,14 +13,14 @@ export default function Dashboard() {
   return (
     <DashboardProvider>
       <DashboardLayout>
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             <ReservasHoy />
             <PersonasActivas />
-            <OcupacionPorEspacio />
+            <OcupacionPorEspacio className="md:col-span-2 xl:col-span-1" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <GraficoReservasPorDia />
             <CurvaReservasPorHora />
           </div>

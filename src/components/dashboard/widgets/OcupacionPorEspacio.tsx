@@ -3,7 +3,11 @@ import { Building2, Users, CalendarCheck } from "lucide-react";
 import { useOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { Badge } from "@/components/ui/badge";
 
-export function OcupacionPorEspacio() {
+interface OcupacionPorEspacioProps {
+  className?: string;
+}
+
+export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
   const { data: ocupacion, isLoading } = useOcupacionHoy();
 
   const getStatusColor = (porcentaje: number) => {
@@ -63,25 +67,25 @@ export function OcupacionPorEspacio() {
     : 0;
 
   return (
-    <Card className="h-full">
+    <Card className={`h-full ${className || ''}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg font-semibold">Ocupación por Espacio</CardTitle>
-        <Building2 className="h-5 w-5 text-primary" />
+        <CardTitle className="text-base sm:text-lg font-semibold">Ocupación por Espacio</CardTitle>
+        <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Resumen general */}
-        <div className="grid grid-cols-3 gap-2 pb-2 border-b">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pb-2 border-b">
           <div className="text-center">
-            <div className="text-xl font-bold text-primary">{ocupacion.length}</div>
-            <p className="text-[10px] text-muted-foreground">Espacios</p>
+            <div className="text-lg sm:text-xl font-bold text-primary">{ocupacion.length}</div>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Espacios</p>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">{totalReservas}</div>
-            <p className="text-[10px] text-muted-foreground">Reservas</p>
+            <div className="text-lg sm:text-xl font-bold">{totalReservas}</div>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Reservas</p>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold">{ocupacionPromedio}%</div>
-            <p className="text-[10px] text-muted-foreground">Ocupación</p>
+            <div className="text-lg sm:text-xl font-bold">{ocupacionPromedio}%</div>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground">Ocupación</p>
           </div>
         </div>
 

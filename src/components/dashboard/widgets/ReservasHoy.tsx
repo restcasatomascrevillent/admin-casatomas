@@ -111,53 +111,53 @@ export function ReservasHoy() {
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Desglose por Turno */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className={`p-3 rounded-lg border ${horaActual < 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Utensils className="h-4 w-4 text-amber-600" />
-              <span className="text-sm font-medium">Comida</span>
-              {horaActual < 17 && <Badge variant="default" className="text-[10px] px-1.5 py-0">Ahora</Badge>}
+        <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3">
+          <div className={`p-2 sm:p-3 rounded-lg border ${horaActual < 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+              <Utensils className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
+              <span className="text-xs sm:text-sm font-medium">Comida</span>
+              {horaActual < 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{reservasComida.length}</span>
-              <span className="text-xs text-muted-foreground">reservas</span>
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-bold">{reservasComida.length}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <Users className="h-3 w-3" />
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               {comensalesComida} comensales
             </div>
           </div>
           
-          <div className={`p-3 rounded-lg border ${horaActual >= 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <Moon className="h-4 w-4 text-indigo-500" />
-              <span className="text-sm font-medium">Cena</span>
-              {horaActual >= 17 && <Badge variant="default" className="text-[10px] px-1.5 py-0">Ahora</Badge>}
+          <div className={`p-2 sm:p-3 rounded-lg border ${horaActual >= 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+              <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
+              <span className="text-xs sm:text-sm font-medium">Cena</span>
+              {horaActual >= 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">{reservasCena.length}</span>
-              <span className="text-xs text-muted-foreground">reservas</span>
+            <div className="flex items-baseline gap-1.5 sm:gap-2">
+              <span className="text-xl sm:text-2xl font-bold">{reservasCena.length}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-              <Users className="h-3 w-3" />
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               {comensalesCena} comensales
             </div>
           </div>
         </div>
 
         {/* Estados */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="text-center p-3 bg-primary/10 rounded-lg">
-            <div className="text-2xl font-bold text-primary">{reservas?.length || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total</p>
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
+          <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-primary">{reservas?.length || 0}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Total</p>
           </div>
-          <div className="text-center p-3 bg-green-500/10 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
-            <p className="text-xs text-muted-foreground mt-1">Confirmadas</p>
+          <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Confirmadas</p>
           </div>
-          <div className="text-center p-3 bg-amber-500/10 rounded-lg">
-            <div className="text-2xl font-bold text-amber-600">{reservasPendientes}</div>
-            <p className="text-xs text-muted-foreground mt-1">Pendientes</p>
+          <div className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Pendientes</p>
           </div>
         </div>
 
