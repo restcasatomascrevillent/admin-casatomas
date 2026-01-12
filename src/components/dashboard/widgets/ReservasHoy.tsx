@@ -109,47 +109,55 @@ export function ReservasHoy() {
           <CalendarCheck className="h-5 w-5 text-primary" />
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-5">
         {/* Desglose por Turno */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className={`p-2 rounded-lg border ${horaActual < 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <Utensils className="h-3.5 w-3.5 text-amber-600" />
-              <span className="text-xs font-medium">Comida</span>
-              {horaActual < 17 && <Badge variant="default" className="text-[9px] px-1 py-0">Ahora</Badge>}
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`p-3 rounded-lg border ${horaActual < 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Utensils className="h-4 w-4 text-amber-600" />
+              <span className="text-sm font-medium">Comida</span>
+              {horaActual < 17 && <Badge variant="default" className="text-[10px] px-1.5 py-0">Ahora</Badge>}
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-bold">{reservasComida.length}</span>
-              <span className="text-[10px] text-muted-foreground">reservas · {comensalesComida} pax</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">{reservasComida.length}</span>
+              <span className="text-xs text-muted-foreground">reservas</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <Users className="h-3 w-3" />
+              {comensalesComida} comensales
             </div>
           </div>
           
-          <div className={`p-2 rounded-lg border ${horaActual >= 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <Moon className="h-3.5 w-3.5 text-indigo-500" />
-              <span className="text-xs font-medium">Cena</span>
-              {horaActual >= 17 && <Badge variant="default" className="text-[9px] px-1 py-0">Ahora</Badge>}
+          <div className={`p-3 rounded-lg border ${horaActual >= 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Moon className="h-4 w-4 text-indigo-500" />
+              <span className="text-sm font-medium">Cena</span>
+              {horaActual >= 17 && <Badge variant="default" className="text-[10px] px-1.5 py-0">Ahora</Badge>}
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-bold">{reservasCena.length}</span>
-              <span className="text-[10px] text-muted-foreground">reservas · {comensalesCena} pax</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">{reservasCena.length}</span>
+              <span className="text-xs text-muted-foreground">reservas</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+              <Users className="h-3 w-3" />
+              {comensalesCena} comensales
             </div>
           </div>
         </div>
 
         {/* Estados */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2 bg-primary/10 rounded-lg">
-            <div className="text-xl font-bold text-primary">{reservas?.length || 0}</div>
-            <p className="text-[10px] text-muted-foreground">Total</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center p-3 bg-primary/10 rounded-lg">
+            <div className="text-2xl font-bold text-primary">{reservas?.length || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total</p>
           </div>
-          <div className="text-center p-2 bg-green-500/10 rounded-lg">
-            <div className="text-xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
-            <p className="text-[10px] text-muted-foreground">Confirmadas</p>
+          <div className="text-center p-3 bg-green-500/10 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
+            <p className="text-xs text-muted-foreground mt-1">Confirmadas</p>
           </div>
-          <div className="text-center p-2 bg-amber-500/10 rounded-lg">
-            <div className="text-xl font-bold text-amber-600">{reservasPendientes}</div>
-            <p className="text-[10px] text-muted-foreground">Pendientes</p>
+          <div className="text-center p-3 bg-amber-500/10 rounded-lg">
+            <div className="text-2xl font-bold text-amber-600">{reservasPendientes}</div>
+            <p className="text-xs text-muted-foreground mt-1">Pendientes</p>
           </div>
         </div>
 
