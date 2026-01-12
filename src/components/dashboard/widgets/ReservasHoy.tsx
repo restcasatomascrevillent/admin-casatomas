@@ -4,7 +4,7 @@ import { useTodayReservations } from "@/hooks/useDashboardStats";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function ReservasHoy() {
@@ -81,33 +81,40 @@ export function ReservasHoy() {
             </Badge>
           )}
           {reservasConNotas.length > 0 && (
-            <Popover>
-              <PopoverTrigger asChild>
+            <Dialog>
+              <DialogTrigger asChild>
                 <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-secondary/80 transition-colors">
                   <MessageSquare className="h-3 w-3" />
                   {reservasConNotas.length}
                 </Badge>
-              </PopoverTrigger>
-              <PopoverContent className="w-80 p-0" align="end">
-                <div className="p-3 border-b">
-                  <h4 className="font-semibold text-sm">Reservas con notas especiales</h4>
-                  <p className="text-xs text-muted-foreground">{reservasConNotas.length} reservas tienen peticiones</p>
-                </div>
-                <ScrollArea className="max-h-64">
-                  <div className="p-2 space-y-2">
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Notas y peticiones especiales
+                  </DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh]">
+                  <div className="space-y-3 pr-4">
                     {reservasConNotas.map((r) => (
-                      <div key={r.id} className="p-2 bg-muted/50 rounded-lg text-sm">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium">{r.nombre || "Sin nombre"}</span>
-                          <Badge variant="outline" className="text-[10px]">{r.hora.substring(0, 5)}</Badge>
+                      <div key={r.id} className="p-3 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <span className="font-medium">{r.nombre || "Sin nombre"}</span>
+                            <span className="text-muted-foreground text-sm ml-2">· {r.numero_comensales} pax</span>
+                          </div>
+                          <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground italic">"{r.notas_cliente}"</p>
+                        <p className="text-sm text-muted-foreground bg-background p-2 rounded italic">
+                          "{r.notas_cliente}"
+                        </p>
                       </div>
                     ))}
                   </div>
                 </ScrollArea>
-              </PopoverContent>
-            </Popover>
+              </DialogContent>
+            </Dialog>
           )}
           {reservasEnRiesgo.length > 0 && (
             <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
