@@ -33,25 +33,3 @@ export function useNewsletterSuscriptores() {
   };
 }
 
-export function useNewsletterEnvios() {
-  const { data: envios, isLoading, error, refetch } = useQuery({
-    queryKey: ["newsletter-envios"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("newsletter_envios")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  return {
-    envios: envios ?? [],
-    isLoading,
-    error,
-    refetch,
-  };
-}
