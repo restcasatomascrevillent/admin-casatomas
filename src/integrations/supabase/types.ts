@@ -856,6 +856,100 @@ export type Database = {
         }
         Relationships: []
       }
+      novedades: {
+        Row: {
+          activo: boolean | null
+          bebida_id: string | null
+          created_at: string | null
+          created_by: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          destacado: boolean | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          imagen_url: string | null
+          orden: number | null
+          plato_id: string | null
+          seccion: string | null
+          tipo_asociacion: string | null
+          titulo: string
+          titulo_en: string | null
+          titulo_fr: string | null
+          updated_at: string | null
+          vino_id: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          bebida_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          destacado?: boolean | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          imagen_url?: string | null
+          orden?: number | null
+          plato_id?: string | null
+          seccion?: string | null
+          tipo_asociacion?: string | null
+          titulo: string
+          titulo_en?: string | null
+          titulo_fr?: string | null
+          updated_at?: string | null
+          vino_id?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          bebida_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          destacado?: boolean | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          imagen_url?: string | null
+          orden?: number | null
+          plato_id?: string | null
+          seccion?: string | null
+          tipo_asociacion?: string | null
+          titulo?: string
+          titulo_en?: string | null
+          titulo_fr?: string | null
+          updated_at?: string | null
+          vino_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "novedades_bebida_id_fkey"
+            columns: ["bebida_id"]
+            isOneToOne: false
+            referencedRelation: "Bebidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "novedades_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: false
+            referencedRelation: "Platos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "novedades_vino_id_fkey"
+            columns: ["vino_id"]
+            isOneToOne: false
+            referencedRelation: "Vinos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ocupacion_diaria: {
         Row: {
           created_at: string | null
