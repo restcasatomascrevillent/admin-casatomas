@@ -873,6 +873,7 @@ export type Database = {
           orden: number | null
           plato_id: string | null
           seccion: string | null
+          tipo: string
           tipo_asociacion: string | null
           titulo: string
           titulo_en: string | null
@@ -896,6 +897,7 @@ export type Database = {
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null
+          tipo?: string
           tipo_asociacion?: string | null
           titulo: string
           titulo_en?: string | null
@@ -919,6 +921,7 @@ export type Database = {
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null
+          tipo?: string
           tipo_asociacion?: string | null
           titulo?: string
           titulo_en?: string | null
