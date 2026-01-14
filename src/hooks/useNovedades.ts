@@ -7,6 +7,7 @@ export interface Novedad {
   titulo: string;
   descripcion: string | null;
   imagen_url: string | null;
+  tipo: "item_carta" | "anuncio";
   tipo_asociacion: "plato" | "vino" | "bebida" | "seccion" | null;
   plato_id: string | null;
   vino_id: string | null;
@@ -27,9 +28,10 @@ export interface Novedad {
 }
 
 export interface NuevaNovedad {
-  titulo: string;
+  titulo?: string;
   descripcion?: string;
   imagen_url?: string;
+  tipo: "item_carta" | "anuncio";
   tipo_asociacion?: "plato" | "vino" | "bebida" | "seccion" | null;
   plato_id?: string | null;
   vino_id?: string | null;
@@ -79,6 +81,7 @@ export function useNovedades() {
         .from("novedades")
         .insert({
           ...novedad,
+          titulo: novedad.titulo || "",
           created_by: userData?.user?.id,
         })
         .select()
