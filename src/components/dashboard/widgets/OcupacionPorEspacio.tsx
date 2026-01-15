@@ -84,10 +84,7 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
             <p className="text-[9px] sm:text-[10px] text-muted-foreground">Reservas</p>
           </div>
           <div className="text-center">
-            <div className="text-base sm:text-lg font-bold">
-              {totalComensales}/{capacidadTotal}
-              <span className="text-muted-foreground ml-1 text-sm">({ocupacionPromedio}%)</span>
-            </div>
+            <div className="text-lg sm:text-xl font-bold">{ocupacionPromedio}%</div>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground">Ocupación</p>
           </div>
         </div>
