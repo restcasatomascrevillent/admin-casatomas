@@ -101,6 +101,45 @@ export function useActiveStaff() {
   });
 }
 
+export function useUpcomingShiftChanges() {
+  return useQuery({
+    queryKey: ["upcoming-shift-changes"],
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const now = new Date();
+      const currentTime = format(now, "HH:mm:ss");
+      
+      // Calculate time 3 hours from now
+      const threeHoursLater = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      const futureTime = format(threeHoursLater, "HH:mm:ss");
+
+      // Turnos que terminan en las próximas 3 horas
+      const { data: endingShifts } = await supabase
+        .from("turnos")
+        .select("*, trabajadores(nombre, apellidos, puesto)")
+        .eq("fecha", today)
+        .gt("hora_fin", currentTime)
+        .lte("hora_fin", futureTime)
+        .order("hora_fin");
+
+      // Turnos que empiezan en las próximas 3 horas
+      const { data: startingShifts } = await supabase
+        .from("turnos")
+        .select("*, trabajadores(nombre, apellidos, puesto)")
+        .eq("fecha", today)
+        .gt("hora_inicio", currentTime)
+        .lte("hora_inicio", futureTime)
+        .order("hora_inicio");
+
+      return {
+        ending: endingShifts || [],
+        starting: startingShifts || [],
+      };
+    },
+    refetchInterval: 60000,
+  });
+}
+
 export function useTodayReservations() {
   return useQuery({
     queryKey: ["today-reservations"],
