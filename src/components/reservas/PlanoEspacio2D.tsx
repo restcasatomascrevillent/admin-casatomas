@@ -190,38 +190,42 @@ function DraggableReserva({
 // Componente para mesa con drop zone
 function DroppableMesa({ 
   mesa, 
+  mesaOriginal,
   reserva, 
   isSelected, 
   isDragging,
-  onMouseDown,
+  onDragStart,
   onClick,
   onRemoveAssignment,
   isDropTarget,
   draggingReserva,
   selectedReservaForClick,
   onClickAssign,
+  scale,
 }: { 
-  mesa: Mesa; 
+  mesa: Mesa; // Mesa con coordenadas en píxeles para render
+  mesaOriginal: Mesa; // Mesa con datos originales para callbacks
   reserva?: AsignacionConDetalles;
   isSelected: boolean;
   isDragging: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onDragStart: (e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => void;
   onClick: () => void;
   onRemoveAssignment?: () => void;
   isDropTarget: boolean;
   draggingReserva?: Reserva | null;
   selectedReservaForClick?: Reserva | null;
   onClickAssign?: (mesa: Mesa) => void;
+  scale: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `mesa-${mesa.id}`,
-    data: { type: "mesa", mesa },
+    data: { type: "mesa", mesa: mesaOriginal },
   });
 
   // Calcular tamaño de fuente dinámico basado en dimensiones de la mesa
   const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
-  const fontSize = Math.max(9, Math.min(14, minDimension * 0.2));
-  const iconSize = Math.max(8, Math.min(12, minDimension * 0.15));
+  const fontSize = Math.max(9, Math.min(14, minDimension * 0.18));
+  const iconSize = Math.max(8, Math.min(12, minDimension * 0.12));
 
   // Usar reserva seleccionada por click O por drag
   const activeReservaForCompatibility = draggingReserva || selectedReservaForClick;
@@ -231,7 +235,7 @@ function DroppableMesa({
     if (!activeReservaForCompatibility || reserva) return null;
     
     const comensales = activeReservaForCompatibility.numero_comensales;
-    const capacidad = mesa.capacidad;
+    const capacidad = mesaOriginal.capacidad;
     
     if (comensales > capacidad) {
       return { type: 'incompatible', message: 'No cabe', icon: '✗' };
@@ -248,13 +252,15 @@ function DroppableMesa({
   const canAcceptClick = selectedReservaForClick && !reserva && compatibility?.type !== 'incompatible';
 
   // Escala de ampliación cuando está en hover durante drag - más grande para mesas pequeñas
-  const baseScale = minDimension < 40 ? 1.8 : minDimension < 60 ? 1.5 : 1.3;
+  const baseScale = minDimension < 40 ? 1.6 : minDimension < 60 ? 1.4 : 1.2;
   const hoverScale = isOver && compatibility?.type !== 'incompatible' ? baseScale : 1;
-  const hoverZIndex = isOver ? 100 : (isSelected ? 30 : isDragging ? 50 : 10);
+  const hoverZIndex = isOver ? 100 : (isDragging ? 60 : isSelected ? 30 : 10);
 
-  // Área de detección extendida para mesas pequeñas (mínimo 40px)
-  const minHitArea = 40;
-  const hitAreaPadding = Math.max(0, (minHitArea - Math.min(mesa.ancho || 60, mesa.alto || 60)) / 2);
+  // Área de detección extendida para mesas pequeñas
+  const minHitArea = 50 * scale;
+  const mesaWidth = mesa.ancho || 60;
+  const mesaHeight = mesa.alto || 60;
+  const hitAreaPadding = Math.max(8, (minHitArea - Math.min(mesaWidth, mesaHeight)) / 2);
 
   const getCompatibilityStyles = () => {
     if (!compatibility) return '';
@@ -262,21 +268,46 @@ function DroppableMesa({
       case 'incompatible':
         return 'ring-2 ring-red-400 border-red-400 opacity-40 grayscale';
       case 'perfect':
-        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30 cursor-pointer';
+        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30';
       case 'good':
-        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20 cursor-pointer';
+        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20';
       case 'oversized':
-        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20 cursor-pointer';
+        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20';
       default:
         return '';
     }
   };
 
-  const handleMesaClick = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Si hay reserva seleccionada para asignar, hacer click
     if (canAcceptClick && onClickAssign) {
+      e.preventDefault();
       e.stopPropagation();
-      onClickAssign(mesa);
-    } else {
+      onClickAssign(mesaOriginal);
+      return;
+    }
+    
+    // Sino, iniciar drag
+    e.preventDefault();
+    e.stopPropagation();
+    onDragStart(e, mesaOriginal);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (canAcceptClick && onClickAssign) {
+      e.preventDefault();
+      e.stopPropagation();
+      onClickAssign(mesaOriginal);
+      return;
+    }
+    
+    e.stopPropagation();
+    onDragStart(e, mesaOriginal);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDragging) {
       onClick();
     }
   };
@@ -288,9 +319,10 @@ function DroppableMesa({
       style={{
         left: (mesa.pos_x || 0) - hitAreaPadding,
         top: (mesa.pos_y || 0) - hitAreaPadding,
-        width: (mesa.ancho || 60) + hitAreaPadding * 2,
-        height: (mesa.alto || 60) + hitAreaPadding * 2,
+        width: mesaWidth + hitAreaPadding * 2,
+        height: mesaHeight + hitAreaPadding * 2,
         zIndex: hoverZIndex,
+        touchAction: 'none',
       }}
     >
       <TooltipProvider>
@@ -298,33 +330,37 @@ function DroppableMesa({
           <TooltipTrigger asChild>
             <div
               className={cn(
-                "absolute flex flex-col items-center justify-center text-center",
+                "absolute flex flex-col items-center justify-center text-center select-none",
                 "border-2 shadow-sm",
                 mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
-                isSelected ? "border-primary ring-2 ring-primary/30" : "border-slate-300",
-                isDragging ? "shadow-xl" : "",
+                isSelected && "border-primary ring-2 ring-primary/30",
+                !isSelected && !isDragging && "border-slate-300 dark:border-slate-600",
+                isDragging && "shadow-2xl border-primary ring-4 ring-primary/40 opacity-90",
                 reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
                 isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 shadow-2xl shadow-green-500/40",
                 isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 opacity-50",
                 isDropTarget && !reserva && "border-dashed",
                 activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
-                canAcceptClick ? "cursor-pointer" : "cursor-move"
+                canAcceptClick ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
               )}
               style={{
                 left: hitAreaPadding,
                 top: hitAreaPadding,
-                width: mesa.ancho,
-                height: mesa.alto,
-                transform: `rotate(${mesa.rotacion}deg) scale(${hoverScale})`,
+                width: mesaWidth,
+                height: mesaHeight,
+                transform: `rotate(${mesa.rotacion || 0}deg) scale(${hoverScale})`,
                 transformOrigin: 'center center',
                 padding: Math.max(2, minDimension * 0.05),
-                transition: 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease',
+                transition: isDragging 
+                  ? 'box-shadow 100ms ease' 
+                  : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease',
               }}
-              onMouseDown={onMouseDown}
-              onClick={handleMesaClick}
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
+              onClick={handleClick}
             >
               <span 
-                className="font-bold leading-tight text-center break-words"
+                className="font-bold leading-tight text-center break-words pointer-events-none"
                 style={{ 
                   fontSize: `${fontSize}px`,
                   maxWidth: '100%',
@@ -332,21 +368,21 @@ function DroppableMesa({
                   lineHeight: 1.1,
                 }}
               >
-                {mesa.nombre}
+                {mesaOriginal.nombre}
               </span>
               <div 
-                className="flex items-center gap-0.5 text-muted-foreground"
+                className="flex items-center gap-0.5 text-muted-foreground pointer-events-none"
                 style={{ fontSize: `${iconSize}px`, marginTop: 1 }}
               >
                 <Users style={{ width: iconSize, height: iconSize }} />
-                <span>{mesa.capacidad}</span>
+                <span>{mesaOriginal.capacidad}</span>
               </div>
             </div>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="space-y-1">
-              <p className="font-semibold">{mesa.nombre}</p>
-              <p className="text-xs">Capacidad: {mesa.capacidad} personas</p>
+              <p className="font-semibold">{mesaOriginal.nombre}</p>
+              <p className="text-xs">Capacidad: {mesaOriginal.capacidad} personas</p>
               {compatibility && (
                 <p className={cn(
                   "text-xs font-medium",
@@ -371,11 +407,11 @@ function DroppableMesa({
         </Tooltip>
       </TooltipProvider>
 
-      {/* Indicador de compatibilidad - fuera de la mesa para no interferir */}
+      {/* Indicador de compatibilidad */}
       {compatibility && !reserva && isOver && compatibility.type !== 'incompatible' && (
         <div 
           className={cn(
-            "absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap shadow-lg z-50 animate-in fade-in zoom-in-95 duration-150",
+            "absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap shadow-lg z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none",
             compatibility.type === 'perfect' && "bg-green-500 text-white",
             compatibility.type === 'good' && "bg-blue-500 text-white",
             compatibility.type === 'oversized' && "bg-yellow-500 text-white",
@@ -391,10 +427,10 @@ function DroppableMesa({
       {/* Tarjeta de reserva asignada */}
       {reserva && (
         <div 
-          className="absolute left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max"
+          className="absolute left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max pointer-events-auto"
           style={{ 
             top: -28,
-            maxWidth: Math.max(120, (mesa.ancho || 60) * 1.5),
+            maxWidth: Math.max(120, mesaWidth * 1.5),
           }}
         >
           {onRemoveAssignment && (
@@ -408,10 +444,10 @@ function DroppableMesa({
               <X className="h-2.5 w-2.5" />
             </button>
           )}
-          <p className="font-semibold text-[11px] leading-tight truncate text-center">
+          <p className="font-semibold text-[11px] leading-tight truncate text-center pointer-events-none">
             {reserva.reservas.nombre}
           </p>
-          <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90">
+          <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90 pointer-events-none">
             <span className="flex items-center gap-0.5">
               <Clock className="h-2.5 w-2.5" />
               {reserva.reservas.hora}
@@ -425,15 +461,14 @@ function DroppableMesa({
         </div>
       )}
 
-      {/* Etiqueta bocadillo - debajo de la mesa */}
-      {mesa.etiqueta && (
+      {/* Etiqueta bocadillo */}
+      {mesaOriginal.etiqueta && (
         <div 
           className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none"
           style={{ 
-            top: hitAreaPadding + (mesa.alto || 60) + 4,
+            top: hitAreaPadding + mesaHeight + 4,
           }}
         >
-          {/* Puntero triangular */}
           <div 
             className="absolute left-1/2 -translate-x-1/2 -top-1 w-0 h-0"
             style={{
@@ -442,9 +477,8 @@ function DroppableMesa({
               borderBottom: '4px solid #d97706',
             }}
           />
-          {/* Contenedor del texto */}
           <div className="bg-amber-100 border border-amber-500 rounded px-1.5 py-0.5 text-[9px] font-medium text-amber-800 whitespace-nowrap shadow-sm">
-            {mesa.etiqueta}
+            {mesaOriginal.etiqueta}
           </div>
         </div>
       )}
@@ -788,29 +822,28 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   }, [selectedReservaForClick, getReservaAsignada, crearAsignacion, refetchAsignaciones]);
 
-  // Handlers de arrastre de mesas
-  const handleMouseDown = useCallback((e: React.MouseEvent, mesa: Mesa) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  // Handlers de arrastre de mesas - unificado para mouse y touch
+  const handleMesaDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
     setDragState({
       isDragging: true,
       mesaId: mesa.id,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       offsetX: mesa.pos_x,
       offsetY: mesa.pos_y,
     });
+    setSelectedMesa(mesa);
   }, []);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handleMesaMove = useCallback((clientX: number, clientY: number) => {
     if (!dragState.isDragging || !dragState.mesaId) return;
 
     // Delta en píxeles de pantalla, convertido a metros considerando la escala
-    const deltaX = (e.clientX - dragState.startX) / (PIXELS_PER_METER * scale);
-    const deltaY = (e.clientY - dragState.startY) / (PIXELS_PER_METER * scale);
+    const deltaX = (clientX - dragState.startX) / (PIXELS_PER_METER * scale);
+    const deltaY = (clientY - dragState.startY) / (PIXELS_PER_METER * scale);
 
     setLocalMesas((prev) =>
       prev.map((m) =>
@@ -825,7 +858,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     );
   }, [dragState, PIXELS_PER_METER, scale, realWidth, realHeight]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    handleMesaMove(e.clientX, e.clientY);
+  }, [handleMesaMove]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (dragState.isDragging) {
+      e.preventDefault();
+      handleMesaMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, [dragState.isDragging, handleMesaMove]);
+
+  const handleMesaDragEnd = useCallback(() => {
     if (dragState.isDragging && dragState.mesaId) {
       const mesa = localMesas.find((m) => m.id === dragState.mesaId);
       if (mesa) {
@@ -1526,14 +1570,17 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   handlePanMove(e);
                   if (!isPanning) handleMouseMove(e);
                 }}
-                onMouseUp={(e) => {
+                onMouseUp={() => {
                   handlePanEnd();
-                  handleMouseUp();
+                  handleMesaDragEnd();
                 }}
                 onMouseLeave={() => {
                   handlePanEnd();
-                  handleMouseUp();
+                  handleMesaDragEnd();
                 }}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleMesaDragEnd}
+                onTouchCancel={handleMesaDragEnd}
               >
                 <div
                   ref={canvasRef}
@@ -1573,16 +1620,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                           ancho: anchoPixels,
                           alto: altoPixels,
                         }}
+                        mesaOriginal={mesa}
                         reserva={reserva}
                         isSelected={isSelected}
                         isDragging={isDragging}
-                        onMouseDown={(e) => handleMouseDown(e, mesa)}
+                        onDragStart={handleMesaDragStart}
                         onClick={() => setSelectedMesa(mesa)}
                         onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
                         isDropTarget={!!activeReserva || !!selectedReservaForClick}
                         draggingReserva={activeReserva}
                         selectedReservaForClick={selectedReservaForClick}
                         onClickAssign={handleClickAssignToMesa}
+                        scale={scale}
                       />
                     );
                   })}
