@@ -50,6 +50,11 @@ export function CurvaReservasPorHora() {
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
+                tickCount={10}
+                domain={[0, 'auto']}
+                allowDecimals={false}
+                interval={0}
+                tickFormatter={(value) => value % 2 === 0 ? value : ''}
               />
               <Tooltip
                 contentStyle={{
