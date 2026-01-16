@@ -1603,6 +1603,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
       }
       
+      // Si la mesa tiene etiqueta bocadillo, crearla
+      if (mesa.etiqueta) {
+        createMesaBocadillo(mesa.id, mesa.etiqueta, posXPixels, posYPixels, anchoPixels, altoPixels);
+      }
+      
       mesasEnCanvas.add(mesa.id);
     });
 
