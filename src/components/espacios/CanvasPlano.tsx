@@ -1152,12 +1152,93 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!fabricCanvas) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el foco está en un input o textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      
       if (e.code === 'Space' && !spacePressed.current) {
         e.preventDefault();
         spacePressed.current = true;
         fabricCanvas.defaultCursor = 'grab';
         fabricCanvas.hoverCursor = 'grab';
         fabricCanvas.selection = false;
+      }
+      
+      // Atajo F para centrar/autoFit
+      if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        // Ejecutar lógica de autoFit inline
+        const viewportW = fabricCanvas.getWidth();
+        const viewportH = fabricCanvas.getHeight();
+        if (viewportW <= 0 || viewportH <= 0) return;
+
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+
+        const contentObjects = fabricCanvas.getObjects().filter((obj) => {
+          const customData = (obj as any).customData;
+          const tipo = customData?.tipo;
+          return tipo === 'wall' || tipo === 'mesa' || tipo === 'area' || tipo === 'door';
+        });
+
+        if (contentObjects.length === 0) {
+          fabricCanvas.calcOffset();
+          fabricCanvas.renderAll();
+          onZoomChange?.(1);
+          return;
+        }
+
+        contentObjects.forEach((obj) => obj.setCoords());
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        contentObjects.forEach((obj) => {
+          if (obj.type === 'line') {
+            const rect = obj.getBoundingRect();
+            minX = Math.min(minX, rect.left);
+            minY = Math.min(minY, rect.top);
+            maxX = Math.max(maxX, rect.left + rect.width);
+            maxY = Math.max(maxY, rect.top + rect.height);
+          } else {
+            const left = obj.left || 0;
+            const top = obj.top || 0;
+            const width = (obj as any).width || ((obj as any).radius || 0) * 2;
+            const height = (obj as any).height || ((obj as any).radius || 0) * 2;
+            minX = Math.min(minX, left);
+            minY = Math.min(minY, top);
+            maxX = Math.max(maxX, left + width);
+            maxY = Math.max(maxY, top + height);
+          }
+        });
+
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+          fabricCanvas.calcOffset();
+          fabricCanvas.renderAll();
+          return;
+        }
+
+        const padding = 80;
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
+
+        const contentWidth = Math.max(1, maxX - minX);
+        const contentHeight = Math.max(1, maxY - minY);
+        const contentCenterX = minX + contentWidth / 2;
+        const contentCenterY = minY + contentHeight / 2;
+
+        const zoomX = viewportW / contentWidth;
+        const zoomY = viewportH / contentHeight;
+        const targetZoom = Math.max(0.25, Math.min(3, Math.min(zoomX, zoomY)));
+
+        const offsetX = viewportW / 2 - contentCenterX * targetZoom;
+        const offsetY = viewportH / 2 - contentCenterY * targetZoom;
+
+        fabricCanvas.setViewportTransform([targetZoom, 0, 0, targetZoom, offsetX, offsetY]);
+        fabricCanvas.calcOffset();
+        fabricCanvas.renderAll();
+        onZoomChange?.(targetZoom);
       }
     };
 

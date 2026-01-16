@@ -108,7 +108,7 @@ export function ToolbarDibujo({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>Centrar y ajustar vista <span className="text-muted-foreground ml-1">(F)</span></p>
+              <p>Centrar <span className="text-muted-foreground ml-1">(F)</span></p>
             </TooltipContent>
           </Tooltip>
         )}
