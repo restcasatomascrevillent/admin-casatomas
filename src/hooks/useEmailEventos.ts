@@ -74,14 +74,14 @@ export function useEmailEventosStats() {
         }
       });
 
-      // Calcular tasas
+      // Calcular tasas - todas basadas en el total de enviados (100%)
       const entregados = stats.delivered + stats.opened + stats.clicked;
       const abiertos = stats.opened + stats.clicked;
 
       const rates = {
         deliveryRate: stats.sent > 0 ? Math.round((entregados / stats.sent) * 100) : 0,
-        openRate: entregados > 0 ? Math.round((abiertos / entregados) * 100) : 0,
-        clickRate: abiertos > 0 ? Math.round((stats.clicked / abiertos) * 100) : 0,
+        openRate: stats.sent > 0 ? Math.round((abiertos / stats.sent) * 100) : 0,
+        clickRate: stats.sent > 0 ? Math.round((stats.clicked / stats.sent) * 100) : 0,
         bounceRate: stats.sent > 0 ? Math.round((stats.bounced / stats.sent) * 100) : 0,
       };
 
