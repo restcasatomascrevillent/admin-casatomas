@@ -547,6 +547,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_eventos: {
+        Row: {
+          created_at: string | null
+          email_destinatario: string | null
+          email_id: string
+          id: string
+          metadata: Json | null
+          timestamp_evento: string | null
+          tipo_evento: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_destinatario?: string | null
+          email_id: string
+          id?: string
+          metadata?: Json | null
+          timestamp_evento?: string | null
+          tipo_evento: string
+        }
+        Update: {
+          created_at?: string | null
+          email_destinatario?: string | null
+          email_id?: string
+          id?: string
+          metadata?: Json | null
+          timestamp_evento?: string | null
+          tipo_evento?: string
+        }
+        Relationships: []
+      }
       espacios_reserva: {
         Row: {
           activa: boolean | null
