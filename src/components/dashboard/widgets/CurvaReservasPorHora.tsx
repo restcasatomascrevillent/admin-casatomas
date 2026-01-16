@@ -39,7 +39,13 @@ export function CurvaReservasPorHora() {
         {datos.length > 0 ? (
           <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
             <LineChart data={datos} margin={{ left: -20, right: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="hsl(var(--border))" 
+                strokeOpacity={0.5}
+                horizontal={true}
+                vertical={false}
+              />
               <XAxis
                 dataKey="hora"
                 stroke="hsl(var(--muted-foreground))"
@@ -50,11 +56,9 @@ export function CurvaReservasPorHora() {
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
-                tickCount={10}
-                domain={[0, 'auto']}
+                domain={[0, (dataMax: number) => Math.ceil(dataMax / 5) * 5]}
+                ticks={Array.from({ length: 20 }, (_, i) => i * 5)}
                 allowDecimals={false}
-                interval={0}
-                tickFormatter={(value) => value % 2 === 0 ? value : ''}
               />
               <Tooltip
                 contentStyle={{
