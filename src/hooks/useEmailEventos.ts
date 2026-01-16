@@ -49,38 +49,44 @@ export function useEmailEventosStats() {
   return useQuery({
     queryKey: ["email-eventos-stats"],
     queryFn: async () => {
-      // Obtener todos los eventos para calcular estadísticas
+      // Obtener todos los eventos con email_id para contar únicos
       const { data, error } = await supabase
         .from("email_eventos")
-        .select("tipo_evento");
+        .select("tipo_evento, email_id");
 
       if (error) throw error;
 
-      const stats: EmailEventosStats = {
-        total: data.length,
-        sent: 0,
-        delivered: 0,
-        opened: 0,
-        clicked: 0,
-        bounced: 0,
-        complained: 0,
+      // Contar emails únicos por tipo de evento
+      const emailsPorTipo: Record<string, Set<string>> = {
+        sent: new Set(),
+        delivered: new Set(),
+        opened: new Set(),
+        clicked: new Set(),
+        bounced: new Set(),
+        complained: new Set(),
       };
 
-      // Contar por tipo
       data.forEach((evento) => {
-        const tipo = evento.tipo_evento as keyof Omit<EmailEventosStats, "total">;
-        if (tipo in stats) {
-          stats[tipo]++;
+        const tipo = evento.tipo_evento;
+        if (tipo in emailsPorTipo) {
+          emailsPorTipo[tipo].add(evento.email_id);
         }
       });
 
-      // Calcular tasas - todas basadas en el total de enviados (100%)
-      const entregados = stats.delivered + stats.opened + stats.clicked;
-      const abiertos = stats.opened + stats.clicked;
+      const stats: EmailEventosStats = {
+        total: data.length,
+        sent: emailsPorTipo.sent.size,
+        delivered: emailsPorTipo.delivered.size,
+        opened: emailsPorTipo.opened.size,
+        clicked: emailsPorTipo.clicked.size,
+        bounced: emailsPorTipo.bounced.size,
+        complained: emailsPorTipo.complained.size,
+      };
 
+      // Calcular tasas - todas basadas en emails únicos enviados (100%)
       const rates = {
-        deliveryRate: stats.sent > 0 ? Math.round((entregados / stats.sent) * 100) : 0,
-        openRate: stats.sent > 0 ? Math.round((abiertos / stats.sent) * 100) : 0,
+        deliveryRate: stats.sent > 0 ? Math.round((stats.delivered / stats.sent) * 100) : 0,
+        openRate: stats.sent > 0 ? Math.round((stats.opened / stats.sent) * 100) : 0,
         clickRate: stats.sent > 0 ? Math.round((stats.clicked / stats.sent) * 100) : 0,
         bounceRate: stats.sent > 0 ? Math.round((stats.bounced / stats.sent) * 100) : 0,
       };
