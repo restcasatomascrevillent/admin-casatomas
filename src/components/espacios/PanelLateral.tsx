@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink } from "lucide-react";
+import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink, Tag, X } from "lucide-react";
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ interface PanelLateralProps {
   onSelectionChange: (element: any) => void;
   onUnmergeMesa?: (mesaId: string) => void;
   onRemoveElement?: (id: string) => void;
+  onUpdateMesaEtiqueta?: (mesaId: string, etiqueta: string | null) => void;
 }
 
 export function PanelLateral({
@@ -41,6 +42,7 @@ export function PanelLateral({
   onSelectionChange,
   onUnmergeMesa,
   onRemoveElement,
+  onUpdateMesaEtiqueta,
 }: PanelLateralProps) {
   const [newMesa, setNewMesa] = useState({
     nombre: "",
@@ -49,7 +51,7 @@ export function PanelLateral({
     ancho: 80,
     alto: 80,
   });
-  
+  const [etiquetaInput, setEtiquetaInput] = useState("");
   // Estados para secciones colapsables
   const [openAddMesa, setOpenAddMesa] = useState(true);
   const [openMesasList, setOpenMesasList] = useState(true);
@@ -174,7 +176,59 @@ export function PanelLateral({
                     Mesa agrupada
                   </Badge>
                 )}
-                <div className="flex gap-1">
+                
+                {/* Sección de etiqueta bocadillo */}
+                <div className="border-t pt-2 mt-2 space-y-2">
+                  <Label className="text-xs flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    Etiqueta (bocadillo)
+                  </Label>
+                  {selectedElement.etiqueta ? (
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 text-xs bg-amber-50 border border-amber-300 rounded px-2 py-1 text-amber-800">
+                        {selectedElement.etiqueta}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          onUpdateMesaEtiqueta?.(selectedElement.id, null);
+                          onSelectionChange({ ...selectedElement, etiqueta: null });
+                        }}
+                        title="Quitar etiqueta"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        placeholder="Ej: Terraza, VIP..."
+                        value={etiquetaInput}
+                        onChange={(e) => setEtiquetaInput(e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs shrink-0"
+                        onClick={() => {
+                          if (etiquetaInput.trim()) {
+                            onUpdateMesaEtiqueta?.(selectedElement.id, etiquetaInput.trim());
+                            onSelectionChange({ ...selectedElement, etiqueta: etiquetaInput.trim() });
+                            setEtiquetaInput("");
+                          }
+                        }}
+                        disabled={!etiquetaInput.trim()}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-1 pt-2">
                   {selectedElement.isMerged && onUnmergeMesa && (
                     <Button
                       variant="outline"

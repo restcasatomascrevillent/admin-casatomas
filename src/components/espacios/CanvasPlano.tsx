@@ -32,6 +32,7 @@ export interface CanvasPlanoRef {
   resetView: () => void;
   unmergeMesa: (mesaId: string) => void;
   autoFit: () => void;
+  updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -429,6 +430,42 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.calcOffset();
       fabricCanvas.renderAll(); // Síncrono para efecto inmediato
       onZoomChange?.(targetZoom);
+    },
+    updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => {
+      if (!fabricCanvas) return;
+      
+      // Primero eliminar el bocadillo existente si lo hay
+      const existingBocadillo = fabricCanvas.getObjects().filter(o => {
+        const customData = (o as any).customData;
+        return customData?.tipo === "mesa-bocadillo" && customData?.parentId === mesaId;
+      });
+      existingBocadillo.forEach(obj => fabricCanvas.remove(obj));
+      
+      // Si no hay etiqueta, solo eliminamos y salimos
+      if (!etiqueta) {
+        fabricCanvas.renderAll();
+        return;
+      }
+      
+      // Buscar la mesa para obtener su posición
+      const mesaObj = fabricCanvas.getObjects().find(o => {
+        const customData = (o as any).customData;
+        return customData?.tipo === "mesa" && customData?.id === mesaId;
+      });
+      
+      if (!mesaObj) {
+        fabricCanvas.renderAll();
+        return;
+      }
+      
+      const objWidth = (mesaObj as any).width || (mesaObj as any).radius * 2 || 0;
+      const objHeight = (mesaObj as any).height || (mesaObj as any).radius * 2 || 0;
+      const posX = mesaObj.left || 0;
+      const posY = mesaObj.top || 0;
+      
+      // Crear el bocadillo debajo de la mesa
+      createMesaBocadillo(mesaId, etiqueta, posX, posY, objWidth, objHeight);
+      fabricCanvas.renderAll();
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange]);
 
@@ -840,14 +877,47 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const currentX = mesaObj.left || 0;
       const currentY = mesaObj.top || 0;
       
-      // Actualizar etiqueta asociada usando posición actual del objeto
+      // Actualizar etiqueta y bocadillo asociados
       canvas.getObjects().forEach((labelObj) => {
         const labelData = (labelObj as any).customData;
+        // Actualizar etiqueta interior (mesa-label)
         if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
           labelObj.set({
             left: currentX + objWidth / 2,
             top: currentY + objHeight / 2,
           });
+        }
+        // Actualizar bocadillo (mesa-bocadillo)
+        if (labelData?.tipo === "mesa-bocadillo" && labelData?.parentId === customData.id) {
+          const centerX = currentX + objWidth / 2;
+          const bocadilloY = currentY + objHeight + 8;
+          
+          if (labelData.subType === "bg") {
+            const bgWidth = (labelObj as any).width || 30;
+            labelObj.set({
+              left: centerX - bgWidth / 2,
+              top: bocadilloY,
+            });
+          } else if (labelData.subType === "pointer") {
+            const pointerSize = 5;
+            (labelObj as any).set({
+              left: centerX - pointerSize,
+              top: bocadilloY - pointerSize,
+            });
+            // Recalcular puntos del triángulo
+            const points = [
+              { x: centerX - pointerSize, y: bocadilloY },
+              { x: centerX + pointerSize, y: bocadilloY },
+              { x: centerX, y: bocadilloY - pointerSize },
+            ];
+            (labelObj as any).points = points;
+            (labelObj as any).setCoords();
+          } else if (labelData.subType === "text") {
+            labelObj.set({
+              left: centerX,
+              top: bocadilloY + 8, // bgHeight / 2
+            });
+          }
         }
       });
     };
@@ -1657,6 +1727,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels);
       }
 
+      // Si la mesa tiene etiqueta bocadillo, crearla
+      if (mesa.etiqueta) {
+        createMesaBocadillo(mesa.id, mesa.etiqueta, posXPixels, posYPixels, anchoPixels, altoPixels);
+      }
+
       // Guardar en estado local en METROS
       newMesasCanvas.push({
         id: mesa.id,
@@ -1669,6 +1744,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         posY: posYMeters,
         isMerged: isMerged,
         originalMesas: mesa.original_mesas || undefined,
+        etiqueta: mesa.etiqueta || null,
       });
       });
     
@@ -2047,6 +2123,70 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     (label as any).customData = { tipo: "mesa-label", parentId: mesaId };
     (label as any).isMesaLabel = true;
     fabricCanvas.add(label);
+  };
+
+  // Función para crear etiqueta bocadillo debajo de la mesa
+  const createMesaBocadillo = (mesaId: string, texto: string, posXPixels: number, posYPixels: number, anchoPixels: number, altoPixels: number) => {
+    if (!fabricCanvas) return;
+    
+    // Posición: debajo de la mesa con un margen de 8px
+    const bocadilloY = posYPixels + altoPixels + 8;
+    const centerX = posXPixels + anchoPixels / 2;
+    
+    // Calcular ancho aproximado del texto
+    const textWidth = texto.length * 5 + 12;
+    const bgWidth = Math.max(textWidth, 30);
+    const bgHeight = 16;
+    
+    // Fondo del bocadillo
+    const bg = new Rect({
+      left: centerX - bgWidth / 2,
+      top: bocadilloY,
+      width: bgWidth,
+      height: bgHeight,
+      fill: "#fef3c7",
+      stroke: "#d97706",
+      strokeWidth: 1,
+      rx: 4,
+      ry: 4,
+      selectable: false,
+      evented: false,
+    });
+    (bg as any).customData = { tipo: "mesa-bocadillo", parentId: mesaId, subType: "bg" };
+    fabricCanvas.add(bg);
+    
+    // Puntero triangular (hacia arriba)
+    const pointerSize = 5;
+    const pointer = new fabric.Polygon([
+      { x: centerX - pointerSize, y: bocadilloY },
+      { x: centerX + pointerSize, y: bocadilloY },
+      { x: centerX, y: bocadilloY - pointerSize },
+    ], {
+      fill: "#fef3c7",
+      stroke: "#d97706",
+      strokeWidth: 1,
+      selectable: false,
+      evented: false,
+    });
+    (pointer as any).customData = { tipo: "mesa-bocadillo", parentId: mesaId, subType: "pointer" };
+    fabricCanvas.add(pointer);
+    
+    // Texto de la etiqueta
+    const textObj = new FabricText(texto, {
+      left: centerX,
+      top: bocadilloY + bgHeight / 2,
+      fontSize: 9,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "500",
+      fill: "#92400e",
+      textAlign: "center",
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+    });
+    (textObj as any).customData = { tipo: "mesa-bocadillo", parentId: mesaId, subType: "text" };
+    fabricCanvas.add(textObj);
   };
 
   const handleMesaClick = (x: number, y: number, forma: "rectangular" | "circular") => {
