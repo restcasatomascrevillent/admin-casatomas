@@ -625,6 +625,72 @@ export type Database = {
         }
         Relationships: []
       }
+      gdpr_audit_log: {
+        Row: {
+          accion: string
+          created_at: string | null
+          detalles: Json | null
+          ejecutado_por: string | null
+          id: string
+          registros_afectados: number | null
+          tabla: string
+        }
+        Insert: {
+          accion: string
+          created_at?: string | null
+          detalles?: Json | null
+          ejecutado_por?: string | null
+          id?: string
+          registros_afectados?: number | null
+          tabla: string
+        }
+        Update: {
+          accion?: string
+          created_at?: string | null
+          detalles?: Json | null
+          ejecutado_por?: string | null
+          id?: string
+          registros_afectados?: number | null
+          tabla?: string
+        }
+        Relationships: []
+      }
+      gdpr_config: {
+        Row: {
+          accion: string
+          activo: boolean | null
+          campos_anonimizar: string[] | null
+          created_at: string | null
+          descripcion: string | null
+          dias_retencion: number
+          id: string
+          tabla: string
+          updated_at: string | null
+        }
+        Insert: {
+          accion: string
+          activo?: boolean | null
+          campos_anonimizar?: string[] | null
+          created_at?: string | null
+          descripcion?: string | null
+          dias_retencion: number
+          id?: string
+          tabla: string
+          updated_at?: string | null
+        }
+        Update: {
+          accion?: string
+          activo?: boolean | null
+          campos_anonimizar?: string[] | null
+          created_at?: string | null
+          descripcion?: string | null
+          dias_retencion?: number
+          id?: string
+          tabla?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       historial_ajustes_precios: {
         Row: {
           categoria: string
@@ -958,36 +1024,54 @@ export type Database = {
       }
       ocupacion_diaria: {
         Row: {
+          comensales_confirmados: number | null
           created_at: string | null
+          dia_semana: number | null
           espacio_id: string
           fecha: string
           hora: string | null
           id: string
+          reservas_canceladas: number | null
+          reservas_confirmadas: number | null
+          reservas_no_show: number | null
           sala_id: string
           total_comensales: number
           total_reservas: number
+          turno: string | null
           updated_at: string | null
         }
         Insert: {
+          comensales_confirmados?: number | null
           created_at?: string | null
+          dia_semana?: number | null
           espacio_id: string
           fecha: string
           hora?: string | null
           id?: string
+          reservas_canceladas?: number | null
+          reservas_confirmadas?: number | null
+          reservas_no_show?: number | null
           sala_id: string
           total_comensales?: number
           total_reservas?: number
+          turno?: string | null
           updated_at?: string | null
         }
         Update: {
+          comensales_confirmados?: number | null
           created_at?: string | null
+          dia_semana?: number | null
           espacio_id?: string
           fecha?: string
           hora?: string | null
           id?: string
+          reservas_canceladas?: number | null
+          reservas_confirmadas?: number | null
+          reservas_no_show?: number | null
           sala_id?: string
           total_comensales?: number
           total_reservas?: number
+          turno?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1668,6 +1752,70 @@ export type Database = {
       }
     }
     Views: {
+      vista_estadisticas_mensuales: {
+        Row: {
+          comensales_confirmados: number | null
+          espacio_id: string | null
+          espacio_nombre: string | null
+          mes_fin: string | null
+          mes_inicio: string | null
+          ocupacion_promedio: number | null
+          reservas_canceladas: number | null
+          reservas_confirmadas: number | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+        ]
+      }
+      vista_estadisticas_semanales: {
+        Row: {
+          comensales_confirmados: number | null
+          distribucion_dias: Json | null
+          espacio_id: string | null
+          espacio_nombre: string | null
+          ocupacion_promedio: number | null
+          reservas_canceladas: number | null
+          reservas_cena: number | null
+          reservas_comida: number | null
+          reservas_confirmadas: number | null
+          reservas_no_show: number | null
+          semana_fin: string | null
+          semana_inicio: string | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ocupacion_hoy"
+            referencedColumns: ["espacio_id"]
+          },
+        ]
+      }
       vista_ocupacion: {
         Row: {
           capacidad_disponible: number | null
@@ -1752,6 +1900,14 @@ export type Database = {
     }
     Functions: {
       bytea_to_text: { Args: { data: string }; Returns: string }
+      ejecutar_limpieza_gdpr: {
+        Args: never
+        Returns: {
+          accion: string
+          registros_procesados: number
+          tabla: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1886,6 +2042,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      recalcular_ocupacion_historica: {
+        Args: { fecha_desde?: string; fecha_hasta?: string }
+        Returns: number
+      }
       text_to_bytea: { Args: { data: string }; Returns: string }
       urlencode:
         | { Args: { data: Json }; Returns: string }
