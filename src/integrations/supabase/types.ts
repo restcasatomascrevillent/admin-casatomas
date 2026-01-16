@@ -840,24 +840,30 @@ export type Database = {
           asunto: string
           created_at: string
           enviado_por: string | null
+          estado: string | null
           id: string
           mensaje: string
+          tipo_newsletter: string | null
           total_destinatarios: number
         }
         Insert: {
           asunto: string
           created_at?: string
           enviado_por?: string | null
+          estado?: string | null
           id?: string
           mensaje: string
+          tipo_newsletter?: string | null
           total_destinatarios?: number
         }
         Update: {
           asunto?: string
           created_at?: string
           enviado_por?: string | null
+          estado?: string | null
           id?: string
           mensaje?: string
+          tipo_newsletter?: string | null
           total_destinatarios?: number
         }
         Relationships: []
