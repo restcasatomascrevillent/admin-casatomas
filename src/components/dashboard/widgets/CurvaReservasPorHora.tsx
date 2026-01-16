@@ -1,19 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useDashboardFilters } from "@/contexts/DashboardContext";
-import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useTodayReservations } from "@/hooks/useDashboardStats";
 
 export function CurvaReservasPorHora() {
-  const { getDateRange } = useDashboardFilters();
-  const { start, end } = getDateRange();
-  const { data } = useDashboardStats(start, end);
+  const { data: reservas } = useTodayReservations();
 
   const calcularReservasPorHora = () => {
-    if (!data?.reservas) return [];
+    if (!reservas || reservas.length === 0) return [];
 
     const horasCounts: Record<string, { reservas: number; comensales: number }> = {};
 
-    data.reservas.forEach((reserva) => {
+    reservas.forEach((reserva) => {
       const hora = reserva.hora.substring(0, 5); // HH:MM
       if (!horasCounts[hora]) {
         horasCounts[hora] = { reservas: 0, comensales: 0 };
