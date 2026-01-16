@@ -830,7 +830,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     });
 
     // Función helper para actualizar posición de una mesa y su etiqueta durante el movimiento
-    // IMPORTANTE: No restringir movimiento durante el arrastre - solo feedback visual
     const updateMesaPositionDuringMove = (mesaObj: FabricObject) => {
       const customData = (mesaObj as any).customData;
       if (customData?.tipo !== "mesa") return;
@@ -841,19 +840,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const currentX = mesaObj.left || 0;
       const currentY = mesaObj.top || 0;
       
-      // Solo feedback visual: borde rojo si está fuera de límites, NO restringir movimiento
-      const isOutOfBounds = currentX < 0 || currentY < 0 ||
-                            currentX + objWidth > logicalWidth ||
-                            currentY + objHeight > logicalHeight;
-      
-      const normalStroke = (mesaObj as any).customData?.isMerged ? "#16a34a" : "#2563eb";
-      mesaObj.set({ stroke: isOutOfBounds ? "#ef4444" : normalStroke });
-      
       // Actualizar etiqueta asociada usando posición actual del objeto
       canvas.getObjects().forEach((labelObj) => {
         const labelData = (labelObj as any).customData;
         if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-          // Usar dimensiones directamente del objeto para sincronización precisa
           labelObj.set({
             left: currentX + objWidth / 2,
             top: currentY + objHeight / 2,
