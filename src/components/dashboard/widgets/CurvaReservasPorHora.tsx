@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useDashboardFilters } from "@/contexts/DashboardContext";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 
@@ -41,7 +41,7 @@ export function CurvaReservasPorHora() {
       <CardContent className="px-2 sm:px-6">
         {datos.length > 0 ? (
           <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <LineChart data={datos} margin={{ left: -20, right: 5, bottom: 5 }}>
+            <LineChart data={datos} margin={{ left: -20, right: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="hora"
@@ -60,14 +60,6 @@ export function CurvaReservasPorHora() {
                   border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                 }}
-                formatter={(value: number, name: string) => [
-                  value,
-                  name === "reservas" ? "Reservas" : "Comensales (personas)"
-                ]}
-              />
-              <Legend 
-                wrapperStyle={{ paddingTop: 10 }}
-                formatter={(value) => value === "reservas" ? "Nº Reservas" : "Nº Comensales"}
               />
               <Line
                 type="monotone"
@@ -75,16 +67,15 @@ export function CurvaReservasPorHora() {
                 stroke="hsl(var(--primary))"
                 strokeWidth={3}
                 dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                name="reservas"
+                name="Reservas"
               />
               <Line
                 type="monotone"
                 dataKey="comensales"
-                stroke="#f97316"
+                stroke="hsl(var(--accent))"
                 strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={{ fill: "#f97316", r: 3 }}
-                name="comensales"
+                dot={{ fill: "hsl(var(--accent))", r: 3 }}
+                name="Comensales"
               />
             </LineChart>
           </ResponsiveContainer>
