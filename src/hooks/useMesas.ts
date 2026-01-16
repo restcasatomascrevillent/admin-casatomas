@@ -26,6 +26,7 @@ export interface Mesa {
   activa: boolean;
   is_merged: boolean;
   original_mesas: OriginalMesaData[] | null;
+  etiqueta: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,7 @@ export interface MesaInput {
   activa?: boolean;
   is_merged?: boolean;
   original_mesas?: Json | null;
+  etiqueta?: string | null;
 }
 
 export function useMesas(espacioId?: string) {

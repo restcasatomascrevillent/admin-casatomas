@@ -705,6 +705,7 @@ export type Database = {
           capacidad: number
           created_at: string | null
           espacio_id: string
+          etiqueta: string | null
           forma: string
           id: string
           is_merged: boolean | null
@@ -722,6 +723,7 @@ export type Database = {
           capacidad?: number
           created_at?: string | null
           espacio_id: string
+          etiqueta?: string | null
           forma?: string
           id?: string
           is_merged?: boolean | null
@@ -739,6 +741,7 @@ export type Database = {
           capacidad?: number
           created_at?: string | null
           espacio_id?: string
+          etiqueta?: string | null
           forma?: string
           id?: string
           is_merged?: boolean | null

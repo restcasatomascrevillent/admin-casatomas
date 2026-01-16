@@ -43,6 +43,7 @@ export interface MesaCanvas {
     ancho: number;
     alto: number;
   }>;
+  etiqueta?: string | null;
 }
 
 export interface ElementoCanvas {
@@ -174,6 +175,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           alto: mesa.alto,
           is_merged: mesa.isMerged || false,
           original_mesas: mesa.originalMesas || null,
+          etiqueta: mesa.etiqueta || null,
         }));
         await actualizarMesas.mutateAsync(updates);
       }
@@ -428,6 +430,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           }}
           onRemoveElement={(id) => {
             canvasRef.current?.removeElement(id);
+          }}
+          onUpdateMesaEtiqueta={(mesaId, etiqueta) => {
+            // Actualizar estado local
+            setMesasCanvas(prev => prev.map(m => 
+              m.id === mesaId ? { ...m, etiqueta } : m
+            ));
+            // Actualizar canvas
+            canvasRef.current?.updateMesaBocadillo(mesaId, etiqueta);
           }}
         />
       </div>
