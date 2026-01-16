@@ -653,25 +653,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setManualZoom(Math.max(currentScale * 0.8, 0.2));
   }, [manualZoom, autoScale]);
 
-  // Centrar y ajustar vista - calcula zoom óptimo para ver todo el contenido
+  // Centrar y ajustar vista - resetea al modo auto para ver todo el contenido centrado
   const handleCenterView = useCallback(() => {
-    if (containerSize.width <= 0 || containerSize.height <= 0) return;
-    if (contentBounds.width <= 0 || contentBounds.height <= 0) return;
-    
-    const padding = 48; // Padding visual en píxeles
-    const availableWidth = containerSize.width - padding * 2;
-    const availableHeight = containerSize.height - padding * 2;
-    
-    // Calcular zoom óptimo para que quepa todo el contenido
-    const optimalScale = Math.min(
-      availableWidth / contentBounds.width,
-      availableHeight / contentBounds.height
-    );
-    
-    // Aplicar zoom y resetear pan
-    setManualZoom(optimalScale);
+    // Resetear a modo auto-zoom (que ya calcula el scale óptimo)
+    // y resetear el pan para que el CSS center el contenido
+    setManualZoom(null);
     setPanOffset({ x: 0, y: 0 });
-  }, [containerSize, contentBounds]);
+  }, []);
 
   // Zoom con rueda del ratón
   const handleWheel = useCallback((e: React.WheelEvent) => {
