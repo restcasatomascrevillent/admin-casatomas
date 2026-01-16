@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const N8N_WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/newsletter";
+const N8N_WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook-test/76c66543-ffec-4cda-aea3-dfd95a020776";
 
 interface NewsletterPayload {
   tipo: 'anuncio' | 'nuevo_menu' | 'oferta';
