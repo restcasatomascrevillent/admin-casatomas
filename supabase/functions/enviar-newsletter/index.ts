@@ -165,7 +165,7 @@ serve(async (req) => {
     // Obtener suscriptores activos
     const { data: suscriptores, error: dbError } = await supabase
       .from("newsletter_suscriptores")
-      .select("email, nombre, token_baja")
+      .select("email, nombre")
       .eq("activo", true);
 
     if (dbError) {
@@ -198,10 +198,8 @@ serve(async (req) => {
     
     for (const suscriptor of suscriptores) {
       try {
-        // Generar link de baja personalizado
-        const unsubscribeLink = suscriptor.token_baja 
-          ? `https://restaurantecasatomascrevillente.es/baja?token=${suscriptor.token_baja}`
-          : `https://restaurantecasatomascrevillente.es/baja?email=${encodeURIComponent(suscriptor.email)}`;
+        // Generar link de baja personalizado (usando email codificado)
+        const unsubscribeLink = `https://restaurantecasatomascrevillente.es/baja?email=${encodeURIComponent(suscriptor.email)}`;
 
         // Generar HTML según tipo
         let html: string;
