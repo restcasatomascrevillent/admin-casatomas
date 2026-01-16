@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.enviar-newsletter]
 verify_jwt = false
+
+[functions.resend-stats]
+verify_jwt = false
