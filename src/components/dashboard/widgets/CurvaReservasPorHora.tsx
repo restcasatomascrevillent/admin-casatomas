@@ -29,6 +29,13 @@ export function CurvaReservasPorHora() {
   };
 
   const datos = calcularReservasPorHora();
+  
+  // Calcular el máximo de comensales y redondear al siguiente múltiplo de 5
+  const maxComensales = datos.length > 0 
+    ? Math.max(...datos.map(d => d.comensales)) 
+    : 0;
+  const yMax = Math.ceil((maxComensales + 5) / 5) * 5;
+  const yTicks = Array.from({ length: yMax / 5 + 1 }, (_, i) => i * 5);
 
   return (
     <Card>
@@ -56,8 +63,8 @@ export function CurvaReservasPorHora() {
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
-                domain={[0, (dataMax: number) => Math.ceil(dataMax / 5) * 5]}
-                ticks={Array.from({ length: 20 }, (_, i) => i * 5)}
+                domain={[0, yMax]}
+                ticks={yTicks}
                 allowDecimals={false}
               />
               <Tooltip
