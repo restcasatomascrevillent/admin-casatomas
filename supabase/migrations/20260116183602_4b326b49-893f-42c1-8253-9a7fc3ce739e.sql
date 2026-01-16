@@ -1,0 +1,1 @@
+DELETE FROM newsletter_suscriptores WHERE email != 'miguelbenito2003@gmail.com';
