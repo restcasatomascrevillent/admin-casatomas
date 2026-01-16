@@ -424,6 +424,30 @@ function DroppableMesa({
           </div>
         </div>
       )}
+
+      {/* Etiqueta bocadillo - debajo de la mesa */}
+      {mesa.etiqueta && (
+        <div 
+          className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none"
+          style={{ 
+            top: hitAreaPadding + (mesa.alto || 60) + 4,
+          }}
+        >
+          {/* Puntero triangular */}
+          <div 
+            className="absolute left-1/2 -translate-x-1/2 -top-1 w-0 h-0"
+            style={{
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderBottom: '4px solid #d97706',
+            }}
+          />
+          {/* Contenedor del texto */}
+          <div className="bg-amber-100 border border-amber-500 rounded px-1.5 py-0.5 text-[9px] font-medium text-amber-800 whitespace-nowrap shadow-sm">
+            {mesa.etiqueta}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
