@@ -653,10 +653,25 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setManualZoom(Math.max(currentScale * 0.8, 0.2));
   }, [manualZoom, autoScale]);
 
-  const handleResetZoom = useCallback(() => {
-    setManualZoom(null);
+  // Centrar y ajustar vista - calcula zoom óptimo para ver todo el contenido
+  const handleCenterView = useCallback(() => {
+    if (containerSize.width <= 0 || containerSize.height <= 0) return;
+    if (contentBounds.width <= 0 || contentBounds.height <= 0) return;
+    
+    const padding = 48; // Padding visual en píxeles
+    const availableWidth = containerSize.width - padding * 2;
+    const availableHeight = containerSize.height - padding * 2;
+    
+    // Calcular zoom óptimo para que quepa todo el contenido
+    const optimalScale = Math.min(
+      availableWidth / contentBounds.width,
+      availableHeight / contentBounds.height
+    );
+    
+    // Aplicar zoom y resetear pan
+    setManualZoom(optimalScale);
     setPanOffset({ x: 0, y: 0 });
-  }, []);
+  }, [containerSize, contentBounds]);
 
   // Zoom con rueda del ratón
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -667,12 +682,22 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setManualZoom(newScale);
   }, [manualZoom, autoScale]);
 
-  // Handlers para pan con Espacio + click
+  // Handlers para pan con Espacio + click y atajo F para centrar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el foco está en un input o textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      
       if (e.code === 'Space' && !isSpacePressed) {
         e.preventDefault();
         setIsSpacePressed(true);
+      }
+      
+      // Atajo F para centrar
+      if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        handleCenterView();
       }
     };
     
@@ -690,7 +715,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isSpacePressed]);
+  }, [isSpacePressed, handleCenterView]);
 
   const handlePanStart = useCallback((e: React.MouseEvent) => {
     if (isSpacePressed) {
@@ -1695,8 +1720,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={handleResetZoom}
-                    title="Ajustar automáticamente"
+                    onClick={handleCenterView}
+                    title="Centrar"
                   >
                     <Maximize2 className="h-4 w-4" />
                   </Button>
