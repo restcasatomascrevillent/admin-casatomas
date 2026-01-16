@@ -2,7 +2,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreadorNewsletter } from "@/components/marketing/CreadorNewsletter";
 import { GestionCorreos } from "@/components/marketing/GestionCorreos";
-import { Send, Users } from "lucide-react";
+import { EstadisticasNewsletter } from "@/components/marketing/EstadisticasNewsletter";
+import { Send, Users, BarChart3 } from "lucide-react";
 
 export default function Marketing() {
   return (
@@ -25,6 +26,10 @@ export default function Marketing() {
               <Users className="h-4 w-4" />
               Suscriptores
             </TabsTrigger>
+            <TabsTrigger value="estadisticas" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Estadísticas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="crear">
@@ -33,6 +38,10 @@ export default function Marketing() {
 
           <TabsContent value="suscriptores">
             <GestionCorreos />
+          </TabsContent>
+
+          <TabsContent value="estadisticas">
+            <EstadisticasNewsletter />
           </TabsContent>
         </Tabs>
       </div>
