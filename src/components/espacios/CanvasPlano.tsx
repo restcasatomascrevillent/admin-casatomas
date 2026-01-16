@@ -234,10 +234,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             strokeWidth: 2,
             originX: "left",
             originY: "top",
+            selectable: true,
             hasControls: false,
             lockScalingX: true,
             lockScalingY: true,
             lockRotation: true,
+            hoverCursor: "move",
+            moveCursor: "move",
             shadow: {
               color: "rgba(0,0,0,0.1)",
               blur: 8,
@@ -258,10 +261,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             ry: 6,
             originX: "left",
             originY: "top",
+            selectable: true,
             hasControls: false,
             lockScalingX: true,
             lockScalingY: true,
             lockRotation: true,
+            hoverCursor: "move",
+            moveCursor: "move",
             shadow: {
               color: "rgba(0,0,0,0.1)",
               blur: 8,
@@ -661,7 +667,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const movingCenterX = movingLeft + movingWidth / 2;
     const movingCenterY = movingTop + movingHeight / 2;
     
-    const SNAP_THRESHOLD = 12; // píxeles de tolerancia para snapping
+    const SNAP_THRESHOLD = 8; // píxeles de tolerancia para snapping (reducido para movimiento más natural)
     
     let snapX: number | null = null;
     let snapY: number | null = null;
@@ -824,38 +830,34 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     });
 
     // Función helper para actualizar posición de una mesa y su etiqueta durante el movimiento
+    // IMPORTANTE: No restringir movimiento durante el arrastre - solo feedback visual
     const updateMesaPositionDuringMove = (mesaObj: FabricObject) => {
       const customData = (mesaObj as any).customData;
       if (customData?.tipo !== "mesa") return;
       
-      // Limitar posición dentro del canvas
       const objWidth = (mesaObj as any).width || (mesaObj as any).radius * 2 || 0;
       const objHeight = (mesaObj as any).height || (mesaObj as any).radius * 2 || 0;
       
-      let newPosX = mesaObj.left || 0;
-      let newPosY = mesaObj.top || 0;
+      const currentX = mesaObj.left || 0;
+      const currentY = mesaObj.top || 0;
       
-      // Mantener dentro de los límites del canvas
-      if (newPosX < 0) newPosX = 0;
-      if (newPosY < 0) newPosY = 0;
-      if (newPosX + objWidth > logicalWidth) newPosX = logicalWidth - objWidth;
-      if (newPosY + objHeight > logicalHeight) newPosY = logicalHeight - objHeight;
+      // Solo feedback visual: borde rojo si está fuera de límites, NO restringir movimiento
+      const isOutOfBounds = currentX < 0 || currentY < 0 ||
+                            currentX + objWidth > logicalWidth ||
+                            currentY + objHeight > logicalHeight;
       
-      mesaObj.set({ left: newPosX, top: newPosY });
+      const normalStroke = (mesaObj as any).customData?.isMerged ? "#16a34a" : "#2563eb";
+      mesaObj.set({ stroke: isOutOfBounds ? "#ef4444" : normalStroke });
       
-      // Actualizar etiqueta asociada
+      // Actualizar etiqueta asociada usando posición actual del objeto
       canvas.getObjects().forEach((labelObj) => {
         const labelData = (labelObj as any).customData;
         if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-          const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-          if (mesa) {
-            const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-            const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
-            labelObj.set({
-              left: newPosX + anchoPixels / 2,
-              top: newPosY + altoPixels / 2,
-            });
-          }
+          // Usar dimensiones directamente del objeto para sincronización precisa
+          labelObj.set({
+            left: currentX + objWidth / 2,
+            top: currentY + objHeight / 2,
+          });
         }
       });
     };
@@ -2091,10 +2093,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         strokeWidth: 2,
         originX: "left",
         originY: "top",
+        selectable: true,
         hasControls: false,
         lockScalingX: true,
         lockScalingY: true,
         lockRotation: true,
+        hoverCursor: "move",
+        moveCursor: "move",
         shadow: {
           color: "rgba(0,0,0,0.1)",
           blur: 8,
@@ -2115,10 +2120,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         ry: 6,
         originX: "left",
         originY: "top",
+        selectable: true,
         hasControls: false,
         lockScalingX: true,
         lockScalingY: true,
         lockRotation: true,
+        hoverCursor: "move",
+        moveCursor: "move",
         shadow: {
           color: "rgba(0,0,0,0.1)",
           blur: 8,
