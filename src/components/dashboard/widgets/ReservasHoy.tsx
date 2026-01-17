@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarCheck, Clock, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon } from "lucide-react";
+import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon } from "lucide-react";
 import { useTodayReservations } from "@/hooks/useDashboardStats";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -44,14 +44,6 @@ export function ReservasHoy() {
     return diffMs > 0 && diffMs <= 60 * 60 * 1000;
   }) || [];
 
-  // Próximas reservas (próximas 2 horas)
-  const proximasReservas = reservas?.filter(r => {
-    const [h, m] = r.hora.split(':').map(Number);
-    const horaReserva = new Date();
-    horaReserva.setHours(h, m, 0, 0);
-    const diffMs = horaReserva.getTime() - ahora.getTime();
-    return diffMs > 0 && diffMs <= 2 * 60 * 60 * 1000;
-  }).slice(0, 4) || [];
 
   return (
     <Card className="h-full">
@@ -161,41 +153,6 @@ export function ReservasHoy() {
           </div>
         </div>
 
-        {/* Próximas Reservas */}
-        {proximasReservas.length > 0 && (
-          <div className="pt-3 border-t space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> Próximas 2 horas
-            </p>
-            {proximasReservas.map((r) => {
-              const esRiesgo = reservasEnRiesgo.some(rr => rr.id === r.id);
-              const esBlacklist = r.en_blacklist;
-              const tieneNotas = r.notas_cliente && r.notas_cliente.trim() !== '';
-              
-              return (
-                <div 
-                  key={r.id} 
-                  className={`flex items-center justify-between text-sm p-2 rounded ${
-                    esBlacklist ? 'bg-red-500/10 border border-red-500/30' : 
-                    esRiesgo ? 'bg-amber-500/10 border border-amber-500/30' : 
-                    'bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {esBlacklist && <ShieldBan className="h-3.5 w-3.5 text-red-500" />}
-                    {esRiesgo && !esBlacklist && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
-                    <div>
-                      <span className="font-medium">{r.nombre || "Sin nombre"}</span>
-                      <span className="text-muted-foreground ml-2">· {r.numero_comensales} pax</span>
-                    </div>
-                    {tieneNotas && <MessageSquare className="h-3 w-3 text-muted-foreground" />}
-                  </div>
-                  <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
