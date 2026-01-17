@@ -198,8 +198,8 @@ serve(async (req) => {
     
     for (const suscriptor of suscriptores) {
       try {
-        // Generar link de baja personalizado (usando email codificado)
-        const unsubscribeLink = `https://restaurantecasatomascrevillente.es/baja?email=${encodeURIComponent(suscriptor.email)}`;
+        // Generar link de baja personalizado (webhook n8n)
+        const unsubscribeLink = `https://n8npersonal.miguelbenito.space/webhook/76c66543-ffec-4cda-aea3-dfd95a020776?email=${encodeURIComponent(suscriptor.email)}`;
 
         // Generar HTML según tipo
         let html: string;
