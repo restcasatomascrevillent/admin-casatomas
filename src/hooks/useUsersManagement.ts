@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface ManagedUser {
   id: string;
   email: string;
+  display_name: string | null;
   role: AppRole | null;
   created_at: string;
   permissions: {
@@ -28,7 +29,29 @@ export function useUsersManagement() {
 
     setLoading(true);
     try {
-      // Obtener usuarios desde auth.users mediante función RPC o listando roles
+      // Obtener usuarios desde auth.users mediante edge function
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      let authUsersMap = new Map<string, { email: string; display_name: string | null }>();
+      
+      if (token) {
+        try {
+          const response = await supabase.functions.invoke("list-users", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          
+          if (response.data?.users) {
+            response.data.users.forEach((u: { id: string; email: string; display_name: string | null }) => {
+              authUsersMap.set(u.id, { email: u.email, display_name: u.display_name });
+            });
+          }
+        } catch (e) {
+          console.error("Error fetching auth users:", e);
+        }
+      }
+
+      // Obtener roles
       const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
         .select("user_id, role, created_at");
@@ -46,9 +69,11 @@ export function useUsersManagement() {
       const userMap = new Map<string, ManagedUser>();
 
       rolesData?.forEach((r) => {
+        const authUser = authUsersMap.get(r.user_id);
         userMap.set(r.user_id, {
           id: r.user_id,
-          email: "", // Se llenará después
+          email: authUser?.email || "",
+          display_name: authUser?.display_name || null,
           role: r.role as AppRole,
           created_at: r.created_at,
           permissions: [],
@@ -66,8 +91,6 @@ export function useUsersManagement() {
         }
       });
 
-      // Obtener emails desde auth.users (necesitamos una función RPC o edge function)
-      // Por ahora usamos el email del usuario actual si está disponible
       const usersArray = Array.from(userMap.values());
       
       setUsers(usersArray);
