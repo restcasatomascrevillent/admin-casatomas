@@ -202,7 +202,8 @@ export function EditorNovedadesWeb({
         body: {
           tipo: formData.tipo === 'plato_nuevo' ? 'plato' : 
                 formData.tipo === 'promocion' ? 'promo' : 
-                formData.tipo === 'evento' ? 'evento' : 'articulo',
+                formData.tipo === 'anuncio' ? 'anuncio' :
+                formData.tipo, // evento, festivo se envían tal cual
           idioma: 'es',
           tono: tonoSeleccionado,
           texto: textoEnriquecido,
