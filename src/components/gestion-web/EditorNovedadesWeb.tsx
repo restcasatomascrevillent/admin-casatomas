@@ -1044,14 +1044,15 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
                 </div>
               )}
 
-              {/* CTA URL */}
-              {resultadoWebhook.cta && resultadoWebhook.cta.url && (
+              {/* CTA */}
+              {resultadoWebhook.cta && (resultadoWebhook.cta.text || resultadoWebhook.cta.url) && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    URL de acción
+                    Llamada a la acción (CTA)
                   </Label>
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-xs text-muted-foreground break-all">{resultadoWebhook.cta.url}</p>
+                  <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
+                    {resultadoWebhook.cta.text && <p className="text-sm font-medium">{resultadoWebhook.cta.text}</p>}
+                    {resultadoWebhook.cta.url && <p className="text-xs text-muted-foreground break-all">{resultadoWebhook.cta.url}</p>}
                   </div>
                 </div>
               )}
