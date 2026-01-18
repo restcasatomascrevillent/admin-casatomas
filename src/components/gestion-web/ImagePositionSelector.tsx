@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Check, Move } from "lucide-react";
+import { MOBILE_PREVIEW_IMAGE_ASPECT_RATIO } from "./previewConstants";
 
 interface ImagePositionSelectorProps {
   open: boolean;
@@ -24,9 +25,8 @@ export function ImagePositionSelector({
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageBounds, setImageBounds] = useState({ top: 0, left: 0, width: 0, height: 0 });
 
-  // El marco visible debe representar lo que se verá con object-cover en la tarjeta.
-  // En MobilePreview la imagen va en un contenedor aprox 320x96 (ratio 10/3).
-  const CARD_ASPECT_RATIO = 10 / 3;
+  // El marco visible debe representar lo que se verá en el preview móvil (object-cover)
+  const CARD_ASPECT_RATIO = MOBILE_PREVIEW_IMAGE_ASPECT_RATIO;
 
   // Altura (en % de la imagen) que realmente se verá en la tarjeta (depende del aspect ratio)
   const [frameHeightPercent, setFrameHeightPercent] = useState(25);

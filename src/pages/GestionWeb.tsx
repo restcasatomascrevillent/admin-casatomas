@@ -26,6 +26,7 @@ export default function GestionWeb() {
         titulo_fr: n.titulo_fr,
         descripcion_fr: n.descripcion_fr,
         imagen_url: n.imagen_url,
+        imagen_posicion_y: n.imagen_posicion_y,
         badge_text: n.badge_text,
         badge_text_en: n.badge_text_en,
         badge_text_fr: n.badge_text_fr,

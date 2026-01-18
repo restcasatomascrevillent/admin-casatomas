@@ -3,6 +3,8 @@ import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { MOBILE_PREVIEW_IMAGE_ASPECT_RATIO } from "./previewConstants";
 
 export interface NovedadPreview {
   id?: string;
@@ -140,14 +142,25 @@ export function MobilePreview({
               const isPreview = novedad.id === 'preview';
               const textos = getTextoIdioma(novedad, idioma);
               return <Card key={novedad.id || index} className={`overflow-hidden transition-all duration-300 ${isPreview ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
-                      {novedad.imagen_url && <div className="relative h-24 overflow-hidden">
-                          <img src={novedad.imagen_url} alt={textos.titulo} className="w-full h-full object-cover" style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }} />
-                          {isPreview && <div className="absolute top-1 right-1">
-                              <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                                Preview
-                              </Badge>
-                            </div>}
-                        </div>}
+                      {novedad.imagen_url && (
+                        <div className="overflow-hidden">
+                          <AspectRatio ratio={MOBILE_PREVIEW_IMAGE_ASPECT_RATIO} className="relative overflow-hidden">
+                            <img
+                              src={novedad.imagen_url}
+                              alt={textos.titulo}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }}
+                            />
+                            {isPreview && (
+                              <div className="absolute top-1 right-1">
+                                <Badge variant="default" className="text-[10px] px-1.5 py-0">
+                                  Preview
+                                </Badge>
+                              </div>
+                            )}
+                          </AspectRatio>
+                        </div>
+                      )}
                       <CardHeader className="p-2 pb-1">
                         <div className="flex items-center justify-between gap-1.5">
                           <div className="p-1 rounded-full bg-accent/20">
