@@ -44,20 +44,27 @@ interface Reservation {
 interface ListaReservasAvanzadaProps {
   onEditReserva?: (reserva: Reservation) => void;
   onEspacioClick?: (espacioId: string) => void;
+  initialStatusFilter?: string;
+  initialDateFilter?: Date;
 }
 
-export function ListaReservasAvanzada({ onEditReserva, onEspacioClick }: ListaReservasAvanzadaProps) {
+export function ListaReservasAvanzada({ 
+  onEditReserva, 
+  onEspacioClick,
+  initialStatusFilter,
+  initialDateFilter 
+}: ListaReservasAvanzadaProps) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
   
-  // Filtros
+  // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [espacioFilter, setEspacioFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
 
   const { data: espacios } = useEspaciosReserva();
 
