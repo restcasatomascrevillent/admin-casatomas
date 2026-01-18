@@ -420,7 +420,7 @@ export function EditorNovedadesWeb({
               </div>
 
               {/* Campos generados por el webhook - solo visibles si tienen contenido */}
-              {(formData.subtitle || formData.bullets.length > 0 || formData.cta_text || formData.tags.length > 0) && (
+              {(formData.subtitle || (formData.bullets?.length ?? 0) > 0 || formData.cta_text || (formData.tags?.length ?? 0) > 0) && (
                 <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-dashed">
                   <p className="text-xs text-muted-foreground font-medium">✨ Contenido generado</p>
                   
@@ -437,17 +437,17 @@ export function EditorNovedadesWeb({
                   )}
 
                   {/* Bullets */}
-                  {formData.bullets.length > 0 && (
+                  {(formData.bullets?.length ?? 0) > 0 && (
                     <div className="space-y-1.5">
                       <Label className="text-xs">Puntos destacados</Label>
                       <div className="space-y-1">
-                        {formData.bullets.map((bullet, index) => (
+                        {formData.bullets?.map((bullet, index) => (
                           <div key={index} className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">•</span>
                             <Input 
                               value={bullet} 
                               onChange={e => {
-                                const newBullets = [...formData.bullets];
+                                const newBullets = [...(formData.bullets ?? [])];
                                 newBullets[index] = e.target.value;
                                 handleInputChange('bullets', newBullets);
                               }}
@@ -459,7 +459,7 @@ export function EditorNovedadesWeb({
                               size="icon" 
                               className="h-6 w-6"
                               onClick={() => {
-                                const newBullets = formData.bullets.filter((_, i) => i !== index);
+                                const newBullets = (formData.bullets ?? []).filter((_, i) => i !== index);
                                 handleInputChange('bullets', newBullets);
                               }}
                             >
@@ -495,17 +495,17 @@ export function EditorNovedadesWeb({
                   )}
 
                   {/* Tags */}
-                  {formData.tags.length > 0 && (
+                  {(formData.tags?.length ?? 0) > 0 && (
                     <div className="space-y-1">
                       <Label className="text-xs">Etiquetas</Label>
                       <div className="flex flex-wrap gap-1">
-                        {formData.tags.map((tag, index) => (
+                        {formData.tags?.map((tag, index) => (
                           <Badge key={index} variant="secondary" className="text-xs gap-1">
                             {tag}
                             <button 
                               type="button"
                               onClick={() => {
-                                const newTags = formData.tags.filter((_, i) => i !== index);
+                                const newTags = (formData.tags ?? []).filter((_, i) => i !== index);
                                 handleInputChange('tags', newTags);
                               }}
                               className="ml-1 hover:text-destructive"
