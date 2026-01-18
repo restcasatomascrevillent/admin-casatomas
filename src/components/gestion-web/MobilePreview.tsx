@@ -71,7 +71,7 @@ export function MobilePreview({
                             </div>}
                         </div>}
                       <CardHeader className="p-2 pb-1">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between gap-1.5">
                           <div className="p-1 rounded-full bg-primary/10">
                             <IconComponent className="w-3 h-3 text-primary" />
                           </div>
