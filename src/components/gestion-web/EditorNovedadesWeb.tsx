@@ -126,6 +126,7 @@ const LOADING_MESSAGES = [
 ];
 interface EditorNovedadesWebProps {
   onPreview: (novedad: NovedadPreview | null) => void;
+  onPreviewListChange?: (ids: string[]) => void;
 }
 // Campos específicos por tipo de novedad
 const CAMPOS_POR_TIPO: Record<
@@ -270,8 +271,8 @@ const initialFormData: FormData = {
   tags: [],
   campos_tipo: {},
 };
-export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
-  const { novedades, isLoading, crearNovedad, actualizarNovedad, eliminarNovedad } = useNovedades();
+export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNovedadesWebProps) {
+  const { novedades, isLoading, crearNovedad, actualizarNovedad, eliminarNovedad, toggleActivo } = useNovedades();
   const [editingId, setEditingId] = useState<string | null>("new");
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -294,7 +295,37 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
     };
     tags?: string[];
   } | null>(null);
+  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Inicializar previewIds con novedades activas
+  useEffect(() => {
+    if (novedades && previewIds.size === 0) {
+      const activeIds = novedades.filter(n => n.activo).map(n => n.id);
+      setPreviewIds(new Set(activeIds));
+    }
+  }, [novedades]);
+
+  // Notificar cambios en preview list
+  useEffect(() => {
+    onPreviewListChange?.(Array.from(previewIds));
+  }, [previewIds, onPreviewListChange]);
+
+  const handleTogglePreview = (id: string) => {
+    setPreviewIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleToggleActivo = async (id: string, currentActivo: boolean) => {
+    await toggleActivo.mutateAsync({ id, activo: !currentActivo });
+  };
   const handleCampoTipoChange = (key: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -571,13 +602,33 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
             novedades?.map((novedad) => (
               <div
                 key={novedad.id}
-                className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {getEstadoBadge(novedad)}
                   <span className="text-sm font-medium truncate">{novedad.titulo}</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
+                  {/* Toggle Activo */}
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={novedad.activo}
+                      onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)}
+                      className="scale-75"
+                    />
+                    <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {novedad.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  {/* Toggle Preview */}
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={previewIds.has(novedad.id)}
+                      onCheckedChange={() => handleTogglePreview(novedad.id)}
+                      className="scale-75"
+                    />
+                    <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </div>
+                  {/* Acciones */}
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(novedad)}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
