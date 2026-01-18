@@ -37,20 +37,20 @@ import type { Json } from "@/integrations/supabase/types";
 
 // Alérgenos oficiales de la UE
 const ALERGENOS_OFICIALES = [
-  { id: "gluten", label: "Gluten", emoji: "🌾" },
-  { id: "crustaceos", label: "Crustáceos", emoji: "🦐" },
-  { id: "huevo", label: "Huevo", emoji: "🥚" },
-  { id: "pescado", label: "Pescado", emoji: "🐟" },
-  { id: "cacahuetes", label: "Cacahuetes", emoji: "🥜" },
-  { id: "frutos_cascara", label: "Frutos de cáscara", emoji: "🌰" },
-  { id: "lacteos", label: "Lácteos", emoji: "🥛" },
-  { id: "apio", label: "Apio", emoji: "🌱" },
-  { id: "mostaza", label: "Mostaza", emoji: "🟡" },
-  { id: "sesamo", label: "Sésamo", emoji: "🌻" },
-  { id: "sulfitos", label: "Sulfitos", emoji: "🧪" },
-  { id: "altramuces", label: "Altramuces", emoji: "🫘" },
-  { id: "moluscos", label: "Moluscos", emoji: "🦑" },
-  { id: "soja", label: "Soja", emoji: "🫛" },
+  { id: "gluten", label: "Gluten" },
+  { id: "crustaceos", label: "Crustáceos" },
+  { id: "huevo", label: "Huevo" },
+  { id: "pescado", label: "Pescado" },
+  { id: "cacahuetes", label: "Cacahuetes" },
+  { id: "frutos_cascara", label: "Frutos de cáscara" },
+  { id: "lacteos", label: "Lácteos" },
+  { id: "apio", label: "Apio" },
+  { id: "mostaza", label: "Mostaza" },
+  { id: "sesamo", label: "Sésamo" },
+  { id: "sulfitos", label: "Sulfitos" },
+  { id: "altramuces", label: "Altramuces" },
+  { id: "moluscos", label: "Moluscos" },
+  { id: "soja", label: "Soja" },
 ];
 
 const formSchema = z.object({
@@ -399,7 +399,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                         }
                       `}
                     >
-                      <span>{alergeno.emoji}</span>
                       <span className="truncate">{alergeno.label}</span>
                     </button>
                   );
