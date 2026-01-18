@@ -24,27 +24,46 @@ export function ImagePositionSelector({
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageBounds, setImageBounds] = useState({ top: 0, left: 0, width: 0, height: 0 });
 
-  // El marco visible tiene una altura fija (proporción de tarjeta)
-  const FRAME_HEIGHT_PERCENT = 25;
+  // El marco visible debe representar lo que se verá con object-cover en la tarjeta.
+  // En MobilePreview la imagen va en un contenedor aprox 320x96 (ratio 10/3).
+  const CARD_ASPECT_RATIO = 10 / 3;
+
+  // Altura (en % de la imagen) que realmente se verá en la tarjeta (depende del aspect ratio)
+  const [frameHeightPercent, setFrameHeightPercent] = useState(25);
 
   useEffect(() => {
-    setPosition(currentPosition);
-  }, [currentPosition, open]);
+    // currentPosition está en el formato que usa CSS object-position (0-100)
+    // Convertimos a la posición del centro del frame (en % de la imagen) para dibujar el marco correctamente.
+    const center = frameHeightPercent >= 99.999
+      ? 50
+      : (currentPosition / 100) * (100 - frameHeightPercent) + frameHeightPercent / 2;
+
+    setPosition(center);
+  }, [currentPosition, open, frameHeightPercent]);
 
   // Calcular los bounds de la imagen dentro del contenedor
   const updateImageBounds = useCallback(() => {
     if (imageRef.current && containerRef.current) {
       const containerRect = containerRef.current.getBoundingClientRect();
       const imageRect = imageRef.current.getBoundingClientRect();
-      
+
       setImageBounds({
         top: imageRect.top - containerRect.top,
         left: imageRect.left - containerRect.left,
         width: imageRect.width,
         height: imageRect.height,
       });
+
+      // Calcular qué % de alto de la imagen se ve en la tarjeta con object-cover
+      // Si la imagen es más "estrecha" que el contenedor (ratio menor), se recorta en vertical.
+      const naturalW = imageRef.current.naturalWidth || imageRect.width;
+      const naturalH = imageRef.current.naturalHeight || imageRect.height;
+      const imageAspect = naturalH ? naturalW / naturalH : CARD_ASPECT_RATIO;
+
+      const visibleFraction = imageAspect < CARD_ASPECT_RATIO ? imageAspect / CARD_ASPECT_RATIO : 1;
+      setFrameHeightPercent(Math.max(1, Math.min(100, visibleFraction * 100)));
     }
-  }, []);
+  }, [CARD_ASPECT_RATIO]);
 
   useEffect(() => {
     if (open) {
@@ -58,20 +77,20 @@ export function ImagePositionSelector({
     if (!containerRef.current || imageBounds.height === 0) return;
 
     const containerRect = containerRef.current.getBoundingClientRect();
-    
+
     // Calcular posición relativa a la imagen, no al contenedor
     const relativeToImage = clientY - containerRect.top - imageBounds.top;
     const imageHeight = imageBounds.height;
-    
+
     // Limitar para que el frame no se salga de la imagen
-    const minY = FRAME_HEIGHT_PERCENT / 2;
-    const maxY = 100 - FRAME_HEIGHT_PERCENT / 2;
-    
+    const minY = frameHeightPercent / 2;
+    const maxY = 100 - frameHeightPercent / 2;
+
     const rawPercent = (relativeToImage / imageHeight) * 100;
     const clampedPercent = Math.max(minY, Math.min(maxY, rawPercent));
-    
+
     setPosition(clampedPercent);
-  }, [imageBounds]);
+  }, [imageBounds, frameHeightPercent]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -118,17 +137,23 @@ export function ImagePositionSelector({
   };
 
   const handleConfirm = () => {
-    // Convertir la posición del centro del frame a la posición superior del frame
-    // Esta es la posición que CSS object-position necesita para mostrar esa parte
-    const frameTop = position - FRAME_HEIGHT_PERCENT / 2;
-    // Normalizar de 0-75 a 0-100 para object-position
-    const normalizedPosition = (frameTop / (100 - FRAME_HEIGHT_PERCENT)) * 100;
+    // position = centro del frame (en % de la imagen)
+    // objectPosition necesita un valor 0-100 que representa el alineado de la imagen dentro del contenedor.
+    if (frameHeightPercent >= 99.999) {
+      onPositionChange(50);
+      onOpenChange(false);
+      return;
+    }
+
+    const frameTop = position - frameHeightPercent / 2;
+    const normalizedPosition = (frameTop / (100 - frameHeightPercent)) * 100;
+
     onPositionChange(Math.round(Math.max(0, Math.min(100, normalizedPosition))));
     onOpenChange(false);
   };
 
   // Calcular posición del frame relativa a la imagen
-  const frameTopPercent = position - FRAME_HEIGHT_PERCENT / 2;
+  const frameTopPercent = position - frameHeightPercent / 2;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,7 +207,7 @@ export function ImagePositionSelector({
                   bottom: containerRef.current ? containerRef.current.clientHeight - imageBounds.top - imageBounds.height : 0,
                   left: imageBounds.left,
                   width: imageBounds.width,
-                  height: `${Math.max(0, 100 - frameTopPercent - FRAME_HEIGHT_PERCENT) * imageBounds.height / 100}px`,
+                  height: `${Math.max(0, 100 - frameTopPercent - frameHeightPercent) * imageBounds.height / 100}px`,
                 }}
               />
 
@@ -193,7 +218,7 @@ export function ImagePositionSelector({
                   top: imageBounds.top + (frameTopPercent * imageBounds.height / 100),
                   left: imageBounds.left,
                   width: imageBounds.width,
-                  height: `${FRAME_HEIGHT_PERCENT * imageBounds.height / 100}px`,
+                  height: `${frameHeightPercent * imageBounds.height / 100}px`,
                 }}
               >
                 {/* Líneas de guía horizontales */}
