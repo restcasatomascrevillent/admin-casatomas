@@ -74,14 +74,14 @@ export function MobilePreview({
         onValueChange={(v) => v && setIdioma(v as Idioma)}
         className="bg-muted rounded-lg p-1"
       >
-        <ToggleGroupItem value="es" className="text-xs px-3 py-1 data-[state=on]:bg-background">
-          🇪🇸 ES
+        <ToggleGroupItem value="es" className="text-base px-2 py-1 data-[state=on]:bg-background">
+          🇪🇸
         </ToggleGroupItem>
-        <ToggleGroupItem value="en" className="text-xs px-3 py-1 data-[state=on]:bg-background">
-          🇬🇧 EN
+        <ToggleGroupItem value="en" className="text-base px-2 py-1 data-[state=on]:bg-background">
+          🇬🇧
         </ToggleGroupItem>
-        <ToggleGroupItem value="fr" className="text-xs px-3 py-1 data-[state=on]:bg-background">
-          🇫🇷 FR
+        <ToggleGroupItem value="fr" className="text-base px-2 py-1 data-[state=on]:bg-background">
+          🇫🇷
         </ToggleGroupItem>
       </ToggleGroup>
       
