@@ -22,6 +22,8 @@ export interface Novedad {
   titulo_fr: string | null;
   descripcion_en: string | null;
   descripcion_fr: string | null;
+  badge_text: string | null;
+  icono: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -42,10 +44,12 @@ export interface NuevaNovedad {
   activo?: boolean;
   destacado?: boolean;
   orden?: number;
-  titulo_en?: string;
-  titulo_fr?: string;
-  descripcion_en?: string;
-  descripcion_fr?: string;
+  titulo_en?: string | null;
+  titulo_fr?: string | null;
+  descripcion_en?: string | null;
+  descripcion_fr?: string | null;
+  badge_text?: string | null;
+  icono?: string | null;
 }
 
 export function useNovedades() {

@@ -24,7 +24,7 @@ const menuItems: { title: string; url: string; icon: React.ComponentType<any>; s
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
   { title: "Personal", url: "/trabajadores", icon: Users, sectionKey: "trabajadores" },
   { title: "Gestor Carta", url: "/gestor-carta", icon: BookOpen, sectionKey: "gestor_carta" },
-  { title: "Soporte", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
+  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },

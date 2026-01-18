@@ -17,7 +17,7 @@ import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
-import { GestionNovedades } from "@/components/carta/GestionNovedades";
+
 
 
 export default function GestorCarta() {
@@ -25,7 +25,7 @@ export default function GestorCarta() {
   const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas } = useBebidas();
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
 
-  const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos" | "novedades">("platos");
+  const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos">("platos");
   const [categoriaPlatos, setCategoriaPlatos] = useState<string>("");
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
@@ -177,13 +177,12 @@ export default function GestorCarta() {
         <Tabs 
           defaultValue="platos" 
           className="w-full"
-          onValueChange={(value) => setSeccionActiva(value as "platos" | "bebidas" | "vinos" | "novedades")}
+          onValueChange={(value) => setSeccionActiva(value as "platos" | "bebidas" | "vinos")}
         >
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="platos">Platos</TabsTrigger>
             <TabsTrigger value="bebidas">Bebidas</TabsTrigger>
             <TabsTrigger value="vinos">Vinos</TabsTrigger>
-            <TabsTrigger value="novedades">Novedades</TabsTrigger>
           </TabsList>
 
           {/* PLATOS */}
@@ -341,10 +340,6 @@ export default function GestorCarta() {
             )}
           </TabsContent>
 
-          {/* NOVEDADES */}
-          <TabsContent value="novedades" className="space-y-4">
-            <GestionNovedades />
-          </TabsContent>
         </Tabs>
 
         <PlatoForm 
