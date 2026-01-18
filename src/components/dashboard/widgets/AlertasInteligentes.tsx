@@ -1,27 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, Info, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useTodayReservations, useActiveStaff } from "@/hooks/useDashboardStats";
+import { useTodayReservations, useTodayConfirmedReservations, useActiveStaff } from "@/hooks/useDashboardStats";
 
 export function AlertasInteligentes() {
-  const { data: reservas } = useTodayReservations();
+  const { data: todasReservas } = useTodayReservations();
+  const { data: reservasConfirmadas } = useTodayConfirmedReservations();
   const { data: activeStaff } = useActiveStaff();
 
   const alerts = [];
 
-  // Check staff coverage
+  // Check staff coverage - usar solo confirmadas para ocupación
   const totalStaff = activeStaff?.length || 0;
-  const totalReservas = reservas?.length || 0;
+  const totalReservasConfirmadas = reservasConfirmadas?.length || 0;
   
-  if (totalReservas > 10 && totalStaff < 5) {
+  if (totalReservasConfirmadas > 10 && totalStaff < 5) {
     alerts.push({
       type: "warning",
-      message: `Ocupación alta prevista (${totalReservas} reservas) con personal limitado (${totalStaff} activos)`,
+      message: `Ocupación alta prevista (${totalReservasConfirmadas} reservas confirmadas) con personal limitado (${totalStaff} activos)`,
     });
   }
 
-  // Check special requests
-  const peticionesEspeciales = reservas?.filter(r => r.notas_cliente?.length > 0).length || 0;
+  // Check special requests - usar todas las reservas no canceladas
+  const peticionesEspeciales = todasReservas?.filter(r => r.notas_cliente?.length > 0).length || 0;
   if (peticionesEspeciales > 0) {
     alerts.push({
       type: "info",
@@ -29,8 +30,8 @@ export function AlertasInteligentes() {
     });
   }
 
-  // Check pending reservations
-  const reservasPendientes = reservas?.filter(r => r.estado === "pendiente").length || 0;
+  // Check pending reservations - usar todas las reservas
+  const reservasPendientes = todasReservas?.filter(r => r.estado === "pendiente").length || 0;
   if (reservasPendientes > 3) {
     alerts.push({
       type: "warning",
