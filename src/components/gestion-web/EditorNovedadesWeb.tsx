@@ -9,222 +9,151 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Eye,
-  Save,
-  X,
-  Image as ImageIcon,
-  Wine,
-  UtensilsCrossed,
-  Gift,
-  Calendar,
-  Star,
-  Sparkles,
-  Loader2,
-} from "lucide-react";
+import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NovedadPreview } from "./MobilePreview";
-const TIPOS_NOVEDAD = [
-  {
-    value: "plato_nuevo",
-    label: "Plato Nuevo",
-  },
-  {
-    value: "promocion",
-    label: "Promoción",
-  },
-  {
-    value: "evento",
-    label: "Evento",
-  },
-  {
-    value: "festivo",
-    label: "Festivo",
-  },
-  {
-    value: "anuncio",
-    label: "Anuncio General",
-  },
-];
-const ICONOS = [
-  {
-    value: "utensils",
-    label: "Cubiertos",
-    icon: UtensilsCrossed,
-  },
-  {
-    value: "wine",
-    label: "Vino",
-    icon: Wine,
-  },
-  {
-    value: "gift",
-    label: "Regalo",
-    icon: Gift,
-  },
-  {
-    value: "calendar",
-    label: "Calendario",
-    icon: Calendar,
-  },
-  {
-    value: "star",
-    label: "Estrella",
-    icon: Star,
-  },
-  {
-    value: "sparkles",
-    label: "Destacado",
-    icon: Sparkles,
-  },
-];
-const TONOS = [
-  {
-    value: "cercano",
-    label: "Cercano",
-    description: "Tono amigable y familiar",
-  },
-  {
-    value: "formal",
-    label: "Formal",
-    description: "Tono profesional y elegante",
-  },
-  {
-    value: "divertido",
-    label: "Divertido",
-    description: "Tono alegre y desenfadado",
-  },
-  {
-    value: "exclusivo",
-    label: "Exclusivo",
-    description: "Tono premium y sofisticado",
-  },
-];
-const LOADING_MESSAGES = [
-  "Generando magia ✨",
-  "Cocinando las palabras perfectas 🍳",
-  "Creando tu descripción...",
-  "Puliendo cada detalle 💎",
-  "Dándole el toque final 🎨",
-  "Inspirándose en tu idea 💡",
-  "Casi listo... ⏳",
-];
+const TIPOS_NOVEDAD = [{
+  value: "plato_nuevo",
+  label: "Plato Nuevo"
+}, {
+  value: "promocion",
+  label: "Promoción"
+}, {
+  value: "evento",
+  label: "Evento"
+}, {
+  value: "festivo",
+  label: "Festivo"
+}, {
+  value: "anuncio",
+  label: "Anuncio General"
+}];
+const ICONOS = [{
+  value: "utensils",
+  label: "Cubiertos",
+  icon: UtensilsCrossed
+}, {
+  value: "wine",
+  label: "Vino",
+  icon: Wine
+}, {
+  value: "gift",
+  label: "Regalo",
+  icon: Gift
+}, {
+  value: "calendar",
+  label: "Calendario",
+  icon: Calendar
+}, {
+  value: "star",
+  label: "Estrella",
+  icon: Star
+}, {
+  value: "sparkles",
+  label: "Destacado",
+  icon: Sparkles
+}];
+const TONOS = [{
+  value: "cercano",
+  label: "Cercano",
+  description: "Tono amigable y familiar"
+}, {
+  value: "formal",
+  label: "Formal",
+  description: "Tono profesional y elegante"
+}, {
+  value: "divertido",
+  label: "Divertido",
+  description: "Tono alegre y desenfadado"
+}, {
+  value: "exclusivo",
+  label: "Exclusivo",
+  description: "Tono premium y sofisticado"
+}];
+const LOADING_MESSAGES = ["Generando magia ✨", "Cocinando las palabras perfectas 🍳", "Creando tu descripción...", "Puliendo cada detalle 💎", "Dándole el toque final 🎨", "Inspirándose en tu idea 💡", "Casi listo... ⏳"];
 interface EditorNovedadesWebProps {
   onPreview: (novedad: NovedadPreview | null) => void;
   onPreviewListChange?: (ids: string[]) => void;
 }
 // Campos específicos por tipo de novedad
-const CAMPOS_POR_TIPO: Record<
-  string,
-  {
-    key: string;
-    label: string;
-    placeholder: string;
-    type?: string;
-  }[]
-> = {
-  plato_nuevo: [
-    {
-      key: "nombre_plato",
-      label: "Nombre del plato",
-      placeholder: "Ej: Risotto de setas...",
-    },
-    {
-      key: "precio",
-      label: "Precio (€)",
-      placeholder: "12.50",
-      type: "number",
-    },
-    {
-      key: "ingredientes",
-      label: "Ingredientes principales",
-      placeholder: "Tomate, mozzarella, albahaca...",
-    },
-    {
-      key: "alergenos",
-      label: "Alérgenos",
-      placeholder: "Gluten, lácteos, frutos secos...",
-    },
-  ],
-  promocion: [
-    {
-      key: "precio_original",
-      label: "Precio original (€)",
-      placeholder: "20.00",
-      type: "number",
-    },
-    {
-      key: "precio_oferta",
-      label: "Precio oferta (€)",
-      placeholder: "15.00",
-      type: "number",
-    },
-    {
-      key: "condiciones",
-      label: "Condiciones",
-      placeholder: "Válido solo fines de semana...",
-    },
-  ],
-  evento: [
-    {
-      key: "fecha_evento",
-      label: "Fecha del evento",
-      placeholder: "",
-      type: "date",
-    },
-    {
-      key: "hora_evento",
-      label: "Hora",
-      placeholder: "20:00",
-      type: "time",
-    },
-    {
-      key: "precio_entrada",
-      label: "Precio entrada (€)",
-      placeholder: "25.00",
-      type: "number",
-    },
-    {
-      key: "aforo",
-      label: "Aforo máximo",
-      placeholder: "50",
-      type: "number",
-    },
-  ],
-  festivo: [
-    {
-      key: "fecha_festivo",
-      label: "Fecha",
-      placeholder: "",
-      type: "date",
-    },
-    {
-      key: "horario_especial",
-      label: "Horario especial",
-      placeholder: "12:00 - 16:00",
-    },
-    {
-      key: "menu_especial",
-      label: "Menú especial",
-      placeholder: "Menú de Navidad...",
-    },
-  ],
-  anuncio: [],
+const CAMPOS_POR_TIPO: Record<string, {
+  key: string;
+  label: string;
+  placeholder: string;
+  type?: string;
+}[]> = {
+  plato_nuevo: [{
+    key: "nombre_plato",
+    label: "Nombre del plato",
+    placeholder: "Ej: Risotto de setas..."
+  }, {
+    key: "precio",
+    label: "Precio (€)",
+    placeholder: "12.50",
+    type: "number"
+  }, {
+    key: "ingredientes",
+    label: "Ingredientes principales",
+    placeholder: "Tomate, mozzarella, albahaca..."
+  }, {
+    key: "alergenos",
+    label: "Alérgenos",
+    placeholder: "Gluten, lácteos, frutos secos..."
+  }],
+  promocion: [{
+    key: "precio_original",
+    label: "Precio original (€)",
+    placeholder: "20.00",
+    type: "number"
+  }, {
+    key: "precio_oferta",
+    label: "Precio oferta (€)",
+    placeholder: "15.00",
+    type: "number"
+  }, {
+    key: "condiciones",
+    label: "Condiciones",
+    placeholder: "Válido solo fines de semana..."
+  }],
+  evento: [{
+    key: "fecha_evento",
+    label: "Fecha del evento",
+    placeholder: "",
+    type: "date"
+  }, {
+    key: "hora_evento",
+    label: "Hora",
+    placeholder: "20:00",
+    type: "time"
+  }, {
+    key: "precio_entrada",
+    label: "Precio entrada (€)",
+    placeholder: "25.00",
+    type: "number"
+  }, {
+    key: "aforo",
+    label: "Aforo máximo",
+    placeholder: "50",
+    type: "number"
+  }],
+  festivo: [{
+    key: "fecha_festivo",
+    label: "Fecha",
+    placeholder: "",
+    type: "date"
+  }, {
+    key: "horario_especial",
+    label: "Horario especial",
+    placeholder: "12:00 - 16:00"
+  }, {
+    key: "menu_especial",
+    label: "Menú especial",
+    placeholder: "Menú de Navidad..."
+  }],
+  anuncio: []
 };
 interface FormData {
   tipo: string;
@@ -269,10 +198,20 @@ const initialFormData: FormData = {
   cta_url: "",
   subtitle: "",
   tags: [],
-  campos_tipo: {},
+  campos_tipo: {}
 };
-export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNovedadesWebProps) {
-  const { novedades, isLoading, crearNovedad, actualizarNovedad, eliminarNovedad, toggleActivo } = useNovedades();
+export function EditorNovedadesWeb({
+  onPreview,
+  onPreviewListChange
+}: EditorNovedadesWebProps) {
+  const {
+    novedades,
+    isLoading,
+    crearNovedad,
+    actualizarNovedad,
+    eliminarNovedad,
+    toggleActivo
+  } = useNovedades();
   const [editingId, setEditingId] = useState<string | null>("new");
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -310,7 +249,6 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
   useEffect(() => {
     onPreviewListChange?.(Array.from(previewIds));
   }, [previewIds, onPreviewListChange]);
-
   const handleTogglePreview = (id: string) => {
     setPreviewIds(prev => {
       const newSet = new Set(prev);
@@ -322,17 +260,19 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       return newSet;
     });
   };
-
   const handleToggleActivo = async (id: string, currentActivo: boolean) => {
-    await toggleActivo.mutateAsync({ id, activo: !currentActivo });
+    await toggleActivo.mutateAsync({
+      id,
+      activo: !currentActivo
+    });
   };
   const handleCampoTipoChange = (key: string, value: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       campos_tipo: {
         ...prev.campos_tipo,
-        [key]: value,
-      },
+        [key]: value
+      }
     }));
   };
   const camposActuales = CAMPOS_POR_TIPO[formData.tipo] || [];
@@ -348,7 +288,7 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
   useEffect(() => {
     if (!generandoDescripcion) return;
     const interval = setInterval(() => {
-      setLoadingMessageIndex((prev) => {
+      setLoadingMessageIndex(prev => {
         const next = (prev + 1) % LOADING_MESSAGES.length;
         setLoadingMessage(LOADING_MESSAGES[next]);
         return next;
@@ -368,33 +308,26 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
     // Construir texto enriquecido con los campos del tipo
     let textoEnriquecido = formData.descripcion;
     if (Object.keys(campos).length > 0) {
-      const detalles = camposActuales
-        .filter((campo) => campos[campo.key])
-        .map((campo) => `${campo.label}: ${campos[campo.key]}`)
-        .join(". ");
+      const detalles = camposActuales.filter(campo => campos[campo.key]).map(campo => `${campo.label}: ${campos[campo.key]}`).join(". ");
       if (detalles) {
         textoEnriquecido += `. Detalles: ${detalles}`;
       }
     }
     setGenerandoDescripcion(true);
     try {
-      const { data, error } = await supabase.functions.invoke("format-novedad", {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke("format-novedad", {
         body: {
-          tipo:
-            formData.tipo === "plato_nuevo"
-              ? "plato"
-              : formData.tipo === "promocion"
-                ? "promo"
-                : formData.tipo === "anuncio"
-                  ? "anuncio"
-                  : formData.tipo,
+          tipo: formData.tipo === "plato_nuevo" ? "plato" : formData.tipo === "promocion" ? "promo" : formData.tipo === "anuncio" ? "anuncio" : formData.tipo,
           // evento, festivo se envían tal cual
           idioma: "es",
           tono: tonoSeleccionado,
           texto: textoEnriquecido,
           canal: "novedades",
-          campos_extra: formData.campos_tipo,
-        },
+          campos_extra: formData.campos_tipo
+        }
       });
       if (error) {
         console.error("Error al llamar webhook:", error);
@@ -428,9 +361,9 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       handleInputChange("descripcion", resultadoWebhook.body);
     }
     if (resultadoWebhook.bullets && Array.isArray(resultadoWebhook.bullets)) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
-        bullets: resultadoWebhook.bullets || [],
+        bullets: resultadoWebhook.bullets || []
       }));
     }
     if (resultadoWebhook.cta) {
@@ -438,9 +371,9 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       if (resultadoWebhook.cta.url) handleInputChange("cta_url", resultadoWebhook.cta.url);
     }
     if (resultadoWebhook.tags && Array.isArray(resultadoWebhook.tags)) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
-        tags: resultadoWebhook.tags || [],
+        tags: resultadoWebhook.tags || []
       }));
     }
     toast.success("Contenido aplicado correctamente");
@@ -456,9 +389,9 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
     setTonoModalOpen(true);
   };
   const handleInputChange = (field: keyof FormData, value: string | boolean | string[]) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
-      [field]: value,
+      [field]: value
     }));
   };
   const handlePreview = () => {
@@ -474,7 +407,7 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       icono: formData.icono,
       destacado: formData.destacado,
       bullets: formData.bullets,
-      tags: formData.tags,
+      tags: formData.tags
     });
   };
   const handleClearPreview = () => {
@@ -488,9 +421,13 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `novedades/${fileName}`;
-      const { error: uploadError } = await supabase.storage.from("novedades").upload(filePath, file);
+      const {
+        error: uploadError
+      } = await supabase.storage.from("novedades").upload(filePath, file);
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("novedades").getPublicUrl(filePath);
+      const {
+        data
+      } = supabase.storage.from("novedades").getPublicUrl(filePath);
       handleInputChange("imagen_url", data.publicUrl);
       toast.success("Imagen subida correctamente");
     } catch (error) {
@@ -522,7 +459,7 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       cta_url: "",
       subtitle: "",
       tags: [],
-      campos_tipo: {},
+      campos_tipo: {}
     });
   };
   const handleCancel = () => {
@@ -549,13 +486,13 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin || null,
       activo: formData.activo,
-      destacado: formData.destacado,
+      destacado: formData.destacado
     };
     try {
       if (editingId && editingId !== "new") {
         await actualizarNovedad.mutateAsync({
           id: editingId,
-          ...data,
+          ...data
         });
         toast.success("Novedad actualizada");
       } else {
@@ -586,64 +523,39 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
     if (fin && fin < hoy) return <Badge variant="destructive">Expirado</Badge>;
     return <Badge variant="default">Activo</Badge>;
   };
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Lista de novedades existentes */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Novedades ({novedades?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 max-h-48 overflow-y-auto">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando...</p>
-          ) : novedades?.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay novedades</p>
-          ) : (
-            novedades?.map((novedad) => (
-              <div
-                key={novedad.id}
-                className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2"
-              >
+          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedades?.length === 0 ? <p className="text-sm text-muted-foreground">No hay novedades</p> : novedades?.map(novedad => <div key={novedad.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-sm font-medium truncate">{novedad.titulo}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Toggle Activo */}
                   <div className="flex items-center gap-1">
-                    <Switch
-                      checked={novedad.activo}
-                      onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)}
-                      className="scale-75"
-                    />
+                    <Switch checked={novedad.activo} onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)} className="scale-75" />
                     <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
                       {novedad.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </div>
                   {/* Toggle Preview */}
-                  <div className="flex items-center gap-1">
-                    <Switch
-                      checked={previewIds.has(novedad.id)}
-                      onCheckedChange={() => handleTogglePreview(novedad.id)}
-                      className="scale-75"
-                    />
+                  <div className="gap-[4px] items-center justify-start flex flex-row my-0 px-[7px]">
+                    <Switch checked={previewIds.has(novedad.id)} onCheckedChange={() => handleTogglePreview(novedad.id)} className="scale-75" />
                     <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
                   </div>
                   {/* Acciones */}
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(novedad)}>
                     <Edit2 className="w-3.5 h-3.5" />
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => setDeleteId(novedad.id)}
-                  >
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(novedad.id)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
-              </div>
-            ))
-          )}
+              </div>)}
         </CardContent>
       </Card>
 
@@ -660,37 +572,33 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Tipo</Label>
-              <Select value={formData.tipo} onValueChange={(v) => handleInputChange("tipo", v)}>
+              <Select value={formData.tipo} onValueChange={v => handleInputChange("tipo", v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS_NOVEDAD.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
+                  {TIPOS_NOVEDAD.map(t => <SelectItem key={t.value} value={t.value}>
                       {t.label}
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Icono</Label>
-              <Select value={formData.icono} onValueChange={(v) => handleInputChange("icono", v)}>
+              <Select value={formData.icono} onValueChange={v => handleInputChange("icono", v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ICONOS.map((i) => {
-                    const Icon = i.icon;
-                    return (
-                      <SelectItem key={i.value} value={i.value}>
+                  {ICONOS.map(i => {
+                  const Icon = i.icon;
+                  return <SelectItem key={i.value} value={i.value}>
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4" />
                           {i.label}
                         </div>
-                      </SelectItem>
-                    );
-                  })}
+                      </SelectItem>;
+                })}
                 </SelectContent>
               </Select>
             </div>
@@ -700,163 +608,93 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1.5">
               <Label className="text-xs">Título *</Label>
-              <Input
-                value={formData.titulo}
-                onChange={(e) => handleInputChange("titulo", e.target.value)}
-                placeholder="Título de la novedad"
-                className="h-9"
-              />
+              <Input value={formData.titulo} onChange={e => handleInputChange("titulo", e.target.value)} placeholder="Título de la novedad" className="h-9" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Badge</Label>
-              <Input
-                value={formData.badge_text}
-                onChange={(e) => handleInputChange("badge_text", e.target.value)}
-                placeholder="Nuevo"
-                className="h-9"
-              />
+              <Input value={formData.badge_text} onChange={e => handleInputChange("badge_text", e.target.value)} placeholder="Nuevo" className="h-9" />
             </div>
           </div>
 
           {/* Campos específicos según tipo */}
-          {camposActuales.length > 0 && (
-            <div className="space-y-2 p-3 rounded-lg bg-accent/30 border">
+          {camposActuales.length > 0 && <div className="space-y-2 p-3 rounded-lg bg-accent/30 border">
               <p className="text-xs font-medium text-muted-foreground">
-                📋 Datos para {TIPOS_NOVEDAD.find((t) => t.value === formData.tipo)?.label}
+                📋 Datos para {TIPOS_NOVEDAD.find(t => t.value === formData.tipo)?.label}
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {camposActuales.map((campo) => (
-                  <div key={campo.key} className="space-y-1">
+                {camposActuales.map(campo => <div key={campo.key} className="space-y-1">
                     <Label className="text-xs">{campo.label}</Label>
-                    <Input
-                      type={campo.type || "text"}
-                      value={(formData.campos_tipo ?? {})[campo.key] || ""}
-                      onChange={(e) => handleCampoTipoChange(campo.key, e.target.value)}
-                      placeholder={campo.placeholder}
-                      className="h-8 text-sm"
-                      step={campo.type === "number" ? "0.01" : undefined}
-                    />
-                  </div>
-                ))}
+                    <Input type={campo.type || "text"} value={(formData.campos_tipo ?? {})[campo.key] || ""} onChange={e => handleCampoTipoChange(campo.key, e.target.value)} placeholder={campo.placeholder} className="h-8 text-sm" step={campo.type === "number" ? "0.01" : undefined} />
+                  </div>)}
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* Descripción */}
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Descripción / Ideas</Label>
-              <Textarea
-                value={formData.descripcion}
-                onChange={(e) => handleInputChange("descripcion", e.target.value)}
-                placeholder="Escribe ideas o un borrador de la descripción..."
-                className="min-h-16 resize-none"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-1"
-                onClick={handleAbrirModalTono}
-                disabled={generandoDescripcion}
-              >
-                {generandoDescripcion ? (
-                  <>
+              <Textarea value={formData.descripcion} onChange={e => handleInputChange("descripcion", e.target.value)} placeholder="Escribe ideas o un borrador de la descripción..." className="min-h-16 resize-none" />
+              <Button type="button" variant="outline" size="sm" className="mt-1" onClick={handleAbrirModalTono} disabled={generandoDescripcion}>
+                {generandoDescripcion ? <>
                     <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
                     Generando...
-                  </>
-                ) : (
-                  <>
+                  </> : <>
                     <Sparkles className="w-3 h-3 mr-1" />
                     Hacer descripción
-                  </>
-                )}
+                  </>}
               </Button>
             </div>
 
             {/* Campos generados por el webhook - solo visibles si tienen contenido */}
-            {(formData.subtitle ||
-              (formData.bullets?.length ?? 0) > 0 ||
-              formData.cta_text ||
-              (formData.tags?.length ?? 0) > 0) && (
-              <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-dashed">
+            {(formData.subtitle || (formData.bullets?.length ?? 0) > 0 || formData.cta_text || (formData.tags?.length ?? 0) > 0) && <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-dashed">
                 <p className="text-xs text-muted-foreground font-medium">✨ Contenido generado</p>
 
                 {/* Subtítulo */}
-                {formData.subtitle && (
-                  <div className="space-y-1">
+                {formData.subtitle && <div className="space-y-1">
                     <Label className="text-xs">Subtítulo</Label>
-                    <Input
-                      value={formData.subtitle}
-                      onChange={(e) => handleInputChange("subtitle", e.target.value)}
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                )}
+                    <Input value={formData.subtitle} onChange={e => handleInputChange("subtitle", e.target.value)} className="h-8 text-sm" />
+                  </div>}
 
                 {/* Bullets */}
-                {(formData.bullets?.length ?? 0) > 0 && (
-                  <div className="space-y-1.5">
+                {(formData.bullets?.length ?? 0) > 0 && <div className="space-y-1.5">
                     <Label className="text-xs">Puntos destacados</Label>
                     <div className="space-y-1">
-                      {formData.bullets?.map((bullet, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                      {formData.bullets?.map((bullet, index) => <div key={index} className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">•</span>
-                          <Input
-                            value={bullet}
-                            onChange={(e) => {
-                              const newBullets = [...(formData.bullets ?? [])];
-                              newBullets[index] = e.target.value;
-                              handleInputChange("bullets", newBullets);
-                            }}
-                            className="h-7 text-sm flex-1"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => {
-                              const newBullets = (formData.bullets ?? []).filter((_, i) => i !== index);
-                              handleInputChange("bullets", newBullets);
-                            }}
-                          >
+                          <Input value={bullet} onChange={e => {
+                    const newBullets = [...(formData.bullets ?? [])];
+                    newBullets[index] = e.target.value;
+                    handleInputChange("bullets", newBullets);
+                  }} className="h-7 text-sm flex-1" />
+                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                    const newBullets = (formData.bullets ?? []).filter((_, i) => i !== index);
+                    handleInputChange("bullets", newBullets);
+                  }}>
                             <X className="w-3 h-3" />
                           </Button>
-                        </div>
-                      ))}
+                        </div>)}
                     </div>
-                  </div>
-                )}
+                  </div>}
 
                 {/* CTA */}
                 {formData.cta_text}
 
                 {/* Tags */}
-                {(formData.tags?.length ?? 0) > 0 && (
-                  <div className="space-y-1">
+                {(formData.tags?.length ?? 0) > 0 && <div className="space-y-1">
                     <Label className="text-xs">Etiquetas</Label>
                     <div className="flex flex-wrap gap-1">
-                      {formData.tags?.map((tag, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs gap-1">
+                      {formData.tags?.map((tag, index) => <Badge key={index} variant="secondary" className="text-xs gap-1">
                           {tag}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newTags = (formData.tags ?? []).filter((_, i) => i !== index);
-                              handleInputChange("tags", newTags);
-                            }}
-                            className="ml-1 hover:text-destructive"
-                          >
+                          <button type="button" onClick={() => {
+                    const newTags = (formData.tags ?? []).filter((_, i) => i !== index);
+                    handleInputChange("tags", newTags);
+                  }} className="ml-1 hover:text-destructive">
                             <X className="w-2.5 h-2.5" />
                           </button>
-                        </Badge>
-                      ))}
+                        </Badge>)}
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  </div>}
+              </div>}
           </div>
 
           {/* Imagen */}
@@ -864,45 +702,23 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
             <Label className="text-xs">Imagen</Label>
 
             {/* Previsualización grande si hay imagen */}
-            {formData.imagen_url ? (
-              <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
-                <img
-                  src={formData.imagen_url}
-                  alt="Preview"
-                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setImageModalOpen(true)}
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2 h-7 w-7"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleInputChange("imagen_url", "");
-                  }}
-                >
+            {formData.imagen_url ? <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
+                <img src={formData.imagen_url} alt="Preview" className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setImageModalOpen(true)} />
+                <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={e => {
+              e.stopPropagation();
+              handleInputChange("imagen_url", "");
+            }}>
                   <X className="w-4 h-4" />
                 </Button>
-              </div>
-            ) : (
-              <div
-                className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {uploading ? (
-                  <div className="flex flex-col items-center gap-2">
+              </div> : <div className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                {uploading ? <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span className="text-xs text-muted-foreground">Subiendo...</span>
-                  </div>
-                ) : (
-                  <>
+                  </div> : <>
                     <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
                     <span className="text-xs text-muted-foreground">Haz clic para subir imagen</span>
-                  </>
-                )}
-              </div>
-            )}
+                  </>}
+              </div>}
 
             <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} className="hidden" />
 
@@ -926,16 +742,11 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
           </div>
           {/* Botón Borrar todo */}
           <div className="pt-2 border-t">
-            <Button
-              variant="destructive"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setFormData(initialFormData);
-                setEditingId("new");
-                handleClearPreview();
-              }}
-            >
+            <Button variant="destructive" size="sm" className="w-full" onClick={() => {
+            setFormData(initialFormData);
+            setEditingId("new");
+            handleClearPreview();
+          }}>
               <Trash2 className="w-4 h-4 mr-1" />
               Borrar todo
             </Button>
@@ -964,13 +775,7 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
       {/* Modal para ver imagen completa */}
       <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
         <DialogContent className="max-w-3xl p-2">
-          {formData.imagen_url && (
-            <img
-              src={formData.imagen_url}
-              alt="Imagen completa"
-              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
-            />
-          )}
+          {formData.imagen_url && <img src={formData.imagen_url} alt="Imagen completa" className="w-full h-auto max-h-[80vh] object-contain rounded-lg" />}
         </DialogContent>
       </Dialog>
 
@@ -981,15 +786,13 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
             <DialogTitle>Selecciona el tono</DialogTitle>
           </DialogHeader>
           <RadioGroup value={tonoSeleccionado} onValueChange={setTonoSeleccionado} className="space-y-3 py-4">
-            {TONOS.map((tono) => (
-              <div key={tono.value} className="flex items-start space-x-3">
+            {TONOS.map(tono => <div key={tono.value} className="flex items-start space-x-3">
                 <RadioGroupItem value={tono.value} id={tono.value} className="mt-0.5" />
                 <Label htmlFor={tono.value} className="flex flex-col cursor-pointer">
                   <span className="font-medium">{tono.label}</span>
                   <span className="text-xs text-muted-foreground">{tono.description}</span>
                 </Label>
-              </div>
-            ))}
+              </div>)}
           </RadioGroup>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTonoModalOpen(false)}>
@@ -1002,11 +805,7 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
 
       {/* Modal de carga mientras se genera */}
       <Dialog open={generandoDescripcion} onOpenChange={() => {}}>
-        <DialogContent
-          className="max-w-md"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
+        <DialogContent className="max-w-md" onPointerDownOutside={e => e.preventDefault()} onEscapeKeyDown={e => e.preventDefault()}>
           <div className="flex flex-col items-center justify-center py-16 space-y-8">
             <div className="relative flex items-center justify-center">
               <div className="absolute w-20 h-20 rounded-full border-4 border-primary/20"></div>
@@ -1030,74 +829,58 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
             </DialogTitle>
           </DialogHeader>
 
-          {resultadoWebhook && (
-            <div className="space-y-4 py-4">
+          {resultadoWebhook && <div className="space-y-4 py-4">
               {/* Título */}
-              {resultadoWebhook.title && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.title && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título</Label>
                   <div className="p-3 bg-muted/50 rounded-lg border">
                     <p className="font-semibold text-lg">{resultadoWebhook.title}</p>
                   </div>
-                </div>
-              )}
+                </div>}
 
               {/* Subtítulo */}
-              {resultadoWebhook.subtitle && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.subtitle && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subtítulo</Label>
                   <div className="p-3 bg-muted/50 rounded-lg border">
                     <p className="text-muted-foreground">{resultadoWebhook.subtitle}</p>
                   </div>
-                </div>
-              )}
+                </div>}
 
               {/* Descripción */}
-              {resultadoWebhook.body && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.body && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Descripción
                   </Label>
                   <div className="p-3 bg-muted/50 rounded-lg border">
                     <p className="text-sm leading-relaxed">{resultadoWebhook.body}</p>
                   </div>
-                </div>
-              )}
+                </div>}
 
               {/* Bullets */}
-              {resultadoWebhook.bullets && resultadoWebhook.bullets.length > 0 && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.bullets && resultadoWebhook.bullets.length > 0 && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Puntos destacados
                   </Label>
                   <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
-                    {resultadoWebhook.bullets.map((bullet, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm">
+                    {resultadoWebhook.bullets.map((bullet, i) => <div key={i} className="flex items-start gap-2 text-sm">
                         <span className="text-primary mt-0.5">•</span>
                         <span>{bullet}</span>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
-                </div>
-              )}
+                </div>}
 
               {/* Tags */}
-              {resultadoWebhook.tags && resultadoWebhook.tags.length > 0 && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.tags && resultadoWebhook.tags.length > 0 && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiquetas</Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {resultadoWebhook.tags.map((tag, i) => (
-                      <Badge key={i} variant="outline" className="text-xs capitalize">
+                    {resultadoWebhook.tags.map((tag, i) => <Badge key={i} variant="outline" className="text-xs capitalize">
                         {tag}
-                      </Badge>
-                    ))}
+                      </Badge>)}
                   </div>
-                </div>
-              )}
+                </div>}
 
               {/* CTA */}
-              {resultadoWebhook.cta && (resultadoWebhook.cta.text || resultadoWebhook.cta.url) && (
-                <div className="space-y-1.5">
+              {resultadoWebhook.cta && (resultadoWebhook.cta.text || resultadoWebhook.cta.url) && <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     Llamada a la acción (CTA)
                   </Label>
@@ -1105,10 +888,8 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
                     {resultadoWebhook.cta.text && <p className="text-sm font-medium">{resultadoWebhook.cta.text}</p>}
                     {resultadoWebhook.cta.url && <p className="text-xs text-muted-foreground break-all">{resultadoWebhook.cta.url}</p>}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                </div>}
+            </div>}
 
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
             <div className="flex gap-2 w-full sm:w-auto">
@@ -1128,6 +909,5 @@ export function EditorNovedadesWeb({ onPreview, onPreviewListChange }: EditorNov
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 }
