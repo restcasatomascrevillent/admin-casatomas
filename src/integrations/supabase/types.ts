@@ -965,12 +965,8 @@ export type Database = {
         Row: {
           activo: boolean | null
           badge_text: string | null
-          badge_text_en: string | null
-          badge_text_fr: string | null
           bebida_id: string | null
           bullets: string[] | null
-          bullets_en: string[] | null
-          bullets_fr: string[] | null
           created_at: string | null
           created_by: string | null
           descripcion: string | null
@@ -986,8 +982,6 @@ export type Database = {
           plato_id: string | null
           seccion: string | null
           tags: string[] | null
-          tags_en: string[] | null
-          tags_fr: string[] | null
           tipo: string
           tipo_asociacion: string | null
           titulo: string
@@ -999,12 +993,8 @@ export type Database = {
         Insert: {
           activo?: boolean | null
           badge_text?: string | null
-          badge_text_en?: string | null
-          badge_text_fr?: string | null
           bebida_id?: string | null
           bullets?: string[] | null
-          bullets_en?: string[] | null
-          bullets_fr?: string[] | null
           created_at?: string | null
           created_by?: string | null
           descripcion?: string | null
@@ -1020,8 +1010,6 @@ export type Database = {
           plato_id?: string | null
           seccion?: string | null
           tags?: string[] | null
-          tags_en?: string[] | null
-          tags_fr?: string[] | null
           tipo?: string
           tipo_asociacion?: string | null
           titulo: string
@@ -1033,12 +1021,8 @@ export type Database = {
         Update: {
           activo?: boolean | null
           badge_text?: string | null
-          badge_text_en?: string | null
-          badge_text_fr?: string | null
           bebida_id?: string | null
           bullets?: string[] | null
-          bullets_en?: string[] | null
-          bullets_fr?: string[] | null
           created_at?: string | null
           created_by?: string | null
           descripcion?: string | null
@@ -1054,8 +1038,6 @@ export type Database = {
           plato_id?: string | null
           seccion?: string | null
           tags?: string[] | null
-          tags_en?: string[] | null
-          tags_fr?: string[] | null
           tipo?: string
           tipo_asociacion?: string | null
           titulo?: string

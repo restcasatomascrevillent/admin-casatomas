@@ -531,69 +531,32 @@ export function EditorNovedadesWeb({
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Novedades ({novedades?.length || 0})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedades?.length === 0 ? <p className="text-sm text-muted-foreground">No hay novedades</p> : novedades?.map(novedad => <div key={novedad.id} className="flex flex-col p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate">{novedad.titulo}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Toggle Activo */}
-                    <div className="flex items-center gap-1">
-                      <Switch checked={novedad.activo} onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)} className="scale-75" />
-                      <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        {novedad.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </div>
-                    {/* Toggle Preview */}
-                    <div className="gap-[4px] items-center justify-start flex flex-row my-0 px-[7px]">
-                      <Switch checked={previewIds.has(novedad.id)} onCheckedChange={() => handleTogglePreview(novedad.id)} className="scale-75" />
-                      <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
-                    </div>
-                    {/* Acciones */}
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(novedad)}>
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(novedad.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+        <CardContent className="space-y-2 max-h-48 overflow-y-auto">
+          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedades?.length === 0 ? <p className="text-sm text-muted-foreground">No hay novedades</p> : novedades?.map(novedad => <div key={novedad.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate">{novedad.titulo}</span>
                 </div>
-                
-                {/* Bullets y Tags - igual que en el preview */}
-                {((novedad.bullets && novedad.bullets.length > 0) || (novedad.tags && novedad.tags.length > 0)) && (
-                  <div className="flex flex-col gap-1.5 pl-1">
-                    {/* Puntos destacados (bullets) */}
-                    {novedad.bullets && novedad.bullets.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {novedad.bullets.map((bullet, i) => (
-                          <Badge 
-                            key={i} 
-                            variant="secondary" 
-                            className="text-[10px] px-1.5 py-0.5 h-auto font-normal"
-                          >
-                            {bullet}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Etiquetas (tags) */}
-                    {novedad.tags && novedad.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {novedad.tags.map((tag, i) => (
-                          <Badge 
-                            key={i} 
-                            variant="outline" 
-                            className="text-[10px] px-1 py-0 h-4 bg-muted/50"
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                <div className="flex items-center gap-2">
+                  {/* Toggle Activo */}
+                  <div className="flex items-center gap-1">
+                    <Switch checked={novedad.activo} onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)} className="scale-75" />
+                    <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {novedad.activo ? 'Activo' : 'Inactivo'}
+                    </span>
                   </div>
-                )}
+                  {/* Toggle Preview */}
+                  <div className="gap-[4px] items-center justify-start flex flex-row my-0 px-[7px]">
+                    <Switch checked={previewIds.has(novedad.id)} onCheckedChange={() => handleTogglePreview(novedad.id)} className="scale-75" />
+                    <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </div>
+                  {/* Acciones */}
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(novedad)}>
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(novedad.id)}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>)}
         </CardContent>
       </Card>
