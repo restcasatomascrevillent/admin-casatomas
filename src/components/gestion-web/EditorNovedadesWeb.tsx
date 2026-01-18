@@ -260,11 +260,7 @@ export function EditorNovedadesWeb({
             {editingId && editingId !== 'new' ? 'Editar Novedad' : 'Nueva Novedad'}
           </CardTitle>
         </CardHeader>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">
-              {editingId === 'new' ? 'Nueva Novedad' : 'Editar Novedad'}
-            </CardTitle>
-          </CardHeader>
+          
           <CardContent className="space-y-4">
             {/* Tipo e Icono */}
             <div className="grid grid-cols-2 gap-3">
@@ -332,16 +328,11 @@ export function EditorNovedadesWeb({
               
               {/* Previsualización grande si hay imagen */}
               {formData.imagen_url ? <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
-                  <img 
-                    src={formData.imagen_url} 
-                    alt="Preview" 
-                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
-                    onClick={() => setImageModalOpen(true)}
-                  />
-                  <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={(e) => {
-                    e.stopPropagation();
-                    handleInputChange('imagen_url', '');
-                  }}>
+                  <img src={formData.imagen_url} alt="Preview" className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setImageModalOpen(true)} />
+                  <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={e => {
+              e.stopPropagation();
+              handleInputChange('imagen_url', '');
+            }}>
                     <X className="w-4 h-4" />
                   </Button>
                 </div> : <div className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
@@ -434,13 +425,7 @@ export function EditorNovedadesWeb({
       {/* Modal para ver imagen completa */}
       <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
         <DialogContent className="max-w-3xl p-2">
-          {formData.imagen_url && (
-            <img 
-              src={formData.imagen_url} 
-              alt="Imagen completa" 
-              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
-            />
-          )}
+          {formData.imagen_url && <img src={formData.imagen_url} alt="Imagen completa" className="w-full h-auto max-h-[80vh] object-contain rounded-lg" />}
         </DialogContent>
       </Dialog>
     </div>;
