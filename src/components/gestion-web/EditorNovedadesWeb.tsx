@@ -887,19 +887,6 @@ export function EditorNovedadesWeb({
                 </div>
               )}
               
-              {/* CTA */}
-              {resultadoWebhook.cta?.text && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Call to Action</Label>
-                  <div className="p-3 bg-muted/50 rounded-lg border flex items-center gap-2">
-                    <Badge variant="secondary">{resultadoWebhook.cta.text}</Badge>
-                    {resultadoWebhook.cta.url && (
-                      <span className="text-xs text-muted-foreground truncate">→ {resultadoWebhook.cta.url}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-              
               {/* Tags */}
               {resultadoWebhook.tags && resultadoWebhook.tags.length > 0 && (
                 <div className="space-y-1.5">
