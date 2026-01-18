@@ -925,7 +925,7 @@ export function EditorNovedadesWeb({
                 Otro tono
               </Button>
             </div>
-            <Button onClick={handleAplicarResultado} className="w-full sm:w-auto">
+            <Button size="sm" onClick={handleAplicarResultado} className="flex-1 sm:flex-none">
               <Save className="w-4 h-4 mr-1.5" />
               Usar
             </Button>
