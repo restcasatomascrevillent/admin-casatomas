@@ -333,7 +333,7 @@ export function EditorNovedadesWeb({
       }));
     }
     if (resultadoWebhook.cta) {
-      if (resultadoWebhook.cta.text) handleInputChange('cta_text', resultadoWebhook.cta.text);
+      if (resultadoWebhook.cta.text) handleInputChange('badge_text', resultadoWebhook.cta.text);
       if (resultadoWebhook.cta.url) handleInputChange('cta_url', resultadoWebhook.cta.url);
     }
     if (resultadoWebhook.tags && Array.isArray(resultadoWebhook.tags)) {
