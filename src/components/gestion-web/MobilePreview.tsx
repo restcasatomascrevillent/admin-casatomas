@@ -150,10 +150,10 @@ export function MobilePreview({
                           {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
                         </p>
                         
-                        {/* Puntos destacados (bullets) como badges */}
+                        {/* Puntos destacados (bullets) */}
                         {novedad.bullets && novedad.bullets.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {novedad.bullets.slice(0, 3).map((bullet, i) => (
+                            {novedad.bullets.map((bullet, i) => (
                               <Badge 
                                 key={i} 
                                 variant="secondary" 
@@ -168,7 +168,7 @@ export function MobilePreview({
                         {/* Etiquetas (tags) */}
                         {novedad.tags && novedad.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {novedad.tags.slice(0, 3).map((tag, i) => (
+                            {novedad.tags.map((tag, i) => (
                               <Badge 
                                 key={i} 
                                 variant="outline" 
