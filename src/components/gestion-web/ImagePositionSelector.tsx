@@ -21,50 +21,40 @@ export function ImagePositionSelector({
   const [position, setPosition] = useState(currentPosition);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [containerHeight, setContainerHeight] = useState(0);
 
-  // Aspect ratio de la tarjeta (aproximadamente 16:9)
-  const CARD_ASPECT_RATIO = 16 / 9;
+  // El marco visible tiene una altura fija (proporción de tarjeta ~16:9 → 25% del contenedor)
+  const FRAME_HEIGHT_PERCENT = 25;
 
   useEffect(() => {
     setPosition(currentPosition);
   }, [currentPosition, open]);
 
-  const handleImageLoad = () => {
-    if (imageRef.current) {
-      setImageDimensions({
-        width: imageRef.current.naturalWidth,
-        height: imageRef.current.naturalHeight,
-      });
-      setImageLoaded(true);
+  useEffect(() => {
+    if (containerRef.current) {
+      setContainerHeight(containerRef.current.clientHeight);
     }
-  };
+  }, [open]);
 
   const calculatePosition = useCallback((clientY: number) => {
-    if (!containerRef.current || !imageLoaded) return;
+    if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const containerHeight = rect.height;
-    const imageHeight = imageDimensions.height;
-    const displayedImageHeight = containerRef.current.querySelector('img')?.clientHeight || 0;
-    
-    // Calcular el rango de movimiento
-    const viewportHeight = containerHeight * 0.4; // La ventana visible es 40% del contenedor
-    const maxOffset = displayedImageHeight - viewportHeight;
-    
-    if (maxOffset <= 0) {
-      setPosition(50);
-      return;
-    }
-
     const relativeY = clientY - rect.top;
-    const percentage = Math.max(0, Math.min(100, (relativeY / containerHeight) * 100));
-    setPosition(percentage);
-  }, [imageLoaded, imageDimensions.height]);
+    const containerH = rect.height;
+    
+    // Limitar para que el frame no se salga de la imagen
+    const minY = FRAME_HEIGHT_PERCENT / 2;
+    const maxY = 100 - FRAME_HEIGHT_PERCENT / 2;
+    
+    const rawPercent = (relativeY / containerH) * 100;
+    const clampedPercent = Math.max(minY, Math.min(maxY, rawPercent));
+    
+    setPosition(clampedPercent);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
     setIsDragging(true);
     calculatePosition(e.clientY);
   };
@@ -98,6 +88,7 @@ export function ImagePositionSelector({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (isDragging) {
+      e.preventDefault();
       calculatePosition(e.touches[0].clientY);
     }
   };
@@ -111,6 +102,9 @@ export function ImagePositionSelector({
     onOpenChange(false);
   };
 
+  // Calcular posición del frame
+  const frameTop = position - FRAME_HEIGHT_PERCENT / 2;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden">
@@ -120,79 +114,64 @@ export function ImagePositionSelector({
             Posicionar imagen
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Arrastra verticalmente para elegir qué parte de la imagen se verá en la tarjeta
+            Arrastra el recuadro para elegir qué parte de la imagen se verá en la tarjeta
           </p>
         </DialogHeader>
 
         <div 
           ref={containerRef}
-          className="relative w-full h-[60vh] overflow-hidden cursor-ns-resize select-none bg-black/90"
+          className="relative w-full h-[60vh] overflow-hidden cursor-ns-resize select-none"
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Imagen de fondo completa con opacidad */}
+          {/* Imagen de fondo fija */}
           <img
-            ref={imageRef}
             src={imageUrl}
             alt="Imagen completa"
-            className="w-full h-auto min-h-full object-cover opacity-30"
-            style={{
-              objectPosition: `center ${position}%`,
-            }}
-            onLoad={handleImageLoad}
+            className="absolute inset-0 w-full h-full object-cover"
             draggable={false}
           />
 
-          {/* Overlay superior oscuro */}
+          {/* Overlay oscuro superior */}
           <div 
-            className="absolute top-0 left-0 right-0 bg-black/70 transition-all duration-75"
-            style={{
-              height: `${Math.max(0, position - 20)}%`,
-            }}
+            className="absolute top-0 left-0 right-0 bg-black/60 transition-all duration-75 pointer-events-none"
+            style={{ height: `${Math.max(0, frameTop)}%` }}
           />
 
-          {/* Ventana visible (rectángulo con la parte seleccionada) */}
+          {/* Overlay oscuro inferior */}
           <div 
-            className="absolute left-4 right-4 border-2 border-white rounded-lg overflow-hidden shadow-2xl transition-all duration-75"
+            className="absolute bottom-0 left-0 right-0 bg-black/60 transition-all duration-75 pointer-events-none"
+            style={{ height: `${Math.max(0, 100 - frameTop - FRAME_HEIGHT_PERCENT)}%` }}
+          />
+
+          {/* Marco visible (transparente con borde) */}
+          <div 
+            className="absolute left-0 right-0 border-2 border-white/90 transition-all duration-75 pointer-events-none"
             style={{
-              top: `${Math.max(5, position - 20)}%`,
-              height: '40%',
+              top: `${frameTop}%`,
+              height: `${FRAME_HEIGHT_PERCENT}%`,
             }}
           >
-            <img
-              src={imageUrl}
-              alt="Parte visible"
-              className="w-full h-full object-cover"
-              style={{
-                objectPosition: `center ${position}%`,
-              }}
-              draggable={false}
-            />
+            {/* Líneas de guía horizontales */}
+            <div className="absolute top-1/3 left-0 right-0 border-t border-white/30" />
+            <div className="absolute top-2/3 left-0 right-0 border-t border-white/30" />
             
-            {/* Indicador de arrastre */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-black/50 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 backdrop-blur-sm">
+            {/* Esquinas decorativas */}
+            <div className="absolute -top-0.5 -left-0.5 w-4 h-4 border-t-2 border-l-2 border-white" />
+            <div className="absolute -top-0.5 -right-0.5 w-4 h-4 border-t-2 border-r-2 border-white" />
+            <div className="absolute -bottom-0.5 -left-0.5 w-4 h-4 border-b-2 border-l-2 border-white" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 border-b-2 border-r-2 border-white" />
+
+            {/* Indicador central */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={`bg-black/50 text-white px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 backdrop-blur-sm transition-opacity ${isDragging ? 'opacity-100' : 'opacity-70'}`}>
                 <Move className="w-4 h-4" />
-                {isDragging ? 'Suelta para confirmar' : 'Arrastra para mover'}
+                {isDragging ? 'Suelta para fijar' : 'Arrastra arriba/abajo'}
               </div>
             </div>
-
-            {/* Bordes decorativos */}
-            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white rounded-tl-lg" />
-            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white rounded-tr-lg" />
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white rounded-bl-lg" />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white rounded-br-lg" />
           </div>
-
-          {/* Overlay inferior oscuro */}
-          <div 
-            className="absolute bottom-0 left-0 right-0 bg-black/70 transition-all duration-75"
-            style={{
-              height: `${Math.max(0, 100 - position - 20)}%`,
-            }}
-          />
         </div>
 
         <DialogFooter className="p-4 pt-2 flex gap-2">
