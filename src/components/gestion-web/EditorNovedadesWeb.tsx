@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Edit2, Trash2, Eye, Save, X, Upload, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
+import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NovedadPreview } from "./MobilePreview";
@@ -344,42 +344,61 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
 
 
             {/* Imagen */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label className="text-xs">Imagen</Label>
-              <div className="flex gap-2">
-                <Input 
-                  value={formData.imagen_url} 
-                  onChange={(e) => handleInputChange('imagen_url', e.target.value)}
-                  placeholder="URL de la imagen"
-                  className="h-9 flex-1"
-                />
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
+              
+              {/* Previsualización grande si hay imagen */}
+              {formData.imagen_url ? (
+                <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
+                  <img 
+                    src={formData.imagen_url} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover" 
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-7 w-7"
+                    onClick={() => handleInputChange('imagen_url', '')}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div 
+                  className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="h-9"
                 >
                   {uploading ? (
-                    <span className="animate-spin">⏳</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-muted-foreground">Subiendo...</span>
+                    </div>
                   ) : (
-                    <Upload className="w-4 h-4" />
+                    <>
+                      <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
+                      <span className="text-xs text-muted-foreground">Haz clic para subir imagen</span>
+                    </>
                   )}
-                </Button>
-              </div>
-              {formData.imagen_url && (
-                <div className="mt-2 relative w-24 h-16 rounded overflow-hidden border">
-                  <img src={formData.imagen_url} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
+              
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              {/* Campo URL opcional */}
+              <Input 
+                value={formData.imagen_url} 
+                onChange={(e) => handleInputChange('imagen_url', e.target.value)}
+                placeholder="O pega una URL de imagen"
+                className="h-8 text-xs"
+              />
             </div>
 
             {/* Fechas */}
