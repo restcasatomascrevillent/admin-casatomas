@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook-test/format-novedad";
+const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/format-novedad";
 
 serve(async (req) => {
   // Handle CORS preflight
