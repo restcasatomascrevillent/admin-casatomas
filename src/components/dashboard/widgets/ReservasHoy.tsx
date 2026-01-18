@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
-
 export function ReservasHoy() {
   const navigate = useNavigate();
-  const { data: todasReservas } = useTodayReservations();
-  const { data: reservasConfirmadas } = useTodayConfirmedReservations();
-
+  const {
+    data: todasReservas
+  } = useTodayReservations();
+  const {
+    data: reservasConfirmadas
+  } = useTodayConfirmedReservations();
   const ahora = new Date();
   const horaActual = ahora.getHours();
 
@@ -19,12 +21,10 @@ export function ReservasHoy() {
     const hora = parseInt(r.hora.split(':')[0]);
     return hora < 17;
   }) || [];
-  
   const reservasCenaConfirmadas = reservasConfirmadas?.filter(r => {
     const hora = parseInt(r.hora.split(':')[0]);
     return hora >= 17;
   }) || [];
-
   const comensalesComida = reservasComidaConfirmadas.reduce((acc, r) => acc + r.numero_comensales, 0);
   const comensalesCena = reservasCenaConfirmadas.reduce((acc, r) => acc + r.numero_comensales, 0);
 
@@ -46,21 +46,15 @@ export function ReservasHoy() {
     const diffMs = horaReserva.getTime() - ahora.getTime();
     return diffMs > 0 && diffMs <= 60 * 60 * 1000;
   }) || [];
-
-
-  return (
-    <Card className="h-full">
+  return <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-semibold">Reservas de Hoy</CardTitle>
         <div className="flex items-center gap-2">
-          {reservasBlacklist.length > 0 && (
-            <Badge variant="destructive" className="gap-1">
+          {reservasBlacklist.length > 0 && <Badge variant="destructive" className="gap-1">
               <ShieldBan className="h-3 w-3" />
               {reservasBlacklist.length}
-            </Badge>
-          )}
-          {reservasConNotas.length > 0 && (
-            <Dialog>
+            </Badge>}
+          {reservasConNotas.length > 0 && <Dialog>
               <DialogTrigger asChild>
                 <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-secondary/80 transition-colors">
                   <MessageSquare className="h-3 w-3" />
@@ -76,8 +70,7 @@ export function ReservasHoy() {
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh]">
                   <div className="space-y-3 pr-4">
-                    {reservasConNotas.map((r) => (
-                      <div key={r.id} className="p-3 bg-muted/50 rounded-lg border">
+                    {reservasConNotas.map(r => <div key={r.id} className="p-3 bg-muted/50 rounded-lg border">
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <span className="font-medium">{r.nombre || "Sin nombre"}</span>
@@ -88,19 +81,15 @@ export function ReservasHoy() {
                         <p className="text-sm text-muted-foreground bg-background p-2 rounded italic">
                           "{r.notas_cliente}"
                         </p>
-                      </div>
-                    ))}
+                      </div>)}
                   </div>
                 </ScrollArea>
               </DialogContent>
-            </Dialog>
-          )}
-          {reservasEnRiesgo.length > 0 && (
-            <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+            </Dialog>}
+          {reservasEnRiesgo.length > 0 && <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
               <AlertTriangle className="h-3 w-3" />
               {reservasEnRiesgo.length}
-            </Badge>
-          )}
+            </Badge>}
           <CalendarCheck className="h-5 w-5 text-primary" />
         </div>
       </CardHeader>
@@ -144,22 +133,18 @@ export function ReservasHoy() {
         <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
           <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
             <div className="text-lg sm:text-2xl font-bold text-primary">{todasReservas?.length || 0}</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Total</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 text-center">Total</p>
           </div>
           <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
             <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas + reservasVerificadas}</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Confirmadas</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 text-center">Confirmadas</p>
           </div>
-          <div 
-            className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors"
-            onClick={() => navigate('/reservas?tab=lista&status=pendiente&date=today')}
-          >
+          <div className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors" onClick={() => navigate('/reservas?tab=lista&status=pendiente&date=today')}>
             <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Pendientes</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 text-center">Pendientes</p>
           </div>
         </div>
 
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
