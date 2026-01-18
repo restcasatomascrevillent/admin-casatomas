@@ -13,6 +13,7 @@ export interface NovedadPreview {
   titulo_fr?: string | null;
   descripcion_fr?: string | null;
   imagen_url?: string | null;
+  imagen_posicion_y?: number | null;
   badge_text?: string | null;
   badge_text_en?: string | null;
   badge_text_fr?: string | null;
@@ -140,7 +141,7 @@ export function MobilePreview({
               const textos = getTextoIdioma(novedad, idioma);
               return <Card key={novedad.id || index} className={`overflow-hidden transition-all duration-300 ${isPreview ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                       {novedad.imagen_url && <div className="relative h-24 overflow-hidden">
-                          <img src={novedad.imagen_url} alt={textos.titulo} className="w-full h-full object-cover" />
+                          <img src={novedad.imagen_url} alt={textos.titulo} className="w-full h-full object-cover" style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }} />
                           {isPreview && <div className="absolute top-1 right-1">
                               <Badge variant="default" className="text-[10px] px-1.5 py-0">
                                 Preview

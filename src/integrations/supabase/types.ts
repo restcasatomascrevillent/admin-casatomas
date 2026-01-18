@@ -981,6 +981,7 @@ export type Database = {
           fecha_inicio: string
           icono: string | null
           id: string
+          imagen_posicion_y: number | null
           imagen_url: string | null
           orden: number | null
           plato_id: string | null
@@ -1015,6 +1016,7 @@ export type Database = {
           fecha_inicio?: string
           icono?: string | null
           id?: string
+          imagen_posicion_y?: number | null
           imagen_url?: string | null
           orden?: number | null
           plato_id?: string | null
@@ -1049,6 +1051,7 @@ export type Database = {
           fecha_inicio?: string
           icono?: string | null
           id?: string
+          imagen_posicion_y?: number | null
           imagen_url?: string | null
           orden?: number | null
           plato_id?: string | null

@@ -7,6 +7,7 @@ export interface Novedad {
   titulo: string;
   descripcion: string | null;
   imagen_url: string | null;
+  imagen_posicion_y: number | null;
   tipo: "item_carta" | "anuncio";
   tipo_asociacion: "plato" | "vino" | "bebida" | "seccion" | null;
   plato_id: string | null;
@@ -41,6 +42,7 @@ export interface NuevaNovedad {
   titulo?: string;
   descripcion?: string;
   imagen_url?: string;
+  imagen_posicion_y?: number;
   tipo: "item_carta" | "anuncio";
   tipo_asociacion?: "plato" | "vino" | "bebida" | "seccion" | null;
   plato_id?: string | null;

@@ -11,10 +11,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2, Globe } from "lucide-react";
+import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2, Globe, Move } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NovedadPreview } from "./MobilePreview";
+import { ImagePositionSelector } from "./ImagePositionSelector";
 const TIPOS_NOVEDAD = [{
   value: "plato_nuevo",
   label: "Plato Nuevo"
@@ -168,6 +169,7 @@ interface FormData {
   badge_text_fr: string;
   icono: string;
   imagen_url: string;
+  imagen_posicion_y: number;
   fecha_inicio: string;
   fecha_fin: string;
   activo: boolean;
@@ -197,6 +199,7 @@ const initialFormData: FormData = {
   badge_text_fr: "",
   icono: "utensils",
   imagen_url: "",
+  imagen_posicion_y: 50,
   fecha_inicio: new Date().toISOString().split("T")[0],
   fecha_fin: "",
   activo: true,
@@ -401,7 +404,7 @@ export function EditorNovedadesWeb({
     setResultadoModalOpen(false);
     setTonoModalOpen(true);
   };
-  const handleInputChange = (field: keyof FormData, value: string | boolean | string[]) => {
+  const handleInputChange = (field: keyof FormData, value: string | boolean | string[] | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -416,6 +419,7 @@ export function EditorNovedadesWeb({
       titulo_fr: formData.titulo_fr,
       descripcion_fr: formData.descripcion_fr,
       imagen_url: formData.imagen_url,
+      imagen_posicion_y: formData.imagen_posicion_y,
       badge_text: formData.badge_text,
       badge_text_en: formData.badge_text_en,
       badge_text_fr: formData.badge_text_fr,
@@ -521,6 +525,7 @@ export function EditorNovedadesWeb({
       badge_text_fr: novedad.badge_text_fr || "",
       icono: novedad.icono || "utensils",
       imagen_url: novedad.imagen_url || "",
+      imagen_posicion_y: novedad.imagen_posicion_y ?? 50,
       fecha_inicio: novedad.fecha_inicio?.split("T")[0] || new Date().toISOString().split("T")[0],
       fecha_fin: novedad.fecha_fin?.split("T")[0] || "",
       activo: novedad.activo ?? true,
@@ -560,6 +565,7 @@ export function EditorNovedadesWeb({
       badge_text_fr: formData.badge_text_fr || null,
       icono: formData.icono,
       imagen_url: formData.imagen_url || null,
+      imagen_posicion_y: formData.imagen_posicion_y,
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin || null,
       activo: formData.activo,
@@ -785,28 +791,55 @@ export function EditorNovedadesWeb({
             <Label className="text-xs">Imagen</Label>
 
             {/* Previsualización grande si hay imagen */}
-            {formData.imagen_url ? <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
-                <img src={formData.imagen_url} alt="Preview" className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setImageModalOpen(true)} />
-                <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={e => {
-              e.stopPropagation();
-              handleInputChange("imagen_url", "");
-            }}>
+            {formData.imagen_url ? (
+              <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
+                <img 
+                  src={formData.imagen_url} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                  style={{ objectPosition: `center ${formData.imagen_posicion_y}%` }}
+                  onClick={() => setImageModalOpen(true)} 
+                />
+                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                  <Move className="w-3 h-3" />
+                  Clic para posicionar
+                </div>
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  size="icon" 
+                  className="absolute top-2 right-2 h-7 w-7" 
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleInputChange("imagen_url", "");
+                    handleInputChange("imagen_posicion_y", 50);
+                  }}
+                >
                   <X className="w-4 h-4" />
                 </Button>
-              </div> : <div className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                {uploading ? <div className="flex flex-col items-center gap-2">
+              </div>
+            ) : (
+              <div 
+                className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" 
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? (
+                  <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     <span className="text-xs text-muted-foreground">Subiendo...</span>
-                  </div> : <>
+                  </div>
+                ) : (
+                  <>
                     <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
                     <span className="text-xs text-muted-foreground">Haz clic para subir imagen</span>
-                  </>}
-              </div>}
+                  </>
+                )}
+              </div>
+            )}
 
             <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} className="hidden" />
-
-            {/* Campo URL opcional */}
           </div>
+
 
           {/* Fechas */}
 
@@ -874,12 +907,14 @@ export function EditorNovedadesWeb({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal para ver imagen completa */}
-      <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
-        <DialogContent className="max-w-3xl p-2">
-          {formData.imagen_url && <img src={formData.imagen_url} alt="Imagen completa" className="w-full h-auto max-h-[80vh] object-contain rounded-lg" />}
-        </DialogContent>
-      </Dialog>
+      {/* Modal para posicionar imagen */}
+      <ImagePositionSelector
+        open={imageModalOpen}
+        onOpenChange={setImageModalOpen}
+        imageUrl={formData.imagen_url}
+        currentPosition={formData.imagen_posicion_y}
+        onPositionChange={(pos) => handleInputChange("imagen_posicion_y", pos)}
+      />
 
       {/* Modal para seleccionar tono */}
       <Dialog open={tonoModalOpen} onOpenChange={setTonoModalOpen}>
