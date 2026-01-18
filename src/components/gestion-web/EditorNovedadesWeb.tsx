@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NovedadPreview } from "./MobilePreview";
@@ -164,6 +164,8 @@ interface FormData {
   titulo_fr: string;
   descripcion_fr: string;
   badge_text: string;
+  badge_text_en: string;
+  badge_text_fr: string;
   icono: string;
   imagen_url: string;
   fecha_inicio: string;
@@ -171,10 +173,14 @@ interface FormData {
   activo: boolean;
   destacado: boolean;
   bullets: string[];
+  bullets_en: string[];
+  bullets_fr: string[];
   cta_text: string;
   cta_url: string;
   subtitle: string;
   tags: string[];
+  tags_en: string[];
+  tags_fr: string[];
   // Campos dinámicos por tipo
   campos_tipo: Record<string, string>;
 }
@@ -187,6 +193,8 @@ const initialFormData: FormData = {
   titulo_fr: "",
   descripcion_fr: "",
   badge_text: "",
+  badge_text_en: "",
+  badge_text_fr: "",
   icono: "utensils",
   imagen_url: "",
   fecha_inicio: new Date().toISOString().split("T")[0],
@@ -194,10 +202,14 @@ const initialFormData: FormData = {
   activo: true,
   destacado: false,
   bullets: [],
+  bullets_en: [],
+  bullets_fr: [],
   cta_text: "",
   cta_url: "",
   subtitle: "",
   tags: [],
+  tags_en: [],
+  tags_fr: [],
   campos_tipo: {}
 };
 export function EditorNovedadesWeb({
@@ -235,6 +247,7 @@ export function EditorNovedadesWeb({
     tags?: string[];
   } | null>(null);
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set());
+  const [isTranslating, setIsTranslating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inicializar previewIds con novedades activas
@@ -404,11 +417,67 @@ export function EditorNovedadesWeb({
       descripcion_fr: formData.descripcion_fr,
       imagen_url: formData.imagen_url,
       badge_text: formData.badge_text,
+      badge_text_en: formData.badge_text_en,
+      badge_text_fr: formData.badge_text_fr,
       icono: formData.icono,
       destacado: formData.destacado,
       bullets: formData.bullets,
-      tags: formData.tags
+      bullets_en: formData.bullets_en,
+      bullets_fr: formData.bullets_fr,
+      tags: formData.tags,
+      tags_en: formData.tags_en,
+      tags_fr: formData.tags_fr,
     });
+  };
+
+  const handleTranslate = async () => {
+    if (!formData.titulo.trim()) {
+      toast.error("Escribe primero un título para traducir");
+      return;
+    }
+    
+    setIsTranslating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("traducir-novedad", {
+        body: {
+          titulo: formData.titulo,
+          descripcion: formData.descripcion,
+          badge_text: formData.badge_text,
+          bullets: formData.bullets,
+          tags: formData.tags,
+        }
+      });
+
+      if (error) {
+        console.error("Error al traducir:", error);
+        toast.error("Error al traducir la novedad");
+        return;
+      }
+
+      console.log("Traducciones recibidas:", data);
+
+      // Actualizar formData con las traducciones
+      setFormData(prev => ({
+        ...prev,
+        titulo_en: data.titulo_en || prev.titulo_en,
+        titulo_fr: data.titulo_fr || prev.titulo_fr,
+        descripcion_en: data.descripcion_en || prev.descripcion_en,
+        descripcion_fr: data.descripcion_fr || prev.descripcion_fr,
+        badge_text_en: data.badge_text_en || prev.badge_text_en,
+        badge_text_fr: data.badge_text_fr || prev.badge_text_fr,
+        bullets_en: data.bullets_en || prev.bullets_en,
+        bullets_fr: data.bullets_fr || prev.bullets_fr,
+        tags_en: data.tags_en || prev.tags_en,
+        tags_fr: data.tags_fr || prev.tags_fr,
+      }));
+
+      toast.success("¡Traducción completada! 🌍");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error al conectar con el servicio de traducción");
+    } finally {
+      setIsTranslating(false);
+    }
   };
   const handleClearPreview = () => {
     onPreview(null);
@@ -448,6 +517,8 @@ export function EditorNovedadesWeb({
       titulo_fr: novedad.titulo_fr || "",
       descripcion_fr: novedad.descripcion_fr || "",
       badge_text: novedad.badge_text || "",
+      badge_text_en: novedad.badge_text_en || "",
+      badge_text_fr: novedad.badge_text_fr || "",
       icono: novedad.icono || "utensils",
       imagen_url: novedad.imagen_url || "",
       fecha_inicio: novedad.fecha_inicio?.split("T")[0] || new Date().toISOString().split("T")[0],
@@ -455,10 +526,14 @@ export function EditorNovedadesWeb({
       activo: novedad.activo ?? true,
       destacado: novedad.destacado ?? false,
       bullets: novedad.bullets || [],
+      bullets_en: novedad.bullets_en || [],
+      bullets_fr: novedad.bullets_fr || [],
       cta_text: "",
       cta_url: "",
       subtitle: "",
       tags: novedad.tags || [],
+      tags_en: novedad.tags_en || [],
+      tags_fr: novedad.tags_fr || [],
       campos_tipo: {}
     });
   };
@@ -481,6 +556,8 @@ export function EditorNovedadesWeb({
       titulo_fr: formData.titulo_fr || null,
       descripcion_fr: formData.descripcion_fr || null,
       badge_text: formData.badge_text || null,
+      badge_text_en: formData.badge_text_en || null,
+      badge_text_fr: formData.badge_text_fr || null,
       icono: formData.icono,
       imagen_url: formData.imagen_url || null,
       fecha_inicio: formData.fecha_inicio,
@@ -488,7 +565,11 @@ export function EditorNovedadesWeb({
       activo: formData.activo,
       destacado: formData.destacado,
       bullets: formData.bullets.length > 0 ? formData.bullets : null,
-      tags: formData.tags.length > 0 ? formData.tags : null
+      bullets_en: formData.bullets_en.length > 0 ? formData.bullets_en : null,
+      bullets_fr: formData.bullets_fr.length > 0 ? formData.bullets_fr : null,
+      tags: formData.tags.length > 0 ? formData.tags : null,
+      tags_en: formData.tags_en.length > 0 ? formData.tags_en : null,
+      tags_fr: formData.tags_fr.length > 0 ? formData.tags_fr : null,
     };
     try {
       if (editingId && editingId !== "new") {
@@ -736,6 +817,25 @@ export function EditorNovedadesWeb({
             <Button variant="outline" size="sm" onClick={handlePreview} className="flex-1">
               <Eye className="w-4 h-4 mr-1" />
               Vista previa
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleTranslate} 
+              disabled={isTranslating || !formData.titulo.trim()}
+              className="flex-1"
+            >
+              {isTranslating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  Traduciendo...
+                </>
+              ) : (
+                <>
+                  <Globe className="w-4 h-4 mr-1" />
+                  Traducir
+                </>
+              )}
             </Button>
             <Button size="sm" onClick={handleSubmit} className="flex-1">
               <Save className="w-4 h-4 mr-1" />
