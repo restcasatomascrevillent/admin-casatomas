@@ -565,7 +565,7 @@ export function EditorNovedadesWeb({
       badge_text_fr: formData.badge_text_fr || null,
       icono: formData.icono,
       imagen_url: formData.imagen_url || null,
-      imagen_posicion_y: formData.imagen_posicion_y,
+      imagen_posicion_y: Math.round(formData.imagen_posicion_y),
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin || null,
       activo: formData.activo,
