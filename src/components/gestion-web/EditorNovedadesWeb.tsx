@@ -385,9 +385,7 @@ export function EditorNovedadesWeb({
                 <Save className="w-4 h-4 mr-1" />
                 Guardar
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleCancel}>
-                <X className="w-4 h-4" />
-              </Button>
+              
             </div>
             {/* Botón Borrar todo */}
             <div className="pt-2 border-t">
