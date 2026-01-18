@@ -116,6 +116,10 @@ export function EditorNovedadesWeb({
     onPreview({
       titulo: formData.titulo,
       descripcion: formData.descripcion,
+      titulo_en: formData.titulo_en,
+      descripcion_en: formData.descripcion_en,
+      titulo_fr: formData.titulo_fr,
+      descripcion_fr: formData.descripcion_fr,
       imagen_url: formData.imagen_url,
       badge_text: formData.badge_text,
       icono: formData.icono,
