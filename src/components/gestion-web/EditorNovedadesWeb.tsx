@@ -168,6 +168,15 @@ export function EditorNovedadesWeb({
   const [tonoSeleccionado, setTonoSeleccionado] = useState("cercano");
   const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [resultadoModalOpen, setResultadoModalOpen] = useState(false);
+  const [resultadoWebhook, setResultadoWebhook] = useState<{
+    title?: string;
+    subtitle?: string;
+    body?: string;
+    bullets?: string[];
+    cta?: { text?: string; url?: string };
+    tags?: string[];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCampoTipoChange = (key: string, value: string) => {
@@ -209,6 +218,7 @@ export function EditorNovedadesWeb({
     setTonoModalOpen(false);
     setLoadingMessageIndex(0);
     setLoadingMessage(LOADING_MESSAGES[0]);
+    setResultadoWebhook(null);
     
     // Campos opcionales - no validamos como obligatorios
     const campos = formData.campos_tipo ?? {};
@@ -244,45 +254,63 @@ export function EditorNovedadesWeb({
       if (error) {
         console.error('Error al llamar webhook:', error);
         toast.error("Error al generar la descripción");
+        setGenerandoDescripcion(false);
         return;
       }
 
       console.log('Respuesta del webhook:', data);
-
-      // Aplicar los datos devueltos por el webhook
-      if (data.title && !formData.titulo) {
-        handleInputChange('titulo', data.title);
-      }
-      if (data.subtitle) {
-        handleInputChange('subtitle', data.subtitle);
-      }
-      if (data.body) {
-        handleInputChange('descripcion', data.body);
-      }
-      if (data.bullets && Array.isArray(data.bullets)) {
-        setFormData(prev => ({ ...prev, bullets: data.bullets }));
-      }
-      if (data.cta) {
-        if (data.cta.text) handleInputChange('cta_text', data.cta.text);
-        if (data.cta.url) handleInputChange('cta_url', data.cta.url);
-      }
-      if (data.tags && Array.isArray(data.tags)) {
-        setFormData(prev => ({ ...prev, tags: data.tags }));
-      }
       
-      // Mostrar warnings si existen
-      if (data.meta?.missing?.length > 0) {
-        toast.warning(`Datos pendientes: ${data.meta.missing.join(', ')}`);
-      }
-
-      toast.success("Descripción generada correctamente");
+      // Guardar resultado y mostrar modal de resultados
+      setResultadoWebhook(data);
+      setGenerandoDescripcion(false);
+      setResultadoModalOpen(true);
+      
     } catch (error) {
       console.error('Error:', error);
       toast.error("Error al conectar con el servicio");
-    } finally {
       setGenerandoDescripcion(false);
     }
   };
+
+  const handleAplicarResultado = () => {
+    if (!resultadoWebhook) return;
+    
+    // Aplicar los datos devueltos por el webhook
+    if (resultadoWebhook.title) {
+      handleInputChange('titulo', resultadoWebhook.title);
+    }
+    if (resultadoWebhook.subtitle) {
+      handleInputChange('subtitle', resultadoWebhook.subtitle);
+    }
+    if (resultadoWebhook.body) {
+      handleInputChange('descripcion', resultadoWebhook.body);
+    }
+    if (resultadoWebhook.bullets && Array.isArray(resultadoWebhook.bullets)) {
+      setFormData(prev => ({ ...prev, bullets: resultadoWebhook.bullets || [] }));
+    }
+    if (resultadoWebhook.cta) {
+      if (resultadoWebhook.cta.text) handleInputChange('cta_text', resultadoWebhook.cta.text);
+      if (resultadoWebhook.cta.url) handleInputChange('cta_url', resultadoWebhook.cta.url);
+    }
+    if (resultadoWebhook.tags && Array.isArray(resultadoWebhook.tags)) {
+      setFormData(prev => ({ ...prev, tags: resultadoWebhook.tags || [] }));
+    }
+    
+    toast.success("Contenido aplicado correctamente");
+    setResultadoModalOpen(false);
+    setResultadoWebhook(null);
+  };
+
+  const handleReenviar = () => {
+    setResultadoModalOpen(false);
+    handleGenerarDescripcion();
+  };
+
+  const handleCambiarTono = () => {
+    setResultadoModalOpen(false);
+    setTonoModalOpen(true);
+  };
+
   const handleInputChange = (field: keyof FormData, value: string | boolean | string[]) => {
     setFormData(prev => ({
       ...prev,
@@ -783,21 +811,125 @@ export function EditorNovedadesWeb({
 
       {/* Modal de carga mientras se genera */}
       <Dialog open={generandoDescripcion} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-          <div className="flex flex-col items-center justify-center py-12 space-y-6">
-            <div className="relative">
-              <Loader2 className="w-16 h-16 text-primary animate-spin" />
-              <Sparkles className="w-6 h-6 text-amber-500 absolute -top-1 -right-1 animate-pulse" />
+        <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center justify-center py-16 space-y-8">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-20 h-20 rounded-full border-4 border-primary/20"></div>
+              <Loader2 className="w-20 h-20 text-primary animate-spin" />
+              <Sparkles className="w-8 h-8 text-amber-500 absolute animate-bounce" />
             </div>
-            <div className="text-center space-y-2">
-              <p className="text-xl font-semibold text-foreground animate-pulse">
+            <div className="text-center space-y-3">
+              <p className="text-2xl font-bold text-foreground">
                 {loadingMessage}
               </p>
               <p className="text-sm text-muted-foreground">
-                Esto puede tardar unos segundos
+                Esto puede tardar unos segundos...
               </p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de resultados del webhook */}
+      <Dialog open={resultadoModalOpen} onOpenChange={setResultadoModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              Contenido generado
+            </DialogTitle>
+          </DialogHeader>
+          
+          {resultadoWebhook && (
+            <div className="space-y-4 py-4">
+              {/* Título */}
+              {resultadoWebhook.title && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="font-semibold text-lg">{resultadoWebhook.title}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Subtítulo */}
+              {resultadoWebhook.subtitle && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subtítulo</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-muted-foreground">{resultadoWebhook.subtitle}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Descripción */}
+              {resultadoWebhook.body && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Descripción</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border">
+                    <p className="text-sm leading-relaxed">{resultadoWebhook.body}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Bullets */}
+              {resultadoWebhook.bullets && resultadoWebhook.bullets.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Puntos destacados</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
+                    {resultadoWebhook.bullets.map((bullet, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <span className="text-primary mt-0.5">•</span>
+                        <span>{bullet}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* CTA */}
+              {resultadoWebhook.cta?.text && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Call to Action</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border flex items-center gap-2">
+                    <Badge variant="secondary">{resultadoWebhook.cta.text}</Badge>
+                    {resultadoWebhook.cta.url && (
+                      <span className="text-xs text-muted-foreground truncate">→ {resultadoWebhook.cta.url}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Tags */}
+              {resultadoWebhook.tags && resultadoWebhook.tags.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiquetas</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {resultadoWebhook.tags.map((tag, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={handleReenviar} className="flex-1 sm:flex-none">
+                <Loader2 className="w-4 h-4 mr-1.5" />
+                Regenerar
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleCambiarTono} className="flex-1 sm:flex-none">
+                <Edit2 className="w-4 h-4 mr-1.5" />
+                Otro tono
+              </Button>
+            </div>
+            <Button onClick={handleAplicarResultado} className="w-full sm:w-auto">
+              <Save className="w-4 h-4 mr-1.5" />
+              Usar esto
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>;
