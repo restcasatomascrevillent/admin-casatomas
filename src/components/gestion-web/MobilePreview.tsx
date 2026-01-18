@@ -1,7 +1,6 @@
 import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
 export interface NovedadPreview {
   id?: string;
   titulo: string;
@@ -11,29 +10,30 @@ export interface NovedadPreview {
   icono?: string | null;
   destacado?: boolean;
 }
-
 interface MobilePreviewProps {
   novedades: NovedadPreview[];
   previewNovedad?: NovedadPreview | null;
 }
-
-const ICONOS_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+const ICONOS_MAP: Record<string, React.ComponentType<{
+  className?: string;
+}>> = {
   utensils: UtensilsCrossed,
   wine: Wine,
   gift: Gift,
   calendar: Calendar,
   star: Star,
-  sparkles: Sparkles,
+  sparkles: Sparkles
 };
-
-export function MobilePreview({ novedades, previewNovedad }: MobilePreviewProps) {
+export function MobilePreview({
+  novedades,
+  previewNovedad
+}: MobilePreviewProps) {
   // Si hay una novedad en preview, mostrarla primero
-  const todasNovedades = previewNovedad 
-    ? [{ ...previewNovedad, id: 'preview' }, ...novedades.filter(n => n.id !== previewNovedad.id)]
-    : novedades;
-
-  return (
-    <div className="flex justify-center">
+  const todasNovedades = previewNovedad ? [{
+    ...previewNovedad,
+    id: 'preview'
+  }, ...novedades.filter(n => n.id !== previewNovedad.id)] : novedades;
+  return <div className="flex justify-center">
       {/* Marco del teléfono */}
       <div className="relative w-[320px] h-[640px] bg-zinc-900 rounded-[3rem] p-2 shadow-2xl">
         {/* Notch */}
@@ -51,53 +51,33 @@ export function MobilePreview({ novedades, previewNovedad }: MobilePreviewProps)
             {/* Header */}
             <div className="text-center space-y-1 mb-4">
               <h2 className="text-lg font-bold text-foreground">Novedades</h2>
-              <p className="text-xs text-muted-foreground">Descubre lo último</p>
+              <p className="text-xs text-muted-foreground">Nuevas incorporaciones y experiencias que queremos compartir       </p>
             </div>
 
             {/* Cards de novedades */}
-            {todasNovedades.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
+            {todasNovedades.length === 0 ? <div className="text-center py-8 text-muted-foreground text-sm">
                 No hay novedades para mostrar
-              </div>
-            ) : (
-              <div className="space-y-3">
+              </div> : <div className="space-y-3">
                 {todasNovedades.map((novedad, index) => {
-                  const IconComponent = ICONOS_MAP[novedad.icono || 'utensils'] || UtensilsCrossed;
-                  const isPreview = novedad.id === 'preview';
-                  
-                  return (
-                    <Card 
-                      key={novedad.id || index} 
-                      className={`overflow-hidden transition-all duration-300 ${
-                        isPreview ? 'ring-2 ring-primary ring-offset-2' : ''
-                      }`}
-                    >
-                      {novedad.imagen_url && (
-                        <div className="relative h-24 overflow-hidden">
-                          <img
-                            src={novedad.imagen_url}
-                            alt={novedad.titulo}
-                            className="w-full h-full object-cover"
-                          />
-                          {isPreview && (
-                            <div className="absolute top-1 right-1">
+              const IconComponent = ICONOS_MAP[novedad.icono || 'utensils'] || UtensilsCrossed;
+              const isPreview = novedad.id === 'preview';
+              return <Card key={novedad.id || index} className={`overflow-hidden transition-all duration-300 ${isPreview ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+                      {novedad.imagen_url && <div className="relative h-24 overflow-hidden">
+                          <img src={novedad.imagen_url} alt={novedad.titulo} className="w-full h-full object-cover" />
+                          {isPreview && <div className="absolute top-1 right-1">
                               <Badge variant="default" className="text-[10px] px-1.5 py-0">
                                 Preview
                               </Badge>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            </div>}
+                        </div>}
                       <CardHeader className="p-2 pb-1">
                         <div className="flex items-center gap-1.5">
                           <div className="p-1 rounded-full bg-primary/10">
                             <IconComponent className="w-3 h-3 text-primary" />
                           </div>
-                          {novedad.badge_text && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {novedad.badge_text && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                               {novedad.badge_text}
-                            </Badge>
-                          )}
+                            </Badge>}
                         </div>
                         <CardTitle className="text-sm font-semibold leading-tight">
                           {novedad.titulo || "Sin título"}
@@ -108,14 +88,11 @@ export function MobilePreview({ novedades, previewNovedad }: MobilePreviewProps)
                           {novedad.descripcion || "Sin descripción"}
                         </p>
                       </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                    </Card>;
+            })}
+              </div>}
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
