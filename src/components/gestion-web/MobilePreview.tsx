@@ -146,7 +146,7 @@ export function MobilePreview({
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-2 pt-0 space-y-2">
-                        <p className="text-xs text-muted-foreground line-clamp-2">
+                        <p className="text-xs text-muted-foreground">
                           {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
                         </p>
                         
