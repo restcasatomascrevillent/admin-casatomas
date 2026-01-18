@@ -72,7 +72,7 @@ const initialFormData: FormData = {
 
 export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
   const { novedades, isLoading, crearNovedad, actualizarNovedad, eliminarNovedad } = useNovedades();
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>('new');
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -214,15 +214,7 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
       {/* Lista de novedades existentes */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Novedades ({novedades?.length || 0})</CardTitle>
-            {!editingId && (
-              <Button size="sm" onClick={() => setEditingId('new')}>
-                <Plus className="w-4 h-4 mr-1" />
-                Nueva
-              </Button>
-            )}
-          </div>
+          <CardTitle className="text-lg">Novedades ({novedades?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 max-h-48 overflow-y-auto">
           {isLoading ? (
@@ -253,9 +245,13 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
         </CardContent>
       </Card>
 
-      {/* Formulario de edición */}
-      {editingId && (
-        <Card>
+      {/* Formulario de edición - Siempre visible */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">
+            {editingId && editingId !== 'new' ? 'Editar Novedad' : 'Nueva Novedad'}
+          </CardTitle>
+        </CardHeader>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">
               {editingId === 'new' ? 'Nueva Novedad' : 'Editar Novedad'}
@@ -440,9 +436,25 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+            {/* Botón Borrar todo */}
+            <div className="pt-2 border-t">
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="w-full"
+                onClick={() => {
+                  setFormData(initialFormData);
+                  setEditingId('new');
+                  handleClearPreview();
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Borrar todo
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      )}
+
 
       {/* Dialog de confirmación de eliminación */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
