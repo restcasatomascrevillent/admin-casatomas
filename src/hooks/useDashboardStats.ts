@@ -16,12 +16,13 @@ export function useDashboardStats(startDate: Date, endDate: Date) {
         .gte("fecha", start)
         .lte("fecha", end);
 
-      // Fetch reservations
+      // Fetch reservations - solo confirmadas para métricas
       const { data: reservasData } = await supabase
         .from("reservas")
         .select("*, espacios_reserva(nombre, capacidad_maxima)")
         .gte("fecha", start)
-        .lte("fecha", end);
+        .lte("fecha", end)
+        .eq("estado", "confirmada");
 
       // Fetch turnos with worker info
       const { data: turnosData } = await supabase
@@ -101,6 +102,7 @@ export function useActiveStaff() {
   });
 }
 
+// Hook para todas las reservas de hoy (para mostrar en widgets informativos)
 export function useTodayReservations() {
   return useQuery({
     queryKey: ["today-reservations"],
@@ -112,6 +114,24 @@ export function useTodayReservations() {
         .select("*, espacios_reserva(nombre, capacidad_maxima)")
         .eq("fecha", today)
         .neq("estado", "cancelada");
+
+      return data || [];
+    },
+  });
+}
+
+// Hook para solo reservas confirmadas de hoy (para métricas de ocupación)
+export function useTodayConfirmedReservations() {
+  return useQuery({
+    queryKey: ["today-confirmed-reservations"],
+    queryFn: async () => {
+      const today = format(new Date(), "yyyy-MM-dd");
+      
+      const { data } = await supabase
+        .from("reservas")
+        .select("*, espacios_reserva(nombre, capacidad_maxima)")
+        .eq("fecha", today)
+        .eq("estado", "confirmada");
 
       return data || [];
     },

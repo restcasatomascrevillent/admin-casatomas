@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon } from "lucide-react";
-import { useTodayReservations } from "@/hooks/useDashboardStats";
+import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,36 +8,37 @@ import { useNavigate } from "react-router-dom";
 
 export function ReservasHoy() {
   const navigate = useNavigate();
-  const { data: reservas } = useTodayReservations();
+  const { data: todasReservas } = useTodayReservations();
+  const { data: reservasConfirmadas } = useTodayConfirmedReservations();
 
   const ahora = new Date();
   const horaActual = ahora.getHours();
 
-  // Desglose por turno (Comida < 17:00, Cena >= 17:00)
-  const reservasComida = reservas?.filter(r => {
+  // Desglose por turno SOLO con reservas confirmadas (Comida < 17:00, Cena >= 17:00)
+  const reservasComidaConfirmadas = reservasConfirmadas?.filter(r => {
     const hora = parseInt(r.hora.split(':')[0]);
     return hora < 17;
   }) || [];
   
-  const reservasCena = reservas?.filter(r => {
+  const reservasCenaConfirmadas = reservasConfirmadas?.filter(r => {
     const hora = parseInt(r.hora.split(':')[0]);
     return hora >= 17;
   }) || [];
 
-  const comensalesComida = reservasComida.reduce((acc, r) => acc + r.numero_comensales, 0);
-  const comensalesCena = reservasCena.reduce((acc, r) => acc + r.numero_comensales, 0);
+  const comensalesComida = reservasComidaConfirmadas.reduce((acc, r) => acc + r.numero_comensales, 0);
+  const comensalesCena = reservasCenaConfirmadas.reduce((acc, r) => acc + r.numero_comensales, 0);
 
-  // Blacklist y notas
-  const reservasBlacklist = reservas?.filter(r => r.en_blacklist) || [];
-  const reservasConNotas = reservas?.filter(r => r.notas_cliente && r.notas_cliente.trim() !== '') || [];
+  // Blacklist y notas - usar todas las reservas no canceladas
+  const reservasBlacklist = todasReservas?.filter(r => r.en_blacklist) || [];
+  const reservasConNotas = todasReservas?.filter(r => r.notas_cliente && r.notas_cliente.trim() !== '') || [];
 
-  // Estados
-  const reservasConfirmadas = reservas?.filter(r => r.estado === "confirmada").length || 0;
-  const reservasPendientes = reservas?.filter(r => r.estado === "pendiente").length || 0;
-  const reservasVerificadas = reservas?.filter(r => r.estado === "verificada").length || 0;
+  // Estados - usar todas las reservas
+  const numConfirmadas = todasReservas?.filter(r => r.estado === "confirmada").length || 0;
+  const reservasPendientes = todasReservas?.filter(r => r.estado === "pendiente").length || 0;
+  const reservasVerificadas = todasReservas?.filter(r => r.estado === "verificada").length || 0;
 
   // Reservas en riesgo (pendientes dentro de 1 hora)
-  const reservasEnRiesgo = reservas?.filter(r => {
+  const reservasEnRiesgo = todasReservas?.filter(r => {
     if (r.estado !== "pendiente") return false;
     const [h, m] = r.hora.split(':').map(Number);
     const horaReserva = new Date();
@@ -113,7 +114,7 @@ export function ReservasHoy() {
               {horaActual < 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasComida.length}</span>
+              <span className="text-xl sm:text-2xl font-bold">{reservasComidaConfirmadas.length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
@@ -129,7 +130,7 @@ export function ReservasHoy() {
               {horaActual >= 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasCena.length}</span>
+              <span className="text-xl sm:text-2xl font-bold">{reservasCenaConfirmadas.length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
@@ -142,11 +143,11 @@ export function ReservasHoy() {
         {/* Estados */}
         <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
           <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-primary">{reservas?.length || 0}</div>
+            <div className="text-lg sm:text-2xl font-bold text-primary">{todasReservas?.length || 0}</div>
             <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Total</p>
           </div>
           <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
+            <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas + reservasVerificadas}</div>
             <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Confirmadas</p>
           </div>
           <div 

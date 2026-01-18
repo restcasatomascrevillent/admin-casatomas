@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useTodayReservations } from "@/hooks/useDashboardStats";
+import { useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 
 export function CurvaReservasPorHora() {
-  const { data: reservas } = useTodayReservations();
+  const { data: reservas } = useTodayConfirmedReservations();
 
   const calcularReservasPorHora = () => {
     if (!reservas || reservas.length === 0) return [];

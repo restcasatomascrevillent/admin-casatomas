@@ -16,8 +16,10 @@ export function GraficoReservasPorDia() {
     const dias = eachDayOfInterval({ start, end });
     
     return dias.map((dia) => {
+      // Solo contar reservas confirmadas para las métricas
       const reservasDelDia = data.reservas.filter(
-        (r) => format(new Date(r.fecha), "yyyy-MM-dd") === format(dia, "yyyy-MM-dd")
+        (r) => format(new Date(r.fecha), "yyyy-MM-dd") === format(dia, "yyyy-MM-dd") 
+          && r.estado === "confirmada"
       );
 
       return {
