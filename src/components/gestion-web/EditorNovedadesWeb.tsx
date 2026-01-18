@@ -681,28 +681,10 @@ export function EditorNovedadesWeb({
             </div>
 
             {/* Fechas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Fecha inicio</Label>
-                <Input type="date" value={formData.fecha_inicio} onChange={e => handleInputChange('fecha_inicio', e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Fecha fin (opcional)</Label>
-                <Input type="date" value={formData.fecha_fin} onChange={e => handleInputChange('fecha_fin', e.target.value)} className="h-9" />
-              </div>
-            </div>
+            
 
             {/* Switches */}
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch checked={formData.activo} onCheckedChange={v => handleInputChange('activo', v)} />
-                <Label className="text-sm">Activo</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={formData.destacado} onCheckedChange={v => handleInputChange('destacado', v)} />
-                <Label className="text-sm">Destacado</Label>
-              </div>
-            </div>
+            
 
             {/* Botones de acción */}
             <div className="flex gap-2 pt-2">
