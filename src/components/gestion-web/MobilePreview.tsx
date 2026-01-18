@@ -150,16 +150,19 @@ export function MobilePreview({
                           {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
                         </p>
                         
-                        {/* Puntos destacados (bullets) */}
+                        {/* Puntos destacados (bullets) como badges */}
                         {novedad.bullets && novedad.bullets.length > 0 && (
-                          <ul className="space-y-0.5">
+                          <div className="flex flex-wrap gap-1">
                             {novedad.bullets.slice(0, 3).map((bullet, i) => (
-                              <li key={i} className="text-[10px] text-muted-foreground flex items-start gap-1">
-                                <span className="text-accent mt-0.5">•</span>
-                                <span className="line-clamp-1">{bullet}</span>
-                              </li>
+                              <Badge 
+                                key={i} 
+                                variant="secondary" 
+                                className="text-[8px] px-1.5 py-0.5 h-auto font-normal"
+                              >
+                                {bullet}
+                              </Badge>
                             ))}
-                          </ul>
+                          </div>
                         )}
                         
                         {/* Etiquetas (tags) */}
