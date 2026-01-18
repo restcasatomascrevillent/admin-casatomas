@@ -819,10 +819,16 @@ export function EditorNovedadesWeb({
                 </Button>
               </div>
             ) : (
-              <div 
-                className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" 
-                onClick={() => fileInputRef.current?.click()}
+              <label 
+                className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors"
               >
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                />
                 {uploading ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -834,10 +840,8 @@ export function EditorNovedadesWeb({
                     <span className="text-xs text-muted-foreground">Haz clic para subir imagen</span>
                   </>
                 )}
-              </div>
+              </label>
             )}
-
-            <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} className="hidden" />
           </div>
 
 
