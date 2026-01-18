@@ -73,6 +73,11 @@ interface FormData {
   fecha_fin: string;
   activo: boolean;
   destacado: boolean;
+  bullets: string[];
+  cta_text: string;
+  cta_url: string;
+  subtitle: string;
+  tags: string[];
 }
 const initialFormData: FormData = {
   tipo: "anuncio",
@@ -88,7 +93,12 @@ const initialFormData: FormData = {
   fecha_inicio: new Date().toISOString().split('T')[0],
   fecha_fin: "",
   activo: true,
-  destacado: false
+  destacado: false,
+  bullets: [],
+  cta_text: "",
+  cta_url: "",
+  subtitle: "",
+  tags: []
 };
 export function EditorNovedadesWeb({
   onPreview
@@ -141,8 +151,21 @@ export function EditorNovedadesWeb({
       if (data.title && !formData.titulo) {
         handleInputChange('titulo', data.title);
       }
+      if (data.subtitle) {
+        handleInputChange('subtitle', data.subtitle);
+      }
       if (data.body) {
         handleInputChange('descripcion', data.body);
+      }
+      if (data.bullets && Array.isArray(data.bullets)) {
+        setFormData(prev => ({ ...prev, bullets: data.bullets }));
+      }
+      if (data.cta) {
+        if (data.cta.text) handleInputChange('cta_text', data.cta.text);
+        if (data.cta.url) handleInputChange('cta_url', data.cta.url);
+      }
+      if (data.tags && Array.isArray(data.tags)) {
+        setFormData(prev => ({ ...prev, tags: data.tags }));
       }
       
       // Mostrar warnings si existen
@@ -158,7 +181,7 @@ export function EditorNovedadesWeb({
       setGenerandoDescripcion(false);
     }
   };
-  const handleInputChange = (field: keyof FormData, value: string | boolean) => {
+  const handleInputChange = (field: keyof FormData, value: string | boolean | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -221,7 +244,12 @@ export function EditorNovedadesWeb({
       fecha_inicio: novedad.fecha_inicio?.split('T')[0] || new Date().toISOString().split('T')[0],
       fecha_fin: novedad.fecha_fin?.split('T')[0] || "",
       activo: novedad.activo ?? true,
-      destacado: novedad.destacado ?? false
+      destacado: novedad.destacado ?? false,
+      bullets: [],
+      cta_text: "",
+      cta_url: "",
+      subtitle: "",
+      tags: []
     });
   };
   const handleCancel = () => {
@@ -365,29 +393,132 @@ export function EditorNovedadesWeb({
             </div>
 
             {/* Descripción */}
-            <div className="space-y-1.5">
-              <Label className="text-xs">Descripción</Label>
-              <Textarea value={formData.descripcion} onChange={e => handleInputChange('descripcion', e.target.value)} placeholder="Escribe ideas o un borrador de la descripción..." className="min-h-16 resize-none" />
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                className="mt-1" 
-                onClick={handleGenerarDescripcion}
-                disabled={generandoDescripcion}
-              >
-                {generandoDescripcion ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
-                    Generando...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Hacer descripción
-                  </>
-                )}
-              </Button>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Descripción / Ideas</Label>
+                <Textarea value={formData.descripcion} onChange={e => handleInputChange('descripcion', e.target.value)} placeholder="Escribe ideas o un borrador de la descripción..." className="min-h-16 resize-none" />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-1" 
+                  onClick={handleGenerarDescripcion}
+                  disabled={generandoDescripcion}
+                >
+                  {generandoDescripcion ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Hacer descripción
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Campos generados por el webhook - solo visibles si tienen contenido */}
+              {(formData.subtitle || formData.bullets.length > 0 || formData.cta_text || formData.tags.length > 0) && (
+                <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-dashed">
+                  <p className="text-xs text-muted-foreground font-medium">✨ Contenido generado</p>
+                  
+                  {/* Subtítulo */}
+                  {formData.subtitle && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Subtítulo</Label>
+                      <Input 
+                        value={formData.subtitle} 
+                        onChange={e => handleInputChange('subtitle', e.target.value)} 
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  )}
+
+                  {/* Bullets */}
+                  {formData.bullets.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Puntos destacados</Label>
+                      <div className="space-y-1">
+                        {formData.bullets.map((bullet, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <Input 
+                              value={bullet} 
+                              onChange={e => {
+                                const newBullets = [...formData.bullets];
+                                newBullets[index] = e.target.value;
+                                handleInputChange('bullets', newBullets);
+                              }}
+                              className="h-7 text-sm flex-1"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => {
+                                const newBullets = formData.bullets.filter((_, i) => i !== index);
+                                handleInputChange('bullets', newBullets);
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CTA */}
+                  {formData.cta_text && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Texto CTA</Label>
+                        <Input 
+                          value={formData.cta_text} 
+                          onChange={e => handleInputChange('cta_text', e.target.value)} 
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">URL CTA (opcional)</Label>
+                        <Input 
+                          value={formData.cta_url} 
+                          onChange={e => handleInputChange('cta_url', e.target.value)} 
+                          placeholder="https://..."
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  {formData.tags.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Etiquetas</Label>
+                      <div className="flex flex-wrap gap-1">
+                        {formData.tags.map((tag, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs gap-1">
+                            {tag}
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                const newTags = formData.tags.filter((_, i) => i !== index);
+                                handleInputChange('tags', newTags);
+                              }}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
 
