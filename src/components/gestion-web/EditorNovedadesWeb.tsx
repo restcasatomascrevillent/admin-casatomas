@@ -906,7 +906,7 @@ export function EditorNovedadesWeb({
                   <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiquetas</Label>
                   <div className="flex flex-wrap gap-1.5">
                     {resultadoWebhook.tags.map((tag, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                      <Badge key={i} variant="outline" className="text-xs capitalize">{tag}</Badge>
                     ))}
                   </div>
                 </div>
