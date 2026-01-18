@@ -120,17 +120,17 @@ export function ImagePositionSelector({
 
         <div 
           ref={containerRef}
-          className="relative w-full h-[60vh] overflow-hidden cursor-ns-resize select-none"
+          className="relative w-full h-[70vh] overflow-hidden cursor-ns-resize select-none bg-black flex items-center justify-center"
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Imagen de fondo fija */}
+          {/* Imagen de fondo fija - 100% visible */}
           <img
             src={imageUrl}
             alt="Imagen completa"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="max-w-full max-h-full object-contain"
             draggable={false}
           />
 
