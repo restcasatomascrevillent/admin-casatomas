@@ -165,8 +165,9 @@ export function EditorNovedadesWeb({
     }
 
     // Validar campos obligatorios según el tipo
+    const campos = formData.campos_tipo ?? {};
     const camposFaltantes = camposActuales.filter(
-      campo => !formData.campos_tipo[campo.key]?.trim()
+      campo => !campos[campo.key]?.trim()
     );
     
     if (camposFaltantes.length > 0) {
@@ -176,10 +177,10 @@ export function EditorNovedadesWeb({
 
     // Construir texto enriquecido con los campos del tipo
     let textoEnriquecido = formData.descripcion;
-    if (Object.keys(formData.campos_tipo).length > 0) {
+    if (Object.keys(campos).length > 0) {
       const detalles = camposActuales
-        .filter(campo => formData.campos_tipo[campo.key])
-        .map(campo => `${campo.label}: ${formData.campos_tipo[campo.key]}`)
+        .filter(campo => campos[campo.key])
+        .map(campo => `${campo.label}: ${campos[campo.key]}`)
         .join('. ');
       if (detalles) {
         textoEnriquecido += `. Detalles: ${detalles}`;
@@ -468,7 +469,7 @@ export function EditorNovedadesWeb({
                       <Label className="text-xs">{campo.label} *</Label>
                       <Input
                         type={campo.type || 'text'}
-                        value={formData.campos_tipo[campo.key] || ''}
+                        value={(formData.campos_tipo ?? {})[campo.key] || ''}
                         onChange={e => handleCampoTipoChange(campo.key, e.target.value)}
                         placeholder={campo.placeholder}
                         className="h-8 text-sm"
