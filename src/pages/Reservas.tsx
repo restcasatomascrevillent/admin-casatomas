@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,12 +17,25 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useUserRole } from "@/hooks/useUserRole";
 
 export default function Reservas() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
+  const [activeTab, setActiveTab] = useState("hoy");
 
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
   const isAdmin = role === "admin";
+
+  // Leer parámetros de URL para controlar tab activo
+  const tabFromUrl = searchParams.get("tab");
+  const statusFromUrl = searchParams.get("status");
+  const dateFromUrl = searchParams.get("date");
+
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -72,7 +86,11 @@ export default function Reservas() {
           </Dialog>
         </div>
 
-        <Tabs defaultValue="hoy" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => {
+          setActiveTab(value);
+          // Limpiar parámetros de URL cuando se cambia de tab manualmente
+          setSearchParams({});
+        }} className="w-full">
           <TabsList className={`grid w-full ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
             <TabsTrigger value="hoy">Hoy</TabsTrigger>
             <TabsTrigger value="lista">Lista de Reservas</TabsTrigger>
@@ -91,7 +109,11 @@ export default function Reservas() {
           </TabsContent>
 
           <TabsContent value="lista" className="space-y-6 mt-6">
-            <ListaReservasAvanzada onEspacioClick={handleEspacioClick} />
+            <ListaReservasAvanzada 
+              onEspacioClick={handleEspacioClick}
+              initialStatusFilter={statusFromUrl || undefined}
+              initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
+            />
           </TabsContent>
 
           <TabsContent value="calendario" className="space-y-6 mt-6">

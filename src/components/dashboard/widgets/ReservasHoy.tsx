@@ -4,8 +4,10 @@ import { useTodayReservations } from "@/hooks/useDashboardStats";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useNavigate } from "react-router-dom";
 
 export function ReservasHoy() {
+  const navigate = useNavigate();
   const { data: reservas } = useTodayReservations();
 
   const ahora = new Date();
@@ -147,7 +149,10 @@ export function ReservasHoy() {
             <div className="text-lg sm:text-2xl font-bold text-green-600">{reservasConfirmadas + reservasVerificadas}</div>
             <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Confirmadas</p>
           </div>
-          <div className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg">
+          <div 
+            className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors"
+            onClick={() => navigate('/reservas?tab=lista&status=pendiente&date=today')}
+          >
             <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
             <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Pendientes</p>
           </div>
