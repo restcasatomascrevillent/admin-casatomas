@@ -75,9 +75,9 @@ export function MobilePreview({
                           <div className="p-1 rounded-full bg-accent/20">
                             <IconComponent className="w-3 h-3 text-accent" />
                           </div>
-                          {novedad.badge_text && <Badge className="text-[10px] px-1.5 py-0 bg-accent text-primary-foreground hover:bg-accent/90 border-0">
-                              {novedad.badge_text}
-                            </Badge>}
+                          <Badge className="text-[10px] px-1.5 py-0 bg-accent text-primary-foreground hover:bg-accent/90 border-0">
+                              {novedad.badge_text || "Nuevo"}
+                            </Badge>
                         </div>
                         <CardTitle className="text-sm font-semibold leading-tight">
                           {novedad.titulo || "Sin título"}
