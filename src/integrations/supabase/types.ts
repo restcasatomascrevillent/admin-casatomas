@@ -966,6 +966,7 @@ export type Database = {
           activo: boolean | null
           badge_text: string | null
           bebida_id: string | null
+          bullets: string[] | null
           created_at: string | null
           created_by: string | null
           descripcion: string | null
@@ -980,6 +981,7 @@ export type Database = {
           orden: number | null
           plato_id: string | null
           seccion: string | null
+          tags: string[] | null
           tipo: string
           tipo_asociacion: string | null
           titulo: string
@@ -992,6 +994,7 @@ export type Database = {
           activo?: boolean | null
           badge_text?: string | null
           bebida_id?: string | null
+          bullets?: string[] | null
           created_at?: string | null
           created_by?: string | null
           descripcion?: string | null
@@ -1006,6 +1009,7 @@ export type Database = {
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null
+          tags?: string[] | null
           tipo?: string
           tipo_asociacion?: string | null
           titulo: string
@@ -1018,6 +1022,7 @@ export type Database = {
           activo?: boolean | null
           badge_text?: string | null
           bebida_id?: string | null
+          bullets?: string[] | null
           created_at?: string | null
           created_by?: string | null
           descripcion?: string | null
@@ -1032,6 +1037,7 @@ export type Database = {
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null
+          tags?: string[] | null
           tipo?: string
           tipo_asociacion?: string | null
           titulo?: string
