@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -103,6 +104,7 @@ export function EditorNovedadesWeb({
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({
@@ -330,8 +332,16 @@ export function EditorNovedadesWeb({
               
               {/* Previsualización grande si hay imagen */}
               {formData.imagen_url ? <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
-                  <img src={formData.imagen_url} alt="Preview" className="w-full h-full object-cover" />
-                  <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={() => handleInputChange('imagen_url', '')}>
+                  <img 
+                    src={formData.imagen_url} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                    onClick={() => setImageModalOpen(true)}
+                  />
+                  <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-7 w-7" onClick={(e) => {
+                    e.stopPropagation();
+                    handleInputChange('imagen_url', '');
+                  }}>
                     <X className="w-4 h-4" />
                   </Button>
                 </div> : <div className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
@@ -420,5 +430,18 @@ export function EditorNovedadesWeb({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal para ver imagen completa */}
+      <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
+        <DialogContent className="max-w-3xl p-2">
+          {formData.imagen_url && (
+            <img 
+              src={formData.imagen_url} 
+              alt="Imagen completa" 
+              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>;
 }
