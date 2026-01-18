@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +56,13 @@ const ICONOS = [{
   label: "Destacado",
   icon: Sparkles
 }];
+
+const TONOS = [
+  { value: "cercano", label: "Cercano", description: "Tono amigable y familiar" },
+  { value: "formal", label: "Formal", description: "Tono profesional y elegante" },
+  { value: "divertido", label: "Divertido", description: "Tono alegre y desenfadado" },
+  { value: "exclusivo", label: "Exclusivo", description: "Tono premium y sofisticado" },
+];
 interface EditorNovedadesWebProps {
   onPreview: (novedad: NovedadPreview | null) => void;
 }
@@ -146,6 +154,8 @@ export function EditorNovedadesWeb({
   const [uploading, setUploading] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [generandoDescripcion, setGenerandoDescripcion] = useState(false);
+  const [tonoModalOpen, setTonoModalOpen] = useState(false);
+  const [tonoSeleccionado, setTonoSeleccionado] = useState("cercano");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCampoTipoChange = (key: string, value: string) => {
@@ -160,12 +170,17 @@ export function EditorNovedadesWeb({
 
   const camposActuales = CAMPOS_POR_TIPO[formData.tipo] || [];
 
-  const handleGenerarDescripcion = async () => {
+  const handleAbrirModalTono = () => {
     if (!formData.descripcion.trim()) {
       toast.error("Escribe primero alguna idea o texto en la descripción");
       return;
     }
+    setTonoModalOpen(true);
+  };
 
+  const handleGenerarDescripcion = async () => {
+    setTonoModalOpen(false);
+    
     // Campos opcionales - no validamos como obligatorios
     const campos = formData.campos_tipo ?? {};
 
@@ -189,9 +204,8 @@ export function EditorNovedadesWeb({
                 formData.tipo === 'promocion' ? 'promo' : 
                 formData.tipo === 'evento' ? 'evento' : 'articulo',
           idioma: 'es',
-          tono: 'cercano',
+          tono: tonoSeleccionado,
           texto: textoEnriquecido,
-          negocio: null,
           canal: 'novedades',
           campos_extra: formData.campos_tipo
         }
@@ -485,7 +499,7 @@ export function EditorNovedadesWeb({
                   variant="outline" 
                   size="sm" 
                   className="mt-1" 
-                  onClick={handleGenerarDescripcion}
+                  onClick={handleAbrirModalTono}
                   disabled={generandoDescripcion}
                 >
                   {generandoDescripcion ? (
@@ -708,6 +722,32 @@ export function EditorNovedadesWeb({
       <Dialog open={imageModalOpen} onOpenChange={setImageModalOpen}>
         <DialogContent className="max-w-3xl p-2">
           {formData.imagen_url && <img src={formData.imagen_url} alt="Imagen completa" className="w-full h-auto max-h-[80vh] object-contain rounded-lg" />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para seleccionar tono */}
+      <Dialog open={tonoModalOpen} onOpenChange={setTonoModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Selecciona el tono</DialogTitle>
+          </DialogHeader>
+          <RadioGroup value={tonoSeleccionado} onValueChange={setTonoSeleccionado} className="space-y-3 py-4">
+            {TONOS.map(tono => (
+              <div key={tono.value} className="flex items-start space-x-3">
+                <RadioGroupItem value={tono.value} id={tono.value} className="mt-0.5" />
+                <Label htmlFor={tono.value} className="flex flex-col cursor-pointer">
+                  <span className="font-medium">{tono.label}</span>
+                  <span className="text-xs text-muted-foreground">{tono.description}</span>
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTonoModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleGenerarDescripcion} disabled={generandoDescripcion}>
+              {generandoDescripcion ? "Generando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>;

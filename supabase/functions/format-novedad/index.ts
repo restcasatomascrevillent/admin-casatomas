@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { tipo, idioma, tono, texto, negocio, canal } = await req.json();
+    const { tipo, idioma, tono, texto, canal } = await req.json();
 
     if (!texto || texto.trim() === '') {
       return new Response(
@@ -40,7 +40,7 @@ serve(async (req) => {
       };
     };
 
-    console.log('Enviando al webhook:', { tipo, idioma, tono, texto, negocio, canal });
+    console.log('Enviando al webhook:', { tipo, idioma, tono, texto, canal });
 
     // Llamada al webhook de n8n con timeout de 30 segundos
     const controller = new AbortController();
@@ -58,7 +58,6 @@ serve(async (req) => {
           idioma: idioma || 'es',
           tono: tono || 'cercano',
           texto: texto,
-          negocio: negocio || null,
           canal: canal || 'novedades'
         }),
         signal: controller.signal,
