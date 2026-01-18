@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.format-novedad]
 verify_jwt = false
+
+[functions.traducir-novedad]
+verify_jwt = false
