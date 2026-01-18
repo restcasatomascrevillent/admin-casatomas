@@ -105,7 +105,59 @@ export function EditorNovedadesWeb({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [generandoDescripcion, setGenerandoDescripcion] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGenerarDescripcion = async () => {
+    if (!formData.descripcion.trim()) {
+      toast.error("Escribe primero alguna idea o texto en la descripción");
+      return;
+    }
+
+    setGenerandoDescripcion(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('format-novedad', {
+        body: {
+          tipo: formData.tipo === 'plato_nuevo' ? 'plato' : 
+                formData.tipo === 'promocion' ? 'promo' : 
+                formData.tipo === 'evento' ? 'evento' : 'articulo',
+          idioma: 'es',
+          tono: 'cercano',
+          texto: formData.descripcion,
+          negocio: null,
+          canal: 'novedades'
+        }
+      });
+
+      if (error) {
+        console.error('Error al llamar webhook:', error);
+        toast.error("Error al generar la descripción");
+        return;
+      }
+
+      console.log('Respuesta del webhook:', data);
+
+      // Aplicar los datos devueltos por el webhook
+      if (data.title && !formData.titulo) {
+        handleInputChange('titulo', data.title);
+      }
+      if (data.body) {
+        handleInputChange('descripcion', data.body);
+      }
+      
+      // Mostrar warnings si existen
+      if (data.meta?.missing?.length > 0) {
+        toast.warning(`Datos pendientes: ${data.meta.missing.join(', ')}`);
+      }
+
+      toast.success("Descripción generada correctamente");
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Error al conectar con el servicio");
+    } finally {
+      setGenerandoDescripcion(false);
+    }
+  };
   const handleInputChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -315,12 +367,26 @@ export function EditorNovedadesWeb({
             {/* Descripción */}
             <div className="space-y-1.5">
               <Label className="text-xs">Descripción</Label>
-              <Textarea value={formData.descripcion} onChange={e => handleInputChange('descripcion', e.target.value)} placeholder="Descripción de la novedad" className="min-h-16 resize-none" />
-              <Button type="button" variant="outline" size="sm" className="mt-1" onClick={() => {
-            // TODO: Implementar generación automática de descripción
-            toast.info("Función de generar descripción próximamente");
-          }}>
-                Hacer descripción
+              <Textarea value={formData.descripcion} onChange={e => handleInputChange('descripcion', e.target.value)} placeholder="Escribe ideas o un borrador de la descripción..." className="min-h-16 resize-none" />
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="mt-1" 
+                onClick={handleGenerarDescripcion}
+                disabled={generandoDescripcion}
+              >
+                {generandoDescripcion ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Hacer descripción
+                  </>
+                )}
               </Button>
             </div>
 
