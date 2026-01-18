@@ -24,8 +24,6 @@ export interface Novedad {
   descripcion_fr: string | null;
   badge_text: string | null;
   icono: string | null;
-  bullets: string[] | null;
-  tags: string[] | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -52,8 +50,6 @@ export interface NuevaNovedad {
   descripcion_fr?: string | null;
   badge_text?: string | null;
   icono?: string | null;
-  bullets?: string[] | null;
-  tags?: string[] | null;
 }
 
 export function useNovedades() {

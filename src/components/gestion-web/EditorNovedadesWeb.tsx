@@ -454,11 +454,11 @@ export function EditorNovedadesWeb({
       fecha_fin: novedad.fecha_fin?.split("T")[0] || "",
       activo: novedad.activo ?? true,
       destacado: novedad.destacado ?? false,
-      bullets: novedad.bullets || [],
+      bullets: [],
       cta_text: "",
       cta_url: "",
       subtitle: "",
-      tags: novedad.tags || [],
+      tags: [],
       campos_tipo: {}
     });
   };
@@ -486,9 +486,7 @@ export function EditorNovedadesWeb({
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin || null,
       activo: formData.activo,
-      destacado: formData.destacado,
-      bullets: formData.bullets.length > 0 ? formData.bullets : null,
-      tags: formData.tags.length > 0 ? formData.tags : null
+      destacado: formData.destacado
     };
     try {
       if (editingId && editingId !== "new") {
