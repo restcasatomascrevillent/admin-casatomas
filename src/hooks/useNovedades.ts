@@ -23,9 +23,15 @@ export interface Novedad {
   descripcion_en: string | null;
   descripcion_fr: string | null;
   badge_text: string | null;
+  badge_text_en: string | null;
+  badge_text_fr: string | null;
   icono: string | null;
   bullets: string[] | null;
+  bullets_en: string[] | null;
+  bullets_fr: string[] | null;
   tags: string[] | null;
+  tags_en: string[] | null;
+  tags_fr: string[] | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -51,9 +57,15 @@ export interface NuevaNovedad {
   descripcion_en?: string | null;
   descripcion_fr?: string | null;
   badge_text?: string | null;
+  badge_text_en?: string | null;
+  badge_text_fr?: string | null;
   icono?: string | null;
   bullets?: string[] | null;
+  bullets_en?: string[] | null;
+  bullets_fr?: string[] | null;
   tags?: string[] | null;
+  tags_en?: string[] | null;
+  tags_fr?: string[] | null;
 }
 
 export function useNovedades() {

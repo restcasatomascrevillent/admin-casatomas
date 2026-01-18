@@ -21,12 +21,22 @@ export default function GestionWeb() {
         id: n.id,
         titulo: n.titulo,
         descripcion: n.descripcion || "",
+        titulo_en: n.titulo_en,
+        descripcion_en: n.descripcion_en,
+        titulo_fr: n.titulo_fr,
+        descripcion_fr: n.descripcion_fr,
         imagen_url: n.imagen_url,
         badge_text: n.badge_text,
+        badge_text_en: n.badge_text_en,
+        badge_text_fr: n.badge_text_fr,
         icono: n.icono,
         destacado: n.destacado,
         bullets: n.bullets || [],
+        bullets_en: n.bullets_en,
+        bullets_fr: n.bullets_fr,
         tags: n.tags || [],
+        tags_en: n.tags_en,
+        tags_fr: n.tags_fr,
       }));
   }, [novedades, previewIds]);
 
