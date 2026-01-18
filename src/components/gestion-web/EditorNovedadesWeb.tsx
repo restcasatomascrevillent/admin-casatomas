@@ -836,6 +836,15 @@ export function EditorNovedadesWeb({
                     {resultadoWebhook.tags.map((tag, i) => <Badge key={i} variant="outline" className="text-xs capitalize">{tag}</Badge>)}
                   </div>
                 </div>}
+              
+              {/* CTA */}
+              {resultadoWebhook.cta && (resultadoWebhook.cta.text || resultadoWebhook.cta.url) && <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Llamada a la acción (CTA)</Label>
+                  <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
+                    {resultadoWebhook.cta.text && <p className="text-sm font-medium">{resultadoWebhook.cta.text}</p>}
+                    {resultadoWebhook.cta.url && <p className="text-xs text-muted-foreground break-all">{resultadoWebhook.cta.url}</p>}
+                  </div>
+                </div>}
             </div>}
           
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
