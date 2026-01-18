@@ -166,16 +166,8 @@ export function EditorNovedadesWeb({
       return;
     }
 
-    // Validar campos obligatorios según el tipo
+    // Campos opcionales - no validamos como obligatorios
     const campos = formData.campos_tipo ?? {};
-    const camposFaltantes = camposActuales.filter(
-      campo => !campos[campo.key]?.trim()
-    );
-    
-    if (camposFaltantes.length > 0) {
-      toast.error(`Completa los campos: ${camposFaltantes.map(c => c.label).join(', ')}`);
-      return;
-    }
 
     // Construir texto enriquecido con los campos del tipo
     let textoEnriquecido = formData.descripcion;
@@ -468,7 +460,7 @@ export function EditorNovedadesWeb({
                 <div className="grid grid-cols-2 gap-2">
                   {camposActuales.map(campo => (
                     <div key={campo.key} className="space-y-1">
-                      <Label className="text-xs">{campo.label} *</Label>
+                      <Label className="text-xs">{campo.label}</Label>
                       <Input
                         type={campo.type || 'text'}
                         value={(formData.campos_tipo ?? {})[campo.key] || ''}
