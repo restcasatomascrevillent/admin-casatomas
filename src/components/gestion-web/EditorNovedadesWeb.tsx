@@ -58,6 +58,31 @@ const ICONOS = [{
 interface EditorNovedadesWebProps {
   onPreview: (novedad: NovedadPreview | null) => void;
 }
+// Campos específicos por tipo de novedad
+const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
+  plato_nuevo: [
+    { key: 'precio', label: 'Precio (€)', placeholder: '12.50', type: 'number' },
+    { key: 'ingredientes', label: 'Ingredientes principales', placeholder: 'Tomate, mozzarella, albahaca...' },
+  ],
+  promocion: [
+    { key: 'precio_original', label: 'Precio original (€)', placeholder: '20.00', type: 'number' },
+    { key: 'precio_oferta', label: 'Precio oferta (€)', placeholder: '15.00', type: 'number' },
+    { key: 'condiciones', label: 'Condiciones', placeholder: 'Válido solo fines de semana...' },
+  ],
+  evento: [
+    { key: 'fecha_evento', label: 'Fecha del evento', placeholder: '', type: 'date' },
+    { key: 'hora_evento', label: 'Hora', placeholder: '20:00', type: 'time' },
+    { key: 'precio_entrada', label: 'Precio entrada (€)', placeholder: '25.00', type: 'number' },
+    { key: 'aforo', label: 'Aforo máximo', placeholder: '50', type: 'number' },
+  ],
+  festivo: [
+    { key: 'fecha_festivo', label: 'Fecha', placeholder: '', type: 'date' },
+    { key: 'horario_especial', label: 'Horario especial', placeholder: '12:00 - 16:00' },
+    { key: 'menu_especial', label: 'Menú especial', placeholder: 'Menú de Navidad...' },
+  ],
+  anuncio: [],
+};
+
 interface FormData {
   tipo: string;
   titulo: string;
@@ -78,6 +103,8 @@ interface FormData {
   cta_url: string;
   subtitle: string;
   tags: string[];
+  // Campos dinámicos por tipo
+  campos_tipo: Record<string, string>;
 }
 const initialFormData: FormData = {
   tipo: "anuncio",
@@ -98,7 +125,8 @@ const initialFormData: FormData = {
   cta_text: "",
   cta_url: "",
   subtitle: "",
-  tags: []
+  tags: [],
+  campos_tipo: {}
 };
 export function EditorNovedadesWeb({
   onPreview
@@ -118,10 +146,44 @@ export function EditorNovedadesWeb({
   const [generandoDescripcion, setGenerandoDescripcion] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleCampoTipoChange = (key: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      campos_tipo: {
+        ...prev.campos_tipo,
+        [key]: value
+      }
+    }));
+  };
+
+  const camposActuales = CAMPOS_POR_TIPO[formData.tipo] || [];
+
   const handleGenerarDescripcion = async () => {
     if (!formData.descripcion.trim()) {
       toast.error("Escribe primero alguna idea o texto en la descripción");
       return;
+    }
+
+    // Validar campos obligatorios según el tipo
+    const camposFaltantes = camposActuales.filter(
+      campo => !formData.campos_tipo[campo.key]?.trim()
+    );
+    
+    if (camposFaltantes.length > 0) {
+      toast.error(`Completa los campos: ${camposFaltantes.map(c => c.label).join(', ')}`);
+      return;
+    }
+
+    // Construir texto enriquecido con los campos del tipo
+    let textoEnriquecido = formData.descripcion;
+    if (Object.keys(formData.campos_tipo).length > 0) {
+      const detalles = camposActuales
+        .filter(campo => formData.campos_tipo[campo.key])
+        .map(campo => `${campo.label}: ${formData.campos_tipo[campo.key]}`)
+        .join('. ');
+      if (detalles) {
+        textoEnriquecido += `. Detalles: ${detalles}`;
+      }
     }
 
     setGenerandoDescripcion(true);
@@ -133,9 +195,10 @@ export function EditorNovedadesWeb({
                 formData.tipo === 'evento' ? 'evento' : 'articulo',
           idioma: 'es',
           tono: 'cercano',
-          texto: formData.descripcion,
+          texto: textoEnriquecido,
           negocio: null,
-          canal: 'novedades'
+          canal: 'novedades',
+          campos_extra: formData.campos_tipo
         }
       });
 
@@ -249,7 +312,8 @@ export function EditorNovedadesWeb({
       cta_text: "",
       cta_url: "",
       subtitle: "",
-      tags: []
+      tags: [],
+      campos_tipo: {}
     });
   };
   const handleCancel = () => {
@@ -391,6 +455,30 @@ export function EditorNovedadesWeb({
                 <Input value={formData.badge_text} onChange={e => handleInputChange('badge_text', e.target.value)} placeholder="Nuevo" className="h-9" />
               </div>
             </div>
+
+            {/* Campos específicos según tipo */}
+            {camposActuales.length > 0 && (
+              <div className="space-y-2 p-3 rounded-lg bg-accent/30 border">
+                <p className="text-xs font-medium text-muted-foreground">
+                  📋 Datos para {TIPOS_NOVEDAD.find(t => t.value === formData.tipo)?.label}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {camposActuales.map(campo => (
+                    <div key={campo.key} className="space-y-1">
+                      <Label className="text-xs">{campo.label} *</Label>
+                      <Input
+                        type={campo.type || 'text'}
+                        value={formData.campos_tipo[campo.key] || ''}
+                        onChange={e => handleCampoTipoChange(campo.key, e.target.value)}
+                        placeholder={campo.placeholder}
+                        className="h-8 text-sm"
+                        step={campo.type === 'number' ? '0.01' : undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Descripción */}
             <div className="space-y-3">
