@@ -964,6 +964,7 @@ export type Database = {
       novedades: {
         Row: {
           activo: boolean | null
+          badge_text: string | null
           bebida_id: string | null
           created_at: string | null
           created_by: string | null
@@ -973,6 +974,7 @@ export type Database = {
           destacado: boolean | null
           fecha_fin: string | null
           fecha_inicio: string
+          icono: string | null
           id: string
           imagen_url: string | null
           orden: number | null
@@ -988,6 +990,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean | null
+          badge_text?: string | null
           bebida_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -997,6 +1000,7 @@ export type Database = {
           destacado?: boolean | null
           fecha_fin?: string | null
           fecha_inicio?: string
+          icono?: string | null
           id?: string
           imagen_url?: string | null
           orden?: number | null
@@ -1012,6 +1016,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean | null
+          badge_text?: string | null
           bebida_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1021,6 +1026,7 @@ export type Database = {
           destacado?: boolean | null
           fecha_fin?: string | null
           fecha_inicio?: string
+          icono?: string | null
           id?: string
           imagen_url?: string | null
           orden?: number | null

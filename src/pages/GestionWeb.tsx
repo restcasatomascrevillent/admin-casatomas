@@ -1,18 +1,55 @@
+import { useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { FormularioSugerencias } from "@/components/gestion-web/FormularioSugerencias";
+import { EditorNovedadesWeb } from "@/components/gestion-web/EditorNovedadesWeb";
+import { MobilePreview, type NovedadPreview } from "@/components/gestion-web/MobilePreview";
+import { useNovedades } from "@/hooks/useNovedades";
 
 export default function GestionWeb() {
+  const [previewNovedad, setPreviewNovedad] = useState<NovedadPreview | null>(null);
+  const { novedadesActivas } = useNovedades();
+
+  // Convertir novedades activas al formato de preview
+  const novedadesParaPreview = useMemo(() => {
+    return (novedadesActivas || []).map(n => ({
+      id: n.id,
+      titulo: n.titulo,
+      descripcion: n.descripcion || "",
+      imagen_url: n.imagen_url,
+      badge_text: n.badge_text,
+      icono: n.icono,
+      destacado: n.destacado,
+    }));
+  }, [novedadesActivas]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Soporte y Sugerencias</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Gestor Web</h2>
           <p className="text-muted-foreground">
-            Envía sugerencias, reporta errores o solicita nuevas funcionalidades
+            Prepara las novedades y contenido que aparecerá en la web pública
           </p>
         </div>
         
-        <FormularioSugerencias />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          {/* Editor - 3 columnas */}
+          <div className="lg:col-span-3">
+            <EditorNovedadesWeb onPreview={setPreviewNovedad} />
+          </div>
+          
+          {/* Preview móvil - 2 columnas */}
+          <div className="lg:col-span-2">
+            <div className="sticky top-6">
+              <h3 className="text-sm font-medium text-muted-foreground mb-4 text-center">
+                Vista previa móvil
+              </h3>
+              <MobilePreview 
+                novedades={novedadesParaPreview} 
+                previewNovedad={previewNovedad}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
