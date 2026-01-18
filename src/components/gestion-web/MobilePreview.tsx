@@ -1,19 +1,49 @@
+import { useState } from "react";
 import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
 export interface NovedadPreview {
   id?: string;
   titulo: string;
   descripcion: string;
+  titulo_en?: string | null;
+  descripcion_en?: string | null;
+  titulo_fr?: string | null;
+  descripcion_fr?: string | null;
   imagen_url?: string | null;
   badge_text?: string | null;
   icono?: string | null;
   destacado?: boolean;
 }
+
 interface MobilePreviewProps {
   novedades: NovedadPreview[];
   previewNovedad?: NovedadPreview | null;
 }
+
+type Idioma = "es" | "en" | "fr";
+
+const getTextoIdioma = (novedad: NovedadPreview, idioma: Idioma) => {
+  switch (idioma) {
+    case "en":
+      return {
+        titulo: novedad.titulo_en || novedad.titulo,
+        descripcion: novedad.descripcion_en || novedad.descripcion,
+      };
+    case "fr":
+      return {
+        titulo: novedad.titulo_fr || novedad.titulo,
+        descripcion: novedad.descripcion_fr || novedad.descripcion,
+      };
+    default:
+      return {
+        titulo: novedad.titulo,
+        descripcion: novedad.descripcion,
+      };
+  }
+};
 const ICONOS_MAP: Record<string, React.ComponentType<{
   className?: string;
 }>> = {
@@ -28,12 +58,33 @@ export function MobilePreview({
   novedades,
   previewNovedad
 }: MobilePreviewProps) {
+  const [idioma, setIdioma] = useState<Idioma>("es");
+  
   // Si hay una novedad en preview, mostrarla primero
   const todasNovedades = previewNovedad ? [{
     ...previewNovedad,
     id: 'preview'
   }, ...novedades.filter(n => n.id !== previewNovedad.id)] : novedades;
-  return <div className="flex justify-center">
+  
+  return <div className="flex flex-col items-center gap-3">
+      {/* Selector de idioma */}
+      <ToggleGroup 
+        type="single" 
+        value={idioma} 
+        onValueChange={(v) => v && setIdioma(v as Idioma)}
+        className="bg-muted rounded-lg p-1"
+      >
+        <ToggleGroupItem value="es" className="text-xs px-3 py-1 data-[state=on]:bg-background">
+          🇪🇸 ES
+        </ToggleGroupItem>
+        <ToggleGroupItem value="en" className="text-xs px-3 py-1 data-[state=on]:bg-background">
+          🇬🇧 EN
+        </ToggleGroupItem>
+        <ToggleGroupItem value="fr" className="text-xs px-3 py-1 data-[state=on]:bg-background">
+          🇫🇷 FR
+        </ToggleGroupItem>
+      </ToggleGroup>
+      
       {/* Marco del teléfono */}
       <div className="relative w-[320px] h-[640px] bg-zinc-900 rounded-[3rem] p-2 shadow-2xl">
         {/* Notch */}
@@ -50,20 +101,29 @@ export function MobilePreview({
           <div className="h-[calc(100%-2rem)] overflow-y-auto px-3 py-4 space-y-4">
             {/* Header */}
             <div className="text-center space-y-1 mb-4">
-              <h2 className="text-lg font-bold text-foreground">Novedades</h2>
-              <p className="text-xs text-muted-foreground">Nuevas incorporaciones y experiencias que queremos compartir       </p>
+              <h2 className="text-lg font-bold text-foreground">
+                {idioma === "en" ? "What's New" : idioma === "fr" ? "Nouveautés" : "Novedades"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {idioma === "en" 
+                  ? "New additions and experiences we want to share" 
+                  : idioma === "fr" 
+                    ? "Nouvelles incorporations et expériences à partager" 
+                    : "Nuevas incorporaciones y experiencias que queremos compartir"}
+              </p>
             </div>
 
             {/* Cards de novedades */}
             {todasNovedades.length === 0 ? <div className="text-center py-8 text-muted-foreground text-sm">
-                No hay novedades para mostrar
+                {idioma === "en" ? "No news to show" : idioma === "fr" ? "Aucune nouveauté à afficher" : "No hay novedades para mostrar"}
               </div> : <div className="space-y-3">
                 {todasNovedades.map((novedad, index) => {
               const IconComponent = ICONOS_MAP[novedad.icono || 'utensils'] || UtensilsCrossed;
               const isPreview = novedad.id === 'preview';
+              const textos = getTextoIdioma(novedad, idioma);
               return <Card key={novedad.id || index} className={`overflow-hidden transition-all duration-300 ${isPreview ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                       {novedad.imagen_url && <div className="relative h-24 overflow-hidden">
-                          <img src={novedad.imagen_url} alt={novedad.titulo} className="w-full h-full object-cover" />
+                          <img src={novedad.imagen_url} alt={textos.titulo} className="w-full h-full object-cover" />
                           {isPreview && <div className="absolute top-1 right-1">
                               <Badge variant="default" className="text-[10px] px-1.5 py-0">
                                 Preview
@@ -76,16 +136,16 @@ export function MobilePreview({
                             <IconComponent className="w-3 h-3 text-accent" />
                           </div>
                           <Badge className="text-[10px] px-1.5 py-0 bg-accent text-primary-foreground hover:bg-accent/90 border-0">
-                              {novedad.badge_text || "Nuevo"}
+                              {novedad.badge_text || (idioma === "en" ? "New" : idioma === "fr" ? "Nouveau" : "Nuevo")}
                             </Badge>
                         </div>
                         <CardTitle className="text-sm font-semibold leading-tight">
-                          {novedad.titulo || "Sin título"}
+                          {textos.titulo || (idioma === "en" ? "No title" : idioma === "fr" ? "Sans titre" : "Sin título")}
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-2 pt-0">
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {novedad.descripcion || "Sin descripción"}
+                          {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
                         </p>
                       </CardContent>
                     </Card>;
