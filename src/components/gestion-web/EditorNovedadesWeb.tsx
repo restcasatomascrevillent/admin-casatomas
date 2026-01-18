@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Edit2, Trash2, Eye, Save, X, Upload, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -331,19 +331,27 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
                 placeholder="Descripción de la novedad"
                 className="min-h-16 resize-none"
               />
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="mt-1"
+                onClick={() => {
+                  // TODO: Implementar generación automática de descripción
+                  toast.info("Función de generar descripción próximamente");
+                }}
+              >
+                Hacer descripción
+              </Button>
             </div>
 
-            {/* Traducciones */}
-            <Tabs defaultValue="es" className="w-full">
-              <TabsList className="h-8">
-                <TabsTrigger value="es" className="text-xs px-3 h-6">ES</TabsTrigger>
-                <TabsTrigger value="en" className="text-xs px-3 h-6">EN</TabsTrigger>
-                <TabsTrigger value="fr" className="text-xs px-3 h-6">FR</TabsTrigger>
-              </TabsList>
-              <TabsContent value="es" className="mt-2">
-                <p className="text-xs text-muted-foreground">Contenido principal en español (campos de arriba)</p>
-              </TabsContent>
-              <TabsContent value="en" className="mt-2 space-y-2">
+            {/* Traducciones - Siempre expandido */}
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
+              <p className="text-xs font-medium text-muted-foreground">Traducciones</p>
+              
+              {/* Inglés */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">🇬🇧 Inglés</Label>
                 <Input 
                   value={formData.titulo_en} 
                   onChange={(e) => handleInputChange('titulo_en', e.target.value)}
@@ -356,8 +364,11 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
                   placeholder="Description (English)"
                   className="min-h-12 resize-none text-sm"
                 />
-              </TabsContent>
-              <TabsContent value="fr" className="mt-2 space-y-2">
+              </div>
+              
+              {/* Francés */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">🇫🇷 Francés</Label>
                 <Input 
                   value={formData.titulo_fr} 
                   onChange={(e) => handleInputChange('titulo_fr', e.target.value)}
@@ -370,8 +381,8 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
                   placeholder="Description (Français)"
                   className="min-h-12 resize-none text-sm"
                 />
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
 
             {/* Imagen */}
             <div className="space-y-1.5">
