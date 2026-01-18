@@ -25,6 +25,8 @@ export default function GestionWeb() {
         badge_text: n.badge_text,
         icono: n.icono,
         destacado: n.destacado,
+        bullets: n.bullets || [],
+        tags: n.tags || [],
       }));
   }, [novedades, previewIds]);
 
