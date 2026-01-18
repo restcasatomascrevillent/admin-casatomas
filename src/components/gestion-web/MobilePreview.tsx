@@ -14,10 +14,16 @@ export interface NovedadPreview {
   descripcion_fr?: string | null;
   imagen_url?: string | null;
   badge_text?: string | null;
+  badge_text_en?: string | null;
+  badge_text_fr?: string | null;
   icono?: string | null;
   destacado?: boolean;
   bullets?: string[];
+  bullets_en?: string[] | null;
+  bullets_fr?: string[] | null;
   tags?: string[];
+  tags_en?: string[] | null;
+  tags_fr?: string[] | null;
 }
 
 interface MobilePreviewProps {
@@ -33,16 +39,25 @@ const getTextoIdioma = (novedad: NovedadPreview, idioma: Idioma) => {
       return {
         titulo: novedad.titulo_en || novedad.titulo,
         descripcion: novedad.descripcion_en || novedad.descripcion,
+        badge_text: novedad.badge_text_en || novedad.badge_text,
+        bullets: novedad.bullets_en || novedad.bullets || [],
+        tags: novedad.tags_en || novedad.tags || [],
       };
     case "fr":
       return {
         titulo: novedad.titulo_fr || novedad.titulo,
         descripcion: novedad.descripcion_fr || novedad.descripcion,
+        badge_text: novedad.badge_text_fr || novedad.badge_text,
+        bullets: novedad.bullets_fr || novedad.bullets || [],
+        tags: novedad.tags_fr || novedad.tags || [],
       };
     default:
       return {
         titulo: novedad.titulo,
         descripcion: novedad.descripcion,
+        badge_text: novedad.badge_text,
+        bullets: novedad.bullets || [],
+        tags: novedad.tags || [],
       };
   }
 };
@@ -138,7 +153,7 @@ export function MobilePreview({
                             <IconComponent className="w-3 h-3 text-accent" />
                           </div>
                           <Badge className="text-[10px] px-1.5 py-0 bg-accent text-primary-foreground hover:bg-accent/90 border-0">
-                              {novedad.badge_text || (idioma === "en" ? "New" : idioma === "fr" ? "Nouveau" : "Nuevo")}
+                              {textos.badge_text || (idioma === "en" ? "New" : idioma === "fr" ? "Nouveau" : "Nuevo")}
                             </Badge>
                         </div>
                         <CardTitle className="text-sm font-semibold leading-tight">
@@ -151,9 +166,9 @@ export function MobilePreview({
                         </p>
                         
                         {/* Puntos destacados (bullets) */}
-                        {novedad.bullets && novedad.bullets.length > 0 && (
+                        {textos.bullets && textos.bullets.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {novedad.bullets.map((bullet, i) => (
+                            {textos.bullets.map((bullet, i) => (
                               <Badge 
                                 key={i} 
                                 variant="secondary" 
@@ -166,9 +181,9 @@ export function MobilePreview({
                         )}
                         
                         {/* Etiquetas (tags) */}
-                        {novedad.tags && novedad.tags.length > 0 && (
+                        {textos.tags && textos.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {novedad.tags.map((tag, i) => (
+                            {textos.tags.map((tag, i) => (
                               <Badge 
                                 key={i} 
                                 variant="outline" 
