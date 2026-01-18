@@ -345,44 +345,7 @@ export function EditorNovedadesWeb({ onPreview }: EditorNovedadesWebProps) {
               </Button>
             </div>
 
-            {/* Traducciones - Siempre expandido */}
-            <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
-              <p className="text-xs font-medium text-muted-foreground">Traducciones</p>
-              
-              {/* Inglés */}
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">🇬🇧 Inglés</Label>
-                <Input 
-                  value={formData.titulo_en} 
-                  onChange={(e) => handleInputChange('titulo_en', e.target.value)}
-                  placeholder="Title (English)"
-                  className="h-8 text-sm"
-                />
-                <Textarea 
-                  value={formData.descripcion_en} 
-                  onChange={(e) => handleInputChange('descripcion_en', e.target.value)}
-                  placeholder="Description (English)"
-                  className="min-h-12 resize-none text-sm"
-                />
-              </div>
-              
-              {/* Francés */}
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">🇫🇷 Francés</Label>
-                <Input 
-                  value={formData.titulo_fr} 
-                  onChange={(e) => handleInputChange('titulo_fr', e.target.value)}
-                  placeholder="Titre (Français)"
-                  className="h-8 text-sm"
-                />
-                <Textarea 
-                  value={formData.descripcion_fr} 
-                  onChange={(e) => handleInputChange('descripcion_fr', e.target.value)}
-                  placeholder="Description (Français)"
-                  className="min-h-12 resize-none text-sm"
-                />
-              </div>
-            </div>
+
 
             {/* Imagen */}
             <div className="space-y-1.5">
