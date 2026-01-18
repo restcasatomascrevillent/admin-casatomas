@@ -16,6 +16,8 @@ export interface NovedadPreview {
   badge_text?: string | null;
   icono?: string | null;
   destacado?: boolean;
+  bullets?: string[];
+  tags?: string[];
 }
 
 interface MobilePreviewProps {
@@ -143,10 +145,37 @@ export function MobilePreview({
                           {textos.titulo || (idioma === "en" ? "No title" : idioma === "fr" ? "Sans titre" : "Sin título")}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="p-2 pt-0">
+                      <CardContent className="p-2 pt-0 space-y-2">
                         <p className="text-xs text-muted-foreground line-clamp-2">
                           {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
                         </p>
+                        
+                        {/* Puntos destacados (bullets) */}
+                        {novedad.bullets && novedad.bullets.length > 0 && (
+                          <ul className="space-y-0.5">
+                            {novedad.bullets.slice(0, 3).map((bullet, i) => (
+                              <li key={i} className="text-[10px] text-muted-foreground flex items-start gap-1">
+                                <span className="text-accent mt-0.5">•</span>
+                                <span className="line-clamp-1">{bullet}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        
+                        {/* Etiquetas (tags) */}
+                        {novedad.tags && novedad.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {novedad.tags.slice(0, 3).map((tag, i) => (
+                              <Badge 
+                                key={i} 
+                                variant="outline" 
+                                className="text-[8px] px-1 py-0 h-4 bg-muted/50"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>;
             })}
