@@ -18,22 +18,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Mapeo de alérgenos oficiales a emojis
-const ALERGENOS_MAP: Record<string, { label: string; emoji: string }> = {
-  gluten: { label: "Gluten", emoji: "🌾" },
-  crustaceos: { label: "Crustáceos", emoji: "🦐" },
-  huevo: { label: "Huevo", emoji: "🥚" },
-  pescado: { label: "Pescado", emoji: "🐟" },
-  cacahuetes: { label: "Cacahuetes", emoji: "🥜" },
-  frutos_cascara: { label: "Frutos de cáscara", emoji: "🌰" },
-  lacteos: { label: "Lácteos", emoji: "🥛" },
-  apio: { label: "Apio", emoji: "🌱" },
-  mostaza: { label: "Mostaza", emoji: "🟡" },
-  sesamo: { label: "Sésamo", emoji: "🌻" },
-  sulfitos: { label: "Sulfitos", emoji: "🧪" },
-  altramuces: { label: "Altramuces", emoji: "🫘" },
-  moluscos: { label: "Moluscos", emoji: "🦑" },
-  soja: { label: "Soja", emoji: "🫛" },
+// Mapeo de alérgenos oficiales
+const ALERGENOS_MAP: Record<string, string> = {
+  gluten: "Gluten",
+  crustaceos: "Crustáceos",
+  huevo: "Huevo",
+  pescado: "Pescado",
+  cacahuetes: "Cacahuetes",
+  frutos_cascara: "Frutos de cáscara",
+  lacteos: "Lácteos",
+  apio: "Apio",
+  mostaza: "Mostaza",
+  sesamo: "Sésamo",
+  sulfitos: "Sulfitos",
+  altramuces: "Altramuces",
+  moluscos: "Moluscos",
+  soja: "Soja",
 };
 
 interface ListaPlatosProps {
@@ -181,21 +181,14 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               {plato.alergenos_oficiales && Array.isArray(plato.alergenos_oficiales) && plato.alergenos_oficiales.length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-2 border-t">
                   {(plato.alergenos_oficiales as string[]).map((alergeno) => {
-                    const info = ALERGENOS_MAP[alergeno];
+                    const label = ALERGENOS_MAP[alergeno] || alergeno;
                     return (
                       <Badge 
                         key={alergeno} 
                         variant="outline" 
-                        className="text-xs py-0 px-1.5 gap-0.5"
+                        className="text-xs py-0 px-1.5"
                       >
-                        {info ? (
-                          <>
-                            <span>{info.emoji}</span>
-                            <span>{info.label}</span>
-                          </>
-                        ) : (
-                          <span>{alergeno}</span>
-                        )}
+                        {label}
                       </Badge>
                     );
                   })}
