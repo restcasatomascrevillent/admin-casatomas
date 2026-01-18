@@ -61,8 +61,10 @@ interface EditorNovedadesWebProps {
 // Campos específicos por tipo de novedad
 const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
   plato_nuevo: [
+    { key: 'nombre_plato', label: 'Nombre del plato', placeholder: 'Ej: Risotto de setas...' },
     { key: 'precio', label: 'Precio (€)', placeholder: '12.50', type: 'number' },
     { key: 'ingredientes', label: 'Ingredientes principales', placeholder: 'Tomate, mozzarella, albahaca...' },
+    { key: 'alergenos', label: 'Alérgenos', placeholder: 'Gluten, lácteos, frutos secos...' },
   ],
   promocion: [
     { key: 'precio_original', label: 'Precio original (€)', placeholder: '20.00', type: 'number' },
