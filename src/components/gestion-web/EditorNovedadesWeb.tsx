@@ -927,7 +927,7 @@ export function EditorNovedadesWeb({
             </div>
             <Button onClick={handleAplicarResultado} className="w-full sm:w-auto">
               <Save className="w-4 h-4 mr-1.5" />
-              Usar esto
+              Usar
             </Button>
           </DialogFooter>
         </DialogContent>
