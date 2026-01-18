@@ -118,7 +118,12 @@ export function ImagePositionSelector({
   };
 
   const handleConfirm = () => {
-    onPositionChange(Math.round(position));
+    // Convertir la posición del centro del frame a la posición superior del frame
+    // Esta es la posición que CSS object-position necesita para mostrar esa parte
+    const frameTop = position - FRAME_HEIGHT_PERCENT / 2;
+    // Normalizar de 0-75 a 0-100 para object-position
+    const normalizedPosition = (frameTop / (100 - FRAME_HEIGHT_PERCENT)) * 100;
+    onPositionChange(Math.round(Math.max(0, Math.min(100, normalizedPosition))));
     onOpenChange(false);
   };
 
