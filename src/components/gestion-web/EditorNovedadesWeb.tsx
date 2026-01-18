@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNovedades } from "@/hooks/useNovedades";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
+import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { NovedadPreview } from "./MobilePreview";
@@ -62,6 +62,16 @@ const TONOS = [
   { value: "formal", label: "Formal", description: "Tono profesional y elegante" },
   { value: "divertido", label: "Divertido", description: "Tono alegre y desenfadado" },
   { value: "exclusivo", label: "Exclusivo", description: "Tono premium y sofisticado" },
+];
+
+const LOADING_MESSAGES = [
+  "Generando magia ✨",
+  "Cocinando las palabras perfectas 🍳",
+  "Creando tu descripción...",
+  "Puliendo cada detalle 💎",
+  "Dándole el toque final 🎨",
+  "Inspirándose en tu idea 💡",
+  "Casi listo... ⏳",
 ];
 interface EditorNovedadesWebProps {
   onPreview: (novedad: NovedadPreview | null) => void;
@@ -156,6 +166,8 @@ export function EditorNovedadesWeb({
   const [generandoDescripcion, setGenerandoDescripcion] = useState(false);
   const [tonoModalOpen, setTonoModalOpen] = useState(false);
   const [tonoSeleccionado, setTonoSeleccionado] = useState("cercano");
+  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCampoTipoChange = (key: string, value: string) => {
@@ -178,8 +190,25 @@ export function EditorNovedadesWeb({
     setTonoModalOpen(true);
   };
 
+  // Efecto para rotar mensajes de carga
+  useEffect(() => {
+    if (!generandoDescripcion) return;
+    
+    const interval = setInterval(() => {
+      setLoadingMessageIndex(prev => {
+        const next = (prev + 1) % LOADING_MESSAGES.length;
+        setLoadingMessage(LOADING_MESSAGES[next]);
+        return next;
+      });
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [generandoDescripcion]);
+
   const handleGenerarDescripcion = async () => {
     setTonoModalOpen(false);
+    setLoadingMessageIndex(0);
+    setLoadingMessage(LOADING_MESSAGES[0]);
     
     // Campos opcionales - no validamos como obligatorios
     const campos = formData.campos_tipo ?? {};
@@ -745,10 +774,30 @@ export function EditorNovedadesWeb({
           </RadioGroup>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTonoModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleGenerarDescripcion} disabled={generandoDescripcion}>
-              {generandoDescripcion ? "Generando..." : "Enviar"}
+            <Button onClick={handleGenerarDescripcion}>
+              Enviar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de carga mientras se genera */}
+      <Dialog open={generandoDescripcion} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col items-center justify-center py-12 space-y-6">
+            <div className="relative">
+              <Loader2 className="w-16 h-16 text-primary animate-spin" />
+              <Sparkles className="w-6 h-6 text-amber-500 absolute -top-1 -right-1 animate-pulse" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-xl font-semibold text-foreground animate-pulse">
+                {loadingMessage}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Esto puede tardar unos segundos
+              </p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>;
