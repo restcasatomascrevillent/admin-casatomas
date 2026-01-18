@@ -72,10 +72,10 @@ export function MobilePreview({
                         </div>}
                       <CardHeader className="p-2 pb-1">
                         <div className="flex items-center justify-between gap-1.5">
-                          <div className="p-1 rounded-full bg-primary/10">
-                            <IconComponent className="w-3 h-3 text-primary" />
+                          <div className="p-1 rounded-full bg-amber-500/20">
+                            <IconComponent className="w-3 h-3 text-amber-600" />
                           </div>
-                          {novedad.badge_text && <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {novedad.badge_text && <Badge className="text-[10px] px-1.5 py-0 bg-amber-500/20 text-amber-700 hover:bg-amber-500/30 border-0">
                               {novedad.badge_text}
                             </Badge>}
                         </div>
