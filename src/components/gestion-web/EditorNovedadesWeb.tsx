@@ -371,7 +371,9 @@ export function EditorNovedadesWeb({
       imagen_url: formData.imagen_url,
       badge_text: formData.badge_text,
       icono: formData.icono,
-      destacado: formData.destacado
+      destacado: formData.destacado,
+      bullets: formData.bullets,
+      tags: formData.tags
     });
   };
   const handleClearPreview = () => {
