@@ -69,7 +69,7 @@ interface PlatoFormProps {
 }
 
 export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
-  const { crearPlato } = usePlatos();
+  const { crearPlato, categorias } = usePlatos();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -277,11 +277,11 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                       </SelectTrigger>
                     </FormControl>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="Entrantes">Entrantes</SelectItem>
-                  <SelectItem value="Principales">Principales</SelectItem>
-                  <SelectItem value="Postres">Postres</SelectItem>
-                  <SelectItem value="Especiales">Especiales</SelectItem>
-                  <SelectItem value="Novedades del día">Novedades del día</SelectItem>
+                  {categorias.map((cat) => (
+                    <SelectItem key={cat} value={cat as string}>
+                      {cat}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
                   </Select>
                   <FormMessage />
