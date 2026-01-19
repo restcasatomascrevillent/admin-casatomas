@@ -48,6 +48,7 @@ export function useBebidas() {
         body: {
           tipo: 'bebida',
           nombre: nuevaBebida.nombre,
+          categoria: nuevaBebida.categoria,
           tamano: nuevaBebida.tamano || '',
         }
       });
