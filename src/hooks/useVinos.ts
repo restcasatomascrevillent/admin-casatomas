@@ -60,6 +60,8 @@ export function useVinos() {
           ...nuevoVino,
           activado: true,
           id: vinoId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }])
         .select()
         .single();
