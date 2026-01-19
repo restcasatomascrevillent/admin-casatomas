@@ -14,6 +14,7 @@ import {
   DoorOpen,
   Trash2,
   Ruler,
+  Focus,
 } from "lucide-react";
 
 export type ToolType = "select" | "wall" | "area" | "mesa-rect" | "mesa-circular" | "door";
@@ -25,6 +26,7 @@ interface ToolbarDibujoProps {
   hasSelection: boolean;
   showMeasurements?: boolean;
   onToggleMeasurements?: () => void;
+  onCenterPlan?: () => void;
 }
 
 interface ToolButton {
@@ -50,6 +52,7 @@ export function ToolbarDibujo({
   hasSelection,
   showMeasurements = true,
   onToggleMeasurements,
+  onCenterPlan,
 }: ToolbarDibujoProps) {
   return (
     <TooltipProvider delayDuration={300}>
@@ -88,6 +91,24 @@ export function ToolbarDibujo({
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <p>{showMeasurements ? "Ocultar medidas" : "Mostrar medidas"}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {onCenterPlan && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onCenterPlan}
+                className="h-9 w-9 p-0"
+              >
+                <Focus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Centrar plano</p>
             </TooltipContent>
           </Tooltip>
         )}

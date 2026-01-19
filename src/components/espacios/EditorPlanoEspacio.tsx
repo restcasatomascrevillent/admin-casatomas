@@ -367,6 +367,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         hasSelection={!!selectedElement}
         showMeasurements={showMeasurements}
         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
+        onCenterPlan={() => canvasRef.current?.centerOnContent()}
       />
 
       {/* Main content */}
