@@ -259,10 +259,15 @@ export function usePlatos() {
     ? Array.from(new Set(platos.map((p) => p.categoria).filter(Boolean)))
     : [];
 
+  const unidades = platos
+    ? Array.from(new Set(platos.map((p) => p.unidad).filter(Boolean)))
+    : [];
+
   return {
     platos,
     isLoading,
     categorias,
+    unidades,
     crearPlato,
     actualizarPlato,
     eliminarPlato,
