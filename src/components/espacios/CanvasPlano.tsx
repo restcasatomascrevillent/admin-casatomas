@@ -373,109 +373,72 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     },
     centerOnContent: () => {
       if (!fabricCanvas) return;
-      
-      // Obtener todos los objetos relevantes (no grid, no guías, no cotas, no etiquetas)
-      const objects = fabricCanvas.getObjects().filter(obj => {
+
+      // Objetos relevantes (excluye grid, guías, cotas, etiquetas y bocadillos)
+      const objects = fabricCanvas.getObjects().filter((obj) => {
         const customData = (obj as any).customData;
-        return !(obj as any).isGrid && 
-               !(obj as any).isAlignmentGuide &&
-               !(obj as any).isCota &&
-               !(obj as any).isMesaLabel &&
-               customData?.tipo !== "mesa-bocadillo" &&
-               customData?.tipo !== "mesa-label";
+        return (
+          !(obj as any).isGrid &&
+          !(obj as any).isAlignmentGuide &&
+          !(obj as any).isCota &&
+          !(obj as any).isMesaLabel &&
+          customData?.tipo !== "mesa-bocadillo" &&
+          customData?.tipo !== "mesa-label"
+        );
       });
-      
-      if (objects.length === 0) {
-        console.log("centerOnContent: No hay objetos relevantes para centrar");
-        return;
-      }
-      
-      console.log("centerOnContent: Objetos encontrados:", objects.length);
-      
-      // Calcular bounding box global usando getBoundingRect de cada objeto
-      let minX = Infinity, minY = Infinity;
-      let maxX = -Infinity, maxY = -Infinity;
-      
-      objects.forEach(obj => {
-        // Resetear temporalmente el viewport para obtener coordenadas absolutas
-        const currentVpt = fabricCanvas.viewportTransform;
-        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
-        
-        // Usar getBoundingRect que funciona con cualquier tipo de objeto
-        const boundingRect = obj.getBoundingRect();
-        
-        // Restaurar viewport
-        if (currentVpt) {
-          fabricCanvas.setViewportTransform(currentVpt);
-        }
-        
-        if (boundingRect) {
-          minX = Math.min(minX, boundingRect.left);
-          maxX = Math.max(maxX, boundingRect.left + boundingRect.width);
-          minY = Math.min(minY, boundingRect.top);
-          maxY = Math.max(maxY, boundingRect.top + boundingRect.height);
-        }
+
+      if (objects.length === 0) return;
+
+      // En Fabric v6, getBoundingRect() depende del viewportTransform.
+      // Para no "romper" el plano (y evitar desapariciones), calculamos bounds en coordenadas de escena
+      // usando getCoords() (aCoords), que no depende del zoom/pan.
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      objects.forEach((obj) => {
+        obj.setCoords();
+        const coords = obj.getCoords(); // 4 puntos en coordenadas de escena
+        coords.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
       });
-      
-      console.log("centerOnContent: Bounding box:", { minX, minY, maxX, maxY });
-      
-      // Verificar que tenemos valores válidos
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-        console.log("centerOnContent: Bounding box inválido");
-        return;
-      }
-      
-      // Calcular dimensiones y centro del contenido
+
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+
       const contentWidth = maxX - minX;
       const contentHeight = maxY - minY;
+      if (contentWidth <= 0 || contentHeight <= 0) return;
+
       const contentCenterX = (minX + maxX) / 2;
       const contentCenterY = (minY + maxY) / 2;
-      
-      console.log("centerOnContent: Content dimensions:", { contentWidth, contentHeight, contentCenterX, contentCenterY });
-      
-      if (contentWidth <= 0 || contentHeight <= 0) {
-        console.log("centerOnContent: Dimensiones inválidas");
-        return;
-      }
-      
-      // Calcular zoom óptimo con padding (60px para mejor visualización)
+
+      const cW = fabricCanvas.getWidth();
+      const cH = fabricCanvas.getHeight();
+
       const padding = 60;
-      const availableWidth = canvasWidth - padding * 2;
-      const availableHeight = canvasHeight - padding * 2;
-      
-      if (availableWidth <= 0 || availableHeight <= 0) {
-        console.log("centerOnContent: Canvas demasiado pequeño");
-        return;
-      }
-      
+      const availableWidth = cW - padding * 2;
+      const availableHeight = cH - padding * 2;
+      if (availableWidth <= 0 || availableHeight <= 0) return;
+
       const zoomX = availableWidth / contentWidth;
       const zoomY = availableHeight / contentHeight;
-      // Limitar zoom entre 0.3 y 2 para evitar extremos
-      const optimalZoom = Math.min(zoomX, zoomY, 2);
-      const finalZoom = Math.max(0.3, optimalZoom);
-      
-      console.log("centerOnContent: Zoom calculado:", { zoomX, zoomY, optimalZoom, finalZoom });
-      
-      // Resetear viewport completamente
-      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      
-      // Aplicar zoom
-      fabricCanvas.setZoom(finalZoom);
-      
-      // Calcular offset para centrar el contenido
-      const canvasCenterX = canvasWidth / 2;
-      const canvasCenterY = canvasHeight / 2;
-      
-      const offsetX = canvasCenterX - contentCenterX * finalZoom;
-      const offsetY = canvasCenterY - contentCenterY * finalZoom;
-      
-      console.log("centerOnContent: Offset calculado:", { offsetX, offsetY });
-      
-      // Aplicar transformación
-      fabricCanvas.setViewportTransform([finalZoom, 0, 0, finalZoom, offsetX, offsetY]);
-      
+      const unclampedZoom = Math.min(zoomX, zoomY);
+      const zoom = Math.max(0.25, Math.min(3, unclampedZoom));
+
+      const canvasCenterX = cW / 2;
+      const canvasCenterY = cH / 2;
+
+      const tx = canvasCenterX - contentCenterX * zoom;
+      const ty = canvasCenterY - contentCenterY * zoom;
+
+      fabricCanvas.setViewportTransform([zoom, 0, 0, zoom, tx, ty] as any);
       fabricCanvas.requestRenderAll();
-      onZoomChange?.(finalZoom);
+      onZoomChange?.(zoom);
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
 
