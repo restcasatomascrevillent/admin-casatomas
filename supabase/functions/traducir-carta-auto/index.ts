@@ -17,7 +17,7 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Received payload:", JSON.stringify(payload));
 
-    const { tipo, nombre, descripcion, categoria, alergenos, tamano, ubicacion_pais, ubicacion_region, alergenos_notas } = payload;
+    const { tipo, nombre, descripcion, categoria, alergenos, tamano, ubicacion_pais, ubicacion_region, alergenos_notas, precio, unidad } = payload;
 
     if (!nombre) {
       return new Response(
@@ -36,6 +36,8 @@ serve(async (req) => {
 
     if (tipo === "plato") {
       webhookPayload.alergenos = alergenos || [];
+      webhookPayload.precio = precio;
+      webhookPayload.unidad = unidad || "";
     } else if (tipo === "bebida") {
       webhookPayload.tamano = tamano || "";
     } else if (tipo === "vino") {
