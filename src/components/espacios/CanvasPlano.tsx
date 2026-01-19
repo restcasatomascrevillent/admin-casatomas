@@ -385,42 +385,45 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
                customData?.tipo !== "mesa-label";
       });
       
-      if (objects.length === 0) return;
+      if (objects.length === 0) {
+        console.log("centerOnContent: No hay objetos relevantes para centrar");
+        return;
+      }
       
-      // Calcular bounding box global
+      console.log("centerOnContent: Objetos encontrados:", objects.length);
+      
+      // Calcular bounding box global usando getBoundingRect de cada objeto
       let minX = Infinity, minY = Infinity;
       let maxX = -Infinity, maxY = -Infinity;
       
       objects.forEach(obj => {
-        const customData = (obj as any).customData;
+        // Resetear temporalmente el viewport para obtener coordenadas absolutas
+        const currentVpt = fabricCanvas.viewportTransform;
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
         
-        if (customData?.tipo === "wall") {
-          // Las paredes son líneas con coordenadas x1,y1,x2,y2
-          const line = obj as Line;
-          const x1 = line.x1 ?? 0;
-          const y1 = line.y1 ?? 0;
-          const x2 = line.x2 ?? 0;
-          const y2 = line.y2 ?? 0;
-          minX = Math.min(minX, x1, x2);
-          maxX = Math.max(maxX, x1, x2);
-          minY = Math.min(minY, y1, y2);
-          maxY = Math.max(maxY, y1, y2);
-        } else {
-          // Otros objetos: usar left, top, width, height o radius
-          const left = obj.left || 0;
-          const top = obj.top || 0;
-          const width = (obj as any).width || ((obj as any).radius ? (obj as any).radius * 2 : 0);
-          const height = (obj as any).height || ((obj as any).radius ? (obj as any).radius * 2 : 0);
-          
-          minX = Math.min(minX, left);
-          maxX = Math.max(maxX, left + width);
-          minY = Math.min(minY, top);
-          maxY = Math.max(maxY, top + height);
+        // Usar getBoundingRect que funciona con cualquier tipo de objeto
+        const boundingRect = obj.getBoundingRect();
+        
+        // Restaurar viewport
+        if (currentVpt) {
+          fabricCanvas.setViewportTransform(currentVpt);
+        }
+        
+        if (boundingRect) {
+          minX = Math.min(minX, boundingRect.left);
+          maxX = Math.max(maxX, boundingRect.left + boundingRect.width);
+          minY = Math.min(minY, boundingRect.top);
+          maxY = Math.max(maxY, boundingRect.top + boundingRect.height);
         }
       });
       
+      console.log("centerOnContent: Bounding box:", { minX, minY, maxX, maxY });
+      
       // Verificar que tenemos valores válidos
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+        console.log("centerOnContent: Bounding box inválido");
+        return;
+      }
       
       // Calcular dimensiones y centro del contenido
       const contentWidth = maxX - minX;
@@ -428,34 +431,50 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const contentCenterX = (minX + maxX) / 2;
       const contentCenterY = (minY + maxY) / 2;
       
-      if (contentWidth <= 0 || contentHeight <= 0) return;
+      console.log("centerOnContent: Content dimensions:", { contentWidth, contentHeight, contentCenterX, contentCenterY });
       
-      // Calcular zoom óptimo con padding (40px)
-      const padding = 40;
+      if (contentWidth <= 0 || contentHeight <= 0) {
+        console.log("centerOnContent: Dimensiones inválidas");
+        return;
+      }
+      
+      // Calcular zoom óptimo con padding (60px para mejor visualización)
+      const padding = 60;
       const availableWidth = canvasWidth - padding * 2;
       const availableHeight = canvasHeight - padding * 2;
       
+      if (availableWidth <= 0 || availableHeight <= 0) {
+        console.log("centerOnContent: Canvas demasiado pequeño");
+        return;
+      }
+      
       const zoomX = availableWidth / contentWidth;
       const zoomY = availableHeight / contentHeight;
-      const optimalZoom = Math.min(zoomX, zoomY, 3); // máximo 3x
-      const finalZoom = Math.max(0.25, optimalZoom); // mínimo 0.25x
+      // Limitar zoom entre 0.3 y 2 para evitar extremos
+      const optimalZoom = Math.min(zoomX, zoomY, 2);
+      const finalZoom = Math.max(0.3, optimalZoom);
       
-      // Resetear viewport y aplicar nuevo zoom centrado
+      console.log("centerOnContent: Zoom calculado:", { zoomX, zoomY, optimalZoom, finalZoom });
+      
+      // Resetear viewport completamente
       fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      
+      // Aplicar zoom
       fabricCanvas.setZoom(finalZoom);
       
-      // Calcular offset para centrar
+      // Calcular offset para centrar el contenido
       const canvasCenterX = canvasWidth / 2;
       const canvasCenterY = canvasHeight / 2;
       
-      const vpt = fabricCanvas.viewportTransform;
-      if (vpt) {
-        vpt[4] = canvasCenterX - contentCenterX * finalZoom;
-        vpt[5] = canvasCenterY - contentCenterY * finalZoom;
-        fabricCanvas.setViewportTransform(vpt);
-      }
+      const offsetX = canvasCenterX - contentCenterX * finalZoom;
+      const offsetY = canvasCenterY - contentCenterY * finalZoom;
       
-      fabricCanvas.renderAll();
+      console.log("centerOnContent: Offset calculado:", { offsetX, offsetY });
+      
+      // Aplicar transformación
+      fabricCanvas.setViewportTransform([finalZoom, 0, 0, finalZoom, offsetX, offsetY]);
+      
+      fabricCanvas.requestRenderAll();
       onZoomChange?.(finalZoom);
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
