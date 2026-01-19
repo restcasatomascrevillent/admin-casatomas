@@ -277,11 +277,11 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                       </SelectTrigger>
                     </FormControl>
                 <SelectContent className="bg-popover z-50">
-                  <SelectItem value="entrantes">Entrantes</SelectItem>
-                  <SelectItem value="principales">Principales</SelectItem>
-                  <SelectItem value="postres">Postres</SelectItem>
-                  <SelectItem value="especiales">Especiales</SelectItem>
-                  <SelectItem value="novedades">Novedades del día</SelectItem>
+                  <SelectItem value="Entrantes">Entrantes</SelectItem>
+                  <SelectItem value="Principales">Principales</SelectItem>
+                  <SelectItem value="Postres">Postres</SelectItem>
+                  <SelectItem value="Especiales">Especiales</SelectItem>
+                  <SelectItem value="Novedades del día">Novedades del día</SelectItem>
                 </SelectContent>
                   </Select>
                   <FormMessage />
