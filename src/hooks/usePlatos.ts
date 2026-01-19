@@ -71,9 +71,15 @@ export function usePlatos() {
       if (error) throw error;
 
       // 2. Llamar al webhook de traducción en background
-      const alergenosArray = nuevoPlato.alergenos_oficiales 
-        ? Object.keys(nuevoPlato.alergenos_oficiales).filter(k => nuevoPlato.alergenos_oficiales[k])
-        : [];
+      // alergenos_oficiales puede ser un array de strings o un objeto con booleanos
+      let alergenosArray: string[] = [];
+      if (nuevoPlato.alergenos_oficiales) {
+        if (Array.isArray(nuevoPlato.alergenos_oficiales)) {
+          alergenosArray = nuevoPlato.alergenos_oficiales;
+        } else if (typeof nuevoPlato.alergenos_oficiales === 'object') {
+          alergenosArray = Object.keys(nuevoPlato.alergenos_oficiales).filter(k => nuevoPlato.alergenos_oficiales[k]);
+        }
+      }
 
       supabase.functions.invoke('traducir-carta-auto', {
         body: {
