@@ -140,7 +140,13 @@ export default function Espacios() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() => setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre })}
+                        onClick={() => {
+                          console.log("[Espacios] abrir editor plano", {
+                            espacioId: espacio.id,
+                            espacioNombre: espacio.nombre,
+                          });
+                          setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre });
+                        }}
                       >
                         <Settings2 className="h-4 w-4 mr-2" />
                         Configurar Plano y Mesas
