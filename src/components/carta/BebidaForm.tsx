@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -42,7 +43,7 @@ interface BebidaFormProps {
 }
 
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
-  const { crearBebida, actualizarBebida } = useBebidas();
+  const { crearBebida, actualizarBebida, categorias } = useBebidas();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -204,9 +205,20 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoría</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Refrescos, Cervezas, Cafés..." {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una categoría" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat} value={cat || ""}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

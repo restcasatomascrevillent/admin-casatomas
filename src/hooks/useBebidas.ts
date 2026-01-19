@@ -43,85 +43,29 @@ export function useBebidas() {
 
   const crearBebida = useMutation({
     mutationFn: async (nuevaBebida: NuevaBebida) => {
-      const bebidaId = crypto.randomUUID();
-
-      // 1. Crear la bebida primero
-      const { data, error } = await supabase
-        .from("Bebidas")
-        .insert([{
-          ...nuevaBebida,
-          activado: true,
-          id: bebidaId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // 2. Llamar al webhook de traducción en background
-      supabase.functions.invoke('traducir-carta-auto', {
+      // Solo enviar al webhook, sin insertar en base de datos
+      const { data, error } = await supabase.functions.invoke('traducir-carta-auto', {
         body: {
           tipo: 'bebida',
           nombre: nuevaBebida.nombre,
-          descripcion: nuevaBebida.descripcion || '',
-          categoria: nuevaBebida.categoria,
           tamano: nuevaBebida.tamano || '',
-        }
-      }).then(async ({ data: traducciones, error: tradError }) => {
-        if (tradError) {
-          console.error('Error en traducción automática:', tradError);
-          return;
-        }
-
-        console.log('Traducciones recibidas:', traducciones);
-
-        // Parsear respuesta del webhook
-        const traduccion = Array.isArray(traducciones) ? traducciones[0] : traducciones;
-        if (!traduccion) return;
-
-        const updateData: Record<string, string | null> = {};
-
-        // Inglés
-        if (traduccion['traduccion ingles']) {
-          const en = traduccion['traduccion ingles'];
-          updateData.nombre_en = en.nombre || null;
-          updateData.descripcion_en = en.descripcion || null;
-          updateData.categoria_en = en.categoria || null;
-        }
-
-        // Francés
-        if (traduccion['traduccion_fr']) {
-          const fr = traduccion['traduccion_fr'];
-          updateData.nombre_fr = fr.nombre || null;
-          updateData.descripcion_fr = fr.descripcion || null;
-          updateData.categoria_fr = fr['catégorie'] || fr.categoria || null;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          const { error: updateError } = await supabase
-            .from("Bebidas")
-            .update(updateData)
-            .eq("id", bebidaId);
-
-          if (updateError) {
-            console.error('Error guardando traducciones:', updateError);
-          } else {
-            console.log('Traducciones guardadas correctamente');
-            queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-          }
         }
       });
 
+      if (error) {
+        console.error('Error enviando al webhook:', error);
+        throw error;
+      }
+
+      console.log('Respuesta del webhook:', data);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      toast.success("Bebida añadida correctamente");
+      toast.success("Bebida enviada correctamente");
     },
     onError: (error) => {
-      toast.error("Error al añadir la bebida");
+      toast.error("Error al enviar la bebida");
       console.error(error);
     },
   });
