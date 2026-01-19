@@ -29,9 +29,7 @@ export interface CanvasPlanoRef {
   removeElement: (id: string) => void;
   getCanvas: () => HTMLCanvasElement | null;
   setZoom: (zoom: number) => void;
-  resetView: () => void;
   unmergeMesa: (mesaId: string) => void;
-  autoFit: () => void;
   updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => void;
 }
 
@@ -189,12 +187,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.renderAll();
       onZoomChange?.(clampedZoom);
     },
-    resetView: () => {
-      if (!fabricCanvas) return;
-      fabricCanvas.setViewportTransform([initialZoom, 0, 0, initialZoom, 0, 0]);
-      fabricCanvas.renderAll();
-      onZoomChange?.(initialZoom);
-    },
     unmergeMesa: (mesaId: string) => {
       if (!fabricCanvas) return;
       
@@ -341,95 +333,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       onMesasChange(updatedMesas);
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
-    },
-    autoFit: () => {
-      if (!fabricCanvas) return;
-
-      // Usar dimensiones reales del canvas de Fabric
-      const viewportW = fabricCanvas.getWidth();
-      const viewportH = fabricCanvas.getHeight();
-      if (viewportW <= 0 || viewportH <= 0) return;
-
-      // CRÍTICO: Resetear viewport a identidad ANTES de medir
-      // Esto garantiza que getBoundingRect() devuelva coordenadas de escena correctas
-      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-
-      // Filtrar solo geometría de contenido (paredes, mesas, áreas, puertas)
-      const contentObjects = fabricCanvas.getObjects().filter((obj) => {
-        const customData = (obj as any).customData;
-        const tipo = customData?.tipo;
-        return tipo === 'wall' || tipo === 'mesa' || tipo === 'area' || tipo === 'door';
-      });
-
-      if (contentObjects.length === 0) {
-        // Sin contenido: mantener viewport en identidad y renderizar
-        fabricCanvas.calcOffset();
-        fabricCanvas.renderAll();
-        onZoomChange?.(1);
-        return;
-      }
-
-      // Actualizar coordenadas de todos los objetos
-      contentObjects.forEach((obj) => obj.setCoords());
-
-      // Calcular bounding box con coordenadas absolutas
-      let minX = Infinity, minY = Infinity;
-      let maxX = -Infinity, maxY = -Infinity;
-
-      contentObjects.forEach((obj) => {
-        if (obj.type === 'line') {
-          // Con viewport en identidad, getBoundingRect() devuelve coords de escena correctas
-          const rect = obj.getBoundingRect();
-          minX = Math.min(minX, rect.left);
-          minY = Math.min(minY, rect.top);
-          maxX = Math.max(maxX, rect.left + rect.width);
-          maxY = Math.max(maxY, rect.top + rect.height);
-        } else {
-          // Rectángulos/Círculos: usar propiedades directas
-          const left = obj.left || 0;
-          const top = obj.top || 0;
-          const width = (obj as any).width || ((obj as any).radius || 0) * 2;
-          const height = (obj as any).height || ((obj as any).radius || 0) * 2;
-          minX = Math.min(minX, left);
-          minY = Math.min(minY, top);
-          maxX = Math.max(maxX, left + width);
-          maxY = Math.max(maxY, top + height);
-        }
-      });
-
-      // Validar medidas
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-        fabricCanvas.calcOffset();
-        fabricCanvas.renderAll();
-        return;
-      }
-
-      // Padding visual (80px en cada lado)
-      const padding = 80;
-      minX -= padding;
-      minY -= padding;
-      maxX += padding;
-      maxY += padding;
-
-      const contentWidth = Math.max(1, maxX - minX);
-      const contentHeight = Math.max(1, maxY - minY);
-      const contentCenterX = minX + contentWidth / 2;
-      const contentCenterY = minY + contentHeight / 2;
-
-      // Calcular zoom para que quepa todo
-      const zoomX = viewportW / contentWidth;
-      const zoomY = viewportH / contentHeight;
-      const targetZoom = Math.max(0.25, Math.min(3, Math.min(zoomX, zoomY)));
-
-      // Calcular offsets para centrar el contenido
-      const offsetX = viewportW / 2 - contentCenterX * targetZoom;
-      const offsetY = viewportH / 2 - contentCenterY * targetZoom;
-
-      // Aplicar viewport transform final
-      fabricCanvas.setViewportTransform([targetZoom, 0, 0, targetZoom, offsetX, offsetY]);
-      fabricCanvas.calcOffset();
-      fabricCanvas.renderAll(); // Síncrono para efecto inmediato
-      onZoomChange?.(targetZoom);
     },
     updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => {
       if (!fabricCanvas) return;
@@ -1164,82 +1067,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         fabricCanvas.selection = false;
       }
       
-      // Atajo F para centrar/autoFit
-      if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        // Ejecutar lógica de autoFit inline
-        const viewportW = fabricCanvas.getWidth();
-        const viewportH = fabricCanvas.getHeight();
-        if (viewportW <= 0 || viewportH <= 0) return;
-
-        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-
-        const contentObjects = fabricCanvas.getObjects().filter((obj) => {
-          const customData = (obj as any).customData;
-          const tipo = customData?.tipo;
-          return tipo === 'wall' || tipo === 'mesa' || tipo === 'area' || tipo === 'door';
-        });
-
-        if (contentObjects.length === 0) {
-          fabricCanvas.calcOffset();
-          fabricCanvas.renderAll();
-          onZoomChange?.(1);
-          return;
-        }
-
-        contentObjects.forEach((obj) => obj.setCoords());
-
-        let minX = Infinity, minY = Infinity;
-        let maxX = -Infinity, maxY = -Infinity;
-
-        contentObjects.forEach((obj) => {
-          if (obj.type === 'line') {
-            const rect = obj.getBoundingRect();
-            minX = Math.min(minX, rect.left);
-            minY = Math.min(minY, rect.top);
-            maxX = Math.max(maxX, rect.left + rect.width);
-            maxY = Math.max(maxY, rect.top + rect.height);
-          } else {
-            const left = obj.left || 0;
-            const top = obj.top || 0;
-            const width = (obj as any).width || ((obj as any).radius || 0) * 2;
-            const height = (obj as any).height || ((obj as any).radius || 0) * 2;
-            minX = Math.min(minX, left);
-            minY = Math.min(minY, top);
-            maxX = Math.max(maxX, left + width);
-            maxY = Math.max(maxY, top + height);
-          }
-        });
-
-        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-          fabricCanvas.calcOffset();
-          fabricCanvas.renderAll();
-          return;
-        }
-
-        const padding = 80;
-        minX -= padding;
-        minY -= padding;
-        maxX += padding;
-        maxY += padding;
-
-        const contentWidth = Math.max(1, maxX - minX);
-        const contentHeight = Math.max(1, maxY - minY);
-        const contentCenterX = minX + contentWidth / 2;
-        const contentCenterY = minY + contentHeight / 2;
-
-        const zoomX = viewportW / contentWidth;
-        const zoomY = viewportH / contentHeight;
-        const targetZoom = Math.max(0.25, Math.min(3, Math.min(zoomX, zoomY)));
-
-        const offsetX = viewportW / 2 - contentCenterX * targetZoom;
-        const offsetY = viewportH / 2 - contentCenterY * targetZoom;
-
-        fabricCanvas.setViewportTransform([targetZoom, 0, 0, targetZoom, offsetX, offsetY]);
-        fabricCanvas.calcOffset();
-        fabricCanvas.renderAll();
-        onZoomChange?.(targetZoom);
-      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {

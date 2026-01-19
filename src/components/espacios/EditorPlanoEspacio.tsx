@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
 import { useMesas, useActualizarMesasSilent } from "@/hooks/useMesas";
 import { supabase } from "@/integrations/supabase/client";
@@ -337,18 +337,6 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7"
-              onClick={() => {
-                canvasRef.current?.resetView();
-                setZoomLevel(fitZoom);
-              }}
-              title="Ajustar al espacio"
-            >
-              <Maximize className="h-4 w-4" />
-            </Button>
           </div>
           
           <Button variant="outline" size="sm" onClick={handleExport} className="rounded-lg">
@@ -379,9 +367,6 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         hasSelection={!!selectedElement}
         showMeasurements={showMeasurements}
         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
-        onAutoFit={() => {
-          canvasRef.current?.autoFit();
-        }}
       />
 
       {/* Main content */}
