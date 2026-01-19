@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
 
 export interface Plato {
   id: string;
@@ -30,7 +29,6 @@ export interface NuevoPlato {
   alergenos_oficiales?: any;
   alergenos_notas?: string;
   orden?: string;
-  traducciones?: Json;
 }
 
 export function usePlatos() {
@@ -54,42 +52,82 @@ export function usePlatos() {
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
       const isNovedades = nuevoPlato.categoria === "Novedades del día";
+      const platoId = crypto.randomUUID();
       
-      // Mapear traducciones a columnas específicas
-      const traduccionesData: Record<string, string | null> = {};
-      if (nuevoPlato.traducciones && typeof nuevoPlato.traducciones === 'object') {
-        const trad = nuevoPlato.traducciones as Record<string, Record<string, string>>;
-        
-        // Inglés
-        if (trad['traduccion ingles']) {
-          traduccionesData.nombre_en = trad['traduccion ingles'].nombre || null;
-          traduccionesData.descripcion_en = trad['traduccion ingles'].descripcion || null;
-          traduccionesData.categoria_en = trad['traduccion ingles'].categoria || null;
-          traduccionesData.alergenos_en = trad['traduccion ingles'].alergenos || null;
-        }
-        
-        // Francés
-        if (trad['traduccion_fr']) {
-          traduccionesData.nombre_fr = trad['traduccion_fr'].nombre || null;
-          traduccionesData.descripcion_fr = trad['traduccion_fr'].descripcion || null;
-          traduccionesData.categoria_fr = trad['traduccion_fr']['catégorie'] || trad['traduccion_fr'].categoria || null;
-          traduccionesData.alergenos_fr = trad['traduccion_fr'].allergenes || null;
-        }
-      }
-      
+      // 1. Crear el plato primero
       const { data, error } = await supabase
         .from("Platos")
         .insert([{
           ...nuevoPlato,
-          ...traduccionesData,
           activado: true,
           expanded: isNovedades,
-          id: crypto.randomUUID(),
+          id: platoId,
         }])
         .select()
         .single();
 
       if (error) throw error;
+
+      // 2. Llamar al webhook de traducción en background
+      const alergenosArray = nuevoPlato.alergenos_oficiales 
+        ? Object.keys(nuevoPlato.alergenos_oficiales).filter(k => nuevoPlato.alergenos_oficiales[k])
+        : [];
+
+      supabase.functions.invoke('traducir-carta-auto', {
+        body: {
+          tipo: 'plato',
+          nombre: nuevoPlato.nombre,
+          descripcion: nuevoPlato.descripcion || '',
+          categoria: nuevoPlato.categoria,
+          alergenos: alergenosArray,
+        }
+      }).then(async ({ data: traducciones, error: tradError }) => {
+        if (tradError) {
+          console.error('Error en traducción automática:', tradError);
+          return;
+        }
+
+        console.log('Traducciones recibidas:', traducciones);
+
+        // Parsear respuesta del webhook [{ "traduccion ingles": {...}, "traduccion_fr": {...} }]
+        const traduccion = Array.isArray(traducciones) ? traducciones[0] : traducciones;
+        if (!traduccion) return;
+
+        const updateData: Record<string, string | null> = {};
+
+        // Inglés
+        if (traduccion['traduccion ingles']) {
+          const en = traduccion['traduccion ingles'];
+          updateData.nombre_en = en.nombre || null;
+          updateData.descripcion_en = en.descripcion || null;
+          updateData.categoria_en = en.categoria || null;
+          updateData.alergenos_en = en.alergenos || null;
+        }
+
+        // Francés
+        if (traduccion['traduccion_fr']) {
+          const fr = traduccion['traduccion_fr'];
+          updateData.nombre_fr = fr.nombre || null;
+          updateData.descripcion_fr = fr.descripcion || null;
+          updateData.categoria_fr = fr['catégorie'] || fr.categoria || null;
+          updateData.alergenos_fr = fr.allergenes || fr.alergenos || null;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
+            .from("Platos")
+            .update(updateData)
+            .eq("id", platoId);
+
+          if (updateError) {
+            console.error('Error guardando traducciones:', updateError);
+          } else {
+            console.log('Traducciones guardadas correctamente');
+            queryClient.invalidateQueries({ queryKey: ["platos"] });
+          }
+        }
+      });
+
       return data;
     },
     onSuccess: () => {
