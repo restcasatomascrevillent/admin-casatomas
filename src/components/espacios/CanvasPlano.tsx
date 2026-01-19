@@ -374,100 +374,171 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     centerOnContent: () => {
       if (!fabricCanvas) return;
 
-      // Descartar selección activa para evitar interferencias
-      fabricCanvas.discardActiveObject();
+      const debug =
+        import.meta.env.DEV &&
+        typeof window !== "undefined" &&
+        ((window as any).__DEBUG_PLANO__ === true || localStorage.getItem("debug-plano") === "1");
 
-      // Guardar viewport actual
-      const prevVpt = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+      const log = (...args: any[]) => {
+        if (!debug) return;
+        // eslint-disable-next-line no-console
+        console.log(...args);
+      };
 
-      // Resetear viewport a identidad para medir en coordenadas de mundo
-      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
+      const warn = (...args: any[]) => {
+        if (!debug) return;
+        // eslint-disable-next-line no-console
+        console.warn(...args);
+      };
 
-      // Filtrar solo objetos relevantes: paredes, áreas, puertas y mesas
-      const relevantTypes = ["wall", "area", "door", "mesa"];
-      const objects = fabricCanvas.getObjects().filter((obj) => {
-        const customData = (obj as any).customData;
-        return customData?.tipo && relevantTypes.includes(customData.tipo);
-      });
-
-      // Si no hay objetos relevantes, restaurar viewport y salir
-      if (objects.length === 0) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
-        fabricCanvas.requestRenderAll();
-        return;
+      if (debug) {
+        // eslint-disable-next-line no-console
+        console.groupCollapsed("[Plano] centerOnContent");
       }
 
-      // Calcular bounds en coordenadas de mundo (viewport es identidad ahora)
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
+      try {
+        // Descartar selección activa para evitar interferencias
+        fabricCanvas.discardActiveObject();
 
-      objects.forEach((obj) => {
-        obj.setCoords();
-        const coords = obj.getCoords(); // Ahora son coordenadas de mundo
-        coords.forEach((p) => {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
+        // Guardar viewport actual
+        const prevVpt = fabricCanvas.viewportTransform
+          ? [...fabricCanvas.viewportTransform]
+          : ([1, 0, 0, 1, 0, 0] as any);
+
+        log("prevVpt:", prevVpt);
+
+        // Resetear viewport a identidad para medir en coordenadas de mundo
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
+
+        // Filtrar solo objetos relevantes: paredes, áreas, puertas y mesas
+        const relevantTypes = ["wall", "area", "door", "mesa"];
+        const objects = fabricCanvas.getObjects().filter((obj) => {
+          const customData = (obj as any).customData;
+          return customData?.tipo && relevantTypes.includes(customData.tipo);
         });
-      });
 
-      // Validar bounds
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
+        if (debug) {
+          const counts = objects.reduce<Record<string, number>>((acc, obj) => {
+            const t = (obj as any).customData?.tipo ?? "(sin-tipo)";
+            acc[t] = (acc[t] ?? 0) + 1;
+            return acc;
+          }, {});
+          log("relevant objects:", objects.length, counts);
+        }
+
+        // Si no hay objetos relevantes, restaurar viewport y salir
+        if (objects.length === 0) {
+          warn("ABORT: no relevant objects");
+          fabricCanvas.setViewportTransform(prevVpt as any);
+          fabricCanvas.requestRenderAll();
+          return;
+        }
+
+        // Calcular bounds en coordenadas de mundo (viewport es identidad ahora)
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        objects.forEach((obj) => {
+          obj.setCoords();
+          const coords = obj.getCoords();
+          coords.forEach((p) => {
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+          });
+        });
+
+        log("bounds:", { minX, minY, maxX, maxY });
+
+        // Validar bounds
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+          warn("ABORT: bounds not finite");
+          fabricCanvas.setViewportTransform(prevVpt as any);
+          fabricCanvas.requestRenderAll();
+          return;
+        }
+
+        const contentWidth = maxX - minX;
+        const contentHeight = maxY - minY;
+
+        log("content size:", { contentWidth, contentHeight });
+
+        if (contentWidth <= 0 || contentHeight <= 0) {
+          warn("ABORT: contentWidth/contentHeight <= 0");
+          fabricCanvas.setViewportTransform(prevVpt as any);
+          fabricCanvas.requestRenderAll();
+          return;
+        }
+
+        const contentCenterX = (minX + maxX) / 2;
+        const contentCenterY = (minY + maxY) / 2;
+
+        const cW = fabricCanvas.getWidth();
+        const cH = fabricCanvas.getHeight();
+
+        log("canvas size:", { cW, cH });
+
+        const padding = 80;
+        const availableWidth = cW - padding * 2;
+        const availableHeight = cH - padding * 2;
+
+        log("available:", { availableWidth, availableHeight, padding });
+
+        if (availableWidth <= 0 || availableHeight <= 0) {
+          warn("ABORT: availableWidth/availableHeight <= 0");
+          fabricCanvas.setViewportTransform(prevVpt as any);
+          fabricCanvas.requestRenderAll();
+          return;
+        }
+
+        const zoomX = availableWidth / contentWidth;
+        const zoomY = availableHeight / contentHeight;
+        const unclampedZoom = Math.min(zoomX, zoomY);
+        const zoom = Math.max(0.3, Math.min(2.5, unclampedZoom));
+
+        const canvasCenterX = cW / 2;
+        const canvasCenterY = cH / 2;
+
+        const tx = canvasCenterX - contentCenterX * zoom;
+        const ty = canvasCenterY - contentCenterY * zoom;
+
+        log("computed:", {
+          zoomX,
+          zoomY,
+          unclampedZoom,
+          zoom,
+          contentCenterX,
+          contentCenterY,
+          tx,
+          ty,
+        });
+
+        // Validar que los valores son finitos antes de aplicar
+        if (!isFinite(zoom) || !isFinite(tx) || !isFinite(ty)) {
+          warn("ABORT: zoom/tx/ty not finite");
+          fabricCanvas.setViewportTransform(prevVpt as any);
+          fabricCanvas.requestRenderAll();
+          return;
+        }
+
+        // Aplicar nuevo viewport
+        fabricCanvas.setViewportTransform([zoom, 0, 0, zoom, tx, ty] as any);
         fabricCanvas.requestRenderAll();
-        return;
+        onZoomChange?.(zoom);
+
+        log("applied viewport:", fabricCanvas.viewportTransform);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[Plano] centerOnContent ERROR", e);
+      } finally {
+        if (debug) {
+          // eslint-disable-next-line no-console
+          console.groupEnd();
+        }
       }
-
-      const contentWidth = maxX - minX;
-      const contentHeight = maxY - minY;
-      
-      if (contentWidth <= 0 || contentHeight <= 0) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
-        fabricCanvas.requestRenderAll();
-        return;
-      }
-
-      const contentCenterX = (minX + maxX) / 2;
-      const contentCenterY = (minY + maxY) / 2;
-
-      const cW = fabricCanvas.getWidth();
-      const cH = fabricCanvas.getHeight();
-
-      const padding = 80;
-      const availableWidth = cW - padding * 2;
-      const availableHeight = cH - padding * 2;
-      
-      if (availableWidth <= 0 || availableHeight <= 0) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
-        fabricCanvas.requestRenderAll();
-        return;
-      }
-
-      const zoomX = availableWidth / contentWidth;
-      const zoomY = availableHeight / contentHeight;
-      const unclampedZoom = Math.min(zoomX, zoomY);
-      const zoom = Math.max(0.3, Math.min(2.5, unclampedZoom));
-
-      const canvasCenterX = cW / 2;
-      const canvasCenterY = cH / 2;
-
-      const tx = canvasCenterX - contentCenterX * zoom;
-      const ty = canvasCenterY - contentCenterY * zoom;
-
-      // Validar que los valores son finitos antes de aplicar
-      if (!isFinite(zoom) || !isFinite(tx) || !isFinite(ty)) {
-        fabricCanvas.setViewportTransform(prevVpt as any);
-        fabricCanvas.requestRenderAll();
-        return;
-      }
-
-      // Aplicar nuevo viewport
-      fabricCanvas.setViewportTransform([zoom, 0, 0, zoom, tx, ty] as any);
-      fabricCanvas.requestRenderAll();
-      onZoomChange?.(zoom);
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
 
