@@ -425,39 +425,17 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
               </div>
             )}
 
-            <div className="flex justify-between gap-2">
+            <div className="flex justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleTranslate}
-                disabled={isTranslating || !form.watch("nombre")}
+                onClick={() => onOpenChange(false)}
               >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Traduciendo...
-                  </>
-                ) : (
-                  <>
-                    <Globe className="mr-2 h-4 w-4" />
-                    Traducir
-                    {traducciones && " ✓"}
-                  </>
-                )}
+                Cancelar
               </Button>
-
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={crearVino.isPending || isUploading}>
-                  {crearVino.isPending || isUploading ? "Guardando..." : "Guardar Vino"}
-                </Button>
-              </div>
+              <Button type="submit" disabled={crearVino.isPending || isUploading}>
+                {crearVino.isPending || isUploading ? "Guardando..." : "Guardar Vino"}
+              </Button>
             </div>
           </form>
         </Form>
