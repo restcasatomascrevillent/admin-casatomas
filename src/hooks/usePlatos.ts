@@ -62,6 +62,8 @@ export function usePlatos() {
           activado: true,
           expanded: isNovedades,
           id: platoId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }])
         .select()
         .single();

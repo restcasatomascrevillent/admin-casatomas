@@ -52,6 +52,8 @@ export function useBebidas() {
           ...nuevaBebida,
           activado: true,
           id: bebidaId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }])
         .select()
         .single();
