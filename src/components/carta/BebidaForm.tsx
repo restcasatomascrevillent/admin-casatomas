@@ -43,7 +43,7 @@ interface BebidaFormProps {
 }
 
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
-  const { crearBebida, actualizarBebida, categorias } = useBebidas();
+  const { crearBebida, actualizarBebida, categorias, tamanos } = useBebidas();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -287,9 +287,20 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tamaño</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: 33cl, 1L..." {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tamaño" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {tamanos.map((tam) => (
+                          <SelectItem key={tam} value={tam || ""}>
+                            {tam}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
