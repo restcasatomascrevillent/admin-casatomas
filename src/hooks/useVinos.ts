@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
 
 export interface Vino {
   id: string;
@@ -32,7 +31,6 @@ export interface NuevoVino {
   ubicacion_region?: string;
   alergenos_notas?: string;
   orden?: string;
-  traducciones?: Json;
 }
 
 export function useVinos() {
@@ -53,44 +51,83 @@ export function useVinos() {
 
   const crearVino = useMutation({
     mutationFn: async (nuevoVino: NuevoVino) => {
-      // Mapear traducciones a columnas específicas
-      const traduccionesData: Record<string, string | null> = {};
-      if (nuevoVino.traducciones && typeof nuevoVino.traducciones === 'object') {
-        const trad = nuevoVino.traducciones as Record<string, Record<string, string>>;
-        
-        // Inglés
-        if (trad['traduccion ingles']) {
-          traduccionesData.nombre_en = trad['traduccion ingles'].nombre || null;
-          traduccionesData.descripcion_en = trad['traduccion ingles'].descripcion || null;
-          traduccionesData.categoria_en = trad['traduccion ingles'].categoria || null;
-          traduccionesData.alergenos_en = trad['traduccion ingles'].alergenos_notas || null;
-          traduccionesData.ubicacion_pais_en = trad['traduccion ingles'].ubicacion_pais || null;
-          traduccionesData.ubicacion_region_en = trad['traduccion ingles'].ubicacion_region || null;
-        }
-        
-        // Francés
-        if (trad['traduccion_fr']) {
-          traduccionesData.nombre_fr = trad['traduccion_fr'].nombre || null;
-          traduccionesData.descripcion_fr = trad['traduccion_fr'].descripcion || null;
-          traduccionesData.categoria_fr = trad['traduccion_fr']['catégorie'] || trad['traduccion_fr'].categoria || null;
-          traduccionesData.alergenos_fr = trad['traduccion_fr'].allergenes_notes || trad['traduccion_fr'].alergenos_notas || null;
-          traduccionesData.ubicacion_pais_fr = trad['traduccion_fr'].ubicacion_pais || trad['traduccion_fr']['pays'] || null;
-          traduccionesData.ubicacion_region_fr = trad['traduccion_fr'].ubicacion_region || trad['traduccion_fr']['région'] || null;
-        }
-      }
+      const vinoId = crypto.randomUUID();
 
+      // 1. Crear el vino primero
       const { data, error } = await supabase
         .from("Vinos")
         .insert([{
           ...nuevoVino,
-          ...traduccionesData,
           activado: true,
-          id: crypto.randomUUID(),
+          id: vinoId,
         }])
         .select()
         .single();
 
       if (error) throw error;
+
+      // 2. Llamar al webhook de traducción en background
+      supabase.functions.invoke('traducir-carta-auto', {
+        body: {
+          tipo: 'vino',
+          nombre: nuevoVino.nombre,
+          descripcion: nuevoVino.descripcion || '',
+          categoria: nuevoVino.categoria,
+          ubicacion_pais: nuevoVino.ubicacion_pais || '',
+          ubicacion_region: nuevoVino.ubicacion_region || '',
+          alergenos_notas: nuevoVino.alergenos_notas || '',
+        }
+      }).then(async ({ data: traducciones, error: tradError }) => {
+        if (tradError) {
+          console.error('Error en traducción automática:', tradError);
+          return;
+        }
+
+        console.log('Traducciones recibidas:', traducciones);
+
+        // Parsear respuesta del webhook
+        const traduccion = Array.isArray(traducciones) ? traducciones[0] : traducciones;
+        if (!traduccion) return;
+
+        const updateData: Record<string, string | null> = {};
+
+        // Inglés
+        if (traduccion['traduccion ingles']) {
+          const en = traduccion['traduccion ingles'];
+          updateData.nombre_en = en.nombre || null;
+          updateData.descripcion_en = en.descripcion || null;
+          updateData.categoria_en = en.categoria || null;
+          updateData.alergenos_en = en.alergenos_notas || en.alergenos || null;
+          updateData.ubicacion_pais_en = en.ubicacion_pais || null;
+          updateData.ubicacion_region_en = en.ubicacion_region || null;
+        }
+
+        // Francés
+        if (traduccion['traduccion_fr']) {
+          const fr = traduccion['traduccion_fr'];
+          updateData.nombre_fr = fr.nombre || null;
+          updateData.descripcion_fr = fr.descripcion || null;
+          updateData.categoria_fr = fr['catégorie'] || fr.categoria || null;
+          updateData.alergenos_fr = fr.allergenes_notes || fr.alergenos_notas || null;
+          updateData.ubicacion_pais_fr = fr.ubicacion_pais || fr['pays'] || null;
+          updateData.ubicacion_region_fr = fr.ubicacion_region || fr['région'] || null;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
+            .from("Vinos")
+            .update(updateData)
+            .eq("id", vinoId);
+
+          if (updateError) {
+            console.error('Error guardando traducciones:', updateError);
+          } else {
+            console.log('Traducciones guardadas correctamente');
+            queryClient.invalidateQueries({ queryKey: ["vinos"] });
+          }
+        }
+      });
+
       return data;
     },
     onSuccess: () => {
