@@ -28,12 +28,15 @@ import { toast } from "sonner";
 import type { Json } from "@/integrations/supabase/types";
 import { useQueryClient } from "@tanstack/react-query";
 
+const UNIDADES_MEDIDA = ["cl", "ml", "L"];
+
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   categoria: z.string().min(1, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   descripcion: z.string().optional(),
-  tamano: z.string().optional(),
+  cantidad: z.coerce.number().optional(),
+  unidad: z.string().optional(),
 });
 
 interface BebidaFormProps {
@@ -43,7 +46,7 @@ interface BebidaFormProps {
 }
 
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
-  const { crearBebida, actualizarBebida, categorias, tamanos } = useBebidas();
+  const { crearBebida, actualizarBebida, categorias } = useBebidas();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -59,7 +62,8 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
       categoria: categoriaInicial || "",
       precio_eur: 0,
       descripcion: "",
-      tamano: "",
+      cantidad: undefined,
+      unidad: "cl",
     },
   });
 
@@ -93,12 +97,13 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
 
     setIsTranslating(true);
     try {
+      const tamano = values.cantidad && values.unidad ? `${values.cantidad}${values.unidad}` : '';
       const { data, error } = await supabase.functions.invoke('traducir-carta', {
         body: {
           nombre: values.nombre,
           descripcion: values.descripcion || '',
           categoria: values.categoria || '',
-          tamano: values.tamano || '',
+          tamano: tamano,
           tipo: 'bebida',
         },
       });
@@ -117,12 +122,13 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const tamano = values.cantidad && values.unidad ? `${values.cantidad}${values.unidad}` : undefined;
     const bebidaData: NuevaBebida = {
       nombre: values.nombre,
       categoria: values.categoria,
       precio_eur: values.precio_eur,
       descripcion: values.descripcion,
-      tamano: values.tamano,
+      tamano: tamano,
       ...(traducciones && { traducciones }),
     };
     
@@ -281,30 +287,45 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="tamano"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tamaño</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-2 gap-2">
+                <FormField
+                  control={form.control}
+                  name="cantidad"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cantidad</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona tamaño" />
-                        </SelectTrigger>
+                        <Input type="number" placeholder="Ej: 33" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {tamanos.map((tam) => (
-                          <SelectItem key={tam} value={tam || ""}>
-                            {tam}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="unidad"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unidad</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Unidad" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {UNIDADES_MEDIDA.map((u) => (
+                            <SelectItem key={u} value={u}>
+                              {u}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <FormField
