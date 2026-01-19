@@ -50,6 +50,7 @@ export function useBebidas() {
           nombre: nuevaBebida.nombre,
           categoria: nuevaBebida.categoria,
           tamano: nuevaBebida.tamano || '',
+          precio: nuevaBebida.precio_eur,
         }
       });
 
