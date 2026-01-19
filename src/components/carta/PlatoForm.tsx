@@ -69,7 +69,7 @@ interface PlatoFormProps {
 }
 
 export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
-  const { crearPlato, categorias } = usePlatos();
+  const { crearPlato, categorias, unidades } = usePlatos();
   const queryClient = useQueryClient();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
@@ -310,9 +310,20 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unidad</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: unidad, ración..." {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Selecciona una unidad" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="bg-popover z-50">
+                        {unidades.map((unidad) => (
+                          <SelectItem key={unidad} value={unidad as string}>
+                            {unidad}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
