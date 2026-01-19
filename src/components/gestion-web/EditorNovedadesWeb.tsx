@@ -251,6 +251,7 @@ export function EditorNovedadesWeb({
   } | null>(null);
   const [previewIds, setPreviewIds] = useState<Set<string>>(new Set());
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inicializar previewIds con novedades activas
@@ -577,20 +578,25 @@ export function EditorNovedadesWeb({
       tags_en: formData.tags_en.length > 0 ? formData.tags_en : null,
       tags_fr: formData.tags_fr.length > 0 ? formData.tags_fr : null,
     };
+    setIsSaving(true);
     try {
       if (editingId && editingId !== "new") {
+        // Actualizar: no llama al webhook
         await actualizarNovedad.mutateAsync({
           id: editingId,
           ...data
         });
         toast.success("Novedad actualizada");
       } else {
+        // Crear: llama al webhook automáticamente desde el hook
         await crearNovedad.mutateAsync(data);
         toast.success("Novedad creada");
       }
       handleCancel();
     } catch (error) {
       toast.error("Error al guardar la novedad");
+    } finally {
+      setIsSaving(false);
     }
   };
   const handleDelete = async () => {
@@ -874,9 +880,18 @@ export function EditorNovedadesWeb({
                 </>
               )}
             </Button>
-            <Button size="sm" onClick={handleSubmit} className="flex-1">
-              <Save className="w-4 h-4 mr-1" />
-              Guardar
+            <Button size="sm" onClick={handleSubmit} disabled={isSaving} className="flex-1">
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  {editingId && editingId !== "new" ? "Actualizando..." : "Guardando..."}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" />
+                  {editingId && editingId !== "new" ? "Actualizar" : "Guardar"}
+                </>
+              )}
             </Button>
           </div>
           {/* Botón Borrar todo */}
