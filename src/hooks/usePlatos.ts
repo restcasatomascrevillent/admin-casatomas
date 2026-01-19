@@ -51,27 +51,7 @@ export function usePlatos() {
 
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
-      const isNovedades = nuevoPlato.categoria === "Novedades del día";
-      const platoId = crypto.randomUUID();
-      
-      // 1. Crear el plato primero
-      const { data, error } = await supabase
-        .from("Platos")
-        .insert([{
-          ...nuevoPlato,
-          activado: true,
-          expanded: isNovedades,
-          id: platoId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // 2. Llamar al webhook de traducción en background
-      // alergenos_oficiales puede ser un array de strings o un objeto con booleanos
+      // Solo enviar al webhook, sin insertar en base de datos
       let alergenosArray: string[] = [];
       if (nuevoPlato.alergenos_oficiales) {
         if (Array.isArray(nuevoPlato.alergenos_oficiales)) {
@@ -81,7 +61,7 @@ export function usePlatos() {
         }
       }
 
-      supabase.functions.invoke('traducir-carta-auto', {
+      const { data, error } = await supabase.functions.invoke('traducir-carta-auto', {
         body: {
           tipo: 'plato',
           nombre: nuevoPlato.nombre,
@@ -91,61 +71,21 @@ export function usePlatos() {
           precio: nuevoPlato.precio_eur,
           unidad: nuevoPlato.unidad || '',
         }
-      }).then(async ({ data: traducciones, error: tradError }) => {
-        if (tradError) {
-          console.error('Error en traducción automática:', tradError);
-          return;
-        }
-
-        console.log('Traducciones recibidas:', traducciones);
-
-        // Parsear respuesta del webhook [{ "traduccion ingles": {...}, "traduccion_fr": {...} }]
-        const traduccion = Array.isArray(traducciones) ? traducciones[0] : traducciones;
-        if (!traduccion) return;
-
-        const updateData: Record<string, string | null> = {};
-
-        // Inglés
-        if (traduccion['traduccion ingles']) {
-          const en = traduccion['traduccion ingles'];
-          updateData.nombre_en = en.nombre || null;
-          updateData.descripcion_en = en.descripcion || null;
-          updateData.categoria_en = en.categoria || null;
-          updateData.alergenos_en = en.alergenos || null;
-        }
-
-        // Francés
-        if (traduccion['traduccion_fr']) {
-          const fr = traduccion['traduccion_fr'];
-          updateData.nombre_fr = fr.nombre || null;
-          updateData.descripcion_fr = fr.descripcion || null;
-          updateData.categoria_fr = fr['catégorie'] || fr.categoria || null;
-          updateData.alergenos_fr = fr.allergenes || fr.alergenos || null;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          const { error: updateError } = await supabase
-            .from("Platos")
-            .update(updateData)
-            .eq("id", platoId);
-
-          if (updateError) {
-            console.error('Error guardando traducciones:', updateError);
-          } else {
-            console.log('Traducciones guardadas correctamente');
-            queryClient.invalidateQueries({ queryKey: ["platos"] });
-          }
-        }
       });
 
+      if (error) {
+        console.error('Error enviando al webhook:', error);
+        throw error;
+      }
+
+      console.log('Respuesta del webhook:', data);
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Plato añadido correctamente");
+      toast.success("Plato enviado al webhook correctamente");
     },
     onError: (error) => {
-      toast.error("Error al añadir el plato");
+      toast.error("Error al enviar el plato");
       console.error(error);
     },
   });
