@@ -40,6 +40,7 @@ serve(async (req) => {
       webhookPayload.unidad = unidad || "";
     } else if (tipo === "bebida") {
       webhookPayload.tamano = tamano || "";
+      webhookPayload.precio = precio;
     } else if (tipo === "vino") {
       webhookPayload.ubicacion_pais = ubicacion_pais || "";
       webhookPayload.ubicacion_region = ubicacion_region || "";
