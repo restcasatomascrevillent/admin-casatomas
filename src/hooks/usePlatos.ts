@@ -88,6 +88,8 @@ export function usePlatos() {
           descripcion: nuevoPlato.descripcion || '',
           categoria: nuevoPlato.categoria,
           alergenos: alergenosArray,
+          precio: nuevoPlato.precio_eur,
+          unidad: nuevoPlato.unidad || '',
         }
       }).then(async ({ data: traducciones, error: tradError }) => {
         if (tradError) {
