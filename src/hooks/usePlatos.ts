@@ -82,7 +82,8 @@ export function usePlatos() {
       return data;
     },
     onSuccess: () => {
-      toast.success("Plato enviado al webhook correctamente");
+      queryClient.invalidateQueries({ queryKey: ["platos"] });
+      toast.success("Plato enviado correctamente");
     },
     onError: (error) => {
       toast.error("Error al enviar el plato");
