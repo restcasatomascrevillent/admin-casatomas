@@ -374,24 +374,30 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     centerOnContent: () => {
       if (!fabricCanvas) return;
 
-      // Objetos relevantes (excluye grid, guías, cotas, etiquetas y bocadillos)
+      // Descartar selección activa para evitar interferencias
+      fabricCanvas.discardActiveObject();
+
+      // Guardar viewport actual
+      const prevVpt = fabricCanvas.viewportTransform ? [...fabricCanvas.viewportTransform] : [1, 0, 0, 1, 0, 0];
+
+      // Resetear viewport a identidad para medir en coordenadas de mundo
+      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
+
+      // Filtrar solo objetos relevantes: paredes, áreas, puertas y mesas
+      const relevantTypes = ["wall", "area", "door", "mesa"];
       const objects = fabricCanvas.getObjects().filter((obj) => {
         const customData = (obj as any).customData;
-        return (
-          !(obj as any).isGrid &&
-          !(obj as any).isAlignmentGuide &&
-          !(obj as any).isCota &&
-          !(obj as any).isMesaLabel &&
-          customData?.tipo !== "mesa-bocadillo" &&
-          customData?.tipo !== "mesa-label"
-        );
+        return customData?.tipo && relevantTypes.includes(customData.tipo);
       });
 
-      if (objects.length === 0) return;
+      // Si no hay objetos relevantes, restaurar viewport y salir
+      if (objects.length === 0) {
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.requestRenderAll();
+        return;
+      }
 
-      // En Fabric v6, getBoundingRect() depende del viewportTransform.
-      // Para no "romper" el plano (y evitar desapariciones), calculamos bounds en coordenadas de escena
-      // usando getCoords() (aCoords), que no depende del zoom/pan.
+      // Calcular bounds en coordenadas de mundo (viewport es identidad ahora)
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -399,7 +405,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
       objects.forEach((obj) => {
         obj.setCoords();
-        const coords = obj.getCoords(); // 4 puntos en coordenadas de escena
+        const coords = obj.getCoords(); // Ahora son coordenadas de mundo
         coords.forEach((p) => {
           minX = Math.min(minX, p.x);
           minY = Math.min(minY, p.y);
@@ -408,11 +414,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         });
       });
 
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+      // Validar bounds
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.requestRenderAll();
+        return;
+      }
 
       const contentWidth = maxX - minX;
       const contentHeight = maxY - minY;
-      if (contentWidth <= 0 || contentHeight <= 0) return;
+      
+      if (contentWidth <= 0 || contentHeight <= 0) {
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.requestRenderAll();
+        return;
+      }
 
       const contentCenterX = (minX + maxX) / 2;
       const contentCenterY = (minY + maxY) / 2;
@@ -420,15 +436,20 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const cW = fabricCanvas.getWidth();
       const cH = fabricCanvas.getHeight();
 
-      const padding = 60;
+      const padding = 80;
       const availableWidth = cW - padding * 2;
       const availableHeight = cH - padding * 2;
-      if (availableWidth <= 0 || availableHeight <= 0) return;
+      
+      if (availableWidth <= 0 || availableHeight <= 0) {
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.requestRenderAll();
+        return;
+      }
 
       const zoomX = availableWidth / contentWidth;
       const zoomY = availableHeight / contentHeight;
       const unclampedZoom = Math.min(zoomX, zoomY);
-      const zoom = Math.max(0.25, Math.min(3, unclampedZoom));
+      const zoom = Math.max(0.3, Math.min(2.5, unclampedZoom));
 
       const canvasCenterX = cW / 2;
       const canvasCenterY = cH / 2;
@@ -436,6 +457,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const tx = canvasCenterX - contentCenterX * zoom;
       const ty = canvasCenterY - contentCenterY * zoom;
 
+      // Validar que los valores son finitos antes de aplicar
+      if (!isFinite(zoom) || !isFinite(tx) || !isFinite(ty)) {
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.requestRenderAll();
+        return;
+      }
+
+      // Aplicar nuevo viewport
       fabricCanvas.setViewportTransform([zoom, 0, 0, zoom, tx, ty] as any);
       fabricCanvas.requestRenderAll();
       onZoomChange?.(zoom);
