@@ -110,6 +110,25 @@ export function useNovedades() {
         .single();
 
       if (error) throw error;
+
+      // Llamar al webhook de traducciones con el ID de la novedad creada
+      try {
+        await supabase.functions.invoke('traducir-novedad-auto', {
+          body: {
+            tipo: 'novedad',
+            id: data.id,
+            titulo: data.titulo,
+            badge_text: data.badge_text,
+            descripcion: data.descripcion,
+            bullets: data.bullets,
+            tags: data.tags,
+          }
+        });
+      } catch (webhookError) {
+        console.error("Error al enviar al webhook de traducciones:", webhookError);
+        // No bloqueamos el flujo si el webhook falla
+      }
+
       return data;
     },
     onSuccess: () => {
