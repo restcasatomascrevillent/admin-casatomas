@@ -134,15 +134,10 @@ export function useBebidas() {
     ? Array.from(new Set(bebidas.map((b) => b.categoria).filter(Boolean)))
     : [];
 
-  const tamanos = bebidas
-    ? Array.from(new Set(bebidas.map((b) => b.tamano).filter(Boolean)))
-    : [];
-
   return {
     bebidas,
     isLoading,
     categorias,
-    tamanos,
     crearBebida,
     actualizarBebida,
     eliminarBebida,
