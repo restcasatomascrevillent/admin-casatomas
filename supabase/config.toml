@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.traducir-carta-auto]
 verify_jwt = false
+
+[functions.traducir-novedad-auto]
+verify_jwt = false
