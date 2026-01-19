@@ -861,25 +861,6 @@ export function EditorNovedadesWeb({
               <Eye className="w-4 h-4 mr-1" />
               Vista previa
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleTranslate} 
-              disabled={isTranslating || !formData.titulo.trim()}
-              className="flex-1"
-            >
-              {isTranslating ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  Traduciendo...
-                </>
-              ) : (
-                <>
-                  <Globe className="w-4 h-4 mr-1" />
-                  Traducir
-                </>
-              )}
-            </Button>
             <Button size="sm" onClick={handleSubmit} disabled={isSaving} className="flex-1">
               {isSaving ? (
                 <>
