@@ -27,6 +27,7 @@ export const SECTIONS = [
   { key: "marketing", label: "Marketing" },
   { key: "facturas", label: "Facturas" },
   { key: "analisis", label: "Análisis" },
+  { key: "touza", label: "Touza" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 

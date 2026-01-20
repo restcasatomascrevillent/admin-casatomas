@@ -376,6 +376,84 @@ export type Database = {
         }
         Relationships: []
       }
+      Cocteles: {
+        Row: {
+          activado: boolean | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          id: string
+          imagen_url: string | null
+          ingredientes: string | null
+          ingredientes_en: string | null
+          ingredientes_fr: string | null
+          nombre: string | null
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          precio_eur: number | null
+          preparacion: string | null
+          traducciones: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          id?: string
+          imagen_url?: string | null
+          ingredientes?: string | null
+          ingredientes_en?: string | null
+          ingredientes_fr?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          preparacion?: string | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          id?: string
+          imagen_url?: string | null
+          ingredientes?: string | null
+          ingredientes_en?: string | null
+          ingredientes_fr?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          preparacion?: string | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       config_google_places: {
         Row: {
           created_at: string | null
