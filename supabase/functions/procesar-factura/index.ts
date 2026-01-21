@@ -27,9 +27,8 @@ serve(async (req) => {
     const formData = new FormData();
     
     // Añadir metadatos generales
-    formData.append('tipo', payload.tipo || 'facturas');
+    formData.append('tipo', payload.tipo || 'FACTURA');
     formData.append('fecha', payload.fecha || new Date().toISOString());
-    formData.append('instrucciones', payload.instrucciones || 'Extraer todos los datos relevantes de la factura');
 
     // Procesar múltiples archivos (nuevo formato)
     if (payload.archivos && Array.isArray(payload.archivos)) {

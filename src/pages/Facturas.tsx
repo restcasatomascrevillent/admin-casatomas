@@ -6,9 +6,9 @@ const Facturas = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Facturas</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Facturas y Albaranes</h1>
           <p className="text-muted-foreground">
-            Sube y envía tus facturas para procesamiento automático
+            Sube y envía tus facturas o albaranes para procesamiento automático
           </p>
         </div>
         

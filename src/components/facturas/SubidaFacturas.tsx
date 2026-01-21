@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +26,7 @@ interface DatosExtraidos {
 export function SubidaFacturas() {
   const [archivos, setArchivos] = useState<ArchivoFactura[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [instruccionesExtraccion, setInstruccionesExtraccion] = useState("");
+  const [tipoDocumento, setTipoDocumento] = useState<"FACTURA" | "ALBARAN">("FACTURA");
   const [datosExtraidos, setDatosExtraidos] = useState<DatosExtraidos | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -103,7 +103,7 @@ export function SubidaFacturas() {
     if (archivos.length === 0) {
       toast({
         title: "Sin archivos",
-        description: "Por favor, selecciona al menos una factura para enviar",
+        description: "Por favor, selecciona al menos un documento para enviar",
         variant: "destructive",
       });
       return;
@@ -127,10 +127,9 @@ export function SubidaFacturas() {
       );
 
       const payload = {
-        tipo: "facturas",
+        tipo: tipoDocumento,
         archivos: archivosPayload,
         fecha: new Date().toISOString(),
-        instrucciones: instruccionesExtraccion.trim() || "Extraer todos los datos relevantes de la factura",
       };
 
       const nombresArchivos = archivos.map(a => a.nombre);
@@ -143,7 +142,7 @@ export function SubidaFacturas() {
         throw new Error(error.message);
       }
 
-      console.log('Facturas enviadas:', data);
+      console.log('Documentos enviados:', data);
 
       // Verificar si el webhook respondió correctamente
       if (data?.success) {
@@ -162,25 +161,24 @@ export function SubidaFacturas() {
         });
 
         toast({
-          title: "Facturas procesadas",
-          description: data.webhookResponse?.message || `Se han procesado ${archivos.length} factura(s) correctamente`,
+          title: "Documentos procesados",
+          description: data.webhookResponse?.message || `Se han procesado ${archivos.length} documento(s) correctamente`,
         });
 
-        // Limpiar archivos e instrucciones solo si fue exitoso
+        // Limpiar archivos solo si fue exitoso
         archivos.forEach(a => {
           if (a.preview) URL.revokeObjectURL(a.preview);
         });
         setArchivos([]);
-        setInstruccionesExtraccion("");
       } else {
-        throw new Error(data?.error || "Error al procesar las facturas");
+        throw new Error(data?.error || "Error al procesar los documentos");
       }
 
     } catch (error) {
-      console.error('Error al enviar facturas:', error);
+      console.error('Error al enviar documentos:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudieron enviar las facturas",
+        description: error instanceof Error ? error.message : "No se pudieron enviar los documentos",
         variant: "destructive",
       });
     } finally {
@@ -195,10 +193,10 @@ export function SubidaFacturas() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Subida de Facturas
+            Subida de Facturas y Albaranes
           </CardTitle>
           <CardDescription>
-            Arrastra o selecciona tus facturas (PDF o imágenes) para enviarlas al sistema de procesamiento
+            Arrastra o selecciona tus facturas o albaranes (PDF o imágenes) para enviarlas al sistema de procesamiento
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -224,7 +222,7 @@ export function SubidaFacturas() {
           >
             <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground mb-2">
-              Arrastra tus facturas aquí o haz clic para seleccionar
+              Arrastra tus facturas o albaranes aquí o haz clic para seleccionar
             </p>
             <p className="text-xs text-muted-foreground">
               PDF, JPG, PNG o WEBP (máximo 10MB por archivo)
@@ -239,19 +237,24 @@ export function SubidaFacturas() {
             />
           </div>
 
-          {/* Campo de instrucciones de extracción */}
+          {/* Selector de tipo de documento */}
           <div className="space-y-2">
-            <Label htmlFor="instrucciones">¿Qué datos quieres extraer?</Label>
-            <Textarea
-              id="instrucciones"
-              placeholder="Ej: Extraer nombre del proveedor, CIF, fecha, importe total, IVA, productos con sus precios..."
-              value={instruccionesExtraccion}
-              onChange={(e) => setInstruccionesExtraccion(e.target.value)}
+            <Label htmlFor="tipo-documento">Tipo de documento</Label>
+            <Select 
+              value={tipoDocumento} 
+              onValueChange={(v) => setTipoDocumento(v as "FACTURA" | "ALBARAN")}
               disabled={isSubmitting}
-              className="min-h-[80px]"
-            />
+            >
+              <SelectTrigger id="tipo-documento">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="FACTURA">📄 Factura</SelectItem>
+                <SelectItem value="ALBARAN">📋 Albarán</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground">
-              Describe qué información necesitas extraer de las facturas
+              Selecciona el tipo de documento que estás subiendo
             </p>
           </div>
 
@@ -310,7 +313,7 @@ export function SubidaFacturas() {
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Enviar {archivos.length > 0 ? `${archivos.length} factura(s)` : 'facturas'}
+                Enviar {archivos.length > 0 ? `${archivos.length} documento(s)` : 'documentos'}
               </>
             )}
           </Button>
