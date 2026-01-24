@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+
 import { GlassWater, Trash2 } from "lucide-react";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
@@ -23,22 +23,7 @@ interface ListaBebidasProps {
 }
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
-  const { toggleActivado, eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
-
-  const handleToggle = (bebida: Bebida, checked: boolean) => {
-    toggleActivado.mutate(
-      { id: bebida.id, activado: checked },
-      {
-        onSuccess: () => {
-          toast.success(
-            checked 
-              ? `${bebida.nombre} está ahora activo` 
-              : `${bebida.nombre} está ahora inactivo`
-          );
-        },
-      }
-    );
-  };
+  const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
 
   if (bebidas.length === 0) {
     return (
@@ -77,31 +62,15 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
           )}
           
           <CardContent className="p-4 space-y-3">
-            {/* Header con nombre */}
-            <h3 className="font-semibold text-base leading-tight">
-              {bebida.nombre}
-            </h3>
-
-            {/* Toggle Activo */}
-            <div className={cn(
-              "flex items-center justify-between py-2 px-3 rounded-md",
-              bebida.activado
-                ? "bg-status-confirmed/10 dark:bg-status-confirmed/20"
-                : "bg-destructive/10 dark:bg-destructive/20"
-            )}>
-              <div className="flex items-center gap-2">
-                <GlassWater className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{bebida.activado ? "Activo" : "Inactivo"}</span>
-              </div>
-              <Switch
-                checked={bebida.activado || false}
-                onCheckedChange={(checked) => handleToggle(bebida, checked)}
-                disabled={toggleActivado.isPending}
-                className="data-[state=checked]:bg-green-600"
-              />
-            </div>
-
             {/* Visibilidad Web */}
+            <VisibilidadToggles
+              restaurante={bebida.restaurante ?? false}
+              touza={bebida.touza ?? false}
+              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
+              onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
+              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+              compact
+            />
             <VisibilidadToggles
               restaurante={bebida.restaurante ?? false}
               touza={bebida.touza ?? false}

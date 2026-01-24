@@ -266,7 +266,6 @@ export function useVinos() {
     crearVino,
     actualizarVino,
     eliminarVino,
-    toggleActivado,
     toggleRestaurante,
     toggleTouza,
   };

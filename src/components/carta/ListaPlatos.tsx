@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChefHat, Trash2 } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
+
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -42,23 +43,8 @@ interface ListaPlatosProps {
 }
 
 export function ListaPlatos({ platos }: ListaPlatosProps) {
-  const { toggleActivado, toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza } = usePlatos();
+  const { toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
-
-  const handleToggle = (plato: Plato, checked: boolean) => {
-    toggleActivado.mutate(
-      { id: plato.id, activado: checked },
-      {
-        onSuccess: () => {
-          toast.success(
-            checked 
-              ? `${plato.nombre} está ahora activo` 
-              : `${plato.nombre} está ahora inactivo`
-          );
-        },
-      }
-    );
-  };
 
   const handleToggleExpanded = (plato: Plato, checked: boolean) => {
     toggleExpanded.mutate(
@@ -133,28 +119,9 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                     checked={plato.expanded || false}
                     onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
                     disabled={toggleExpanded.isPending}
-                    className="data-[state=checked]:bg-blue-600"
+                    className="data-[state=checked]:bg-primary"
                   />
                 </div>
-              </div>
-
-              {/* Toggle Activo */}
-              <div className={cn(
-                "flex items-center justify-between py-2 px-3 rounded-md",
-                plato.activado
-                  ? "bg-status-confirmed/10 dark:bg-status-confirmed/20"
-                  : "bg-destructive/10 dark:bg-destructive/20"
-              )}>
-                <div className="flex items-center gap-2">
-                  <ChefHat className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">{plato.activado ? "Activo" : "Inactivo"}</span>
-                </div>
-                <Switch
-                  checked={plato.activado || false}
-                  onCheckedChange={(checked) => handleToggle(plato, checked)}
-                  disabled={toggleActivado.isPending}
-                  className="data-[state=checked]:bg-green-600"
-              />
               </div>
 
               {/* Visibilidad Web */}

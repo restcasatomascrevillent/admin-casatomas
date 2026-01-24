@@ -1,6 +1,6 @@
-import { Wine, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Wine, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,11 +23,7 @@ interface ListaCoctelesProps {
 }
 
 export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
-  const { toggleActivado, eliminarCoctel, toggleRestaurante, toggleTouza } = useCocteles();
-
-  const handleToggle = (coctel: Coctel, checked: boolean) => {
-    toggleActivado.mutate({ id: coctel.id, activado: checked });
-  };
+  const { eliminarCoctel, toggleRestaurante, toggleTouza } = useCocteles();
 
   if (cocteles.length === 0) {
     return (
@@ -59,26 +55,13 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
           )}
           
           <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg truncate">{coctel.nombre}</CardTitle>
-                {coctel.categoria && (
-                  <Badge variant="secondary" className="mt-1">
-                    {coctel.categoria}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {coctel.activado ? (
-                  <CheckCircle className="h-4 w-4 text-primary" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-destructive" />
-                )}
-                <Switch
-                  checked={coctel.activado ?? false}
-                  onCheckedChange={(checked) => handleToggle(coctel, checked)}
-                />
-              </div>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg truncate">{coctel.nombre}</CardTitle>
+              {coctel.categoria && (
+                <Badge variant="secondary" className="mt-1">
+                  {coctel.categoria}
+                </Badge>
+              )}
             </div>
           </CardHeader>
 
