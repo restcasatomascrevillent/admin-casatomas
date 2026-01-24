@@ -62,15 +62,12 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
           )}
           
           <CardContent className="p-4 space-y-3">
+            {/* Header con nombre */}
+            <h3 className="font-semibold text-base leading-tight">
+              {vino.nombre}
+            </h3>
+
             {/* Visibilidad Web */}
-            <VisibilidadToggles
-              restaurante={vino.restaurante ?? false}
-              touza={vino.touza ?? false}
-              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
-              onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
-              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-              compact
-            />
             <VisibilidadToggles
               restaurante={vino.restaurante ?? false}
               touza={vino.touza ?? false}
