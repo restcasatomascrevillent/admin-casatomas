@@ -15,7 +15,6 @@ import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
-import Touza from "./pages/Touza";
 
 const queryClient = new QueryClient();
 
@@ -104,14 +103,6 @@ const App = () => (
             element={
               <ProtectedRoute requiredSection="usuarios">
                 <Usuarios />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/touza"
-            element={
-              <ProtectedRoute>
-                <Touza />
               </ProtectedRoute>
             }
           />

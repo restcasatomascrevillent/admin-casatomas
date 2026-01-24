@@ -16,6 +16,9 @@ export interface Plato {
   activado: boolean | null;
   expanded: boolean | null;
   imagen_url: string | null;
+  touza: boolean | null;
+  restaurante: boolean | null;
+  featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -206,6 +209,42 @@ export function usePlatos() {
     },
   });
 
+  const toggleRestaurante = useMutation({
+    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
+      const { error } = await supabase
+        .from("Platos")
+        .update({ restaurante })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Restaurante");
+      console.error(error);
+    },
+  });
+
+  const toggleTouza = useMutation({
+    mutationFn: async ({ id, touza }: { id: string; touza: boolean }) => {
+      const { error } = await supabase
+        .from("Platos")
+        .update({ touza })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Touza");
+      console.error(error);
+    },
+  });
+
   const categorias = platos
     ? Array.from(new Set(platos.map((p) => p.categoria).filter(Boolean)))
     : [];
@@ -226,5 +265,7 @@ export function usePlatos() {
     toggleExpanded,
     expandirTodos,
     contraerTodos,
+    toggleRestaurante,
+    toggleTouza,
   };
 }

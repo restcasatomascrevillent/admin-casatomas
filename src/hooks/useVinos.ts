@@ -17,6 +17,9 @@ export interface Vino {
   orden: string | null;
   activado: boolean | null;
   imagen_url: string | null;
+  touza: boolean | null;
+  restaurante: boolean | null;
+  featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -201,6 +204,42 @@ export function useVinos() {
     },
   });
 
+  const toggleRestaurante = useMutation({
+    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
+      const { error } = await supabase
+        .from("Vinos")
+        .update({ restaurante })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vinos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Restaurante");
+      console.error(error);
+    },
+  });
+
+  const toggleTouza = useMutation({
+    mutationFn: async ({ id, touza }: { id: string; touza: boolean }) => {
+      const { error } = await supabase
+        .from("Vinos")
+        .update({ touza })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vinos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Touza");
+      console.error(error);
+    },
+  });
+
   const categorias = vinos
     ? Array.from(new Set(vinos.map((v) => v.categoria).filter(Boolean))) as string[]
     : [];
@@ -228,5 +267,7 @@ export function useVinos() {
     actualizarVino,
     eliminarVino,
     toggleActivado,
+    toggleRestaurante,
+    toggleTouza,
   };
 }

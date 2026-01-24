@@ -16,13 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { VisibilidadToggles } from "./VisibilidadToggles";
 
 interface ListaBebidasProps {
   bebidas: Bebida[];
 }
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
-  const { toggleActivado, eliminarBebida } = useBebidas();
+  const { toggleActivado, eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
 
   const handleToggle = (bebida: Bebida, checked: boolean) => {
     toggleActivado.mutate(
@@ -99,7 +100,16 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                 className="data-[state=checked]:bg-green-600"
               />
             </div>
-            
+
+            {/* Visibilidad Web */}
+            <VisibilidadToggles
+              restaurante={bebida.restaurante ?? false}
+              touza={bebida.touza ?? false}
+              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
+              onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
+              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+              compact
+            />
             {bebida.descripcion && (
               <p className="text-sm text-muted-foreground line-clamp-2">
                 {bebida.descripcion}

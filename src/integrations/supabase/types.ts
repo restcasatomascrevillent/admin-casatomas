@@ -176,6 +176,7 @@ export type Database = {
           descripcion: string | null
           descripcion_en: string | null
           descripcion_fr: string | null
+          featured: boolean | null
           id: string
           imagen_url: string | null
           nombre: string | null
@@ -183,7 +184,11 @@ export type Database = {
           nombre_fr: string | null
           orden: number | null
           precio_eur: number | null
+          restaurante: boolean | null
+          tag: string | null
           tamano: string | null
+          tipo: string | null
+          touza: boolean | null
           traducciones: Json | null
           updated_at: string | null
         }
@@ -196,6 +201,7 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
+          featured?: boolean | null
           id: string
           imagen_url?: string | null
           nombre?: string | null
@@ -203,7 +209,11 @@ export type Database = {
           nombre_fr?: string | null
           orden?: number | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          tag?: string | null
           tamano?: string | null
+          tipo?: string | null
+          touza?: boolean | null
           traducciones?: Json | null
           updated_at?: string | null
         }
@@ -216,6 +226,7 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
+          featured?: boolean | null
           id?: string
           imagen_url?: string | null
           nombre?: string | null
@@ -223,7 +234,11 @@ export type Database = {
           nombre_fr?: string | null
           orden?: number | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          tag?: string | null
           tamano?: string | null
+          tipo?: string | null
+          touza?: boolean | null
           traducciones?: Json | null
           updated_at?: string | null
         }
@@ -381,6 +396,7 @@ export type Database = {
           activado: boolean | null
           alergenos_notas: string | null
           alergenos_oficiales: Json | null
+          base: string | null
           categoria: string | null
           categoria_en: string | null
           categoria_fr: string | null
@@ -388,6 +404,7 @@ export type Database = {
           descripcion: string | null
           descripcion_en: string | null
           descripcion_fr: string | null
+          featured: boolean | null
           id: string
           imagen_url: string | null
           ingredientes: string | null
@@ -399,6 +416,8 @@ export type Database = {
           orden: number | null
           precio_eur: number | null
           preparacion: string | null
+          restaurante: boolean | null
+          touza: boolean | null
           traducciones: Json | null
           updated_at: string | null
         }
@@ -406,6 +425,7 @@ export type Database = {
           activado?: boolean | null
           alergenos_notas?: string | null
           alergenos_oficiales?: Json | null
+          base?: string | null
           categoria?: string | null
           categoria_en?: string | null
           categoria_fr?: string | null
@@ -413,6 +433,7 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
+          featured?: boolean | null
           id?: string
           imagen_url?: string | null
           ingredientes?: string | null
@@ -424,6 +445,8 @@ export type Database = {
           orden?: number | null
           precio_eur?: number | null
           preparacion?: string | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           updated_at?: string | null
         }
@@ -431,6 +454,7 @@ export type Database = {
           activado?: boolean | null
           alergenos_notas?: string | null
           alergenos_oficiales?: Json | null
+          base?: string | null
           categoria?: string | null
           categoria_en?: string | null
           categoria_fr?: string | null
@@ -438,6 +462,7 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
+          featured?: boolean | null
           id?: string
           imagen_url?: string | null
           ingredientes?: string | null
@@ -449,6 +474,8 @@ export type Database = {
           orden?: number | null
           precio_eur?: number | null
           preparacion?: string | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           updated_at?: string | null
         }
@@ -622,6 +649,42 @@ export type Database = {
           updated_at?: string | null
           user_id?: string
           widgets_activos?: Json
+        }
+        Relationships: []
+      }
+      documentos: {
+        Row: {
+          created_at: string
+          fecha: string | null
+          id: string
+          importe_total: number | null
+          moneda: string | null
+          nombre_archivo: string | null
+          numero_documento: string
+          proveedor: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          fecha?: string | null
+          id?: string
+          importe_total?: number | null
+          moneda?: string | null
+          nombre_archivo?: string | null
+          numero_documento: string
+          proveedor?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          fecha?: string | null
+          id?: string
+          importe_total?: number | null
+          moneda?: string | null
+          nombre_archivo?: string | null
+          numero_documento?: string
+          proveedor?: string | null
+          tipo?: string
         }
         Relationships: []
       }
@@ -870,6 +933,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      items_documento: {
+        Row: {
+          cantidad: number | null
+          descripcion: string
+          documento_id: string
+          embedding: string | null
+          id: string
+          importe_linea: number | null
+          precio_unitario: number | null
+        }
+        Insert: {
+          cantidad?: number | null
+          descripcion: string
+          documento_id: string
+          embedding?: string | null
+          id?: string
+          importe_linea?: number | null
+          precio_unitario?: number | null
+        }
+        Update: {
+          cantidad?: number | null
+          descripcion?: string
+          documento_id?: string
+          embedding?: string | null
+          id?: string
+          importe_linea?: number | null
+          precio_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_documento_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mesas: {
         Row: {
@@ -1325,6 +1426,7 @@ export type Database = {
           descripcion_en: string | null
           descripcion_fr: string | null
           expanded: boolean | null
+          featured: boolean | null
           id: string
           imagen_url: string | null
           nombre: string | null
@@ -1332,6 +1434,8 @@ export type Database = {
           nombre_fr: string | null
           orden: string | null
           precio_eur: number | null
+          restaurante: boolean | null
+          touza: boolean | null
           traducciones: Json | null
           unidad: string | null
           updated_at: string | null
@@ -1351,6 +1455,7 @@ export type Database = {
           descripcion_en?: string | null
           descripcion_fr?: string | null
           expanded?: boolean | null
+          featured?: boolean | null
           id: string
           imagen_url?: string | null
           nombre?: string | null
@@ -1358,6 +1463,8 @@ export type Database = {
           nombre_fr?: string | null
           orden?: string | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
@@ -1377,6 +1484,7 @@ export type Database = {
           descripcion_en?: string | null
           descripcion_fr?: string | null
           expanded?: boolean | null
+          featured?: boolean | null
           id?: string
           imagen_url?: string | null
           nombre?: string | null
@@ -1384,6 +1492,8 @@ export type Database = {
           nombre_fr?: string | null
           orden?: string | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
@@ -1821,6 +1931,7 @@ export type Database = {
           created_at: string | null
           denominacion_origen: string | null
           descripcion: string | null
+          featured: boolean | null
           id: string
           imagen_url: string | null
           nombre: string | null
@@ -1828,6 +1939,8 @@ export type Database = {
           nombre_fr: string | null
           orden: string | null
           precio_eur: number | null
+          restaurante: boolean | null
+          touza: boolean | null
           traducciones: Json | null
           ubicacion_pais: string | null
           ubicacion_pais_en: string | null
@@ -1850,6 +1963,7 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
+          featured?: boolean | null
           id: string
           imagen_url?: string | null
           nombre?: string | null
@@ -1857,6 +1971,8 @@ export type Database = {
           nombre_fr?: string | null
           orden?: string | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           ubicacion_pais?: string | null
           ubicacion_pais_en?: string | null
@@ -1879,6 +1995,7 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
+          featured?: boolean | null
           id?: string
           imagen_url?: string | null
           nombre?: string | null
@@ -1886,6 +2003,8 @@ export type Database = {
           nombre_fr?: string | null
           orden?: string | null
           precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
           traducciones?: Json | null
           ubicacion_pais?: string | null
           ubicacion_pais_en?: string | null
