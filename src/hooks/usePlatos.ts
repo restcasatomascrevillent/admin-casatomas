@@ -261,7 +261,6 @@ export function usePlatos() {
     crearPlato,
     actualizarPlato,
     eliminarPlato,
-    toggleActivado,
     toggleExpanded,
     expandirTodos,
     contraerTodos,

@@ -194,7 +194,6 @@ export function useCocteles() {
     crearCoctel,
     actualizarCoctel,
     eliminarCoctel,
-    toggleActivado,
     toggleRestaurante,
     toggleTouza,
   };

@@ -181,7 +181,6 @@ export function useBebidas() {
     crearBebida,
     actualizarBebida,
     eliminarBebida,
-    toggleActivado,
     toggleRestaurante,
     toggleTouza,
   };
