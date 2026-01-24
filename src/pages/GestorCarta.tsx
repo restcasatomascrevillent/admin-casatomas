@@ -10,34 +10,41 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { usePlatos } from "@/hooks/usePlatos";
 import { useBebidas } from "@/hooks/useBebidas";
 import { useVinos } from "@/hooks/useVinos";
+import { useCocteles } from "@/hooks/useCocteles";
 import { PlatoForm } from "@/components/carta/PlatoForm";
 import { BebidaForm } from "@/components/carta/BebidaForm";
 import { VinoForm } from "@/components/carta/VinoForm";
+import { CoctelForm } from "@/components/carta/CoctelForm";
 import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
+import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 
-
+type FiltroWeb = "todos" | "restaurante" | "touza" | "ninguno";
 
 export default function GestorCarta() {
   const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos, expandirTodos, contraerTodos } = usePlatos();
   const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas } = useBebidas();
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
+  const { cocteles, isLoading: isLoadingCocteles, categorias: categoriasCocteles } = useCocteles();
 
-  const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos">("platos");
+  const [seccionActiva, setSeccionActiva] = useState<"platos" | "bebidas" | "vinos" | "cocteles">("platos");
   const [categoriaPlatos, setCategoriaPlatos] = useState<string>("");
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
+  const [categoriaCocteles, setCategoriaCocteles] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
+  const [filtroWeb, setFiltroWeb] = useState<FiltroWeb>("todos");
   const [busqueda, setBusqueda] = useState<string>("");
   
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
   const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
   const [dialogVinoOpen, setDialogVinoOpen] = useState(false);
+  const [dialogCoctelOpen, setDialogCoctelOpen] = useState(false);
   const [dialogAjustePreciosOpen, setDialogAjustePreciosOpen] = useState(false);
 
-  const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos;
+  const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos || isLoadingCocteles;
 
   // Inicializar la primera categoría cuando se carguen los datos
   if (categoriasPlatos.length > 0 && !categoriaPlatos) {
@@ -48,6 +55,9 @@ export default function GestorCarta() {
   }
   if (categoriasVinos.length > 0 && !categoriaVinos) {
     setCategoriaVinos(categoriasVinos[0] || "");
+  }
+  if (categoriasCocteles.length > 0 && !categoriaCocteles) {
+    setCategoriaCocteles(categoriasCocteles[0] || "");
   }
 
   const filtrarPorEstado = <T extends { activado: boolean | null }>(items: T[]): T[] => {
@@ -60,6 +70,13 @@ export default function GestorCarta() {
     return items;
   };
 
+  const filtrarPorWeb = <T extends { restaurante?: boolean | null; touza?: boolean | null }>(items: T[]): T[] => {
+    if (filtroWeb === "todos") return items;
+    if (filtroWeb === "restaurante") return items.filter(i => i.restaurante === true);
+    if (filtroWeb === "touza") return items.filter(i => i.touza === true);
+    return items.filter(i => !i.restaurante && !i.touza); // ninguno
+  };
+
   const filtrarPorBusqueda = <T extends { nombre: string | null; descripcion?: string | null }>(items: T[]): T[] => {
     if (!busqueda.trim()) return items;
     const termino = busqueda.toLowerCase().trim();
@@ -70,15 +87,15 @@ export default function GestorCarta() {
   };
 
   const getPlatosFiltrados = () => {
-    const todosFiltrados = filtrarPorBusqueda(filtrarPorEstado(platos || []));
+    const todosFiltrados = filtrarPorBusqueda(filtrarPorWeb(filtrarPorEstado(platos || [])));
     if (busqueda.trim()) {
-      return todosFiltrados; // Mostrar todos si hay búsqueda
+      return todosFiltrados;
     }
     return todosFiltrados.filter((p) => p.categoria === categoriaPlatos);
   };
 
   const getBebidasFiltradas = () => {
-    const todosFiltradas = filtrarPorBusqueda(filtrarPorEstado(bebidas || []));
+    const todosFiltradas = filtrarPorBusqueda(filtrarPorWeb(filtrarPorEstado(bebidas || [])));
     if (busqueda.trim()) {
       return todosFiltradas;
     }
@@ -86,21 +103,30 @@ export default function GestorCarta() {
   };
 
   const getVinosFiltrados = () => {
-    const todosFiltrados = filtrarPorBusqueda(filtrarPorEstado(vinos || []));
+    const todosFiltrados = filtrarPorBusqueda(filtrarPorWeb(filtrarPorEstado(vinos || [])));
     if (busqueda.trim()) {
       return todosFiltrados;
     }
     return todosFiltrados.filter((v) => v.categoria === categoriaVinos);
   };
 
+  const getCoctelesFiltrados = () => {
+    const todosFiltrados = filtrarPorBusqueda(filtrarPorWeb(filtrarPorEstado(cocteles || [])));
+    if (busqueda.trim()) {
+      return todosFiltrados;
+    }
+    return todosFiltrados.filter((c) => c.categoria === categoriaCocteles);
+  };
 
   const handleAñadir = () => {
     if (seccionActiva === "platos") {
       setDialogPlatoOpen(true);
     } else if (seccionActiva === "bebidas") {
       setDialogBebidaOpen(true);
-    } else {
+    } else if (seccionActiva === "vinos") {
       setDialogVinoOpen(true);
+    } else {
+      setDialogCoctelOpen(true);
     }
   };
 
@@ -123,7 +149,7 @@ export default function GestorCarta() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Gestor de Carta</h2>
             <p className="text-muted-foreground">
-              Gestiona el menú, bebidas y vinos de tu restaurante
+              Gestiona el menú, bebidas, vinos y cócteles de tu restaurante y Touza
             </p>
           </div>
           <div className="flex gap-3 items-center flex-wrap">
@@ -154,35 +180,49 @@ export default function GestorCarta() {
           </div>
         </div>
 
-        {/* Buscador */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o descripción..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-10 pr-10"
-          />
-          {busqueda && (
-            <button
-              type="button"
-              onClick={() => setBusqueda("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+        {/* Buscador y Filtro Web */}
+        <div className="flex gap-3 flex-col sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o descripción..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Select value={filtroWeb} onValueChange={(v) => setFiltroWeb(v as FiltroWeb)}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover z-50">
+              <SelectItem value="todos">🌐 Todas las webs</SelectItem>
+              <SelectItem value="restaurante">🍽️ Solo Restaurante</SelectItem>
+              <SelectItem value="touza">🍸 Solo Touza</SelectItem>
+              <SelectItem value="ninguno">⚠️ Sin asignar</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Tabs 
           defaultValue="platos" 
           className="w-full"
-          onValueChange={(value) => setSeccionActiva(value as "platos" | "bebidas" | "vinos")}
+          onValueChange={(value) => setSeccionActiva(value as "platos" | "bebidas" | "vinos" | "cocteles")}
         >
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="platos">Platos</TabsTrigger>
             <TabsTrigger value="bebidas">Bebidas</TabsTrigger>
             <TabsTrigger value="vinos">Vinos</TabsTrigger>
+            <TabsTrigger value="cocteles">Cócteles</TabsTrigger>
           </TabsList>
 
           {/* PLATOS */}
@@ -340,6 +380,47 @@ export default function GestorCarta() {
             )}
           </TabsContent>
 
+          {/* CÓCTELES */}
+          <TabsContent value="cocteles" className="space-y-4">
+            {categoriasCocteles.length === 0 ? (
+              <Card>
+                <CardContent className="p-6">
+                  <p className="text-center text-muted-foreground">
+                    No hay cócteles todavía. Haz clic en "Añadir" para comenzar.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                      <CardTitle>Cócteles</CardTitle>
+                      <CardDescription>
+                        Gestiona los cócteles de tu carta
+                      </CardDescription>
+                    </div>
+                    <Select value={categoriaCocteles} onValueChange={setCategoriaCocteles}>
+                      <SelectTrigger className="w-full sm:w-[280px] bg-background">
+                        <SelectValue placeholder="Selecciona categoría" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover z-50">
+                        {categoriasCocteles.map((categoria) => (
+                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                            {categoria}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ListaCocteles cocteles={getCoctelesFiltrados()} />
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
         </Tabs>
 
         <PlatoForm 
@@ -356,6 +437,11 @@ export default function GestorCarta() {
           open={dialogVinoOpen} 
           onOpenChange={setDialogVinoOpen}
           categoriaInicial={categoriaVinos}
+        />
+        <CoctelForm 
+          open={dialogCoctelOpen} 
+          onOpenChange={setDialogCoctelOpen}
+          categoriaInicial={categoriaCocteles}
         />
         
         <AjustePreciosModal

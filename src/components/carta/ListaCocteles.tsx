@@ -16,13 +16,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useCocteles, Coctel } from "@/hooks/useCocteles";
 import { cn } from "@/lib/utils";
+import { VisibilidadToggles } from "./VisibilidadToggles";
 
 interface ListaCoctelesProps {
   cocteles: Coctel[];
 }
 
 export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
-  const { toggleActivado, eliminarCoctel } = useCocteles();
+  const { toggleActivado, eliminarCoctel, toggleRestaurante, toggleTouza } = useCocteles();
 
   const handleToggle = (coctel: Coctel, checked: boolean) => {
     toggleActivado.mutate({ id: coctel.id, activado: checked });
@@ -94,6 +95,16 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 {coctel.ingredientes}
               </div>
             )}
+
+            {/* Visibilidad Web */}
+            <VisibilidadToggles
+              restaurante={coctel.restaurante ?? false}
+              touza={coctel.touza ?? false}
+              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
+              onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
+              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+              compact
+            />
 
             <div className="flex items-center justify-between pt-2">
               <span className="text-lg font-bold text-primary">

@@ -12,6 +12,9 @@ export interface Bebida {
   orden: number | null;
   activado: boolean | null;
   imagen_url: string | null;
+  touza: boolean | null;
+  restaurante: boolean | null;
+  featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -131,6 +134,42 @@ export function useBebidas() {
     },
   });
 
+  const toggleRestaurante = useMutation({
+    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
+      const { error } = await supabase
+        .from("Bebidas")
+        .update({ restaurante })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Restaurante");
+      console.error(error);
+    },
+  });
+
+  const toggleTouza = useMutation({
+    mutationFn: async ({ id, touza }: { id: string; touza: boolean }) => {
+      const { error } = await supabase
+        .from("Bebidas")
+        .update({ touza })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Touza");
+      console.error(error);
+    },
+  });
+
   const categorias = bebidas
     ? Array.from(new Set(bebidas.map((b) => b.categoria).filter(Boolean)))
     : [];
@@ -143,5 +182,7 @@ export function useBebidas() {
     actualizarBebida,
     eliminarBebida,
     toggleActivado,
+    toggleRestaurante,
+    toggleTouza,
   };
 }

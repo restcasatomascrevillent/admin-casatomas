@@ -17,6 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { VisibilidadToggles } from "./VisibilidadToggles";
 
 // Mapeo de alérgenos oficiales
 const ALERGENOS_MAP: Record<string, string> = {
@@ -41,7 +42,7 @@ interface ListaPlatosProps {
 }
 
 export function ListaPlatos({ platos }: ListaPlatosProps) {
-  const { toggleActivado, toggleExpanded, eliminarPlato } = usePlatos();
+  const { toggleActivado, toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
 
   const handleToggle = (plato: Plato, checked: boolean) => {
@@ -153,9 +154,18 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                   onCheckedChange={(checked) => handleToggle(plato, checked)}
                   disabled={toggleActivado.isPending}
                   className="data-[state=checked]:bg-green-600"
-                />
+              />
               </div>
-              
+
+              {/* Visibilidad Web */}
+              <VisibilidadToggles
+                restaurante={plato.restaurante ?? false}
+                touza={plato.touza ?? false}
+                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: plato.id, restaurante: checked })}
+                onTouzaChange={(checked) => toggleTouza.mutate({ id: plato.id, touza: checked })}
+                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                compact
+              />
               {plato.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {plato.descripcion}

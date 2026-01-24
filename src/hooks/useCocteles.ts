@@ -24,6 +24,9 @@ export interface Coctel {
   categoria_fr: string | null;
   descripcion_fr: string | null;
   ingredientes_fr: string | null;
+  touza: boolean | null;
+  restaurante: boolean | null;
+  featured: boolean | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -144,6 +147,42 @@ export function useCocteles() {
     },
   });
 
+  const toggleRestaurante = useMutation({
+    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
+      const { error } = await supabase
+        .from("Cocteles")
+        .update({ restaurante })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Restaurante");
+      console.error(error);
+    },
+  });
+
+  const toggleTouza = useMutation({
+    mutationFn: async ({ id, touza }: { id: string; touza: boolean }) => {
+      const { error } = await supabase
+        .from("Cocteles")
+        .update({ touza })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar visibilidad Touza");
+      console.error(error);
+    },
+  });
+
   const categorias = cocteles
     ? Array.from(new Set(cocteles.map((c) => c.categoria).filter(Boolean)))
     : [];
@@ -156,5 +195,7 @@ export function useCocteles() {
     actualizarCoctel,
     eliminarCoctel,
     toggleActivado,
+    toggleRestaurante,
+    toggleTouza,
   };
 }

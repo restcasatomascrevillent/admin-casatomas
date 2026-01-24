@@ -21,7 +21,6 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/marketing": "marketing",
   "/facturas": "facturas",
   "/analisis": "analisis",
-  "/touza": "touza",
   "/usuarios": "usuarios",
 };
 

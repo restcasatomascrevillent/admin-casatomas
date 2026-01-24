@@ -16,13 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { VisibilidadToggles } from "./VisibilidadToggles";
 
 interface ListaVinosProps {
   vinos: Vino[];
 }
 
 export function ListaVinos({ vinos }: ListaVinosProps) {
-  const { toggleActivado, eliminarVino } = useVinos();
+  const { toggleActivado, eliminarVino, toggleRestaurante, toggleTouza } = useVinos();
 
   const handleToggle = (vino: Vino, checked: boolean) => {
     toggleActivado.mutate(
@@ -99,7 +100,16 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 className="data-[state=checked]:bg-green-600"
               />
             </div>
-            
+
+            {/* Visibilidad Web */}
+            <VisibilidadToggles
+              restaurante={vino.restaurante ?? false}
+              touza={vino.touza ?? false}
+              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
+              onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
+              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+              compact
+            />
             {vino.descripcion && (
               <p className="text-sm text-muted-foreground line-clamp-2">
                 {vino.descripcion}
