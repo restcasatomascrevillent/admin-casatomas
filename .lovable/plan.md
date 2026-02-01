@@ -1,231 +1,143 @@
 
-## Plan: Enviar Documentos Individualmente con Control de Errores
+## Plan: Visualización de Facturas y Albaranes con Productos
 
-### Objetivo
-Modificar el flujo de procesamiento para que cada documento se envíe por separado al webhook, permitiendo:
-1. Procesar cada archivo de forma independiente
-2. Esperar a que todos completen (éxito o fallo)
-3. Identificar exactamente qué archivo(s) fallaron
-4. Mostrar un resumen detallado del resultado
+### Resumen
+Crear una interfaz visual con dos pestanas (Facturas y Albaranes) que muestren tablas con la informacion almacenada en la base de datos, incluyendo los productos/lineas de cada documento.
 
 ---
 
-### Cambios en Edge Function
+### Estructura de Datos Actual
 
-**Archivo: `supabase/functions/procesar-factura/index.ts`**
+La informacion esta en estas tablas:
+- **facturas**: Contiene tanto facturas como albaranes (campo `tipo` = 'factura' | 'albaran')
+- **historial_precios**: Contiene los productos/lineas asociadas a cada factura (campo `factura_id`)
 
-Modificar para procesar un solo archivo por petición:
+---
+
+### Arquitectura de la Solucion
+
+#### 1. Hook useFacturas
+
+Crear `src/hooks/useFacturas.ts`:
+- Consultar tabla `facturas` con filtro por tipo
+- Incluir productos desde `historial_precios`
+- Exportar funciones para facturas y albaranes por separado
 
 ```typescript
-// Recibe UN solo archivo en lugar de un array
-const payload = await req.json();
-
-// Validar que viene un archivo
-if (!payload.archivo?.contenido_base64) {
-  throw new Error('No se recibió ningún archivo');
+interface Factura {
+  id: number;
+  tipo: string;
+  numero_documento: string;
+  proveedor: string | null;
+  cif: string | null;
+  fecha: string;
+  subtotal: number | null;
+  iva: number | null;
+  total: number | null;
+  observaciones: string | null;
+  productos: ProductoFactura[];
 }
 
-// Procesar solo ese archivo
-const formData = new FormData();
-formData.append('tipo', payload.tipo || 'AUTO');
-formData.append('fecha', payload.fecha);
-
-// Convertir base64 a blob
-const binaryString = atob(payload.archivo.contenido_base64);
-const bytes = new Uint8Array(binaryString.length);
-for (let i = 0; i < binaryString.length; i++) {
-  bytes[i] = binaryString.charCodeAt(i);
+interface ProductoFactura {
+  id: number;
+  producto_nombre: string;
+  precio: number;
 }
-const blob = new Blob([bytes.buffer], { type: payload.archivo.tipo });
-formData.append('file', blob, payload.archivo.nombre);
-
-// Enviar al webhook
-const response = await fetch(WEBHOOK_URL, {
-  method: 'POST',
-  body: formData,
-});
-
-return new Response(JSON.stringify({
-  success: true,
-  nombre: payload.archivo.nombre,
-  webhookResponse: await response.json(),
-}));
 ```
+
+#### 2. Componente TablaFacturas
+
+Crear `src/components/facturas/TablaFacturas.tsx`:
+- Tabla con columnas: Numero, Proveedor, CIF, Fecha, Subtotal, IVA, Total
+- Filas expandibles para mostrar productos
+- Busqueda por numero o proveedor
+- Ordenacion por columnas
+
+#### 3. Componente TablaAlbaranes
+
+Crear `src/components/facturas/TablaAlbaranes.tsx`:
+- Similar a TablaFacturas pero para albaranes
+- Columnas adaptadas: Numero, Proveedor, Fecha, Observaciones
+- Sin columnas de importe (los albaranes no tienen totales)
+- Filas expandibles para productos si los tienen
+
+#### 4. Actualizar Pagina Facturas
+
+Modificar `src/pages/Facturas.tsx`:
+- Anadir pestanas (Tabs): "Subir", "Facturas", "Albaranes", "Chat"
+- Integrar las nuevas tablas
+- Mantener el layout existente pero ampliado
 
 ---
 
-### Cambios en Componente Frontend
-
-**Archivo: `src/components/facturas/SubidaFacturas.tsx`**
-
-Modificar `enviarFacturas` para enviar documentos uno a uno:
-
-```typescript
-interface ResultadoProcesamiento {
-  nombre: string;
-  success: boolean;
-  error?: string;
-  respuesta?: any;
-}
-
-const enviarFacturas = async () => {
-  setIsSubmitting(true);
-  setDatosExtraidos(null);
-  
-  const resultados: ResultadoProcesamiento[] = [];
-  
-  // Procesar cada archivo individualmente
-  for (const archivo of archivos) {
-    try {
-      const base64 = await convertirABase64(archivo.file);
-      
-      const payload = {
-        tipo: "AUTO",
-        archivo: {
-          nombre: archivo.nombre,
-          tipo: archivo.file.type,
-          size: archivo.file.size,
-          contenido_base64: base64,
-        },
-        fecha: new Date().toISOString(),
-      };
-      
-      const { data, error } = await supabase.functions.invoke('procesar-factura', {
-        body: payload,
-      });
-      
-      if (error || !data?.success) {
-        resultados.push({
-          nombre: archivo.nombre,
-          success: false,
-          error: error?.message || data?.error || 'Error desconocido',
-        });
-      } else {
-        resultados.push({
-          nombre: archivo.nombre,
-          success: true,
-          respuesta: data.webhookResponse,
-        });
-      }
-    } catch (err) {
-      resultados.push({
-        nombre: archivo.nombre,
-        success: false,
-        error: err instanceof Error ? err.message : 'Error desconocido',
-      });
-    }
-  }
-  
-  // Analizar resultados
-  const exitosos = resultados.filter(r => r.success);
-  const fallidos = resultados.filter(r => !r.success);
-  
-  if (fallidos.length > 0) {
-    toast({
-      title: `${fallidos.length} documento(s) fallaron`,
-      description: fallidos.map(f => f.nombre).join(', '),
-      variant: "destructive",
-    });
-  }
-  
-  if (exitosos.length > 0) {
-    toast({
-      title: `${exitosos.length} documento(s) procesados`,
-      description: exitosos.map(e => e.nombre).join(', '),
-    });
-    
-    // Limpiar solo archivos exitosos
-    setArchivos(prev => prev.filter(a => 
-      fallidos.some(f => f.nombre === a.nombre)
-    ));
-  }
-  
-  setIsSubmitting(false);
-};
-```
-
----
-
-### Mejoras en la UI
-
-**Mostrar progreso por archivo:**
-
-```tsx
-// Nuevo estado para tracking de progreso
-const [progreso, setProgreso] = useState<{
-  total: number;
-  actual: number;
-  nombreActual: string;
-}>({ total: 0, actual: 0, nombreActual: '' });
-
-// Durante el procesamiento
-{isSubmitting && progreso.total > 0 && (
-  <div className="space-y-2">
-    <p className="text-sm text-muted-foreground">
-      Procesando {progreso.actual} de {progreso.total}: {progreso.nombreActual}
-    </p>
-    <Progress value={(progreso.actual / progreso.total) * 100} />
-  </div>
-)}
-```
-
-**Mostrar resultados individuales con badges de estado:**
-
-```tsx
-// En la sección de resultados
-{resultados.map((r, i) => (
-  <div key={i} className="flex items-center gap-2">
-    {r.success ? (
-      <CheckCircle2 className="h-4 w-4 text-green-500" />
-    ) : (
-      <XCircle className="h-4 w-4 text-red-500" />
-    )}
-    <span className={r.success ? "" : "text-destructive"}>
-      {r.nombre}
-    </span>
-    {!r.success && (
-      <span className="text-xs text-muted-foreground">
-        - {r.error}
-      </span>
-    )}
-  </div>
-))}
-```
-
----
-
-### Flujo Visual
+### Diseno Visual
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  📄 factura-1.pdf    ✅ Procesado                           │
-│  📄 albaran-23.png   ✅ Procesado                           │
-│  📄 factura-2.pdf    ❌ Error: Timeout                      │
-│  📄 ticket-45.jpg    ✅ Procesado                           │
-├─────────────────────────────────────────────────────────────┤
-│  Resumen: 3 exitosos, 1 fallido                             │
-│                                                             │
-│  [Reintentar fallidos]  [Limpiar todo]                      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FACTURAS Y ALBARANES                                                       │
+│  Sube documentos y consulta la informacion almacenada                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  [Subir] [Facturas] [Albaranes] [Chat]                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Pestana FACTURAS:                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ Buscar: [________________]                                              ││
+│  ├───────┬────────────────────┬────────────┬────────────┬──────────────────┤│
+│  │ Num   │ Proveedor          │ Fecha      │ Total      │                  ││
+│  ├───────┼────────────────────┼────────────┼────────────┼──────────────────┤│
+│  │ > 0002721 │ FRIO S.A.T.    │ 30/12/2025 │ 982.50 EUR │                  ││
+│  ├───────┴────────────────────┴────────────┴────────────┴──────────────────┤│
+│  │   Productos:                                                            ││
+│  │   - VENTILADOR 10W: 87.00 EUR                                           ││
+│  │   - MANO DE OBRA: 30.00 EUR                                             ││
+│  │   - PROGRAMADOR CICLICO: 248.66 EUR                                     ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  Pestana ALBARANES:                                                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ Buscar: [________________]                                              ││
+│  ├───────┬────────────────────┬────────────┬───────────────────────────────┤│
+│  │ Num   │ Proveedor          │ Fecha      │ Observaciones                 ││
+│  ├───────┼────────────────────┼────────────┼───────────────────────────────┤│
+│  │ 260008151 │ PROD. ALMADRABA│ 15/01/2026 │ 2 bultos, temp. congelado     ││
+│  │ 2.0668571 │ COMERCIAL TABA.│ 12/01/2026 │ Devolucion envases            ││
+│  │ AL26000081│ Racionalismo D.│ 07/01/2026 │ Entrega CASA TOMAS            ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Archivos a Modificar
+### Archivos a Crear/Modificar
 
-| Archivo | Cambio |
+| Archivo | Accion |
 |---------|--------|
-| `supabase/functions/procesar-factura/index.ts` | Simplificar para recibir 1 archivo |
-| `src/components/facturas/SubidaFacturas.tsx` | Loop individual + progreso + resultados detallados |
+| `src/hooks/useFacturas.ts` | **Crear** - Hook para consultar facturas/albaranes con productos |
+| `src/components/facturas/TablaFacturas.tsx` | **Crear** - Tabla de facturas con expansion |
+| `src/components/facturas/TablaAlbaranes.tsx` | **Crear** - Tabla de albaranes |
+| `src/pages/Facturas.tsx` | **Modificar** - Agregar pestanas y nuevas tablas |
 
 ---
 
-### Detalles Adicionales
+### Detalles Tecnicos
 
-**Timeout individual**: Cada petición tiene su propio timeout de 30s
+**Hook useFacturas**
+- Usa TanStack Query para cache y revalidacion
+- Consulta separada para facturas y albaranes
+- Join con historial_precios para obtener productos
 
-**Orden de procesamiento**: Secuencial (uno tras otro) para no saturar el webhook
+**Filas Expandibles**
+- Usar el componente Collapsible de Radix UI
+- Al hacer clic en una fila, expandir para mostrar productos
+- Icono de chevron para indicar expansion
 
-**Archivos que fallan**: Se mantienen en la lista para poder reintentarlos
+**Formato de Datos**
+- Fechas formateadas con date-fns en espanol
+- Importes con formato de moneda EUR
+- Textos largos truncados con tooltip
 
-**Archivos exitosos**: Se eliminan automáticamente de la lista
+**Responsive**
+- En movil, ocultar columnas secundarias (CIF, Subtotal)
+- Scroll horizontal si es necesario
+- Cards en lugar de tabla para pantallas muy pequenas
