@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.traducir-novedad-auto]
 verify_jwt = false
+
+[functions.chat-facturas]
+verify_jwt = false

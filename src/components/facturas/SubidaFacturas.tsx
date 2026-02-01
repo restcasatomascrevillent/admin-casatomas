@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +25,6 @@ interface DatosExtraidos {
 export function SubidaFacturas() {
   const [archivos, setArchivos] = useState<ArchivoFactura[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tipoDocumento, setTipoDocumento] = useState<"FACTURA" | "ALBARAN">("FACTURA");
   const [datosExtraidos, setDatosExtraidos] = useState<DatosExtraidos | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -127,7 +125,7 @@ export function SubidaFacturas() {
       );
 
       const payload = {
-        tipo: tipoDocumento,
+        tipo: "AUTO",
         archivos: archivosPayload,
         fecha: new Date().toISOString(),
       };
@@ -235,27 +233,6 @@ export function SubidaFacturas() {
               className="hidden"
               onChange={handleFileChange}
             />
-          </div>
-
-          {/* Selector de tipo de documento */}
-          <div className="space-y-2">
-            <Label htmlFor="tipo-documento">Tipo de documento</Label>
-            <Select 
-              value={tipoDocumento} 
-              onValueChange={(v) => setTipoDocumento(v as "FACTURA" | "ALBARAN")}
-              disabled={isSubmitting}
-            >
-              <SelectTrigger id="tipo-documento">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FACTURA">📄 Factura</SelectItem>
-                <SelectItem value="ALBARAN">📋 Albarán</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Selecciona el tipo de documento que estás subiendo
-            </p>
           </div>
 
           {/* Lista de archivos */}
