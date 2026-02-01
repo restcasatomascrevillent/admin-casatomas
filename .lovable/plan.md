@@ -1,102 +1,125 @@
 
-## Plan: Mejorar Alineación de Tabla de Facturas con Productos en Columnas
+
+## Plan: Mostrar Cantidad y Unidad en Albaranes en Lugar de Precio
 
 ### Problema Detectado
-La tabla actual tiene las columnas de datos desalineadas con las cabeceras. Además, cuando se expande una fila para ver los productos, estos se muestran como una lista simple en lugar de una tabla con columnas alineadas.
+
+Los productos de albaranes en la tabla `productos_factura` no tienen valores de precio (`precio_unitario` y `total` son `null`). Esto es correcto porque los albaranes son documentos de logística que registran cantidades, no importes.
+
+**Datos en la base de datos:**
+```
+nombre: VENTRESCA ATÚN ROJO SALVAJE ALM...
+cantidad: 23.480
+unidad: kg
+precio_unitario: null
+total: null
+```
 
 ### Solución
 
-Reestructurar la tabla para usar `table-layout: fixed` con anchos de columna explícitos, y mostrar los productos en una subtabla con las mismas proporciones de columnas.
+Modificar la tabla de albaranes para mostrar **Cantidad** y **Unidad** en lugar de **Precio**, ya que esos son los datos relevantes para albaranes.
 
 ---
 
-### Cambios en TablaFacturas.tsx
+### Cambios en TablaAlbaranes.tsx
 
-#### 1. Aplicar layout fijo con anchos específicos
+#### 1. Actualizar cabeceras de la subtabla de productos
 
-```tsx
-<Table className="table-fixed">
-  <TableHeader>
-    <TableRow className="bg-muted/50">
-      <TableHead className="w-[40px]"></TableHead>
-      <TableHead className="w-[120px]">Número</TableHead>
-      <TableHead className="w-[180px]">Proveedor</TableHead>
-      <TableHead className="w-[110px] hidden md:table-cell">CIF</TableHead>
-      <TableHead className="w-[100px]">Fecha</TableHead>
-      <TableHead className="w-[100px] hidden lg:table-cell text-right">Subtotal</TableHead>
-      <TableHead className="w-[90px] hidden lg:table-cell text-right">IVA</TableHead>
-      <TableHead className="w-[100px] text-right">Total</TableHead>
-      <TableHead className="w-[60px] text-center">Items</TableHead>
-    </TableRow>
-  </TableHeader>
-</Table>
+Cambiar de:
+```
+| Producto | Precio | Proveedor |
 ```
 
-#### 2. Separar fila de datos y fila de productos
+A:
+```
+| Producto | Cantidad | Unidad |
+```
 
-Cambiar de usar `Collapsible` envolviendo `TableRow` a usar Fragment con dos filas separadas:
+#### 2. Mostrar cantidad y unidad en cada fila
 
-```tsx
-const FilaFactura = ({ factura, isMobile }: FilaFacturaProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const tieneProductos = factura.productos.length > 0;
+En lugar de `formatCurrency(p.precio)`, mostrar:
+- `p.cantidad` formateado con decimales
+- `p.unidad` (kg, unidades, cajas, etc.)
 
-  // Para desktop: usar dos TableRow separados
-  return (
-    <>
-      <TableRow 
-        className="cursor-pointer hover:bg-muted/50"
-        onClick={() => tieneProductos && setIsOpen(!isOpen)}
-      >
-        <TableCell className="w-[40px]">
-          {tieneProductos && (isOpen ? <ChevronDown /> : <ChevronRight />)}
-        </TableCell>
-        <TableCell className="w-[120px] font-medium">{factura.numero_documento}</TableCell>
-        {/* ... resto de celdas con mismos anchos ... */}
-      </TableRow>
-      
-      {isOpen && tieneProductos && (
-        <TableRow className="bg-muted/20">
-          <TableCell colSpan={9} className="p-0">
-            <Table className="table-fixed">
-              <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="w-[40px]"></TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead className="w-[100px] text-right">Precio</TableHead>
-                  <TableHead className="w-[100px] text-right">Proveedor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {factura.productos.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="w-[40px]"></TableCell>
-                    <TableCell>{p.producto_nombre}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(p.precio)}</TableCell>
-                    <TableCell className="text-right">{p.proveedor || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableCell>
-        </TableRow>
-      )}
-    </>
-  );
+#### 3. Formato de cantidad
+
+Crear una función `formatCantidad` que:
+- Muestre hasta 3 decimales si es necesario
+- Elimine ceros innecesarios (23.480 → 23.48)
+
+---
+
+### Código a Implementar
+
+**Función de formateo:**
+```typescript
+const formatCantidad = (cantidad: number | undefined): string => {
+  if (cantidad === undefined || cantidad === null) return "-";
+  // Formatear con hasta 3 decimales, eliminando ceros finales
+  return new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  }).format(cantidad);
 };
 ```
 
+**Cabeceras de subtabla (desktop):**
+```tsx
+<TableHeader>
+  <TableRow className="bg-muted/30 hover:bg-muted/30">
+    <TableHead className="h-8">Producto</TableHead>
+    <TableHead className="w-[100px] h-8 text-right">Cantidad</TableHead>
+    <TableHead className="w-[100px] h-8">Unidad</TableHead>
+  </TableRow>
+</TableHeader>
+```
+
+**Filas de productos:**
+```tsx
+{albaran.productos.map((p) => (
+  <TableRow key={p.id} className="hover:bg-muted/10">
+    <TableCell className="py-2">{p.producto_nombre}</TableCell>
+    <TableCell className="py-2 text-right font-medium">
+      {formatCantidad(p.cantidad)}
+    </TableCell>
+    <TableCell className="py-2 text-muted-foreground">
+      {p.unidad || "-"}
+    </TableCell>
+  </TableRow>
+))}
+```
+
+**Vista móvil actualizada:**
+```tsx
+{albaran.productos.map((p) => (
+  <div key={p.id} className="flex justify-between text-xs">
+    <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
+    <span className="font-medium">
+      {formatCantidad(p.cantidad)} {p.unidad || ""}
+    </span>
+  </div>
+))}
+```
+
 ---
 
-### Mejoras Visuales Adicionales
+### Resultado Visual
 
-| Mejora | Descripción |
-|--------|-------------|
-| Fondo en cabecera | Añadir `bg-muted/50` a la fila de cabecera para distinguirla |
-| Anchos fijos | Usar `table-fixed` con valores en píxeles para cada columna |
-| Subtabla de productos | Los productos se muestran en una tabla anidada con columnas: Producto, Precio, Proveedor |
-| Eliminar Collapsible | Usar estado `isOpen` simple con onClick en lugar de Collapsible wrapper |
-| Bordes sutiles | Añadir separadores visuales entre productos |
+**Antes (mostraba "-" porque no hay precios):**
+```
+| Producto                              | Precio | Proveedor |
+|---------------------------------------|--------|-----------|
+| VENTRESCA ATÚN ROJO SALVAJE ALM...    | -      | -         |
+| NAVAJA (Lote: 252580)                 | -      | -         |
+```
+
+**Después (muestra cantidad y unidad):**
+```
+| Producto                              | Cantidad | Unidad   |
+|---------------------------------------|----------|----------|
+| VENTRESCA ATÚN ROJO SALVAJE ALM...    | 23,48    | kg       |
+| NAVAJA (Lote: 252580)                 | 5        | unidades |
+```
 
 ---
 
@@ -104,4 +127,5 @@ const FilaFactura = ({ factura, isMobile }: FilaFacturaProps) => {
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/components/facturas/TablaFacturas.tsx` | Reestructurar con layout fijo y subtabla de productos |
+| `src/components/facturas/TablaAlbaranes.tsx` | Cambiar columnas de Precio/Proveedor por Cantidad/Unidad |
+
