@@ -18,12 +18,12 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const formatCurrency = (value: number | null): string => {
-  if (value === null || value === undefined) return "-";
+const formatCantidad = (cantidad: number | undefined): string => {
+  if (cantidad === undefined || cantidad === null) return "-";
   return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  }).format(value);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  }).format(cantidad);
 };
 
 const formatDate = (dateString: string): string => {
@@ -95,7 +95,9 @@ const FilaAlbaranMobile = ({ albaran }: { albaran: Factura }) => {
                   {albaran.productos.map((p) => (
                     <div key={p.id} className="flex justify-between text-xs">
                       <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
-                      <span className="font-medium">{formatCurrency(p.precio)}</span>
+                      <span className="font-medium">
+                        {formatCantidad(p.cantidad)} {p.unidad || ""}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -160,16 +162,16 @@ const FilaAlbaranDesktop = ({ albaran }: { albaran: Factura }) => {
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
                     <TableHead className="h-8">Producto</TableHead>
-                    <TableHead className="w-[120px] h-8 text-right">Precio</TableHead>
-                    <TableHead className="w-[150px] h-8 text-right">Proveedor</TableHead>
+                    <TableHead className="w-[100px] h-8 text-right">Cantidad</TableHead>
+                    <TableHead className="w-[100px] h-8">Unidad</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {albaran.productos.map((p) => (
                     <TableRow key={p.id} className="hover:bg-muted/10">
                       <TableCell className="py-2">{p.producto_nombre}</TableCell>
-                      <TableCell className="py-2 text-right font-medium">{formatCurrency(p.precio)}</TableCell>
-                      <TableCell className="py-2 text-right text-muted-foreground">{p.proveedor || "-"}</TableCell>
+                      <TableCell className="py-2 text-right font-medium">{formatCantidad(p.cantidad)}</TableCell>
+                      <TableCell className="py-2 text-muted-foreground">{p.unidad || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
