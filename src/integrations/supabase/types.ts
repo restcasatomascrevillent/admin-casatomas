@@ -391,6 +391,36 @@ export type Database = {
         }
         Relationships: []
       }
+      carrito: {
+        Row: {
+          cantidad: number
+          created_at: string
+          id: string
+          producto_id: string
+          producto_tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string
+          id?: string
+          producto_id: string
+          producto_tipo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          id?: string
+          producto_id?: string
+          producto_tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       Cocteles: {
         Row: {
           activado: boolean | null
@@ -619,6 +649,36 @@ export type Database = {
           },
         ]
       }
+      consultas_chatbot: {
+        Row: {
+          created_at: string | null
+          embedding: string | null
+          id: number
+          pregunta: string
+          respuesta: string | null
+          resultados: Json | null
+          sql_generado: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          embedding?: string | null
+          id?: number
+          pregunta: string
+          respuesta?: string | null
+          resultados?: Json | null
+          sql_generado?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          embedding?: string | null
+          id?: number
+          pregunta?: string
+          respuesta?: string | null
+          resultados?: Json | null
+          sql_generado?: string | null
+        }
+        Relationships: []
+      }
       dashboard_config: {
         Row: {
           created_at: string | null
@@ -796,6 +856,84 @@ export type Database = {
         }
         Relationships: []
       }
+      facturas: {
+        Row: {
+          cif: string | null
+          created_at: string | null
+          embedding: string | null
+          embedding_observaciones: string | null
+          fecha: string
+          id: number
+          iva: number | null
+          numero_documento: string
+          observaciones: string | null
+          procesado_en: string | null
+          proveedor: string | null
+          subtotal: number | null
+          tipo: string
+          total: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cif?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          embedding_observaciones?: string | null
+          fecha: string
+          id?: number
+          iva?: number | null
+          numero_documento: string
+          observaciones?: string | null
+          procesado_en?: string | null
+          proveedor?: string | null
+          subtotal?: number | null
+          tipo: string
+          total?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cif?: string | null
+          created_at?: string | null
+          embedding?: string | null
+          embedding_observaciones?: string | null
+          fecha?: string
+          id?: number
+          iva?: number | null
+          numero_documento?: string
+          observaciones?: string | null
+          procesado_en?: string | null
+          proveedor?: string | null
+          subtotal?: number | null
+          tipo?: string
+          total?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      favoritos: {
+        Row: {
+          created_at: string
+          id: string
+          producto_id: string
+          producto_tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          producto_id: string
+          producto_tipo?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          producto_id?: string
+          producto_tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       gdpr_audit_log: {
         Row: {
           accion: string
@@ -897,6 +1035,51 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      historial_precios: {
+        Row: {
+          created_at: string | null
+          factura_id: number | null
+          fecha: string
+          id: number
+          precio: number
+          producto_nombre: string
+          proveedor: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha: string
+          id?: number
+          precio: number
+          producto_nombre: string
+          proveedor?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha?: string
+          id?: number
+          precio?: number
+          producto_nombre?: string
+          proveedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       imagenes_base64: {
         Row: {
@@ -1500,6 +1683,160 @@ export type Database = {
         }
         Relationships: []
       }
+      productos_catalogo: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          created_at: string | null
+          id: number
+          nombre: string
+          notas: string | null
+          precio_actual: number | null
+          proveedor_habitual_id: number | null
+          unidad_medida: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          id?: number
+          nombre: string
+          notas?: string | null
+          precio_actual?: number | null
+          proveedor_habitual_id?: number | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          id?: number
+          nombre?: string
+          notas?: string | null
+          precio_actual?: number | null
+          proveedor_habitual_id?: number | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_catalogo_proveedor_habitual_id_fkey"
+            columns: ["proveedor_habitual_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_factura: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          embedding: string | null
+          factura_id: number
+          id: number
+          nombre: string
+          precio_unitario: number | null
+          total: number | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string | null
+          embedding?: string | null
+          factura_id: number
+          id?: number
+          nombre: string
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          embedding?: string | null
+          factura_id?: number
+          id?: number
+          nombre?: string
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_factura"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_factura"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_factura_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_factura_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proveedores: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          cif: string | null
+          created_at: string | null
+          direccion: string | null
+          email: string | null
+          id: number
+          nombre: string
+          notas: string | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          cif?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: number
+          nombre: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          cif?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: number
+          nombre?: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       publicaciones_redes: {
         Row: {
           contenido: string
@@ -1735,6 +2072,57 @@ export type Database = {
           currency?: string
           scope_name?: string
           unit_price_cents?: number
+        }
+        Relationships: []
+      }
+      sell_users: {
+        Row: {
+          acepta_marketing: boolean | null
+          apellidos: string | null
+          avatar_url: string | null
+          ciudad: string | null
+          codigo_postal: string | null
+          created_at: string | null
+          direccion: string | null
+          fecha_nacimiento: string | null
+          id: string
+          nombre: string | null
+          pais: string | null
+          telefono: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          acepta_marketing?: boolean | null
+          apellidos?: string | null
+          avatar_url?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          id?: string
+          nombre?: string | null
+          pais?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          acepta_marketing?: boolean | null
+          apellidos?: string | null
+          avatar_url?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          id?: string
+          nombre?: string | null
+          pais?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -2082,6 +2470,16 @@ export type Database = {
           },
         ]
       }
+      vista_gastos_mensuales: {
+        Row: {
+          mes: string | null
+          num_facturas: number | null
+          num_proveedores: number | null
+          promedio_factura: number | null
+          total_mes: number | null
+        }
+        Relationships: []
+      }
       vista_ocupacion: {
         Row: {
           capacidad_disponible: number | null
@@ -2119,6 +2517,33 @@ export type Database = {
           porcentaje_ocupacion: number | null
           total_comensales: number | null
           total_reservas: number | null
+        }
+        Relationships: []
+      }
+      vista_productos_top: {
+        Row: {
+          cantidad_total: number | null
+          nombre: string | null
+          num_proveedores: number | null
+          precio_maximo: number | null
+          precio_minimo: number | null
+          precio_promedio: number | null
+          unidad: string | null
+          veces_comprado: number | null
+        }
+        Relationships: []
+      }
+      vista_proveedores_resumen: {
+        Row: {
+          cif: string | null
+          num_albaranes: number | null
+          num_documentos: number | null
+          num_facturas: number | null
+          primera_compra: string | null
+          proveedor: string | null
+          ticket_promedio: number | null
+          total_gastado: number | null
+          ultima_compra: string | null
         }
         Relationships: []
       }
@@ -2163,15 +2588,76 @@ export type Database = {
           },
         ]
       }
+      vista_ultimos_documentos: {
+        Row: {
+          fecha: string | null
+          id: number | null
+          num_productos: number | null
+          numero_documento: string | null
+          procesado_en: string | null
+          proveedor: string | null
+          tipo: string | null
+          total: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      buscar_contexto_chatbot: {
+        Args: { embedding_query: string }
+        Returns: Json
+      }
+      buscar_facturas_por_contexto: {
+        Args: { limite?: number; query_embedding: string }
+        Returns: {
+          fecha: string
+          id: number
+          numero_documento: string
+          observaciones: string
+          proveedor: string
+          similitud: number
+          tipo: string
+        }[]
+      }
+      buscar_producto: {
+        Args: { termino: string }
+        Returns: {
+          nombre: string
+          precio_promedio: number
+          ultima_fecha: string
+          ultimo_precio: number
+          veces_comprado: number
+        }[]
+      }
+      buscar_productos_similares: {
+        Args: { limite?: number; query_embedding: string }
+        Returns: {
+          cantidad: number
+          fecha: string
+          id: number
+          nombre: string
+          precio_unitario: number
+          proveedor: string
+          similitud: number
+        }[]
+      }
       bytea_to_text: { Args: { data: string }; Returns: string }
+      ejecutar_consulta_chatbot: { Args: { query_sql: string }; Returns: Json }
       ejecutar_limpieza_gdpr: {
         Args: never
         Returns: {
           accion: string
           registros_procesados: number
           tabla: string
+        }[]
+      }
+      gastos_periodo: {
+        Args: { fecha_fin: string; fecha_inicio: string }
+        Returns: {
+          num_facturas: number
+          proveedor_principal: string
+          ticket_promedio: number
+          total_gastado: number
         }[]
       }
       get_user_role: {
