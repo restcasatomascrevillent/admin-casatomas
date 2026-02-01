@@ -2813,6 +2813,15 @@ export type Database = {
               error: true
             } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
           }
+      verificar_duplicado_factura: {
+        Args: {
+          p_fecha: string
+          p_numero_documento: string
+          p_proveedor: string
+          p_total: number
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
