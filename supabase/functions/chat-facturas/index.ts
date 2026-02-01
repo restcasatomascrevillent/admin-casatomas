@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 // URL del webhook de chat de n8n - PLACEHOLDER para configurar
-const WEBHOOK_CHAT_URL = 'https://n8npersonal.miguelbenito.space/webhook/chat-facturas';
+const WEBHOOK_CHAT_URL = 'https://n8npersonal.miguelbenito.space/webhook/chatbot';
 
 serve(async (req) => {
   // Handle CORS preflight requests
