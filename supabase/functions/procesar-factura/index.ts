@@ -17,61 +17,31 @@ serve(async (req) => {
   try {
     const payload = await req.json();
 
-    console.log('Recibida petición para procesar:', {
-      tipo: payload.tipo,
-      num_archivos: payload.archivos?.length || 1,
+    // Validar que viene un archivo
+    if (!payload.archivo?.contenido_base64) {
+      throw new Error('No se recibió ningún archivo');
+    }
+
+    console.log('Procesando archivo:', {
+      nombre: payload.archivo.nombre,
+      tipo: payload.archivo.tipo,
+      size: payload.archivo.size,
       fecha: payload.fecha,
     });
 
-    // Crear FormData para enviar los archivos
+    // Crear FormData para enviar el archivo
     const formData = new FormData();
-    
-    // Añadir metadatos generales
-    formData.append('tipo', payload.tipo || 'FACTURA');
+    formData.append('tipo', payload.tipo || 'AUTO');
     formData.append('fecha', payload.fecha || new Date().toISOString());
 
-    // Procesar múltiples archivos (nuevo formato)
-    if (payload.archivos && Array.isArray(payload.archivos)) {
-      formData.append('num_archivos', String(payload.archivos.length));
-      
-      for (let i = 0; i < payload.archivos.length; i++) {
-        const archivo = payload.archivos[i];
-        
-        if (archivo.contenido_base64) {
-          const binaryString = atob(archivo.contenido_base64);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let j = 0; j < binaryString.length; j++) {
-            bytes[j] = binaryString.charCodeAt(j);
-          }
-          const blob = new Blob([bytes.buffer], { type: archivo.tipo });
-          formData.append('file', blob, archivo.nombre);
-        }
-        
-        console.log(`Archivo ${i + 1}:`, {
-          nombre: archivo.nombre,
-          tipo: archivo.tipo,
-          size: archivo.size,
-        });
-      }
-    } 
-    // Compatibilidad con formato antiguo (un solo archivo)
-    else if (payload.archivo?.contenido_base64) {
-      formData.append('num_archivos', '1');
-      
-      const binaryString = atob(payload.archivo.contenido_base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes.buffer], { type: payload.archivo.tipo });
-      formData.append('file', blob, payload.archivo.nombre);
-      
-      console.log('Archivo único:', {
-        nombre: payload.archivo.nombre,
-        tipo: payload.archivo.tipo,
-        size: payload.archivo.size,
-      });
+    // Convertir base64 a blob
+    const binaryString = atob(payload.archivo.contenido_base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+    const blob = new Blob([bytes.buffer], { type: payload.archivo.tipo });
+    formData.append('file', blob, payload.archivo.nombre);
 
     // Enviar al webhook como multipart/form-data
     const controller = new AbortController();
@@ -97,7 +67,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Facturas enviadas correctamente',
+        nombre: payload.archivo.nombre,
+        message: 'Documento procesado correctamente',
         status: response.status,
         webhookResponse,
       }),
@@ -107,7 +78,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error procesando facturas:', error);
+    console.error('Error procesando documento:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     

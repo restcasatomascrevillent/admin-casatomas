@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 interface ArchivoFactura {
   file: File;
@@ -15,17 +15,22 @@ interface ArchivoFactura {
   nombre: string;
 }
 
-interface DatosExtraidos {
+interface ResultadoProcesamiento {
+  nombre: string;
   success: boolean;
-  archivos: string[];
-  texto: string;
-  timestamp: string;
+  error?: string;
+  respuesta?: any;
 }
 
 export function SubidaFacturas() {
   const [archivos, setArchivos] = useState<ArchivoFactura[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [datosExtraidos, setDatosExtraidos] = useState<DatosExtraidos | null>(null);
+  const [resultados, setResultados] = useState<ResultadoProcesamiento[]>([]);
+  const [progreso, setProgreso] = useState<{
+    total: number;
+    actual: number;
+    nombreActual: string;
+  }>({ total: 0, actual: 0, nombreActual: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -108,175 +113,273 @@ export function SubidaFacturas() {
     }
 
     setIsSubmitting(true);
-    setDatosExtraidos(null);
+    setResultados([]);
+    setProgreso({ total: archivos.length, actual: 0, nombreActual: '' });
 
-    try {
-      // Convertir todos los archivos a base64
-      const archivosPayload = await Promise.all(
-        archivos.map(async (archivo) => {
-          const base64 = await convertirABase64(archivo.file);
-          return {
+    const nuevosResultados: ResultadoProcesamiento[] = [];
+
+    // Procesar cada archivo individualmente
+    for (let i = 0; i < archivos.length; i++) {
+      const archivo = archivos[i];
+      
+      setProgreso({
+        total: archivos.length,
+        actual: i + 1,
+        nombreActual: archivo.nombre,
+      });
+
+      try {
+        const base64 = await convertirABase64(archivo.file);
+
+        const payload = {
+          tipo: "AUTO",
+          archivo: {
             nombre: archivo.nombre,
             tipo: archivo.file.type,
             size: archivo.file.size,
             contenido_base64: base64,
-          };
-        })
-      );
+          },
+          fecha: new Date().toISOString(),
+        };
 
-      const payload = {
-        tipo: "AUTO",
-        archivos: archivosPayload,
-        fecha: new Date().toISOString(),
-      };
+        const { data, error } = await supabase.functions.invoke('procesar-factura', {
+          body: payload,
+        });
 
-      const nombresArchivos = archivos.map(a => a.nombre);
-
-      const { data, error } = await supabase.functions.invoke('procesar-factura', {
-        body: payload,
-      });
-
-      if (error) {
-        throw new Error(error.message);
+        if (error || !data?.success) {
+          nuevosResultados.push({
+            nombre: archivo.nombre,
+            success: false,
+            error: error?.message || data?.error || 'Error desconocido',
+          });
+        } else {
+          nuevosResultados.push({
+            nombre: archivo.nombre,
+            success: true,
+            respuesta: data.webhookResponse,
+          });
+        }
+      } catch (err) {
+        nuevosResultados.push({
+          nombre: archivo.nombre,
+          success: false,
+          error: err instanceof Error ? err.message : 'Error desconocido',
+        });
       }
+    }
 
-      console.log('Documentos enviados:', data);
+    setResultados(nuevosResultados);
 
-      // Verificar si el webhook respondió correctamente
-      if (data?.success) {
-        // Extraer el campo text del content del output
-        const textoExtraido = data.webhookResponse?.output?.[0]?.content?.[0]?.text || 
-          data.webhookResponse?.text || 
-          data.webhookResponse?.message || 
-          '';
+    // Analizar resultados
+    const exitosos = nuevosResultados.filter(r => r.success);
+    const fallidos = nuevosResultados.filter(r => !r.success);
 
-        // Guardar los datos extraídos para mostrarlos
-        setDatosExtraidos({
-          success: true,
-          archivos: nombresArchivos,
-          texto: textoExtraido,
-          timestamp: new Date().toISOString(),
-        });
-
-        toast({
-          title: "Documentos procesados",
-          description: data.webhookResponse?.message || `Se han procesado ${archivos.length} documento(s) correctamente`,
-        });
-
-        // Limpiar archivos solo si fue exitoso
-        archivos.forEach(a => {
-          if (a.preview) URL.revokeObjectURL(a.preview);
-        });
-        setArchivos([]);
-      } else {
-        throw new Error(data?.error || "Error al procesar los documentos");
-      }
-
-    } catch (error) {
-      console.error('Error al enviar documentos:', error);
+    if (fallidos.length > 0 && exitosos.length > 0) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudieron enviar los documentos",
+        title: `${exitosos.length} procesados, ${fallidos.length} fallidos`,
+        description: `Fallidos: ${fallidos.map(f => f.nombre).join(', ')}`,
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
+    } else if (fallidos.length > 0) {
+      toast({
+        title: `${fallidos.length} documento(s) fallaron`,
+        description: fallidos.map(f => f.nombre).join(', '),
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Todos los documentos procesados",
+        description: `${exitosos.length} documento(s) procesados correctamente`,
+      });
     }
+
+    // Limpiar solo archivos exitosos
+    if (exitosos.length > 0) {
+      setArchivos(prev => {
+        const archivosRestantes = prev.filter(a => 
+          fallidos.some(f => f.nombre === a.nombre)
+        );
+        // Liberar URLs de preview de archivos exitosos
+        prev.forEach(a => {
+          if (!fallidos.some(f => f.nombre === a.nombre) && a.preview) {
+            URL.revokeObjectURL(a.preview);
+          }
+        });
+        return archivosRestantes;
+      });
+    }
+
+    setIsSubmitting(false);
+    setProgreso({ total: 0, actual: 0, nombreActual: '' });
   };
 
+  const reintentarFallidos = () => {
+    // Los fallidos ya están en la lista de archivos
+    setResultados([]);
+    enviarFacturas();
+  };
+
+  const limpiarTodo = () => {
+    archivos.forEach(a => {
+      if (a.preview) URL.revokeObjectURL(a.preview);
+    });
+    setArchivos([]);
+    setResultados([]);
+  };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Subida de Facturas y Albaranes
-          </CardTitle>
-          <CardDescription>
-            Arrastra o selecciona tus facturas o albaranes (PDF o imágenes) para enviarlas al sistema de procesamiento
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Zona de carga */}
-          <div 
-            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const files = e.dataTransfer.files;
-              if (files.length > 0 && fileInputRef.current) {
-                const dt = new DataTransfer();
-                Array.from(files).forEach(f => dt.items.add(f));
-                fileInputRef.current.files = dt.files;
-                handleFileChange({ target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>);
-              }
-            }}
-          >
-            <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
-            <p className="text-sm text-muted-foreground mb-2">
-              Arrastra tus facturas o albaranes aquí o haz clic para seleccionar
-            </p>
-            <p className="text-xs text-muted-foreground">
-              PDF, JPG, PNG o WEBP (máximo 10MB por archivo)
-            </p>
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,image/jpeg,image/png,image/webp"
-              multiple
-              className="hidden"
-              onChange={handleFileChange}
-            />
-          </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          Subida de Facturas y Albaranes
+        </CardTitle>
+        <CardDescription>
+          Arrastra o selecciona tus facturas o albaranes (PDF o imágenes) para enviarlas al sistema de procesamiento
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Zona de carga */}
+        <div 
+          className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && fileInputRef.current) {
+              const dt = new DataTransfer();
+              Array.from(files).forEach(f => dt.items.add(f));
+              fileInputRef.current.files = dt.files;
+              handleFileChange({ target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>);
+            }
+          }}
+        >
+          <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+          <p className="text-sm text-muted-foreground mb-2">
+            Arrastra tus facturas o albaranes aquí o haz clic para seleccionar
+          </p>
+          <p className="text-xs text-muted-foreground">
+            PDF, JPG, PNG o WEBP (máximo 10MB por archivo)
+          </p>
+          <Input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+        </div>
 
-          {/* Lista de archivos */}
-          {archivos.length > 0 && (
-            <div className="space-y-3">
-              <Label>Archivos seleccionados ({archivos.length})</Label>
-              <div className="grid gap-3">
-                {archivos.map((archivo, index) => (
-                  <div 
-                    key={index}
-                    className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
-                  >
-                    {archivo.preview ? (
-                      <img 
-                        src={archivo.preview} 
-                        alt={archivo.nombre}
-                        className="h-12 w-12 object-cover rounded"
-                      />
-                    ) : (
-                      <div className="h-12 w-12 bg-primary/10 rounded flex items-center justify-center">
-                        <FileText className="h-6 w-6 text-primary" />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{archivo.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(archivo.file.size / 1024).toFixed(1)} KB
-                      </p>
+        {/* Barra de progreso */}
+        {isSubmitting && progreso.total > 0 && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Procesando {progreso.actual} de {progreso.total}</span>
+              <span>{progreso.nombreActual}</span>
+            </div>
+            <Progress value={(progreso.actual / progreso.total) * 100} />
+          </div>
+        )}
+
+        {/* Lista de archivos */}
+        {archivos.length > 0 && (
+          <div className="space-y-3">
+            <Label>Archivos seleccionados ({archivos.length})</Label>
+            <div className="grid gap-3">
+              {archivos.map((archivo, index) => (
+                <div 
+                  key={index}
+                  className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
+                >
+                  {archivo.preview ? (
+                    <img 
+                      src={archivo.preview} 
+                      alt={archivo.nombre}
+                      className="h-12 w-12 object-cover rounded"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 bg-primary/10 rounded flex items-center justify-center">
+                      <FileText className="h-6 w-6 text-primary" />
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => eliminarArchivo(index)}
-                      disabled={isSubmitting}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{archivo.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(archivo.file.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => eliminarArchivo(index)}
+                    disabled={isSubmitting}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Resultados de procesamiento */}
+        {resultados.length > 0 && (
+          <div className="space-y-3">
+            <Label>Resultados del procesamiento</Label>
+            <ScrollArea className="h-[200px] rounded-md border p-4">
+              <div className="space-y-2">
+                {resultados.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {r.success ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    )}
+                    <span className={`text-sm truncate ${!r.success ? 'text-destructive' : 'text-foreground'}`}>
+                      {r.nombre}
+                    </span>
+                    {!r.success && r.error && (
+                      <span className="text-xs text-muted-foreground truncate">
+                        - {r.error}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
+            </ScrollArea>
+            
+            {/* Botones de acción para resultados */}
+            <div className="flex gap-2">
+              {resultados.some(r => !r.success) && archivos.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={reintentarFallidos}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Reintentar fallidos
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={limpiarTodo}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Limpiar todo
+              </Button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Botón enviar */}
+        {/* Botón enviar */}
+        {archivos.length > 0 && resultados.length === 0 && (
           <Button 
             onClick={enviarFacturas}
             disabled={archivos.length === 0 || isSubmitting}
@@ -290,52 +393,12 @@ export function SubidaFacturas() {
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Enviar {archivos.length > 0 ? `${archivos.length} documento(s)` : 'documentos'}
+                Enviar {archivos.length} documento{archivos.length !== 1 ? 's' : ''}
               </>
             )}
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Resultados de extracción */}
-      {datosExtraidos && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {datosExtraidos.success ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-destructive" />
-              )}
-              Datos Extraídos
-            </CardTitle>
-            <CardDescription className="flex items-center gap-2 flex-wrap">
-              <span>Procesado: {new Date(datosExtraidos.timestamp).toLocaleString('es-ES')}</span>
-              <span className="text-muted-foreground">•</span>
-              <div className="flex gap-1 flex-wrap">
-                {datosExtraidos.archivos.map((nombre, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {nombre}
-                  </Badge>
-                ))}
-              </div>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ScrollArea className="h-[400px] rounded-md border p-4">
-              <p className="text-sm whitespace-pre-wrap">{datosExtraidos.texto || "Sin datos extraídos"}</p>
-            </ScrollArea>
-
-            <Button 
-              variant="outline" 
-              onClick={() => setDatosExtraidos(null)}
-              className="w-full"
-            >
-              Limpiar resultados
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
