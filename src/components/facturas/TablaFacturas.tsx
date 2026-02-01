@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,138 +38,149 @@ interface FilaFacturaProps {
   isMobile: boolean;
 }
 
-const FilaFactura = ({ factura, isMobile }: FilaFacturaProps) => {
+const FilaFacturaMobile = ({ factura }: { factura: Factura }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
 
-  if (isMobile) {
-    return (
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <Card className="mb-3">
-          <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {tieneProductos ? (
-                    isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-                  ) : (
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <div>
-                    <CardTitle className="text-sm font-medium">
-                      {factura.numero_documento}
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      {factura.proveedor || "Sin proveedor"}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-sm">{formatCurrency(factura.total)}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(factura.fecha)}</p>
-                </div>
-              </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0 pb-3">
-              <div className="space-y-2 text-sm">
-                {factura.cif && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">CIF:</span>
-                    <span>{factura.cif}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal:</span>
-                  <span>{formatCurrency(factura.subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">IVA:</span>
-                  <span>{formatCurrency(factura.iva)}</span>
-                </div>
-                {tieneProductos && (
-                  <div className="mt-3 pt-3 border-t">
-                    <p className="font-medium mb-2 flex items-center gap-1">
-                      <Package className="h-3 w-3" />
-                      Productos ({factura.productos.length})
-                    </p>
-                    <div className="space-y-1">
-                      {factura.productos.map((p) => (
-                        <div key={p.id} className="flex justify-between text-xs">
-                          <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
-                          <span className="font-medium">{formatCurrency(p.precio)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-    );
-  }
-
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <TableRow className="cursor-pointer hover:bg-muted/50">
-          <TableCell className="w-8">
+    <Card className="mb-3">
+      <CardHeader 
+        className="cursor-pointer hover:bg-muted/50 transition-colors py-3"
+        onClick={() => tieneProductos && setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             {tieneProductos ? (
               isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-            ) : null}
-          </TableCell>
-          <TableCell className="font-medium">{factura.numero_documento}</TableCell>
-          <TableCell>{factura.proveedor || "-"}</TableCell>
-          <TableCell className="hidden md:table-cell">{factura.cif || "-"}</TableCell>
-          <TableCell>{formatDate(factura.fecha)}</TableCell>
-          <TableCell className="hidden lg:table-cell text-right">
-            {formatCurrency(factura.subtotal)}
-          </TableCell>
-          <TableCell className="hidden lg:table-cell text-right">
-            {formatCurrency(factura.iva)}
-          </TableCell>
-          <TableCell className="text-right font-semibold">
-            {formatCurrency(factura.total)}
-          </TableCell>
-          <TableCell className="text-center">
-            {tieneProductos && (
-              <Badge variant="secondary" className="text-xs">
-                {factura.productos.length}
-              </Badge>
+            ) : (
+              <FileText className="h-4 w-4 text-muted-foreground" />
             )}
-          </TableCell>
-        </TableRow>
-      </CollapsibleTrigger>
-      {tieneProductos && (
-        <CollapsibleContent asChild>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableCell colSpan={9} className="p-4">
-              <div className="pl-6">
-                <p className="font-medium text-sm mb-2 flex items-center gap-1">
-                  <Package className="h-4 w-4" />
-                  Productos
+            <div>
+              <CardTitle className="text-sm font-medium">
+                {factura.numero_documento}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {factura.proveedor || "Sin proveedor"}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-semibold text-sm">{formatCurrency(factura.total)}</p>
+            <p className="text-xs text-muted-foreground">{formatDate(factura.fecha)}</p>
+          </div>
+        </div>
+      </CardHeader>
+      {isOpen && (
+        <CardContent className="pt-0 pb-3">
+          <div className="space-y-2 text-sm">
+            {factura.cif && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CIF:</span>
+                <span>{factura.cif}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal:</span>
+              <span>{formatCurrency(factura.subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">IVA:</span>
+              <span>{formatCurrency(factura.iva)}</span>
+            </div>
+            {tieneProductos && (
+              <div className="mt-3 pt-3 border-t">
+                <p className="font-medium mb-2 flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Productos ({factura.productos.length})
                 </p>
-                <div className="grid gap-1">
+                <div className="space-y-1">
                   {factura.productos.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex justify-between items-center text-sm py-1 border-b border-border/50 last:border-0"
-                    >
-                      <span>{p.producto_nombre}</span>
+                    <div key={p.id} className="flex justify-between text-xs">
+                      <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
                       <span className="font-medium">{formatCurrency(p.precio)}</span>
                     </div>
                   ))}
                 </div>
               </div>
-            </TableCell>
-          </TableRow>
-        </CollapsibleContent>
+            )}
+          </div>
+        </CardContent>
       )}
-    </Collapsible>
+    </Card>
   );
+};
+
+const FilaFacturaDesktop = ({ factura }: { factura: Factura }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const tieneProductos = factura.productos.length > 0;
+
+  return (
+    <>
+      <TableRow 
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => tieneProductos && setIsOpen(!isOpen)}
+      >
+        <TableCell className="w-[40px]">
+          {tieneProductos ? (
+            isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+          ) : null}
+        </TableCell>
+        <TableCell className="w-[120px] font-medium">{factura.numero_documento}</TableCell>
+        <TableCell className="w-[180px]">{factura.proveedor || "-"}</TableCell>
+        <TableCell className="w-[110px] hidden md:table-cell">{factura.cif || "-"}</TableCell>
+        <TableCell className="w-[100px]">{formatDate(factura.fecha)}</TableCell>
+        <TableCell className="w-[100px] hidden lg:table-cell text-right">
+          {formatCurrency(factura.subtotal)}
+        </TableCell>
+        <TableCell className="w-[90px] hidden lg:table-cell text-right">
+          {formatCurrency(factura.iva)}
+        </TableCell>
+        <TableCell className="w-[100px] text-right font-semibold">
+          {formatCurrency(factura.total)}
+        </TableCell>
+        <TableCell className="w-[60px] text-center">
+          {tieneProductos && (
+            <Badge variant="secondary" className="text-xs">
+              {factura.productos.length}
+            </Badge>
+          )}
+        </TableCell>
+      </TableRow>
+      {isOpen && tieneProductos && (
+        <TableRow className="bg-muted/20 hover:bg-muted/20">
+          <TableCell colSpan={9} className="p-0">
+            <div className="p-4 pl-10">
+              <Table className="table-fixed">
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="h-8">Producto</TableHead>
+                    <TableHead className="w-[120px] h-8 text-right">Precio</TableHead>
+                    <TableHead className="w-[150px] h-8 text-right">Proveedor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {factura.productos.map((p) => (
+                    <TableRow key={p.id} className="hover:bg-muted/10">
+                      <TableCell className="py-2">{p.producto_nombre}</TableCell>
+                      <TableCell className="py-2 text-right font-medium">{formatCurrency(p.precio)}</TableCell>
+                      <TableCell className="py-2 text-right text-muted-foreground">{p.proveedor || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
+  );
+};
+
+const FilaFactura = ({ factura, isMobile }: FilaFacturaProps) => {
+  if (isMobile) {
+    return <FilaFacturaMobile factura={factura} />;
+  }
+  return <FilaFacturaDesktop factura={factura} />;
 };
 
 export const TablaFacturas = () => {
@@ -229,18 +239,18 @@ export const TablaFacturas = () => {
         </div>
       ) : (
         <div className="rounded-md border">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"></TableHead>
-                <TableHead>Número</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead className="hidden md:table-cell">CIF</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead className="hidden lg:table-cell text-right">Subtotal</TableHead>
-                <TableHead className="hidden lg:table-cell text-right">IVA</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-center">Items</TableHead>
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead className="w-[120px]">Número</TableHead>
+                <TableHead className="w-[180px]">Proveedor</TableHead>
+                <TableHead className="w-[110px] hidden md:table-cell">CIF</TableHead>
+                <TableHead className="w-[100px]">Fecha</TableHead>
+                <TableHead className="w-[100px] hidden lg:table-cell text-right">Subtotal</TableHead>
+                <TableHead className="w-[90px] hidden lg:table-cell text-right">IVA</TableHead>
+                <TableHead className="w-[100px] text-right">Total</TableHead>
+                <TableHead className="w-[60px] text-center">Items</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
