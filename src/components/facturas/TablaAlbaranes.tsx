@@ -35,7 +35,7 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-const truncateText = (text: string | null, maxLength: number = 50): string => {
+const truncateText = (text: string | null, maxLength: number = 40): string => {
   if (!text) return "-";
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
@@ -119,38 +119,40 @@ const FilaAlbaran = ({ albaran, isMobile }: FilaAlbaranProps) => {
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
-        <TableRow className="cursor-pointer hover:bg-muted/50">
-          <TableCell className="w-8">
-            {tieneProductos ? (
-              isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-            ) : null}
+        <TableRow className={`cursor-pointer hover:bg-muted/50 ${tieneProductos ? '' : 'cursor-default'}`}>
+          <TableCell className="w-10 text-center">
+            {tieneProductos && (
+              isOpen ? <ChevronDown className="h-4 w-4 mx-auto" /> : <ChevronRight className="h-4 w-4 mx-auto" />
+            )}
           </TableCell>
-          <TableCell className="font-medium">{albaran.numero_documento}</TableCell>
-          <TableCell>{albaran.proveedor || "-"}</TableCell>
-          <TableCell>{formatDate(albaran.fecha)}</TableCell>
-          <TableCell className="max-w-xs">
-            {albaran.observaciones && albaran.observaciones.length > 50 ? (
+          <TableCell className="font-mono text-sm">{albaran.numero_documento}</TableCell>
+          <TableCell className="font-medium">{albaran.proveedor || "-"}</TableCell>
+          <TableCell className="text-center whitespace-nowrap">{formatDate(albaran.fecha)}</TableCell>
+          <TableCell>
+            {albaran.observaciones && albaran.observaciones.length > 40 ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help">
+                    <span className="cursor-help text-sm">
                       {truncateText(albaran.observaciones)}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-sm">
-                    <p>{albaran.observaciones}</p>
+                    <p className="text-sm">{albaran.observaciones}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              truncateText(albaran.observaciones)
+              <span className="text-sm">{albaran.observaciones || "-"}</span>
             )}
           </TableCell>
-          <TableCell className="text-center">
-            {tieneProductos && (
+          <TableCell className="text-center w-20">
+            {tieneProductos ? (
               <Badge variant="secondary" className="text-xs">
                 {albaran.productos.length}
               </Badge>
+            ) : (
+              <span className="text-muted-foreground text-sm">-</span>
             )}
           </TableCell>
         </TableRow>
@@ -158,22 +160,31 @@ const FilaAlbaran = ({ albaran, isMobile }: FilaAlbaranProps) => {
       {tieneProductos && (
         <CollapsibleContent asChild>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableCell colSpan={6} className="p-4">
-              <div className="pl-6">
-                <p className="font-medium text-sm mb-2 flex items-center gap-1">
+            <TableCell colSpan={6} className="p-0">
+              <div className="p-4 pl-12">
+                <p className="font-medium text-sm mb-3 flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  Productos
+                  Productos del albarán
                 </p>
-                <div className="grid gap-1">
-                  {albaran.productos.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex justify-between items-center text-sm py-1 border-b border-border/50 last:border-0"
-                    >
-                      <span>{p.producto_nombre}</span>
-                      <span className="font-medium">{formatCurrency(p.precio)}</span>
-                    </div>
-                  ))}
+                <div className="bg-background rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Producto</TableHead>
+                        <TableHead className="text-xs text-right w-32">Precio</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {albaran.productos.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="text-sm py-2">{p.producto_nombre}</TableCell>
+                          <TableCell className="text-sm py-2 text-right font-medium">
+                            {formatCurrency(p.precio)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </TableCell>
@@ -210,7 +221,7 @@ export const TablaAlbaranes = () => {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
+      <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Buscar por número, proveedor u observaciones..."
@@ -223,7 +234,7 @@ export const TablaAlbaranes = () => {
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={i} className="h-14 w-full" />
           ))}
         </div>
       ) : albaranesFiltrados.length === 0 ? (
@@ -239,16 +250,16 @@ export const TablaAlbaranes = () => {
           ))}
         </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"></TableHead>
-                <TableHead>Número</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead>Fecha</TableHead>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-10"></TableHead>
+                <TableHead className="w-32">Número</TableHead>
+                <TableHead className="w-48">Proveedor</TableHead>
+                <TableHead className="w-28 text-center">Fecha</TableHead>
                 <TableHead>Observaciones</TableHead>
-                <TableHead className="text-center">Items</TableHead>
+                <TableHead className="w-20 text-center">Items</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -260,7 +271,7 @@ export const TablaAlbaranes = () => {
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground text-right">
+      <p className="text-sm text-muted-foreground">
         {albaranesFiltrados.length} albarán(es) encontrado(s)
       </p>
     </div>
