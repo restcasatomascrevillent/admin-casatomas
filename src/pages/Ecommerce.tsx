@@ -19,7 +19,6 @@ const CATEGORIAS_BEBIDAS = [
   "Vinos Rosados",
   "Champagnes",
   "Cavas",
-  "Espumosos",
   "Whisky",
 ];
 
