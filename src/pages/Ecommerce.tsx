@@ -101,12 +101,12 @@ export default function Ecommerce() {
                   className="pl-9"
                 />
               </div>
-              <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+              <Select value={categoriaFiltro || "all"} onValueChange={(v) => setCategoriaFiltro(v === "all" ? "" : v)}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Todas las categorías" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las categorías</SelectItem>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
                   {categoriasActuales.map((cat) => (
                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
