@@ -26,7 +26,7 @@ export function VisibilidadToggles({
     )}>
       <div className="flex items-center gap-2">
         <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Rest</span>
+        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Restaurante</span>
         <Switch
           checked={restaurante}
           onCheckedChange={onRestauranteChange}
