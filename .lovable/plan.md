@@ -1,210 +1,333 @@
 
-## Plan: Nueva Seccion Ecommerce para Productos de Venta
+# Plan: Seccion Ecommerce Completa
 
-### Resumen
+## Resumen
 
-Crear una nueva seccion "Ecommerce" en el panel de administracion que funcione de manera similar a "Gestor Carta" pero enfocada en productos destinados a la venta online. Se crearan dos nuevas tablas en la base de datos y todos los componentes necesarios.
-
----
-
-### 1. Esquema de Base de Datos
-
-#### Tabla: BebidasVENTA
-
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | text | Primary key (UUID) |
-| nombre | text | Nombre del producto |
-| categoria | text | Vinos Tintos, Vinos Blancos, Vinos Rosados, Champagnes, Cavas, Espumosos, Whisky |
-| precio_eur | double precision | Precio de venta |
-| descripcion | text | Descripcion del producto |
-| imagen_url | text | URL de la imagen |
-| stock | integer | Cantidad disponible |
-| activado | boolean | Si esta activo para venta |
-| featured | boolean | Si es producto destacado |
-| orden | integer | Orden de visualizacion |
-| denominacion_origen | text | D.O. para vinos |
-| ubicacion_pais | text | Pais de origen |
-| ubicacion_region | text | Region de origen |
-| nombre_en | text | Nombre en ingles |
-| nombre_fr | text | Nombre en frances |
-| descripcion_en | text | Descripcion en ingles |
-| descripcion_fr | text | Descripcion en frances |
-| categoria_en | text | Categoria en ingles |
-| categoria_fr | text | Categoria en frances |
-| created_at | timestamp | Fecha de creacion |
-| updated_at | timestamp | Fecha de actualizacion |
-
-#### Tabla: ComidaVENTA
-
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | text | Primary key (UUID) |
-| nombre | text | Nombre del producto |
-| categoria | text | Jamon, Lomo Embuchado, Chorizo, Quesos |
-| precio_eur | double precision | Precio de venta |
-| descripcion | text | Descripcion del producto |
-| imagen_url | text | URL de la imagen |
-| stock | integer | Cantidad disponible |
-| peso | text | Peso del producto (ej: "100g", "1kg") |
-| activado | boolean | Si esta activo para venta |
-| featured | boolean | Si es producto destacado |
-| orden | integer | Orden de visualizacion |
-| origen | text | Origen del producto |
-| nombre_en | text | Nombre en ingles |
-| nombre_fr | text | Nombre en frances |
-| descripcion_en | text | Descripcion en ingles |
-| descripcion_fr | text | Descripcion en frances |
-| categoria_en | text | Categoria en ingles |
-| categoria_fr | text | Categoria en frances |
-| created_at | timestamp | Fecha de creacion |
-| updated_at | timestamp | Fecha de actualizacion |
-
-#### Politicas RLS
-
-Ambas tablas tendran:
-- SELECT publico para productos activados
-- SELECT autenticado para todos los productos
-- INSERT/UPDATE/DELETE solo para usuarios autenticados
+Transformar la seccion de Ecommerce actual en un modulo completo con navegacion por subsecciones, incluyendo gestion de productos, control de stock, metricas de ventas, analisis de clientes y mas.
 
 ---
 
-### 2. Archivos a Crear
+## Estructura de Subsecciones
 
-#### Pagina Principal
-```
-src/pages/Ecommerce.tsx
-```
-- Layout similar a GestorCarta.tsx
-- Tabs: "Bebidas" y "Comida"
-- Filtros por categoria, estado, busqueda
-- Boton "Anadir" contextual
+La pagina Ecommerce tendra navegacion por tabs principales:
 
-#### Hooks de Datos
-```
-src/hooks/useBebidasVenta.ts
-src/hooks/useComidaVenta.ts
-```
-- CRUD completo para cada tabla
-- Extraccion de categorias unicas
-- Toggle de activado/featured
-
-#### Formularios de Creacion
-```
-src/components/ecommerce/BebidaVentaForm.tsx
-src/components/ecommerce/ComidaVentaForm.tsx
-```
-- Campos especificos para cada tipo
-- Selector de categoria con ComboboxCreatable
-- Subida de imagen
-- Campo de stock
-
-#### Listas de Productos
-```
-src/components/ecommerce/ListaBebidasVenta.tsx
-src/components/ecommerce/ListaComidaVenta.tsx
-```
-- Cards con imagen, nombre, precio, stock
-- Toggle de activado/featured
-- Boton eliminar con confirmacion
+1. **Dashboard** - Vista general con KPIs y metricas clave
+2. **Productos** - Gestion actual de bebidas y comida (ya existe)
+3. **Pedidos** - Lista de pedidos y su estado
+4. **Stock** - Control de inventario y alertas
+5. **Clientes** - Usuarios registrados y comportamiento
+6. **Analiticas** - Graficos detallados y reportes
 
 ---
 
-### 3. Modificaciones a Archivos Existentes
+## Componentes a Crear
 
-#### src/App.tsx
-Anadir nueva ruta:
+### 1. Dashboard Ecommerce (Widgets)
+
+```
+src/components/ecommerce/dashboard/
+  - ResumenVentas.tsx        (ventas hoy/semana/mes + comparativa)
+  - GraficoVentasDiarias.tsx  (grafico de barras ventas por dia)
+  - ProductosMasVendidos.tsx  (top 5 productos)
+  - IngresosPorCategoria.tsx  (grafico circular por categoria)
+  - AlertasStock.tsx          (productos con stock bajo)
+  - PedidosPendientes.tsx     (pedidos por procesar)
+  - MapaVentas.tsx            (ventas por region/pais)
+  - ConversionCarrito.tsx     (carritos vs compras completadas)
+```
+
+### 2. Gestion de Pedidos
+
+```
+src/components/ecommerce/pedidos/
+  - ListaPedidos.tsx          (tabla con filtros)
+  - DetallePedido.tsx         (modal con info completa)
+  - EstadoPedidoSelector.tsx  (cambiar estado)
+  - ExportarPedidos.tsx       (CSV/PDF)
+```
+
+### 3. Control de Stock
+
+```
+src/components/ecommerce/stock/
+  - TablaStock.tsx            (vista consolidada)
+  - HistorialStock.tsx        (movimientos)
+  - AlertasStockConfig.tsx    (umbral minimo)
+  - AjusteStock.tsx           (modal para ajustar)
+```
+
+### 4. Clientes
+
+```
+src/components/ecommerce/clientes/
+  - ListaClientes.tsx         (usuarios sell_users)
+  - DetalleCliente.tsx        (historial compras)
+  - SegmentacionClientes.tsx  (por valor/frecuencia)
+```
+
+### 5. Analiticas Avanzadas
+
+```
+src/components/ecommerce/analiticas/
+  - GraficoIngresosMensuales.tsx
+  - EvolucionProductos.tsx
+  - AnalisisMargen.tsx        (beneficio por producto)
+  - ComparativaCategoiras.tsx
+  - TendenciasEstacionales.tsx
+```
+
+---
+
+## Tablas de Base de Datos Nuevas
+
+### pedidos_ecommerce
+```sql
+CREATE TABLE pedidos_ecommerce (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  numero_pedido TEXT UNIQUE NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  
+  -- Datos cliente (para pedidos sin registro)
+  email TEXT,
+  telefono TEXT,
+  nombre_completo TEXT,
+  
+  -- Direccion envio
+  direccion_envio TEXT,
+  ciudad_envio TEXT,
+  codigo_postal_envio TEXT,
+  pais_envio TEXT DEFAULT 'Espana',
+  
+  -- Importes
+  subtotal NUMERIC(10,2) NOT NULL,
+  gastos_envio NUMERIC(10,2) DEFAULT 0,
+  descuento NUMERIC(10,2) DEFAULT 0,
+  iva NUMERIC(10,2),
+  total NUMERIC(10,2) NOT NULL,
+  
+  -- Estado
+  estado TEXT DEFAULT 'pendiente' CHECK (estado IN (
+    'pendiente', 'confirmado', 'preparando', 
+    'enviado', 'entregado', 'cancelado', 'devuelto'
+  )),
+  
+  -- Pago
+  metodo_pago TEXT,
+  referencia_pago TEXT,
+  pagado BOOLEAN DEFAULT false,
+  fecha_pago TIMESTAMPTZ,
+  
+  -- Envio
+  transportista TEXT,
+  numero_seguimiento TEXT,
+  fecha_envio TIMESTAMPTZ,
+  fecha_entrega TIMESTAMPTZ,
+  
+  -- Notas
+  notas_cliente TEXT,
+  notas_internas TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### lineas_pedido
+```sql
+CREATE TABLE lineas_pedido (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pedido_id UUID REFERENCES pedidos_ecommerce(id) ON DELETE CASCADE,
+  producto_id TEXT NOT NULL,
+  producto_tipo TEXT NOT NULL CHECK (producto_tipo IN ('bebida', 'comida')),
+  nombre_producto TEXT NOT NULL,
+  cantidad INTEGER NOT NULL,
+  precio_unitario NUMERIC(10,2) NOT NULL,
+  total_linea NUMERIC(10,2) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### movimientos_stock
+```sql
+CREATE TABLE movimientos_stock (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  producto_id TEXT NOT NULL,
+  producto_tipo TEXT NOT NULL CHECK (producto_tipo IN ('bebida', 'comida')),
+  tipo_movimiento TEXT NOT NULL CHECK (tipo_movimiento IN (
+    'entrada', 'salida', 'ajuste', 'venta', 'devolucion'
+  )),
+  cantidad INTEGER NOT NULL,
+  stock_anterior INTEGER,
+  stock_nuevo INTEGER,
+  motivo TEXT,
+  referencia TEXT,
+  usuario_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+### alertas_stock
+```sql
+CREATE TABLE alertas_stock (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  producto_id TEXT NOT NULL,
+  producto_tipo TEXT NOT NULL,
+  stock_minimo INTEGER DEFAULT 5,
+  notificar_email BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(producto_id, producto_tipo)
+);
+```
+
+### visitas_producto
+```sql
+CREATE TABLE visitas_producto (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  producto_id TEXT NOT NULL,
+  producto_tipo TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  session_id TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  referer TEXT,
+  pais TEXT,
+  ciudad TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+---
+
+## Hooks Nuevos
+
+```
+src/hooks/
+  - usePedidosEcommerce.ts    (CRUD pedidos)
+  - useLineasPedido.ts        (items de pedido)
+  - useMovimientosStock.ts    (historial stock)
+  - useAlertasStock.ts        (configuracion alertas)
+  - useVisitasProducto.ts     (analiticas visitas)
+  - useEcommerceStats.ts      (estadisticas agregadas)
+  - useClientesEcommerce.ts   (gestion sell_users)
+```
+
+---
+
+## Metricas y KPIs
+
+El dashboard mostrara:
+
+**Ventas**
+- Ventas de hoy / esta semana / este mes
+- Comparativa con periodo anterior (%)
+- Ticket medio
+- Numero de pedidos
+
+**Productos**
+- Top 5 mas vendidos
+- Productos sin stock
+- Productos con stock bajo
+- Productos mas visitados vs vendidos (conversion)
+
+**Clientes**
+- Nuevos clientes (semana/mes)
+- Clientes recurrentes vs nuevos
+- Valor medio por cliente
+- Carritos abandonados
+
+**Geografico**
+- Ventas por region/pais
+- Coste medio de envio por zona
+
+**Margenes**
+- Ingresos totales
+- Beneficio estimado (si se añade coste)
+- Margen por categoria
+
+---
+
+## Vistas SQL para Analiticas
+
+```sql
+-- Vista resumen ventas diarias
+CREATE VIEW vista_ventas_diarias AS
+SELECT 
+  DATE(created_at) as fecha,
+  COUNT(*) as num_pedidos,
+  SUM(total) as total_ventas,
+  AVG(total) as ticket_medio
+FROM pedidos_ecommerce
+WHERE estado NOT IN ('cancelado', 'devuelto')
+GROUP BY DATE(created_at);
+
+-- Vista productos mas vendidos
+CREATE VIEW vista_productos_vendidos AS
+SELECT 
+  lp.producto_id,
+  lp.producto_tipo,
+  lp.nombre_producto,
+  SUM(lp.cantidad) as unidades_vendidas,
+  SUM(lp.total_linea) as total_ingresos
+FROM lineas_pedido lp
+JOIN pedidos_ecommerce p ON lp.pedido_id = p.id
+WHERE p.estado NOT IN ('cancelado', 'devuelto')
+GROUP BY lp.producto_id, lp.producto_tipo, lp.nombre_producto;
+```
+
+---
+
+## Modificaciones a Pagina Principal
+
+El archivo `src/pages/Ecommerce.tsx` se reestructurara con navegacion por subsecciones:
+
 ```tsx
-<Route
-  path="/ecommerce"
-  element={
-    <ProtectedRoute>
-      <Ecommerce />
-    </ProtectedRoute>
-  }
-/>
-```
-
-#### src/components/AppSidebar.tsx
-Anadir item al menu:
-```tsx
-{ title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" }
-```
-
-#### src/hooks/useUserRole.ts
-Anadir seccion de permisos:
-```tsx
-{ key: "ecommerce", label: "Ecommerce" }
+<Tabs value={seccion} onValueChange={setSeccion}>
+  <TabsList>
+    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+    <TabsTrigger value="productos">Productos</TabsTrigger>
+    <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
+    <TabsTrigger value="stock">Stock</TabsTrigger>
+    <TabsTrigger value="clientes">Clientes</TabsTrigger>
+    <TabsTrigger value="analiticas">Analiticas</TabsTrigger>
+  </TabsList>
+  
+  <TabsContent value="dashboard">
+    <DashboardEcommerce />
+  </TabsContent>
+  
+  {/* ... demas secciones */}
+</Tabs>
 ```
 
 ---
 
-### 4. Estructura de Componentes
+## Seguridad (RLS)
 
-```text
-src/
-├── pages/
-│   └── Ecommerce.tsx                    # Pagina principal
-├── hooks/
-│   ├── useBebidasVenta.ts               # Hook para BebidasVENTA
-│   └── useComidaVenta.ts                # Hook para ComidaVENTA
-└── components/
-    └── ecommerce/
-        ├── BebidaVentaForm.tsx          # Formulario bebidas
-        ├── ComidaVentaForm.tsx          # Formulario comida
-        ├── ListaBebidasVenta.tsx        # Lista bebidas
-        └── ListaComidaVenta.tsx         # Lista comida
-```
+Todas las tablas nuevas tendran RLS habilitado:
+- Solo usuarios autenticados pueden ver/editar pedidos
+- Clientes solo ven sus propios pedidos
+- Admins pueden ver todo
 
 ---
 
-### 5. Categorias Predefinidas
+## Orden de Implementacion
 
-#### BebidasVENTA
-- Vinos Tintos
-- Vinos Blancos
-- Vinos Rosados
-- Champagnes
-- Cavas
-- Espumosos
-- Whisky
-
-#### ComidaVENTA
-- Jamon
-- Lomo Embuchado
-- Chorizo
-- Quesos
+1. Crear tablas de base de datos y vistas
+2. Crear hooks para acceso a datos
+3. Implementar Dashboard con widgets principales
+4. Desarrollar gestion de Pedidos
+5. Implementar control de Stock
+6. Crear seccion Clientes
+7. Desarrollar Analiticas avanzadas
+8. Reestructurar pagina principal con navegacion
 
 ---
 
-### 6. Funcionalidades Clave
+## Detalles Tecnicos
 
-| Funcionalidad | Descripcion |
-|---------------|-------------|
-| Gestion de Stock | Campo numerico para controlar unidades disponibles |
-| Productos Destacados | Toggle para marcar productos como featured |
-| Traduccion Automatica | Integracion con edge function traducir-carta-auto |
-| Imagenes | Subida a storage bucket "ecommerce" |
-| Busqueda | Filtrado por nombre y descripcion |
-| Categorias Dinamicas | Selector que permite crear nuevas categorias |
+- Se reutilizara el patron de widgets del Dashboard principal
+- Graficos con Recharts (ya instalado)
+- Tablas con componentes UI existentes
+- Exportacion PDF con jsPDF (ya instalado)
+- Formularios con react-hook-form y zod
 
----
-
-### 7. Storage Bucket
-
-Crear bucket "ecommerce" para las imagenes con:
-- Politica de lectura publica
-- Politica de escritura para usuarios autenticados
-
----
-
-### Secuencia de Implementacion
-
-1. Crear migracion SQL con tablas, RLS y bucket
-2. Crear hooks useBebidasVenta y useComidaVenta
-3. Crear formularios BebidaVentaForm y ComidaVentaForm
-4. Crear listas ListaBebidasVenta y ListaComidaVenta
-5. Crear pagina Ecommerce.tsx
-6. Actualizar AppSidebar con nuevo menu item
-7. Actualizar App.tsx con nueva ruta
-8. Actualizar useUserRole con seccion "ecommerce"
