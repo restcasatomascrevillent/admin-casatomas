@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutDashboard, Package, ShoppingCart, Boxes, Users, BarChart3 } from "lucide-react";
-import { DashboardEcommerce } from "@/components/ecommerce/dashboard/DashboardEcommerce";
+import { Package, ShoppingCart, Boxes, Users, BarChart3 } from "lucide-react";
 import { SeccionProductos } from "@/components/ecommerce/productos/SeccionProductos";
 import { ListaPedidos } from "@/components/ecommerce/pedidos/ListaPedidos";
 import { TablaStock } from "@/components/ecommerce/stock/TablaStock";
 import { HistorialMovimientos } from "@/components/ecommerce/stock/HistorialMovimientos";
+import { SeccionAnaliticas } from "@/components/ecommerce/analiticas/SeccionAnaliticas";
 
 export default function Ecommerce() {
-  const [seccionActiva, setSeccionActiva] = useState("dashboard");
+  const [seccionActiva, setSeccionActiva] = useState("productos");
   const [subSeccionStock, setSubSeccionStock] = useState("inventario");
 
   return (
@@ -23,11 +23,7 @@ export default function Ecommerce() {
         </div>
 
         <Tabs value={seccionActiva} onValueChange={setSeccionActiva}>
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
-            <TabsTrigger value="dashboard" className="gap-2 py-2">
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto">
             <TabsTrigger value="productos" className="gap-2 py-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Productos</span>
@@ -49,10 +45,6 @@ export default function Ecommerce() {
               <span className="hidden sm:inline">Analíticas</span>
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="dashboard" className="mt-6">
-            <DashboardEcommerce />
-          </TabsContent>
 
           <TabsContent value="productos" className="mt-6">
             <SeccionProductos />
@@ -86,11 +78,7 @@ export default function Ecommerce() {
           </TabsContent>
 
           <TabsContent value="analiticas" className="mt-6">
-            <div className="text-center py-12 text-muted-foreground">
-              <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium">Analíticas Avanzadas</h3>
-              <p className="text-sm">Próximamente: márgenes, tendencias, comparativas y más</p>
-            </div>
+            <SeccionAnaliticas />
           </TabsContent>
         </Tabs>
       </div>
