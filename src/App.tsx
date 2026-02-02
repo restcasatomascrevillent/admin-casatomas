@@ -10,6 +10,7 @@ import Reservas from "./pages/Reservas";
 import Espacios from "./pages/Espacios";
 import Trabajadores from "./pages/Trabajadores";
 import GestorCarta from "./pages/GestorCarta";
+import Ecommerce from "./pages/Ecommerce";
 import GestionWeb from "./pages/GestionWeb";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
@@ -71,6 +72,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <GestorCarta />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ecommerce"
+            element={
+              <ProtectedRoute>
+                <Ecommerce />
               </ProtectedRoute>
             }
           />
