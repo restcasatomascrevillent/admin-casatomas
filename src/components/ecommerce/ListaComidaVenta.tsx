@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Star, Package } from "lucide-react";
+import { Trash2, Star, Package, Pencil } from "lucide-react";
 import { useComidaVenta, ComidaVenta } from "@/hooks/useComidaVenta";
 import {
   AlertDialog,
@@ -20,9 +20,10 @@ interface Props {
   comidas: ComidaVenta[];
   busqueda: string;
   categoriaFiltro: string;
+  onEdit?: (comida: ComidaVenta) => void;
 }
 
-export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro }: Props) {
+export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro, onEdit }: Props) {
   const { deleteComida, toggleActivado, toggleFeatured } = useComidaVenta();
 
   const filtradas = comidas.filter((comida) => {
@@ -116,30 +117,41 @@ export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro }: Props) 
                 </div>
               </div>
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Esta acción eliminará "{comida.nombre}" permanentemente.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteComida.mutate(comida.id)}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="flex items-center gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => onEdit?.(comida)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción eliminará "{comida.nombre}" permanentemente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteComida.mutate(comida.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           </CardContent>
         </Card>

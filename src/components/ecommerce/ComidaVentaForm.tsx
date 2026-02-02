@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
-import { useComidaVenta, ComidaVentaInsert } from "@/hooks/useComidaVenta";
+import { useComidaVenta, ComidaVenta, ComidaVentaInsert } from "@/hooks/useComidaVenta";
 import { Upload, X } from "lucide-react";
 
 const CATEGORIAS_DEFAULT = [
@@ -18,14 +18,15 @@ const CATEGORIAS_DEFAULT = [
 
 interface Props {
   onSuccess?: () => void;
+  comidaEditar?: ComidaVenta | null;
 }
 
-export function ComidaVentaForm({ onSuccess }: Props) {
-  const { addComida, categorias, origenes } = useComidaVenta();
+export function ComidaVentaForm({ onSuccess, comidaEditar }: Props) {
+  const { addComida, updateComida, categorias, origenes } = useComidaVenta();
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
-  const [form, setForm] = useState<ComidaVentaInsert>({
+  const initialForm: ComidaVentaInsert = {
     nombre: "",
     categoria: null,
     precio_eur: null,
@@ -43,7 +44,39 @@ export function ComidaVentaForm({ onSuccess }: Props) {
     descripcion_fr: null,
     categoria_en: null,
     categoria_fr: null,
-  });
+  };
+
+  const [form, setForm] = useState<ComidaVentaInsert>(initialForm);
+
+  const isEditing = !!comidaEditar;
+
+  useEffect(() => {
+    if (comidaEditar) {
+      setForm({
+        nombre: comidaEditar.nombre,
+        categoria: comidaEditar.categoria,
+        precio_eur: comidaEditar.precio_eur,
+        descripcion: comidaEditar.descripcion,
+        imagen_url: comidaEditar.imagen_url,
+        stock: comidaEditar.stock ?? 0,
+        peso: comidaEditar.peso,
+        activado: comidaEditar.activado ?? true,
+        featured: comidaEditar.featured ?? false,
+        orden: comidaEditar.orden,
+        origen: comidaEditar.origen,
+        nombre_en: comidaEditar.nombre_en,
+        nombre_fr: comidaEditar.nombre_fr,
+        descripcion_en: comidaEditar.descripcion_en,
+        descripcion_fr: comidaEditar.descripcion_fr,
+        categoria_en: comidaEditar.categoria_en,
+        categoria_fr: comidaEditar.categoria_fr,
+      });
+      setImagePreview(comidaEditar.imagen_url);
+    } else {
+      setForm(initialForm);
+      setImagePreview(null);
+    }
+  }, [comidaEditar]);
 
   const allCategorias = [...new Set([...CATEGORIAS_DEFAULT, ...categorias])];
 
@@ -73,34 +106,23 @@ export function ComidaVentaForm({ onSuccess }: Props) {
     e.preventDefault();
     if (!form.nombre.trim()) return;
 
-    await addComida.mutateAsync(form);
-    setForm({
-      nombre: "",
-      categoria: null,
-      precio_eur: null,
-      descripcion: null,
-      imagen_url: null,
-      stock: 0,
-      peso: null,
-      activado: true,
-      featured: false,
-      orden: null,
-      origen: null,
-      nombre_en: null,
-      nombre_fr: null,
-      descripcion_en: null,
-      descripcion_fr: null,
-      categoria_en: null,
-      categoria_fr: null,
-    });
+    if (isEditing && comidaEditar) {
+      await updateComida.mutateAsync({ id: comidaEditar.id, ...form });
+    } else {
+      await addComida.mutateAsync(form);
+    }
+    
+    setForm(initialForm);
     setImagePreview(null);
     onSuccess?.();
   };
 
+  const isPending = isEditing ? updateComida.isPending : addComida.isPending;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Nuevo Producto de Comida</CardTitle>
+        <CardTitle>{isEditing ? "Editar Producto" : "Nuevo Producto de Comida"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -229,8 +251,8 @@ export function ComidaVentaForm({ onSuccess }: Props) {
             </div>
           </div>
 
-          <Button type="submit" disabled={addComida.isPending || !form.nombre.trim()}>
-            {addComida.isPending ? "Añadiendo..." : "Añadir Producto"}
+          <Button type="submit" disabled={isPending || !form.nombre.trim()}>
+            {isPending ? (isEditing ? "Guardando..." : "Añadiendo...") : (isEditing ? "Guardar Cambios" : "Añadir Producto")}
           </Button>
         </form>
       </CardContent>

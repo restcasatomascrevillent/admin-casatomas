@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
-import { useBebidasVenta, BebidaVentaInsert } from "@/hooks/useBebidasVenta";
+import { useBebidasVenta, BebidaVenta, BebidaVentaInsert } from "@/hooks/useBebidasVenta";
 import { Upload, X } from "lucide-react";
 
 const CATEGORIAS_DEFAULT = [
@@ -21,14 +21,15 @@ const CATEGORIAS_DEFAULT = [
 
 interface Props {
   onSuccess?: () => void;
+  bebidaEditar?: BebidaVenta | null;
 }
 
-export function BebidaVentaForm({ onSuccess }: Props) {
-  const { addBebida, categorias, paises, regiones, denominaciones } = useBebidasVenta();
+export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
+  const { addBebida, updateBebida, categorias, paises, regiones, denominaciones } = useBebidasVenta();
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
-  const [form, setForm] = useState<BebidaVentaInsert>({
+  const initialForm: BebidaVentaInsert = {
     nombre: "",
     categoria: null,
     precio_eur: null,
@@ -47,7 +48,40 @@ export function BebidaVentaForm({ onSuccess }: Props) {
     descripcion_fr: null,
     categoria_en: null,
     categoria_fr: null,
-  });
+  };
+
+  const [form, setForm] = useState<BebidaVentaInsert>(initialForm);
+
+  const isEditing = !!bebidaEditar;
+
+  useEffect(() => {
+    if (bebidaEditar) {
+      setForm({
+        nombre: bebidaEditar.nombre,
+        categoria: bebidaEditar.categoria,
+        precio_eur: bebidaEditar.precio_eur,
+        descripcion: bebidaEditar.descripcion,
+        imagen_url: bebidaEditar.imagen_url,
+        stock: bebidaEditar.stock ?? 0,
+        activado: bebidaEditar.activado ?? true,
+        featured: bebidaEditar.featured ?? false,
+        orden: bebidaEditar.orden,
+        denominacion_origen: bebidaEditar.denominacion_origen,
+        ubicacion_pais: bebidaEditar.ubicacion_pais,
+        ubicacion_region: bebidaEditar.ubicacion_region,
+        nombre_en: bebidaEditar.nombre_en,
+        nombre_fr: bebidaEditar.nombre_fr,
+        descripcion_en: bebidaEditar.descripcion_en,
+        descripcion_fr: bebidaEditar.descripcion_fr,
+        categoria_en: bebidaEditar.categoria_en,
+        categoria_fr: bebidaEditar.categoria_fr,
+      });
+      setImagePreview(bebidaEditar.imagen_url);
+    } else {
+      setForm(initialForm);
+      setImagePreview(null);
+    }
+  }, [bebidaEditar]);
 
   const allCategorias = [...new Set([...CATEGORIAS_DEFAULT, ...categorias])];
 
@@ -77,35 +111,23 @@ export function BebidaVentaForm({ onSuccess }: Props) {
     e.preventDefault();
     if (!form.nombre.trim()) return;
 
-    await addBebida.mutateAsync(form);
-    setForm({
-      nombre: "",
-      categoria: null,
-      precio_eur: null,
-      descripcion: null,
-      imagen_url: null,
-      stock: 0,
-      activado: true,
-      featured: false,
-      orden: null,
-      denominacion_origen: null,
-      ubicacion_pais: null,
-      ubicacion_region: null,
-      nombre_en: null,
-      nombre_fr: null,
-      descripcion_en: null,
-      descripcion_fr: null,
-      categoria_en: null,
-      categoria_fr: null,
-    });
+    if (isEditing && bebidaEditar) {
+      await updateBebida.mutateAsync({ id: bebidaEditar.id, ...form });
+    } else {
+      await addBebida.mutateAsync(form);
+    }
+    
+    setForm(initialForm);
     setImagePreview(null);
     onSuccess?.();
   };
 
+  const isPending = isEditing ? updateBebida.isPending : addBebida.isPending;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Nueva Bebida para Venta</CardTitle>
+        <CardTitle>{isEditing ? "Editar Bebida" : "Nueva Bebida para Venta"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -244,8 +266,8 @@ export function BebidaVentaForm({ onSuccess }: Props) {
             </div>
           </div>
 
-          <Button type="submit" disabled={addBebida.isPending || !form.nombre.trim()}>
-            {addBebida.isPending ? "Añadiendo..." : "Añadir Bebida"}
+          <Button type="submit" disabled={isPending || !form.nombre.trim()}>
+            {isPending ? (isEditing ? "Guardando..." : "Añadiendo...") : (isEditing ? "Guardar Cambios" : "Añadir Bebida")}
           </Button>
         </form>
       </CardContent>

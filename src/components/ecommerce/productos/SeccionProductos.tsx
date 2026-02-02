@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Search, Wine, Beef } from "lucide-react";
-import { useBebidasVenta } from "@/hooks/useBebidasVenta";
-import { useComidaVenta } from "@/hooks/useComidaVenta";
+import { useBebidasVenta, BebidaVenta } from "@/hooks/useBebidasVenta";
+import { useComidaVenta, ComidaVenta } from "@/hooks/useComidaVenta";
 import { BebidaVentaForm } from "@/components/ecommerce/BebidaVentaForm";
 import { ComidaVentaForm } from "@/components/ecommerce/ComidaVentaForm";
 import { ListaBebidasVenta } from "@/components/ecommerce/ListaBebidasVenta";
@@ -33,6 +33,10 @@ export function SeccionProductos() {
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Estado para edición
+  const [bebidaEditando, setBebidaEditando] = useState<BebidaVenta | null>(null);
+  const [comidaEditando, setComidaEditando] = useState<ComidaVenta | null>(null);
 
   const { bebidas, isLoading: loadingBebidas, categorias: categoriasBebidasDB } = useBebidasVenta();
   const { comidas, isLoading: loadingComidas, categorias: categoriasComidaDB } = useComidaVenta();
@@ -46,6 +50,30 @@ export function SeccionProductos() {
     setActiveTab(value);
     setCategoriaFiltro("");
     setBusqueda("");
+  };
+
+  const handleDialogClose = () => {
+    setDialogOpen(false);
+    setBebidaEditando(null);
+    setComidaEditando(null);
+  };
+
+  const handleEditBebida = (bebida: BebidaVenta) => {
+    setBebidaEditando(bebida);
+    setComidaEditando(null);
+    setDialogOpen(true);
+  };
+
+  const handleEditComida = (comida: ComidaVenta) => {
+    setComidaEditando(comida);
+    setBebidaEditando(null);
+    setDialogOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setBebidaEditando(null);
+    setComidaEditando(null);
+    setDialogOpen(true);
   };
 
   return (
@@ -63,18 +91,24 @@ export function SeccionProductos() {
             </TabsTrigger>
           </TabsList>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); else handleAddNew(); }}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir {activeTab === "bebidas" ? "Bebida" : "Comida"}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               {activeTab === "bebidas" ? (
-                <BebidaVentaForm onSuccess={() => setDialogOpen(false)} />
+                <BebidaVentaForm 
+                  onSuccess={handleDialogClose} 
+                  bebidaEditar={bebidaEditando}
+                />
               ) : (
-                <ComidaVentaForm onSuccess={() => setDialogOpen(false)} />
+                <ComidaVentaForm 
+                  onSuccess={handleDialogClose} 
+                  comidaEditar={comidaEditando}
+                />
               )}
             </DialogContent>
           </Dialog>
@@ -110,7 +144,8 @@ export function SeccionProductos() {
             <ListaBebidasVenta 
               bebidas={bebidas} 
               busqueda={busqueda} 
-              categoriaFiltro={categoriaFiltro} 
+              categoriaFiltro={categoriaFiltro}
+              onEdit={handleEditBebida}
             />
           )}
         </TabsContent>
@@ -122,7 +157,8 @@ export function SeccionProductos() {
             <ListaComidaVenta 
               comidas={comidas} 
               busqueda={busqueda} 
-              categoriaFiltro={categoriaFiltro} 
+              categoriaFiltro={categoriaFiltro}
+              onEdit={handleEditComida}
             />
           )}
         </TabsContent>
