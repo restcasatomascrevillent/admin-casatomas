@@ -26,6 +26,7 @@ export const SECTIONS = [
   { key: "gestion_web", label: "Gestión Web" },
   { key: "marketing", label: "Marketing" },
   { key: "facturas", label: "Facturas" },
+  { key: "ecommerce", label: "Ecommerce" },
   { key: "analisis", label: "Análisis" },
   { key: "touza", label: "Touza" },
   { key: "usuarios", label: "Usuarios" },

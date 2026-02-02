@@ -244,6 +244,78 @@ export type Database = {
         }
         Relationships: []
       }
+      BebidasVENTA: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          denominacion_origen: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          nombre: string
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          precio_eur: number | null
+          stock: number | null
+          ubicacion_pais: string | null
+          ubicacion_region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre?: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bew: {
         Row: {
           activado: boolean | null
@@ -507,6 +579,75 @@ export type Database = {
           restaurante?: boolean | null
           touza?: boolean | null
           traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ComidaVENTA: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          nombre: string
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          origen: string | null
+          peso: string | null
+          precio_eur: number | null
+          stock: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          origen?: string | null
+          peso?: string | null
+          precio_eur?: number | null
+          stock?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre?: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          origen?: string | null
+          peso?: string | null
+          precio_eur?: number | null
+          stock?: number | null
           updated_at?: string | null
         }
         Relationships: []
