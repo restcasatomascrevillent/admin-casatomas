@@ -1,131 +1,210 @@
 
+## Plan: Nueva Seccion Ecommerce para Productos de Venta
 
-## Plan: Mostrar Cantidad y Unidad en Albaranes en Lugar de Precio
+### Resumen
 
-### Problema Detectado
-
-Los productos de albaranes en la tabla `productos_factura` no tienen valores de precio (`precio_unitario` y `total` son `null`). Esto es correcto porque los albaranes son documentos de logística que registran cantidades, no importes.
-
-**Datos en la base de datos:**
-```
-nombre: VENTRESCA ATÚN ROJO SALVAJE ALM...
-cantidad: 23.480
-unidad: kg
-precio_unitario: null
-total: null
-```
-
-### Solución
-
-Modificar la tabla de albaranes para mostrar **Cantidad** y **Unidad** en lugar de **Precio**, ya que esos son los datos relevantes para albaranes.
+Crear una nueva seccion "Ecommerce" en el panel de administracion que funcione de manera similar a "Gestor Carta" pero enfocada en productos destinados a la venta online. Se crearan dos nuevas tablas en la base de datos y todos los componentes necesarios.
 
 ---
 
-### Cambios en TablaAlbaranes.tsx
+### 1. Esquema de Base de Datos
 
-#### 1. Actualizar cabeceras de la subtabla de productos
+#### Tabla: BebidasVENTA
 
-Cambiar de:
-```
-| Producto | Precio | Proveedor |
-```
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | text | Primary key (UUID) |
+| nombre | text | Nombre del producto |
+| categoria | text | Vinos Tintos, Vinos Blancos, Vinos Rosados, Champagnes, Cavas, Espumosos, Whisky |
+| precio_eur | double precision | Precio de venta |
+| descripcion | text | Descripcion del producto |
+| imagen_url | text | URL de la imagen |
+| stock | integer | Cantidad disponible |
+| activado | boolean | Si esta activo para venta |
+| featured | boolean | Si es producto destacado |
+| orden | integer | Orden de visualizacion |
+| denominacion_origen | text | D.O. para vinos |
+| ubicacion_pais | text | Pais de origen |
+| ubicacion_region | text | Region de origen |
+| nombre_en | text | Nombre en ingles |
+| nombre_fr | text | Nombre en frances |
+| descripcion_en | text | Descripcion en ingles |
+| descripcion_fr | text | Descripcion en frances |
+| categoria_en | text | Categoria en ingles |
+| categoria_fr | text | Categoria en frances |
+| created_at | timestamp | Fecha de creacion |
+| updated_at | timestamp | Fecha de actualizacion |
 
-A:
-```
-| Producto | Cantidad | Unidad |
-```
+#### Tabla: ComidaVENTA
 
-#### 2. Mostrar cantidad y unidad en cada fila
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | text | Primary key (UUID) |
+| nombre | text | Nombre del producto |
+| categoria | text | Jamon, Lomo Embuchado, Chorizo, Quesos |
+| precio_eur | double precision | Precio de venta |
+| descripcion | text | Descripcion del producto |
+| imagen_url | text | URL de la imagen |
+| stock | integer | Cantidad disponible |
+| peso | text | Peso del producto (ej: "100g", "1kg") |
+| activado | boolean | Si esta activo para venta |
+| featured | boolean | Si es producto destacado |
+| orden | integer | Orden de visualizacion |
+| origen | text | Origen del producto |
+| nombre_en | text | Nombre en ingles |
+| nombre_fr | text | Nombre en frances |
+| descripcion_en | text | Descripcion en ingles |
+| descripcion_fr | text | Descripcion en frances |
+| categoria_en | text | Categoria en ingles |
+| categoria_fr | text | Categoria en frances |
+| created_at | timestamp | Fecha de creacion |
+| updated_at | timestamp | Fecha de actualizacion |
 
-En lugar de `formatCurrency(p.precio)`, mostrar:
-- `p.cantidad` formateado con decimales
-- `p.unidad` (kg, unidades, cajas, etc.)
+#### Politicas RLS
 
-#### 3. Formato de cantidad
-
-Crear una función `formatCantidad` que:
-- Muestre hasta 3 decimales si es necesario
-- Elimine ceros innecesarios (23.480 → 23.48)
+Ambas tablas tendran:
+- SELECT publico para productos activados
+- SELECT autenticado para todos los productos
+- INSERT/UPDATE/DELETE solo para usuarios autenticados
 
 ---
 
-### Código a Implementar
+### 2. Archivos a Crear
 
-**Función de formateo:**
-```typescript
-const formatCantidad = (cantidad: number | undefined): string => {
-  if (cantidad === undefined || cantidad === null) return "-";
-  // Formatear con hasta 3 decimales, eliminando ceros finales
-  return new Intl.NumberFormat("es-ES", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 3,
-  }).format(cantidad);
-};
+#### Pagina Principal
 ```
+src/pages/Ecommerce.tsx
+```
+- Layout similar a GestorCarta.tsx
+- Tabs: "Bebidas" y "Comida"
+- Filtros por categoria, estado, busqueda
+- Boton "Anadir" contextual
 
-**Cabeceras de subtabla (desktop):**
+#### Hooks de Datos
+```
+src/hooks/useBebidasVenta.ts
+src/hooks/useComidaVenta.ts
+```
+- CRUD completo para cada tabla
+- Extraccion de categorias unicas
+- Toggle de activado/featured
+
+#### Formularios de Creacion
+```
+src/components/ecommerce/BebidaVentaForm.tsx
+src/components/ecommerce/ComidaVentaForm.tsx
+```
+- Campos especificos para cada tipo
+- Selector de categoria con ComboboxCreatable
+- Subida de imagen
+- Campo de stock
+
+#### Listas de Productos
+```
+src/components/ecommerce/ListaBebidasVenta.tsx
+src/components/ecommerce/ListaComidaVenta.tsx
+```
+- Cards con imagen, nombre, precio, stock
+- Toggle de activado/featured
+- Boton eliminar con confirmacion
+
+---
+
+### 3. Modificaciones a Archivos Existentes
+
+#### src/App.tsx
+Anadir nueva ruta:
 ```tsx
-<TableHeader>
-  <TableRow className="bg-muted/30 hover:bg-muted/30">
-    <TableHead className="h-8">Producto</TableHead>
-    <TableHead className="w-[100px] h-8 text-right">Cantidad</TableHead>
-    <TableHead className="w-[100px] h-8">Unidad</TableHead>
-  </TableRow>
-</TableHeader>
+<Route
+  path="/ecommerce"
+  element={
+    <ProtectedRoute>
+      <Ecommerce />
+    </ProtectedRoute>
+  }
+/>
 ```
 
-**Filas de productos:**
+#### src/components/AppSidebar.tsx
+Anadir item al menu:
 ```tsx
-{albaran.productos.map((p) => (
-  <TableRow key={p.id} className="hover:bg-muted/10">
-    <TableCell className="py-2">{p.producto_nombre}</TableCell>
-    <TableCell className="py-2 text-right font-medium">
-      {formatCantidad(p.cantidad)}
-    </TableCell>
-    <TableCell className="py-2 text-muted-foreground">
-      {p.unidad || "-"}
-    </TableCell>
-  </TableRow>
-))}
+{ title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" }
 ```
 
-**Vista móvil actualizada:**
+#### src/hooks/useUserRole.ts
+Anadir seccion de permisos:
 ```tsx
-{albaran.productos.map((p) => (
-  <div key={p.id} className="flex justify-between text-xs">
-    <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
-    <span className="font-medium">
-      {formatCantidad(p.cantidad)} {p.unidad || ""}
-    </span>
-  </div>
-))}
+{ key: "ecommerce", label: "Ecommerce" }
 ```
 
 ---
 
-### Resultado Visual
+### 4. Estructura de Componentes
 
-**Antes (mostraba "-" porque no hay precios):**
-```
-| Producto                              | Precio | Proveedor |
-|---------------------------------------|--------|-----------|
-| VENTRESCA ATÚN ROJO SALVAJE ALM...    | -      | -         |
-| NAVAJA (Lote: 252580)                 | -      | -         |
-```
-
-**Después (muestra cantidad y unidad):**
-```
-| Producto                              | Cantidad | Unidad   |
-|---------------------------------------|----------|----------|
-| VENTRESCA ATÚN ROJO SALVAJE ALM...    | 23,48    | kg       |
-| NAVAJA (Lote: 252580)                 | 5        | unidades |
+```text
+src/
+├── pages/
+│   └── Ecommerce.tsx                    # Pagina principal
+├── hooks/
+│   ├── useBebidasVenta.ts               # Hook para BebidasVENTA
+│   └── useComidaVenta.ts                # Hook para ComidaVENTA
+└── components/
+    └── ecommerce/
+        ├── BebidaVentaForm.tsx          # Formulario bebidas
+        ├── ComidaVentaForm.tsx          # Formulario comida
+        ├── ListaBebidasVenta.tsx        # Lista bebidas
+        └── ListaComidaVenta.tsx         # Lista comida
 ```
 
 ---
 
-### Archivo a Modificar
+### 5. Categorias Predefinidas
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/facturas/TablaAlbaranes.tsx` | Cambiar columnas de Precio/Proveedor por Cantidad/Unidad |
+#### BebidasVENTA
+- Vinos Tintos
+- Vinos Blancos
+- Vinos Rosados
+- Champagnes
+- Cavas
+- Espumosos
+- Whisky
 
+#### ComidaVENTA
+- Jamon
+- Lomo Embuchado
+- Chorizo
+- Quesos
+
+---
+
+### 6. Funcionalidades Clave
+
+| Funcionalidad | Descripcion |
+|---------------|-------------|
+| Gestion de Stock | Campo numerico para controlar unidades disponibles |
+| Productos Destacados | Toggle para marcar productos como featured |
+| Traduccion Automatica | Integracion con edge function traducir-carta-auto |
+| Imagenes | Subida a storage bucket "ecommerce" |
+| Busqueda | Filtrado por nombre y descripcion |
+| Categorias Dinamicas | Selector que permite crear nuevas categorias |
+
+---
+
+### 7. Storage Bucket
+
+Crear bucket "ecommerce" para las imagenes con:
+- Politica de lectura publica
+- Politica de escritura para usuarios autenticados
+
+---
+
+### Secuencia de Implementacion
+
+1. Crear migracion SQL con tablas, RLS y bucket
+2. Crear hooks useBebidasVenta y useComidaVenta
+3. Crear formularios BebidaVentaForm y ComidaVentaForm
+4. Crear listas ListaBebidasVenta y ListaComidaVenta
+5. Crear pagina Ecommerce.tsx
+6. Actualizar AppSidebar con nuevo menu item
+7. Actualizar App.tsx con nueva ruta
+8. Actualizar useUserRole con seccion "ecommerce"
