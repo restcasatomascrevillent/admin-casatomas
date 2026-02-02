@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      alertas_stock: {
+        Row: {
+          created_at: string | null
+          id: string
+          notificar_email: boolean | null
+          producto_id: string
+          producto_tipo: string
+          stock_minimo: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notificar_email?: boolean | null
+          producto_id: string
+          producto_tipo: string
+          stock_minimo?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notificar_email?: boolean | null
+          producto_id?: string
+          producto_tipo?: string
+          stock_minimo?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       areas_trabajo: {
         Row: {
           activa: boolean | null
@@ -1296,6 +1326,50 @@ export type Database = {
           },
         ]
       }
+      lineas_pedido: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          id: string
+          nombre_producto: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_tipo: string
+          total_linea: number
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          nombre_producto: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_tipo: string
+          total_linea: number
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          nombre_producto?: string
+          pedido_id?: string
+          precio_unitario?: number
+          producto_id?: string
+          producto_tipo?: string
+          total_linea?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineas_pedido_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_ecommerce"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mesas: {
         Row: {
           activa: boolean | null
@@ -1367,6 +1441,48 @@ export type Database = {
             referencedColumns: ["espacio_id"]
           },
         ]
+      }
+      movimientos_stock: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          id: string
+          motivo: string | null
+          producto_id: string
+          producto_tipo: string
+          referencia: string | null
+          stock_anterior: number | null
+          stock_nuevo: number | null
+          tipo_movimiento: string
+          usuario_id: string | null
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id: string
+          producto_tipo: string
+          referencia?: string | null
+          stock_anterior?: number | null
+          stock_nuevo?: number | null
+          tipo_movimiento: string
+          usuario_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id?: string
+          producto_tipo?: string
+          referencia?: string | null
+          stock_anterior?: number | null
+          stock_nuevo?: number | null
+          tipo_movimiento?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
       }
       newsletter_envios: {
         Row: {
@@ -1676,6 +1792,99 @@ export type Database = {
             referencedColumns: ["espacio_id"]
           },
         ]
+      }
+      pedidos_ecommerce: {
+        Row: {
+          ciudad_envio: string | null
+          codigo_postal_envio: string | null
+          created_at: string | null
+          descuento: number | null
+          direccion_envio: string | null
+          email: string | null
+          estado: string | null
+          fecha_entrega: string | null
+          fecha_envio: string | null
+          fecha_pago: string | null
+          gastos_envio: number | null
+          id: string
+          iva: number | null
+          metodo_pago: string | null
+          nombre_completo: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          numero_pedido: string
+          numero_seguimiento: string | null
+          pagado: boolean | null
+          pais_envio: string | null
+          referencia_pago: string | null
+          subtotal: number
+          telefono: string | null
+          total: number
+          transportista: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ciudad_envio?: string | null
+          codigo_postal_envio?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          direccion_envio?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha_entrega?: string | null
+          fecha_envio?: string | null
+          fecha_pago?: string | null
+          gastos_envio?: number | null
+          id?: string
+          iva?: number | null
+          metodo_pago?: string | null
+          nombre_completo?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_pedido: string
+          numero_seguimiento?: string | null
+          pagado?: boolean | null
+          pais_envio?: string | null
+          referencia_pago?: string | null
+          subtotal?: number
+          telefono?: string | null
+          total?: number
+          transportista?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ciudad_envio?: string | null
+          codigo_postal_envio?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          direccion_envio?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha_entrega?: string | null
+          fecha_envio?: string | null
+          fecha_pago?: string | null
+          gastos_envio?: number | null
+          id?: string
+          iva?: number | null
+          metodo_pago?: string | null
+          nombre_completo?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_pedido?: string
+          numero_seguimiento?: string | null
+          pagado?: boolean | null
+          pais_envio?: string | null
+          referencia_pago?: string | null
+          subtotal?: number
+          telefono?: string | null
+          total?: number
+          transportista?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       planos_espacio: {
         Row: {
@@ -2545,6 +2754,48 @@ export type Database = {
         }
         Relationships: []
       }
+      visitas_producto: {
+        Row: {
+          ciudad: string | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          pais: string | null
+          producto_id: string
+          producto_tipo: string
+          referer: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ciudad?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          pais?: string | null
+          producto_id: string
+          producto_tipo: string
+          referer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ciudad?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          pais?: string | null
+          producto_id?: string
+          producto_tipo?: string
+          referer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       vista_estadisticas_mensuales: {
@@ -2674,6 +2925,16 @@ export type Database = {
         }
         Relationships: []
       }
+      vista_productos_vendidos: {
+        Row: {
+          nombre_producto: string | null
+          producto_id: string | null
+          producto_tipo: string | null
+          total_ingresos: number | null
+          unidades_vendidas: number | null
+        }
+        Relationships: []
+      }
       vista_proveedores_resumen: {
         Row: {
           cif: string | null
@@ -2700,6 +2961,18 @@ export type Database = {
           numero_comensales: number | null
           sala: string | null
           telefono: string | null
+        }
+        Relationships: []
+      }
+      vista_stock_consolidado: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          id: string | null
+          nombre: string | null
+          precio_eur: number | null
+          stock: number | null
+          tipo: string | null
         }
         Relationships: []
       }
@@ -2739,6 +3012,15 @@ export type Database = {
           proveedor: string | null
           tipo: string | null
           total: number | null
+        }
+        Relationships: []
+      }
+      vista_ventas_diarias: {
+        Row: {
+          fecha: string | null
+          num_pedidos: number | null
+          ticket_medio: number | null
+          total_ventas: number | null
         }
         Relationships: []
       }
