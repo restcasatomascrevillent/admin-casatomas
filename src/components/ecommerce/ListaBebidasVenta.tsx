@@ -48,140 +48,151 @@ export function ListaBebidasVenta({ bebidas, busqueda, categoriaFiltro, onEdit }
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {filtradas.map((bebida) => (
-        <Card key={bebida.id} className={`overflow-hidden ${!bebida.activado ? "opacity-60" : ""}`}>
-          <div className="relative">
-            {bebida.imagen_url ? (
-              <img
-                src={bebida.imagen_url}
-                alt={bebida.nombre}
-                className="w-full h-40 object-cover"
-              />
-            ) : (
-              <div className="w-full h-40 bg-muted flex items-center justify-center">
-                <Package className="h-12 w-12 text-muted-foreground" />
-              </div>
-            )}
-            {bebida.featured && (
-              <Badge className="absolute top-2 right-2 bg-amber-500 text-amber-50">
-                <Star className="h-3 w-3 mr-1" />
-                Destacado
-              </Badge>
-            )}
-          </div>
-          
-          <CardContent className="p-4 space-y-3">
-            <div>
-              <h3 className="font-semibold text-lg line-clamp-1">{bebida.nombre}</h3>
-              {bebida.categoria && (
-                <Badge variant="secondary" className="mt-1">{bebida.categoria}</Badge>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {filtradas.map((bebida) => {
+        const ganancia = bebida.precio_coste != null && bebida.precio_eur != null 
+          ? bebida.precio_eur - bebida.precio_coste 
+          : null;
+        const rentabilidad = bebida.precio_coste != null && bebida.precio_coste > 0 && ganancia != null
+          ? ((ganancia / bebida.precio_coste) * 100)
+          : null;
+
+        return (
+          <Card key={bebida.id} className={`group overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/30 ${!bebida.activado ? "opacity-50 grayscale" : ""}`}>
+            <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+              {bebida.imagen_url ? (
+                <img
+                  src={bebida.imagen_url}
+                  alt={bebida.nombre}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Package className="h-16 w-16 text-muted-foreground/40" />
+                </div>
+              )}
+              {bebida.featured && (
+                <Badge className="absolute top-2 right-2 bg-amber-500/90 text-white shadow-md">
+                  <Star className="h-3 w-3 mr-1 fill-current" />
+                  Destacado
+                </Badge>
+              )}
+              {!bebida.activado && (
+                <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+                  <Badge variant="secondary">Desactivado</Badge>
+                </div>
               )}
             </div>
-
-            {bebida.descripcion && (
-              <p className="text-sm text-muted-foreground line-clamp-2">{bebida.descripcion}</p>
-            )}
-
-            {/* Precios y rentabilidad */}
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">P. Coste:</span>
-                <span>{bebida.precio_coste != null ? formatPrice(bebida.precio_coste) : "-"}</span>
+            
+            <CardContent className="p-4 space-y-3">
+              <div>
+                <h3 className="font-semibold text-base line-clamp-1">{bebida.nombre}</h3>
+                {bebida.categoria && (
+                  <Badge variant="outline" className="mt-1.5 text-xs">{bebida.categoria}</Badge>
+                )}
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">P. Venta:</span>
-                <span className="font-bold text-primary">{formatPrice(bebida.precio_eur)}</span>
-              </div>
-              {bebida.precio_coste != null && bebida.precio_eur != null && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ganancia:</span>
-                    <span className="text-green-600 font-medium">
-                      {formatPrice(bebida.precio_eur - bebida.precio_coste)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Rentabilidad:</span>
-                    <span className="text-green-600 font-medium">
-                      {bebida.precio_coste > 0 
-                        ? `${(((bebida.precio_eur - bebida.precio_coste) / bebida.precio_coste) * 100).toFixed(1)}%`
-                        : "-"}
-                    </span>
-                  </div>
-                </>
+
+              {bebida.descripcion && (
+                <p className="text-xs text-muted-foreground line-clamp-2">{bebida.descripcion}</p>
               )}
-            </div>
 
-            <div className="flex items-center justify-end">
-              <span className="text-sm text-muted-foreground">Stock: {bebida.stock ?? 0}</span>
-            </div>
-
-            {(bebida.denominacion_origen || bebida.ubicacion_region) && (
-              <div className="text-xs text-muted-foreground">
-                {bebida.denominacion_origen && <span>{bebida.denominacion_origen}</span>}
-                {bebida.denominacion_origen && bebida.ubicacion_region && " · "}
-                {bebida.ubicacion_region && <span>{bebida.ubicacion_region}</span>}
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={bebida.activado ?? false}
-                    onCheckedChange={(checked) => toggleActivado(bebida.id, checked)}
-                  />
-                  <span className="text-xs">Activo</span>
+              {/* Precios y rentabilidad */}
+              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Coste</span>
+                  <span className="font-medium">{bebida.precio_coste != null ? formatPrice(bebida.precio_coste) : "-"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={bebida.featured ?? false}
-                    onCheckedChange={(checked) => toggleFeatured(bebida.id, checked)}
-                  />
-                  <span className="text-xs">Destacar</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-sm">Venta</span>
+                  <span className="font-bold text-lg text-primary">{formatPrice(bebida.precio_eur)}</span>
                 </div>
+                {ganancia != null && (
+                  <div className="pt-2 border-t border-border/50 grid grid-cols-2 gap-2">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Ganancia</p>
+                      <p className="font-semibold text-green-600">{formatPrice(ganancia)}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Rentabilidad</p>
+                      <p className="font-semibold text-green-600">{rentabilidad != null ? `${rentabilidad.toFixed(0)}%` : "-"}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex items-center gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => onEdit?.(bebida)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción eliminará "{bebida.nombre}" permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteBebida.mutate(bebida.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Stock</span>
+                <Badge variant={bebida.stock && bebida.stock > 5 ? "secondary" : "destructive"} className="font-mono">
+                  {bebida.stock ?? 0} uds
+                </Badge>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+
+              {(bebida.denominacion_origen || bebida.ubicacion_region) && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {[bebida.denominacion_origen, bebida.ubicacion_region].filter(Boolean).join(" · ")}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      checked={bebida.activado ?? false}
+                      onCheckedChange={(checked) => toggleActivado(bebida.id, checked)}
+                      className="scale-90"
+                    />
+                    <span className="text-xs text-muted-foreground">Activo</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      checked={bebida.featured ?? false}
+                      onCheckedChange={(checked) => toggleFeatured(bebida.id, checked)}
+                      className="scale-90"
+                    />
+                    <span className="text-xs text-muted-foreground">★</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-0.5">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => onEdit?.(bebida)}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta acción eliminará "{bebida.nombre}" permanentemente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteBebida.mutate(bebida.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Eliminar
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
