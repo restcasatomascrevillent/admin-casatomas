@@ -79,7 +79,7 @@ export function TPVContainer() {
   };
 
   return (
-    <div className="h-[calc(100vh-200px)] min-h-[600px] flex flex-col">
+    <div className="h-[calc(100vh-220px)] flex flex-col overflow-hidden">
       {/* Contenido principal */}
       <div className="flex-1 flex gap-4 overflow-hidden">
         {/* Panel izquierdo: Productos */}
