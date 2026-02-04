@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, ShoppingCart, Boxes, Users, BarChart3 } from "lucide-react";
+import { Package, ShoppingCart, Boxes, Users, BarChart3, Receipt } from "lucide-react";
+import { TPVContainer } from "@/components/ecommerce/tpv/TPVContainer";
 import { SeccionProductos } from "@/components/ecommerce/productos/SeccionProductos";
 import { ListaPedidos } from "@/components/ecommerce/pedidos/ListaPedidos";
 import { TablaStock } from "@/components/ecommerce/stock/TablaStock";
@@ -23,7 +24,11 @@ export default function Ecommerce() {
         </div>
 
         <Tabs value={seccionActiva} onValueChange={setSeccionActiva}>
-          <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+            <TabsTrigger value="tpv" className="gap-2 py-2">
+              <Receipt className="h-4 w-4" />
+              <span className="hidden sm:inline">TPV</span>
+            </TabsTrigger>
             <TabsTrigger value="productos" className="gap-2 py-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Productos</span>
@@ -45,6 +50,10 @@ export default function Ecommerce() {
               <span className="hidden sm:inline">Analíticas</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="tpv" className="mt-6">
+            <TPVContainer />
+          </TabsContent>
 
           <TabsContent value="productos" className="mt-6">
             <SeccionProductos />

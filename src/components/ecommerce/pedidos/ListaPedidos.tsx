@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, Search, Truck, CheckCircle, XCircle, Clock, Package, RotateCcw } from "lucide-react";
+import { Eye, Search, Truck, CheckCircle, XCircle, Clock, Package, RotateCcw, Store, Globe } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DetallePedido } from "./DetallePedido";
@@ -33,11 +33,13 @@ const ESTADO_ICONOS: Record<string, React.ReactNode> = {
 
 export function ListaPedidos() {
   const [estadoFiltro, setEstadoFiltro] = useState<string>("all");
+  const [tipoVentaFiltro, setTipoVentaFiltro] = useState<'online' | 'presencial' | 'todos'>('todos');
   const [busqueda, setBusqueda] = useState("");
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
 
   const { pedidos, isLoading, cambiarEstado, ESTADOS_PEDIDO } = usePedidosEcommerce({
     estado: estadoFiltro !== "all" ? estadoFiltro : undefined,
+    tipoVenta: tipoVentaFiltro,
   });
 
   const formatCurrency = (value: number) => 
@@ -46,7 +48,8 @@ export function ListaPedidos() {
   const pedidosFiltrados = pedidos.filter(p => 
     p.numero_pedido.toLowerCase().includes(busqueda.toLowerCase()) ||
     p.nombre_completo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-    p.email?.toLowerCase().includes(busqueda.toLowerCase())
+    p.email?.toLowerCase().includes(busqueda.toLowerCase()) ||
+    p.numero_ticket?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
   return (
@@ -55,12 +58,32 @@ export function ListaPedidos() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nº pedido, cliente o email..."
+            placeholder="Buscar por nº pedido, ticket, cliente o email..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="pl-9"
           />
         </div>
+        <Select value={tipoVentaFiltro} onValueChange={(v) => setTipoVentaFiltro(v as 'online' | 'presencial' | 'todos')}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Tipo de venta" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas las ventas</SelectItem>
+            <SelectItem value="online">
+              <div className="flex items-center gap-2">
+                <Globe className="h-3 w-3" />
+                Online
+              </div>
+            </SelectItem>
+            <SelectItem value="presencial">
+              <div className="flex items-center gap-2">
+                <Store className="h-3 w-3" />
+                Presencial (TPV)
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filtrar por estado" />
@@ -86,6 +109,7 @@ export function ListaPedidos() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nº Pedido</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -97,12 +121,27 @@ export function ListaPedidos() {
               {pedidosFiltrados.map((pedido) => (
                 <TableRow key={pedido.id}>
                   <TableCell className="font-mono font-medium">
-                    {pedido.numero_pedido}
+                    {pedido.tipo_venta === 'presencial' ? pedido.numero_ticket : pedido.numero_pedido}
+                  </TableCell>
+                  <TableCell>
+                    {pedido.tipo_venta === 'presencial' ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <Store className="h-3 w-3" />
+                        TPV
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1">
+                        <Globe className="h-3 w-3" />
+                        Online
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{pedido.nombre_completo || 'Sin nombre'}</p>
-                      <p className="text-xs text-muted-foreground">{pedido.email}</p>
+                      <p className="font-medium">{pedido.nombre_completo || 'Venta en tienda'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {pedido.tipo_venta === 'presencial' ? `Caja: ${pedido.caja || '-'}` : pedido.email}
+                      </p>
                     </div>
                   </TableCell>
                   <TableCell>

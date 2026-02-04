@@ -1795,6 +1795,7 @@ export type Database = {
       }
       pedidos_ecommerce: {
         Row: {
+          caja: string | null
           ciudad_envio: string | null
           codigo_postal_envio: string | null
           created_at: string | null
@@ -1814,17 +1815,21 @@ export type Database = {
           notas_internas: string | null
           numero_pedido: string
           numero_seguimiento: string | null
+          numero_ticket: string | null
           pagado: boolean | null
           pais_envio: string | null
           referencia_pago: string | null
           subtotal: number
           telefono: string | null
+          tipo_venta: string | null
           total: number
           transportista: string | null
           updated_at: string | null
           user_id: string | null
+          vendedor_id: string | null
         }
         Insert: {
+          caja?: string | null
           ciudad_envio?: string | null
           codigo_postal_envio?: string | null
           created_at?: string | null
@@ -1844,17 +1849,21 @@ export type Database = {
           notas_internas?: string | null
           numero_pedido: string
           numero_seguimiento?: string | null
+          numero_ticket?: string | null
           pagado?: boolean | null
           pais_envio?: string | null
           referencia_pago?: string | null
           subtotal?: number
           telefono?: string | null
+          tipo_venta?: string | null
           total?: number
           transportista?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vendedor_id?: string | null
         }
         Update: {
+          caja?: string | null
           ciudad_envio?: string | null
           codigo_postal_envio?: string | null
           created_at?: string | null
@@ -1874,15 +1883,18 @@ export type Database = {
           notas_internas?: string | null
           numero_pedido?: string
           numero_seguimiento?: string | null
+          numero_ticket?: string | null
           pagado?: boolean | null
           pais_envio?: string | null
           referencia_pago?: string | null
           subtotal?: number
           telefono?: string | null
+          tipo_venta?: string | null
           total?: number
           transportista?: string | null
           updated_at?: string | null
           user_id?: string | null
+          vendedor_id?: string | null
         }
         Relationships: []
       }
