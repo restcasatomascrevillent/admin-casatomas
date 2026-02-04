@@ -1,333 +1,233 @@
 
-# Plan: Seccion Ecommerce Completa
+# Plan: Sistema de Tickets/Ventas Presenciales (TPV)
 
 ## Resumen
 
-Transformar la seccion de Ecommerce actual en un modulo completo con navegacion por subsecciones, incluyendo gestion de productos, control de stock, metricas de ventas, analisis de clientes y mas.
+Añadir la funcionalidad de crear tickets de venta presencial (punto de venta / TPV) en el modulo de Ecommerce, permitiendo registrar ventas realizadas en persona sin pasar por la tienda online.
 
 ---
 
-## Estructura de Subsecciones
+## Cambios en Base de Datos
 
-La pagina Ecommerce tendra navegacion por tabs principales:
+### Modificar tabla pedidos_ecommerce
 
-1. **Dashboard** - Vista general con KPIs y metricas clave
-2. **Productos** - Gestion actual de bebidas y comida (ya existe)
-3. **Pedidos** - Lista de pedidos y su estado
-4. **Stock** - Control de inventario y alertas
-5. **Clientes** - Usuarios registrados y comportamiento
-6. **Analiticas** - Graficos detallados y reportes
-
----
-
-## Componentes a Crear
-
-### 1. Dashboard Ecommerce (Widgets)
-
-```
-src/components/ecommerce/dashboard/
-  - ResumenVentas.tsx        (ventas hoy/semana/mes + comparativa)
-  - GraficoVentasDiarias.tsx  (grafico de barras ventas por dia)
-  - ProductosMasVendidos.tsx  (top 5 productos)
-  - IngresosPorCategoria.tsx  (grafico circular por categoria)
-  - AlertasStock.tsx          (productos con stock bajo)
-  - PedidosPendientes.tsx     (pedidos por procesar)
-  - MapaVentas.tsx            (ventas por region/pais)
-  - ConversionCarrito.tsx     (carritos vs compras completadas)
-```
-
-### 2. Gestion de Pedidos
-
-```
-src/components/ecommerce/pedidos/
-  - ListaPedidos.tsx          (tabla con filtros)
-  - DetallePedido.tsx         (modal con info completa)
-  - EstadoPedidoSelector.tsx  (cambiar estado)
-  - ExportarPedidos.tsx       (CSV/PDF)
-```
-
-### 3. Control de Stock
-
-```
-src/components/ecommerce/stock/
-  - TablaStock.tsx            (vista consolidada)
-  - HistorialStock.tsx        (movimientos)
-  - AlertasStockConfig.tsx    (umbral minimo)
-  - AjusteStock.tsx           (modal para ajustar)
-```
-
-### 4. Clientes
-
-```
-src/components/ecommerce/clientes/
-  - ListaClientes.tsx         (usuarios sell_users)
-  - DetalleCliente.tsx        (historial compras)
-  - SegmentacionClientes.tsx  (por valor/frecuencia)
-```
-
-### 5. Analiticas Avanzadas
-
-```
-src/components/ecommerce/analiticas/
-  - GraficoIngresosMensuales.tsx
-  - EvolucionProductos.tsx
-  - AnalisisMargen.tsx        (beneficio por producto)
-  - ComparativaCategoiras.tsx
-  - TendenciasEstacionales.tsx
-```
-
----
-
-## Tablas de Base de Datos Nuevas
-
-### pedidos_ecommerce
-```sql
-CREATE TABLE pedidos_ecommerce (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  numero_pedido TEXT UNIQUE NOT NULL,
-  user_id UUID REFERENCES auth.users(id),
-  
-  -- Datos cliente (para pedidos sin registro)
-  email TEXT,
-  telefono TEXT,
-  nombre_completo TEXT,
-  
-  -- Direccion envio
-  direccion_envio TEXT,
-  ciudad_envio TEXT,
-  codigo_postal_envio TEXT,
-  pais_envio TEXT DEFAULT 'Espana',
-  
-  -- Importes
-  subtotal NUMERIC(10,2) NOT NULL,
-  gastos_envio NUMERIC(10,2) DEFAULT 0,
-  descuento NUMERIC(10,2) DEFAULT 0,
-  iva NUMERIC(10,2),
-  total NUMERIC(10,2) NOT NULL,
-  
-  -- Estado
-  estado TEXT DEFAULT 'pendiente' CHECK (estado IN (
-    'pendiente', 'confirmado', 'preparando', 
-    'enviado', 'entregado', 'cancelado', 'devuelto'
-  )),
-  
-  -- Pago
-  metodo_pago TEXT,
-  referencia_pago TEXT,
-  pagado BOOLEAN DEFAULT false,
-  fecha_pago TIMESTAMPTZ,
-  
-  -- Envio
-  transportista TEXT,
-  numero_seguimiento TEXT,
-  fecha_envio TIMESTAMPTZ,
-  fecha_entrega TIMESTAMPTZ,
-  
-  -- Notas
-  notas_cliente TEXT,
-  notas_internas TEXT,
-  
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### lineas_pedido
-```sql
-CREATE TABLE lineas_pedido (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pedido_id UUID REFERENCES pedidos_ecommerce(id) ON DELETE CASCADE,
-  producto_id TEXT NOT NULL,
-  producto_tipo TEXT NOT NULL CHECK (producto_tipo IN ('bebida', 'comida')),
-  nombre_producto TEXT NOT NULL,
-  cantidad INTEGER NOT NULL,
-  precio_unitario NUMERIC(10,2) NOT NULL,
-  total_linea NUMERIC(10,2) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### movimientos_stock
-```sql
-CREATE TABLE movimientos_stock (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  producto_id TEXT NOT NULL,
-  producto_tipo TEXT NOT NULL CHECK (producto_tipo IN ('bebida', 'comida')),
-  tipo_movimiento TEXT NOT NULL CHECK (tipo_movimiento IN (
-    'entrada', 'salida', 'ajuste', 'venta', 'devolucion'
-  )),
-  cantidad INTEGER NOT NULL,
-  stock_anterior INTEGER,
-  stock_nuevo INTEGER,
-  motivo TEXT,
-  referencia TEXT,
-  usuario_id UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-### alertas_stock
-```sql
-CREATE TABLE alertas_stock (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  producto_id TEXT NOT NULL,
-  producto_tipo TEXT NOT NULL,
-  stock_minimo INTEGER DEFAULT 5,
-  notificar_email BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(producto_id, producto_tipo)
-);
-```
-
-### visitas_producto
-```sql
-CREATE TABLE visitas_producto (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  producto_id TEXT NOT NULL,
-  producto_tipo TEXT NOT NULL,
-  user_id UUID REFERENCES auth.users(id),
-  session_id TEXT,
-  ip_address TEXT,
-  user_agent TEXT,
-  referer TEXT,
-  pais TEXT,
-  ciudad TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
----
-
-## Hooks Nuevos
-
-```
-src/hooks/
-  - usePedidosEcommerce.ts    (CRUD pedidos)
-  - useLineasPedido.ts        (items de pedido)
-  - useMovimientosStock.ts    (historial stock)
-  - useAlertasStock.ts        (configuracion alertas)
-  - useVisitasProducto.ts     (analiticas visitas)
-  - useEcommerceStats.ts      (estadisticas agregadas)
-  - useClientesEcommerce.ts   (gestion sell_users)
-```
-
----
-
-## Metricas y KPIs
-
-El dashboard mostrara:
-
-**Ventas**
-- Ventas de hoy / esta semana / este mes
-- Comparativa con periodo anterior (%)
-- Ticket medio
-- Numero de pedidos
-
-**Productos**
-- Top 5 mas vendidos
-- Productos sin stock
-- Productos con stock bajo
-- Productos mas visitados vs vendidos (conversion)
-
-**Clientes**
-- Nuevos clientes (semana/mes)
-- Clientes recurrentes vs nuevos
-- Valor medio por cliente
-- Carritos abandonados
-
-**Geografico**
-- Ventas por region/pais
-- Coste medio de envio por zona
-
-**Margenes**
-- Ingresos totales
-- Beneficio estimado (si se añade coste)
-- Margen por categoria
-
----
-
-## Vistas SQL para Analiticas
+Añadir campos para distinguir el origen de la venta:
 
 ```sql
--- Vista resumen ventas diarias
-CREATE VIEW vista_ventas_diarias AS
-SELECT 
-  DATE(created_at) as fecha,
-  COUNT(*) as num_pedidos,
-  SUM(total) as total_ventas,
-  AVG(total) as ticket_medio
-FROM pedidos_ecommerce
-WHERE estado NOT IN ('cancelado', 'devuelto')
-GROUP BY DATE(created_at);
+ALTER TABLE pedidos_ecommerce
+ADD COLUMN tipo_venta TEXT DEFAULT 'online' CHECK (tipo_venta IN ('online', 'presencial')),
+ADD COLUMN vendedor_id UUID REFERENCES auth.users(id),
+ADD COLUMN caja TEXT,
+ADD COLUMN numero_ticket TEXT;
+```
 
--- Vista productos mas vendidos
-CREATE VIEW vista_productos_vendidos AS
-SELECT 
-  lp.producto_id,
-  lp.producto_tipo,
-  lp.nombre_producto,
-  SUM(lp.cantidad) as unidades_vendidas,
-  SUM(lp.total_linea) as total_ingresos
-FROM lineas_pedido lp
-JOIN pedidos_ecommerce p ON lp.pedido_id = p.id
-WHERE p.estado NOT IN ('cancelado', 'devuelto')
-GROUP BY lp.producto_id, lp.producto_tipo, lp.nombre_producto;
+| Campo | Descripcion |
+|-------|-------------|
+| tipo_venta | 'online' o 'presencial' |
+| vendedor_id | Usuario que realizo la venta presencial |
+| caja | Identificador de caja/terminal |
+| numero_ticket | Numero de ticket impreso |
+
+---
+
+## Nuevos Componentes
+
+### TPV / Punto de Venta
+
+```
+src/components/ecommerce/tpv/
+  - TPVContainer.tsx          (contenedor principal del TPV)
+  - ProductoPicker.tsx        (selector de productos con busqueda)
+  - CarritoTPV.tsx            (lineas del ticket actual)
+  - ResumenTicket.tsx         (totales y finalizacion)
+  - TecladoNumerico.tsx       (para cantidades)
+  - MetodoPagoSelector.tsx    (efectivo, tarjeta, etc)
+  - TicketImprimible.tsx      (formato para imprimir)
+```
+
+### Flujo del TPV
+
+1. **Seleccion de productos**: Buscar y añadir productos al carrito
+2. **Ajustar cantidades**: Modificar unidades de cada linea
+3. **Aplicar descuentos**: Descuento por linea o global
+4. **Seleccionar pago**: Efectivo, tarjeta, mixto
+5. **Finalizar venta**: Crear pedido con tipo_venta='presencial'
+6. **Imprimir/guardar**: Generar ticket
+
+---
+
+## Componente Principal: TPVContainer
+
+Interface tipo punto de venta con:
+
+- Panel izquierdo: Grid de productos con categorias
+- Panel derecho: Carrito actual con lineas
+- Barra inferior: Totales y boton de cobrar
+
+```text
++---------------------------+------------------+
+|  [Categorias]             |  TICKET #1234    |
+|  +-------+  +-------+     |                  |
+|  | Prod1 |  | Prod2 |     |  Vino Rioja x2   |
+|  +-------+  +-------+     |  Jamon 500g x1   |
+|  +-------+  +-------+     |  ---------------  |
+|  | Prod3 |  | Prod4 |     |  Subtotal: 45€   |
+|  +-------+  +-------+     |  IVA: 9.45€      |
+|                           |  TOTAL: 54.45€   |
++---------------------------+------------------+
+| [Buscar producto...]    [COBRAR] [CANCELAR]  |
++----------------------------------------------+
 ```
 
 ---
 
-## Modificaciones a Pagina Principal
+## Logica de Stock
 
-El archivo `src/pages/Ecommerce.tsx` se reestructurara con navegacion por subsecciones:
+Al finalizar una venta presencial:
+
+1. Crear pedido en `pedidos_ecommerce` con `tipo_venta = 'presencial'`
+2. Crear lineas en `lineas_pedido`
+3. Registrar movimiento de stock con `tipo_movimiento = 'venta'` y `referencia = numero_ticket`
+4. Actualizar stock de productos (resta automatica)
+
+Se reutiliza el hook `useMovimientosStock` existente.
+
+---
+
+## Hook useTPV
+
+Nuevo hook para gestionar el estado del punto de venta:
+
+```typescript
+src/hooks/useTPV.ts
+
+interface LineaTPV {
+  producto_id: string;
+  producto_tipo: 'bebida' | 'comida';
+  nombre: string;
+  precio: number;
+  cantidad: number;
+  descuento?: number;
+}
+
+interface useTPVReturn {
+  lineas: LineaTPV[];
+  addProducto: (producto) => void;
+  removeLinea: (index) => void;
+  updateCantidad: (index, cantidad) => void;
+  aplicarDescuento: (descuento) => void;
+  calcularTotales: () => { subtotal, iva, total };
+  finalizarVenta: (metodoPago) => Promise<pedido>;
+  cancelar: () => void;
+  numeroTicket: string;
+}
+```
+
+---
+
+## Integracion con Pedidos
+
+El hook `usePedidosEcommerce` se amplia para:
+
+- Filtrar por `tipo_venta` (online/presencial)
+- Generar `numero_ticket` automatico para ventas presenciales (formato: TPV-YYYYMMDD-XXX)
+- El estado de ventas presenciales es `entregado` + `pagado = true` al crearse
+
+---
+
+## Modificar ListaPedidos
+
+Añadir:
+- Filtro por tipo de venta
+- Indicador visual (badge) para diferenciar online vs presencial
+- Columna de vendedor para ventas presenciales
+
+---
+
+## Integracion en Ecommerce.tsx
+
+Añadir nueva pestaña "TPV":
 
 ```tsx
-<Tabs value={seccion} onValueChange={setSeccion}>
-  <TabsList>
-    <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-    <TabsTrigger value="productos">Productos</TabsTrigger>
-    <TabsTrigger value="pedidos">Pedidos</TabsTrigger>
-    <TabsTrigger value="stock">Stock</TabsTrigger>
-    <TabsTrigger value="clientes">Clientes</TabsTrigger>
-    <TabsTrigger value="analiticas">Analiticas</TabsTrigger>
-  </TabsList>
-  
-  <TabsContent value="dashboard">
-    <DashboardEcommerce />
-  </TabsContent>
-  
-  {/* ... demas secciones */}
-</Tabs>
+<TabsTrigger value="tpv" className="gap-2 py-2">
+  <Receipt className="h-4 w-4" />
+  <span className="hidden sm:inline">TPV</span>
+</TabsTrigger>
+
+<TabsContent value="tpv">
+  <TPVContainer />
+</TabsContent>
 ```
 
 ---
 
-## Seguridad (RLS)
+## Metodos de Pago
 
-Todas las tablas nuevas tendran RLS habilitado:
-- Solo usuarios autenticados pueden ver/editar pedidos
-- Clientes solo ven sus propios pedidos
-- Admins pueden ver todo
+Selector con opciones:
+
+- Efectivo (con calculo de cambio)
+- Tarjeta
+- Bizum
+- Mixto (combinacion)
+
+Para efectivo, mostrar campo "Importe recibido" y calcular cambio automaticamente.
+
+---
+
+## Analiticas
+
+Actualizar `SeccionAnaliticas` para:
+
+- Mostrar desglose ventas online vs presenciales
+- Graficos separados por canal
+- Rendimiento por vendedor (ventas presenciales)
+
+---
+
+## Vista de Ticket Imprimible
+
+Componente `TicketImprimible` con formato para impresion termica:
+
+- Logo/nombre establecimiento
+- Numero ticket y fecha
+- Lineas de productos
+- Totales (subtotal, IVA, total)
+- Metodo de pago
+- Vendedor
+
+Usar `window.print()` con estilos CSS para impresion.
+
+---
+
+## Archivos a Crear
+
+| Archivo | Descripcion |
+|---------|-------------|
+| src/components/ecommerce/tpv/TPVContainer.tsx | Contenedor principal TPV |
+| src/components/ecommerce/tpv/ProductoPicker.tsx | Selector de productos |
+| src/components/ecommerce/tpv/CarritoTPV.tsx | Lineas del ticket |
+| src/components/ecommerce/tpv/MetodoPagoModal.tsx | Modal para finalizar cobro |
+| src/components/ecommerce/tpv/TicketImprimible.tsx | Ticket para imprimir |
+| src/hooks/useTPV.ts | Logica del punto de venta |
+
+## Archivos a Modificar
+
+| Archivo | Cambios |
+|---------|---------|
+| src/pages/Ecommerce.tsx | Añadir pestaña TPV |
+| src/hooks/usePedidosEcommerce.ts | Soportar tipo_venta y filtros |
+| src/components/ecommerce/pedidos/ListaPedidos.tsx | Filtro y badges tipo venta |
+| src/components/ecommerce/analiticas/SeccionAnaliticas.tsx | Desglose por canal |
 
 ---
 
 ## Orden de Implementacion
 
-1. Crear tablas de base de datos y vistas
-2. Crear hooks para acceso a datos
-3. Implementar Dashboard con widgets principales
-4. Desarrollar gestion de Pedidos
-5. Implementar control de Stock
-6. Crear seccion Clientes
-7. Desarrollar Analiticas avanzadas
-8. Reestructurar pagina principal con navegacion
-
----
-
-## Detalles Tecnicos
-
-- Se reutilizara el patron de widgets del Dashboard principal
-- Graficos con Recharts (ya instalado)
-- Tablas con componentes UI existentes
-- Exportacion PDF con jsPDF (ya instalado)
-- Formularios con react-hook-form y zod
-
+1. Migracion de base de datos (nuevos campos)
+2. Actualizar tipos en hooks existentes
+3. Crear hook useTPV
+4. Desarrollar componentes TPV (ProductoPicker, CarritoTPV, etc)
+5. Crear TPVContainer
+6. Integrar en Ecommerce.tsx
+7. Actualizar ListaPedidos con filtros
+8. Añadir metricas a Analiticas
