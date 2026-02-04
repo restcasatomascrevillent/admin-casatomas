@@ -7,7 +7,6 @@ import { PedidosPendientesWidget } from "../dashboard/PedidosPendientesWidget";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, MapPin, Percent } from "lucide-react";
-
 export function SeccionAnaliticas() {
   const {
     isLoading,
@@ -23,26 +22,22 @@ export function SeccionAnaliticas() {
     pedidosPendientes,
     productosVendidos,
     datosGraficoVentas,
-    ventasPorPais,
+    ventasPorPais
   } = useEcommerceStats();
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
-
+  const formatCurrency = (value: number) => new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR"
+  }).format(value);
   if (isLoading) {
-    return (
-      <div className="space-y-6">
+    return <div className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
         </div>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-80 lg:col-span-2" />
           <Skeleton className="h-80" />
         </div>
-      </div>
-    );
+      </div>;
   }
 
   // Calcular ganancias estimadas (margen del 30% sobre ventas)
@@ -50,23 +45,10 @@ export function SeccionAnaliticas() {
   const gananciasHoy = ventasHoy * margenEstimado;
   const gananciasSemana = ventasSemana * margenEstimado;
   const gananciasMes = ventasMes * margenEstimado;
-
-  const paisesOrdenados = Object.entries(ventasPorPais)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
-
-  return (
-    <div className="space-y-6">
+  const paisesOrdenados = Object.entries(ventasPorPais).sort(([, a], [, b]) => b - a).slice(0, 5);
+  return <div className="space-y-6">
       {/* Resumen de ventas */}
-      <ResumenVentas
-        ventasHoy={ventasHoy}
-        ventasSemana={ventasSemana}
-        ventasMes={ventasMes}
-        numPedidosHoy={numPedidosHoy}
-        numPedidosSemana={numPedidosSemana}
-        numPedidosMes={numPedidosMes}
-        ticketMedio={ticketMedio}
-      />
+      <ResumenVentas ventasHoy={ventasHoy} ventasSemana={ventasSemana} ventasMes={ventasMes} numPedidosHoy={numPedidosHoy} numPedidosSemana={numPedidosSemana} numPedidosMes={numPedidosMes} ticketMedio={ticketMedio} />
 
       {/* Ganancias estimadas */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -111,35 +93,6 @@ export function SeccionAnaliticas() {
       </div>
 
       {/* Ventas por país y alertas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Ventas por País
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {paisesOrdenados.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Sin datos de ventas por país
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {paisesOrdenados.map(([pais, total]) => (
-                  <div key={pais} className="flex items-center justify-between">
-                    <span className="text-sm">{pais}</span>
-                    <span className="font-medium">{formatCurrency(total)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <AlertasStockWidget stockBajo={stockBajo} sinStock={sinStock} />
-        <PedidosPendientesWidget pendientes={pedidosPendientes} totalHoy={numPedidosHoy} />
-      </div>
-    </div>
-  );
+      
+    </div>;
 }
