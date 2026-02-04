@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, ShoppingCart, Boxes, Users, BarChart3, Receipt } from "lucide-react";
@@ -8,22 +8,29 @@ import { ListaPedidos } from "@/components/ecommerce/pedidos/ListaPedidos";
 import { TablaStock } from "@/components/ecommerce/stock/TablaStock";
 import { HistorialMovimientos } from "@/components/ecommerce/stock/HistorialMovimientos";
 import { SeccionAnaliticas } from "@/components/ecommerce/analiticas/SeccionAnaliticas";
+import { cn } from "@/lib/utils";
 
 export default function Ecommerce() {
   const [seccionActiva, setSeccionActiva] = useState("productos");
   const [subSeccionStock, setSubSeccionStock] = useState("inventario");
 
+  const isTPV = useMemo(() => seccionActiva === "tpv", [seccionActiva]);
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
+      <div className={cn(isTPV ? "h-full min-h-0 flex flex-col" : "space-y-6")}>
+        <div className={cn(isTPV ? "shrink-0" : "")}>
           <h1 className="text-3xl font-bold">Ecommerce</h1>
           <p className="text-muted-foreground">
             Gestiona tu tienda online: productos, pedidos, stock y analíticas
           </p>
         </div>
 
-        <Tabs value={seccionActiva} onValueChange={setSeccionActiva}>
+        <Tabs
+          value={seccionActiva}
+          onValueChange={setSeccionActiva}
+          className={cn(isTPV ? "flex-1 min-h-0 flex flex-col" : "")}
+        >
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
             <TabsTrigger value="tpv" className="gap-2 py-2">
               <Receipt className="h-4 w-4" />
@@ -51,7 +58,10 @@ export default function Ecommerce() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tpv" className="mt-6">
+          <TabsContent
+            value="tpv"
+            className={cn("mt-6", isTPV ? "flex-1 min-h-0 overflow-hidden" : "")}
+          >
             <TPVContainer />
           </TabsContent>
 
