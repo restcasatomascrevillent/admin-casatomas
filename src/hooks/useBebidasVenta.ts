@@ -7,6 +7,7 @@ export interface BebidaVenta {
   nombre: string;
   categoria: string | null;
   precio_eur: number | null;
+  precio_coste: number | null;
   descripcion: string | null;
   imagen_url: string | null;
   stock: number | null;
