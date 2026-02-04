@@ -31,6 +31,11 @@ export interface PedidoEcommerce {
   notas_internas: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // Nuevos campos TPV
+  tipo_venta: 'online' | 'presencial' | null;
+  vendedor_id: string | null;
+  caja: string | null;
+  numero_ticket: string | null;
 }
 
 export interface LineaPedido {
@@ -63,6 +68,7 @@ export function usePedidosEcommerce(filtros?: {
   estado?: string;
   fechaDesde?: string;
   fechaHasta?: string;
+  tipoVenta?: 'online' | 'presencial' | 'todos';
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -83,6 +89,9 @@ export function usePedidosEcommerce(filtros?: {
       }
       if (filtros?.fechaHasta) {
         query = query.lte("created_at", filtros.fechaHasta);
+      }
+      if (filtros?.tipoVenta && filtros.tipoVenta !== 'todos') {
+        query = query.eq("tipo_venta", filtros.tipoVenta);
       }
 
       const { data, error } = await query;
