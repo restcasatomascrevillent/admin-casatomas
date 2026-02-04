@@ -114,7 +114,7 @@ export function ListaBebidasVenta({ bebidas, busqueda, categoriaFiltro, onEdit }
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground">Rentabilidad</p>
-                      <p className="font-semibold text-green-600">{rentabilidad != null ? `${rentabilidad.toFixed(0)}%` : "-"}</p>
+                      <p className="font-semibold text-blue-600">{rentabilidad != null ? `${rentabilidad.toFixed(0)}%` : "-"}</p>
                     </div>
                   </div>
                 )}
