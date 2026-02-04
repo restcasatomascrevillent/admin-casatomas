@@ -33,6 +33,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
     nombre: "",
     categoria: null,
     precio_eur: null,
+    precio_coste: null,
     descripcion: null,
     imagen_url: null,
     stock: 0,
@@ -60,6 +61,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
         nombre: bebidaEditar.nombre,
         categoria: bebidaEditar.categoria,
         precio_eur: bebidaEditar.precio_eur,
+        precio_coste: bebidaEditar.precio_coste,
         descripcion: bebidaEditar.descripcion,
         imagen_url: bebidaEditar.imagen_url,
         stock: bebidaEditar.stock ?? 0,
@@ -154,7 +156,19 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="precio">Precio (€)</Label>
+              <Label htmlFor="precio_coste">Precio Coste (€)</Label>
+              <Input
+                id="precio_coste"
+                type="number"
+                step="0.01"
+                value={form.precio_coste || ""}
+                onChange={(e) => setForm({ ...form, precio_coste: e.target.value ? parseFloat(e.target.value) : null })}
+                placeholder="15.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="precio">Precio Venta (€)</Label>
               <Input
                 id="precio"
                 type="number"
@@ -164,6 +178,23 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
                 placeholder="29.90"
               />
             </div>
+
+            {form.precio_coste && form.precio_eur && (
+              <div className="space-y-2">
+                <Label>Ganancia / Rentabilidad</Label>
+                <div className="flex gap-2 text-sm">
+                  <span className="text-green-600 font-medium">
+                    +{new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(form.precio_eur - form.precio_coste)}
+                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-green-600 font-medium">
+                    {form.precio_coste > 0 
+                      ? `${(((form.precio_eur - form.precio_coste) / form.precio_coste) * 100).toFixed(1)}%`
+                      : "-"}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="stock">Stock</Label>

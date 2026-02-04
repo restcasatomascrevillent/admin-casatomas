@@ -292,6 +292,7 @@ export type Database = {
           nombre_en: string | null
           nombre_fr: string | null
           orden: number | null
+          precio_coste: number | null
           precio_eur: number | null
           stock: number | null
           ubicacion_pais: string | null
@@ -315,6 +316,7 @@ export type Database = {
           nombre_en?: string | null
           nombre_fr?: string | null
           orden?: number | null
+          precio_coste?: number | null
           precio_eur?: number | null
           stock?: number | null
           ubicacion_pais?: string | null
@@ -338,6 +340,7 @@ export type Database = {
           nombre_en?: string | null
           nombre_fr?: string | null
           orden?: number | null
+          precio_coste?: number | null
           precio_eur?: number | null
           stock?: number | null
           ubicacion_pais?: string | null
@@ -632,6 +635,7 @@ export type Database = {
           orden: number | null
           origen: string | null
           peso: string | null
+          precio_coste: number | null
           precio_eur: number | null
           stock: number | null
           updated_at: string | null
@@ -654,6 +658,7 @@ export type Database = {
           orden?: number | null
           origen?: string | null
           peso?: string | null
+          precio_coste?: number | null
           precio_eur?: number | null
           stock?: number | null
           updated_at?: string | null
@@ -676,6 +681,7 @@ export type Database = {
           orden?: number | null
           origen?: string | null
           peso?: string | null
+          precio_coste?: number | null
           precio_eur?: number | null
           stock?: number | null
           updated_at?: string | null

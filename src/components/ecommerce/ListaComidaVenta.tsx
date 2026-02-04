@@ -88,8 +88,37 @@ export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro, onEdit }:
               <p className="text-sm text-muted-foreground line-clamp-2">{comida.descripcion}</p>
             )}
 
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-bold text-primary">{formatPrice(comida.precio_eur)}</span>
+            {/* Precios y rentabilidad */}
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">P. Coste:</span>
+                <span>{comida.precio_coste != null ? formatPrice(comida.precio_coste) : "-"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">P. Venta:</span>
+                <span className="font-bold text-primary">{formatPrice(comida.precio_eur)}</span>
+              </div>
+              {comida.precio_coste != null && comida.precio_eur != null && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Ganancia:</span>
+                    <span className="text-green-600 font-medium">
+                      {formatPrice(comida.precio_eur - comida.precio_coste)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Rentabilidad:</span>
+                    <span className="text-green-600 font-medium">
+                      {comida.precio_coste > 0 
+                        ? `${(((comida.precio_eur - comida.precio_coste) / comida.precio_coste) * 100).toFixed(1)}%`
+                        : "-"}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end">
               <span className="text-sm text-muted-foreground">Stock: {comida.stock ?? 0}</span>
             </div>
 
