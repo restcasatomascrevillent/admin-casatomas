@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -20,6 +20,7 @@ interface ResultadoProcesamiento {
   success: boolean;
   error?: string;
   respuesta?: any;
+  tipo?: 'factura' | 'albaran' | string;
 }
 
 export function SubidaFacturas() {
@@ -39,7 +40,7 @@ export function SubidaFacturas() {
     if (!files) return;
 
     const nuevosArchivos: ArchivoFactura[] = [];
-    
+
     Array.from(files).forEach((file) => {
       // Validar tipo de archivo
       const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
@@ -70,7 +71,7 @@ export function SubidaFacturas() {
     });
 
     setArchivos(prev => [...prev, ...nuevosArchivos]);
-    
+
     // Limpiar input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -121,7 +122,7 @@ export function SubidaFacturas() {
     // Procesar cada archivo individualmente
     for (let i = 0; i < archivos.length; i++) {
       const archivo = archivos[i];
-      
+
       setProgreso({
         total: archivos.length,
         actual: i + 1,
@@ -157,6 +158,7 @@ export function SubidaFacturas() {
             nombre: archivo.nombre,
             success: true,
             respuesta: data.webhookResponse,
+            tipo: data.webhookResponse?.tipo || data.tipo,
           });
         }
       } catch (err) {
@@ -196,7 +198,7 @@ export function SubidaFacturas() {
     // Limpiar solo archivos exitosos
     if (exitosos.length > 0) {
       setArchivos(prev => {
-        const archivosRestantes = prev.filter(a => 
+        const archivosRestantes = prev.filter(a =>
           fallidos.some(f => f.nombre === a.nombre)
         );
         // Liberar URLs de preview de archivos exitosos
@@ -240,7 +242,7 @@ export function SubidaFacturas() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Zona de carga */}
-        <div 
+        <div
           className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
           onClick={() => fileInputRef.current?.click()}
           onDragOver={(e) => {
@@ -293,13 +295,13 @@ export function SubidaFacturas() {
             <Label>Archivos seleccionados ({archivos.length})</Label>
             <div className="grid gap-3">
               {archivos.map((archivo, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
                 >
                   {archivo.preview ? (
-                    <img 
-                      src={archivo.preview} 
+                    <img
+                      src={archivo.preview}
                       alt={archivo.nombre}
                       className="h-12 w-12 object-cover rounded"
                     />
@@ -341,9 +343,26 @@ export function SubidaFacturas() {
                     ) : (
                       <XCircle className="h-4 w-4 text-destructive shrink-0" />
                     )}
-                    <span className={`text-sm truncate ${!r.success ? 'text-destructive' : 'text-foreground'}`}>
+                    <span className={`text-sm truncate flex-1 ${!r.success ? 'text-destructive' : 'text-foreground'}`}>
                       {r.nombre}
                     </span>
+                    {r.success && r.tipo && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        {r.tipo === 'factura' ? (
+                          <>
+                            <Receipt className="h-3 w-3 text-blue-600" />
+                            <span className="text-xs font-medium text-blue-600">Factura</span>
+                          </>
+                        ) : r.tipo === 'albaran' ? (
+                          <>
+                            <Package className="h-3 w-3 text-green-600" />
+                            <span className="text-xs font-medium text-green-600">Albarán</span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{r.tipo}</span>
+                        )}
+                      </div>
+                    )}
                     {!r.success && r.error && (
                       <span className="text-xs text-muted-foreground truncate">
                         - {r.error}
@@ -353,12 +372,12 @@ export function SubidaFacturas() {
                 ))}
               </div>
             </ScrollArea>
-            
+
             {/* Botones de acción para resultados */}
             <div className="flex gap-2">
               {resultados.some(r => !r.success) && archivos.length > 0 && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={reintentarFallidos}
                   disabled={isSubmitting}
                   className="flex-1"
@@ -366,8 +385,8 @@ export function SubidaFacturas() {
                   Reintentar fallidos
                 </Button>
               )}
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={limpiarTodo}
                 disabled={isSubmitting}
                 className="flex-1"
@@ -380,7 +399,7 @@ export function SubidaFacturas() {
 
         {/* Botón enviar */}
         {archivos.length > 0 && resultados.length === 0 && (
-          <Button 
+          <Button
             onClick={enviarFacturas}
             disabled={archivos.length === 0 || isSubmitting}
             className="w-full"

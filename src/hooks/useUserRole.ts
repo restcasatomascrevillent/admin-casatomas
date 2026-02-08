@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
 
 export type AppRole = "admin" | "manager" | "staff";
 
@@ -40,6 +41,8 @@ export function useUserRole(): UserRoleData {
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const isSuperAdminUser = checkIsSuperAdmin(user?.email);
+
   useEffect(() => {
     if (!user) {
       setRole(null);
@@ -48,8 +51,16 @@ export function useUserRole(): UserRoleData {
       return;
     }
 
+    // Si es super admin, acceso inmediato
+    if (isSuperAdminUser) {
+      setRole("admin");
+      setLoading(false);
+    }
+
     const fetchRoleAndPermissions = async () => {
-      setLoading(true);
+      // Si no es super admin, mostramos loading
+      if (!isSuperAdminUser) setLoading(true);
+
       try {
         // Obtener rol
         const { data: roleData } = await supabase
@@ -60,6 +71,8 @@ export function useUserRole(): UserRoleData {
 
         if (roleData) {
           setRole(roleData.role as AppRole);
+        } else if (isSuperAdminUser) {
+          setRole("admin");
         }
 
         // Obtener permisos
@@ -74,30 +87,30 @@ export function useUserRole(): UserRoleData {
       } catch (error) {
         console.error("Error fetching role/permissions:", error);
       } finally {
-        setLoading(false);
+        if (!isSuperAdminUser) setLoading(false);
       }
     };
 
     fetchRoleAndPermissions();
-  }, [user]);
+  }, [user, isSuperAdminUser]);
 
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || isSuperAdminUser;
 
-  return { role, isAdmin, permissions, loading };
+  return { role: isSuperAdminUser ? "admin" : role, isAdmin, permissions, loading };
 }
 
 export function useCanAccessSection(sectionKey: SectionKey, permissionType: "view" | "edit" = "view") {
   const { isAdmin, permissions, loading } = useUserRole();
 
   if (loading) return { canAccess: false, loading: true };
-  
+
   if (isAdmin) return { canAccess: true, loading: false };
 
   const permission = permissions.find(p => p.section_key === sectionKey);
-  
+
   if (!permission) return { canAccess: false, loading: false };
 
   const canAccess = permissionType === "view" ? permission.can_view : permission.can_edit;
-  
+
   return { canAccess, loading: false };
 }

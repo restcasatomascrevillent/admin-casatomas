@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, Search, FileText, Package } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -44,7 +44,7 @@ const FilaFacturaMobile = ({ factura }: { factura: Factura }) => {
 
   return (
     <Card className="mb-3">
-      <CardHeader 
+      <CardHeader
         className="cursor-pointer hover:bg-muted/50 transition-colors py-3"
         onClick={() => tieneProductos && setIsOpen(!isOpen)}
       >
@@ -67,6 +67,18 @@ const FilaFacturaMobile = ({ factura }: { factura: Factura }) => {
           <div className="text-right">
             <p className="font-semibold text-sm">{formatCurrency(factura.total)}</p>
             <p className="text-xs text-muted-foreground">{formatDate(factura.fecha)}</p>
+            {factura.drive_url && (
+              <a
+                href={factura.drive_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Ver Doc
+              </a>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -116,7 +128,7 @@ const FilaFacturaDesktop = ({ factura }: { factura: Factura }) => {
 
   return (
     <>
-      <TableRow 
+      <TableRow
         className="cursor-pointer hover:bg-muted/50"
         onClick={() => tieneProductos && setIsOpen(!isOpen)}
       >
@@ -145,10 +157,24 @@ const FilaFacturaDesktop = ({ factura }: { factura: Factura }) => {
             </Badge>
           )}
         </TableCell>
+        <TableCell className="w-[80px] text-center">
+          {factura.drive_url && (
+            <a
+              href={factura.drive_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+              title="Ver documento en Google Drive"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+        </TableCell>
       </TableRow>
       {isOpen && tieneProductos && (
         <TableRow className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={9} className="p-0">
+          <TableCell colSpan={10} className="p-0">
             <div className="p-4 pl-10">
               <Table className="table-fixed">
                 <TableHeader>
@@ -251,6 +277,7 @@ export const TablaFacturas = () => {
                 <TableHead className="w-[90px] hidden lg:table-cell text-right">IVA</TableHead>
                 <TableHead className="w-[100px] text-right">Total</TableHead>
                 <TableHead className="w-[60px] text-center">Items</TableHead>
+                <TableHead className="w-[80px] text-center">Doc</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

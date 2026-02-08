@@ -8,6 +8,7 @@ export interface ProductoFactura {
   cantidad?: number;
   unidad?: string | null;
   proveedor: string | null;
+  precio_unitario?: number;
 }
 
 export interface Factura {
@@ -22,6 +23,7 @@ export interface Factura {
   total: number | null;
   observaciones: string | null;
   productos: ProductoFactura[];
+  drive_url: string | null;
 }
 
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
@@ -46,47 +48,28 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
 
   if (prodFacturaError) throw prodFacturaError;
 
-  // Also fetch from historial_precios as fallback
-  const { data: historialPrecios, error: historialError } = await supabase
-    .from('historial_precios')
-    .select('*')
-    .in('factura_id', documentoIds);
-
-  if (historialError) throw historialError;
-
-  // Map products to their documents - prioritize productos_factura
+  // Map products to their documents
   const productosMap = new Map<number, ProductoFactura[]>();
-  
-  // First add products from productos_factura
+
   (productosFactura || []).forEach(p => {
     const facturaId = p.factura_id;
     if (facturaId) {
       if (!productosMap.has(facturaId)) {
         productosMap.set(facturaId, []);
       }
+      // Calculate individual product total if not present
+      const precioUnitario = Number(p.precio_unitario) || 0;
+      const cantidad = Number(p.cantidad) || 0;
+      const totalProducto = Number(p.total) || (precioUnitario * cantidad);
+
       productosMap.get(facturaId)!.push({
         id: p.id,
         producto_nombre: p.nombre,
-        precio: Number(p.precio_unitario) || Number(p.total) || 0,
-        cantidad: p.cantidad,
+        precio: totalProducto, // Use total price for display
+        cantidad: cantidad,
         unidad: p.unidad,
-        proveedor: null, // productos_factura doesn't have proveedor
-      });
-    }
-  });
-
-  // Then add products from historial_precios for documents that don't have productos_factura
-  (historialPrecios || []).forEach(p => {
-    const facturaId = p.factura_id;
-    if (facturaId && !productosMap.has(facturaId)) {
-      productosMap.set(facturaId, []);
-    }
-    if (facturaId && productosMap.get(facturaId)!.length === 0) {
-      productosMap.get(facturaId)!.push({
-        id: p.id,
-        producto_nombre: p.producto_nombre,
-        precio: Number(p.precio),
-        proveedor: p.proveedor,
+        proveedor: null, // This comes from parent document
+        precio_unitario: precioUnitario
       });
     }
   });
@@ -104,6 +87,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     total: doc.total ? Number(doc.total) : null,
     observaciones: doc.observaciones,
     productos: productosMap.get(doc.id) || [],
+    // Google Drive
+    drive_url: doc.drive_url || null,
   }));
 };
 

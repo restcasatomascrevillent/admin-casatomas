@@ -58,36 +58,41 @@ serve(async (req) => {
     console.log('Respuesta del webhook:', response.status);
 
     let webhookResponse = null;
+    let tipoDocumento = null;
+
     try {
       webhookResponse = await response.json();
+      // Extraer el tipo de documento de la respuesta
+      tipoDocumento = webhookResponse?.tipo || null;
     } catch {
       webhookResponse = await response.text();
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         nombre: payload.archivo.nombre,
         message: 'Documento procesado correctamente',
         status: response.status,
+        tipo: tipoDocumento,
         webhookResponse,
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
   } catch (error) {
     console.error('Error procesando documento:', error);
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         error: errorMessage,
       }),
-      { 
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       }
