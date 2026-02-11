@@ -24,6 +24,8 @@ export interface Factura {
   observaciones: string | null;
   productos: ProductoFactura[];
   drive_url: string | null;
+  procesado_en: string | null;
+  created_at: string | null;
 }
 
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
@@ -87,8 +89,9 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     total: doc.total ? Number(doc.total) : null,
     observaciones: doc.observaciones,
     productos: productosMap.get(doc.id) || [],
-    // Google Drive
     drive_url: (doc as any).drive_url || null,
+    procesado_en: doc.procesado_en || null,
+    created_at: doc.created_at || null,
   }));
 };
 
