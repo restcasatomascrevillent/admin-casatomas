@@ -1037,6 +1037,7 @@ export type Database = {
         Row: {
           cif: string | null
           created_at: string | null
+          drive_url: string | null
           embedding: string | null
           embedding_observaciones: string | null
           fecha: string
@@ -1054,6 +1055,7 @@ export type Database = {
         Insert: {
           cif?: string | null
           created_at?: string | null
+          drive_url?: string | null
           embedding?: string | null
           embedding_observaciones?: string | null
           fecha: string
@@ -1071,6 +1073,7 @@ export type Database = {
         Update: {
           cif?: string | null
           created_at?: string | null
+          drive_url?: string | null
           embedding?: string | null
           embedding_observaciones?: string | null
           fecha?: string
@@ -1212,51 +1215,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
-      }
-      historial_precios: {
-        Row: {
-          created_at: string | null
-          factura_id: number | null
-          fecha: string
-          id: number
-          precio: number
-          producto_nombre: string
-          proveedor: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          factura_id?: number | null
-          fecha: string
-          id?: number
-          precio: number
-          producto_nombre: string
-          proveedor?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          factura_id?: number | null
-          fecha?: string
-          id?: number
-          precio?: number
-          producto_nombre?: string
-          proveedor?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "historial_precios_factura_id_fkey"
-            columns: ["factura_id"]
-            isOneToOne: false
-            referencedRelation: "facturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "historial_precios_factura_id_fkey"
-            columns: ["factura_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ultimos_documentos"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       imagenes_base64: {
         Row: {
@@ -2253,6 +2211,24 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_log: {
+        Row: {
+          created_at: string
+          id: string
+          identifier: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          identifier: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          identifier?: string
+        }
+        Relationships: []
+      }
       registro_horas: {
         Row: {
           created_at: string | null
@@ -2440,6 +2416,30 @@ export type Database = {
           currency?: string
           scope_name?: string
           unit_price_cents?: number
+        }
+        Relationships: []
+      }
+      security_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          type?: string
         }
         Relationships: []
       }
@@ -3083,6 +3083,8 @@ export type Database = {
         }[]
       }
       bytea_to_text: { Args: { data: string }; Returns: string }
+      cleanup_old_security_logs: { Args: never; Returns: undefined }
+      cleanup_rate_limit_log: { Args: never; Returns: undefined }
       ejecutar_consulta_chatbot: { Args: { query_sql: string }; Returns: Json }
       ejecutar_limpieza_gdpr: {
         Args: never
@@ -3262,6 +3264,10 @@ export type Database = {
           p_total: number
         }
         Returns: Json
+      }
+      withdraw_stock_inventory: {
+        Args: { p_product_id: string; p_quantity: number }
+        Returns: undefined
       }
     }
     Enums: {

@@ -88,7 +88,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     observaciones: doc.observaciones,
     productos: productosMap.get(doc.id) || [],
     // Google Drive
-    drive_url: doc.drive_url || null,
+    drive_url: (doc as any).drive_url || null,
   }));
 };
 
