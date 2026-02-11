@@ -172,14 +172,14 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1 auto-rows-fr">
               {productosDisponibles
                 .slice(pagina * PRODUCTOS_POR_PAGINA, (pagina + 1) * PRODUCTOS_POR_PAGINA)
                 .map((producto) => (
                 <button
                   key={`${producto.tipo}-${producto.id}`}
                   onClick={() => handleSelectProducto(producto)}
-                  className="flex flex-col items-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
+                  className="flex flex-col items-center justify-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left h-full"
                 >
                   {producto.imagen_url ? (
                     <img
@@ -196,7 +196,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
                       )}
                     </div>
                   )}
-                  <span className="text-xs font-medium text-center line-clamp-2 mb-1">
+                  <span className="text-xs font-medium text-center line-clamp-1 mb-1">
                     {producto.nombre}
                   </span>
                   <span className="text-sm font-bold text-primary">
