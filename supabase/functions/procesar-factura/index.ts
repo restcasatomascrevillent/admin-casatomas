@@ -44,16 +44,10 @@ serve(async (req) => {
     formData.append('file', blob, payload.archivo.nombre);
 
     // Enviar al webhook como multipart/form-data
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
-
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
       body: formData,
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     console.log('Respuesta del webhook:', response.status);
 
