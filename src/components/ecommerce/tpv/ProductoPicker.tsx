@@ -169,7 +169,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
             No hay productos disponibles
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-4">
+          <div className="grid grid-cols-3 gap-2 p-4">
             {productosDisponibles.map((producto) => (
               <button
                 key={`${producto.tipo}-${producto.id}`}
