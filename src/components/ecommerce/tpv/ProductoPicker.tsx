@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Wine, Utensils } from "lucide-react";
+import { Search, Wine, Utensils, ChevronLeft, ChevronRight } from "lucide-react";
 import { useBebidasVenta, BebidaVenta } from "@/hooks/useBebidasVenta";
 import { useComidaVenta, ComidaVenta } from "@/hooks/useComidaVenta";
 import { LineaTPV } from "@/hooks/useTPV";
@@ -18,6 +18,8 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
   const [busqueda, setBusqueda] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState<TipoProducto>('todos');
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const PRODUCTOS_POR_PAGINA = 12;
 
   const { bebidas, isLoading: loadingBebidas } = useBebidasVenta();
   const { comidas, isLoading: loadingComidas } = useComidaVenta();
@@ -110,14 +112,14 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           <Button
             variant={tipoFiltro === 'todos' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => { setTipoFiltro('todos'); setCategoriaFiltro(null); }}
+            onClick={() => { setTipoFiltro('todos'); setCategoriaFiltro(null); setPagina(0); }}
           >
             Todos
           </Button>
           <Button
             variant={tipoFiltro === 'bebida' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => { setTipoFiltro('bebida'); setCategoriaFiltro(null); }}
+            onClick={() => { setTipoFiltro('bebida'); setCategoriaFiltro(null); setPagina(0); }}
             className="gap-1"
           >
             <Wine className="h-3 w-3" />
@@ -126,7 +128,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           <Button
             variant={tipoFiltro === 'comida' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => { setTipoFiltro('comida'); setCategoriaFiltro(null); }}
+            onClick={() => { setTipoFiltro('comida'); setCategoriaFiltro(null); setPagina(0); }}
             className="gap-1"
           >
             <Utensils className="h-3 w-3" />
@@ -141,7 +143,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
               <Badge
                 variant={categoriaFiltro === null ? "default" : "outline"}
                 className="cursor-pointer shrink-0"
-                onClick={() => setCategoriaFiltro(null)}
+                onClick={() => { setCategoriaFiltro(null); setPagina(0); }}
               >
                 Todas
               </Badge>
@@ -150,7 +152,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
                   key={cat}
                   variant={categoriaFiltro === cat ? "default" : "outline"}
                   className="cursor-pointer shrink-0"
-                  onClick={() => setCategoriaFiltro(cat)}
+                  onClick={() => { setCategoriaFiltro(cat); setPagina(0); }}
                 >
                   {cat}
                 </Badge>
@@ -161,7 +163,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
       </div>
 
       {/* Grid de productos */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 flex flex-col min-h-0">
         {isLoading ? (
           <div className="p-4 text-center text-muted-foreground">Cargando productos...</div>
         ) : productosDisponibles.length === 0 ? (
@@ -169,42 +171,69 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
             No hay productos disponibles
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
-            {productosDisponibles.map((producto) => (
-              <button
-                key={`${producto.tipo}-${producto.id}`}
-                onClick={() => handleSelectProducto(producto)}
-                className="flex flex-col items-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
-              >
-                {producto.imagen_url ? (
-                  <img
-                    src={producto.imagen_url}
-                    alt={producto.nombre}
-                    className="w-12 h-12 object-cover rounded-md mb-1"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-muted rounded-md mb-1 flex items-center justify-center">
-                    {producto.tipo === 'bebida' ? (
-                      <Wine className="h-6 w-6 text-muted-foreground" />
-                    ) : (
-                      <Utensils className="h-6 w-6 text-muted-foreground" />
-                    )}
-                  </div>
-                )}
-                <span className="text-xs font-medium text-center line-clamp-2 mb-1">
-                  {producto.nombre}
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1">
+              {productosDisponibles
+                .slice(pagina * PRODUCTOS_POR_PAGINA, (pagina + 1) * PRODUCTOS_POR_PAGINA)
+                .map((producto) => (
+                <button
+                  key={`${producto.tipo}-${producto.id}`}
+                  onClick={() => handleSelectProducto(producto)}
+                  className="flex flex-col items-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
+                >
+                  {producto.imagen_url ? (
+                    <img
+                      src={producto.imagen_url}
+                      alt={producto.nombre}
+                      className="w-12 h-12 object-cover rounded-md mb-1"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-muted rounded-md mb-1 flex items-center justify-center">
+                      {producto.tipo === 'bebida' ? (
+                        <Wine className="h-6 w-6 text-muted-foreground" />
+                      ) : (
+                        <Utensils className="h-6 w-6 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+                  <span className="text-xs font-medium text-center line-clamp-2 mb-1">
+                    {producto.nombre}
+                  </span>
+                  <span className="text-sm font-bold text-primary">
+                    {formatCurrency(producto.precio_eur || 0)}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px] mt-1">
+                    Stock: {producto.stock}
+                  </Badge>
+                </button>
+              ))}
+            </div>
+            {productosDisponibles.length > PRODUCTOS_POR_PAGINA && (
+              <div className="flex items-center justify-between px-3 py-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={pagina === 0}
+                  onClick={() => setPagina(p => p - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {pagina + 1} / {Math.ceil(productosDisponibles.length / PRODUCTOS_POR_PAGINA)}
                 </span>
-                <span className="text-sm font-bold text-primary">
-                  {formatCurrency(producto.precio_eur || 0)}
-                </span>
-                <Badge variant="secondary" className="text-[10px] mt-1">
-                  Stock: {producto.stock}
-                </Badge>
-              </button>
-            ))}
-          </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={(pagina + 1) * PRODUCTOS_POR_PAGINA >= productosDisponibles.length}
+                  onClick={() => setPagina(p => p + 1)}
+                >
+                  Siguiente <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+          </>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 }
