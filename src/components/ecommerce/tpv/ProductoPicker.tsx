@@ -169,21 +169,21 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
             No hay productos disponibles
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 p-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
             {productosDisponibles.map((producto) => (
               <button
                 key={`${producto.tipo}-${producto.id}`}
                 onClick={() => handleSelectProducto(producto)}
-                className="flex flex-col items-center p-3 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
+                className="flex flex-col items-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
               >
                 {producto.imagen_url ? (
                   <img
                     src={producto.imagen_url}
                     alt={producto.nombre}
-                    className="w-16 h-16 object-cover rounded-md mb-2"
+                    className="w-12 h-12 object-cover rounded-md mb-1"
                   />
                 ) : (
-                  <div className="w-16 h-16 bg-muted rounded-md mb-2 flex items-center justify-center">
+                  <div className="w-12 h-12 bg-muted rounded-md mb-1 flex items-center justify-center">
                     {producto.tipo === 'bebida' ? (
                       <Wine className="h-6 w-6 text-muted-foreground" />
                     ) : (
