@@ -172,30 +172,32 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1 auto-rows-fr">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1">
               {productosDisponibles
                 .slice(pagina * PRODUCTOS_POR_PAGINA, (pagina + 1) * PRODUCTOS_POR_PAGINA)
                 .map((producto) => (
                 <button
                   key={`${producto.tipo}-${producto.id}`}
                   onClick={() => handleSelectProducto(producto)}
-                  className="flex flex-col items-center justify-center p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left h-full"
+                  className="flex flex-col items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left h-[130px] w-full"
                 >
-                  {producto.imagen_url ? (
-                    <img
-                      src={producto.imagen_url}
-                      alt={producto.nombre}
-                      className="w-12 h-12 object-cover rounded-md mb-1"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-muted rounded-md mb-1 flex items-center justify-center">
-                      {producto.tipo === 'bebida' ? (
-                        <Wine className="h-6 w-6 text-muted-foreground" />
-                      ) : (
-                        <Utensils className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </div>
-                  )}
+                  <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden mb-1">
+                    {producto.imagen_url ? (
+                      <img
+                        src={producto.imagen_url}
+                        alt={producto.nombre}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        {producto.tipo === 'bebida' ? (
+                          <Wine className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <Utensils className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-xs font-medium text-center line-clamp-1 mb-1">
                     {producto.nombre}
                   </span>
