@@ -45,7 +45,7 @@ serve(async (req) => {
 
     // Enviar al webhook como multipart/form-data
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     const response = await fetch(WEBHOOK_URL, {
       method: 'POST',
