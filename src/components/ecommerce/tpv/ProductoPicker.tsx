@@ -172,7 +172,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 flex-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 content-start">
               {productosDisponibles
                 .slice(pagina * PRODUCTOS_POR_PAGINA, (pagina + 1) * PRODUCTOS_POR_PAGINA)
                 .map((producto) => (
