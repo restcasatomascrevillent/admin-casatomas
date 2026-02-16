@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, CalendarCheck, Clock, Utensils } from "lucide-react";
+import { Building2, CalendarCheck, Utensils } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,8 @@ interface OcupacionPorEspacioProps {
 }
 
 interface ResumenOcupacion {
-  confirmadas: number;
-  pendientes: number;
-  comensalesConfirmados: number;
-  comensalesPendientes: number;
+  totalReservas: number;
+  totalComensales: number;
   capacidadTotal: number;
   porcentajeOcupacion: number;
   comida: { reservas: number; comensales: number };
@@ -30,9 +28,9 @@ function useResumenOcupacionCompleto() {
       const [{ data: reservas }, { data: espacios }] = await Promise.all([
         supabase
           .from("reservas")
-          .select("estado, numero_comensales, hora")
+          .select("numero_comensales, hora")
           .eq("fecha", today)
-          .neq("estado", "cancelada"),
+          .eq("estado", "confirmada"),
         supabase
           .from("espacios_reserva")
           .select("capacidad_maxima")
@@ -40,35 +38,21 @@ function useResumenOcupacionCompleto() {
       ]);
 
       const capacidadTotal = (espacios || []).reduce((s, e) => s + (e.capacidad_maxima || 0), 0);
+      const all = reservas || [];
+      const totalComensales = all.reduce((s, r) => s + (r.numero_comensales || 0), 0);
 
-      const confirmadas = (reservas || []).filter((r) => r.estado === "confirmada");
-      const pendientes = (reservas || []).filter((r) => r.estado === "pendiente");
+      const isComida = (hora: string) => parseInt(hora.split(":")[0]) < 17;
+      const comida = all.filter((r) => isComida(r.hora));
+      const cena = all.filter((r) => !isComida(r.hora));
 
-      const comensalesConfirmados = confirmadas.reduce((s, r) => s + (r.numero_comensales || 0), 0);
-      const comensalesPendientes = pendientes.reduce((s, r) => s + (r.numero_comensales || 0), 0);
-
-      const isComida = (hora: string) => {
-        const h = parseInt(hora.split(":")[0]);
-        return h < 17;
-      };
-
-      const allActive = reservas || [];
-      const comida = allActive.filter((r) => isComida(r.hora));
-      const cena = allActive.filter((r) => !isComida(r.hora));
-
-      // Próxima reserva
       const now = format(new Date(), "HH:mm:ss");
-      const futuras = allActive
-        .filter((r) => r.hora >= now)
-        .sort((a, b) => a.hora.localeCompare(b.hora));
+      const futuras = all.filter((r) => r.hora >= now).sort((a, b) => a.hora.localeCompare(b.hora));
 
       return {
-        confirmadas: confirmadas.length,
-        pendientes: pendientes.length,
-        comensalesConfirmados,
-        comensalesPendientes,
+        totalReservas: all.length,
+        totalComensales,
         capacidadTotal,
-        porcentajeOcupacion: capacidadTotal > 0 ? Math.round((comensalesConfirmados / capacidadTotal) * 100) : 0,
+        porcentajeOcupacion: capacidadTotal > 0 ? Math.round((totalComensales / capacidadTotal) * 100) : 0,
         comida: {
           reservas: comida.length,
           comensales: comida.reduce((s, r) => s + (r.numero_comensales || 0), 0),
@@ -117,8 +101,6 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
   if (!data) return null;
 
   const colors = getStatusColor(data.porcentajeOcupacion);
-  const totalReservas = data.confirmadas + data.pendientes;
-  const totalComensales = data.comensalesConfirmados + data.comensalesPendientes;
 
   return (
     <Card className={`h-full ${className || ""}`}>
@@ -137,7 +119,7 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground">
-              {data.comensalesConfirmados}/{data.capacidadTotal} pax
+              {data.totalComensales}/{data.capacidadTotal} pax
             </span>
           </div>
           <div className="h-2 bg-background/50 rounded-full overflow-hidden">
@@ -148,21 +130,12 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
           </div>
         </div>
 
-        {/* Métricas rápidas */}
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-            <CalendarCheck className="h-4 w-4 text-primary shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{data.confirmadas}</p>
-              <p className="text-[10px] text-muted-foreground">Confirmadas</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
-            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{data.pendientes}</p>
-              <p className="text-[10px] text-muted-foreground">Pendientes</p>
-            </div>
+        {/* Métrica de reservas */}
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+          <CalendarCheck className="h-4 w-4 text-primary shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{data.totalReservas} reservas · {data.totalComensales} comensales</p>
+            <p className="text-[10px] text-muted-foreground">Solo confirmadas</p>
           </div>
         </div>
 
