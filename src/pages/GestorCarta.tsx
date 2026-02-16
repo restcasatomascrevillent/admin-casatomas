@@ -200,17 +200,6 @@ export default function GestorCarta() {
               </button>
             )}
           </div>
-          <Select value={filtroWeb} onValueChange={(v) => setFiltroWeb(v as FiltroWeb)}>
-            <SelectTrigger className="w-full sm:w-[180px] bg-background">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-popover z-50">
-              <SelectItem value="todos">🌐 Todas las webs</SelectItem>
-              <SelectItem value="restaurante">🍽️ Solo Restaurante</SelectItem>
-              <SelectItem value="touza">🍸 Solo Touza</SelectItem>
-              <SelectItem value="ninguno">⚠️ Sin asignar</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <Tabs 
