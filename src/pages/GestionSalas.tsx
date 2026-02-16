@@ -98,10 +98,23 @@ function ReservaOverlay({ reserva }: { reserva: any }) {
   );
 }
 
-// ── Kanban column card (already assigned) ──
+// ── Kanban column card (also draggable for re-assignment) ──
 function KanbanCard({ reserva }: { reserva: any }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: reserva.id,
+    data: reserva,
+  });
+
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded border bg-card text-sm">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex items-center justify-between gap-2 px-3 py-1.5 rounded border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all",
+        isDragging && "opacity-30"
+      )}
+      {...listeners}
+      {...attributes}
+    >
       <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
       <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
         <Users className="h-3 w-3" />
@@ -114,7 +127,7 @@ function KanbanCard({ reserva }: { reserva: any }) {
 // ── Droppable kanban column ──
 function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reservas: any[]; searchTerm: string }) {
   const { isOver, setNodeRef } = useDroppable({
-    id: espacio.id,
+    id: `espacio-${espacio.id}`,
   });
 
   const filtered = useMemo(() => {
@@ -160,6 +173,22 @@ function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reserva
           )}
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// ── Droppable sidebar (sin asignar) ──
+function SidebarDropZone({ children }: { children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: "sin-asignar" });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "w-[320px] shrink-0 flex flex-col border rounded-xl bg-card transition-colors",
+        isOver && "border-primary bg-primary/5"
+      )}
+    >
+      {children}
     </div>
   );
 }
@@ -244,7 +273,7 @@ export default function GestionSalas() {
   }, [reservasHoy, espacios]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    const reserva = sinAsignar.find((r) => r.id === event.active.id) || reservasHoy?.find((r: any) => r.id === event.active.id);
+    const reserva = reservasHoy?.find((r: any) => r.id === event.active.id);
     setActiveReserva(reserva || null);
   };
 
@@ -254,26 +283,52 @@ export default function GestionSalas() {
     if (!over) return;
 
     const reservaId = active.id as string;
-    const espacioId = over.id as string;
+    const targetId = over.id as string;
 
-    // Check it's a valid space
+    const reserva = reservasHoy?.find((r: any) => r.id === reservaId);
+    if (!reserva) return;
+
+    // Dropping back to "sin asignar"
+    if (targetId === "sin-asignar") {
+      if (!reserva.sala_id) return; // already unassigned
+      try {
+        const { error } = await supabase
+          .from("reservas")
+          .update({ sala_id: null, estado: "pendiente" })
+          .eq("id", reservaId);
+        if (error) throw error;
+        toast.success("Reserva desasignada → Pendiente");
+        invalidateAll();
+      } catch (err: any) {
+        toast.error("Error: " + err.message);
+      }
+      return;
+    }
+
+    // Dropping onto a space column
+    const espacioId = targetId.replace("espacio-", "");
     if (!(espacios || []).some((e: any) => e.id === espacioId)) return;
+    if (reserva.sala_id === espacioId) return; // same space, no-op
 
     try {
       const { error } = await supabase
         .from("reservas")
-        .update({ sala_id: espacioId })
+        .update({ sala_id: espacioId, estado: "confirmada" })
         .eq("id", reservaId);
-
       if (error) throw error;
 
-      toast.success("Reserva asignada al espacio");
-      queryClient.invalidateQueries({ queryKey: ["reservas-hoy-gestion"] });
-      queryClient.invalidateQueries({ queryKey: ["reservas-hoy"] });
-      queryClient.invalidateQueries({ queryKey: ["ocupacion_hoy"] });
+      const espacioNombre = (espacios || []).find((e: any) => e.id === espacioId)?.nombre || "espacio";
+      toast.success(`Reserva asignada a ${espacioNombre} → Confirmada`);
+      invalidateAll();
     } catch (err: any) {
       toast.error("Error al asignar: " + err.message);
     }
+  };
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["reservas-hoy-gestion"] });
+    queryClient.invalidateQueries({ queryKey: ["reservas-hoy"] });
+    queryClient.invalidateQueries({ queryKey: ["ocupacion_hoy"] });
   };
 
   return (
@@ -303,8 +358,8 @@ export default function GestionSalas() {
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-4 h-[calc(100vh-240px)]">
-            {/* ── Left sidebar: unassigned reservations ── */}
-            <div className="w-[320px] shrink-0 flex flex-col border rounded-xl bg-card">
+            {/* ── Left sidebar: unassigned reservations (droppable) ── */}
+            <SidebarDropZone>
               <div className="p-3 border-b space-y-2">
                 <h3 className="font-semibold text-sm">Sin asignar ({sinAsignar.length})</h3>
                 <div className="flex gap-2">
@@ -344,7 +399,7 @@ export default function GestionSalas() {
                   )}
                 </div>
               </ScrollArea>
-            </div>
+            </SidebarDropZone>
 
             {/* ── Right: Kanban columns ── */}
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-min overflow-y-auto">
