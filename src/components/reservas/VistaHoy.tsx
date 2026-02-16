@@ -99,7 +99,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         </div>
         <Button
           variant="outline"
-          className="gap-2 shrink-0"
+          className="gap-2 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
           onClick={() => setKanbanOpen(true)}
         >
           <LayoutGrid className="h-4 w-4" />
