@@ -153,7 +153,7 @@ function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[52px] shrink-0 transition-all duration-200 cursor-pointer",
+          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[52px] shrink-0 transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none",
           isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
           !isOver && "border-transparent hover:border-muted-foreground/20",
         )}
@@ -174,7 +174,7 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[250px] w-[270px] shrink-0 transition-all duration-200",
+        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[250px] w-[270px] shrink-0 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none",
         isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]",
         !isOver && "border-transparent",
         isActive && !isOver && "border-muted-foreground/10"
