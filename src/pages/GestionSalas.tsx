@@ -414,6 +414,12 @@ export default function GestionSalas() {
     const reserva = reservasHoy?.find((r: any) => r.id === reservaId);
     if (!reserva) return;
 
+    // No permitir asignar reservas pendientes
+    if (reserva.estado === "pendiente" && targetId !== "sin-asignar") {
+      toast.error("No se puede asignar una reserva pendiente. Verifica o confirma primero.");
+      return;
+    }
+
     // Dropping back to "sin asignar"
     if (targetId === "sin-asignar") {
       if (!reserva.sala_id) return;
