@@ -817,13 +817,6 @@ export type Database = {
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "configuracion_turnos_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
         ]
       }
       consultas_chatbot: {
@@ -1442,13 +1435,6 @@ export type Database = {
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "mesas_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
         ]
       }
       movimientos_stock: {
@@ -1919,13 +1905,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "espacios_reserva"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "planos_espacio_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: true
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
           },
         ]
       }

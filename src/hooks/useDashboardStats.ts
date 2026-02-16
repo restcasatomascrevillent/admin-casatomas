@@ -19,7 +19,7 @@ export function useDashboardStats(startDate: Date, endDate: Date) {
       // Fetch reservations - solo confirmadas para métricas
       const { data: reservasData } = await supabase
         .from("reservas")
-        .select("*, espacios_reserva(nombre, capacidad_maxima)")
+        .select("*")
         .gte("fecha", start)
         .lte("fecha", end)
         .eq("estado", "confirmada");
@@ -111,7 +111,7 @@ export function useTodayReservations() {
       
       const { data } = await supabase
         .from("reservas")
-        .select("*, espacios_reserva(nombre, capacidad_maxima)")
+        .select("*")
         .eq("fecha", today)
         .neq("estado", "cancelada");
 
@@ -129,7 +129,7 @@ export function useTodayConfirmedReservations() {
       
       const { data } = await supabase
         .from("reservas")
-        .select("*, espacios_reserva(nombre, capacidad_maxima)")
+        .select("*")
         .eq("fecha", today)
         .eq("estado", "confirmada");
 
