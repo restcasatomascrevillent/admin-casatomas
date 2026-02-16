@@ -97,6 +97,18 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         </div>
       </div>
 
+      {/* Botón Gestor Reservas */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => setKanbanOpen(true)}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          Gestor Reservas
+        </Button>
+      </div>
+
       {/* Stats cards */}
       <div className="grid gap-4 md:grid-cols-4">
 
@@ -148,32 +160,21 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
           </CardContent>
         </Card>
 
-        {/* Botón Gestor Reservas + Ocupación Media */}
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() => setKanbanOpen(true)}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Gestor Reservas
-          </Button>
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Ocupación Media
-                  </p>
-                  <p className="text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
-                </div>
-                <div className="p-3 rounded-full bg-green-500/10">
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Ocupación Media
+                </p>
+                <p className="text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="p-3 rounded-full bg-green-500/10">
+                <TrendingUp className="h-5 w-5 text-green-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Lista de reservas del día */}
