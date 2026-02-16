@@ -345,7 +345,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
               Gestor de Reservas por Espacio
             </DialogTitle>
           </DialogHeader>
-          <div className="overflow-auto flex-1">
+          <div className="overflow-hidden flex-1">
             <GestorReservasKanban />
           </div>
         </DialogContent>
