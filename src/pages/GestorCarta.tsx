@@ -62,7 +62,7 @@ export default function GestorCarta() {
 
   const filtrarPorEstado = <T extends { activado: boolean | null }>(items: T[]): T[] => {
     if (filtroEstado === "activos") {
-      return items.filter((item) => item.activado === true);
+      return items.filter((item) => item.activado !== false);
     }
     if (filtroEstado === "inactivos") {
       return items.filter((item) => item.activado === false);
@@ -281,8 +281,8 @@ export default function GestorCarta() {
                           <SelectValue placeholder="Selecciona categoría" />
                         </SelectTrigger>
                         <SelectContent className="bg-popover z-50">
-                          {categoriasPlatos.map((categoria) => (
-                            <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                          {categoriasPlatos.filter(Boolean).map((categoria) => (
+                            <SelectItem key={categoria} value={categoria!} className="capitalize">
                               {categoria}
                             </SelectItem>
                           ))}
@@ -323,8 +323,8 @@ export default function GestorCarta() {
                         <SelectValue placeholder="Selecciona categoría" />
                       </SelectTrigger>
                       <SelectContent className="bg-popover z-50">
-                        {categoriasBebidas.map((categoria) => (
-                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                        {categoriasBebidas.filter(Boolean).map((categoria) => (
+                          <SelectItem key={categoria} value={categoria!} className="capitalize">
                             {categoria}
                           </SelectItem>
                         ))}
@@ -364,8 +364,8 @@ export default function GestorCarta() {
                         <SelectValue placeholder="Selecciona categoría" />
                       </SelectTrigger>
                       <SelectContent className="bg-popover z-50">
-                        {categoriasVinos.map((categoria) => (
-                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                        {categoriasVinos.filter(Boolean).map((categoria) => (
+                          <SelectItem key={categoria} value={categoria!} className="capitalize">
                             {categoria}
                           </SelectItem>
                         ))}
@@ -405,8 +405,8 @@ export default function GestorCarta() {
                         <SelectValue placeholder="Selecciona categoría" />
                       </SelectTrigger>
                       <SelectContent className="bg-popover z-50">
-                        {categoriasCocteles.map((categoria) => (
-                          <SelectItem key={categoria} value={categoria || ""} className="capitalize">
+                        {categoriasCocteles.filter(Boolean).map((categoria) => (
+                          <SelectItem key={categoria} value={categoria!} className="capitalize">
                             {categoria}
                           </SelectItem>
                         ))}
