@@ -34,7 +34,7 @@ export default function GestorCarta() {
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
   const [categoriaCocteles, setCategoriaCocteles] = useState<string>("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos_rest" | "inactivos_touza">("todos");
   const [filtroWeb, setFiltroWeb] = useState<FiltroWeb>("todos");
   const [busqueda, setBusqueda] = useState<string>("");
   
@@ -60,12 +60,15 @@ export default function GestorCarta() {
     setCategoriaCocteles(categoriasCocteles[0] || "");
   }
 
-  const filtrarPorEstado = <T extends { activado: boolean | null }>(items: T[]): T[] => {
+  const filtrarPorEstado = <T extends { activado: boolean | null; restaurante?: boolean | null; touza?: boolean | null }>(items: T[]): T[] => {
     if (filtroEstado === "activos") {
       return items.filter((item) => item.activado !== false);
     }
-    if (filtroEstado === "inactivos") {
-      return items.filter((item) => item.activado === false);
+    if (filtroEstado === "inactivos_rest") {
+      return items.filter((item) => item.restaurante !== true);
+    }
+    if (filtroEstado === "inactivos_touza") {
+      return items.filter((item) => item.touza !== true);
     }
     return items;
   };
@@ -156,7 +159,7 @@ export default function GestorCarta() {
             <ToggleGroup 
               type="single" 
               value={filtroEstado} 
-              onValueChange={(value) => value && setFiltroEstado(value as "todos" | "activos" | "inactivos")}
+              onValueChange={(value) => value && setFiltroEstado(value as typeof filtroEstado)}
               className="border rounded-md"
             >
               <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
@@ -165,8 +168,11 @@ export default function GestorCarta() {
               <ToggleGroupItem value="activos" aria-label="Mostrar activos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
                 Activos
               </ToggleGroupItem>
-              <ToggleGroupItem value="inactivos" aria-label="Mostrar inactivos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                Inactivos
+              <ToggleGroupItem value="inactivos_rest" aria-label="Inactivos Restaurante" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
+                🍽️ Inactivos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="inactivos_touza" aria-label="Inactivos Touza" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
+                🍸 Inactivos
               </ToggleGroupItem>
             </ToggleGroup>
             <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
