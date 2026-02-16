@@ -2392,6 +2392,7 @@ export type Database = {
           fecha: string
           hora: string
           id: string
+          importante: boolean
           nombre: string | null
           notas_cliente: string | null
           numero_comensales: number
@@ -2407,6 +2408,7 @@ export type Database = {
           fecha: string
           hora: string
           id?: string
+          importante?: boolean
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales: number
@@ -2422,6 +2424,7 @@ export type Database = {
           fecha?: string
           hora?: string
           id?: string
+          importante?: boolean
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales?: number

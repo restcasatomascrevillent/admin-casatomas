@@ -1,0 +1,1 @@
+ALTER TABLE public.reservas ADD COLUMN importante boolean NOT NULL DEFAULT false;
