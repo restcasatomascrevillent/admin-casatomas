@@ -76,7 +76,7 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group",
+        "p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group outline-none focus:outline-none focus-visible:outline-none",
         "hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
         isDragging && "opacity-20 scale-95 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20"
@@ -189,7 +189,7 @@ function KanbanColumn({
           <div className="flex items-center gap-1.5">
             <button
               onClick={onToggleMinimize}
-              className="p-0.5 rounded hover:bg-muted transition-colors"
+              className="p-0.5 rounded hover:bg-muted transition-colors outline-none focus:outline-none focus-visible:outline-none"
               title="Minimizar columna"
             >
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -386,7 +386,7 @@ export function GestorReservasKanban() {
           placeholder="Buscar por nombre, email o teléfono..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="pl-9"
+          className="pl-9 focus-visible:ring-0 focus-visible:ring-offset-0"
         />
       </div>
       <DndContext
