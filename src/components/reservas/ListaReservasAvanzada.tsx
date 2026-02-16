@@ -15,7 +15,8 @@ import {
   Users,
   Calendar,
   MapPin,
-  Loader2
+  Loader2,
+  ShieldBan
 } from "lucide-react";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,6 +25,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
+import { BlacklistModal } from "./BlacklistModal";
 
 interface Reservation {
   id: string;
@@ -59,6 +61,7 @@ export function ListaReservasAvanzada({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
+  const [blacklistReserva, setBlacklistReserva] = useState<Reservation | null>(null);
   
   // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
@@ -318,6 +321,7 @@ export function ListaReservasAvanzada({
                 <TableHead>Espacio</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -405,6 +409,17 @@ export function ListaReservasAvanzada({
                         )}
                       </div>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 hover:bg-destructive/10"
+                        onClick={() => setBlacklistReserva(reservation)}
+                        title="Añadir a lista negra"
+                      >
+                        <ShieldBan className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -418,6 +433,12 @@ export function ListaReservasAvanzada({
         open={verificacionModalOpen}
         onOpenChange={setVerificacionModalOpen}
         onSuccess={fetchReservations}
+      />
+
+      <BlacklistModal
+        reserva={blacklistReserva}
+        open={!!blacklistReserva}
+        onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
       />
     </div>
   );

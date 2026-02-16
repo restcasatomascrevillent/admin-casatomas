@@ -13,6 +13,7 @@ import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { BlacklistModal } from "./BlacklistModal";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
@@ -33,6 +34,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const { data: resumen, isLoading } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
+  const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const { data: reservasHoy, isLoading: loadingReservas } = useQuery({
@@ -239,6 +241,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                         <TableHead>Contacto</TableHead>
                          <TableHead>Comensales</TableHead>
                          <TableHead>Estado</TableHead>
+                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -290,7 +293,18 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                               <Badge className={cn("text-white", estadoInfo.color)}>
                                 {estadoInfo.label}
                               </Badge>
-                            </TableCell>
+                             </TableCell>
+                             <TableCell>
+                               <Button
+                                 variant="ghost"
+                                 size="icon"
+                                 className="h-7 w-7 hover:bg-destructive/10"
+                                 onClick={() => setBlacklistReserva(reserva)}
+                                 title="Añadir a lista negra"
+                               >
+                                 <ShieldBan className="h-3.5 w-3.5 text-destructive" />
+                               </Button>
+                             </TableCell>
                           </TableRow>
                         );
                       })}
@@ -308,6 +322,12 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
           )}
         </CardContent>
       </Card>
+
+      <BlacklistModal
+        reserva={blacklistReserva}
+        open={!!blacklistReserva}
+        onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
+      />
     </div>
   );
 }
