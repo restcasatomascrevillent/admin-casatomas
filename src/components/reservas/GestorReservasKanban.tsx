@@ -7,13 +7,12 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  DragStartEvent,
-  DragEndEvent,
-  useDroppable,
-  useDraggable,
   closestCenter,
   MeasuringStrategy,
+  useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
+import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
