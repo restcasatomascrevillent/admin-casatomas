@@ -48,19 +48,14 @@ interface Reserva {
 
 // Draggable reservation card
 function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverlay?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
   });
 
-  const style: React.CSSProperties = {
-    ...(transform
-      ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-      : {}),
-    ...(isDragOverlay
-      ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.05) rotate(1.5deg)" }
-      : {}),
-  };
+  const style: React.CSSProperties = isDragOverlay
+    ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.03) rotate(1deg)" }
+    : {};
 
   const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
 
