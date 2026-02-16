@@ -1,13 +1,26 @@
 import { useState, useMemo } from "react";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent, useDroppable } from "@dnd-kit/core";
-import { useDraggable } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  useDroppable,
+  useDraggable,
+  closestCenter,
+  MeasuringStrategy,
+} from "@dnd-kit/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Star, GripVertical } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -41,15 +54,23 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
     data: reserva,
   });
 
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined;
+  const style: React.CSSProperties = {
+    ...(transform
+      ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+      : {}),
+    ...(isDragOverlay
+      ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.05) rotate(1.5deg)" }
+      : {}),
+  };
 
   const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
 
   if (isDragOverlay) {
     return (
-      <div className="p-3 rounded-lg border bg-card shadow-lg w-[220px]">
+      <div
+        className="p-3 rounded-lg border-2 border-primary bg-card w-[230px] animate-in zoom-in-95 duration-150"
+        style={style}
+      >
         <CardContent reserva={reserva} estadoInfo={estadoInfo} />
       </div>
     );
@@ -60,8 +81,9 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-3 rounded-lg border bg-card hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-30",
+        "p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group",
+        "hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
+        isDragging && "opacity-20 scale-95 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20"
       )}
       {...listeners}
@@ -75,19 +97,19 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
 function CardContent({ reserva, estadoInfo }: { reserva: Reserva; estadoInfo: { label: string; color: string } }) {
   return (
     <>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          {reserva.importante && <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />}
-          <span className="font-medium text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
+          {reserva.importante && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />}
+          <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
         </div>
-        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
       </div>
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5">
           <Clock className="h-3 w-3" />
           {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5">
           <Users className="h-3 w-3" />
           {reserva.numero_comensales}
         </span>
@@ -95,6 +117,12 @@ function CardContent({ reserva, estadoInfo }: { reserva: Reserva; estadoInfo: { 
           {estadoInfo.label}
         </Badge>
       </div>
+      {reserva.telefono && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60 mt-1.5">
+          <Phone className="h-2.5 w-2.5" />
+          {reserva.telefono}
+        </div>
+      )}
     </>
   );
 }
@@ -107,6 +135,7 @@ function KanbanColumn({
   comensalesActuales,
   children,
   count,
+  isActive,
 }: {
   id: string;
   title: string;
@@ -114,6 +143,7 @@ function KanbanColumn({
   comensalesActuales: number;
   children: React.ReactNode;
   count: number;
+  isActive: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   const porcentaje = capacidadMax ? Math.min(100, Math.round((comensalesActuales / capacidadMax) * 100)) : 0;
@@ -123,34 +153,53 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col rounded-xl border bg-muted/30 min-w-[240px] w-[260px] shrink-0",
-        isOver && "ring-2 ring-primary/50 bg-primary/5"
+        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[250px] w-[270px] shrink-0 transition-all duration-200",
+        isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]",
+        !isOver && "border-transparent",
+        isActive && !isOver && "border-muted-foreground/10"
       )}
     >
       {/* Header */}
-      <div className="p-3 border-b space-y-2">
+      <div className={cn(
+        "p-3 border-b space-y-2 transition-colors duration-200",
+        isOver && "bg-primary/5"
+      )}>
         <div className="flex items-center justify-between">
           <h4 className="font-semibold text-sm">{title}</h4>
-          <Badge variant="secondary" className="text-xs">{count}</Badge>
+          <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
         {capacidadMax != null && (
           <>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{comensalesActuales}/{capacidadMax} pax</span>
-              <span className={cn(excedido && "text-destructive font-medium")}>{porcentaje}%</span>
+              <span className="tabular-nums">{comensalesActuales}/{capacidadMax} pax</span>
+              <span className={cn("tabular-nums", excedido && "text-destructive font-medium")}>{porcentaje}%</span>
             </div>
             <Progress value={porcentaje} className={cn("h-1.5", excedido && "[&>div]:bg-destructive")} />
           </>
         )}
       </div>
       {/* Cards */}
-      <ScrollArea className="flex-1 max-h-[60vh]">
-        <div className="p-2 space-y-2 min-h-[100px]">
+      <ScrollArea className="flex-1 max-h-[55vh]">
+        <div className={cn(
+          "p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl",
+          isOver && "bg-primary/[0.02]"
+        )}>
           {children}
           {count === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              Arrastra reservas aquí
-            </p>
+            <div className={cn(
+              "flex flex-col items-center justify-center py-8 text-muted-foreground/50 transition-all duration-200",
+              isOver && "text-primary/60 scale-105"
+            )}>
+              <div className={cn(
+                "w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center mb-2 transition-colors",
+                isOver ? "border-primary/40 bg-primary/5" : "border-muted-foreground/20"
+              )}>
+                <Users className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-medium">
+                {isOver ? "Soltar aquí" : "Arrastra reservas aquí"}
+              </p>
+            </div>
           )}
         </div>
       </ScrollArea>
@@ -165,7 +214,9 @@ export function GestorReservasKanban() {
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
   );
 
   const { data: reservas, isLoading } = useQuery({
@@ -277,8 +328,14 @@ export function GestorReservasKanban() {
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex gap-3 overflow-x-auto pb-4">
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      collisionDetection={closestCenter}
+      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+    >
+      <div className="flex gap-4 overflow-x-auto pb-4 px-1">
         {columnas.map((col) => (
           <KanbanColumn
             key={col.id}
@@ -287,6 +344,7 @@ export function GestorReservasKanban() {
             capacidadMax={col.capacidadMax}
             comensalesActuales={comensalesPorColumna[col.id] || 0}
             count={reservasPorColumna[col.id]?.length || 0}
+            isActive={!!activeReserva}
           >
             {(reservasPorColumna[col.id] || []).map((reserva) => (
               <ReservaCard key={reserva.id} reserva={reserva} />
@@ -295,7 +353,10 @@ export function GestorReservasKanban() {
         ))}
       </div>
 
-      <DragOverlay>
+      <DragOverlay dropAnimation={{
+        duration: 200,
+        easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+      }}>
         {activeReserva ? <ReservaCard reserva={activeReserva} isDragOverlay /> : null}
       </DragOverlay>
     </DndContext>
