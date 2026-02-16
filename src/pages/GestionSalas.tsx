@@ -4,13 +4,17 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle } from "lucide-react";
+import { useCrearBlacklist } from "@/hooks/useBlacklist";
+import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle, ShieldBan, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -36,7 +40,7 @@ const ESTADOS_RESERVA: Record<string, { label: string; color: string; bg: string
 };
 
 // ── Draggable reservation card (sidebar) ──
-function ReservaCardDraggable({ reserva }: { reserva: any }) {
+function ReservaCardDraggable({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: any) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
@@ -58,9 +62,19 @@ function ReservaCardDraggable({ reserva }: { reserva: any }) {
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center justify-between gap-1">
           <span className="text-sm font-semibold truncate">{reserva.nombre || "Sin nombre"}</span>
-          <Badge className={cn("text-[10px] px-1.5 py-0 shrink-0 border", estadoInfo.bg)}>
-            {estadoInfo.label}
-          </Badge>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onBlacklist(reserva); }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10"
+              title="Añadir a lista negra"
+            >
+              <ShieldBan className="h-3.5 w-3.5 text-destructive" />
+            </button>
+            <Badge className={cn("text-[10px] px-1.5 py-0 border", estadoInfo.bg)}>
+              {estadoInfo.label}
+            </Badge>
+          </div>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -127,7 +141,7 @@ function ReservaOverlay({ reserva }: { reserva: any }) {
 }
 
 // ── Kanban column card (also draggable for re-assignment) ──
-function KanbanCard({ reserva }: { reserva: any }) {
+function KanbanCard({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: any) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
@@ -149,7 +163,17 @@ function KanbanCard({ reserva }: { reserva: any }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
           <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-          <div className={cn("w-2 h-2 rounded-full shrink-0", estadoInfo.color)} title={estadoInfo.label} />
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onBlacklist(reserva); }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10"
+              title="Añadir a lista negra"
+            >
+              <ShieldBan className="h-3 w-3 text-destructive" />
+            </button>
+            <div className={cn("w-2 h-2 rounded-full shrink-0", estadoInfo.color)} title={estadoInfo.label} />
+          </div>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
           <span className="flex items-center gap-0.5">
@@ -173,7 +197,7 @@ function KanbanCard({ reserva }: { reserva: any }) {
 }
 
 // ── Droppable kanban column ──
-function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reservas: any[]; searchTerm: string }) {
+function KanbanColumn({ espacio, reservas, searchTerm, onBlacklist }: { espacio: any; reservas: any[]; searchTerm: string; onBlacklist: (r: any) => void }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `espacio-${espacio.id}`,
   });
@@ -241,7 +265,7 @@ function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reserva
               </p>
             </div>
           ) : (
-            filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} />)
+            filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} onBlacklist={onBlacklist} />)
           )}
         </div>
       </ScrollArea>
@@ -273,6 +297,17 @@ export default function GestionSalas() {
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [ordenar, setOrdenar] = useState("hora");
   const [activeReserva, setActiveReserva] = useState<any>(null);
+  const [blacklistTarget, setBlacklistTarget] = useState<any>(null);
+  const [blacklistMotivo, setBlacklistMotivo] = useState("");
+  const [blacklistTipo, setBlacklistTipo] = useState<"email" | "telefono">("email");
+
+  const crearBlacklist = useCrearBlacklist();
+
+  const openBlacklistModal = (reserva: any) => {
+    setBlacklistTarget(reserva);
+    setBlacklistMotivo("");
+    setBlacklistTipo(reserva.email ? "email" : "telefono");
+  };
 
   const hoy = format(new Date(), "yyyy-MM-dd");
   const hoyDisplay = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
@@ -497,7 +532,7 @@ export default function GestionSalas() {
                     </div>
                   ) : (
                     reservasFiltradas.map((r) => (
-                      <ReservaCardDraggable key={r.id} reserva={r} />
+                      <ReservaCardDraggable key={r.id} reserva={r} onBlacklist={openBlacklistModal} />
                     ))
                   )}
                 </div>
@@ -512,6 +547,7 @@ export default function GestionSalas() {
                   espacio={espacio}
                   reservas={porEspacio[espacio.id] || []}
                   searchTerm={busqueda}
+                  onBlacklist={openBlacklistModal}
                 />
               ))}
             </div>
@@ -521,6 +557,102 @@ export default function GestionSalas() {
             {activeReserva ? <ReservaOverlay reserva={activeReserva} /> : null}
           </DragOverlay>
         </DndContext>
+        {/* ── Blacklist Modal ── */}
+        <Dialog open={!!blacklistTarget} onOpenChange={(open) => { if (!open) { setBlacklistTarget(null); setBlacklistMotivo(""); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShieldBan className="h-5 w-5 text-destructive" />
+                Añadir a Lista Negra
+              </DialogTitle>
+              <DialogDescription>
+                Esta persona no podrá realizar futuras reservas.
+              </DialogDescription>
+            </DialogHeader>
+
+            {blacklistTarget && (
+              <div className="space-y-4">
+                {/* Info de la reserva */}
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+                  <p className="text-sm font-semibold">{blacklistTarget.nombre || "Sin nombre"}</p>
+                  {blacklistTarget.email && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Mail className="h-3 w-3" /> {blacklistTarget.email}
+                    </p>
+                  )}
+                  {blacklistTarget.telefono && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Phone className="h-3 w-3" /> {blacklistTarget.telefono}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" />
+                    {typeof blacklistTarget.hora === "string" ? blacklistTarget.hora.substring(0, 5) : blacklistTarget.hora}
+                    {" · "}
+                    <Users className="h-3 w-3" /> {blacklistTarget.numero_comensales} pax
+                  </p>
+                </div>
+
+                {/* Tipo de bloqueo */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Bloquear por</Label>
+                  <Select value={blacklistTipo} onValueChange={(v) => setBlacklistTipo(v as "email" | "telefono")}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {blacklistTarget.email && <SelectItem value="email">Email: {blacklistTarget.email}</SelectItem>}
+                      {blacklistTarget.telefono && <SelectItem value="telefono">Teléfono: {blacklistTarget.telefono}</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Motivo */}
+                <div className="space-y-2">
+                  <Label className="text-sm">Motivo del bloqueo</Label>
+                  <Textarea
+                    placeholder="Describe el motivo por el cual esta persona será bloqueada..."
+                    value={blacklistMotivo}
+                    onChange={(e) => setBlacklistMotivo(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => { setBlacklistTarget(null); setBlacklistMotivo(""); }}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={!blacklistMotivo.trim() || crearBlacklist.isPending}
+                onClick={async () => {
+                  if (!blacklistTarget) return;
+                  const valor = blacklistTipo === "email" ? blacklistTarget.email : blacklistTarget.telefono;
+                  if (!valor) {
+                    toast.error("No hay " + blacklistTipo + " para esta reserva");
+                    return;
+                  }
+                  await crearBlacklist.mutateAsync({
+                    tipo: blacklistTipo,
+                    valor,
+                    nombre: blacklistTarget.nombre || null,
+                    motivo: blacklistMotivo.trim(),
+                  });
+                  setBlacklistTarget(null);
+                  setBlacklistMotivo("");
+                }}
+              >
+                {crearBlacklist.isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Añadiendo...</>
+                ) : (
+                  <><ShieldBan className="h-4 w-4 mr-1" /> Añadir a Lista Negra</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
