@@ -64,7 +64,7 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
   if (isDragOverlay) {
     return (
       <div
-        className="p-3 rounded-lg border-2 border-primary bg-card w-[230px] animate-in zoom-in-95 duration-150"
+        className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] animate-in zoom-in-95 duration-150"
         style={style}
       >
         <CardContent reserva={reserva} estadoInfo={estadoInfo} />
@@ -77,7 +77,7 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group outline-none focus:outline-none focus-visible:outline-none",
+        "p-2.5 sm:p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group outline-none focus:outline-none focus-visible:outline-none",
         "hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
         isDragging && "opacity-20 scale-95 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20"
@@ -154,7 +154,7 @@ function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[52px] shrink-0 transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none",
+          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[42px] sm:w-[52px] shrink-0 transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none",
           isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
           !isOver && "border-transparent hover:border-muted-foreground/20",
         )}
@@ -175,7 +175,7 @@ function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[250px] w-[270px] shrink-0 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none",
+        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[200px] w-[220px] sm:min-w-[250px] sm:w-[270px] shrink-0 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none",
         isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
         !isOver && "border-transparent",
         isActive && !isOver && "border-muted-foreground/10"
@@ -380,7 +380,7 @@ export function GestorReservasKanban() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-8 h-full flex flex-col">
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -397,7 +397,7 @@ export function GestorReservasKanban() {
         collisionDetection={closestCenter}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       >
-        <div className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1">
+        <div className="flex gap-2 sm:gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
         {columnas.map((col) => (
           <KanbanColumn
             key={col.id}
