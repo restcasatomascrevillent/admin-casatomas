@@ -13,6 +13,7 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -55,7 +56,7 @@ function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverl
   });
 
   const style: React.CSSProperties = isDragOverlay
-    ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.03) rotate(1deg)" }
+    ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.03) rotate(1deg)", pointerEvents: "none", cursor: "grabbing" }
     : {};
 
   const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
@@ -416,10 +417,13 @@ export function GestorReservasKanban() {
         ))}
       </div>
 
-      <DragOverlay dropAnimation={{
-        duration: 200,
-        easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
-      }}>
+      <DragOverlay
+        modifiers={[snapCenterToCursor]}
+        dropAnimation={{
+          duration: 200,
+          easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+        }}
+      >
         {activeReserva ? <ReservaCard reserva={activeReserva} isDragOverlay /> : null}
       </DragOverlay>
       </DndContext>
