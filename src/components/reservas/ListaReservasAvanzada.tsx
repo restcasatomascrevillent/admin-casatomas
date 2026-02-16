@@ -16,7 +16,8 @@ import {
   Calendar,
   MapPin,
   Loader2,
-  ShieldBan
+  ShieldBan,
+  Star
 } from "lucide-react";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -62,6 +63,15 @@ export function ListaReservasAvanzada({
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<Reservation | null>(null);
+
+  const toggleImportante = async (reservation: Reservation) => {
+    const nuevoValor = !(reservation as any).importante;
+    const { error } = await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reservation.id);
+    if (!error) {
+      toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
+      fetchReservations();
+    }
+  };
   
   // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
@@ -339,11 +349,20 @@ export function ListaReservasAvanzada({
                     </TableCell>
                     <TableCell>{reservation.hora}</TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{reservation.nombre || "Sin nombre"}</p>
-                        {reservation.telefono && (
-                          <p className="text-xs text-muted-foreground">{reservation.telefono}</p>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleImportante(reservation)}
+                          className="shrink-0 hover:scale-110 transition-transform"
+                          title={(reservation as any).importante ? "Desmarcar importante" : "Marcar como importante"}
+                        >
+                          <Star className={cn("h-4 w-4", (reservation as any).importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
+                        </button>
+                        <div>
+                          <p className="font-medium">{reservation.nombre || "Sin nombre"}</p>
+                          {reservation.telefono && (
+                            <p className="text-xs text-muted-foreground">{reservation.telefono}</p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>

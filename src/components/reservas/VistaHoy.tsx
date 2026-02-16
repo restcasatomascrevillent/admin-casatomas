@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, LayoutGrid } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, LayoutGrid, Star } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -31,11 +33,19 @@ const ESTADOS_RESERVA = {
 
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: resumen, isLoading } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
   const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
+
+  const toggleImportante = async (reserva: any) => {
+    const nuevoValor = !reserva.importante;
+    await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reserva.id);
+    queryClient.invalidateQueries({ queryKey: ["reservas-hoy"] });
+    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
+  };
 
   const { data: reservasHoy, isLoading: loadingReservas } = useQuery({
     queryKey: ["reservas-hoy", hoy],
@@ -259,6 +269,13 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => toggleImportante(reserva)}
+                                  className="shrink-0 hover:scale-110 transition-transform"
+                                  title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
+                                >
+                                  <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
+                                </button>
                                 <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
                                 {reserva.en_blacklist && (
                                   <span title="En lista negra">

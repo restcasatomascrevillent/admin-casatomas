@@ -11,7 +11,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { BlacklistModal } from "@/components/reservas/BlacklistModal";
-import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle, ShieldBan } from "lucide-react";
+import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle, ShieldBan, Star } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ const ESTADOS_RESERVA: Record<string, { label: string; color: string; bg: string
 };
 
 // ── Draggable reservation card (sidebar) ──
-function ReservaCardDraggable({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: any) => void }) {
+function ReservaCardDraggable({ reserva, onBlacklist, onToggleImportante }: { reserva: any; onBlacklist: (r: any) => void; onToggleImportante: (r: any) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
@@ -60,6 +60,14 @@ function ReservaCardDraggable({ reserva, onBlacklist }: { reserva: any; onBlackl
         <div className="flex items-center justify-between gap-1">
           <span className="text-sm font-semibold truncate">{reserva.nombre || "Sin nombre"}</span>
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
+              className={cn("p-0.5 rounded hover:scale-110 transition-all", reserva.importante ? "" : "opacity-0 group-hover:opacity-100")}
+              title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
+            >
+              <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
+            </button>
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); onBlacklist(reserva); }}
@@ -138,7 +146,7 @@ function ReservaOverlay({ reserva }: { reserva: any }) {
 }
 
 // ── Kanban column card (also draggable for re-assignment) ──
-function KanbanCard({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: any) => void }) {
+function KanbanCard({ reserva, onBlacklist, onToggleImportante }: { reserva: any; onBlacklist: (r: any) => void; onToggleImportante: (r: any) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
@@ -161,6 +169,14 @@ function KanbanCard({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: a
         <div className="flex items-center justify-between gap-1">
           <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
+              className={cn("p-0.5 rounded hover:scale-110 transition-all", reserva.importante ? "" : "opacity-0 group-hover:opacity-100")}
+              title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
+            >
+              <Star className={cn("h-3 w-3", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
+            </button>
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); onBlacklist(reserva); }}
@@ -194,7 +210,7 @@ function KanbanCard({ reserva, onBlacklist }: { reserva: any; onBlacklist: (r: a
 }
 
 // ── Droppable kanban column ──
-function KanbanColumn({ espacio, reservas, searchTerm, onBlacklist }: { espacio: any; reservas: any[]; searchTerm: string; onBlacklist: (r: any) => void }) {
+function KanbanColumn({ espacio, reservas, searchTerm, onBlacklist, onToggleImportante }: { espacio: any; reservas: any[]; searchTerm: string; onBlacklist: (r: any) => void; onToggleImportante: (r: any) => void }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `espacio-${espacio.id}`,
   });
@@ -262,7 +278,7 @@ function KanbanColumn({ espacio, reservas, searchTerm, onBlacklist }: { espacio:
               </p>
             </div>
           ) : (
-            filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} onBlacklist={onBlacklist} />)
+            filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} onBlacklist={onBlacklist} onToggleImportante={onToggleImportante} />)
           )}
         </div>
       </ScrollArea>
@@ -298,6 +314,13 @@ export default function GestionSalas() {
 
   const openBlacklistModal = (reserva: any) => {
     setBlacklistTarget(reserva);
+  };
+
+  const toggleImportante = async (reserva: any) => {
+    const nuevoValor = !reserva.importante;
+    await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reserva.id);
+    queryClient.invalidateQueries({ queryKey: ["reservas-hoy-gestion"] });
+    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
   };
 
   const hoy = format(new Date(), "yyyy-MM-dd");
@@ -523,7 +546,7 @@ export default function GestionSalas() {
                     </div>
                   ) : (
                     reservasFiltradas.map((r) => (
-                      <ReservaCardDraggable key={r.id} reserva={r} onBlacklist={openBlacklistModal} />
+                      <ReservaCardDraggable key={r.id} reserva={r} onBlacklist={openBlacklistModal} onToggleImportante={toggleImportante} />
                     ))
                   )}
                 </div>
@@ -539,6 +562,7 @@ export default function GestionSalas() {
                   reservas={porEspacio[espacio.id] || []}
                   searchTerm={busqueda}
                   onBlacklist={openBlacklistModal}
+                  onToggleImportante={toggleImportante}
                 />
               ))}
             </div>
