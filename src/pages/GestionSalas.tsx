@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { ArrowLeft, Search, Users, Clock, GripVertical } from "lucide-react";
+import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
   DndContext,
@@ -26,12 +27,12 @@ import {
 } from "@dnd-kit/core";
 import { toast } from "sonner";
 
-const ESTADOS_RESERVA: Record<string, { label: string; color: string }> = {
-  pendiente: { label: "Pendiente", color: "bg-yellow-500" },
-  verificada: { label: "Verificada", color: "bg-blue-500" },
-  confirmada: { label: "Confirmada", color: "bg-green-500" },
-  cancelada: { label: "Cancelada", color: "bg-red-500" },
-  "no-show": { label: "No Show", color: "bg-gray-500" },
+const ESTADOS_RESERVA: Record<string, { label: string; color: string; bg: string }> = {
+  pendiente: { label: "Pendiente", color: "bg-yellow-500", bg: "bg-yellow-500/10 text-yellow-700 border-yellow-200" },
+  verificada: { label: "Verificada", color: "bg-blue-500", bg: "bg-blue-500/10 text-blue-700 border-blue-200" },
+  confirmada: { label: "Confirmada", color: "bg-green-500", bg: "bg-green-500/10 text-green-700 border-green-200" },
+  cancelada: { label: "Cancelada", color: "bg-red-500", bg: "bg-red-500/10 text-red-700 border-red-200" },
+  "no-show": { label: "No Show", color: "bg-gray-500", bg: "bg-gray-500/10 text-gray-700 border-gray-200" },
 };
 
 // ── Draggable reservation card (sidebar) ──
@@ -41,36 +42,57 @@ function ReservaCardDraggable({ reserva }: { reserva: any }) {
     data: reserva,
   });
 
-  const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
+  const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500", bg: "bg-gray-500/10 text-gray-700 border-gray-200" };
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-center gap-2 p-2.5 rounded-lg border bg-card cursor-grab active:cursor-grabbing transition-all hover:shadow-sm hover:border-primary/30",
-        isDragging && "opacity-30"
+        "group flex items-start gap-2.5 p-3 rounded-lg border bg-card cursor-grab active:cursor-grabbing transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5",
+        isDragging && "opacity-30 scale-95"
       )}
       {...listeners}
       {...attributes}
     >
-      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      <div className="flex-1 min-w-0">
+      <GripVertical className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 mt-0.5 transition-colors" />
+      <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center justify-between gap-1">
-          <span className="text-sm font-medium truncate">{reserva.nombre || "Sin nombre"}</span>
-          <Badge className={cn("text-white text-[10px] px-1.5 py-0 shrink-0", estadoInfo.color)}>
+          <span className="text-sm font-semibold truncate">{reserva.nombre || "Sin nombre"}</span>
+          <Badge className={cn("text-[10px] px-1.5 py-0 shrink-0 border", estadoInfo.bg)}>
             {estadoInfo.label}
           </Badge>
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
           </span>
           <span className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {reserva.numero_comensales}
+            {reserva.numero_comensales} pax
           </span>
         </div>
+        {(reserva.telefono || reserva.email) && (
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground/70">
+            {reserva.telefono && (
+              <span className="flex items-center gap-1 truncate">
+                <Phone className="h-2.5 w-2.5" />
+                {reserva.telefono}
+              </span>
+            )}
+            {reserva.email && (
+              <span className="flex items-center gap-1 truncate">
+                <Mail className="h-2.5 w-2.5" />
+                {reserva.email}
+              </span>
+            )}
+          </div>
+        )}
+        {reserva.notas && (
+          <p className="text-[11px] text-muted-foreground/60 italic truncate">
+            "{reserva.notas}"
+          </p>
+        )}
       </div>
     </div>
   );
@@ -78,19 +100,25 @@ function ReservaCardDraggable({ reserva }: { reserva: any }) {
 
 // ── Drag overlay (floating card while dragging) ──
 function ReservaOverlay({ reserva }: { reserva: any }) {
+  const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500", bg: "" };
   return (
-    <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-card shadow-lg w-[260px]">
-      <GripVertical className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      <div className="flex-1 min-w-0">
-        <span className="text-sm font-medium truncate">{reserva.nombre || "Sin nombre"}</span>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+    <div className="flex items-start gap-2.5 p-3 rounded-lg border bg-card shadow-2xl w-[280px] ring-2 ring-primary/20">
+      <GripVertical className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-sm font-semibold truncate">{reserva.nombre || "Sin nombre"}</span>
+          <Badge className={cn("text-[10px] px-1.5 py-0 shrink-0 border", estadoInfo.bg)}>
+            {estadoInfo.label}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
           </span>
           <span className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {reserva.numero_comensales}
+            {reserva.numero_comensales} pax
           </span>
         </div>
       </div>
@@ -105,21 +133,41 @@ function KanbanCard({ reserva }: { reserva: any }) {
     data: reserva,
   });
 
+  const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500", bg: "" };
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-center justify-between gap-2 px-3 py-1.5 rounded border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all",
-        isDragging && "opacity-30"
+        "group flex items-center gap-2 px-3 py-2 rounded-lg border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all",
+        isDragging && "opacity-30 scale-95"
       )}
       {...listeners}
       {...attributes}
     >
-      <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-      <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-        <Users className="h-3 w-3" />
-        {reserva.numero_comensales}
-      </span>
+      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 transition-colors" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1">
+          <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
+          <div className={cn("w-2 h-2 rounded-full shrink-0", estadoInfo.color)} title={estadoInfo.label} />
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+          <span className="flex items-center gap-0.5">
+            <Clock className="h-2.5 w-2.5" />
+            {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
+          </span>
+          <span className="flex items-center gap-0.5">
+            <Users className="h-2.5 w-2.5" />
+            {reserva.numero_comensales}
+          </span>
+          {reserva.telefono && (
+            <span className="flex items-center gap-0.5 truncate">
+              <Phone className="h-2.5 w-2.5" />
+              {reserva.telefono}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -141,33 +189,57 @@ function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reserva
   }, [reservas, searchTerm]);
 
   const totalComensales = reservas.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0);
+  const ocupacion = espacio.capacidad_maxima > 0 ? Math.round((totalComensales / espacio.capacidad_maxima) * 100) : 0;
+  const isOverCapacity = totalComensales > espacio.capacidad_maxima;
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col rounded-xl border-2 border-dashed transition-colors min-h-[300px]",
-        isOver ? "border-primary bg-primary/5" : "border-border bg-muted/20"
+        "flex flex-col rounded-xl border-2 transition-all min-h-[280px]",
+        isOver ? "border-primary bg-primary/5 shadow-lg scale-[1.01]" : "border-border/60 bg-card/50",
+        isOverCapacity && !isOver && "border-destructive/40"
       )}
     >
-      <div className="p-3 border-b bg-muted/30 rounded-t-xl">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">{espacio.nombre}</h3>
-          <Badge variant="outline" className="text-xs">
-            {totalComensales}/{espacio.capacidad_maxima}
-          </Badge>
+      <div className={cn(
+        "p-3 border-b rounded-t-xl",
+        isOverCapacity ? "bg-destructive/5" : "bg-muted/30"
+      )}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-3.5 w-3.5 text-primary" />
+            <h3 className="font-semibold text-sm">{espacio.nombre}</h3>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {isOverCapacity && <AlertCircle className="h-3.5 w-3.5 text-destructive" />}
+            <Badge variant={isOverCapacity ? "destructive" : "outline"} className="text-xs font-mono">
+              {totalComensales}/{espacio.capacidad_maxima}
+            </Badge>
+          </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {reservas.length} reserva{reservas.length !== 1 ? "s" : ""}
-          {searchTerm && filtered.length !== reservas.length && ` (${filtered.length} coinciden)`}
-        </p>
+        <Progress
+          value={Math.min(ocupacion, 100)}
+          className={cn("h-1.5", isOverCapacity && "[&>div]:bg-destructive")}
+        />
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="text-[11px] text-muted-foreground">
+            {reservas.length} reserva{reservas.length !== 1 ? "s" : ""}
+            {searchTerm && filtered.length !== reservas.length && ` · ${filtered.length} coinciden`}
+          </p>
+          <p className="text-[11px] text-muted-foreground font-medium">
+            {ocupacion}% ocupado
+          </p>
+        </div>
       </div>
       <ScrollArea className="flex-1 p-2">
         <div className="space-y-1.5">
           {filtered.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-6">
-              {searchTerm ? "Sin resultados" : "Arrastra reservas aquí"}
-            </p>
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/50">
+              <Users className="h-8 w-8 mb-2" />
+              <p className="text-xs">
+                {searchTerm ? "Sin resultados" : "Arrastra reservas aquí"}
+              </p>
+            </div>
           ) : (
             filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} />)
           )}
@@ -184,8 +256,8 @@ function SidebarDropZone({ children }: { children: React.ReactNode }) {
     <div
       ref={setNodeRef}
       className={cn(
-        "w-[320px] shrink-0 flex flex-col border rounded-xl bg-card transition-colors",
-        isOver && "border-primary bg-primary/5"
+        "w-[320px] shrink-0 flex flex-col border rounded-xl bg-card transition-all",
+        isOver && "border-primary bg-primary/5 shadow-lg"
       )}
     >
       {children}
@@ -203,6 +275,7 @@ export default function GestionSalas() {
   const [activeReserva, setActiveReserva] = useState<any>(null);
 
   const hoy = format(new Date(), "yyyy-MM-dd");
+  const hoyDisplay = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
 
   const { data: espacios } = useEspaciosReserva();
 
@@ -224,7 +297,7 @@ export default function GestionSalas() {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  // Split reservations: unassigned (no sala_id or not in active spaces) vs assigned per space
+  // Split reservations
   const { sinAsignar, porEspacio } = useMemo(() => {
     const espacioIds = new Set((espacios || []).map((e: any) => e.id));
     const sin: any[] = [];
@@ -242,6 +315,14 @@ export default function GestionSalas() {
     });
     return { sinAsignar: sin, porEspacio: por };
   }, [reservasHoy, espacios]);
+
+  // Summary stats
+  const stats = useMemo(() => {
+    const total = reservasHoy?.length || 0;
+    const totalPax = (reservasHoy || []).reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0);
+    const asignadas = total - sinAsignar.length;
+    return { total, totalPax, asignadas, sinAsignar: sinAsignar.length };
+  }, [reservasHoy, sinAsignar]);
 
   // Filter & sort sidebar
   const reservasFiltradas = useMemo(() => {
@@ -266,12 +347,6 @@ export default function GestionSalas() {
     return list;
   }, [sinAsignar, busqueda, filtroEstado, ordenar]);
 
-  // Also filter assigned reservations in kanban
-  const reservasAsignadas = useMemo(() => {
-    const all = reservasHoy || [];
-    return all.filter((r: any) => r.sala_id && (espacios || []).some((e: any) => e.id === r.sala_id));
-  }, [reservasHoy, espacios]);
-
   const handleDragStart = (event: DragStartEvent) => {
     const reserva = reservasHoy?.find((r: any) => r.id === event.active.id);
     setActiveReserva(reserva || null);
@@ -290,7 +365,7 @@ export default function GestionSalas() {
 
     // Dropping back to "sin asignar"
     if (targetId === "sin-asignar") {
-      if (!reserva.sala_id) return; // already unassigned
+      if (!reserva.sala_id) return;
       try {
         const { error } = await supabase
           .from("reservas")
@@ -308,7 +383,7 @@ export default function GestionSalas() {
     // Dropping onto a space column
     const espacioId = targetId.replace("espacio-", "");
     if (!(espacios || []).some((e: any) => e.id === espacioId)) return;
-    if (reserva.sala_id === espacioId) return; // same space, no-op
+    if (reserva.sala_id === espacioId) return;
 
     try {
       const { error } = await supabase
@@ -335,13 +410,34 @@ export default function GestionSalas() {
     <DashboardLayout>
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/reservas")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Gestión de Salas</h2>
-            <p className="text-muted-foreground text-sm">Arrastra las reservas a los espacios del restaurante</p>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/reservas")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Gestión de Salas</h2>
+              <p className="text-muted-foreground text-sm capitalize">{hoyDisplay}</p>
+            </div>
+          </div>
+
+          {/* Summary stats */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+              <CalendarCheck className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">{stats.total} reservas</span>
+              <span className="text-xs text-muted-foreground">· {stats.totalPax} pax</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-200">
+              <MapPin className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">{stats.asignadas} asignadas</span>
+            </div>
+            {stats.sinAsignar > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-200">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm font-medium text-yellow-700">{stats.sinAsignar} pendientes</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -349,7 +445,7 @@ export default function GestionSalas() {
         <div className="relative max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar en todas las reservas (nombre, email, teléfono)..."
+            placeholder="Buscar reservas (nombre, email, teléfono)..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="pl-9"
@@ -357,11 +453,16 @@ export default function GestionSalas() {
         </div>
 
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-[calc(100vh-240px)]">
+          <div className="flex gap-4 h-[calc(100vh-280px)]">
             {/* ── Left sidebar: unassigned reservations (droppable) ── */}
             <SidebarDropZone>
               <div className="p-3 border-b space-y-2">
-                <h3 className="font-semibold text-sm">Sin asignar ({sinAsignar.length})</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Sin asignar</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {sinAsignar.length}
+                  </Badge>
+                </div>
                 <div className="flex gap-2">
                   <Select value={filtroEstado} onValueChange={setFiltroEstado}>
                     <SelectTrigger className="h-8 text-xs flex-1">
@@ -387,11 +488,13 @@ export default function GestionSalas() {
                 </div>
               </div>
               <ScrollArea className="flex-1 p-2">
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {reservasFiltradas.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      No hay reservas sin asignar
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/50">
+                      <CalendarCheck className="h-10 w-10 mb-3" />
+                      <p className="text-sm font-medium">Todo asignado</p>
+                      <p className="text-xs mt-1">No hay reservas sin asignar</p>
+                    </div>
                   ) : (
                     reservasFiltradas.map((r) => (
                       <ReservaCardDraggable key={r.id} reserva={r} />
