@@ -386,7 +386,7 @@ export function GestorReservasKanban() {
           placeholder="Buscar por nombre, email o teléfono..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="pl-9"
+          className="pl-9 hover:border-input hover:shadow-none"
         />
       </div>
       <DndContext
