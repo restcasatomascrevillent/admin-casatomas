@@ -1724,14 +1724,12 @@ export type Database = {
           comensales_confirmados: number | null
           created_at: string | null
           dia_semana: number | null
-          espacio_id: string
           fecha: string
           hora: string | null
           id: string
           reservas_canceladas: number | null
           reservas_confirmadas: number | null
           reservas_no_show: number | null
-          sala_id: string
           total_comensales: number
           total_reservas: number
           turno: string | null
@@ -1741,14 +1739,12 @@ export type Database = {
           comensales_confirmados?: number | null
           created_at?: string | null
           dia_semana?: number | null
-          espacio_id: string
           fecha: string
           hora?: string | null
           id?: string
           reservas_canceladas?: number | null
           reservas_confirmadas?: number | null
           reservas_no_show?: number | null
-          sala_id: string
           total_comensales?: number
           total_reservas?: number
           turno?: string | null
@@ -1758,49 +1754,18 @@ export type Database = {
           comensales_confirmados?: number | null
           created_at?: string | null
           dia_semana?: number | null
-          espacio_id?: string
           fecha?: string
           hora?: string | null
           id?: string
           reservas_canceladas?: number | null
           reservas_confirmadas?: number | null
           reservas_no_show?: number | null
-          sala_id?: string
           total_comensales?: number
           total_reservas?: number
           turno?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_sala_id_fkey"
-            columns: ["sala_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_sala_id_fkey"
-            columns: ["sala_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-        ]
+        Relationships: []
       }
       pedidos_ecommerce: {
         Row: {
@@ -2396,7 +2361,6 @@ export type Database = {
           nombre: string | null
           notas_cliente: string | null
           numero_comensales: number
-          sala_id: string
           telefono: string | null
           updated_at: string | null
         }
@@ -2412,7 +2376,6 @@ export type Database = {
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales: number
-          sala_id: string
           telefono?: string | null
           updated_at?: string | null
         }
@@ -2428,26 +2391,10 @@ export type Database = {
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales?: number
-          sala_id?: string
           telefono?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "reservas_sala_id_fkey"
-            columns: ["sala_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reservas_sala_id_fkey"
-            columns: ["sala_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-        ]
+        Relationships: []
       }
       scope_prices: {
         Row: {
@@ -2867,40 +2814,18 @@ export type Database = {
       vista_estadisticas_mensuales: {
         Row: {
           comensales_confirmados: number | null
-          espacio_id: string | null
-          espacio_nombre: string | null
           mes_fin: string | null
           mes_inicio: string | null
-          ocupacion_promedio: number | null
           reservas_canceladas: number | null
           reservas_confirmadas: number | null
           total_comensales: number | null
           total_reservas: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-        ]
+        Relationships: []
       }
       vista_estadisticas_semanales: {
         Row: {
           comensales_confirmados: number | null
-          distribucion_dias: Json | null
-          espacio_id: string | null
-          espacio_nombre: string | null
-          ocupacion_promedio: number | null
           reservas_canceladas: number | null
           reservas_cena: number | null
           reservas_comida: number | null
@@ -2911,22 +2836,7 @@ export type Database = {
           total_comensales: number | null
           total_reservas: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-        ]
+        Relationships: []
       }
       vista_gastos_mensuales: {
         Row: {
@@ -2940,32 +2850,30 @@ export type Database = {
       }
       vista_ocupacion: {
         Row: {
-          capacidad_disponible: number | null
-          capacidad_maxima: number | null
-          espacio: string | null
-          espacio_id: string | null
+          dia_semana: number | null
           fecha: string | null
           hora: string | null
-          porcentaje_ocupacion: number | null
           total_comensales: number | null
           total_reservas: number | null
+          turno: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "espacios_reserva"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ocupacion_diaria_espacio_id_fkey"
-            columns: ["espacio_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ocupacion_hoy"
-            referencedColumns: ["espacio_id"]
-          },
-        ]
+        Insert: {
+          dia_semana?: number | null
+          fecha?: string | null
+          hora?: string | null
+          total_comensales?: number | null
+          total_reservas?: number | null
+          turno?: string | null
+        }
+        Update: {
+          dia_semana?: number | null
+          fecha?: string | null
+          hora?: string | null
+          total_comensales?: number | null
+          total_reservas?: number | null
+          turno?: string | null
+        }
+        Relationships: []
       }
       vista_ocupacion_hoy: {
         Row: {
@@ -3025,8 +2933,29 @@ export type Database = {
           id: string | null
           nombre_cliente: string | null
           numero_comensales: number | null
-          sala: string | null
           telefono: string | null
+        }
+        Insert: {
+          email?: string | null
+          estado?: string | null
+          fecha?: string | null
+          fecha_solicitud?: string | null
+          hora?: string | null
+          id?: string | null
+          nombre_cliente?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+        }
+        Update: {
+          email?: string | null
+          estado?: string | null
+          fecha?: string | null
+          fecha_solicitud?: string | null
+          hora?: string | null
+          id?: string | null
+          nombre_cliente?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
         }
         Relationships: []
       }

@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Loader2, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+
 
 interface Reservation {
   id: string;
@@ -25,10 +25,6 @@ interface Reservation {
   nombre: string;
   telefono: string;
   email: string | null;
-  sala_id: string;
-  espacios_reserva: {
-    nombre: string;
-  } | null;
 }
 
 interface ModalVerificacionReservaProps {
@@ -58,7 +54,6 @@ export function ModalVerificacionReserva({
   onOpenChange, 
   onSuccess 
 }: ModalVerificacionReservaProps) {
-  const { data: espacios } = useEspaciosReserva();
   const [saving, setSaving] = useState(false);
   
   // Form state
@@ -68,7 +63,6 @@ export function ModalVerificacionReserva({
   const [fecha, setFecha] = useState<Date | undefined>(undefined);
   const [hora, setHora] = useState("");
   const [numComensales, setNumComensales] = useState(1);
-  const [salaId, setSalaId] = useState("");
   const [notas, setNotas] = useState("");
 
   // Initialize form when modal opens with reserva data
@@ -80,7 +74,6 @@ export function ModalVerificacionReserva({
       setFecha(reserva.fecha ? new Date(reserva.fecha) : undefined);
       setHora(reserva.hora || "");
       setNumComensales(reserva.numero_comensales || 1);
-      setSalaId(reserva.sala_id || "");
       setNotas(reserva.notas_cliente || "");
     }
   }, [open, reserva]);
@@ -88,7 +81,7 @@ export function ModalVerificacionReserva({
   const handleVerificar = async () => {
     if (!reserva) return;
     
-    if (!nombre.trim() || !telefono.trim() || !fecha || !hora || !salaId) {
+    if (!nombre.trim() || !telefono.trim() || !fecha || !hora) {
       toast.error("Por favor completa todos los campos obligatorios");
       return;
     }
@@ -102,7 +95,6 @@ export function ModalVerificacionReserva({
         fecha: format(fecha, "yyyy-MM-dd"),
         hora,
         numero_comensales: numComensales,
-        sala_id: salaId,
         notas_cliente: notas.trim() || null,
         estado: "verificada",
       };
@@ -228,33 +220,15 @@ export function ModalVerificacionReserva({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="comensales">Nº Comensales *</Label>
-                <Input
-                  id="comensales"
-                  type="number"
-                  min={1}
-                  value={numComensales}
-                  onChange={(e) => setNumComensales(parseInt(e.target.value) || 1)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Sala *</Label>
-                <Select value={salaId} onValueChange={setSalaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar sala" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {espacios?.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="comensales">Nº Comensales *</Label>
+              <Input
+                id="comensales"
+                type="number"
+                min={1}
+                value={numComensales}
+                onChange={(e) => setNumComensales(parseInt(e.target.value) || 1)}
+              />
             </div>
 
             <div className="space-y-2">

@@ -7,9 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 
 interface CalendarioOcupacionProps {
   onDayClick?: (date: Date, reservas: any[]) => void;
@@ -20,7 +19,7 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
-  const { data: espacios } = useEspaciosReserva();
+  
 
   // Obtener reservas del mes
   const { data: reservasMes, isLoading } = useQuery({
@@ -37,9 +36,7 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
           hora,
           numero_comensales,
           estado,
-          nombre,
-          sala_id,
-          espacios_reserva!reservas_sala_id_fkey (id, nombre, capacidad_maxima)
+          nombre
         `)
         .gte("fecha", inicio)
         .lte("fecha", fin)
@@ -54,66 +51,33 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
 
   // Calcular estadísticas por día
   const statsPerDay = useMemo(() => {
-    if (!reservasMes || !espacios) return {};
+    if (!reservasMes) return {};
 
     const stats: Record<string, { 
       total: number; 
       comensales: number; 
-      capacidad: number;
       porcentaje: number;
       reservas: any[];
     }> = {};
 
-    const capacidadTotal = espacios.reduce((acc, e) => acc + (e.capacidad_maxima || 0), 0);
-
-    reservasMes.forEach((r) => {
+    reservasMes.forEach((r: any) => {
       const key = r.fecha;
       if (!stats[key]) {
-        stats[key] = { 
-          total: 0, 
-          comensales: 0, 
-          capacidad: capacidadTotal,
-          porcentaje: 0,
-          reservas: []
-        };
+        stats[key] = { total: 0, comensales: 0, porcentaje: 0, reservas: [] };
       }
       stats[key].total++;
       stats[key].comensales += r.numero_comensales;
       stats[key].reservas.push(r);
     });
 
-    // Calcular porcentajes
-    Object.keys(stats).forEach((key) => {
-      stats[key].porcentaje = stats[key].capacidad > 0
-        ? Math.round((stats[key].comensales / stats[key].capacidad) * 100)
-        : 0;
-    });
-
     return stats;
-  }, [reservasMes, espacios]);
+  }, [reservasMes]);
 
-  // Obtener reservas del día seleccionado agrupadas por espacio
+  // Obtener reservas del día seleccionado
   const reservasDelDia = useMemo(() => {
-    if (!selectedDate || !reservasMes) return {};
-
+    if (!selectedDate || !reservasMes) return [];
     const dateKey = format(selectedDate, "yyyy-MM-dd");
-    const reservas = reservasMes.filter((r) => r.fecha === dateKey);
-
-    // Agrupar por espacio
-    const grouped: Record<string, { espacio: any; reservas: any[] }> = {};
-    
-    reservas.forEach((r) => {
-      const espacioId = r.sala_id;
-      if (!grouped[espacioId]) {
-        grouped[espacioId] = {
-          espacio: r.espacios_reserva,
-          reservas: [],
-        };
-      }
-      grouped[espacioId].reservas.push(r);
-    });
-
-    return grouped;
+    return reservasMes.filter((r: any) => r.fecha === dateKey);
   }, [selectedDate, reservasMes]);
 
   const handlePrevMonth = () => {
@@ -245,44 +209,26 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
                   </h4>
                 </div>
 
-                {Object.keys(reservasDelDia).length === 0 ? (
+                {reservasDelDia.length === 0 ? (
                   <p className="text-muted-foreground text-sm py-4 text-center">
                     No hay reservas para este día
                   </p>
                 ) : (
-                  <div className="space-y-4 overflow-y-auto flex-1 pr-2">
-                    {Object.entries(reservasDelDia).map(([espacioId, { espacio, reservas }]) => (
-                      <div key={espacioId} className="space-y-2">
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start p-2 h-auto"
-                          onClick={() => onEspacioClick?.(espacioId)}
-                        >
-                          <MapPin className="h-4 w-4 mr-2" />
-                          <span className="font-medium">{espacio?.nombre || "Espacio"}</span>
-                          <Badge variant="secondary" className="ml-auto">
-                            {reservas.length}
-                          </Badge>
-                        </Button>
-
-                        <div className="pl-6 space-y-1">
-                          {reservas.map((r: any) => (
-                            <div
-                              key={r.id}
-                              className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded"
-                            >
-                              <div>
-                                <p className="font-medium">{r.nombre}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {r.hora} · {r.numero_comensales} personas
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {r.estado}
-                              </Badge>
-                            </div>
-                          ))}
+                  <div className="space-y-1 overflow-y-auto flex-1 pr-2">
+                    {reservasDelDia.map((r: any) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between text-sm p-2 bg-muted/50 rounded"
+                      >
+                        <div>
+                          <p className="font-medium">{r.nombre}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {r.hora} · {r.numero_comensales} personas
+                          </p>
                         </div>
+                        <Badge variant="outline" className="text-xs">
+                          {r.estado}
+                        </Badge>
                       </div>
                     ))}
                   </div>

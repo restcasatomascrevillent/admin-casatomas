@@ -29,7 +29,6 @@ const formSchema = z.object({
   email: z.string().email("Email inválido").min(1, "El email es requerido"),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
-  sala_id: z.string().min(1, "Selecciona una sala"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
 });
@@ -40,7 +39,6 @@ interface FormularioReservaProps {
   onSuccess?: () => void;
   isPublic?: boolean;
   datosPreseleccionados?: {
-    sala_id: string;
     fecha: Date;
     hora: string;
   } | null;
@@ -67,7 +65,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   // Actualizar formulario cuando cambien los datos preseleccionados
   useEffect(() => {
     if (datosPreseleccionados) {
-      form.setValue("sala_id", datosPreseleccionados.sala_id);
       form.setValue("fecha", datosPreseleccionados.fecha);
       form.setValue("hora", datosPreseleccionados.hora);
     }
@@ -111,7 +108,6 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         email: values.email,
         fecha: format(values.fecha, "yyyy-MM-dd"),
         hora: values.hora,
-        sala_id: values.sala_id,
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente || null,
         estado: blacklisted ? "rechazada" : "pendiente",

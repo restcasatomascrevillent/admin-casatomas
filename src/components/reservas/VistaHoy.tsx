@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, LayoutGrid, Star } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -52,10 +52,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas")
-        .select(`
-          *,
-          espacios_reserva:sala_id (nombre)
-        `)
+        .select("*")
         .eq("fecha", hoy)
         .order("hora", { ascending: true });
 
@@ -98,20 +95,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-4 md:grid-cols-5">
-        {/* Gestión de salas button */}
-        <Card
-          className="border-2 border-destructive/50 bg-destructive/5 hover:bg-destructive/10 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
-          onClick={() => navigate("/reservas/gestion")}
-        >
-          <CardContent className="p-6 flex flex-col items-center justify-center h-full">
-            <div className="p-3 rounded-full bg-destructive/10 mb-2">
-              <LayoutGrid className="h-5 w-5 text-destructive" />
-            </div>
-            <p className="font-bold text-destructive text-sm text-center">Gestión de Salas</p>
-            <p className="text-xs text-muted-foreground text-center mt-1">Asignar reservas</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-4">
 
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-6">
