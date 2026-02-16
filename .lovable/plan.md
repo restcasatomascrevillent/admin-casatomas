@@ -1,73 +1,63 @@
 
 
-# Eliminar `sala_id` del flujo de reservas
+# Plan: Gestor de Reservas con Kanban por Espacios
 
 ## Resumen
 
-Se eliminara completamente el concepto de "sala" (sala_id) del flujo de reservas. Esto afecta a la base de datos, formularios, listados, calendario y la pagina de Gestion de Salas (que se eliminara).
+Se creara un nuevo componente "Gestor de Reservas" con una vista Kanban que muestra los espacios (Comedor, Salon, Terraza) como columnas, permitiendo arrastrar y soltar reservas entre ellos para asignarlas. Se anadira un boton de acceso encima de la tarjeta de "Ocupacion Media" en la vista Hoy.
 
-## Cambios en Base de Datos
+## Cambios necesarios
 
-1. **Migracion SQL**: 
-   - Eliminar la constraint `reservas_sala_id_fkey` (foreign key)
-   - Hacer `sala_id` nullable primero, luego eliminarlo de la tabla `reservas`
-   - Actualizar la vista `vista_ocupacion_hoy` si depende de `sala_id`
-   - Actualizar el trigger `actualizar_ocupacion_diaria_espacios` que usa `sala_id` de reservas
-   - Actualizar la constraint unica de `ocupacion_diaria` que incluye `sala_id`
+### 1. Base de datos: nueva columna `espacio_id` en `reservas`
 
-2. **Tipos TypeScript** (`src/integrations/supabase/types.ts`):
-   - Eliminar `sala_id` de las interfaces Row, Insert y Update de `reservas`
-   - Eliminar la relacion `reservas_sala_id_fkey`
+Crear una migracion que anade la columna `espacio_id` (uuid, nullable, FK a `espacios_reserva`) a la tabla `reservas`. Las reservas sin espacio asignado apareceran en una columna "Sin asignar".
 
-## Pagina eliminada
+### 2. Nuevo componente: `GestorReservasKanban.tsx`
 
-- **`src/pages/GestionSalas.tsx`**: Se elimina completamente (su unica funcion era asignar salas a reservas via drag-and-drop)
-- **`src/App.tsx`**: Eliminar la ruta `/reservas/gestion` y el import de `GestionSalas`
+Crear `src/components/reservas/GestorReservasKanban.tsx`:
 
-## Componentes modificados
+- **Columnas del Kanban**: Una columna "Sin asignar" + una columna por cada espacio activo (Comedor, Salon, Terraza)
+- **Cabecera de columna**: Nombre del espacio, capacidad actual vs. maxima, barra de progreso
+- **Tarjetas de reserva**: Nombre, hora, numero comensales, estado (badge de color), icono importante
+- **Drag & Drop**: Usando `@dnd-kit/core` y `@dnd-kit/sortable` (ya instalados) para mover reservas entre columnas
+- **Al soltar**: Se actualiza `espacio_id` en la base de datos
+- **Filtros**: Solo reservas de hoy, excluyendo canceladas
+- **Validacion de capacidad**: Aviso si se excede la capacidad maxima del espacio
 
-### Formularios
-- **`src/components/reservas/FormularioReserva.tsx`**: Eliminar `sala_id` del schema zod, del formulario y del insert a Supabase
-- **`src/components/reservas/ModalVerificacionReserva.tsx`**: Eliminar el campo de seleccion de sala, el estado `salaId`, y la referencia en el update. Quitar la validacion de `salaId` como obligatorio
-- **`src/components/reservas/GenerarReservasFicticias.tsx`**: Eliminar `sala_id` de los datos ficticios (ya no necesitara buscar espacios)
+### 3. Modificar `VistaHoy.tsx`
 
-### Vistas y listados
-- **`src/components/reservas/VistaHoy.tsx`**: 
-  - Eliminar la tarjeta "Gestion de Salas" (link a `/reservas/gestion`)
-  - Eliminar el join con `espacios_reserva:sala_id` en la query
-- **`src/components/reservas/CalendarioOcupacion.tsx`**: Eliminar la agrupacion por `sala_id`/espacio en el panel lateral. Mostrar las reservas del dia sin agrupar
-- **`src/components/reservas/CalendarioReservaPublica.tsx`**: Eliminar la seleccion de sala. Simplificar para que no dependa de `sala_id`
+Anadir un boton "Gestor Reservas" con icono `LayoutGrid` justo encima de la tarjeta de "Ocupacion Media" (la cuarta card del grid de stats). Al hacer clic, se abre un Dialog/Sheet a pantalla completa con el componente Kanban.
 
-### Hooks
-- **`src/hooks/useOcupacionHoy.ts`**: Eliminar `useReservasHoyPorEspacio` que filtra por `sala_id`. Quitar el join `espacios_reserva!reservas_sala_id_fkey`
-- **`src/hooks/useDisponibilidad.ts`**: Refactorizar para que no dependa de `sala_id` en reservas. Las funciones de disponibilidad seguiran usando `espacios_reserva` directamente pero sin relacion con reservas
-- **`src/components/reservas/SelectorHorasDisponibles.tsx`**: Adaptar para funcionar sin `salaId` obligatorio
-- **`src/hooks/useAsignacionesMesa.ts`**: Eliminar referencia a `sala_id` en el select de reservas
+### 4. Actualizar tipos de Supabase
 
-## Seccion tecnica - Detalles de la migracion
+Actualizar `src/integrations/supabase/types.ts` para reflejar la nueva columna `espacio_id` en la tabla `reservas`.
+
+## Detalle tecnico
 
 ```text
-Orden de ejecucion:
-1. Migracion SQL (eliminar FK, luego columna)
-2. Actualizar types.ts
-3. Eliminar GestionSalas.tsx y su ruta
-4. Modificar formularios (FormularioReserva, ModalVerificacion)
-5. Modificar vistas (VistaHoy, Calendario, etc.)
-6. Modificar hooks (useDisponibilidad, useOcupacionHoy)
-7. Adaptar GenerarReservasFicticias
+Vista Hoy
++-------------------------------------------+
+| Stats cards (4 columnas)                  |
+| [Reservas] [Comensales] [Capacidad]       |
+|                                           |
+| [Boton: Gestor Reservas]  [Ocupacion %]   |
++-------------------------------------------+
+|                                           |
+| Click "Gestor Reservas" abre:             |
++-------------------------------------------+
+
+Kanban (Dialog fullscreen)
++-------------+-------------+-------------+-------------+
+| Sin asignar | Comedor     | Salon       | Terraza     |
+| (12 res.)   | 24/40 pax   | 10/25 pax   | 15/40 pax   |
+|             | [===----]   | [==-----]   | [==-----]   |
+| [Card]      | [Card]      | [Card]      | [Card]      |
+| [Card]      | [Card]      |             |             |
+| [Card]      |             |             |             |
++-------------+-------------+-------------+-------------+
 ```
 
-La migracion SQL sera:
-```text
-ALTER TABLE reservas DROP CONSTRAINT IF EXISTS reservas_sala_id_fkey;
-ALTER TABLE reservas ALTER COLUMN sala_id DROP NOT NULL;
-ALTER TABLE reservas DROP COLUMN sala_id;
-```
-
-Tambien hay que actualizar el trigger `actualizar_ocupacion_diaria_espacios` y la tabla `ocupacion_diaria` ya que dependen de `sala_id` de reservas.
-
-## Notas importantes
-
-- Los datos existentes en Live tienen 1317 reservas con `sala_id`. Al eliminar la columna se perdera esa informacion. Si se necesita preservar, hay que correr la migracion en Live antes de publicar.
-- La pagina de **Espacios** (`src/pages/Espacios.tsx`) y los espacios de reserva como entidad independiente NO se eliminan, ya que pueden usarse para otros propositos (planos 2D, capacidad general).
+- Las tarjetas se arrastran entre columnas con `@dnd-kit`
+- Al soltar, se ejecuta `UPDATE reservas SET espacio_id = ? WHERE id = ?`
+- Actualizacion optimista del estado local para fluidez visual
 
