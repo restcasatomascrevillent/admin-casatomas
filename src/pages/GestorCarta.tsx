@@ -181,16 +181,16 @@ export default function GestorCarta() {
             Todos
           </ToggleGroupItem>
           <ToggleGroupItem value="activos" aria-label="Restaurante activos" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
-            🍽️ Activos
+            Restaurante Activos
           </ToggleGroupItem>
           <ToggleGroupItem value="inactivos_rest" aria-label="Restaurante inactivos" className="data-[state=on]:bg-amber-800 data-[state=on]:text-white">
-            🍽️ Inactivos
+            Restaurante Inactivos
           </ToggleGroupItem>
           <ToggleGroupItem value="activos_touza" aria-label="Touza activos" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
-            🍸 Activos
+            Touza Activos
           </ToggleGroupItem>
           <ToggleGroupItem value="inactivos_touza" aria-label="Touza inactivos" className="data-[state=on]:bg-purple-800 data-[state=on]:text-white">
-            🍸 Inactivos
+            Touza Inactivos
           </ToggleGroupItem>
         </ToggleGroup>
 
