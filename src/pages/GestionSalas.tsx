@@ -112,10 +112,20 @@ function KanbanCard({ reserva }: { reserva: any }) {
 }
 
 // ── Droppable kanban column ──
-function KanbanColumn({ espacio, reservas }: { espacio: any; reservas: any[] }) {
+function KanbanColumn({ espacio, reservas, searchTerm }: { espacio: any; reservas: any[]; searchTerm: string }) {
   const { isOver, setNodeRef } = useDroppable({
     id: espacio.id,
   });
+
+  const filtered = useMemo(() => {
+    if (!searchTerm) return reservas;
+    const t = searchTerm.toLowerCase();
+    return reservas.filter((r: any) =>
+      (r.nombre || "").toLowerCase().includes(t) ||
+      (r.email || "").toLowerCase().includes(t) ||
+      (r.telefono || "").toLowerCase().includes(t)
+    );
+  }, [reservas, searchTerm]);
 
   const totalComensales = reservas.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0);
 
@@ -136,16 +146,17 @@ function KanbanColumn({ espacio, reservas }: { espacio: any; reservas: any[] }) 
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {reservas.length} reserva{reservas.length !== 1 ? "s" : ""}
+          {searchTerm && filtered.length !== reservas.length && ` (${filtered.length} coinciden)`}
         </p>
       </div>
       <ScrollArea className="flex-1 p-2">
         <div className="space-y-1.5">
-          {reservas.length === 0 ? (
+          {filtered.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-6">
-              Arrastra reservas aquí
+              {searchTerm ? "Sin resultados" : "Arrastra reservas aquí"}
             </p>
           ) : (
-            reservas.map((r: any) => <KanbanCard key={r.id} reserva={r} />)
+            filtered.map((r: any) => <KanbanCard key={r.id} reserva={r} />)
           )}
         </div>
       </ScrollArea>
@@ -279,21 +290,23 @@ export default function GestionSalas() {
           </div>
         </div>
 
+        {/* Global search bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar en todas las reservas (nombre, email, teléfono)..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4 h-[calc(100vh-200px)]">
+          <div className="flex gap-4 h-[calc(100vh-240px)]">
             {/* ── Left sidebar: unassigned reservations ── */}
             <div className="w-[320px] shrink-0 flex flex-col border rounded-xl bg-card">
               <div className="p-3 border-b space-y-2">
-                <h3 className="font-semibold text-sm">Reservas sin asignar ({sinAsignar.length})</h3>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar..."
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    className="pl-9 h-9 text-sm"
-                  />
-                </div>
+                <h3 className="font-semibold text-sm">Sin asignar ({sinAsignar.length})</h3>
                 <div className="flex gap-2">
                   <Select value={filtroEstado} onValueChange={setFiltroEstado}>
                     <SelectTrigger className="h-8 text-xs flex-1">
@@ -340,6 +353,7 @@ export default function GestionSalas() {
                   key={espacio.id}
                   espacio={espacio}
                   reservas={porEspacio[espacio.id] || []}
+                  searchTerm={busqueda}
                 />
               ))}
             </div>
