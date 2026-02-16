@@ -19,7 +19,8 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Star, GripVertical, Phone } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -205,6 +206,7 @@ export function GestorReservasKanban() {
   const queryClient = useQueryClient();
   const { data: espacios } = useEspaciosReserva();
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const sensors = useSensors(
@@ -244,16 +246,26 @@ export function GestorReservasKanban() {
     return cols;
   }, [espaciosActivos]);
 
+  const reservasFiltradas = useMemo(() => {
+    if (!busqueda.trim()) return reservas || [];
+    const q = busqueda.toLowerCase().trim();
+    return (reservas || []).filter((r) =>
+      (r.nombre || "").toLowerCase().includes(q) ||
+      (r.email || "").toLowerCase().includes(q) ||
+      (r.telefono || "").includes(q)
+    );
+  }, [reservas, busqueda]);
+
   const reservasPorColumna = useMemo(() => {
     const map: Record<string, Reserva[]> = {};
     columnas.forEach((c) => (map[c.id] = []));
-    (reservas || []).forEach((r) => {
+    reservasFiltradas.forEach((r) => {
       const key = r.espacio_id || "sin-asignar";
       if (map[key]) map[key].push(r);
       else map["sin-asignar"].push(r);
     });
     return map;
-  }, [reservas, columnas]);
+  }, [reservasFiltradas, columnas]);
 
   const comensalesPorColumna = useMemo(() => {
     const map: Record<string, number> = {};
@@ -322,14 +334,24 @@ export function GestorReservasKanban() {
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      collisionDetection={closestCenter}
-      measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4 px-1">
+    <div className="space-y-3">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nombre, email o teléfono..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        collisionDetection={closestCenter}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4 px-1">
         {columnas.map((col) => (
           <KanbanColumn
             key={col.id}
@@ -353,6 +375,7 @@ export function GestorReservasKanban() {
       }}>
         {activeReserva ? <ReservaCard reserva={activeReserva} isDragOverlay /> : null}
       </DragOverlay>
-    </DndContext>
+      </DndContext>
+    </div>
   );
 }
