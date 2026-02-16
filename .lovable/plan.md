@@ -1,65 +1,73 @@
 
 
-## Tablas de Facturas y Albaranes: Drive URL + Observaciones + Selector de columnas
+# Eliminar `sala_id` del flujo de reservas
 
-### Resumen
+## Resumen
 
-Se van a hacer tres cosas:
-1. Mostrar el **drive_url** como boton en **ambas** tablas (facturas ya lo tiene, falta en albaranes)
-2. Mostrar **observaciones** en la tabla de facturas (ya esta en albaranes)
-3. Agregar un **selector de columnas** configurable para que puedas elegir que campos mostrar/ocultar en cada tabla
+Se eliminara completamente el concepto de "sala" (sala_id) del flujo de reservas. Esto afecta a la base de datos, formularios, listados, calendario y la pagina de Gestion de Salas (que se eliminara).
 
-### Todos los campos disponibles
+## Cambios en Base de Datos
 
-Estos son todos los campos de la tabla `facturas` en Supabase que se podran activar/desactivar:
+1. **Migracion SQL**: 
+   - Eliminar la constraint `reservas_sala_id_fkey` (foreign key)
+   - Hacer `sala_id` nullable primero, luego eliminarlo de la tabla `reservas`
+   - Actualizar la vista `vista_ocupacion_hoy` si depende de `sala_id`
+   - Actualizar el trigger `actualizar_ocupacion_diaria_espacios` que usa `sala_id` de reservas
+   - Actualizar la constraint unica de `ocupacion_diaria` que incluye `sala_id`
 
-| Campo | Descripcion |
-|---|---|
-| Numero | Numero de documento |
-| Proveedor | Nombre del proveedor |
-| CIF | Identificacion fiscal |
-| Fecha | Fecha del documento |
-| Subtotal | Importe sin IVA |
-| IVA | Importe del IVA |
-| Total | Importe total |
-| Observaciones | Notas del documento |
-| Items | Cantidad de productos |
-| Doc (Drive) | Enlace al documento en Google Drive |
-| Procesado en | Fecha/hora de procesamiento |
-| Creado | Fecha de creacion del registro |
+2. **Tipos TypeScript** (`src/integrations/supabase/types.ts`):
+   - Eliminar `sala_id` de las interfaces Row, Insert y Update de `reservas`
+   - Eliminar la relacion `reservas_sala_id_fkey`
 
-### Cambios por archivo
+## Pagina eliminada
 
-#### 1. `src/hooks/useFacturas.ts`
-- Agregar campos `procesado_en`, `created_at`, `updated_at` a la interfaz `Factura`
-- Mapear estos campos en la funcion `fetchDocumentosConProductos`
+- **`src/pages/GestionSalas.tsx`**: Se elimina completamente (su unica funcion era asignar salas a reservas via drag-and-drop)
+- **`src/App.tsx`**: Eliminar la ruta `/reservas/gestion` y el import de `GestionSalas`
 
-#### 2. `src/components/facturas/TablaFacturas.tsx`
-- Agregar columna **Observaciones** (con tooltip para textos largos)
-- Agregar columna **Procesado en** y **Creado**
-- Agregar un **boton de configuracion** (icono engranaje) que abre un popover con checkboxes para elegir que columnas mostrar
-- Estado de columnas visibles guardado con `useState` con valores por defecto razonables (Numero, Proveedor, Fecha, Total, Items, Doc activos por defecto)
-- En la subtabla de productos agregar Cantidad, Unidad, Precio unitario
+## Componentes modificados
 
-#### 3. `src/components/facturas/TablaAlbaranes.tsx`
-- Agregar boton **Doc (Drive)** igual que en facturas
-- Agregar columnas opcionales: CIF, Subtotal, IVA, Total, Procesado en, Creado
-- Agregar el mismo **selector de columnas** con checkboxes
-- Por defecto mostrar: Numero, Proveedor, Fecha, Observaciones, Items, Doc
-- En la subtabla de productos agregar Precio unitario y Total
+### Formularios
+- **`src/components/reservas/FormularioReserva.tsx`**: Eliminar `sala_id` del schema zod, del formulario y del insert a Supabase
+- **`src/components/reservas/ModalVerificacionReserva.tsx`**: Eliminar el campo de seleccion de sala, el estado `salaId`, y la referencia en el update. Quitar la validacion de `salaId` como obligatorio
+- **`src/components/reservas/GenerarReservasFicticias.tsx`**: Eliminar `sala_id` de los datos ficticios (ya no necesitara buscar espacios)
 
-#### 4. Mecanismo del selector de columnas (ambas tablas)
-- Un boton con icono de engranaje/columnas junto al buscador
-- Al hacer clic abre un `Popover` con una lista de checkboxes, uno por cada campo
-- Al marcar/desmarcar, la columna aparece/desaparece de la tabla
-- Se usa estado local (`useState`) para guardar la seleccion
+### Vistas y listados
+- **`src/components/reservas/VistaHoy.tsx`**: 
+  - Eliminar la tarjeta "Gestion de Salas" (link a `/reservas/gestion`)
+  - Eliminar el join con `espacios_reserva:sala_id` en la query
+- **`src/components/reservas/CalendarioOcupacion.tsx`**: Eliminar la agrupacion por `sala_id`/espacio en el panel lateral. Mostrar las reservas del dia sin agrupar
+- **`src/components/reservas/CalendarioReservaPublica.tsx`**: Eliminar la seleccion de sala. Simplificar para que no dependa de `sala_id`
 
-### Detalles tecnicos
+### Hooks
+- **`src/hooks/useOcupacionHoy.ts`**: Eliminar `useReservasHoyPorEspacio` que filtra por `sala_id`. Quitar el join `espacios_reserva!reservas_sala_id_fkey`
+- **`src/hooks/useDisponibilidad.ts`**: Refactorizar para que no dependa de `sala_id` en reservas. Las funciones de disponibilidad seguiran usando `espacios_reserva` directamente pero sin relacion con reservas
+- **`src/components/reservas/SelectorHorasDisponibles.tsx`**: Adaptar para funcionar sin `salaId` obligatorio
+- **`src/hooks/useAsignacionesMesa.ts`**: Eliminar referencia a `sala_id` en el select de reservas
 
-- Se reutiliza el componente `Popover` de Radix UI y `Checkbox` ya existentes
-- Las columnas se renderizan condicionalmente segun el estado de visibilidad
-- El `colSpan` de la fila expandible de productos se calcula dinamicamente segun columnas visibles
-- Los campos `embedding` y `embedding_observaciones` NO se incluyen (son datos internos del chatbot)
-- El campo `updated_at` se omite del selector por ser redundante con `procesado_en` y `creado`
-- Vista mobile: se mantiene el formato de tarjetas, mostrando todos los datos en la seccion expandible sin necesidad del selector de columnas
+## Seccion tecnica - Detalles de la migracion
+
+```text
+Orden de ejecucion:
+1. Migracion SQL (eliminar FK, luego columna)
+2. Actualizar types.ts
+3. Eliminar GestionSalas.tsx y su ruta
+4. Modificar formularios (FormularioReserva, ModalVerificacion)
+5. Modificar vistas (VistaHoy, Calendario, etc.)
+6. Modificar hooks (useDisponibilidad, useOcupacionHoy)
+7. Adaptar GenerarReservasFicticias
+```
+
+La migracion SQL sera:
+```text
+ALTER TABLE reservas DROP CONSTRAINT IF EXISTS reservas_sala_id_fkey;
+ALTER TABLE reservas ALTER COLUMN sala_id DROP NOT NULL;
+ALTER TABLE reservas DROP COLUMN sala_id;
+```
+
+Tambien hay que actualizar el trigger `actualizar_ocupacion_diaria_espacios` y la tabla `ocupacion_diaria` ya que dependen de `sala_id` de reservas.
+
+## Notas importantes
+
+- Los datos existentes en Live tienen 1317 reservas con `sala_id`. Al eliminar la columna se perdera esa informacion. Si se necesita preservar, hay que correr la migracion en Live antes de publicar.
+- La pagina de **Espacios** (`src/pages/Espacios.tsx`) y los espacios de reserva como entidad independiente NO se eliminan, ya que pueden usarse para otros propositos (planos 2D, capacidad general).
 
