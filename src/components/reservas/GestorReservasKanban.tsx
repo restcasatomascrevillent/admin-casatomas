@@ -19,7 +19,7 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -379,37 +379,22 @@ export function GestorReservasKanban() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-          <Input
-            placeholder="Buscar reserva..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9 pr-8 h-9 text-sm bg-muted/30 border-transparent focus-visible:border-input focus-visible:bg-background transition-colors"
-          />
-          {busqueda && (
-            <button
-              onClick={() => setBusqueda("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        {busqueda && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {reservasFiltradas.length} resultado{reservasFiltradas.length !== 1 ? "s" : ""}
-          </span>
-        )}
+    <div className="space-y-3">
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por nombre, email o teléfono..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="pl-9"
+        />
       </div>
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
-        measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       >
         <div className="flex gap-4 overflow-x-auto pb-4 px-1">
         {columnas.map((col) => (
