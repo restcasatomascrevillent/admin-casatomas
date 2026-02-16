@@ -394,7 +394,7 @@ export function GestorReservasKanban() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
       >
         <div className="flex gap-4 overflow-x-auto pb-4 px-1">
         {columnas.map((col) => (
