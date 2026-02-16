@@ -34,7 +34,7 @@ export default function GestorCarta() {
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
   const [categoriaCocteles, setCategoriaCocteles] = useState<string>("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos_rest" | "inactivos_touza">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza">("todos");
   const [filtroWeb, setFiltroWeb] = useState<FiltroWeb>("todos");
   const [busqueda, setBusqueda] = useState<string>("");
   
@@ -62,10 +62,13 @@ export default function GestorCarta() {
 
   const filtrarPorEstado = <T extends { activado: boolean | null; restaurante?: boolean | null; touza?: boolean | null }>(items: T[]): T[] => {
     if (filtroEstado === "activos") {
-      return items.filter((item) => item.activado !== false);
+      return items.filter((item) => item.restaurante === true);
     }
     if (filtroEstado === "inactivos_rest") {
       return items.filter((item) => item.restaurante !== true);
+    }
+    if (filtroEstado === "activos_touza") {
+      return items.filter((item) => item.touza === true);
     }
     if (filtroEstado === "inactivos_touza") {
       return items.filter((item) => item.touza !== true);
@@ -156,25 +159,6 @@ export default function GestorCarta() {
             </p>
           </div>
           <div className="flex gap-3 items-center flex-wrap">
-            <ToggleGroup 
-              type="single" 
-              value={filtroEstado} 
-              onValueChange={(value) => value && setFiltroEstado(value as typeof filtroEstado)}
-              className="border rounded-md"
-            >
-              <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                Todos
-              </ToggleGroupItem>
-              <ToggleGroupItem value="activos" aria-label="Mostrar activos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-                Activos
-              </ToggleGroupItem>
-              <ToggleGroupItem value="inactivos_rest" aria-label="Inactivos Restaurante" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
-                🍽️ Inactivos
-              </ToggleGroupItem>
-              <ToggleGroupItem value="inactivos_touza" aria-label="Inactivos Touza" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
-                🍸 Inactivos
-              </ToggleGroupItem>
-            </ToggleGroup>
             <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
               <Percent className="mr-2 h-4 w-4" />
               Ajustar Precios
@@ -185,6 +169,30 @@ export default function GestorCarta() {
             </Button>
           </div>
         </div>
+
+        {/* Filtros de visibilidad */}
+        <ToggleGroup 
+          type="single" 
+          value={filtroEstado} 
+          onValueChange={(value) => value && setFiltroEstado(value as typeof filtroEstado)}
+          className="border rounded-md w-fit"
+        >
+          <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+            Todos
+          </ToggleGroupItem>
+          <ToggleGroupItem value="activos" aria-label="Restaurante activos" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
+            🍽️ Activos
+          </ToggleGroupItem>
+          <ToggleGroupItem value="inactivos_rest" aria-label="Restaurante inactivos" className="data-[state=on]:bg-amber-800 data-[state=on]:text-white">
+            🍽️ Inactivos
+          </ToggleGroupItem>
+          <ToggleGroupItem value="activos_touza" aria-label="Touza activos" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
+            🍸 Activos
+          </ToggleGroupItem>
+          <ToggleGroupItem value="inactivos_touza" aria-label="Touza inactivos" className="data-[state=on]:bg-purple-800 data-[state=on]:text-white">
+            🍸 Inactivos
+          </ToggleGroupItem>
+        </ToggleGroup>
 
         {/* Buscador y Filtro Web */}
         <div className="flex gap-3 flex-col sm:flex-row">
