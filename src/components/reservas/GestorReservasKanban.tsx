@@ -175,7 +175,7 @@ function KanbanColumn({
       ref={setNodeRef}
       className={cn(
         "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[250px] w-[270px] shrink-0 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none",
-        isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10 scale-[1.01]",
+        isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
         !isOver && "border-transparent",
         isActive && !isOver && "border-muted-foreground/10"
       )}
@@ -396,7 +396,7 @@ export function GestorReservasKanban() {
         collisionDetection={closestCenter}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4 px-1">
+        <div className="flex gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1">
         {columnas.map((col) => (
           <KanbanColumn
             key={col.id}
