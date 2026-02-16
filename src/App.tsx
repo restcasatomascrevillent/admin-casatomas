@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
+import GestionSalas from "./pages/GestionSalas";
 import Espacios from "./pages/Espacios";
 import Trabajadores from "./pages/Trabajadores";
 import GestorCarta from "./pages/GestorCarta";
@@ -48,6 +49,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Reservas />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reservas/gestion"
+            element={
+              <ProtectedRoute>
+                <GestionSalas />
               </ProtectedRoute>
             }
           />

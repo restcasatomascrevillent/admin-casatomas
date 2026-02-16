@@ -1,13 +1,15 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, LayoutGrid } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -27,6 +29,7 @@ const ESTADOS_RESERVA = {
 };
 
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
+  const navigate = useNavigate();
   const { data: resumen, isLoading } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
@@ -83,7 +86,21 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
+        {/* Gestión de salas button */}
+        <Card
+          className="border-2 border-destructive/50 bg-destructive/5 hover:bg-destructive/10 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
+          onClick={() => navigate("/reservas/gestion")}
+        >
+          <CardContent className="p-6 flex flex-col items-center justify-center h-full">
+            <div className="p-3 rounded-full bg-destructive/10 mb-2">
+              <LayoutGrid className="h-5 w-5 text-destructive" />
+            </div>
+            <p className="font-bold text-destructive text-sm text-center">Gestión de Salas</p>
+            <p className="text-xs text-muted-foreground text-center mt-1">Asignar reservas</p>
+          </CardContent>
+        </Card>
+
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
