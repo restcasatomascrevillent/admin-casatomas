@@ -280,21 +280,6 @@ export function ListaReservasAvanzada({
               </PopoverContent>
             </Popover>
 
-            {/* Filtro de espacio */}
-            <Select value={espacioFilter} onValueChange={setEspacioFilter}>
-              <SelectTrigger className="w-[180px]">
-                <MapPin className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Espacio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los espacios</SelectItem>
-                {espacios?.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
 
             {/* Filtro de estado */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -328,7 +313,6 @@ export function ListaReservasAvanzada({
                 <TableHead>Hora</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Comensales</TableHead>
-                <TableHead>Espacio</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -337,7 +321,7 @@ export function ListaReservasAvanzada({
             <TableBody>
               {filteredReservations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No se encontraron reservas con los filtros aplicados
                   </TableCell>
                 </TableRow>
@@ -370,19 +354,6 @@ export function ListaReservasAvanzada({
                         <Users className="h-4 w-4 text-muted-foreground" />
                         {reservation.numero_comensales}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {reservation.espacios_reserva?.nombre ? (
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto font-normal"
-                          onClick={() => onEspacioClick?.(reservation.sala_id)}
-                        >
-                          {reservation.espacios_reserva.nombre}
-                        </Button>
-                      ) : (
-                        "-"
-                      )}
                     </TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
