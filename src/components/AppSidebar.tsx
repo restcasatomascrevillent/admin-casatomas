@@ -26,7 +26,7 @@ const menuItems: { title: string; url: string; icon: React.ComponentType<any>; s
   { title: "Gestor Carta", url: "/gestor-carta", icon: BookOpen, sectionKey: "gestor_carta" },
   { title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" },
   { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
-  { title: "Gestión Bot", url: "/gestion-bot", icon: Bot, sectionKey: "gestion_bot" },
+  { title: "Gestor Bot", url: "/gestion-bot", icon: Bot, sectionKey: "gestion_bot" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
