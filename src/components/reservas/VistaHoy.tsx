@@ -338,14 +338,14 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </Card>
 
       <Dialog open={kanbanOpen} onOpenChange={setKanbanOpen}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-hidden">
+        <DialogContent className="max-w-[95vw] w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LayoutGrid className="h-5 w-5" />
               Gestor de Reservas por Espacio
             </DialogTitle>
           </DialogHeader>
-          <div className="overflow-auto">
+          <div className="overflow-auto flex-1">
             <GestorReservasKanban />
           </div>
         </DialogContent>
