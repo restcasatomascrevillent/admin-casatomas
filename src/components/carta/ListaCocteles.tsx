@@ -79,25 +79,6 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 compact
               />
 
-              {coctel.descripcion && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {coctel.descripcion}
-                </p>
-              )}
-
-              {coctel.ingredientes && (
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-medium">Ingredientes: </span>
-                  {coctel.ingredientes}
-                </div>
-              )}
-
-              {(coctel as any).base && (
-                <div className="text-xs text-muted-foreground">
-                  <span className="font-medium">Base: </span>
-                  {(coctel as any).base}
-                </div>
-              )}
 
               {/* Alérgenos */}
               {coctel.alergenos_oficiales && Array.isArray(coctel.alergenos_oficiales) && coctel.alergenos_oficiales.length > 0 && (
