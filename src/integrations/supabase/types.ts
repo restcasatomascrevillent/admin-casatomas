@@ -526,6 +526,33 @@ export type Database = {
         }
         Relationships: []
       }
+      chatbot_config: {
+        Row: {
+          clave: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          clave: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          updated_at?: string
+          valor?: string
+        }
+        Update: {
+          clave?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       Cocteles: {
         Row: {
           activado: boolean | null

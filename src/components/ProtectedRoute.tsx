@@ -18,6 +18,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/trabajadores": "trabajadores",
   "/gestor-carta": "gestor_carta",
   "/gestion-web": "gestion_web",
+  "/gestion-bot": "gestion_bot",
   "/marketing": "marketing",
   "/facturas": "facturas",
   "/analisis": "analisis",
