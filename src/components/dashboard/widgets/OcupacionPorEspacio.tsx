@@ -26,7 +26,7 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg font-semibold">Ocupación por Espacio</CardTitle>
+          <CardTitle className="text-lg font-semibold">Ocupación de Hoy</CardTitle>
           <Building2 className="h-5 w-5 text-primary" />
         </CardHeader>
         <CardContent>
@@ -47,7 +47,7 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
     return (
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg font-semibold">Ocupación por Espacio</CardTitle>
+          <CardTitle className="text-lg font-semibold">Ocupación de Hoy</CardTitle>
           <Building2 className="h-5 w-5 text-primary" />
         </CardHeader>
         <CardContent>
@@ -69,7 +69,7 @@ export function OcupacionPorEspacio({ className }: OcupacionPorEspacioProps) {
   return (
     <Card className={`h-full ${className || ''}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base sm:text-lg font-semibold">Ocupación por Espacio</CardTitle>
+        <CardTitle className="text-base sm:text-lg font-semibold">Ocupación de Hoy</CardTitle>
         <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
       </CardHeader>
       <CardContent className="space-y-3">
