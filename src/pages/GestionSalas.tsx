@@ -159,8 +159,9 @@ function KanbanCard({ reserva, onBlacklist, onToggleImportante }: { reserva: any
     <div
       ref={setNodeRef}
       className={cn(
-        "group flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all",
-        isDragging && "opacity-30 scale-95"
+        "group flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all",
+         reserva.importante ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/40" : "bg-card",
+         isDragging && "opacity-30 scale-95"
       )}
       {...listeners}
       {...attributes}

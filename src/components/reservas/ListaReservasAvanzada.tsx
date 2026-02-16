@@ -327,7 +327,7 @@ export function ListaReservasAvanzada({
                 </TableRow>
               ) : (
                 filteredReservations.map((reservation) => (
-                  <TableRow key={reservation.id}>
+                   <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
                     <TableCell>
                       {new Date(reservation.fecha).toLocaleDateString("es-ES")}
                     </TableCell>
