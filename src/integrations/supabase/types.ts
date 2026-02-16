@@ -1216,6 +1216,51 @@ export type Database = {
         }
         Relationships: []
       }
+      historial_precios: {
+        Row: {
+          created_at: string | null
+          factura_id: number | null
+          fecha: string | null
+          id: string
+          precio: number | null
+          producto_nombre: string | null
+          proveedor: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha?: string | null
+          id?: string
+          precio?: number | null
+          producto_nombre?: string | null
+          proveedor?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha?: string | null
+          id?: string
+          precio?: number | null
+          producto_nombre?: string | null
+          proveedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       imagenes_base64: {
         Row: {
           categoria: string | null
