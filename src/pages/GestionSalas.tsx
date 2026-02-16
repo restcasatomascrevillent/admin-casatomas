@@ -4,17 +4,14 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useCrearBlacklist } from "@/hooks/useBlacklist";
-import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle, ShieldBan, Loader2 } from "lucide-react";
+import { BlacklistModal } from "@/components/reservas/BlacklistModal";
+import { ArrowLeft, Search, Users, Clock, GripVertical, Phone, Mail, MapPin, CalendarCheck, AlertCircle, ShieldBan } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -298,15 +295,9 @@ export default function GestionSalas() {
   const [ordenar, setOrdenar] = useState("hora");
   const [activeReserva, setActiveReserva] = useState<any>(null);
   const [blacklistTarget, setBlacklistTarget] = useState<any>(null);
-  const [blacklistMotivo, setBlacklistMotivo] = useState("");
-  const [blacklistTipo, setBlacklistTipo] = useState<"email" | "telefono">("email");
-
-  const crearBlacklist = useCrearBlacklist();
 
   const openBlacklistModal = (reserva: any) => {
     setBlacklistTarget(reserva);
-    setBlacklistMotivo("");
-    setBlacklistTipo(reserva.email ? "email" : "telefono");
   };
 
   const hoy = format(new Date(), "yyyy-MM-dd");
@@ -557,102 +548,11 @@ export default function GestionSalas() {
             {activeReserva ? <ReservaOverlay reserva={activeReserva} /> : null}
           </DragOverlay>
         </DndContext>
-        {/* ── Blacklist Modal ── */}
-        <Dialog open={!!blacklistTarget} onOpenChange={(open) => { if (!open) { setBlacklistTarget(null); setBlacklistMotivo(""); } }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ShieldBan className="h-5 w-5 text-destructive" />
-                Añadir a Lista Negra
-              </DialogTitle>
-              <DialogDescription>
-                Esta persona no podrá realizar futuras reservas.
-              </DialogDescription>
-            </DialogHeader>
-
-            {blacklistTarget && (
-              <div className="space-y-4">
-                {/* Info de la reserva */}
-                <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
-                  <p className="text-sm font-semibold">{blacklistTarget.nombre || "Sin nombre"}</p>
-                  {blacklistTarget.email && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <Mail className="h-3 w-3" /> {blacklistTarget.email}
-                    </p>
-                  )}
-                  {blacklistTarget.telefono && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <Phone className="h-3 w-3" /> {blacklistTarget.telefono}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <Clock className="h-3 w-3" />
-                    {typeof blacklistTarget.hora === "string" ? blacklistTarget.hora.substring(0, 5) : blacklistTarget.hora}
-                    {" · "}
-                    <Users className="h-3 w-3" /> {blacklistTarget.numero_comensales} pax
-                  </p>
-                </div>
-
-                {/* Tipo de bloqueo */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Bloquear por</Label>
-                  <Select value={blacklistTipo} onValueChange={(v) => setBlacklistTipo(v as "email" | "telefono")}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {blacklistTarget.email && <SelectItem value="email">Email: {blacklistTarget.email}</SelectItem>}
-                      {blacklistTarget.telefono && <SelectItem value="telefono">Teléfono: {blacklistTarget.telefono}</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Motivo */}
-                <div className="space-y-2">
-                  <Label className="text-sm">Motivo del bloqueo</Label>
-                  <Textarea
-                    placeholder="Describe el motivo por el cual esta persona será bloqueada..."
-                    value={blacklistMotivo}
-                    onChange={(e) => setBlacklistMotivo(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </div>
-            )}
-
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => { setBlacklistTarget(null); setBlacklistMotivo(""); }}>
-                Cancelar
-              </Button>
-              <Button
-                variant="destructive"
-                disabled={!blacklistMotivo.trim() || crearBlacklist.isPending}
-                onClick={async () => {
-                  if (!blacklistTarget) return;
-                  const valor = blacklistTipo === "email" ? blacklistTarget.email : blacklistTarget.telefono;
-                  if (!valor) {
-                    toast.error("No hay " + blacklistTipo + " para esta reserva");
-                    return;
-                  }
-                  await crearBlacklist.mutateAsync({
-                    tipo: blacklistTipo,
-                    valor,
-                    nombre: blacklistTarget.nombre || null,
-                    motivo: blacklistMotivo.trim(),
-                  });
-                  setBlacklistTarget(null);
-                  setBlacklistMotivo("");
-                }}
-              >
-                {crearBlacklist.isPending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Añadiendo...</>
-                ) : (
-                  <><ShieldBan className="h-4 w-4 mr-1" /> Añadir a Lista Negra</>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <BlacklistModal
+          reserva={blacklistTarget}
+          open={!!blacklistTarget}
+          onOpenChange={(open) => { if (!open) setBlacklistTarget(null); }}
+        />
       </div>
     </DashboardLayout>
   );
