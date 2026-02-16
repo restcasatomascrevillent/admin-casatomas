@@ -209,7 +209,7 @@ function KanbanColumn({
         )}
       </div>
       {/* Cards */}
-      <ScrollArea className="flex-1 max-h-[55vh]">
+      <ScrollArea className="flex-1 max-h-[70vh]">
         <div className={cn(
           "p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl",
           isOver && "bg-primary/[0.02]"
