@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ const ESTADOS_RESERVA = {
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const { data: resumen, isLoading } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
-
+  const [busqueda, setBusqueda] = useState("");
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const { data: reservasHoy, isLoading: loadingReservas } = useQuery({
@@ -149,108 +149,36 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         </Card>
       </div>
 
-      {/* Lista de espacios */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Espacios del Restaurante
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!resumen?.espacios?.length ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No hay espacios configurados</p>
-              <p className="text-sm">Crea espacios desde la sección de Espacios</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {resumen.espacios.map((espacio) => (
-                <Card
-                  key={espacio.espacio_id}
-                  className={cn(
-                    "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-                    "border-2 hover:scale-[1.02]"
-                  )}
-                  onClick={() => onEspacioClick(espacio.espacio_id)}
-                >
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-4">
-                      <h4 className="font-semibold text-lg">{espacio.espacio_nombre}</h4>
-                      <Badge
-                        variant={
-                          espacio.porcentaje_ocupacion > 80
-                            ? "destructive"
-                            : espacio.porcentaje_ocupacion > 50
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {espacio.porcentaje_ocupacion}%
-                      </Badge>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="mb-4">
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn(
-                            "h-full transition-all",
-                            espacio.porcentaje_ocupacion > 80
-                              ? "bg-destructive"
-                              : espacio.porcentaje_ocupacion > 50
-                              ? "bg-primary"
-                              : "bg-green-500"
-                          )}
-                          style={{ width: `${Math.min(espacio.porcentaje_ocupacion, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Reservas</p>
-                        <p className="font-semibold text-lg">{espacio.total_reservas}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Comensales</p>
-                        <p className="font-semibold text-lg">
-                          {espacio.total_comensales}/{espacio.capacidad_maxima}
-                        </p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground mt-3 text-center">
-                      Click para ver plano y mesas
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Lista de reservas del día */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <List className="h-5 w-5" />
               Reservas de Hoy
             </CardTitle>
-            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filtrar por estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los estados</SelectItem>
-                {Object.entries(ESTADOS_RESERVA).map(([key, { label }]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-none">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar nombre, email, teléfono..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  className="pl-9 w-full sm:w-[250px]"
+                />
+              </div>
+              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {Object.entries(ESTADOS_RESERVA).map(([key, { label }]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -264,9 +192,18 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
           ) : (
             <>
               {(() => {
+                const term = busqueda.toLowerCase();
+                const reservasBuscadas = reservasHoy.filter(r => {
+                  const matchBusqueda = !term || 
+                    (r.nombre || "").toLowerCase().includes(term) ||
+                    (r.email || "").toLowerCase().includes(term) ||
+                    (r.telefono || "").toLowerCase().includes(term) ||
+                    (r.notas_cliente || "").toLowerCase().includes(term);
+                  return matchBusqueda;
+                });
                 const reservasFiltradas = filtroEstado === "todos" 
-                  ? reservasHoy 
-                  : reservasHoy.filter(r => r.estado === filtroEstado);
+                  ? reservasBuscadas 
+                  : reservasBuscadas.filter(r => r.estado === filtroEstado);
 
                 if (!reservasFiltradas.length) {
                   return (
@@ -283,9 +220,8 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                         <TableHead>Hora</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Contacto</TableHead>
-                        <TableHead>Comensales</TableHead>
-                        <TableHead>Sala</TableHead>
-                        <TableHead>Estado</TableHead>
+                         <TableHead>Comensales</TableHead>
+                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -333,10 +269,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                                 {reserva.numero_comensales}
                               </div>
                             </TableCell>
-                            <TableCell>
-                              {(reserva.espacios_reserva as any)?.nombre || "-"}
-                            </TableCell>
-                            <TableCell>
+                             <TableCell>
                               <Badge className={cn("text-white", estadoInfo.color)}>
                                 {estadoInfo.label}
                               </Badge>
