@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star } from "lucide-react";
+import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star, LayoutGrid } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { BlacklistModal } from "./BlacklistModal";
+import { GestorReservasKanban } from "./GestorReservasKanban";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
@@ -38,6 +40,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
   const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
+  const [kanbanOpen, setKanbanOpen] = useState(false);
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const toggleImportante = async (reserva: any) => {
@@ -145,21 +148,32 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Ocupación Media
-                </p>
-                <p className="text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
+        {/* Botón Gestor Reservas + Ocupación Media */}
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => setKanbanOpen(true)}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Gestor Reservas
+          </Button>
+          <Card className="border-l-4 border-l-green-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Ocupación Media
+                  </p>
+                  <p className="text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
+                </div>
+                <div className="p-3 rounded-full bg-green-500/10">
+                  <TrendingUp className="h-5 w-5 text-green-500" />
+                </div>
               </div>
-              <div className="p-3 rounded-full bg-green-500/10">
-                <TrendingUp className="h-5 w-5 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Lista de reservas del día */}
@@ -323,6 +337,20 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={kanbanOpen} onOpenChange={setKanbanOpen}>
+        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5" />
+              Gestor de Reservas por Espacio
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto">
+            <GestorReservasKanban />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <BlacklistModal
         reserva={blacklistReserva}

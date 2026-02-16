@@ -2332,6 +2332,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           en_blacklist: boolean | null
+          espacio_id: string | null
           estado: string
           fecha: string
           hora: string
@@ -2347,6 +2348,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
+          espacio_id?: string | null
           estado?: string
           fecha: string
           hora: string
@@ -2362,6 +2364,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
+          espacio_id?: string | null
           estado?: string
           fecha?: string
           hora?: string
@@ -2373,7 +2376,15 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reservas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scope_prices: {
         Row: {
