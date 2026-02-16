@@ -6,7 +6,6 @@ import { format, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 export interface EstadisticaDiaria {
   fecha: string;
   hora: string;
-  espacio_id: string;
   total_reservas: number;
   total_comensales: number;
   reservas_confirmadas: number;
@@ -20,8 +19,6 @@ export interface EstadisticaDiaria {
 export interface EstadisticaSemanal {
   semana_inicio: string;
   semana_fin: string;
-  espacio_id: string;
-  espacio_nombre: string;
   total_reservas: number;
   total_comensales: number;
   reservas_confirmadas: number;
@@ -37,8 +34,6 @@ export interface EstadisticaSemanal {
 export interface EstadisticaMensual {
   mes_inicio: string;
   mes_fin: string;
-  espacio_id: string;
-  espacio_nombre: string;
   total_reservas: number;
   total_comensales: number;
   reservas_confirmadas: number;

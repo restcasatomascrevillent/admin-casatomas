@@ -47,21 +47,15 @@ export function useResumenOcupacionHoy() {
   return { data: resumen, ...rest };
 }
 
-export function useReservasHoyPorEspacio(espacioId?: string) {
+export function useReservasHoyPorEspacio() {
   return useQuery({
-    queryKey: ["reservas_hoy_espacio", espacioId],
+    queryKey: ["reservas_hoy_todas"],
     queryFn: async () => {
-      if (!espacioId) return [];
-
       const today = new Date().toISOString().split("T")[0];
 
       const { data, error } = await supabase
         .from("reservas")
-        .select(`
-          *,
-          espacios_reserva!reservas_sala_id_fkey (nombre)
-        `)
-        .eq("sala_id", espacioId)
+        .select("*")
         .eq("fecha", today)
         .neq("estado", "cancelada")
         .order("hora");
@@ -69,6 +63,5 @@ export function useReservasHoyPorEspacio(espacioId?: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!espacioId,
   });
 }

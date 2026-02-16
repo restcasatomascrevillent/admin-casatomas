@@ -521,7 +521,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
   const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(fechaActual, espacioId);
-  const { data: reservasHoy } = useReservasHoyPorEspacio(espacioId);
+  const { data: reservasHoy } = useReservasHoyPorEspacio();
 
   const crearMesa = useCrearMesa();
   const actualizarMesasSilent = useActualizarMesasSilent();

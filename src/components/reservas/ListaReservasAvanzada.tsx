@@ -14,7 +14,6 @@ import {
   Search, 
   Users,
   Calendar,
-  MapPin,
   Loader2,
   ShieldBan,
   Star
@@ -24,7 +23,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
 import { BlacklistModal } from "./BlacklistModal";
 
@@ -38,10 +36,6 @@ interface Reservation {
   nombre: string;
   telefono: string;
   email: string | null;
-  sala_id: string;
-  espacios_reserva: {
-    nombre: string;
-  } | null;
 }
 
 interface ListaReservasAvanzadaProps {
@@ -76,10 +70,9 @@ export function ListaReservasAvanzada({
   // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
-  const [espacioFilter, setEspacioFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
 
-  const { data: espacios } = useEspaciosReserva();
+
 
   useEffect(() => {
     fetchReservations();
@@ -90,17 +83,8 @@ export function ListaReservasAvanzada({
     const { data, error } = await supabase
       .from("reservas")
       .select(`
-        id,
-        fecha,
-        hora,
-        numero_comensales,
-        estado,
-        notas_cliente,
-        nombre,
-        telefono,
-        email,
-        sala_id,
-        espacios_reserva!reservas_sala_id_fkey (nombre)
+        id, fecha, hora, numero_comensales, estado, notas_cliente,
+        nombre, telefono, email
       `)
       .order("fecha", { ascending: false })
       .order("hora", { ascending: true });
@@ -186,11 +170,6 @@ export function ListaReservasAvanzada({
     
     // Filtro de estado
     if (statusFilter !== "all" && r.estado !== statusFilter) {
-      return false;
-    }
-    
-    // Filtro de espacio
-    if (espacioFilter !== "all" && r.sala_id !== espacioFilter) {
       return false;
     }
     

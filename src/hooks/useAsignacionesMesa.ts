@@ -38,8 +38,7 @@ export function useAsignacionesMesa(fecha?: string, espacioId?: string) {
             hora,
             numero_comensales,
             estado,
-            fecha,
-            sala_id
+            fecha
           ),
           mesas!inner (
             id,
