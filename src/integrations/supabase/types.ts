@@ -766,6 +766,51 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracion_reservas: {
+        Row: {
+          auto_confirmar: boolean
+          created_at: string
+          dias_max_antelacion: number
+          email_obligatorio: boolean
+          id: string
+          max_comensales_por_reserva: number
+          max_reservas_por_email_dia: number
+          max_reservas_por_telefono_dia: number
+          min_comensales_por_reserva: number
+          minutos_corte_antes_servicio: number
+          telefono_obligatorio: boolean
+          updated_at: string
+        }
+        Insert: {
+          auto_confirmar?: boolean
+          created_at?: string
+          dias_max_antelacion?: number
+          email_obligatorio?: boolean
+          id?: string
+          max_comensales_por_reserva?: number
+          max_reservas_por_email_dia?: number
+          max_reservas_por_telefono_dia?: number
+          min_comensales_por_reserva?: number
+          minutos_corte_antes_servicio?: number
+          telefono_obligatorio?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auto_confirmar?: boolean
+          created_at?: string
+          dias_max_antelacion?: number
+          email_obligatorio?: boolean
+          id?: string
+          max_comensales_por_reserva?: number
+          max_reservas_por_email_dia?: number
+          max_reservas_por_telefono_dia?: number
+          min_comensales_por_reserva?: number
+          minutos_corte_antes_servicio?: number
+          telefono_obligatorio?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       configuracion_turnos: {
         Row: {
           activo: boolean

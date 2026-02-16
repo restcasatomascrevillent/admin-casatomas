@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ConfiguracionGeneralReservas } from "./ConfiguracionGeneralReservas";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -165,7 +166,10 @@ export function ConfiguracionTurnos() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Configuración general de reservas */}
+      <ConfiguracionGeneralReservas />
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">Configuración de Turnos</h3>
