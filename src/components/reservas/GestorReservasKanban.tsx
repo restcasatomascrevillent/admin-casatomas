@@ -19,7 +19,7 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Star, GripVertical, Phone, Search } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -131,6 +131,8 @@ function KanbanColumn({
   children,
   count,
   isActive,
+  minimized,
+  onToggleMinimize,
 }: {
   id: string;
   title: string;
@@ -139,10 +141,34 @@ function KanbanColumn({
   children: React.ReactNode;
   count: number;
   isActive: boolean;
+  minimized: boolean;
+  onToggleMinimize: () => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   const porcentaje = capacidadMax ? Math.min(100, Math.round((comensalesActuales / capacidadMax) * 100)) : 0;
   const excedido = capacidadMax ? comensalesActuales > capacidadMax : false;
+
+  if (minimized) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[52px] shrink-0 transition-all duration-200 cursor-pointer",
+          isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
+          !isOver && "border-transparent hover:border-muted-foreground/20",
+        )}
+        onClick={onToggleMinimize}
+      >
+        <div className="p-2 flex flex-col items-center gap-2">
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-semibold [writing-mode:vertical-lr] rotate-180 whitespace-nowrap">
+            {title}
+          </span>
+          <Badge variant="secondary" className="text-[10px] px-1.5 tabular-nums">{count}</Badge>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -160,7 +186,16 @@ function KanbanColumn({
         isOver && "bg-primary/5"
       )}>
         <div className="flex items-center justify-between">
-          <h4 className="font-semibold text-sm">{title}</h4>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onToggleMinimize}
+              className="p-0.5 rounded hover:bg-muted transition-colors"
+              title="Minimizar columna"
+            >
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+            <h4 className="font-semibold text-sm">{title}</h4>
+          </div>
           <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
         {capacidadMax != null && (
@@ -207,7 +242,17 @@ export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
   const hoy = format(new Date(), "yyyy-MM-dd");
+
+  const toggleMinimize = (colId: string) => {
+    setMinimizedCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      return next;
+    });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -361,6 +406,8 @@ export function GestorReservasKanban() {
             comensalesActuales={comensalesPorColumna[col.id] || 0}
             count={reservasPorColumna[col.id]?.length || 0}
             isActive={!!activeReserva}
+            minimized={minimizedCols.has(col.id)}
+            onToggleMinimize={() => toggleMinimize(col.id)}
           >
             {(reservasPorColumna[col.id] || []).map((reserva) => (
               <ReservaCard key={reserva.id} reserva={reserva} />
