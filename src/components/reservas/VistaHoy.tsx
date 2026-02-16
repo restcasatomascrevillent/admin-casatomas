@@ -84,24 +84,22 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header con fecha */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 rounded-xl bg-primary/10">
-          <CalendarCheck className="h-6 w-6 text-primary" />
+      {/* Header con fecha + Botón Gestor */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-primary/10">
+            <CalendarCheck className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold">
+              {format(today, "EEEE, d 'de' MMMM", { locale: es })}
+            </h3>
+            <p className="text-muted-foreground">Resumen de ocupación del día</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-2xl font-bold">
-            {format(today, "EEEE, d 'de' MMMM", { locale: es })}
-          </h3>
-          <p className="text-muted-foreground">Resumen de ocupación del día</p>
-        </div>
-      </div>
-
-      {/* Botón Gestor Reservas */}
-      <div className="flex justify-end">
         <Button
           variant="outline"
-          className="gap-2"
+          className="gap-2 shrink-0"
           onClick={() => setKanbanOpen(true)}
         >
           <LayoutGrid className="h-4 w-4" />
