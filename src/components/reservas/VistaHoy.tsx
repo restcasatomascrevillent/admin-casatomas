@@ -338,7 +338,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </Card>
 
       <Dialog open={kanbanOpen} onOpenChange={setKanbanOpen}>
-        <DialogContent className="max-w-[95vw] w-full h-[90vh] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-[98vw] sm:max-w-[95vw] w-full h-[95vh] sm:h-[90vh] max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LayoutGrid className="h-5 w-5" />
