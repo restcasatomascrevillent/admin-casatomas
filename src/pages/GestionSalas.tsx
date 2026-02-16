@@ -159,53 +159,25 @@ function KanbanCard({ reserva, onBlacklist, onToggleImportante }: { reserva: any
     <div
       ref={setNodeRef}
       className={cn(
-        "group flex items-center gap-2 px-3 py-2 rounded-lg border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all",
+        "group flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-card text-sm cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all",
         isDragging && "opacity-30 scale-95"
       )}
       {...listeners}
       {...attributes}
     >
-      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground shrink-0 transition-colors" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1">
-          <span className="truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
-              className={cn("p-0.5 rounded hover:scale-110 transition-all", reserva.importante ? "" : "opacity-0 group-hover:opacity-100")}
-              title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
-            >
-              <Star className={cn("h-3 w-3", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
-            </button>
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); onBlacklist(reserva); }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10"
-              title="Añadir a lista negra"
-            >
-              <ShieldBan className="h-3 w-3 text-destructive" />
-            </button>
-            <div className={cn("w-2 h-2 rounded-full shrink-0", estadoInfo.color)} title={estadoInfo.label} />
-          </div>
-        </div>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-          <span className="flex items-center gap-0.5">
-            <Clock className="h-2.5 w-2.5" />
-            {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
-          </span>
-          <span className="flex items-center gap-0.5">
-            <Users className="h-2.5 w-2.5" />
-            {reserva.numero_comensales}
-          </span>
-          {reserva.telefono && (
-            <span className="flex items-center gap-0.5 truncate">
-              <Phone className="h-2.5 w-2.5" />
-              {reserva.telefono}
-            </span>
-          )}
-        </div>
-      </div>
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
+        className="shrink-0 hover:scale-110 transition-transform"
+        title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
+      >
+        <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/20")} />
+      </button>
+      <span className="truncate font-medium flex-1">{reserva.nombre || "Sin nombre"}</span>
+      <span className="text-xs text-muted-foreground flex items-center gap-0.5 shrink-0">
+        <Users className="h-3 w-3" />
+        {reserva.numero_comensales}
+      </span>
     </div>
   );
 }
