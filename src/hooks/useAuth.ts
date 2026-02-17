@@ -109,6 +109,24 @@ export const useAuth = () => {
       }
 
       toast.success("Sesión iniciada correctamente");
+
+      // Registrar inicio de sesión en BD de métricas
+      try {
+        supabase.functions.invoke("registrar-metrica", {
+          body: {
+            evento: "inicio_sesion",
+            usuario_email: data.user?.email,
+            usuario_id: data.user?.id,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              user_agent: navigator.userAgent,
+            },
+          },
+        });
+      } catch (e) {
+        console.error("Error registrando métrica:", e);
+      }
+
       return { data, error: null };
     } catch (error) {
       if (error instanceof z.ZodError) {
