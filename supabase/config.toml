@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.chat-facturas]
 verify_jwt = false
+
+[functions.registrar-metrica]
+verify_jwt = false
