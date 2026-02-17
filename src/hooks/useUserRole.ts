@@ -32,6 +32,7 @@ export const SECTIONS = [
   { key: "analisis", label: "Análisis" },
   { key: "touza", label: "Touza" },
   { key: "usuarios", label: "Usuarios" },
+  { key: "gestor_gasto", label: "Gestor Gasto" },
 ] as const;
 
 export type SectionKey = typeof SECTIONS[number]["key"];

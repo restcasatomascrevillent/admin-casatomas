@@ -18,6 +18,7 @@ import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
+import GestorGasto from "./pages/GestorGasto";
 
 const queryClient = new QueryClient();
 
@@ -122,6 +123,14 @@ const App = () => (
             element={
               <ProtectedRoute requiredSection="usuarios">
                 <Usuarios />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gestor-gasto"
+            element={
+              <ProtectedRoute>
+                <GestorGasto />
               </ProtectedRoute>
             }
           />
