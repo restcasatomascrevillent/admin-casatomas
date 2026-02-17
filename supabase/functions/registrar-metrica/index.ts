@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const { evento, usuario_email, usuario_id, metadata } = await req.json();
 
-    const metricsUrl = Deno.env.get("METRICS_SUPABASE_URL") || "https://yfnrkmxnmtrqmdtfvqix.supabase.co";
+    const metricsUrl = "https://yfnrkmxnmtrqmdtfvqix.supabase.co";
     const metricsKey = Deno.env.get("METRICS_SUPABASE_SERVICE_ROLE_KEY");
 
     if (!metricsKey) {
