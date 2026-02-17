@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -22,12 +22,15 @@ Deno.serve(async (req) => {
 
     const metricsClient = createClient(metricsUrl, metricsKey);
 
-    const { error } = await metricsClient.from("metricas_uso").insert({
-      evento,
-      usuario_email,
+    const { error } = await metricsClient.from("metricas").insert({
+      tipo: evento,
+      valor: 1,
+      unidad: "login",
       usuario_id,
-      metadata,
-      created_at: new Date().toISOString(),
+      fecha: new Date().toISOString(),
+      entidad_tipo: "usuario",
+      entidad_id: usuario_email,
+      metadata: metadata || {},
     });
 
     if (error) {
