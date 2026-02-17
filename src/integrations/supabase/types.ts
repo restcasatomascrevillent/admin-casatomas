@@ -451,6 +451,48 @@ export type Database = {
         }
         Relationships: []
       }
+      call_logs: {
+        Row: {
+          call_type: string | null
+          caller_number: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          id: string
+          restaurant_id: string
+          started_at: string | null
+          status: string | null
+          summary: string | null
+          vapi_call_id: string | null
+        }
+        Insert: {
+          call_type?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          restaurant_id: string
+          started_at?: string | null
+          status?: string | null
+          summary?: string | null
+          vapi_call_id?: string | null
+        }
+        Update: {
+          call_type?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          restaurant_id?: string
+          started_at?: string | null
+          status?: string | null
+          summary?: string | null
+          vapi_call_id?: string | null
+        }
+        Relationships: []
+      }
       campanas_marketing: {
         Row: {
           canal: string
@@ -1927,6 +1969,60 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
           vendedor_id?: string | null
+        }
+        Relationships: []
+      }
+      phone_system_config: {
+        Row: {
+          address: string | null
+          bot_greeting: string | null
+          created_at: string | null
+          forward_phone: string | null
+          id: string
+          max_party_size: number | null
+          mode: string
+          opening_hours: string | null
+          phone_number: string | null
+          restaurant_id: string
+          restaurant_name: string
+          updated_at: string | null
+          vapi_assistant_id: string | null
+          vapi_phone_number_id: string | null
+          voice_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          bot_greeting?: string | null
+          created_at?: string | null
+          forward_phone?: string | null
+          id?: string
+          max_party_size?: number | null
+          mode?: string
+          opening_hours?: string | null
+          phone_number?: string | null
+          restaurant_id: string
+          restaurant_name?: string
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          voice_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          bot_greeting?: string | null
+          created_at?: string | null
+          forward_phone?: string | null
+          id?: string
+          max_party_size?: number | null
+          mode?: string
+          opening_hours?: string | null
+          phone_number?: string | null
+          restaurant_id?: string
+          restaurant_name?: string
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          voice_id?: string | null
         }
         Relationships: []
       }

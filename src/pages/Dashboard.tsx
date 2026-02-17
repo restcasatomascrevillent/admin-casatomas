@@ -7,6 +7,7 @@ import { CurvaReservasPorHora } from "@/components/dashboard/widgets/CurvaReserv
 import { PersonasActivas } from "@/components/dashboard/widgets/PersonasActivas";
 import { ResenasRecientes } from "@/components/dashboard/widgets/ResenasRecientes";
 import { NoticiasHosteleria } from "@/components/dashboard/widgets/NoticiasHosteleria";
+import { GestorGasto } from "@/components/dashboard/widgets/GestorGasto";
 
 export default function Dashboard() {
   return (
@@ -29,6 +30,8 @@ export default function Dashboard() {
             <ResenasRecientes />
             <NoticiasHosteleria />
           </div>
+
+          <GestorGasto />
         </div>
       </DashboardLayout>
     </DashboardProvider>
