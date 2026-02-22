@@ -340,12 +340,7 @@ export default function GestionBot() {
         </Card>
 
         {/* Pregunta 5: Frases que debe decir */}
-        <Card>
-          
-
-
-
-          
+        
 
 
 
@@ -353,7 +348,12 @@ export default function GestionBot() {
 
 
 
-        </Card>
+
+
+
+
+
+
 
         {/* Pregunta 6: Instrucciones extra */}
         <Card>
