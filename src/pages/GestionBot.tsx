@@ -33,9 +33,9 @@ export default function GestionBot() {
       setTono(getConfigValue("tono"));
       setMensajeBienvenida(getConfigValue("mensaje_bienvenida"));
       const platosStr = getConfigValue("platos_recomendados");
-      setPlatosSeleccionados(platosStr ? platosStr.split(",").map(s => s.trim()).filter(Boolean) : []);
+      setPlatosSeleccionados(platosStr ? platosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
       const vinosStr = getConfigValue("vinos_recomendados");
-      setVinosSeleccionados(vinosStr ? vinosStr.split(",").map(s => s.trim()).filter(Boolean) : []);
+      setVinosSeleccionados(vinosStr ? vinosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
       setInstruccionesExtra(getConfigValue("instrucciones_extra"));
       setFrasesPersonalizadas(getConfigValue("frases_personalizadas"));
     }
@@ -43,38 +43,38 @@ export default function GestionBot() {
 
   const handleSaveAll = async () => {
     await Promise.all([
-      updateConfig.mutateAsync({ clave: "tono", valor: tono }),
-      updateConfig.mutateAsync({ clave: "mensaje_bienvenida", valor: mensajeBienvenida }),
-      updateConfig.mutateAsync({ clave: "platos_recomendados", valor: platosSeleccionados.join(", ") }),
-      updateConfig.mutateAsync({ clave: "vinos_recomendados", valor: vinosSeleccionados.join(", ") }),
-      updateConfig.mutateAsync({ clave: "instrucciones_extra", valor: instruccionesExtra }),
-      updateConfig.mutateAsync({ clave: "frases_personalizadas", valor: frasesPersonalizadas }),
-    ]);
+    updateConfig.mutateAsync({ clave: "tono", valor: tono }),
+    updateConfig.mutateAsync({ clave: "mensaje_bienvenida", valor: mensajeBienvenida }),
+    updateConfig.mutateAsync({ clave: "platos_recomendados", valor: platosSeleccionados.join(", ") }),
+    updateConfig.mutateAsync({ clave: "vinos_recomendados", valor: vinosSeleccionados.join(", ") }),
+    updateConfig.mutateAsync({ clave: "instrucciones_extra", valor: instruccionesExtra }),
+    updateConfig.mutateAsync({ clave: "frases_personalizadas", valor: frasesPersonalizadas })]
+    );
   };
 
   const togglePlato = (nombre: string) => {
-    setPlatosSeleccionados(prev =>
-      prev.includes(nombre) ? prev.filter(p => p !== nombre) : [...prev, nombre]
+    setPlatosSeleccionados((prev) =>
+    prev.includes(nombre) ? prev.filter((p) => p !== nombre) : [...prev, nombre]
     );
   };
 
   const toggleVino = (nombre: string) => {
-    setVinosSeleccionados(prev =>
-      prev.includes(nombre) ? prev.filter(v => v !== nombre) : [...prev, nombre]
+    setVinosSeleccionados((prev) =>
+    prev.includes(nombre) ? prev.filter((v) => v !== nombre) : [...prev, nombre]
     );
   };
 
   // Agrupar platos por categoría
   const platosActivos = useMemo(() => {
-    const items = (platos || []).filter(p => p.activado !== false && p.nombre);
+    const items = (platos || []).filter((p) => p.activado !== false && p.nombre);
     if (!buscarPlato) return items;
     const q = buscarPlato.toLowerCase();
-    return items.filter(p => p.nombre?.toLowerCase().includes(q) || p.categoria?.toLowerCase().includes(q));
+    return items.filter((p) => p.nombre?.toLowerCase().includes(q) || p.categoria?.toLowerCase().includes(q));
   }, [platos, buscarPlato]);
 
   const platosPorCategoria = useMemo(() => {
     const map: Record<string, typeof platosActivos> = {};
-    platosActivos.forEach(p => {
+    platosActivos.forEach((p) => {
       const cat = p.categoria || "Sin categoría";
       if (!map[cat]) map[cat] = [];
       map[cat].push(p);
@@ -84,15 +84,15 @@ export default function GestionBot() {
 
   // Agrupar vinos por categoría
   const vinosActivos = useMemo(() => {
-    const items = (vinos || []).filter(v => v.activado !== false && v.nombre);
+    const items = (vinos || []).filter((v) => v.activado !== false && v.nombre);
     if (!buscarVino) return items;
     const q = buscarVino.toLowerCase();
-    return items.filter(v => v.nombre?.toLowerCase().includes(q) || v.categoria?.toLowerCase().includes(q));
+    return items.filter((v) => v.nombre?.toLowerCase().includes(q) || v.categoria?.toLowerCase().includes(q));
   }, [vinos, buscarVino]);
 
   const vinosPorCategoria = useMemo(() => {
     const map: Record<string, typeof vinosActivos> = {};
-    vinosActivos.forEach(v => {
+    vinosActivos.forEach((v) => {
       const cat = v.categoria || "Sin categoría";
       if (!map[cat]) map[cat] = [];
       map[cat].push(v);
@@ -106,8 +106,8 @@ export default function GestionBot() {
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
-    );
+      </DashboardLayout>);
+
   }
 
   return (
@@ -141,23 +141,23 @@ export default function GestionBot() {
               type="single"
               value={tono}
               onValueChange={(val) => val && setTono(val)}
-              className="flex flex-wrap gap-2"
-            >
+              className="flex flex-wrap gap-2">
+
               {[
-                { value: "cercano", label: "😊 Cercano", desc: "Amigable, como un camarero que te conoce" },
-                { value: "formal", label: "👔 Formal", desc: "Profesional y elegante" },
-                { value: "divertido", label: "🎉 Divertido", desc: "Desenfadado con toques de humor" },
-                { value: "exclusivo", label: "✨ Exclusivo", desc: "Sofisticado, alta gastronomía" },
-              ].map(t => (
-                <ToggleGroupItem
-                  key={t.value}
-                  value={t.value}
-                  className="flex flex-col items-start gap-1 h-auto py-3 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                >
+              { value: "cercano", label: "😊 Cercano", desc: "Amigable, como un camarero que te conoce" },
+              { value: "formal", label: "👔 Formal", desc: "Profesional y elegante" },
+              { value: "divertido", label: "🎉 Divertido", desc: "Desenfadado con toques de humor" },
+              { value: "exclusivo", label: "✨ Exclusivo", desc: "Sofisticado, alta gastronomía" }].
+              map((t) =>
+              <ToggleGroupItem
+                key={t.value}
+                value={t.value}
+                className="flex flex-col items-start gap-1 h-auto py-3 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+
                   <span className="font-medium">{t.label}</span>
                   <span className="text-xs opacity-70">{t.desc}</span>
                 </ToggleGroupItem>
-              ))}
+              )}
             </ToggleGroup>
           </CardContent>
         </Card>
@@ -176,8 +176,8 @@ export default function GestionBot() {
               value={mensajeBienvenida}
               onChange={(e) => setMensajeBienvenida(e.target.value)}
               placeholder="¡Hola! Soy el asistente virtual de Casa Tomás. ¿En qué puedo ayudarte?"
-              rows={2}
-            />
+              rows={2} />
+
           </CardContent>
         </Card>
 
@@ -190,30 +190,30 @@ export default function GestionBot() {
             </CardTitle>
             <CardDescription>
               Selecciona los platos que el bot priorizará cuando un cliente pida sugerencias
-              {platosSeleccionados.length > 0 && (
-                <span className="ml-2 text-primary font-medium">
+              {platosSeleccionados.length > 0 &&
+              <span className="ml-2 text-primary font-medium">
                   ({platosSeleccionados.length} seleccionados)
                 </span>
-              )}
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Chips de seleccionados */}
-            {platosSeleccionados.length > 0 && (
-              <div className="flex flex-wrap gap-2 pb-2 border-b">
-                {platosSeleccionados.map(nombre => (
-                  <span
-                    key={nombre}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-                  >
+            {platosSeleccionados.length > 0 &&
+            <div className="flex flex-wrap gap-2 pb-2 border-b">
+                {platosSeleccionados.map((nombre) =>
+              <span
+                key={nombre}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+
                     {nombre}
                     <button onClick={() => togglePlato(nombre)} className="hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
-                ))}
+              )}
               </div>
-            )}
+            }
 
             {/* Buscador */}
             <div className="relative">
@@ -222,40 +222,40 @@ export default function GestionBot() {
                 placeholder="Buscar platos..."
                 value={buscarPlato}
                 onChange={(e) => setBuscarPlato(e.target.value)}
-                className="pl-9"
-              />
+                className="pl-9" />
+
             </div>
 
             {/* Lista por categorías */}
             <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-              {loadingPlatos ? (
-                <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
-              ) : Object.keys(platosPorCategoria).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos</p>
-              ) : (
-                Object.entries(platosPorCategoria).map(([cat, items]) => (
-                  <div key={cat}>
+              {loadingPlatos ?
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div> :
+              Object.keys(platosPorCategoria).length === 0 ?
+              <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos</p> :
+
+              Object.entries(platosPorCategoria).map(([cat, items]) =>
+              <div key={cat}>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
                     <div className="space-y-1">
-                      {items.map(p => (
-                        <label
-                          key={p.id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                        >
+                      {items.map((p) =>
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
+
                           <Checkbox
-                            checked={platosSeleccionados.includes(p.nombre || "")}
-                            onCheckedChange={() => togglePlato(p.nombre || "")}
-                          />
+                      checked={platosSeleccionados.includes(p.nombre || "")}
+                      onCheckedChange={() => togglePlato(p.nombre || "")} />
+
                           <span className="text-sm flex-1">{p.nombre}</span>
-                          {p.precio_eur != null && (
-                            <span className="text-xs text-muted-foreground">{p.precio_eur.toFixed(2)}€</span>
-                          )}
+                          {p.precio_eur != null &&
+                    <span className="text-xs text-muted-foreground">{p.precio_eur.toFixed(2)}€</span>
+                    }
                         </label>
-                      ))}
+                  )}
                     </div>
                   </div>
-                ))
-              )}
+              )
+              }
             </div>
           </CardContent>
         </Card>
@@ -269,30 +269,30 @@ export default function GestionBot() {
             </CardTitle>
             <CardDescription>
               Selecciona los vinos que el bot priorizará
-              {vinosSeleccionados.length > 0 && (
-                <span className="ml-2 text-primary font-medium">
+              {vinosSeleccionados.length > 0 &&
+              <span className="ml-2 text-primary font-medium">
                   ({vinosSeleccionados.length} seleccionados)
                 </span>
-              )}
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Chips de seleccionados */}
-            {vinosSeleccionados.length > 0 && (
-              <div className="flex flex-wrap gap-2 pb-2 border-b">
-                {vinosSeleccionados.map(nombre => (
-                  <span
-                    key={nombre}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-                  >
+            {vinosSeleccionados.length > 0 &&
+            <div className="flex flex-wrap gap-2 pb-2 border-b">
+                {vinosSeleccionados.map((nombre) =>
+              <span
+                key={nombre}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+
                     {nombre}
                     <button onClick={() => toggleVino(nombre)} className="hover:text-destructive">
                       <X className="h-3 w-3" />
                     </button>
                   </span>
-                ))}
+              )}
               </div>
-            )}
+            }
 
             {/* Buscador */}
             <div className="relative">
@@ -301,40 +301,40 @@ export default function GestionBot() {
                 placeholder="Buscar vinos..."
                 value={buscarVino}
                 onChange={(e) => setBuscarVino(e.target.value)}
-                className="pl-9"
-              />
+                className="pl-9" />
+
             </div>
 
             {/* Lista por categorías */}
             <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-              {loadingVinos ? (
-                <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>
-              ) : Object.keys(vinosPorCategoria).length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No se encontraron vinos</p>
-              ) : (
-                Object.entries(vinosPorCategoria).map(([cat, items]) => (
-                  <div key={cat}>
+              {loadingVinos ?
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div> :
+              Object.keys(vinosPorCategoria).length === 0 ?
+              <p className="text-sm text-muted-foreground text-center py-4">No se encontraron vinos</p> :
+
+              Object.entries(vinosPorCategoria).map(([cat, items]) =>
+              <div key={cat}>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
                     <div className="space-y-1">
-                      {items.map(v => (
-                        <label
-                          key={v.id}
-                          className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                        >
+                      {items.map((v) =>
+                  <label
+                    key={v.id}
+                    className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
+
                           <Checkbox
-                            checked={vinosSeleccionados.includes(v.nombre || "")}
-                            onCheckedChange={() => toggleVino(v.nombre || "")}
-                          />
+                      checked={vinosSeleccionados.includes(v.nombre || "")}
+                      onCheckedChange={() => toggleVino(v.nombre || "")} />
+
                           <span className="text-sm flex-1">{v.nombre}</span>
-                          {v.precio_eur != null && (
-                            <span className="text-xs text-muted-foreground">{v.precio_eur.toFixed(2)}€</span>
-                          )}
+                          {v.precio_eur != null &&
+                    <span className="text-xs text-muted-foreground">{v.precio_eur.toFixed(2)}€</span>
+                    }
                         </label>
-                      ))}
+                  )}
                     </div>
                   </div>
-                ))
-              )}
+              )
+              }
             </div>
           </CardContent>
         </Card>
@@ -345,14 +345,14 @@ export default function GestionBot() {
             <CardTitle>¿Hay algo que el bot deba decir siempre?</CardTitle>
             <CardDescription>Escribe frases que el bot incluirá en sus respuestas (una por línea)</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Textarea
-              value={frasesPersonalizadas}
-              onChange={(e) => setFrasesPersonalizadas(e.target.value)}
-              placeholder={"Nuestro chuletón es el mejor de la zona\nTenemos terraza con vistas al mar\nAbrimos de martes a domingo"}
-              rows={4}
-            />
-          </CardContent>
+          
+
+
+
+
+
+
+
         </Card>
 
         {/* Pregunta 6: Instrucciones extra */}
@@ -366,8 +366,8 @@ export default function GestionBot() {
               value={instruccionesExtra}
               onChange={(e) => setInstruccionesExtra(e.target.value)}
               placeholder={"Ej:\n- Si preguntan por horarios: abrimos de 13:00 a 16:00 y de 20:30 a 23:30\n- Siempre mencionar opciones veganas\n- No recomendar productos con gluten si lo piden"}
-              rows={5}
-            />
+              rows={5} />
+
           </CardContent>
         </Card>
 
@@ -379,6 +379,6 @@ export default function GestionBot() {
           </Button>
         </div>
       </div>
-    </DashboardLayout>
-  );
+    </DashboardLayout>);
+
 }
