@@ -963,6 +963,30 @@ export type Database = {
         }
         Relationships: []
       }
+      conversaciones: {
+        Row: {
+          created_at: string | null
+          id: string
+          session_id: string
+          titulo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          session_id: string
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          session_id?: string
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       dashboard_config: {
         Row: {
           created_at: string | null
@@ -1154,6 +1178,8 @@ export type Database = {
           observaciones: string | null
           procesado_en: string | null
           proveedor: string | null
+          proveedor_normalizado: string | null
+          resumen: string | null
           subtotal: number | null
           tipo: string
           total: number | null
@@ -1172,6 +1198,8 @@ export type Database = {
           observaciones?: string | null
           procesado_en?: string | null
           proveedor?: string | null
+          proveedor_normalizado?: string | null
+          resumen?: string | null
           subtotal?: number | null
           tipo: string
           total?: number | null
@@ -1190,6 +1218,8 @@ export type Database = {
           observaciones?: string | null
           procesado_en?: string | null
           proveedor?: string | null
+          proveedor_normalizado?: string | null
+          resumen?: string | null
           subtotal?: number | null
           tipo?: string
           total?: number | null
@@ -1486,6 +1516,38 @@ export type Database = {
           },
         ]
       }
+      mensajes_chat: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
       mesas: {
         Row: {
           activa: boolean | null
@@ -1590,6 +1652,24 @@ export type Database = {
           stock_nuevo?: number | null
           tipo_movimiento?: string
           usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      n8n_chat_histories: {
+        Row: {
+          id: number
+          message: Json
+          session_id: string
+        }
+        Insert: {
+          id?: number
+          message: Json
+          session_id: string
+        }
+        Update: {
+          id?: number
+          message?: Json
+          session_id?: string
         }
         Relationships: []
       }
@@ -2221,6 +2301,7 @@ export type Database = {
           factura_id: number
           id: number
           nombre: string
+          nombre_normalizado: string | null
           precio_unitario: number | null
           total: number | null
           unidad: string | null
@@ -2232,6 +2313,7 @@ export type Database = {
           factura_id: number
           id?: number
           nombre: string
+          nombre_normalizado?: string | null
           precio_unitario?: number | null
           total?: number | null
           unidad?: string | null
@@ -2243,6 +2325,7 @@ export type Database = {
           factura_id?: number
           id?: number
           nombre?: string
+          nombre_normalizado?: string | null
           precio_unitario?: number | null
           total?: number | null
           unidad?: string | null
@@ -2999,9 +3082,21 @@ export type Database = {
       vista_gastos_mensuales: {
         Row: {
           mes: string | null
+          num_albaranes: number | null
           num_facturas: number | null
           num_proveedores: number | null
           promedio_factura: number | null
+          total_facturas: number | null
+        }
+        Relationships: []
+      }
+      vista_gastos_proveedor_mes: {
+        Row: {
+          mes: string | null
+          num_facturas: number | null
+          promedio_factura: number | null
+          proveedor_nombre: string | null
+          proveedor_normalizado: string | null
           total_mes: number | null
         }
         Relationships: []
@@ -3035,10 +3130,10 @@ export type Database = {
       }
       vista_ocupacion_hoy: {
         Row: {
-          capacidad_maxima: number | null
-          espacio_id: string | null
-          espacio_nombre: string | null
-          porcentaje_ocupacion: number | null
+          comensales_confirmados: number | null
+          reservas_canceladas: number | null
+          reservas_confirmadas: number | null
+          reservas_pendientes: number | null
           total_comensales: number | null
           total_reservas: number | null
         }
@@ -3047,13 +3142,15 @@ export type Database = {
       vista_productos_top: {
         Row: {
           cantidad_total: number | null
-          nombre: string | null
+          nombre_completo: string | null
+          nombre_normalizado: string | null
           num_proveedores: number | null
           precio_maximo: number | null
           precio_minimo: number | null
           precio_promedio: number | null
           unidad: string | null
           veces_comprado: number | null
+          veces_con_precio: number | null
         }
         Relationships: []
       }
@@ -3074,7 +3171,8 @@ export type Database = {
           num_documentos: number | null
           num_facturas: number | null
           primera_compra: string | null
-          proveedor: string | null
+          proveedor_nombre_completo: string | null
+          proveedor_normalizado: string | null
           ticket_promedio: number | null
           total_gastado: number | null
           ultima_compra: string | null
@@ -3157,12 +3255,14 @@ export type Database = {
       }
       vista_ultimos_documentos: {
         Row: {
+          drive_url: string | null
           fecha: string | null
+          fecha_procesado: string | null
           id: number | null
           num_productos: number | null
           numero_documento: string | null
-          procesado_en: string | null
           proveedor: string | null
+          proveedor_normalizado: string | null
           tipo: string | null
           total: number | null
         }
@@ -3181,6 +3281,10 @@ export type Database = {
     Functions: {
       buscar_contexto_chatbot: {
         Args: { embedding_query: string }
+        Returns: Json
+      }
+      buscar_facturas_agente: {
+        Args: { embedding_query: string; limite?: number; umbral?: number }
         Returns: Json
       }
       buscar_facturas_por_contexto: {
@@ -3204,6 +3308,10 @@ export type Database = {
           ultimo_precio: number
           veces_comprado: number
         }[]
+      }
+      buscar_productos_agente: {
+        Args: { embedding_query: string; limite?: number; umbral?: number }
+        Returns: Json
       }
       buscar_productos_similares: {
         Args: { limite?: number; query_embedding: string }
@@ -3229,6 +3337,7 @@ export type Database = {
           tabla: string
         }[]
       }
+      estadisticas_globales_agente: { Args: never; Returns: Json }
       gastos_periodo: {
         Args: { fecha_fin: string; fecha_inicio: string }
         Returns: {
@@ -3372,11 +3481,18 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      normalizar_nombre_producto: {
+        Args: { p_nombre: string }
+        Returns: string
+      }
+      normalizar_proveedor: { Args: { p_proveedor: string }; Returns: string }
+      normalizar_texto: { Args: { p_texto: string }; Returns: string }
       recalcular_ocupacion_historica: {
         Args: { fecha_desde?: string; fecha_hasta?: string }
         Returns: number
       }
       text_to_bytea: { Args: { data: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
       urlencode:
         | { Args: { data: Json }; Returns: string }
         | {
