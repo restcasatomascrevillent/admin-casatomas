@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.registrar-metrica]
 verify_jwt = false
+
+[functions.leer-metricas]
+verify_jwt = false
