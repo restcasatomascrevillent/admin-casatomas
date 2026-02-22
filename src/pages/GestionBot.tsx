@@ -341,10 +341,10 @@ export default function GestionBot() {
 
         {/* Pregunta 5: Frases que debe decir */}
         <Card>
-          <CardHeader>
-            <CardTitle>¿Hay algo que el bot deba decir siempre?</CardTitle>
-            <CardDescription>Escribe frases que el bot incluirá en sus respuestas (una por línea)</CardDescription>
-          </CardHeader>
+          
+
+
+
           
 
 
