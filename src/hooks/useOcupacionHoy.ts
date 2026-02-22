@@ -2,12 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface OcupacionEspacio {
-  espacio_id: string;
-  espacio_nombre: string;
-  capacidad_maxima: number;
+  espacio_id?: string;
+  espacio_nombre?: string;
+  capacidad_maxima?: number;
   total_reservas: number;
   total_comensales: number;
-  porcentaje_ocupacion: number;
+  porcentaje_ocupacion?: number;
+  comensales_confirmados?: number;
+  reservas_canceladas?: number;
+  reservas_confirmadas?: number;
+  reservas_pendientes?: number;
 }
 
 export function useOcupacionHoy() {
@@ -19,7 +23,7 @@ export function useOcupacionHoy() {
         .select("*");
 
       if (error) throw error;
-      return data as OcupacionEspacio[];
+      return (data ?? []) as unknown as OcupacionEspacio[];
     },
     refetchInterval: 60000, // Refrescar cada minuto
   });
