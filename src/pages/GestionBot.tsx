@@ -3,21 +3,18 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Loader2, Save, Bot, Utensils, Wine, MessageSquare, X, Search } from "lucide-react";
-import { useChatbotConfig } from "@/hooks/useChatbotConfig";
+import { useConfigBotWeb } from "@/hooks/useConfigBotWeb";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useVinos } from "@/hooks/useVinos";
-import { useBebidas } from "@/hooks/useBebidas";
 
 export default function GestionBot() {
-  const { configs, isLoading, updateConfig, getConfigValue } = useChatbotConfig();
+  const { config, isLoading, updateConfig } = useConfigBotWeb();
   const { platos, isLoading: loadingPlatos } = usePlatos();
   const { vinos, isLoading: loadingVinos } = useVinos();
-  const { bebidas, isLoading: loadingBebidas } = useBebidas();
 
   const [tono, setTono] = useState("");
   const [mensajeBienvenida, setMensajeBienvenida] = useState("");
@@ -29,27 +26,27 @@ export default function GestionBot() {
   const [buscarVino, setBuscarVino] = useState("");
 
   useEffect(() => {
-    if (configs) {
-      setTono(getConfigValue("tono"));
-      setMensajeBienvenida(getConfigValue("mensaje_bienvenida"));
-      const platosStr = getConfigValue("platos_recomendados");
+    if (config) {
+      setTono(config.tono ?? "");
+      setMensajeBienvenida(config.mensaje_bienvenida ?? "");
+      const platosStr = config.platos_recomendados ?? "";
       setPlatosSeleccionados(platosStr ? platosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-      const vinosStr = getConfigValue("vinos_recomendados");
+      const vinosStr = config.vinos_recomendados ?? "";
       setVinosSeleccionados(vinosStr ? vinosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-      setInstruccionesExtra(getConfigValue("instrucciones_extra"));
-      setFrasesPersonalizadas(getConfigValue("frases_personalizadas"));
+      setInstruccionesExtra(config.instrucciones_extra ?? "");
+      setFrasesPersonalizadas(config.frases_personalizadas ?? "");
     }
-  }, [configs]);
+  }, [config]);
 
   const handleSaveAll = async () => {
-    await Promise.all([
-    updateConfig.mutateAsync({ clave: "tono", valor: tono }),
-    updateConfig.mutateAsync({ clave: "mensaje_bienvenida", valor: mensajeBienvenida }),
-    updateConfig.mutateAsync({ clave: "platos_recomendados", valor: platosSeleccionados.join(", ") }),
-    updateConfig.mutateAsync({ clave: "vinos_recomendados", valor: vinosSeleccionados.join(", ") }),
-    updateConfig.mutateAsync({ clave: "instrucciones_extra", valor: instruccionesExtra }),
-    updateConfig.mutateAsync({ clave: "frases_personalizadas", valor: frasesPersonalizadas })]
-    );
+    await updateConfig.mutateAsync({
+      tono,
+      mensaje_bienvenida: mensajeBienvenida,
+      platos_recomendados: platosSeleccionados.join(", "),
+      vinos_recomendados: vinosSeleccionados.join(", "),
+      instrucciones_extra: instruccionesExtra,
+      frases_personalizadas: frasesPersonalizadas,
+    });
   };
 
   const togglePlato = (nombre: string) => {
