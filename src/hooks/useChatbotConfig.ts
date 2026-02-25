@@ -18,18 +18,18 @@ export function useChatbotConfig() {
     queryKey: ["chatbot_config"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("chatbot_config")
+        .from("chatbot_config" as any)
         .select("*")
         .order("clave");
       if (error) throw error;
-      return data as ChatbotConfigItem[];
+      return data as unknown as ChatbotConfigItem[];
     },
   });
 
   const updateConfig = useMutation({
     mutationFn: async ({ clave, valor }: { clave: string; valor: string }) => {
       const { error } = await supabase
-        .from("chatbot_config")
+        .from("chatbot_config" as any)
         .update({ valor })
         .eq("clave", clave);
       if (error) throw error;

@@ -5,22 +5,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// URL del webhook de chat de n8n - PLACEHOLDER para configurar
 const WEBHOOK_CHAT_URL = 'https://n8npersonal.miguelbenito.space/webhook/chatbot';
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { mensaje, historial } = await req.json();
+    const { mensaje, session_id } = await req.json();
 
-    console.log('Chat facturas - Mensaje recibido:', mensaje);
-    console.log('Chat facturas - Historial:', historial?.length || 0, 'mensajes');
+    console.log('Chat facturas - Mensaje:', mensaje);
+    console.log('Chat facturas - Session ID:', session_id);
 
-    // Enviar al webhook de n8n
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -29,7 +26,7 @@ serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mensaje,
-        historial,
+        session_id,
         timestamp: new Date().toISOString(),
       }),
       signal: controller.signal,
@@ -47,7 +44,6 @@ serve(async (req) => {
       webhookData = { text: textResponse };
     }
 
-    // Extraer la respuesta del formato del webhook
     const respuesta = webhookData?.output?.[0]?.content?.[0]?.text ||
       webhookData?.text ||
       webhookData?.message ||
@@ -57,16 +53,13 @@ serve(async (req) => {
       'No pude obtener una respuesta. Por favor, intenta de nuevo.';
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        respuesta,
-      }),
+      JSON.stringify({ success: true, respuesta }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error en chat-facturas:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Error desconocido';

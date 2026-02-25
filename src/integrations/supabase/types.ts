@@ -568,69 +568,6 @@ export type Database = {
         }
         Relationships: []
       }
-      chatbot_config: {
-        Row: {
-          clave: string
-          created_at: string
-          descripcion: string | null
-          id: string
-          updated_at: string
-          valor: string
-        }
-        Insert: {
-          clave: string
-          created_at?: string
-          descripcion?: string | null
-          id?: string
-          updated_at?: string
-          valor?: string
-        }
-        Update: {
-          clave?: string
-          created_at?: string
-          descripcion?: string | null
-          id?: string
-          updated_at?: string
-          valor?: string
-        }
-        Relationships: []
-      }
-      configBotWeb: {
-        Row: {
-          id: string
-          tono: string
-          mensaje_bienvenida: string
-          platos_recomendados: string
-          vinos_recomendados: string
-          instrucciones_extra: string
-          frases_personalizadas: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          tono?: string
-          mensaje_bienvenida?: string
-          platos_recomendados?: string
-          vinos_recomendados?: string
-          instrucciones_extra?: string
-          frases_personalizadas?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          tono?: string
-          mensaje_bienvenida?: string
-          platos_recomendados?: string
-          vinos_recomendados?: string
-          instrucciones_extra?: string
-          frases_personalizadas?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       Cocteles: {
         Row: {
           activado: boolean | null
@@ -868,6 +805,45 @@ export type Database = {
           red_social?: string
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      configBotWeb: {
+        Row: {
+          created_at: string
+          frases_personalizadas: string | null
+          id: string
+          idioma: string | null
+          instrucciones_extra: string | null
+          mensaje_bienvenida: string | null
+          platos_recomendados: string | null
+          tono: string | null
+          updated_at: string
+          vinos_recomendados: string | null
+        }
+        Insert: {
+          created_at?: string
+          frases_personalizadas?: string | null
+          id?: string
+          idioma?: string | null
+          instrucciones_extra?: string | null
+          mensaje_bienvenida?: string | null
+          platos_recomendados?: string | null
+          tono?: string | null
+          updated_at?: string
+          vinos_recomendados?: string | null
+        }
+        Update: {
+          created_at?: string
+          frases_personalizadas?: string | null
+          id?: string
+          idioma?: string | null
+          instrucciones_extra?: string | null
+          mensaje_bienvenida?: string | null
+          platos_recomendados?: string | null
+          tono?: string | null
+          updated_at?: string
+          vinos_recomendados?: string | null
         }
         Relationships: []
       }
@@ -1555,6 +1531,7 @@ export type Database = {
       mensajes_chat: {
         Row: {
           content: string
+          conversacion_id: string | null
           created_at: string | null
           id: string
           role: string
@@ -1562,6 +1539,7 @@ export type Database = {
         }
         Insert: {
           content: string
+          conversacion_id?: string | null
           created_at?: string | null
           id?: string
           role: string
@@ -1569,12 +1547,34 @@ export type Database = {
         }
         Update: {
           content?: string
+          conversacion_id?: string | null
           created_at?: string | null
           id?: string
           role?: string
           session_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["session_id"]
+          },
           {
             foreignKeyName: "mensajes_chat_session_id_fkey"
             columns: ["session_id"]
@@ -3088,6 +3088,86 @@ export type Database = {
       }
     }
     Views: {
+      chat_facturas_conversaciones: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          session_id: string | null
+          titulo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          session_id?: string | null
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          session_id?: string | null
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      chat_facturas_mensajes: {
+        Row: {
+          contenido: string | null
+          conversacion_id: string | null
+          created_at: string | null
+          id: string | null
+          rol: string | null
+          session_id: string | null
+        }
+        Insert: {
+          contenido?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rol?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          contenido?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rol?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["session_id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
       vista_estadisticas_mensuales: {
         Row: {
           comensales_confirmados: number | null
@@ -3402,47 +3482,47 @@ export type Database = {
         }
       }
       http_delete:
-      | {
-        Args: { uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      | {
-        Args: { content: string; content_type: string; uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       http_get:
-      | {
-        Args: { uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      | {
-        Args: { data: Json; uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       http_head: {
         Args: { uri: string }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
@@ -3481,26 +3561,26 @@ export type Database = {
         }
       }
       http_post:
-      | {
-        Args: { content: string; content_type: string; uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      | {
-        Args: { data: Json; uri: string }
-        Returns: Database["public"]["CompositeTypes"]["http_response"]
-        SetofOptions: {
-          from: "*"
-          to: "http_response"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       http_put: {
         Args: { content: string; content_type: string; uri: string }
         Returns: Database["public"]["CompositeTypes"]["http_response"]
@@ -3530,19 +3610,19 @@ export type Database = {
       text_to_bytea: { Args: { data: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
       urlencode:
-      | { Args: { data: Json }; Returns: string }
-      | {
-        Args: { string: string }
-        Returns: {
-          error: true
-        } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-      }
-      | {
-        Args: { string: string }
-        Returns: {
-          error: true
-        } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-      }
+        | { Args: { data: Json }; Returns: string }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
       verificar_duplicado_factura: {
         Args: {
           p_fecha: string
@@ -3561,13 +3641,13 @@ export type Database = {
       app_role: "admin" | "manager" | "staff"
       estado_turno: "programado" | "activo" | "completado" | "cancelado"
       puesto_trabajo:
-      | "gerente"
-      | "camarero"
-      | "ayudante_camarero"
-      | "cocinero"
-      | "ayudante_cocina"
-      | "recepcionista"
-      | "limpieza"
+        | "gerente"
+        | "camarero"
+        | "ayudante_camarero"
+        | "cocinero"
+        | "ayudante_cocina"
+        | "recepcionista"
+        | "limpieza"
     }
     CompositeTypes: {
       http_header: {
@@ -3597,116 +3677,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
