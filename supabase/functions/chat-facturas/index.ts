@@ -37,19 +37,29 @@ serve(async (req) => {
     console.log('Respuesta del webhook chat:', response.status);
 
     let webhookData = null;
+    const rawText = await response.text();
+    console.log('Raw webhook response:', rawText);
+    
     try {
-      webhookData = await response.json();
+      webhookData = JSON.parse(rawText);
     } catch {
-      const textResponse = await response.text();
-      webhookData = { text: textResponse };
+      // Si no es JSON, usar el texto directamente
+      webhookData = { text: rawText };
     }
 
+    console.log('Parsed webhook data:', JSON.stringify(webhookData));
+
+    // Extraer respuesta - probar múltiples paths comunes
     const respuesta = webhookData?.output?.[0]?.content?.[0]?.text ||
+      webhookData?.output ||
       webhookData?.text ||
       webhookData?.message ||
       webhookData?.response ||
       webhookData?.respuesta ||
+      webhookData?.answer ||
+      webhookData?.result ||
       (typeof webhookData === 'string' ? webhookData : null) ||
+      (typeof rawText === 'string' && rawText.length > 0 && !rawText.startsWith('{') ? rawText : null) ||
       'No pude obtener una respuesta. Por favor, intenta de nuevo.';
 
     return new Response(
