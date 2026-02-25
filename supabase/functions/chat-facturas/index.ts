@@ -49,17 +49,18 @@ serve(async (req) => {
 
     console.log('Parsed webhook data:', JSON.stringify(webhookData));
 
-    // Extraer respuesta - probar múltiples paths comunes
-    const respuesta = webhookData?.output?.[0]?.content?.[0]?.text ||
-      webhookData?.output ||
-      webhookData?.text ||
-      webhookData?.message ||
-      webhookData?.response ||
-      webhookData?.respuesta ||
-      webhookData?.answer ||
-      webhookData?.result ||
-      (typeof webhookData === 'string' ? webhookData : null) ||
-      (typeof rawText === 'string' && rawText.length > 0 && !rawText.startsWith('{') ? rawText : null) ||
+    // Extraer respuesta - el webhook devuelve un array: [{output: "..."}]
+    const firstItem = Array.isArray(webhookData) ? webhookData[0] : webhookData;
+    
+    const respuesta = firstItem?.output ||
+      firstItem?.text ||
+      firstItem?.message ||
+      firstItem?.response ||
+      firstItem?.respuesta ||
+      firstItem?.answer ||
+      firstItem?.result ||
+      (typeof firstItem === 'string' ? firstItem : null) ||
+      (typeof rawText === 'string' && rawText.length > 0 && !rawText.startsWith('[') && !rawText.startsWith('{') ? rawText : null) ||
       'No pude obtener una respuesta. Por favor, intenta de nuevo.';
 
     return new Response(
