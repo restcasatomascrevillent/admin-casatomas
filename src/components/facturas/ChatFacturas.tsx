@@ -1,10 +1,13 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageCircle } from "lucide-react";
+import { forwardRef, useImperativeHandle } from "react";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
 import { ConversacionesList } from "./ConversacionesList";
 import { ChatArea } from "./ChatArea";
 
-export function ChatFacturas() {
+export interface ChatFacturasRef {
+  enviarConsulta: (texto: string) => void;
+}
+
+export const ChatFacturas = forwardRef<ChatFacturasRef>((props, ref) => {
   const {
     conversaciones,
     conversacionActiva,
@@ -17,20 +20,21 @@ export function ChatFacturas() {
     eliminarConversacion,
   } = useChatFacturas();
 
+  useImperativeHandle(ref, () => ({
+    enviarConsulta: (texto: string) => {
+      enviarMensaje(texto);
+    }
+  }));
+
   return (
-    <Card className="flex flex-col h-[600px]">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5" />
-          Asistente de Facturas
-        </CardTitle>
-        <CardDescription>
-          Pregunta sobre tus facturas, proveedores o importes
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex-1 flex min-h-0 p-0">
-        {/* Lista de conversaciones */}
-        <div className="w-64 shrink-0 hidden md:block">
+    // Altura del 100% real sin max-h limitante si está en una pestaña, ya que el contenedor padre controla el alto.
+    // Se ha eliminado el div con el "Header Premium" a petición del usuario para ganar espacio útil de pantalla.
+    <div className="flex flex-col h-full w-full bg-card overflow-hidden">
+      {/* Body: área a pantalla completa con las dos sub-columnas (Historial / Chat) */}
+      <div className="flex-1 flex min-h-0 bg-background border border-border/50 rounded-lg overflow-hidden shadow-sm">
+
+        {/* Panel lateral conversaciones - En full screen se hace un poco más ancho por comodidad */}
+        <div className="w-64 shrink-0 hidden md:block border-r border-border/60 bg-muted/10">
           <ConversacionesList
             conversaciones={conversaciones}
             conversacionActiva={conversacionActiva}
@@ -40,15 +44,21 @@ export function ChatFacturas() {
           />
         </div>
 
-        {/* Área de chat */}
-        <ChatArea
-          mensajes={mensajes}
-          isLoading={isLoading}
-          isSending={isSending}
-          onEnviar={enviarMensaje}
-          tieneConversacion={!!conversacionActiva}
-        />
-      </CardContent>
-    </Card>
+        {/* Área interactiva del chat envuelta para centrar el contenido (maxWidth de lectura) si es muy ancho */}
+        <div className="flex-1 flex justify-center bg-background">
+          <div className="w-full max-w-4xl flex flex-col h-full bg-card/50">
+            <ChatArea
+              mensajes={mensajes}
+              isLoading={isLoading}
+              isSending={isSending}
+              onEnviar={enviarMensaje}
+              tieneConversacion={!!conversacionActiva}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
-}
+});
+
+ChatFacturas.displayName = "ChatFacturas";

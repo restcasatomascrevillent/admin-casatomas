@@ -20,46 +20,89 @@ export function ConversacionesList({
   onEliminar,
 }: ConversacionesListProps) {
   return (
-    <div className="flex flex-col h-full border-r">
-      <div className="p-3 border-b">
-        <Button onClick={onNueva} className="w-full gap-2" size="sm">
-          <Plus className="h-4 w-4" />
+    <div className="flex flex-col h-full bg-muted/20">
+      {/* Botón nueva conversación */}
+      <div className="p-3 border-b border-border/60">
+        <Button
+          onClick={onNueva}
+          className="w-full gap-2 text-xs font-semibold"
+          size="sm"
+          style={{
+            background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))",
+            color: "white",
+            border: "none",
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
           Nueva conversación
         </Button>
       </div>
+
+      {/* Lista */}
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+        <div className="p-2 space-y-0.5">
           {conversaciones.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">
-              Sin conversaciones
-            </p>
-          )}
-          {conversaciones.map((conv) => (
-            <div
-              key={conv.id}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-3 py-2 text-sm cursor-pointer group hover:bg-accent transition-colors",
-                conversacionActiva?.id === conv.id && "bg-accent"
-              )}
-              onClick={() => onSeleccionar(conv)}
-            >
-              <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="truncate flex-1">
-                {conv.titulo || "Sin título"}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEliminar(conv.id, conv.session_id);
-                }}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+            <div className="py-8 text-center">
+              <MessageSquare className="h-6 w-6 text-muted-foreground/40 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground/60">Sin conversaciones</p>
             </div>
-          ))}
+          )}
+
+          {conversaciones.map((conv) => {
+            const isActive = conversacionActiva?.id === conv.id;
+            const fecha = new Date(conv.updated_at).toLocaleDateString("es-ES", {
+              day: "2-digit",
+              month: "short",
+            });
+
+            return (
+              <div
+                key={conv.id}
+                className={cn(
+                  "group relative flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-all duration-150",
+                  isActive
+                    ? "bg-accent/10 text-foreground"
+                    : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => onSeleccionar(conv)}
+              >
+                {/* Borde izquierdo activo */}
+                {isActive && (
+                  <span
+                    className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full"
+                    style={{ background: "hsl(38 59% 45%)" }}
+                  />
+                )}
+
+                <MessageSquare
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0 mt-0.5",
+                    isActive ? "text-[hsl(38,59%,45%)]" : "text-muted-foreground/50"
+                  )}
+                />
+
+                <div className="flex-1 min-w-0 pr-6"> {/* pr-6 deja hueco para el botón de borrar al hacer hover sin tapar el texto */}
+                  {/* Quitado 'truncate' para permitir multilínea, y añadido break-words/whitespace-normal */}
+                  <p className="text-xs font-medium leading-tight whitespace-normal break-words">
+                    {conv.titulo || "Sin título"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-1">{fecha}</p>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-2 h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEliminar(conv.id, conv.session_id);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>

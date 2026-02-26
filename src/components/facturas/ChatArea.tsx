@@ -1,12 +1,11 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, Bot, User, MessageCircle } from "lucide-react";
+import { Send, Bot, User, Zap, FileText, BarChart3, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
-import { useState } from "react";
 
 interface ChatAreaProps {
   mensajes: MensajeChat[];
@@ -14,6 +13,32 @@ interface ChatAreaProps {
   isSending: boolean;
   onEnviar: (texto: string) => void;
   tieneConversacion: boolean;
+}
+
+const SUGERENCIAS = [
+  { icon: FileText, texto: "¿Cuáles son las últimas facturas recibidas?" },
+  { icon: BarChart3, texto: "¿Cuánto hemos gastado este mes?" },
+  { icon: Package, texto: "¿Qué facturas hay pendientes de pago?" },
+  { icon: Zap, texto: "Resume los albaranes de esta semana" },
+];
+
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-1 py-1">
+      <span
+        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        style={{ animationDelay: "0ms", animationDuration: "1s" }}
+      />
+      <span
+        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        style={{ animationDelay: "180ms", animationDuration: "1s" }}
+      />
+      <span
+        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        style={{ animationDelay: "360ms", animationDuration: "1s" }}
+      />
+    </div>
+  );
 }
 
 export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConversacion }: ChatAreaProps) {
@@ -24,7 +49,7 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [mensajes]);
+  }, [mensajes, isSending]);
 
   const handleSend = () => {
     if (!input.trim() || isSending) return;
@@ -39,123 +64,204 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
     }
   };
 
+  const handleSugerencia = (texto: string) => {
+    if (isSending) return;
+    onEnviar(texto);
+  };
+
+  // ─── Estado vacío ──────────────────────────────────────────────────────────
   if (!tieneConversacion && mensajes.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4 p-8">
-        <MessageCircle className="h-12 w-12" />
-        <div className="text-center">
-          <p className="font-medium">Asistente de Facturas</p>
-          <p className="text-sm">Selecciona una conversación o crea una nueva para empezar</p>
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
+          {/* Icono central */}
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl"
+              style={{
+                background: "linear-gradient(135deg, hsl(206 11% 22%), hsl(206 11% 30%))",
+                boxShadow: "0 8px 24px hsl(206 11% 15% / 0.25)",
+              }}
+            >
+              <Bot className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-foreground text-sm">¿En qué puedo ayudarte?</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Pregunta sobre tus facturas, albaranes o proveedores
+              </p>
+            </div>
+          </div>
+
+          {/* Sugerencias */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+            {SUGERENCIAS.map(({ icon: Icon, texto }) => (
+              <button
+                key={texto}
+                onClick={() => handleSugerencia(texto)}
+                disabled={isSending}
+                className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-card p-3 text-left text-xs text-muted-foreground hover:border-[hsl(38,59%,45%)] hover:text-foreground hover:shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0 mt-0.5 group-hover:text-[hsl(38,59%,45%)] transition-colors" />
+                <span className="leading-snug">{texto}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        {/* Input siempre visible para crear conv automáticamente */}
-        <div className="w-full max-w-lg flex gap-2">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribe tu pregunta para iniciar..."
-            disabled={isSending}
-            className="min-h-[60px] resize-none"
-            rows={2}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={isSending || !input.trim()}
-            size="icon"
-            className="h-auto"
-          >
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
-        </div>
+
+        {/* Input inferior */}
+        <InputBar
+          input={input}
+          setInput={setInput}
+          isSending={isSending}
+          onSend={handleSend}
+          onKeyDown={handleKeyDown}
+        />
       </div>
     );
   }
 
+  // ─── Chat con mensajes ──────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <ScrollArea className="flex-1 px-4 py-2">
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 px-4 py-4">
+        <div className="space-y-5">
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="flex justify-center py-12">
+              <TypingDots />
             </div>
           ) : (
-            mensajes.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  "flex gap-3",
-                  msg.rol === "user" ? "flex-row-reverse" : "flex-row"
-                )}
-              >
+            mensajes.map((msg) => {
+              const isUser = msg.rol === "user";
+              return (
                 <div
-                  className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                    msg.rol === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                  )}
+                  key={msg.id}
+                  className={cn("flex gap-2.5", isUser ? "flex-row-reverse" : "flex-row")}
                 >
-                  {msg.rol === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                </div>
-                <div
-                  className={cn(
-                    "rounded-lg px-4 py-3 max-w-[80%]",
-                    msg.rol === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
-                  )}
-                >
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{msg.contenido}</ReactMarkdown>
-                  </div>
-                  <p
+                  {/* Avatar */}
+                  <div
                     className={cn(
-                      "text-xs mt-2",
-                      msg.rol === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2",
+                      isUser
+                        ? "ring-[hsl(38,59%,45%)/0.3]"
+                        : "ring-border/60"
                     )}
+                    style={
+                      isUser
+                        ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
+                        : { background: "linear-gradient(135deg, hsl(206 11% 28%), hsl(206 11% 22%))" }
+                    }
                   >
-                    {new Date(msg.created_at).toLocaleTimeString("es-ES", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                    {isUser ? (
+                      <User className="h-3.5 w-3.5 text-white" />
+                    ) : (
+                      <Bot className="h-3.5 w-3.5 text-white" />
+                    )}
+                  </div>
+
+                  {/* Burbuja */}
+                  <div
+                    className={cn(
+                      "rounded-2xl px-4 py-2.5 max-w-[78%] shadow-sm",
+                      isUser
+                        ? "rounded-tr-sm text-white"
+                        : "rounded-tl-sm bg-muted/60 text-foreground border border-border/40"
+                    )}
+                    style={
+                      isUser
+                        ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
+                        : undefined
+                    }
+                  >
+                    <div
+                      className={cn(
+                        "prose prose-sm max-w-none",
+                        isUser ? "prose-invert" : "dark:prose-invert"
+                      )}
+                    >
+                      <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                    </div>
+                    <p
+                      className={cn(
+                        "text-[10px] mt-1.5 text-right",
+                        isUser ? "text-white/60" : "text-muted-foreground/60"
+                      )}
+                    >
+                      {new Date(msg.created_at).toLocaleTimeString("es-ES", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
+
+          {/* Typing indicator */}
           {isSending && (
-            <div className="flex gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                <Bot className="h-4 w-4" />
+            <div className="flex gap-2.5 flex-row">
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                style={{ background: "linear-gradient(135deg, hsl(206 11% 28%), hsl(206 11% 22%))" }}
+              >
+                <Bot className="h-3.5 w-3.5 text-white" />
               </div>
-              <div className="rounded-lg px-4 py-3 bg-muted">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Pensando...</span>
-                </div>
+              <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-muted/60 border border-border/40 shadow-sm">
+                <TypingDots />
               </div>
             </div>
           )}
+
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
 
-      <div className="flex gap-2 p-4 border-t">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Escribe tu pregunta..."
-          disabled={isSending}
-          className="min-h-[60px] resize-none"
-          rows={2}
-        />
-        <Button
-          onClick={handleSend}
-          disabled={isSending || !input.trim()}
-          size="icon"
-          className="h-auto"
-        >
-          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </Button>
-      </div>
+      <InputBar
+        input={input}
+        setInput={setInput}
+        isSending={isSending}
+        onSend={handleSend}
+        onKeyDown={handleKeyDown}
+      />
+    </div>
+  );
+}
+
+// ─── Input compartido ─────────────────────────────────────────────────────────
+interface InputBarProps {
+  input: string;
+  setInput: (v: string) => void;
+  isSending: boolean;
+  onSend: () => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+}
+
+function InputBar({ input, setInput, isSending, onSend, onKeyDown }: InputBarProps) {
+  return (
+    <div className="flex gap-2 p-4 border-t border-border/60 bg-background/80 backdrop-blur-sm">
+      <Textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder="Escribe tu pregunta… (Enter para enviar)"
+        disabled={isSending}
+        className="min-h-[52px] max-h-32 resize-none text-sm rounded-xl border-border/60 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-1 focus-visible:border-[hsl(38,59%,45%)]"
+        rows={2}
+      />
+      <Button
+        onClick={onSend}
+        disabled={isSending || !input.trim()}
+        size="icon"
+        className="h-auto w-11 shrink-0 rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+        style={{
+          background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 36%))",
+          border: "none",
+          color: "white",
+        }}
+      >
+        <Send className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -82,7 +82,7 @@ const SelectorColumnas = ({
 }) => (
   <Popover>
     <PopoverTrigger asChild>
-      <Button variant="outline" size="sm" className="gap-1.5">
+      <Button variant="outline" size="sm" className="gap-1.5 border-border/50 shadow-sm hover:bg-muted/50 transition-colors">
         <Settings2 className="h-4 w-4" />
         Columnas
       </Button>
@@ -104,66 +104,89 @@ const SelectorColumnas = ({
   </Popover>
 );
 
-const FilaFacturaMobile = ({ factura }: { factura: Factura }) => {
+const FilaFacturaMobile = ({
+  factura,
+  onPreguntarIA
+}: {
+  factura: Factura;
+  onPreguntarIA?: (doc: Factura) => void;
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
 
   return (
-    <Card className="mb-3">
+    <Card className="mb-3 border-border/50 shadow-sm overflow-hidden">
       <CardHeader
-        className="cursor-pointer hover:bg-muted/50 transition-colors py-3"
+        className="cursor-pointer hover:bg-muted/30 transition-colors py-3"
         onClick={() => tieneProductos && setIsOpen(!isOpen)}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {tieneProductos ? (
-              isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+              isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />
             ) : (
               <FileText className="h-4 w-4 text-muted-foreground" />
             )}
             <div>
-              <CardTitle className="text-sm font-medium">{factura.numero_documento}</CardTitle>
-              <p className="text-xs text-muted-foreground">{factura.proveedor || "Sin proveedor"}</p>
+              <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                {factura.proveedor || "Sin proveedor"}
+              </p>
             </div>
           </div>
           <div className="text-right">
-            <p className="font-semibold text-sm">{formatCurrency(factura.total)}</p>
-            <p className="text-xs text-muted-foreground">{formatDate(factura.fecha)}</p>
-            {factura.drive_url && (
-              <a href={factura.drive_url} target="_blank" rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1">
-                <ExternalLink className="h-3 w-3" /> Ver Doc
-              </a>
-            )}
+            <p className="font-semibold text-sm tracking-tight">{formatCurrency(factura.total)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{formatDate(factura.fecha)}</p>
           </div>
         </div>
       </CardHeader>
+
+      {/* Botonera de acciones rápida unida al Header en mobile */}
+      <div className="flex bg-muted/20 border-t border-border/30 px-3 py-2 items-center justify-end gap-2">
+        {factura.drive_url && (
+          <a href={factura.drive_url} target="_blank" rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-md transition-colors">
+            <ExternalLink className="h-3 w-3" /> Ver Escaneo
+          </a>
+        )}
+        {onPreguntarIA && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-[11px] font-medium px-2.5 text-[hsl(38,59%,45%)] hover:text-[hsl(38,59%,45%)] bg-[hsl(38,59%,45%)/0.05] hover:bg-[hsl(38,59%,45%)/0.15] border border-[hsl(38,59%,45%)/0.2] transition-colors"
+            onClick={(e) => { e.stopPropagation(); onPreguntarIA(factura); }}
+          >
+            <Sparkles className="h-3 w-3 mr-1.5" /> Analizar con IA
+          </Button>
+        )}
+      </div>
+
       {isOpen && (
-        <CardContent className="pt-0 pb-3">
-          <div className="space-y-2 text-sm">
+        <CardContent className="pt-3 pb-4 bg-muted/5">
+          <div className="space-y-2.5 text-sm">
             {factura.cif && (
-              <div className="flex justify-between"><span className="text-muted-foreground">CIF:</span><span>{factura.cif}</span></div>
+              <div className="flex justify-between border-b border-border/30 pb-1.5"><span className="text-muted-foreground">CIF</span><span className="font-medium">{factura.cif}</span></div>
             )}
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span>{formatCurrency(factura.subtotal)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">IVA:</span><span>{formatCurrency(factura.iva)}</span></div>
+            <div className="flex justify-between border-b border-border/30 pb-1.5"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">{formatCurrency(factura.subtotal)}</span></div>
+            <div className="flex justify-between border-b border-border/30 pb-1.5"><span className="text-muted-foreground">IVA</span><span className="font-medium">{formatCurrency(factura.iva)}</span></div>
             {factura.observaciones && (
-              <div><span className="text-muted-foreground">Observaciones:</span><p className="mt-1">{factura.observaciones}</p></div>
+              <div className="py-1"><span className="text-muted-foreground text-xs block mb-1 uppercase tracking-wider">Observaciones</span><p className="text-sm bg-muted/30 p-2 rounded-md border border-border/50">{factura.observaciones}</p></div>
             )}
-            {factura.procesado_en && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Procesado:</span><span>{formatDateTime(factura.procesado_en)}</span></div>
-            )}
-            {factura.created_at && (
-              <div className="flex justify-between"><span className="text-muted-foreground">Creado:</span><span>{formatDateTime(factura.created_at)}</span></div>
-            )}
+
             {tieneProductos && (
-              <div className="mt-3 pt-3 border-t">
-                <p className="font-medium mb-2 flex items-center gap-1"><Package className="h-3 w-3" /> Productos ({factura.productos.length})</p>
-                <div className="space-y-1">
+              <div className="mt-4">
+                <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
+                  <Package className="h-3.5 w-3.5" /> Desglose ({factura.productos.length})
+                </p>
+                <div className="space-y-1.5">
                   {factura.productos.map((p) => (
-                    <div key={p.id} className="flex justify-between text-xs">
-                      <span className="truncate flex-1 mr-2">{p.producto_nombre}</span>
-                      <span className="font-medium">{formatCurrency(p.precio)}</span>
+                    <div key={p.id} className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm">
+                      <span className="font-medium text-foreground mb-1">{p.producto_nombre}</span>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
+                        <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -176,41 +199,50 @@ const FilaFacturaMobile = ({ factura }: { factura: Factura }) => {
   );
 };
 
-const FilaFacturaDesktop = ({ factura, visibles }: { factura: Factura; visibles: Record<string, boolean> }) => {
+const FilaFacturaDesktop = ({
+  factura,
+  visibles,
+  onPreguntarIA
+}: {
+  factura: Factura;
+  visibles: Record<string, boolean>;
+  onPreguntarIA?: (doc: Factura) => void;
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
-  const colSpan = 1 + Object.values(visibles).filter(Boolean).length;
+  // +1 para acciones IA
+  const colSpan = 2 + Object.values(visibles).filter(Boolean).length;
 
   return (
     <>
-      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => tieneProductos && setIsOpen(!isOpen)}>
-        <TableCell className="w-[40px]">
-          {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : null}
+      <TableRow className="cursor-pointer hover:bg-muted/30 transition-colors group" onClick={() => tieneProductos && setIsOpen(!isOpen)}>
+        <TableCell className="w-[40px] pl-4">
+          {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-medium">{factura.numero_documento}</TableCell>}
-        {visibles.proveedor && <TableCell>{factura.proveedor || "-"}</TableCell>}
-        {visibles.cif && <TableCell>{factura.cif || "-"}</TableCell>}
-        {visibles.fecha && <TableCell>{formatDate(factura.fecha)}</TableCell>}
-        {visibles.subtotal && <TableCell className="text-right">{formatCurrency(factura.subtotal)}</TableCell>}
-        {visibles.iva && <TableCell className="text-right">{formatCurrency(factura.iva)}</TableCell>}
-        {visibles.total && <TableCell className="text-right font-semibold">{formatCurrency(factura.total)}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento}</TableCell>}
+        {visibles.proveedor && <TableCell className="font-medium">{factura.proveedor || "-"}</TableCell>}
+        {visibles.cif && <TableCell className="text-muted-foreground">{factura.cif || "-"}</TableCell>}
+        {visibles.fecha && <TableCell className="text-muted-foreground">{formatDate(factura.fecha)}</TableCell>}
+        {visibles.subtotal && <TableCell className="text-right tabular-nums">{formatCurrency(factura.subtotal)}</TableCell>}
+        {visibles.iva && <TableCell className="text-right tabular-nums">{formatCurrency(factura.iva)}</TableCell>}
+        {visibles.total && <TableCell className="text-right font-bold tabular-nums text-foreground">{formatCurrency(factura.total)}</TableCell>}
         {visibles.observaciones && (
-          <TableCell className="max-w-[200px]">
-            {factura.observaciones && factura.observaciones.length > 40 ? (
+          <TableCell className="max-w-[150px]">
+            {factura.observaciones && factura.observaciones.length > 30 ? (
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild><span className="cursor-help text-sm">{truncateText(factura.observaciones)}</span></TooltipTrigger>
+                  <TooltipTrigger asChild><span className="cursor-help text-sm text-muted-foreground">{truncateText(factura.observaciones, 30)}</span></TooltipTrigger>
                   <TooltipContent className="max-w-sm"><p className="text-sm">{factura.observaciones}</p></TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              <span className="text-sm">{factura.observaciones || "-"}</span>
+              <span className="text-sm text-muted-foreground">{factura.observaciones || "-"}</span>
             )}
           </TableCell>
         )}
         {visibles.items && (
           <TableCell className="text-center">
-            {tieneProductos && <Badge variant="secondary" className="text-xs">{factura.productos.length}</Badge>}
+            {tieneProductos ? <Badge variant="secondary" className="text-xs font-mono">{factura.productos.length}</Badge> : "-"}
           </TableCell>
         )}
         {visibles.doc && (
@@ -218,42 +250,62 @@ const FilaFacturaDesktop = ({ factura, visibles }: { factura: Factura; visibles:
             {factura.drive_url && (
               <a href={factura.drive_url} target="_blank" rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
-                title="Ver documento en Google Drive">
+                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
+                title="Ver Escaneo original">
                 <ExternalLink className="h-4 w-4" />
               </a>
             )}
           </TableCell>
         )}
-        {visibles.procesado_en && <TableCell className="text-sm text-muted-foreground">{formatDateTime(factura.procesado_en)}</TableCell>}
-        {visibles.creado && <TableCell className="text-sm text-muted-foreground">{formatDateTime(factura.created_at)}</TableCell>}
+        {visibles.procesado_en && <TableCell className="text-xs text-muted-foreground">{formatDateTime(factura.procesado_en)}</TableCell>}
+        {visibles.creado && <TableCell className="text-xs text-muted-foreground">{formatDateTime(factura.created_at)}</TableCell>}
+
+        {/* Acciones Rápidas (IA) */}
+        <TableCell className="text-right pr-4">
+          <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+            {onPreguntarIA && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-medium text-[hsl(38,59%,45%)] border-[hsl(38,59%,45%)/0.3] hover:border-[hsl(38,59%,45%)] hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)] transition-all shadow-sm"
+                onClick={(e) => { e.stopPropagation(); onPreguntarIA(factura); }}
+                title="Analizar esta factura con IA"
+              >
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Asistente IA
+              </Button>
+            )}
+          </div>
+        </TableCell>
       </TableRow>
       {isOpen && tieneProductos && (
-        <TableRow className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={colSpan} className="p-0">
-            <div className="p-4 pl-10">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="h-8">Producto</TableHead>
-                    <TableHead className="w-[100px] h-8 text-right">Cantidad</TableHead>
-                    <TableHead className="w-[80px] h-8">Unidad</TableHead>
-                    <TableHead className="w-[120px] h-8 text-right">P. Unitario</TableHead>
-                    <TableHead className="w-[120px] h-8 text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {factura.productos.map((p) => (
-                    <TableRow key={p.id} className="hover:bg-muted/10">
-                      <TableCell className="py-2">{p.producto_nombre}</TableCell>
-                      <TableCell className="py-2 text-right">{p.cantidad ?? "-"}</TableCell>
-                      <TableCell className="py-2 text-muted-foreground">{p.unidad || "-"}</TableCell>
-                      <TableCell className="py-2 text-right">{formatCurrency(p.precio_unitario ?? null)}</TableCell>
-                      <TableCell className="py-2 text-right font-medium">{formatCurrency(p.precio)}</TableCell>
+        <TableRow className="bg-muted/10 hover:bg-muted/10">
+          <TableCell colSpan={colSpan} className="p-0 border-b">
+            <div className="p-4 pl-12 pr-6">
+              <div className="rounded-md border border-border/40 bg-background shadow-sm max-h-[300px] overflow-auto custom-scrollbar">
+                <Table>
+                  <TableHeader className="sticky top-0 z-10 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80 shadow-sm border-b border-border/40">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-9 text-xs uppercase tracking-wider font-semibold">Producto</TableHead>
+                      <TableHead className="h-9 w-[120px] text-right text-xs uppercase tracking-wider font-semibold">Cant. / U.</TableHead>
+                      <TableHead className="h-9 w-[120px] text-right text-xs uppercase tracking-wider font-semibold">P. Unitario</TableHead>
+                      <TableHead className="h-9 w-[120px] text-right text-xs uppercase tracking-wider font-semibold">Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {factura.productos.map((p) => (
+                      <TableRow key={p.id} className="hover:bg-muted/20">
+                        <TableCell className="py-2.5 font-medium">{p.producto_nombre}</TableCell>
+                        <TableCell className="py-2.5 text-right text-muted-foreground">
+                          <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
+                          <span className="text-xs">{p.unidad || ""}</span>
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">{formatCurrency(p.precio_unitario ?? null)}</TableCell>
+                        <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </TableCell>
         </TableRow>
@@ -262,7 +314,7 @@ const FilaFacturaDesktop = ({ factura, visibles }: { factura: Factura; visibles:
   );
 };
 
-export const TablaFacturas = () => {
+export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura) => void }) => {
   const { data: facturas, isLoading, error } = useFacturas();
   const [busqueda, setBusqueda] = useState("");
   const isMobile = useIsMobile();
@@ -283,15 +335,20 @@ export const TablaFacturas = () => {
   });
 
   if (error) {
-    return <Card><CardContent className="pt-6"><p className="text-destructive">Error al cargar facturas: {error.message}</p></CardContent></Card>;
+    return <Card className="border-destructive/50"><CardContent className="pt-6"><p className="text-destructive font-medium flex items-center gap-2">⚠️ Error al cargar facturas: {error.message}</p></CardContent></Card>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-4 h-full min-h-0 pb-2">
+      <div className="flex flex-col sm:flex-row gap-3 shrink-0">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por número, proveedor, CIF u observaciones..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="pl-10" />
+          <Input
+            placeholder="Buscar por número, proveedor, CIF u observaciones..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9 bg-background shadow-sm border-border/60 transition-colors focus-visible:border-primary"
+          />
         </div>
         {!isMobile && (
           <SelectorColumnas columnas={COLUMNAS_FACTURAS} visibles={columnasVisibles} onChange={toggleColumna} />
@@ -299,39 +356,42 @@ export const TablaFacturas = () => {
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-[60px] w-full rounded-xl" />)}
+        </div>
       ) : facturasFiltradas.length === 0 ? (
-        <Card><CardContent className="pt-6 text-center text-muted-foreground">{busqueda ? "No se encontraron facturas" : "No hay facturas registradas"}</CardContent></Card>
+        <Card className="border-border/50 bg-muted/10 shadow-none"><CardContent className="pt-8 pb-8 text-center"><FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" /><p className="text-muted-foreground font-medium">{busqueda ? "No se encontraron facturas" : "No hay facturas registradas"}</p></CardContent></Card>
       ) : isMobile ? (
-        <div>{facturasFiltradas.map((f) => <FilaFacturaMobile key={f.id} factura={f} />)}</div>
+        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{facturasFiltradas.map((f) => <FilaFacturaMobile key={f.id} factura={f} onPreguntarIA={onPreguntarIA} />)}</div>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <div className="rounded-xl border border-border/60 bg-background shadow-sm overflow-auto custom-scrollbar flex-1 min-h-0 relative">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="w-[40px]"></TableHead>
-                {columnasVisibles.numero && <TableHead>Número</TableHead>}
-                {columnasVisibles.proveedor && <TableHead>Proveedor</TableHead>}
-                {columnasVisibles.cif && <TableHead>CIF</TableHead>}
-                {columnasVisibles.fecha && <TableHead>Fecha</TableHead>}
-                {columnasVisibles.subtotal && <TableHead className="text-right">Subtotal</TableHead>}
-                {columnasVisibles.iva && <TableHead className="text-right">IVA</TableHead>}
-                {columnasVisibles.total && <TableHead className="text-right">Total</TableHead>}
-                {columnasVisibles.observaciones && <TableHead>Observaciones</TableHead>}
-                {columnasVisibles.items && <TableHead className="text-center">Items</TableHead>}
-                {columnasVisibles.doc && <TableHead className="text-center">Doc</TableHead>}
-                {columnasVisibles.procesado_en && <TableHead>Procesado en</TableHead>}
-                {columnasVisibles.creado && <TableHead>Creado</TableHead>}
+            <TableHeader className="sticky top-0 z-20 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+              <TableRow className="border-b-border/60 hover:bg-transparent">
+                <TableHead className="w-[40px] pl-4"></TableHead>
+                {columnasVisibles.numero && <TableHead className="font-semibold px-2">Nº Factura</TableHead>}
+                {columnasVisibles.proveedor && <TableHead className="font-semibold">Proveedor</TableHead>}
+                {columnasVisibles.cif && <TableHead className="font-semibold">CIF</TableHead>}
+                {columnasVisibles.fecha && <TableHead className="font-semibold">Fecha</TableHead>}
+                {columnasVisibles.subtotal && <TableHead className="text-right font-semibold">Subtotal</TableHead>}
+                {columnasVisibles.iva && <TableHead className="text-right font-semibold">IVA</TableHead>}
+                {columnasVisibles.total && <TableHead className="text-right font-bold text-foreground">Total</TableHead>}
+                {columnasVisibles.observaciones && <TableHead className="font-semibold">Obs.</TableHead>}
+                {columnasVisibles.items && <TableHead className="text-center font-semibold">Items</TableHead>}
+                {columnasVisibles.doc && <TableHead className="text-center font-semibold">Escaneo</TableHead>}
+                {columnasVisibles.procesado_en && <TableHead className="font-semibold">Procesado</TableHead>}
+                {columnasVisibles.creado && <TableHead className="font-semibold">Creado</TableHead>}
+                <TableHead className="text-right pr-4 font-semibold w-[140px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {facturasFiltradas.map((f) => <FilaFacturaDesktop key={f.id} factura={f} visibles={columnasVisibles} />)}
+              {facturasFiltradas.map((f) => <FilaFacturaDesktop key={f.id} factura={f} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} />)}
             </TableBody>
           </Table>
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground text-right">{facturasFiltradas.length} factura(s) encontrada(s)</p>
+      <p className="text-[12px] font-medium text-muted-foreground text-right shrink-0">{facturasFiltradas.length} total</p>
     </div>
   );
 };
