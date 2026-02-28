@@ -6,11 +6,19 @@ import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TablaAlbaranes } from "@/components/facturas/TablaAlbaranes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen } from "lucide-react";
-import { Factura } from "@/hooks/useFacturas";
+import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
+import { useChatFacturas } from "@/hooks/useChatFacturas";
 
 const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
   const [activeTab, setActiveTab] = useState<string>("documentos");
+
+  // Contadores para los badges de las pestañas
+  const { data: facturas } = useFacturas();
+  const { data: albaranes } = useAlbaranes();
+  const { conversaciones } = useChatFacturas();
+  const totalDocumentos = (facturas?.length ?? 0) + (albaranes?.length ?? 0);
+  const totalConversaciones = conversaciones.length;
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
@@ -51,6 +59,11 @@ const Facturas = () => {
               >
                 <FolderOpen className="h-[18px] w-[18px]" />
                 <span className="font-medium text-[15px]">Ver Documentos</span>
+                {totalDocumentos > 0 && (
+                  <span className="ml-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-0.5 leading-none">
+                    {totalDocumentos}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="chat"
@@ -58,6 +71,11 @@ const Facturas = () => {
               >
                 <MessageSquare className="h-[18px] w-[18px]" />
                 <span className="font-medium text-[15px]">Asistente IA</span>
+                {totalConversaciones > 0 && (
+                  <span className="ml-1 rounded-full bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)] text-[11px] font-semibold px-1.5 py-0.5 leading-none">
+                    {totalConversaciones}
+                  </span>
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="cargar"

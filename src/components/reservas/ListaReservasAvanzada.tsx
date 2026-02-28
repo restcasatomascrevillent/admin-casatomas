@@ -7,16 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Search, 
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Search,
   Users,
   Calendar,
   Loader2,
   ShieldBan,
-  Star
+  Star,
+  Phone,
+  Globe,
+  Pencil
 } from "lucide-react";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,6 +39,7 @@ interface Reservation {
   nombre: string;
   telefono: string;
   email: string | null;
+  canal: 'telefono' | 'web' | 'manual' | null;
 }
 
 interface ListaReservasAvanzadaProps {
@@ -45,11 +49,11 @@ interface ListaReservasAvanzadaProps {
   initialDateFilter?: Date;
 }
 
-export function ListaReservasAvanzada({ 
-  onEditReserva, 
+export function ListaReservasAvanzada({
+  onEditReserva,
   onEspacioClick,
   initialStatusFilter,
-  initialDateFilter 
+  initialDateFilter
 }: ListaReservasAvanzadaProps) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +70,11 @@ export function ListaReservasAvanzada({
       fetchReservations();
     }
   };
-  
+
   // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
+  const [canalFilter, setCanalFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
 
 
@@ -84,7 +89,7 @@ export function ListaReservasAvanzada({
       .from("reservas")
       .select(`
         id, fecha, hora, numero_comensales, estado, notas_cliente,
-        nombre, telefono, email
+        nombre, telefono, email, canal
       `)
       .order("fecha", { ascending: false })
       .order("hora", { ascending: true });
@@ -114,15 +119,48 @@ export function ListaReservasAvanzada({
       }
 
       toast.success("Estado actualizado correctamente");
-      
+
       // Enviar datos al webhook
       supabase.functions.invoke('notify-reservation-change', {
         body: { ...currentReservation, estado: newStatus }
       }).catch(err => console.error('Error notifying webhook:', err));
-      
+
       fetchReservations();
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const getCanalBadge = (canal: string | null) => {
+    switch (canal) {
+      case 'telefono':
+        return (
+          <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 gap-1">
+            <Phone className="h-3 w-3" />
+            Teléfono
+          </Badge>
+        );
+      case 'web':
+        return (
+          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 gap-1">
+            <Globe className="h-3 w-3" />
+            Web
+          </Badge>
+        );
+      case 'manual':
+        return (
+          <Badge className="bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300 gap-1">
+            <Pencil className="h-3 w-3" />
+            Manual
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-muted-foreground gap-1">
+            <Globe className="h-3 w-3" />
+            Web
+          </Badge>
+        );
     }
   };
 
@@ -167,12 +205,18 @@ export function ListaReservasAvanzada({
     if (searchQuery && !r.nombre?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
-    
+
     // Filtro de estado
     if (statusFilter !== "all" && r.estado !== statusFilter) {
       return false;
     }
-    
+
+    // Filtro de canal
+    if (canalFilter !== "all") {
+      const canalReserva = r.canal || 'web';
+      if (canalReserva !== canalFilter) return false;
+    }
+
     // Filtro de fecha
     if (dateFilter) {
       const reservaDate = new Date(r.fecha);
@@ -183,7 +227,7 @@ export function ListaReservasAvanzada({
         return false;
       }
     }
-    
+
     return true;
   });
 
@@ -230,10 +274,10 @@ export function ListaReservasAvanzada({
               <PopoverTrigger asChild>
                 <Button variant="outline" className="min-w-[150px]">
                   <Calendar className="mr-2 h-4 w-4" />
-                  {dateFilter 
-                    ? (dateFilter.toDateString() === new Date().toDateString() 
-                        ? "Hoy" 
-                        : format(dateFilter, "d MMM yyyy", { locale: es }))
+                  {dateFilter
+                    ? (dateFilter.toDateString() === new Date().toDateString()
+                      ? "Hoy"
+                      : format(dateFilter, "d MMM yyyy", { locale: es }))
                     : "Fecha"}
                 </Button>
               </PopoverTrigger>
@@ -274,6 +318,19 @@ export function ListaReservasAvanzada({
               </SelectContent>
             </Select>
 
+            {/* Filtro de canal */}
+            <Select value={canalFilter} onValueChange={setCanalFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Canal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los canales</SelectItem>
+                <SelectItem value="telefono">📞 Teléfono</SelectItem>
+                <SelectItem value="web">🌐 Web</SelectItem>
+                <SelectItem value="manual">✏️ Manual</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Contador de resultados */}
             <Badge variant="secondary" className="ml-auto">
               {filteredReservations.length} reservas
@@ -292,6 +349,7 @@ export function ListaReservasAvanzada({
                 <TableHead>Hora</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Comensales</TableHead>
+                <TableHead>Canal</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Acciones</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -300,13 +358,13 @@ export function ListaReservasAvanzada({
             <TableBody>
               {filteredReservations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No se encontraron reservas con los filtros aplicados
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredReservations.map((reservation) => (
-                   <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
+                  <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
                     <TableCell>
                       {new Date(reservation.fecha).toLocaleDateString("es-ES")}
                     </TableCell>
@@ -334,6 +392,7 @@ export function ListaReservasAvanzada({
                         {reservation.numero_comensales}
                       </div>
                     </TableCell>
+                    <TableCell>{getCanalBadge(reservation.canal)}</TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">

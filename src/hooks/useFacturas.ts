@@ -28,83 +28,71 @@ export interface Factura {
   created_at: string | null;
 }
 
+const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
+
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
-  // Fetch documents of specified type
-  const { data: documentos, error: docError } = await supabase
+  // Una sola query con JOIN — se evita el N+1 de queries separadas
+  const { data, error } = await supabase
     .from('facturas')
-    .select('*')
+    .select(`
+      id, tipo, numero_documento, proveedor, cif, fecha,
+      subtotal, iva, total, observaciones, drive_url,
+      procesado_en, created_at,
+      productos_factura (
+        id, nombre, precio_unitario, cantidad, unidad, total
+      )
+    `)
     .eq('tipo', tipo)
     .order('fecha', { ascending: false });
 
-  if (docError) throw docError;
-  if (!documentos || documentos.length === 0) return [];
+  if (error) throw error;
+  if (!data || data.length === 0) return [];
 
-  // Get all document IDs
-  const documentoIds = documentos.map(d => d.id);
-
-  // Fetch products from productos_factura table
-  const { data: productosFactura, error: prodFacturaError } = await supabase
-    .from('productos_factura')
-    .select('*')
-    .in('factura_id', documentoIds);
-
-  if (prodFacturaError) throw prodFacturaError;
-
-  // Map products to their documents
-  const productosMap = new Map<number, ProductoFactura[]>();
-
-  (productosFactura || []).forEach(p => {
-    const facturaId = p.factura_id;
-    if (facturaId) {
-      if (!productosMap.has(facturaId)) {
-        productosMap.set(facturaId, []);
-      }
-      // Calculate individual product total if not present
+  return data.map((doc: any) => {
+    const productos: ProductoFactura[] = (doc.productos_factura || []).map((p: any) => {
       const precioUnitario = Number(p.precio_unitario) || 0;
       const cantidad = Number(p.cantidad) || 0;
-      const totalProducto = Number(p.total) || (precioUnitario * cantidad);
-
-      productosMap.get(facturaId)!.push({
+      const totalProducto = Number(p.total) || precioUnitario * cantidad;
+      return {
         id: p.id,
         producto_nombre: p.nombre,
-        precio: totalProducto, // Use total price for display
-        cantidad: cantidad,
-        unidad: p.unidad,
-        proveedor: null, // This comes from parent document
-        precio_unitario: precioUnitario
-      });
-    }
-  });
+        precio: totalProducto,
+        cantidad,
+        unidad: p.unidad ?? null,
+        proveedor: null,
+        precio_unitario: precioUnitario,
+      };
+    });
 
-  // Combine documents with products
-  return documentos.map(doc => ({
-    id: doc.id,
-    tipo: doc.tipo,
-    numero_documento: doc.numero_documento,
-    proveedor: doc.proveedor,
-    cif: doc.cif,
-    fecha: doc.fecha,
-    subtotal: doc.subtotal ? Number(doc.subtotal) : null,
-    iva: doc.iva ? Number(doc.iva) : null,
-    total: doc.total ? Number(doc.total) : null,
-    observaciones: doc.observaciones,
-    productos: productosMap.get(doc.id) || [],
-    drive_url: (doc as any).drive_url || null,
-    procesado_en: doc.procesado_en || null,
-    created_at: doc.created_at || null,
-  }));
+    return {
+      id: doc.id,
+      tipo: doc.tipo,
+      numero_documento: doc.numero_documento,
+      proveedor: doc.proveedor,
+      cif: doc.cif,
+      fecha: doc.fecha,
+      subtotal: doc.subtotal != null ? Number(doc.subtotal) : null,
+      iva: doc.iva != null ? Number(doc.iva) : null,
+      total: doc.total != null ? Number(doc.total) : null,
+      observaciones: doc.observaciones,
+      productos,
+      drive_url: doc.drive_url ?? null,
+      procesado_en: doc.procesado_en ?? null,
+      created_at: doc.created_at ?? null,
+    };
+  });
 };
 
-export const useFacturas = () => {
-  return useQuery({
+export const useFacturas = () =>
+  useQuery({
     queryKey: ['facturas'],
     queryFn: () => fetchDocumentosConProductos('factura'),
+    staleTime: STALE_TIME,
   });
-};
 
-export const useAlbaranes = () => {
-  return useQuery({
+export const useAlbaranes = () =>
+  useQuery({
     queryKey: ['albaranes'],
     queryFn: () => fetchDocumentosConProductos('albaran'),
+    staleTime: STALE_TIME,
   });
-};

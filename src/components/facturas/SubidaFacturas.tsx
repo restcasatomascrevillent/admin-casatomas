@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,7 @@ interface ResultadoProcesamiento {
 export function SubidaFacturas() {
   const [archivos, setArchivos] = useState<ArchivoFactura[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [resultados, setResultados] = useState<ResultadoProcesamiento[]>([]);
   const [progreso, setProgreso] = useState<{
     total: number;
@@ -34,6 +36,7 @@ export function SubidaFacturas() {
   }>({ total: 0, actual: 0, nombreActual: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -115,23 +118,21 @@ export function SubidaFacturas() {
 
     setIsSubmitting(true);
     setResultados([]);
-    setProgreso({ total: archivos.length, actual: 0, nombreActual: '' });
+    setProgreso({ total: archivos.length, actual: 0, nombreActual: 'Preparando archivos…' });
 
-    const nuevosResultados: ResultadoProcesamiento[] = [];
+    // Convertir todos los archivos a base64 en paralelo
+    const archivosConBase64 = await Promise.all(
+      archivos.map(async (archivo) => ({
+        archivo,
+        base64: await convertirABase64(archivo.file),
+      }))
+    );
 
-    // Procesar cada archivo individualmente
-    for (let i = 0; i < archivos.length; i++) {
-      const archivo = archivos[i];
+    let completados = 0;
 
-      setProgreso({
-        total: archivos.length,
-        actual: i + 1,
-        nombreActual: archivo.nombre,
-      });
-
-      try {
-        const base64 = await convertirABase64(archivo.file);
-
+    // Procesar todos los archivos en paralelo con Promise.allSettled
+    const resultadosSettled = await Promise.allSettled(
+      archivosConBase64.map(async ({ archivo, base64 }) => {
         const payload = {
           tipo: "AUTO",
           archivo: {
@@ -147,34 +148,52 @@ export function SubidaFacturas() {
           body: payload,
         });
 
+        // Actualizar contador de progreso en tiempo real
+        completados += 1;
+        setProgreso({
+          total: archivos.length,
+          actual: completados,
+          nombreActual: `${completados} de ${archivos.length}`,
+        });
+
         if (error || !data?.success) {
-          nuevosResultados.push({
+          return {
             nombre: archivo.nombre,
             success: false,
             error: error?.message || data?.error || 'Error desconocido',
-          });
-        } else {
-          nuevosResultados.push({
-            nombre: archivo.nombre,
-            success: true,
-            respuesta: data.webhookResponse,
-            tipo: data.webhookResponse?.tipo || data.tipo,
-          });
+          } as ResultadoProcesamiento;
         }
-      } catch (err) {
-        nuevosResultados.push({
+
+        return {
           nombre: archivo.nombre,
-          success: false,
-          error: err instanceof Error ? err.message : 'Error desconocido',
-        });
-      }
-    }
+          success: true,
+          respuesta: data.webhookResponse,
+          tipo: data.webhookResponse?.tipo || data.tipo,
+        } as ResultadoProcesamiento;
+      })
+    );
+
+    // Extraer resultados de Promise.allSettled
+    const nuevosResultados: ResultadoProcesamiento[] = resultadosSettled.map((res, i) => {
+      if (res.status === 'fulfilled') return res.value;
+      return {
+        nombre: archivos[i].nombre,
+        success: false,
+        error: res.reason instanceof Error ? res.reason.message : 'Error desconocido',
+      };
+    });
 
     setResultados(nuevosResultados);
 
     // Analizar resultados
     const exitosos = nuevosResultados.filter(r => r.success);
     const fallidos = nuevosResultados.filter(r => !r.success);
+
+    // Refrescar tablas si hay documentos procesados correctamente
+    if (exitosos.length > 0) {
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+    }
 
     if (fallidos.length > 0 && exitosos.length > 0) {
       toast({
@@ -201,7 +220,6 @@ export function SubidaFacturas() {
         const archivosRestantes = prev.filter(a =>
           fallidos.some(f => f.nombre === a.nombre)
         );
-        // Liberar URLs de preview de archivos exitosos
         prev.forEach(a => {
           if (!fallidos.some(f => f.nombre === a.nombre) && a.preview) {
             URL.revokeObjectURL(a.preview);
@@ -243,15 +261,20 @@ export function SubidaFacturas() {
       <CardContent className="space-y-6">
         {/* Zona de carga */}
         <div
-          className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+          className={[
+            "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200",
+            isDragging
+              ? "border-primary bg-primary/5 scale-[1.01] shadow-md"
+              : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",
+          ].join(" ")}
           onClick={() => fileInputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
+          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
           onDrop={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            setIsDragging(false);
             const files = e.dataTransfer.files;
             if (files.length > 0 && fileInputRef.current) {
               const dt = new DataTransfer();
@@ -261,9 +284,14 @@ export function SubidaFacturas() {
             }
           }}
         >
-          <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+          <Upload
+            className={[
+              "h-10 w-10 mx-auto mb-4 transition-all duration-200",
+              isDragging ? "text-primary scale-110" : "text-muted-foreground",
+            ].join(" ")}
+          />
           <p className="text-sm text-muted-foreground mb-2">
-            Arrastra tus facturas o albaranes aquí o haz clic para seleccionar
+            {isDragging ? "Suelta aquí para añadir" : "Arrastra tus facturas o albaranes aquí o haz clic para seleccionar"}
           </p>
           <p className="text-xs text-muted-foreground">
             PDF, JPG, PNG o WEBP (máximo 10MB por archivo)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { useAlbaranes, Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
@@ -289,6 +289,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA }: { albaran: Fac
 export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura) => void }) => {
   const { data: albaranes, isLoading, error } = useAlbaranes();
   const [busqueda, setBusqueda] = useState("");
+  const busquedaDeferida = useDeferredValue(busqueda); // No bloquea el thread durante escritura rápida
   const isMobile = useIsMobile();
   const [columnasVisibles, setColumnasVisibles] = useState<Record<string, boolean>>(DEFAULTS_ALBARANES);
 
@@ -297,13 +298,15 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
   };
 
   const albaranesFiltrados = (albaranes || []).filter((a) => {
-    const termino = busqueda.toLowerCase();
+    const termino = busquedaDeferida.toLowerCase();
     return (
       a.numero_documento.toLowerCase().includes(termino) ||
       (a.proveedor?.toLowerCase().includes(termino) ?? false) ||
       (a.observaciones?.toLowerCase().includes(termino) ?? false)
     );
   });
+
+  const isFiltrandoBusqueda = busqueda !== busquedaDeferida;
 
   if (error) {
     return <Card className="border-destructive/50"><CardContent className="pt-6"><p className="text-destructive font-medium flex items-center gap-2">⚠️ Error al cargar albaranes: {error.message}</p></CardContent></Card>;
@@ -318,7 +321,10 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
             placeholder="Buscar por número, proveedor u observaciones..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9 bg-background shadow-sm border-border/60 transition-colors focus-visible:border-primary"
+            className={[
+              "pl-9 bg-background shadow-sm border-border/60 transition-colors focus-visible:border-primary",
+              isFiltrandoBusqueda ? "opacity-70" : "",
+            ].join(" ")}
           />
         </div>
         {!isMobile && (

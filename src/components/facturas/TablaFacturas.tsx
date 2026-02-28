@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { useFacturas, Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
@@ -317,6 +317,7 @@ const FilaFacturaDesktop = ({
 export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura) => void }) => {
   const { data: facturas, isLoading, error } = useFacturas();
   const [busqueda, setBusqueda] = useState("");
+  const busquedaDeferida = useDeferredValue(busqueda); // No bloquea el thread durante escritura rápida
   const isMobile = useIsMobile();
   const [columnasVisibles, setColumnasVisibles] = useState<Record<string, boolean>>(DEFAULTS_FACTURAS);
 
@@ -325,7 +326,7 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
   };
 
   const facturasFiltradas = (facturas || []).filter((f) => {
-    const termino = busqueda.toLowerCase();
+    const termino = busquedaDeferida.toLowerCase();
     return (
       f.numero_documento.toLowerCase().includes(termino) ||
       (f.proveedor?.toLowerCase().includes(termino) ?? false) ||
@@ -333,6 +334,8 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
       (f.observaciones?.toLowerCase().includes(termino) ?? false)
     );
   });
+
+  const isFiltrandoBusqueda = busqueda !== busquedaDeferida;
 
   if (error) {
     return <Card className="border-destructive/50"><CardContent className="pt-6"><p className="text-destructive font-medium flex items-center gap-2">⚠️ Error al cargar facturas: {error.message}</p></CardContent></Card>;
@@ -347,7 +350,10 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
             placeholder="Buscar por número, proveedor, CIF u observaciones..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9 bg-background shadow-sm border-border/60 transition-colors focus-visible:border-primary"
+            className={[
+              "pl-9 bg-background shadow-sm border-border/60 transition-colors focus-visible:border-primary",
+              isFiltrandoBusqueda ? "opacity-70" : "",
+            ].join(" ")}
           />
         </div>
         {!isMobile && (

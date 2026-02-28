@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useDeferredValue } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,8 +69,8 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
     onEnviar(texto);
   };
 
-  // ─── Estado vacío ──────────────────────────────────────────────────────────
-  if (!tieneConversacion && mensajes.length === 0) {
+  // ─── Estado vacío (sin mensajes) ──────────────────────────────────────────
+  if (mensajes.length === 0 && !isSending) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
@@ -136,7 +136,10 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
               return (
                 <div
                   key={msg.id}
-                  className={cn("flex gap-2.5", isUser ? "flex-row-reverse" : "flex-row")}
+                  className={cn(
+                    "flex gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300",
+                    isUser ? "flex-row-reverse" : "flex-row"
+                  )}
                 >
                   {/* Avatar */}
                   <div

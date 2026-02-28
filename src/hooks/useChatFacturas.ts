@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+// ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
+// Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
+
 export interface Conversacion {
   id: string;
   session_id: string;
@@ -14,8 +17,7 @@ export interface MensajeChat {
   id: string;
   contenido: string;
   rol: "user" | "assistant";
-  session_id: string;
-  conversacion_id: string | null;
+  conversacion_id: string;
   created_at: string;
 }
 
@@ -27,10 +29,10 @@ export function useChatFacturas() {
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
-  // Cargar lista de conversaciones
+  // ─── Cargar lista de conversaciones ──────────────────────────────────────────
   const cargarConversaciones = useCallback(async () => {
     const { data, error } = await supabase
-      .from("conversaciones")
+      .from("chat_facturas_conversaciones")
       .select("*")
       .order("updated_at", { ascending: false });
 
@@ -41,13 +43,13 @@ export function useChatFacturas() {
     setConversaciones((data ?? []) as unknown as Conversacion[]);
   }, []);
 
-  // Cargar mensajes de una conversación
-  const cargarMensajes = useCallback(async (sessionId: string) => {
+  // ─── Cargar mensajes de una conversación ─────────────────────────────────────
+  const cargarMensajes = useCallback(async (conversacionId: string) => {
     setIsLoading(true);
     const { data, error } = await supabase
-      .from("mensajes_chat")
+      .from("chat_facturas_mensajes")
       .select("*")
-      .eq("session_id", sessionId)
+      .eq("conversacion_id", conversacionId)
       .order("created_at", { ascending: true });
 
     if (error) {
@@ -56,11 +58,11 @@ export function useChatFacturas() {
       return;
     }
 
+    // Columnas reales: id, conversacion_id, rol, contenido, created_at
     const mapped: MensajeChat[] = (data ?? []).map((m: any) => ({
       id: m.id,
-      contenido: m.content,
-      rol: m.role as "user" | "assistant",
-      session_id: m.session_id,
+      contenido: m.contenido,
+      rol: m.rol as "user" | "assistant",
       conversacion_id: m.conversacion_id,
       created_at: m.created_at,
     }));
@@ -69,17 +71,17 @@ export function useChatFacturas() {
     setIsLoading(false);
   }, []);
 
-  // Seleccionar conversación
+  // ─── Seleccionar conversación ─────────────────────────────────────────────────
   const seleccionarConversacion = useCallback(async (conv: Conversacion) => {
     setConversacionActiva(conv);
-    await cargarMensajes(conv.session_id);
+    await cargarMensajes(conv.id);
   }, [cargarMensajes]);
 
-  // Crear nueva conversación
+  // ─── Crear nueva conversación ─────────────────────────────────────────────────
   const nuevaConversacion = useCallback(async (): Promise<Conversacion | null> => {
     const sessionId = crypto.randomUUID();
     const { data, error } = await supabase
-      .from("conversaciones")
+      .from("chat_facturas_conversaciones")
       .insert({ session_id: sessionId, titulo: "Nueva conversación" })
       .select()
       .single();
@@ -101,19 +103,16 @@ export function useChatFacturas() {
     return conv;
   }, [cargarConversaciones, toast]);
 
-  // Guardar mensaje en Supabase
+  // ─── Guardar mensaje en Supabase ──────────────────────────────────────────────
+  // Tabla: chat_facturas_mensajes (id, conversacion_id, rol, contenido, created_at)
   const guardarMensaje = useCallback(async (
-    sessionId: string,
+    conversacionId: string,
     contenido: string,
     rol: "user" | "assistant"
   ) => {
     const { data, error } = await supabase
-      .from("mensajes_chat")
-      .insert({
-        session_id: sessionId,
-        content: contenido,
-        role: rol,
-      })
+      .from("chat_facturas_mensajes")
+      .insert({ conversacion_id: conversacionId, contenido, rol })
       .select()
       .single();
 
@@ -121,31 +120,36 @@ export function useChatFacturas() {
       console.error("Error guardando mensaje:", error);
       return null;
     }
-
     return data;
   }, []);
 
-  // Actualizar título de conversación basado en primer mensaje
+  // ─── Actualizar título de conversación ────────────────────────────────────────
   const actualizarTitulo = useCallback(async (convId: string, primerMensaje: string) => {
-    const titulo = primerMensaje.length > 50
-      ? primerMensaje.substring(0, 50) + "..."
-      : primerMensaje;
+    // Limpiar prefijo automático del botón "Analizar con IA"
+    let textoTitulo = primerMensaje
+      .replace(/^Hola,\s*quiero hacerte una consulta sobre\s+/i, "")
+      .trim();
+
+    if (textoTitulo.length < 5) textoTitulo = primerMensaje;
+
+    const titulo = textoTitulo.length > 55
+      ? textoTitulo.substring(0, 55) + "…"
+      : textoTitulo;
 
     await supabase
-      .from("conversaciones")
-      .update({ titulo })
+      .from("chat_facturas_conversaciones")
+      .update({ titulo, updated_at: new Date().toISOString() })
       .eq("id", convId);
 
     await cargarConversaciones();
   }, [cargarConversaciones]);
 
-  // Enviar mensaje al webhook via edge function
+  // ─── Enviar mensaje al chatbot (edge function → webhook n8n) ─────────────────
   const enviarMensaje = useCallback(async (texto: string) => {
     if (!texto.trim() || isSending) return;
 
     let conv = conversacionActiva;
 
-    // Si no hay conversación activa, crear una nueva
     if (!conv) {
       conv = await nuevaConversacion();
       if (!conv) return;
@@ -153,15 +157,14 @@ export function useChatFacturas() {
 
     setIsSending(true);
 
-    // Guardar mensaje del usuario
-    await guardarMensaje(conv.session_id, texto, "user");
+    // Guardar mensaje del usuario en Supabase
+    await guardarMensaje(conv.id, texto, "user");
 
-    // Añadir mensaje localmente
+    // Añadir mensaje localmente de inmediato
     const msgUsuario: MensajeChat = {
       id: crypto.randomUUID(),
       contenido: texto,
       rol: "user",
-      session_id: conv.session_id,
       conversacion_id: conv.id,
       created_at: new Date().toISOString(),
     };
@@ -173,7 +176,7 @@ export function useChatFacturas() {
     }
 
     try {
-      // Enviar al edge function solo con session_id
+      // Llamar a la edge function con session_id = conv.session_id
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
         body: {
           mensaje: texto,
@@ -185,15 +188,20 @@ export function useChatFacturas() {
 
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
 
-      // Guardar respuesta en Supabase
-      await guardarMensaje(conv.session_id, respuesta, "assistant");
+      // Guardar respuesta del asistente en Supabase
+      await guardarMensaje(conv.id, respuesta, "assistant");
+
+      // Actualizar updated_at de la conversación
+      await supabase
+        .from("chat_facturas_conversaciones")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conv.id);
 
       // Añadir respuesta localmente
       const msgAsistente: MensajeChat = {
         id: crypto.randomUUID(),
         contenido: respuesta,
         rol: "assistant",
-        session_id: conv.session_id,
         conversacion_id: conv.id,
         created_at: new Date().toISOString(),
       };
@@ -210,7 +218,6 @@ export function useChatFacturas() {
         id: crypto.randomUUID(),
         contenido: "⚠️ Hubo un problema al procesar tu consulta.",
         rol: "assistant",
-        session_id: conv.session_id,
         conversacion_id: conv.id,
         created_at: new Date().toISOString(),
       };
@@ -220,11 +227,11 @@ export function useChatFacturas() {
     }
   }, [conversacionActiva, isSending, mensajes.length, nuevaConversacion, guardarMensaje, actualizarTitulo, toast]);
 
-  // Eliminar conversación
-  const eliminarConversacion = useCallback(async (convId: string, sessionId: string) => {
-    // Borrar mensajes primero
-    await supabase.from("mensajes_chat").delete().eq("session_id", sessionId);
-    await supabase.from("conversaciones").delete().eq("id", convId);
+  // ─── Eliminar conversación ────────────────────────────────────────────────────
+  const eliminarConversacion = useCallback(async (convId: string) => {
+    // Borrar mensajes de la conversación primero (FK)
+    await supabase.from("chat_facturas_mensajes").delete().eq("conversacion_id", convId);
+    await supabase.from("chat_facturas_conversaciones").delete().eq("id", convId);
 
     if (conversacionActiva?.id === convId) {
       setConversacionActiva(null);
@@ -234,7 +241,7 @@ export function useChatFacturas() {
     await cargarConversaciones();
   }, [conversacionActiva, cargarConversaciones]);
 
-  // Cargar conversaciones al montar
+  // ─── Cargar conversaciones al montar ─────────────────────────────────────────
   useEffect(() => {
     cargarConversaciones();
   }, [cargarConversaciones]);
