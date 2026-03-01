@@ -241,7 +241,53 @@ export function useChatFacturas() {
     await cargarConversaciones();
   }, [conversacionActiva, cargarConversaciones]);
 
-  // ─── Cargar conversaciones al montar ─────────────────────────────────────────
+  // ─── Regenerar última respuesta del asistente ─────────────────────────────
+  const regenerarRespuesta = useCallback(async () => {
+    if (isSending || mensajes.length === 0) return;
+
+    // Buscar el último mensaje del usuario anterior al último mensaje del asistente
+    const lastUserMsg = [...mensajes].reverse().find((m) => m.rol === "user");
+    if (!lastUserMsg) return;
+
+    // Eliminar el último mensaje del asistente del estado local y de la BD
+    const lastAssistantMsg = [...mensajes].reverse().find((m) => m.rol === "assistant");
+    if (lastAssistantMsg) {
+      setMensajes((prev) => prev.filter((m) => m.id !== lastAssistantMsg.id));
+      await supabase
+        .from("chat_facturas_mensajes")
+        .delete()
+        .eq("id", lastAssistantMsg.id)
+        .eq("conversacion_id", conversacionActiva?.id ?? "");
+    }
+
+    // Reenviar el mensaje del usuario (sin guardarlo de nuevo en DB ni en el estado)
+    if (!conversacionActiva) return;
+    setIsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("chat-facturas", {
+        body: { mensaje: lastUserMsg.contenido, session_id: conversacionActiva.session_id },
+      });
+      if (error) throw new Error(error.message);
+      const respuesta = data?.respuesta || "No pude obtener una respuesta.";
+      await guardarMensaje(conversacionActiva.id, respuesta, "assistant");
+      setMensajes((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          contenido: respuesta,
+          rol: "assistant",
+          conversacion_id: conversacionActiva.id,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch {
+      toast({ title: "Error", description: "No se pudo regenerar la respuesta.", variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  }, [isSending, mensajes, conversacionActiva, guardarMensaje, toast]);
+
+  // ─── Cargar conversaciones al montar ─────────────────────────────────────
   useEffect(() => {
     cargarConversaciones();
   }, [cargarConversaciones]);
@@ -255,6 +301,7 @@ export function useChatFacturas() {
     seleccionarConversacion,
     nuevaConversacion,
     enviarMensaje,
+    regenerarRespuesta,
     eliminarConversacion,
     cargarConversaciones,
   };

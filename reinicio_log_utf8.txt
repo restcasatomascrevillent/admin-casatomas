@@ -1,0 +1,20 @@
+﻿6b3be6c feat: Add a new invoice management module with chat, tables for invoices and delivery notes, upload functionality, and an advanced reservation list.
+a581629 lcoal benito
+18ebeac Ajuste parsing webhook
+88771d2 Changes
+d78d4c3 Robustify chat-facturas parsing
+aac634c Changes
+5481827 Refactor chatfacturas to persist
+54bb934 Changes
+e974aae feat: enviar configuracion del bot a webhook
+b2e820f Visual edit in Lovable
+6e242dd Visual edit in Lovable
+676b319 Visual edit in Lovable
+ca64f3b Fix ocupacion types for hoy
+a2766c3 Changes
+fba7bfd Add read metrics endpoint
+fe58cd8 Changes
+e2e208e Lovable update
+61037d7 Changes
+25c54ba Actualizar registro de m├®tricas
+548b739 Changes
