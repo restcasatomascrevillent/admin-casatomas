@@ -2368,20 +2368,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "fk_factura"
-            columns: ["factura_id"]
-            isOneToOne: false
-            referencedRelation: "facturas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_factura"
-            columns: ["factura_id"]
-            isOneToOne: false
-            referencedRelation: "vista_ultimos_documentos"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "productos_factura_factura_id_fkey"
             columns: ["factura_id"]
             isOneToOne: false
@@ -2616,6 +2602,7 @@ export type Database = {
       }
       reservas: {
         Row: {
+          canal: string | null
           created_at: string | null
           email: string | null
           en_blacklist: boolean | null
@@ -2632,6 +2619,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          canal?: string | null
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
@@ -2648,6 +2636,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          canal?: string | null
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
