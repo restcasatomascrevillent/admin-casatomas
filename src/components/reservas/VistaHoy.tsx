@@ -85,21 +85,22 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   return (
     <div className="space-y-6">
       {/* Header con fecha + Botón Gestor */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-primary/10">
-            <CalendarCheck className="h-6 w-6 text-primary" />
+          <div className="p-2 sm:p-3 rounded-xl bg-primary/10">
+            <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-2xl font-bold">
+            <h3 className="text-lg sm:text-2xl font-bold">
               {format(today, "EEEE, d 'de' MMMM", { locale: es })}
             </h3>
-            <p className="text-muted-foreground">Resumen de ocupación del día</p>
+            <p className="text-muted-foreground text-xs sm:text-sm">Resumen de ocupación del día</p>
           </div>
         </div>
         <Button
           variant="outline"
-          className="gap-2 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          size="sm"
+          className="gap-2 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
           onClick={() => setKanbanOpen(true)}
         >
           <LayoutGrid className="h-4 w-4" />
@@ -108,7 +109,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
 
         <Card className="border-l-4 border-l-primary">
           <CardContent className="p-6">
