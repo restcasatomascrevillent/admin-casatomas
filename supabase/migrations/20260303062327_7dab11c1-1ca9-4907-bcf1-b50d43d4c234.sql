@@ -1,0 +1,1 @@
+UPDATE espacios_reserva SET capacidad_maxima = 50 WHERE id IN ('5888d22a-f228-41f5-8a9d-c8b3ee255863', 'db8be4e2-2e67-4110-99b1-9e1d779514cc', '449cffc7-1189-4f3c-a0b3-b60b3442979d');
