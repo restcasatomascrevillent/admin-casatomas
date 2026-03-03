@@ -340,8 +340,67 @@ export function ListaReservasAvanzada({
         </CardContent>
       </Card>
 
-      {/* Tabla de reservas */}
-      <Card>
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-3">
+        {filteredReservations.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8 text-muted-foreground">
+              No se encontraron reservas con los filtros aplicados
+            </CardContent>
+          </Card>
+        ) : (
+          filteredReservations.map((reservation) => (
+            <Card key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => toggleImportante(reservation)} className="shrink-0">
+                      <Star className={cn("h-4 w-4", (reservation as any).importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
+                    </button>
+                    <span className="font-medium text-sm">{reservation.nombre || "Sin nombre"}</span>
+                  </div>
+                  {getStatusBadge(reservation.estado)}
+                </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
+                  <span>{reservation.hora}</span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reservation.numero_comensales}</span>
+                  {getCanalBadge(reservation.canal)}
+                </div>
+                {reservation.telefono && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Phone className="h-3 w-3" />{reservation.telefono}
+                  </p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  {reservation.estado === "pendiente" && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                      setSelectedReservaForVerification(reservation);
+                      setVerificacionModalOpen(true);
+                    }}>Verificar</Button>
+                  )}
+                  {reservation.estado === "verificada" && (
+                    <Button size="sm" className="h-7 text-xs" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "confirmada")}>
+                      {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirmar"}
+                    </Button>
+                  )}
+                  {reservation.estado !== "cancelada" && (
+                    <Button size="sm" variant="destructive" className="h-7 text-xs" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "cancelada")}>
+                      {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancelar"}
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={() => setBlacklistReserva(reservation)}>
+                    <ShieldBan className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table view */}
+      <Card className="hidden sm:block">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -359,7 +418,7 @@ export function ListaReservasAvanzada({
             <TableBody>
               {filteredReservations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No se encontraron reservas con los filtros aplicados
                   </TableCell>
                 </TableRow>
@@ -372,80 +431,42 @@ export function ListaReservasAvanzada({
                     <TableCell>{reservation.hora}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleImportante(reservation)}
-                          className="shrink-0 hover:scale-110 transition-transform"
-                          title={(reservation as any).importante ? "Desmarcar importante" : "Marcar como importante"}
-                        >
+                        <button onClick={() => toggleImportante(reservation)} className="shrink-0 hover:scale-110 transition-transform">
                           <Star className={cn("h-4 w-4", (reservation as any).importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
                         </button>
                         <div>
                           <p className="font-medium">{reservation.nombre || "Sin nombre"}</p>
-                          {reservation.telefono && (
-                            <p className="text-xs text-muted-foreground">{reservation.telefono}</p>
-                          )}
+                          {reservation.telefono && <p className="text-xs text-muted-foreground">{reservation.telefono}</p>}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        {reservation.numero_comensales}
-                      </div>
+                      <div className="flex items-center gap-1"><Users className="h-4 w-4 text-muted-foreground" />{reservation.numero_comensales}</div>
                     </TableCell>
                     <TableCell>{getCanalBadge(reservation.canal)}</TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         {reservation.estado === "pendiente" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedReservaForVerification(reservation);
-                              setVerificacionModalOpen(true);
-                            }}
-                          >
-                            Verificar
-                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => {
+                            setSelectedReservaForVerification(reservation);
+                            setVerificacionModalOpen(true);
+                          }}>Verificar</Button>
                         )}
                         {reservation.estado === "verificada" && (
-                          <Button
-                            size="sm"
-                            disabled={updatingId === reservation.id}
-                            onClick={() => updateReservationStatus(reservation.id, "confirmada")}
-                          >
-                            {updatingId === reservation.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Confirmar"
-                            )}
+                          <Button size="sm" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "confirmada")}>
+                            {updatingId === reservation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar"}
                           </Button>
                         )}
                         {reservation.estado !== "cancelada" && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={updatingId === reservation.id}
-                            onClick={() => updateReservationStatus(reservation.id, "cancelada")}
-                          >
-                            {updatingId === reservation.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Cancelar"
-                            )}
+                          <Button size="sm" variant="destructive" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "cancelada")}>
+                            {updatingId === reservation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
                           </Button>
                         )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 hover:bg-destructive/10"
-                        onClick={() => setBlacklistReserva(reservation)}
-                        title="Añadir a lista negra"
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reservation)}>
                         <ShieldBan className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </TableCell>
