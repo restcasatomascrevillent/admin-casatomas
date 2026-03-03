@@ -248,9 +248,9 @@ export function ListaReservasAvanzada({
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
             {/* Búsqueda */}
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre..."
@@ -260,79 +260,80 @@ export function ListaReservasAvanzada({
               />
             </div>
 
-            {/* Botón Hoy */}
-            <Button
-              variant={dateFilter && dateFilter.toDateString() === new Date().toDateString() ? "default" : "outline"}
-              size="default"
-              onClick={() => setDateFilter(new Date())}
-            >
-              Hoy
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              {/* Botón Hoy */}
+              <Button
+                variant={dateFilter && dateFilter.toDateString() === new Date().toDateString() ? "default" : "outline"}
+                size="default"
+                onClick={() => setDateFilter(new Date())}
+              >
+                Hoy
+              </Button>
 
-            {/* Filtro de fecha */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="min-w-[150px]">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {dateFilter
-                    ? (dateFilter.toDateString() === new Date().toDateString()
-                      ? "Hoy"
-                      : format(dateFilter, "d MMM yyyy", { locale: es }))
-                    : "Fecha"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <CalendarUI
-                  mode="single"
-                  selected={dateFilter}
-                  onSelect={setDateFilter}
-                  initialFocus
-                />
-                {dateFilter && (
-                  <div className="p-2 border-t">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setDateFilter(undefined)}
-                    >
-                      Limpiar
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
+              {/* Filtro de fecha */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="min-w-[120px] sm:min-w-[150px]">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {dateFilter
+                      ? (dateFilter.toDateString() === new Date().toDateString()
+                        ? "Hoy"
+                        : format(dateFilter, "d MMM yyyy", { locale: es }))
+                      : "Fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarUI
+                    mode="single"
+                    selected={dateFilter}
+                    onSelect={setDateFilter}
+                    initialFocus
+                  />
+                  {dateFilter && (
+                    <div className="p-2 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setDateFilter(undefined)}
+                      >
+                        Limpiar
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
 
+              {/* Filtro de estado */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[130px] sm:w-[160px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                  <SelectItem value="verificada">Verificada</SelectItem>
+                  <SelectItem value="confirmada">Confirmada</SelectItem>
+                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {/* Filtro de estado */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="verificada">Verificada</SelectItem>
-                <SelectItem value="confirmada">Confirmada</SelectItem>
-                <SelectItem value="cancelada">Cancelada</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Filtro de canal */}
-            <Select value={canalFilter} onValueChange={setCanalFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Canal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los canales</SelectItem>
-                <SelectItem value="telefono">📞 Teléfono</SelectItem>
-                <SelectItem value="web">🌐 Web</SelectItem>
-                <SelectItem value="manual">✏️ Manual</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Filtro de canal */}
+              <Select value={canalFilter} onValueChange={setCanalFilter}>
+                <SelectTrigger className="w-[120px] sm:w-[140px]">
+                  <SelectValue placeholder="Canal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="telefono">📞 Tel</SelectItem>
+                  <SelectItem value="web">🌐 Web</SelectItem>
+                  <SelectItem value="manual">✏️ Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Contador de resultados */}
-            <Badge variant="secondary" className="ml-auto">
+            <Badge variant="secondary" className="self-center sm:ml-auto">
               {filteredReservations.length} reservas
             </Badge>
           </div>
