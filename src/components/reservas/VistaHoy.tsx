@@ -241,90 +241,104 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                 }
 
                 return (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Hora</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Contacto</TableHead>
-                         <TableHead>Comensales</TableHead>
-                         <TableHead>Estado</TableHead>
-                         <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    {/* Mobile card view */}
+                    <div className="space-y-3 sm:hidden">
                       {reservasFiltradas.map((reserva) => {
                         const estadoInfo = ESTADOS_RESERVA[reserva.estado as keyof typeof ESTADOS_RESERVA] || { label: reserva.estado, color: "bg-gray-500" };
                         return (
-                          <TableRow key={reserva.id} className={cn(reserva.en_blacklist && "bg-destructive/5")}>
-                            <TableCell>
+                          <div key={reserva.id} className={cn("p-3 rounded-lg border", reserva.en_blacklist && "bg-destructive/5")}>
+                            <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">
                                   {typeof reserva.hora === 'string' ? reserva.hora.substring(0, 5) : reserva.hora}
                                 </span>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => toggleImportante(reserva)}
-                                  className="shrink-0 hover:scale-110 transition-transform"
-                                  title={reserva.importante ? "Desmarcar importante" : "Marcar como importante"}
-                                >
-                                  <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
-                                </button>
-                                <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
-                                {reserva.en_blacklist && (
-                                  <span title="En lista negra">
-                                    <ShieldBan className="h-4 w-4 text-destructive" />
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                                {reserva.telefono && (
-                                  <div className="flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {reserva.telefono}
-                                  </div>
-                                )}
-                                {reserva.email && (
-                                  <div className="flex items-center gap-1">
-                                    <Mail className="h-3 w-3" />
-                                    {reserva.email}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                {reserva.numero_comensales}
-                              </div>
-                            </TableCell>
-                             <TableCell>
                               <Badge className={cn("text-white", estadoInfo.color)}>
                                 {estadoInfo.label}
                               </Badge>
-                             </TableCell>
-                             <TableCell>
-                               <Button
-                                 variant="ghost"
-                                 size="icon"
-                                 className="h-7 w-7 hover:bg-destructive/10"
-                                 onClick={() => setBlacklistReserva(reserva)}
-                                 title="Añadir a lista negra"
-                               >
-                                 <ShieldBan className="h-3.5 w-3.5 text-destructive" />
-                               </Button>
-                             </TableCell>
-                          </TableRow>
+                            </div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <button onClick={() => toggleImportante(reserva)} className="shrink-0">
+                                <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
+                              </button>
+                              <span className="font-medium text-sm">{reserva.nombre || "Sin nombre"}</span>
+                              {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <div className="flex items-center gap-3">
+                                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reserva.numero_comensales}</span>
+                                {reserva.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{reserva.telefono}</span>}
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBlacklistReserva(reserva)}>
+                                <ShieldBan className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
                         );
                       })}
-                    </TableBody>
-                  </Table>
+                    </div>
+
+                    {/* Desktop table view */}
+                    <div className="hidden sm:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Hora</TableHead>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Contacto</TableHead>
+                            <TableHead>Comensales</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reservasFiltradas.map((reserva) => {
+                            const estadoInfo = ESTADOS_RESERVA[reserva.estado as keyof typeof ESTADOS_RESERVA] || { label: reserva.estado, color: "bg-gray-500" };
+                            return (
+                              <TableRow key={reserva.id} className={cn(reserva.en_blacklist && "bg-destructive/5")}>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-mono font-medium">
+                                      {typeof reserva.hora === 'string' ? reserva.hora.substring(0, 5) : reserva.hora}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <button onClick={() => toggleImportante(reserva)} className="shrink-0 hover:scale-110 transition-transform">
+                                      <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
+                                    </button>
+                                    <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
+                                    {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                                    {reserva.telefono && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{reserva.telefono}</div>}
+                                    {reserva.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{reserva.email}</div>}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1"><Users className="h-4 w-4 text-muted-foreground" />{reserva.numero_comensales}</div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={cn("text-white", estadoInfo.color)}>{estadoInfo.label}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reserva)}>
+                                    <ShieldBan className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 );
               })()}
               <div className="mt-4 text-sm text-muted-foreground text-center">
