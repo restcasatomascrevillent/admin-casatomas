@@ -94,7 +94,7 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
           </div>
 
           {/* Sugerencias */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+          <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
             {SUGERENCIAS.map(({ icon: Icon, texto }) => (
               <button
                 key={texto}
