@@ -41,81 +41,77 @@ const Facturas = () => {
 
   return (
     <DashboardLayout>
-      {/* Contenedor Flex para que crezca y ocupe toda la altura de la página si es necesario */}
-      <div className="flex flex-col h-[calc(100vh-6rem)] space-y-4">
+      <div className="flex flex-col h-[calc(100vh-6rem)] space-y-2 sm:space-y-4">
 
-        {/* Sistema Principal de Pestañas */}
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex-1 flex flex-col min-h-0"
         >
           {/* Botonera de navegación superior */}
-          <div className="shrink-0 mb-4 bg-card rounded-lg border border-border/50 shadow-sm p-1 inline-block w-full max-w-3xl">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-11">
+          <div className="shrink-0 mb-2 sm:mb-4 bg-card rounded-lg border border-border/50 shadow-sm p-1 w-full sm:inline-block sm:max-w-3xl">
+            <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-10 sm:h-11">
               <TabsTrigger
                 value="documentos"
-                className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md"
+                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md px-1.5 sm:px-3"
               >
-                <FolderOpen className="h-[18px] w-[18px]" />
-                <span className="font-medium text-[15px]">Ver Documentos</span>
+                <FolderOpen className="h-4 w-4 shrink-0" />
+                <span className="font-medium text-xs sm:text-[15px] truncate">Documentos</span>
                 {totalDocumentos > 0 && (
-                  <span className="ml-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-0.5 leading-none">
+                  <span className="hidden sm:inline ml-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-0.5 leading-none">
                     {totalDocumentos}
                   </span>
                 )}
               </TabsTrigger>
               <TabsTrigger
                 value="chat"
-                className="flex items-center gap-2 data-[state=active]:bg-[hsl(38,59%,45%)/0.08] data-[state=active]:text-[hsl(38,65%,40%)] data-[state=active]:shadow-sm transition-all rounded-md"
+                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-[hsl(38,59%,45%)/0.08] data-[state=active]:text-[hsl(38,65%,40%)] data-[state=active]:shadow-sm transition-all rounded-md px-1.5 sm:px-3"
               >
-                <MessageSquare className="h-[18px] w-[18px]" />
-                <span className="font-medium text-[15px]">Asistente IA</span>
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="font-medium text-xs sm:text-[15px] truncate">IA</span>
                 {totalConversaciones > 0 && (
-                  <span className="ml-1 rounded-full bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)] text-[11px] font-semibold px-1.5 py-0.5 leading-none">
+                  <span className="hidden sm:inline ml-1 rounded-full bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)] text-[11px] font-semibold px-1.5 py-0.5 leading-none">
                     {totalConversaciones}
                   </span>
                 )}
               </TabsTrigger>
               <TabsTrigger
                 value="cargar"
-                className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md"
+                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md px-1.5 sm:px-3"
               >
-                <Upload className="h-[18px] w-[18px]" />
-                <span className="font-medium text-[15px]">Cargar Datos</span>
+                <Upload className="h-4 w-4 shrink-0" />
+                <span className="font-medium text-xs sm:text-[15px] truncate">Cargar</span>
               </TabsTrigger>
             </TabsList>
           </div>
 
-          {/* Área de Visualización (crece llenando el hueco restante) */}
+          {/* Área de Visualización */}
           <div className="flex-1 min-h-0 relative">
 
-            {/* PESTAÑA 1: DOCUMENTOS (Contiene mini-tabs de Facturas/Albaranes) */}
+            {/* PESTAÑA 1: DOCUMENTOS */}
             <TabsContent value="documentos" className="h-full m-0 outline-none flex flex-col data-[state=inactive]:hidden">
               <div className="flex-1 bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden flex flex-col">
                 <Tabs defaultValue="facturas" className="w-full flex-1 flex flex-col">
-                  {/* Punteros secundarios */}
-                  <div className="shrink-0 px-4 pt-4 pb-0 bg-muted/5 border-b border-border/30">
-                    <TabsList className="flex h-10 w-full justify-start rounded-none bg-transparent p-0">
+                  <div className="shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-0 bg-muted/5 border-b border-border/30">
+                    <TabsList className="flex h-9 sm:h-10 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
                       <TabsTrigger
                         value="facturas"
-                        className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                        className="relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap"
                       >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Listado de Facturas
+                        <FileText className="mr-1.5 sm:mr-2 h-3.5 sm:h-4 w-3.5 sm:w-4" />
+                        Facturas
                       </TabsTrigger>
                       <TabsTrigger
                         value="albaranes"
-                        className="relative h-10 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                        className="relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap"
                       >
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        Listado de Albaranes
+                        <ClipboardList className="mr-1.5 sm:mr-2 h-3.5 sm:h-4 w-3.5 sm:w-4" />
+                        Albaranes
                       </TabsTrigger>
                     </TabsList>
                   </div>
 
-                  {/* Vistas Listas */}
-                  <div className="flex-1 overflow-hidden p-4 md:p-6 bg-background flex flex-col min-h-0">
+                  <div className="flex-1 overflow-hidden p-2 sm:p-4 md:p-6 bg-background flex flex-col min-h-0">
                     <TabsContent value="facturas" className="m-0 h-full flex-col min-h-0 focus-visible:outline-none data-[state=inactive]:hidden data-[state=active]:flex">
                       <TablaFacturas onPreguntarIA={(doc) => handlePreguntarIA(doc, 'factura')} />
                     </TabsContent>
@@ -128,9 +124,8 @@ const Facturas = () => {
               </div>
             </TabsContent>
 
-            {/* PESTAÑA 2: ASISTENTE IA (Ocupa el 100% de la zona) */}
+            {/* PESTAÑA 2: ASISTENTE IA */}
             <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              {/* Le pasamos un wrapper para que el ChatFacturas pueda extenderse hasta el final sin restricciones de la Card */}
               <div className="h-full max-h-none rounded-xl overflow-hidden shadow-md">
                 <ChatFacturas ref={chatRef} />
               </div>
@@ -138,8 +133,7 @@ const Facturas = () => {
 
             {/* PESTAÑA 3: CARGAR DATOS */}
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden overflow-y-auto">
-              {/* Centramos visualmente la subida en pantallas grandes para que respire */}
-              <div className="max-w-4xl mx-auto rounded-xl overflow-hidden border border-border/50 shadow-sm bg-card mt-2">
+              <div className="max-w-4xl mx-auto rounded-xl overflow-hidden border border-border/50 shadow-sm bg-card mt-1 sm:mt-2">
                 <SubidaFacturas />
               </div>
             </TabsContent>
