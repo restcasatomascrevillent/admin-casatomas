@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface ProductoFactura {
   id: number;
@@ -26,6 +27,7 @@ export interface Factura {
   drive_url: string | null;
   procesado_en: string | null;
   created_at: string | null;
+  verificada: boolean;
 }
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
@@ -37,7 +39,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     .select(`
       id, tipo, numero_documento, proveedor, cif, fecha,
       subtotal, iva, total, observaciones, drive_url,
-      procesado_en, created_at,
+      procesado_en, created_at, verificada,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total
       )
@@ -79,6 +81,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       drive_url: doc.drive_url ?? null,
       procesado_en: doc.procesado_en ?? null,
       created_at: doc.created_at ?? null,
+      verificada: doc.verificada ?? false,
     };
   });
 };
@@ -96,3 +99,92 @@ export const useAlbaranes = () =>
     queryFn: () => fetchDocumentosConProductos('albaran'),
     staleTime: STALE_TIME,
   });
+
+export const useUpdateFactura = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Factura> & { id: number }) => {
+      // Filtrar los campos que van a 'facturas'
+      const dataToUpdate = {
+        proveedor: updates.proveedor,
+        cif: updates.cif,
+        numero_documento: updates.numero_documento,
+        fecha: updates.fecha,
+        subtotal: updates.subtotal,
+        iva: updates.iva,
+        total: updates.total,
+        observaciones: updates.observaciones,
+        verificada: updates.verificada,
+      };
+
+      // Remover undefined
+      Object.keys(dataToUpdate).forEach(key => {
+        if (dataToUpdate[key as keyof typeof dataToUpdate] === undefined) {
+          delete dataToUpdate[key as keyof typeof dataToUpdate];
+        }
+      });
+
+      const { data, error } = await supabase
+        .from('facturas')
+        .update(dataToUpdate)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      toast.success("Documento actualizado correctamente");
+    },
+    onError: (error) => {
+      console.error("Error al actualizar la factura:", error);
+      toast.error("Error al actualizar el documento");
+    }
+  });
+};
+
+export const useUpdateProductoFactura = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ProductoFactura> & { id: number }) => {
+      const dataToUpdate = {
+        nombre: updates.producto_nombre,
+        precio_unitario: updates.precio_unitario,
+        cantidad: updates.cantidad,
+        unidad: updates.unidad,
+        total: updates.precio,
+      };
+
+      // Remover undefined
+      Object.keys(dataToUpdate).forEach(key => {
+        if (dataToUpdate[key as keyof typeof dataToUpdate] === undefined) {
+          delete dataToUpdate[key as keyof typeof dataToUpdate];
+        }
+      });
+
+      const { data, error } = await supabase
+        .from('productos_factura')
+        .update(dataToUpdate)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      toast.success("Línea de producto actualizada");
+    },
+    onError: (error) => {
+      console.error("Error updating producto_factura:", error);
+      toast.error("Error al actualizar el producto");
+    }
+  });
+};

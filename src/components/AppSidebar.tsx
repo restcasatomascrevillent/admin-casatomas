@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet, Star } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -31,6 +31,7 @@ const menuItems: { title: string; url: string; icon: React.ComponentType<any>; s
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
   { title: "Gestor Gasto", url: "/gestor-gasto", icon: Wallet, sectionKey: "gestor_gasto" },
+  { title: "Reseñas Google", url: "/resenas", icon: Star, sectionKey: "gestion_web" },
 ];
 
 export function AppSidebar() {

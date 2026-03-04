@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { useFacturas, Factura } from "@/hooks/useFacturas";
+import { useFacturas, Factura, useUpdateProductoFactura, ProductoFactura, useUpdateFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,10 +11,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, CheckCircle2, Clock, Check } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { EditarFacturaDialog } from "./EditarFacturaDialog";
 
 const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
@@ -40,9 +41,40 @@ const formatDateTime = (dateString: string | null): string => {
 };
 
 const truncateText = (text: string | null, maxLength: number = 40): string => {
-  if (!text) return "-";
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
+};
+
+const getVerificationBadge = (factura: Factura, todasFacturas: Factura[]) => {
+  if (factura.verificada) {
+    return <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-[10px] px-1.5 py-0 gap-1 border-emerald-200 shadow-none font-medium h-5"><CheckCircle2 className="h-3 w-3" /> Verificada</Badge>;
+  }
+
+  const sub = factura.subtotal || 0;
+  const iva = factura.iva || 0;
+  const tot = factura.total || 0;
+  const mathError = Math.abs((sub + iva) - tot) > 0.05;
+
+  if (mathError) {
+    return <Badge variant="destructive" className="bg-red-500/10 text-red-600 hover:bg-red-500/20 text-[10px] px-1.5 py-0 gap-1 border-red-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Error Suma</Badge>;
+  }
+
+  const hasAnomalousProduct = factura.productos.some(p => {
+    if (!p.precio_unitario) return false;
+    const pastPrices = todasFacturas
+      .flatMap(f => f.productos)
+      .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
+      .map(past => past.precio_unitario as number);
+    if (pastPrices.length === 0) return false;
+    const avg = pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length;
+    return p.precio_unitario > avg * 2;
+  });
+
+  if (hasAnomalousProduct) {
+    return <Badge variant="destructive" className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 text-[10px] px-1.5 py-0 gap-1 border-orange-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Anomalía Precio</Badge>;
+  }
+
+  return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-[10px] px-1.5 py-0 gap-1 border-amber-200 shadow-none font-medium h-5"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 };
 
 type ColumnaFactura = {
@@ -52,6 +84,7 @@ type ColumnaFactura = {
 
 const COLUMNAS_FACTURAS: ColumnaFactura[] = [
   { key: "numero", label: "Número" },
+  { key: "estado", label: "Estado" },
   { key: "proveedor", label: "Proveedor" },
   { key: "cif", label: "CIF" },
   { key: "fecha", label: "Fecha" },
@@ -66,9 +99,133 @@ const COLUMNAS_FACTURAS: ColumnaFactura[] = [
 ];
 
 const DEFAULTS_FACTURAS: Record<string, boolean> = {
-  numero: true, proveedor: true, cif: false, fecha: true,
+  numero: true, estado: true, proveedor: true, cif: false, fecha: true,
   subtotal: false, iva: false, total: true, observaciones: false,
   items: true, doc: true, procesado_en: false, creado: false,
+};
+
+const FilaProducto = ({ p, isMobile, todasFacturas }: { p: ProductoFactura, isMobile?: boolean, todasFacturas: Factura[] }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [nombre, setNombre] = useState(p.producto_nombre);
+  const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
+  const [unidad, setUnidad] = useState(p.unidad || "");
+  const [precioUnitario, setPrecioUnitario] = useState(String(p.precio_unitario ?? ""));
+  const [total, setTotal] = useState(String(p.precio));
+
+  const updateMutation = useUpdateProductoFactura();
+
+  const handleSave = async () => {
+    await updateMutation.mutateAsync({
+      id: p.id,
+      producto_nombre: nombre,
+      cantidad: cantidad ? Number(cantidad) : undefined,
+      unidad: unidad || null,
+      precio_unitario: Number(precioUnitario),
+      precio: Number(total),
+    });
+    setIsEditing(false);
+  };
+
+  const pastPrices = todasFacturas
+    .flatMap(f => f.productos)
+    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
+    .map(past => past.precio_unitario as number);
+
+  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
+
+  // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
+  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
+  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
+
+  if (isMobile) {
+    if (isEditing) {
+      return (
+        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
+          <Input className="h-7 text-xs" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
+          <div className="flex gap-2">
+            <Input className="h-7 text-xs w-full" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
+            <Input className="h-7 text-xs w-full" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="w-12 text-muted-foreground">P. Unit:</span>
+            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="w-12 font-medium">Total:</span>
+            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+          </div>
+          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium">⚠️ Anomalía: Precio disparado respecto al original</p>}
+          <div className="flex gap-2 mt-1 justify-end">
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditing(false)}>Cancelar</Button>
+            <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod hover:border-[hsl(38,59%,45%)/0.3] transition-colors">
+        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover/prod:opacity-100 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(true)}>
+          <Pencil className="h-3 w-3 text-muted-foreground" />
+        </Button>
+        <span className="font-medium text-foreground mb-1 pr-6">{p.producto_nombre}</span>
+        <div className="flex justify-between text-muted-foreground items-center">
+          <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
+          <div className="flex items-center gap-1.5">
+            {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+            <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop View
+  if (isEditing) {
+    return (
+      <TableRow className="bg-muted/30">
+        <TableCell className="py-2">
+          <Input className="h-7 text-xs max-w-[200px]" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium mt-1">⚠️ Precio anómalo vs historial</p>}
+        </TableCell>
+        <TableCell className="py-2 text-right opacity-100 flex justify-end gap-1">
+          <Input className="h-7 text-xs w-16 text-right" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
+          <Input className="h-7 text-xs w-16" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
+        </TableCell>
+        <TableCell className="py-2 text-right">
+          <Input className="h-7 text-xs text-right w-20 ml-auto" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+        </TableCell>
+        <TableCell className="py-2 text-right flex justify-end gap-1 items-center">
+          <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+          <Button size="icon" className="h-7 w-7 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending}><Check className="h-3.5 w-3.5" /></Button>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow className="hover:bg-muted/20 group/prod">
+      <TableCell className="py-2.5 font-medium">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <span className="truncate">{p.producto_nombre}</span>
+        </div>
+      </TableCell>
+      <TableCell className="py-2.5 text-right text-muted-foreground">
+        <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
+        <span className="text-xs">{p.unidad || ""}</span>
+      </TableCell>
+      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">
+        <div className="flex items-center justify-end gap-1.5">
+          {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+          <span>{formatCurrency(p.precio_unitario ?? null)}</span>
+        </div>
+      </TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
+    </TableRow>
+  );
 };
 
 const SelectorColumnas = ({
@@ -106,13 +263,23 @@ const SelectorColumnas = ({
 
 const FilaFacturaMobile = ({
   factura,
-  onPreguntarIA
+  todasFacturas,
+  onPreguntarIA,
+  onEdit
 }: {
   factura: Factura;
+  todasFacturas: Factura[];
   onPreguntarIA?: (doc: Factura) => void;
+  onEdit: (doc: Factura) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
+  const updateFactura = useUpdateFactura();
+
+  const handleToggleVerified = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+  };
 
   return (
     <Card className="mb-3 border-border/50 shadow-sm overflow-hidden">
@@ -128,7 +295,10 @@ const FilaFacturaMobile = ({
               <FileText className="h-4 w-4 text-muted-foreground" />
             )}
             <div>
-              <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
+                {getVerificationBadge(factura, todasFacturas)}
+              </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 {factura.proveedor || "Sin proveedor"}
               </p>
@@ -150,6 +320,23 @@ const FilaFacturaMobile = ({
             <ExternalLink className="h-3 w-3" /> Ver Escaneo
           </a>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 text-[11px] font-medium px-2.5 transition-colors border ${factura.verificada ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-200' : 'text-foreground hover:bg-muted/50 border-border/40'}`}
+          onClick={handleToggleVerified}
+          disabled={updateFactura.isPending}
+        >
+          <CheckCircle2 className="h-3 w-3 mr-1.5" /> {factura.verificada ? "Verificada" : "Verificar"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px] font-medium px-2.5 text-foreground hover:bg-muted/50 border border-border/40 transition-colors"
+          onClick={(e) => { e.stopPropagation(); onEdit(factura); }}
+        >
+          <Pencil className="h-3 w-3 mr-1.5" /> Editar
+        </Button>
         {onPreguntarIA && (
           <Button
             variant="ghost"
@@ -181,13 +368,7 @@ const FilaFacturaMobile = ({
                 </p>
                 <div className="space-y-1.5">
                   {factura.productos.map((p) => (
-                    <div key={p.id} className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm">
-                      <span className="font-medium text-foreground mb-1">{p.producto_nombre}</span>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
-                        <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
-                      </div>
-                    </div>
+                    <FilaProducto key={p.id} p={p} isMobile={true} todasFacturas={todasFacturas} />
                   ))}
                 </div>
               </div>
@@ -202,16 +383,27 @@ const FilaFacturaMobile = ({
 const FilaFacturaDesktop = ({
   factura,
   visibles,
-  onPreguntarIA
+  todasFacturas,
+  onPreguntarIA,
+  onEdit
 }: {
   factura: Factura;
   visibles: Record<string, boolean>;
+  todasFacturas: Factura[];
   onPreguntarIA?: (doc: Factura) => void;
+  onEdit: (doc: Factura) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
   // +1 para acciones IA
   const colSpan = 2 + Object.values(visibles).filter(Boolean).length;
+
+  const updateFactura = useUpdateFactura();
+
+  const handleToggleVerified = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+  };
 
   return (
     <>
@@ -220,6 +412,7 @@ const FilaFacturaDesktop = ({
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
         {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento}</TableCell>}
+        {visibles.estado && <TableCell>{getVerificationBadge(factura, todasFacturas)}</TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{factura.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{factura.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground">{formatDate(factura.fecha)}</TableCell>}
@@ -262,7 +455,26 @@ const FilaFacturaDesktop = ({
 
         {/* Acciones Rápidas (IA) */}
         <TableCell className="text-right pr-4">
-          <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`h-8 text-xs font-medium transition-all shadow-sm ${factura.verificada ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-200' : 'border-border/40 hover:bg-muted/50'}`}
+              onClick={handleToggleVerified}
+              title={factura.verificada ? "Marcar como pendiente" : "Marcar como verificada"}
+              disabled={updateFactura.isPending}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-medium border-border/40 hover:bg-muted/50 transition-all shadow-sm"
+              onClick={(e) => { e.stopPropagation(); onEdit(factura); }}
+              title="Editar Factura"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             {onPreguntarIA && (
               <Button
                 variant="outline"
@@ -293,15 +505,7 @@ const FilaFacturaDesktop = ({
                   </TableHeader>
                   <TableBody>
                     {factura.productos.map((p) => (
-                      <TableRow key={p.id} className="hover:bg-muted/20">
-                        <TableCell className="py-2.5 font-medium">{p.producto_nombre}</TableCell>
-                        <TableCell className="py-2.5 text-right text-muted-foreground">
-                          <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
-                          <span className="text-xs">{p.unidad || ""}</span>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">{formatCurrency(p.precio_unitario ?? null)}</TableCell>
-                        <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
-                      </TableRow>
+                      <FilaProducto key={p.id} p={p} todasFacturas={todasFacturas} />
                     ))}
                   </TableBody>
                 </Table>
@@ -320,6 +524,13 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
   const busquedaDeferida = useDeferredValue(busqueda); // No bloquea el thread durante escritura rápida
   const isMobile = useIsMobile();
   const [columnasVisibles, setColumnasVisibles] = useState<Record<string, boolean>>(DEFAULTS_FACTURAS);
+  const [facturaEditando, setFacturaEditando] = useState<Factura | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const handleEditFactura = (factura: Factura) => {
+    setFacturaEditando(factura);
+    setIsEditDialogOpen(true);
+  };
 
   const toggleColumna = (key: string, checked: boolean) => {
     setColumnasVisibles((prev) => ({ ...prev, [key]: checked }));
@@ -368,7 +579,7 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
       ) : facturasFiltradas.length === 0 ? (
         <Card className="border-border/50 bg-muted/10 shadow-none"><CardContent className="pt-8 pb-8 text-center"><FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" /><p className="text-muted-foreground font-medium">{busqueda ? "No se encontraron facturas" : "No hay facturas registradas"}</p></CardContent></Card>
       ) : isMobile ? (
-        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{facturasFiltradas.map((f) => <FilaFacturaMobile key={f.id} factura={f} onPreguntarIA={onPreguntarIA} />)}</div>
+        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{facturasFiltradas.map((f) => <FilaFacturaMobile key={f.id} factura={f} todasFacturas={facturas || []} onPreguntarIA={onPreguntarIA} onEdit={handleEditFactura} />)}</div>
       ) : (
         <div className="rounded-xl border border-border/60 bg-background shadow-sm overflow-auto custom-scrollbar flex-1 min-h-0 relative">
           <Table>
@@ -376,6 +587,7 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
               <TableRow className="border-b-border/60 hover:bg-transparent">
                 <TableHead className="w-[40px] pl-4"></TableHead>
                 {columnasVisibles.numero && <TableHead className="font-semibold px-2">Nº Factura</TableHead>}
+                {columnasVisibles.estado && <TableHead className="font-semibold">Estado</TableHead>}
                 {columnasVisibles.proveedor && <TableHead className="font-semibold">Proveedor</TableHead>}
                 {columnasVisibles.cif && <TableHead className="font-semibold">CIF</TableHead>}
                 {columnasVisibles.fecha && <TableHead className="font-semibold">Fecha</TableHead>}
@@ -391,13 +603,19 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
               </TableRow>
             </TableHeader>
             <TableBody>
-              {facturasFiltradas.map((f) => <FilaFacturaDesktop key={f.id} factura={f} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} />)}
+              {facturasFiltradas.map((f) => <FilaFacturaDesktop key={f.id} factura={f} visibles={columnasVisibles} todasFacturas={facturas || []} onPreguntarIA={onPreguntarIA} onEdit={handleEditFactura} />)}
             </TableBody>
           </Table>
         </div>
       )}
 
       <p className="text-[12px] font-medium text-muted-foreground text-right shrink-0">{facturasFiltradas.length} total</p>
+
+      <EditarFacturaDialog
+        factura={facturaEditando}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      />
     </div>
   );
 };
