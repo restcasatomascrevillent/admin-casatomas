@@ -258,11 +258,11 @@ export function SubidaFacturas() {
           Arrastra o selecciona tus facturas o albaranes (PDF o imágenes) para enviarlas al sistema de procesamiento
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4 sm:space-y-6 px-3 sm:px-6">
         {/* Zona de carga */}
         <div
           className={[
-            "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200",
+            "border-2 border-dashed rounded-lg p-4 sm:p-8 text-center cursor-pointer transition-all duration-200",
             isDragging
               ? "border-primary bg-primary/5 scale-[1.01] shadow-md"
               : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",

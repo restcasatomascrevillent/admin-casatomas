@@ -36,7 +36,7 @@ serve(async (req) => {
     };
 
     // URL del webhook
-    const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook-test/traducciones";
+    const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/traducciones";
     
     console.log("Enviando a webhook:", WEBHOOK_URL);
     console.log("Payload:", JSON.stringify(webhookPayload));
