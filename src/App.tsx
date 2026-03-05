@@ -14,6 +14,7 @@ import GestorCarta from "./pages/GestorCarta";
 import Ecommerce from "./pages/Ecommerce";
 import GestionWeb from "./pages/GestionWeb";
 import GestionBot from "./pages/GestionBot";
+import AsistenteTelefonico from "./pages/AsistenteTelefonico";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 import Facturas from "./pages/Facturas";
@@ -100,6 +101,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <GestionBot />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/asistente-telefonico"
+            element={
+              <ProtectedRoute>
+                <AsistenteTelefonico />
               </ProtectedRoute>
             }
           />
