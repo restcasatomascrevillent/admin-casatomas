@@ -101,9 +101,15 @@ export default function AsistenteTelefonico() {
 
     const isLoading = isLoadingConfig || isLoadingCalls;
 
-    // Stats
-    const today = new Date().toISOString().split('T')[0];
-    const todayCalls = calls.filter((c: any) => c.started_at.startsWith(today));
+    // Stats (calculados usando la zona horaria de Madrid)
+    const todayMadrid = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
+
+    const todayCalls = calls.filter((c: any) => {
+        if (!c.started_at) return false;
+        const callDateMadrid = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(c.started_at));
+        return callDateMadrid === todayMadrid;
+    });
+
     const botCalls = todayCalls.filter((c: any) => c.call_type === 'bot').length;
     const humanCalls = todayCalls.filter((c: any) => c.call_type === 'human').length;
 
