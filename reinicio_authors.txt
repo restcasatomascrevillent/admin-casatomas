@@ -1,0 +1,20 @@
+﻿6b3be6c Miguel feat: Add a new invoice management module with chat, tables for invoices and delivery notes, upload functionality, and an advanced reservation list.
+a581629 Miguel lcoal benito
+18ebeac gpt-engineer-app[bot] Ajuste parsing webhook
+88771d2 gpt-engineer-app[bot] Changes
+d78d4c3 gpt-engineer-app[bot] Robustify chat-facturas parsing
+aac634c gpt-engineer-app[bot] Changes
+5481827 gpt-engineer-app[bot] Refactor chatfacturas to persist
+54bb934 gpt-engineer-app[bot] Changes
+e974aae Pablo Candela feat: enviar configuracion del bot a webhook
+b2e820f gpt-engineer-app[bot] Visual edit in Lovable
+6e242dd gpt-engineer-app[bot] Visual edit in Lovable
+676b319 gpt-engineer-app[bot] Visual edit in Lovable
+ca64f3b gpt-engineer-app[bot] Fix ocupacion types for hoy
+a2766c3 gpt-engineer-app[bot] Changes
+fba7bfd gpt-engineer-app[bot] Add read metrics endpoint
+fe58cd8 gpt-engineer-app[bot] Changes
+e2e208e gpt-engineer-app[bot] Lovable update
+61037d7 gpt-engineer-app[bot] Changes
+25c54ba gpt-engineer-app[bot] Actualizar registro de m├®tricas
+548b739 gpt-engineer-app[bot] Changes

@@ -1,13 +1,14 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SubidaFacturas } from "@/components/facturas/SubidaFacturas";
 import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFacturas";
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TablaAlbaranes } from "@/components/facturas/TablaAlbaranes";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen } from "lucide-react";
+import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen, BarChart3, Package, Zap } from "lucide-react";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
+import type { Sugerencia } from "@/components/facturas/ChatArea";
 
 const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
@@ -19,6 +20,41 @@ const Facturas = () => {
   const { conversaciones } = useChatFacturas();
   const totalDocumentos = (facturas?.length ?? 0) + (albaranes?.length ?? 0);
   const totalConversaciones = conversaciones.length;
+
+  // ─── Sugerencias dinámicas basadas en datos reales ─────────────────────────
+  const sugerenciasDinamicas = useMemo((): Sugerencia[] => {
+    const mesActual = new Date().toLocaleString("es-ES", { month: "long" });
+    const mesCapitalizado = mesActual.charAt(0).toUpperCase() + mesActual.slice(1);
+
+    // Proveedor más reciente de facturas
+    const proveedorReciente = facturas?.find((f) => f.proveedor)?.proveedor ?? null;
+    // Proveedor más reciente de albaranes
+    const proveedorAlbaran = albaranes?.find((a) => a.proveedor)?.proveedor ?? null;
+
+    const sugerencias: Sugerencia[] = [
+      {
+        icon: BarChart3,
+        texto: `¿Cuánto hemos gastado en ${mesCapitalizado}?`,
+      },
+      {
+        icon: FileText,
+        texto: proveedorReciente
+          ? `Muéstrame todas las facturas de ${proveedorReciente}`
+          : "¿Cuáles son las últimas facturas recibidas?",
+      },
+      {
+        icon: Package,
+        texto: proveedorAlbaran
+          ? `¿Qué albaranes de ${proveedorAlbaran} hay esta semana?`
+          : "Resume los albaranes de esta semana",
+      },
+      {
+        icon: Zap,
+        texto: `¿Qué productos hemos comprado más veces este mes?`,
+      },
+    ];
+    return sugerencias;
+  }, [facturas, albaranes]);
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
@@ -127,7 +163,7 @@ const Facturas = () => {
             {/* PESTAÑA 2: ASISTENTE IA */}
             <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="h-full max-h-none rounded-xl overflow-hidden shadow-md">
-                <ChatFacturas ref={chatRef} />
+                <ChatFacturas ref={chatRef} sugerencias={sugerenciasDinamicas} />
               </div>
             </TabsContent>
 

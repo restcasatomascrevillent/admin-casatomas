@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle, useState } from "react";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
 import { ConversacionesList } from "./ConversacionesList";
-import { ChatArea } from "./ChatArea";
+import { ChatArea, Sugerencia } from "./ChatArea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
@@ -10,7 +10,11 @@ export interface ChatFacturasRef {
   enviarConsulta: (texto: string) => void;
 }
 
-export const ChatFacturas = forwardRef<ChatFacturasRef>((props, ref) => {
+interface ChatFacturasProps {
+  sugerencias?: Sugerencia[];
+}
+
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ sugerencias }, ref) => {
   const {
     conversaciones,
     conversacionActiva,
@@ -20,6 +24,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef>((props, ref) => {
     seleccionarConversacion,
     nuevaConversacion,
     enviarMensaje,
+    regenerarRespuesta,
     eliminarConversacion,
   } = useChatFacturas();
 
@@ -97,7 +102,9 @@ export const ChatFacturas = forwardRef<ChatFacturasRef>((props, ref) => {
                 mensajes={mensajes}
                 isLoading={isLoading}
                 isSending={isSending}
+                sugerencias={sugerencias}
                 onEnviar={enviarMensaje}
+                onRegenerar={regenerarRespuesta}
                 tieneConversacion={!!conversacionActiva}
               />
             </div>

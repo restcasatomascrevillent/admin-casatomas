@@ -14,11 +14,13 @@ import GestorCarta from "./pages/GestorCarta";
 import Ecommerce from "./pages/Ecommerce";
 import GestionWeb from "./pages/GestionWeb";
 import GestionBot from "./pages/GestionBot";
+import AsistenteTelefonico from "./pages/AsistenteTelefonico";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
 import GestorGasto from "./pages/GestorGasto";
+import GestionResenas from "./pages/GestionResenas";
 
 const queryClient = new QueryClient();
 
@@ -29,9 +31,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route
-          path="/"
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
                 <Dashboard />
@@ -103,6 +105,14 @@ const App = () => (
             }
           />
           <Route
+            path="/asistente-telefonico"
+            element={
+              <ProtectedRoute>
+                <AsistenteTelefonico />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/marketing"
             element={
               <ProtectedRoute>
@@ -131,6 +141,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <GestorGasto />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/resenas"
+            element={
+              <ProtectedRoute>
+                <GestionResenas />
               </ProtectedRoute>
             }
           />

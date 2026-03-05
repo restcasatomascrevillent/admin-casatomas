@@ -1,26 +1,33 @@
-import { useRef, useEffect, useState, useDeferredValue } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Zap, FileText, BarChart3, Package } from "lucide-react";
+import { Send, Bot, User, Zap, FileText, BarChart3, Package, Copy, Check, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
 
-interface ChatAreaProps {
-  mensajes: MensajeChat[];
-  isLoading: boolean;
-  isSending: boolean;
-  onEnviar: (texto: string) => void;
-  tieneConversacion: boolean;
+export interface Sugerencia {
+  icon: React.ElementType;
+  texto: string;
 }
 
-const SUGERENCIAS = [
+const SUGERENCIAS_DEFAULT: Sugerencia[] = [
   { icon: FileText, texto: "¿Cuáles son las últimas facturas recibidas?" },
   { icon: BarChart3, texto: "¿Cuánto hemos gastado este mes?" },
   { icon: Package, texto: "¿Qué facturas hay pendientes de pago?" },
   { icon: Zap, texto: "Resume los albaranes de esta semana" },
 ];
+
+interface ChatAreaProps {
+  mensajes: MensajeChat[];
+  isLoading: boolean;
+  isSending: boolean;
+  sugerencias?: Sugerencia[];
+  onEnviar: (texto: string) => void;
+  onRegenerar?: () => void;
+  tieneConversacion: boolean;
+}
 
 function TypingDots() {
   return (
@@ -41,9 +48,59 @@ function TypingDots() {
   );
 }
 
-export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConversacion }: ChatAreaProps) {
+// ─── Botón de copiar con feedback visual ──────────────────────────────────────
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback si el clipboard no está disponible
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? "¡Copiado!" : "Copiar respuesta"}
+      className={cn(
+        "flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium transition-all duration-150",
+        copied
+          ? "text-emerald-500 bg-emerald-500/10"
+          : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60"
+      )}
+    >
+      {copied ? (
+        <Check className="h-3 w-3" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+      {copied ? "Copiado" : "Copiar"}
+    </button>
+  );
+}
+
+export function ChatArea({
+  mensajes,
+  isLoading,
+  isSending,
+  sugerencias,
+  onEnviar,
+  onRegenerar,
+  tieneConversacion,
+}: ChatAreaProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const listaSugerencias = sugerencias && sugerencias.length > 0 ? sugerencias : SUGERENCIAS_DEFAULT;
+
+  // Índice del último mensaje del asistente (para mostrar el botón de regenerar)
+  const lastAssistantIndex = mensajes.reduce<number>(
+    (last, msg, i) => (msg.rol === "assistant" ? i : last),
+    -1
+  );
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -93,9 +150,9 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
             </div>
           </div>
 
-          {/* Sugerencias */}
-          <div className="grid grid-cols-1 gap-2 w-full max-w-sm">
-            {SUGERENCIAS.map(({ icon: Icon, texto }) => (
+          {/* Sugerencias (dinámicas o por defecto) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+            {listaSugerencias.map(({ icon: Icon, texto }) => (
               <button
                 key={texto}
                 onClick={() => handleSugerencia(texto)}
@@ -131,8 +188,10 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
               <TypingDots />
             </div>
           ) : (
-            mensajes.map((msg) => {
+            mensajes.map((msg, index) => {
               const isUser = msg.rol === "user";
+              const isLastAssistant = !isUser && index === lastAssistantIndex;
+
               return (
                 <div
                   key={msg.id}
@@ -162,39 +221,60 @@ export function ChatArea({ mensajes, isLoading, isSending, onEnviar, tieneConver
                     )}
                   </div>
 
-                  {/* Burbuja */}
-                  <div
-                    className={cn(
-                      "rounded-2xl px-4 py-2.5 max-w-[78%] shadow-sm",
-                      isUser
-                        ? "rounded-tr-sm text-white"
-                        : "rounded-tl-sm bg-muted/60 text-foreground border border-border/40"
-                    )}
-                    style={
-                      isUser
-                        ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
-                        : undefined
-                    }
-                  >
+                  {/* Burbuja + acciones */}
+                  <div className={cn("flex flex-col gap-1 max-w-[78%]", isUser ? "items-end" : "items-start")}>
                     <div
                       className={cn(
-                        "prose prose-sm max-w-none",
-                        isUser ? "prose-invert" : "dark:prose-invert"
+                        "rounded-2xl px-4 py-2.5 shadow-sm",
+                        isUser
+                          ? "rounded-tr-sm text-white"
+                          : "rounded-tl-sm bg-muted/60 text-foreground border border-border/40"
                       )}
+                      style={
+                        isUser
+                          ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
+                          : undefined
+                      }
                     >
-                      <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                      <div
+                        className={cn(
+                          "prose prose-sm max-w-none",
+                          isUser ? "prose-invert" : "dark:prose-invert"
+                        )}
+                      >
+                        <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                      </div>
+                      <p
+                        className={cn(
+                          "text-[10px] mt-1.5 text-right",
+                          isUser ? "text-white/60" : "text-muted-foreground/60"
+                        )}
+                      >
+                        {new Date(msg.created_at).toLocaleTimeString("es-ES", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
                     </div>
-                    <p
-                      className={cn(
-                        "text-[10px] mt-1.5 text-right",
-                        isUser ? "text-white/60" : "text-muted-foreground/60"
-                      )}
-                    >
-                      {new Date(msg.created_at).toLocaleTimeString("es-ES", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+
+                    {/* Acciones bajo el mensaje del asistente */}
+                    {!isUser && (
+                      <div className="flex items-center gap-1 pl-1">
+                        <CopyButton text={msg.contenido} />
+
+                        {/* Botón regenerar solo en el último mensaje del asistente */}
+                        {isLastAssistant && onRegenerar && !isSending && (
+                          <button
+                            onClick={onRegenerar}
+                            title="Regenerar respuesta"
+                            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-all duration-150"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Regenerar
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
