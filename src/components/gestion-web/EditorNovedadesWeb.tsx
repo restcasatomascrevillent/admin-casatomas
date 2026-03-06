@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNovedades } from "@/hooks/useNovedades";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,43 @@ const TONOS = [{
   description: "Tono premium y sofisticado"
 }];
 const LOADING_MESSAGES = ["Generando magia ✨", "Cocinando las palabras perfectas 🍳", "Creando tu descripción...", "Puliendo cada detalle 💎", "Dándole el toque final 🎨", "Inspirándose en tu idea 💡", "Casi listo... ⏳"];
+type GestionWebSeccion = "novedades" | "menus_diarios" | "tapas";
+
+const SECCION_CONFIG: Record<
+  GestionWebSeccion,
+  { dbValue: string; singular: string; plural: string; canalWebhook: string }
+> = {
+  novedades: {
+    dbValue: "gestion_web_novedades",
+    singular: "Novedad",
+    plural: "Novedades",
+    canalWebhook: "novedades",
+  },
+  menus_diarios: {
+    dbValue: "gestion_web_menus_diarios",
+    singular: "Menú diario",
+    plural: "Menús diarios",
+    canalWebhook: "menus_diarios",
+  },
+  tapas: {
+    dbValue: "gestion_web_tapas",
+    singular: "Tapa",
+    plural: "Tapas",
+    canalWebhook: "tapas",
+  },
+};
+
+const perteneceASeccion = (seccionActiva: GestionWebSeccion, seccion: string | null): boolean => {
+  if (seccionActiva === "novedades") {
+    // Compatibilidad con contenido previo sin sección asignada.
+    return !seccion || seccion === SECCION_CONFIG.novedades.dbValue;
+  }
+
+  return seccion === SECCION_CONFIG[seccionActiva].dbValue;
+};
+
 interface EditorNovedadesWebProps {
+  seccionActiva: GestionWebSeccion;
   onPreview: (novedad: NovedadPreview | null) => void;
   onPreviewListChange?: (ids: string[]) => void;
 }
@@ -216,6 +252,7 @@ const initialFormData: FormData = {
   campos_tipo: {}
 };
 export function EditorNovedadesWeb({
+  seccionActiva,
   onPreview,
   onPreviewListChange
 }: EditorNovedadesWebProps) {
@@ -253,35 +290,58 @@ export function EditorNovedadesWeb({
   const [isTranslating, setIsTranslating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewInicializadoRef = useRef(false);
+  const configSeccion = SECCION_CONFIG[seccionActiva];
+  const novedadesSeccion = useMemo(() => {
+    return (novedades || []).filter(
+      (novedad) => novedad.tipo === "anuncio" && perteneceASeccion(seccionActiva, novedad.seccion)
+    );
+  }, [novedades, seccionActiva]);
 
-  // Inicializar previewIds con novedades activas
+  // Inicializar previewIds una sola vez para no sobrescribir cambios manuales.
   useEffect(() => {
-    if (novedades && previewIds.size === 0) {
-      const activeIds = novedades.filter(n => n.activo).map(n => n.id);
+    if (!previewInicializadoRef.current && !isLoading) {
+      const activeIds = novedadesSeccion.filter(n => n.activo).map(n => n.id);
       setPreviewIds(new Set(activeIds));
+      previewInicializadoRef.current = true;
     }
-  }, [novedades]);
+  }, [novedadesSeccion, isLoading]);
+
+  // Limpiar IDs que ya no existen en la sección actual.
+  useEffect(() => {
+    const idsVigentes = new Set(novedadesSeccion.map((n) => n.id));
+    setPreviewIds((prev) => {
+      const filtrados = new Set(Array.from(prev).filter((id) => idsVigentes.has(id)));
+      return filtrados.size === prev.size ? prev : filtrados;
+    });
+  }, [novedadesSeccion]);
 
   // Notificar cambios en preview list
   useEffect(() => {
     onPreviewListChange?.(Array.from(previewIds));
   }, [previewIds, onPreviewListChange]);
-  const handleTogglePreview = (id: string) => {
+  const handleTogglePreview = (id: string, checked: boolean) => {
     setPreviewIds(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
+      if (checked) newSet.add(id);
+      else newSet.delete(id);
       return newSet;
     });
   };
-  const handleToggleActivo = async (id: string, currentActivo: boolean) => {
+  const handleToggleActivo = async (id: string, checked: boolean) => {
     await toggleActivo.mutateAsync({
       id,
-      activo: !currentActivo
+      activo: checked
     });
+
+    // Si se desactiva, también se oculta de preview.
+    if (!checked) {
+      setPreviewIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
   const handleCampoTipoChange = (key: string, value: string) => {
     setFormData(prev => ({
@@ -342,7 +402,7 @@ export function EditorNovedadesWeb({
           idioma: "es",
           tono: tonoSeleccionado,
           texto: textoEnriquecido,
-          canal: "novedades",
+          canal: configSeccion.canalWebhook,
           campos_extra: formData.campos_tipo
         }
       });
@@ -555,6 +615,8 @@ export function EditorNovedadesWeb({
     }
     const data = {
       tipo: "anuncio" as const,
+      tipo_asociacion: "seccion" as const,
+      seccion: configSeccion.dbValue,
       titulo: formData.titulo,
       descripcion: formData.descripcion,
       titulo_en: formData.titulo_en || null,
@@ -622,24 +684,34 @@ export function EditorNovedadesWeb({
       {/* Lista de novedades existentes */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Novedades ({novedades?.length || 0})</CardTitle>
+          <CardTitle className="text-lg">
+            {configSeccion.plural} ({novedadesSeccion.length})
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 max-h-48 overflow-y-auto">
-          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedades?.length === 0 ? <p className="text-sm text-muted-foreground">No hay novedades</p> : novedades?.map(novedad => <div key={novedad.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
+          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedadesSeccion.length === 0 ? <p className="text-sm text-muted-foreground">No hay {configSeccion.plural.toLowerCase()}</p> : novedadesSeccion.map(novedad => <div key={novedad.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span className="text-sm font-medium truncate">{novedad.titulo}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Toggle Activo */}
                   <div className="flex items-center gap-1">
-                    <Switch checked={novedad.activo} onCheckedChange={() => handleToggleActivo(novedad.id, novedad.activo)} className="scale-75" />
+                    <Switch
+                      checked={!!novedad.activo}
+                      onCheckedChange={(checked) => handleToggleActivo(novedad.id, checked)}
+                      className="scale-75"
+                    />
                     <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
                       {novedad.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </div>
                   {/* Toggle Preview */}
                   <div className="gap-[4px] items-center justify-start flex flex-row my-0 px-[7px]">
-                    <Switch checked={previewIds.has(novedad.id)} onCheckedChange={() => handleTogglePreview(novedad.id)} className="scale-75" />
+                    <Switch
+                      checked={previewIds.has(novedad.id)}
+                      onCheckedChange={(checked) => handleTogglePreview(novedad.id, checked)}
+                      className="scale-75"
+                    />
                     <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
                   </div>
                   {/* Acciones */}
@@ -658,7 +730,9 @@ export function EditorNovedadesWeb({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">
-            {editingId && editingId !== "new" ? "Editar Novedad" : "Nueva Novedad"}
+            {editingId && editingId !== "new"
+              ? `Editar ${configSeccion.singular}`
+              : `Nueva ${configSeccion.singular}`}
           </CardTitle>
         </CardHeader>
 
