@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar } from "lucide-react";
+import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -73,25 +73,54 @@ export default function AsistenteTelefonico() {
 
     // Schedule state
     const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-    const DEFAULT_SCHEDULE = [
-        { day: 0, start: "11:00", end: "16:00", mode: "human" },
-        { day: 1, mode: "bot" as const },
-        { day: 2, start: "09:30", end: "23:00", mode: "human" },
-        { day: 3, start: "09:30", end: "23:00", mode: "human" },
-        { day: 4, start: "09:30", end: "23:00", mode: "human" },
-        { day: 5, start: "09:00", end: "23:30", mode: "human" },
-        { day: 6, start: "10:30", end: "23:30", mode: "human" },
-    ];
+
+    // Generador de ID corto local
+    const genId = () => Math.random().toString(36).substring(2, 9);
+
+    const DEFAULT_SCHEDULE = DAY_NAMES.map((name, i) => ({
+        day: i,
+        ranges: i === 1 ? [] : [{ id: genId(), start: "09:30", end: "23:00", mode: "human" }]
+    }));
+
     const [schedule, setSchedule] = useState<any[]>(DEFAULT_SCHEDULE);
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [scheduleDirty, setScheduleDirty] = useState(false);
+
+    const normalizeSchedule = (rawSchedule: any[]) => {
+        if (!rawSchedule) return DEFAULT_SCHEDULE;
+        return DAY_NAMES.map((name, i) => {
+            const existing = rawSchedule.find(r => r.day === i);
+            if (!existing) return { day: i, ranges: [] };
+
+            // Backward compatibility para datos viejos
+            if (!existing.ranges) {
+                if (existing.start && existing.end) {
+                    return { day: i, ranges: [{ id: genId(), start: existing.start, end: existing.end, mode: existing.mode || "human" }] };
+                } else if (existing.mode === "human") {
+                    return { day: i, ranges: [{ id: genId(), start: "00:00", end: "23:59", mode: "human" }] };
+                } else {
+                    return { day: i, ranges: [] };
+                }
+            }
+
+            // Asegurar que cada rango tiene id
+            const ranges = existing.ranges.map((r: any) => ({
+                ...r,
+                id: r.id || genId()
+            }));
+
+            return { ...existing, ranges };
+        });
+    };
 
     useEffect(() => {
         if (config) {
             setScheduleEnabled((config as any).schedule_enabled ?? false);
             const s = (config as any).schedule;
             if (s && Array.isArray(s) && s.length > 0) {
-                setSchedule(s);
+                setSchedule(normalizeSchedule(s));
+            } else {
+                setSchedule(normalizeSchedule(DEFAULT_SCHEDULE));
             }
         }
     }, [config]);
@@ -150,10 +179,38 @@ export default function AsistenteTelefonico() {
         updateScheduleMutation.mutate({ enabled: checked, rules: schedule });
     };
 
-    const updateScheduleRule = (dayIndex: number, field: string, value: string) => {
-        setSchedule(prev => prev.map(rule =>
-            rule.day === dayIndex ? { ...rule, [field]: value } : rule
-        ));
+    // Funciones Helper para Rangos
+    const addRange = (dayIndex: number) => {
+        setSchedule(prev => prev.map(rule => {
+            if (rule.day === dayIndex) {
+                const newRanges = [...(rule.ranges || []), { id: genId(), start: "12:00", end: "16:00", mode: "human" }];
+                return { ...rule, ranges: newRanges };
+            }
+            return rule;
+        }));
+        setScheduleDirty(true);
+    };
+
+    const removeRange = (dayIndex: number, rangeId: string) => {
+        setSchedule(prev => prev.map(rule => {
+            if (rule.day === dayIndex && rule.ranges) {
+                return { ...rule, ranges: rule.ranges.filter((r: any) => r.id !== rangeId) };
+            }
+            return rule;
+        }));
+        setScheduleDirty(true);
+    };
+
+    const updateRangeRule = (dayIndex: number, rangeId: string, field: string, value: string) => {
+        setSchedule(prev => prev.map(rule => {
+            if (rule.day === dayIndex && rule.ranges) {
+                return {
+                    ...rule,
+                    ranges: rule.ranges.map((r: any) => r.id === rangeId ? { ...r, [field]: value } : r)
+                };
+            }
+            return rule;
+        }));
         setScheduleDirty(true);
     };
 
@@ -292,44 +349,76 @@ export default function AsistenteTelefonico() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {DAY_NAMES.map((name, dayIndex) => {
-                                const rule = schedule.find((r: any) => r.day === dayIndex) || { day: dayIndex, mode: "bot" };
+                                const defaultRule = { day: dayIndex, ranges: [] };
+                                const rule = schedule.find((r: any) => r.day === dayIndex) || defaultRule;
+
                                 return (
-                                    <div key={dayIndex} className={`grid grid-cols-[120px_1fr_1fr_1fr] gap-3 items-center p-2 rounded-md ${!scheduleEnabled ? "opacity-50" : ""} ${rule.mode === "bot" ? "bg-blue-50" : "bg-green-50"}`}>
-                                        <span className="font-medium text-sm">{name}</span>
-                                        <Select
-                                            value={rule.mode}
-                                            onValueChange={(v) => updateScheduleRule(dayIndex, "mode", v)}
-                                            disabled={!scheduleEnabled}
-                                        >
-                                            <SelectTrigger className="h-8">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="human">👤 Humano</SelectItem>
-                                                <SelectItem value="bot">🤖 Bot IA</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        {rule.mode === "human" ? (
-                                            <>
-                                                <Input
-                                                    type="time"
-                                                    value={rule.start || "09:00"}
-                                                    onChange={(e) => updateScheduleRule(dayIndex, "start", e.target.value)}
-                                                    disabled={!scheduleEnabled}
-                                                    className="h-8"
-                                                />
-                                                <Input
-                                                    type="time"
-                                                    value={rule.end || "23:00"}
-                                                    onChange={(e) => updateScheduleRule(dayIndex, "end", e.target.value)}
-                                                    disabled={!scheduleEnabled}
-                                                    className="h-8"
-                                                />
-                                            </>
+                                    <div key={dayIndex} className={`p-4 rounded-lg border bg-card transition-opacity ${!scheduleEnabled ? "opacity-50" : ""}`}>
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="font-medium text-sm sm:text-base">{name}</h4>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => addRange(dayIndex)}
+                                                disabled={!scheduleEnabled}
+                                                className="h-8 shadow-sm"
+                                            >
+                                                <Plus className="w-3 h-3 mr-1" /> Añadir franja
+                                            </Button>
+                                        </div>
+                                        {(!rule.ranges || rule.ranges.length === 0) ? (
+                                            <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-md border border-dashed flex flex-col sm:flex-row items-center justify-center gap-2">
+                                                <Bot className="w-4 h-4 text-blue-500" />
+                                                <span>Fuera de franjas, <span className="font-medium text-foreground">Bot IA</span> responde las llamadas.</span>
+                                            </div>
                                         ) : (
-                                            <span className="col-span-2 text-xs text-muted-foreground italic pl-2">Bot IA todo el día</span>
+                                            <div className="space-y-2">
+                                                {rule.ranges.map((range: any) => (
+                                                    <div key={range.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${range.mode === "bot" ? "bg-blue-50/50 border-blue-100" : "bg-green-50/50 border-green-100"}`}>
+                                                        <Select
+                                                            value={range.mode}
+                                                            onValueChange={(v) => updateRangeRule(dayIndex, range.id, "mode", v)}
+                                                            disabled={!scheduleEnabled}
+                                                        >
+                                                            <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="human">👤 Humano</SelectItem>
+                                                                <SelectItem value="bot">🤖 Bot IA</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                            <Input
+                                                                type="time"
+                                                                value={range.start}
+                                                                onChange={(e) => updateRangeRule(dayIndex, range.id, "start", e.target.value)}
+                                                                disabled={!scheduleEnabled}
+                                                                className="h-9 w-full sm:w-auto bg-background"
+                                                            />
+                                                            <span className="text-muted-foreground text-sm">a</span>
+                                                            <Input
+                                                                type="time"
+                                                                value={range.end}
+                                                                onChange={(e) => updateRangeRule(dayIndex, range.id, "end", e.target.value)}
+                                                                disabled={!scheduleEnabled}
+                                                                className="h-9 w-full sm:w-auto bg-background"
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-destructive h-9 w-9 sm:ml-auto hover:bg-destructive/10"
+                                                            onClick={() => removeRange(dayIndex, range.id)}
+                                                            disabled={!scheduleEnabled}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         )}
                                     </div>
                                 );
@@ -337,7 +426,7 @@ export default function AsistenteTelefonico() {
                         </div>
                         {scheduleDirty && (
                             <Button
-                                className="mt-4 w-full"
+                                className="mt-6 w-full shadow-sm"
                                 onClick={saveSchedule}
                                 disabled={updateScheduleMutation.isPending}
                             >
