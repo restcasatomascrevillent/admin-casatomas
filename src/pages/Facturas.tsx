@@ -13,6 +13,10 @@ import type { Sugerencia } from "@/components/facturas/ChatArea";
 const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
   const [activeTab, setActiveTab] = useState<string>("documentos");
+  const topTabClass =
+    "flex items-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 transition-colors hover:bg-background/70 hover:text-foreground data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary";
+  const docsTabClass =
+    "relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-colors hover:bg-muted/30 hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap";
 
   // Contadores para los badges de las pestañas
   const { data: facturas } = useFacturas();
@@ -89,7 +93,7 @@ const Facturas = () => {
             <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-10 sm:h-11">
               <TabsTrigger
                 value="documentos"
-                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md px-1.5 sm:px-3"
+                className={topTabClass}
               >
                 <FolderOpen className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Documentos</span>
@@ -101,7 +105,7 @@ const Facturas = () => {
               </TabsTrigger>
               <TabsTrigger
                 value="chat"
-                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-[hsl(38,59%,45%)/0.08] data-[state=active]:text-[hsl(38,65%,40%)] data-[state=active]:shadow-sm transition-all rounded-md px-1.5 sm:px-3"
+                className={topTabClass}
               >
                 <MessageSquare className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">IA</span>
@@ -113,7 +117,7 @@ const Facturas = () => {
               </TabsTrigger>
               <TabsTrigger
                 value="cargar"
-                className="flex items-center gap-1 sm:gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all rounded-md px-1.5 sm:px-3"
+                className={topTabClass}
               >
                 <Upload className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Cargar</span>
@@ -132,14 +136,14 @@ const Facturas = () => {
                     <TabsList className="flex h-9 sm:h-10 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
                       <TabsTrigger
                         value="facturas"
-                        className="relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap"
+                        className={docsTabClass}
                       >
                         <FileText className="mr-1.5 sm:mr-2 h-3.5 sm:h-4 w-3.5 sm:w-4" />
                         Facturas
                       </TabsTrigger>
                       <TabsTrigger
                         value="albaranes"
-                        className="relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap"
+                        className={docsTabClass}
                       >
                         <ClipboardList className="mr-1.5 sm:mr-2 h-3.5 sm:h-4 w-3.5 sm:w-4" />
                         Albaranes

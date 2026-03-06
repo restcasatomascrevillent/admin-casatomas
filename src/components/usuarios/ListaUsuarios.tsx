@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUsersManagement, ManagedUser } from "@/hooks/useUsersManagement";
 import { SECTIONS, AppRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,7 +29,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Settings, Shield, ShieldCheck, User, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
+import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 
 const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
   admin: { label: "Administrador", color: "bg-red-500" },
@@ -37,35 +39,43 @@ const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
 };
 
 export function ListaUsuarios() {
-  const { users, loading, updateUserRole, setAllPermissions, deleteUser } = useUsersManagement();
+  const { users, loading, updateUserRole, setAllPermissions, deleteUser, fetchUsers } = useUsersManagement();
+  const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<
     { section_key: string; can_view: boolean; can_edit: boolean }[]
   >([]);
+  const [selectedPresetId, setSelectedPresetId] = useState("manual");
+  const editableSections = SECTIONS.filter((s) => s.key !== "usuarios");
 
   const openPermissionsDialog = (user: ManagedUser) => {
     setSelectedUser(user);
     // Inicializar con permisos existentes o defaults
-    const perms = SECTIONS.map((s) => {
+    const perms = editableSections.map((s) => {
       const existing = user.permissions.find((p) => p.section_key === s.key);
       return {
         section_key: s.key,
         can_view: existing?.can_view ?? false,
-        can_edit: existing?.can_edit ?? false,
+        can_edit: false,
       };
     });
     setEditingPermissions(perms);
+    setSelectedPresetId("manual");
   };
 
-  const handlePermissionChange = (
-    sectionKey: string,
-    field: "can_view" | "can_edit",
-    value: boolean
-  ) => {
+  const handlePermissionChange = (sectionKey: string, value: boolean) => {
+    if (selectedPresetId !== "manual") {
+      setSelectedPresetId("manual");
+    }
+
     setEditingPermissions((prev) =>
       prev.map((p) =>
         p.section_key === sectionKey
-          ? { ...p, [field]: value, ...(field === "can_edit" && value ? { can_view: true } : {}) }
+          ? {
+              ...p,
+              can_view: value,
+              can_edit: false,
+            }
           : p
       )
     );
@@ -74,11 +84,14 @@ export function ListaUsuarios() {
   const savePermissions = async () => {
     if (!selectedUser) return;
     await setAllPermissions(selectedUser.id, editingPermissions);
+    if (selectedPresetId !== "manual") {
+      const selectedPreset = presets.find((preset) => preset.id === selectedPresetId);
+      if (selectedPreset) {
+        await updateUserRole(selectedUser.id, selectedPreset.base_role);
+      }
+    }
     setSelectedUser(null);
-  };
-
-  const handleRoleChange = async (userId: string, newRole: AppRole) => {
-    await updateUserRole(userId, newRole);
+    setSelectedPresetId("manual");
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -86,6 +99,67 @@ export function ListaUsuarios() {
       await deleteUser(userId);
     }
   };
+
+  const applyPresetToEditing = (selectedPreset: UserRolePreset) => {
+    setSelectedPresetId(selectedPreset.id);
+    setEditingPermissions(
+      editableSections.map((section) => {
+        const existing = selectedPreset.permissions.find(
+          (permission) => permission.section_key === section.key
+        );
+        return {
+          section_key: section.key,
+          can_view: existing?.can_edit ? true : (existing?.can_view ?? false),
+          can_edit: false,
+        };
+      })
+    );
+  };
+
+  const handlePresetChange = (presetId: string) => {
+    setSelectedPresetId(presetId);
+    if (presetId === "manual") return;
+
+    const selectedPreset = presets.find((preset) => preset.id === presetId);
+    if (!selectedPreset) return;
+
+    applyPresetToEditing(selectedPreset);
+  };
+
+  const handleDeletePresetOnly = async (presetId: string) => {
+    const deleted = await deletePreset(presetId);
+    if (!deleted) return false;
+
+    if (selectedPresetId === presetId) {
+      setSelectedPresetId("manual");
+    }
+    return true;
+  };
+
+  const handleUpdatePresetOnly = async (
+    presetId: string,
+    name: string,
+    baseRole: "manager" | "staff",
+    presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
+  ) => {
+    const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
+    if (!updatedPreset) return null;
+
+    if (selectedPresetId === presetId) {
+      applyPresetToEditing(updatedPreset);
+    }
+
+    return updatedPreset;
+  };
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      void fetchUsers();
+    };
+
+    window.addEventListener("users-management-refresh", handleRefresh);
+    return () => window.removeEventListener("users-management-refresh", handleRefresh);
+  }, [fetchUsers]);
 
   if (loading) {
     return (
@@ -111,15 +185,14 @@ export function ListaUsuarios() {
           <TableRow>
             <TableHead>Usuario</TableHead>
             <TableHead>Rol</TableHead>
-            <TableHead>Permisos</TableHead>
+            <TableHead>Accesos</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {users.map((user) => {
             const roleInfo = user.role ? ROLE_LABELS[user.role] : null;
-            const viewCount = user.permissions.filter((p) => p.can_view).length;
-            const editCount = user.permissions.filter((p) => p.can_edit).length;
+            const accessCount = user.permissions.filter((p) => p.can_view).length;
 
             return (
               <TableRow key={user.id}>
@@ -142,18 +215,7 @@ export function ListaUsuarios() {
                   {user.role === "admin" ? (
                     <Badge className={roleInfo?.color}>{roleInfo?.label}</Badge>
                   ) : (
-                    <Select
-                      value={user.role || "staff"}
-                      onValueChange={(value) => handleRoleChange(user.id, value as AppRole)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Badge variant="outline">Acceso por permisos</Badge>
                   )}
                 </TableCell>
                 <TableCell>
@@ -161,8 +223,7 @@ export function ListaUsuarios() {
                     <span className="text-sm text-muted-foreground">Acceso completo</span>
                   ) : (
                     <div className="flex gap-2">
-                      <Badge variant="outline">{viewCount} ver</Badge>
-                      <Badge variant="outline">{editCount} editar</Badge>
+                      <Badge variant="outline">{accessCount} secciones</Badge>
                     </div>
                   )}
                 </TableCell>
@@ -181,9 +242,9 @@ export function ListaUsuarios() {
                               Permisos
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
+                          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
+                            <DialogHeader className="pr-6">
+                              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                                 <Shield className="h-5 w-5" />
                                 Permisos de {selectedUser?.display_name || 
                                   (selectedUser?.email?.endsWith("@staff.local") 
@@ -191,58 +252,100 @@ export function ListaUsuarios() {
                                     : selectedUser?.email || selectedUser?.id.slice(0, 8))}
                               </DialogTitle>
                               <DialogDescription>
-                                Configura qué secciones puede ver y editar este usuario
+                                Configura a qué secciones tiene acceso este usuario
                               </DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Sección</TableHead>
-                                    <TableHead className="text-center">Ver</TableHead>
-                                    <TableHead className="text-center">Editar</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {SECTIONS.filter((s) => s.key !== "usuarios").map((section) => {
+                            <div className="space-y-4 py-2 sm:py-4">
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <Label className="text-sm font-medium">Rol preconfigurado</Label>
+                                  <ConfigurarRolesModal
+                                    currentPermissions={editingPermissions}
+                                    presets={presets}
+                                    presetsLoading={presetsLoading}
+                                    onCreatePreset={createPreset}
+                                    onUpdatePreset={handleUpdatePresetOnly}
+                                    onDeletePreset={handleDeletePresetOnly}
+                                  />
+                                </div>
+                                <Select
+                                  value={selectedPresetId}
+                                  onValueChange={handlePresetChange}
+                                  disabled={presetsLoading}
+                                >
+                                  <SelectTrigger className="w-full sm:w-[360px]">
+                                    <SelectValue
+                                      placeholder={presetsLoading ? "Cargando roles..." : "Sin rol preconfigurado"}
+                                    />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="manual">Sin rol preconfigurado</SelectItem>
+                                    {presets.map((preset) => (
+                                      <SelectItem key={preset.id} value={preset.id}>
+                                        {preset.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                                <div className="space-y-2 sm:hidden">
+                                  {editableSections.map((section) => {
                                     const perm = editingPermissions.find(
                                       (p) => p.section_key === section.key
                                     );
                                     return (
-                                      <TableRow key={section.key}>
-                                        <TableCell className="font-medium">
-                                          {section.label}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Checkbox
-                                            checked={perm?.can_view ?? false}
-                                            onCheckedChange={(checked) =>
-                                              handlePermissionChange(
-                                                section.key,
-                                                "can_view",
-                                                checked as boolean
-                                              )
-                                            }
-                                          />
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                          <Checkbox
-                                            checked={perm?.can_edit ?? false}
-                                            onCheckedChange={(checked) =>
-                                              handlePermissionChange(
-                                                section.key,
-                                                "can_edit",
-                                                checked as boolean
-                                              )
-                                            }
-                                          />
-                                        </TableCell>
-                                      </TableRow>
+                                      <div key={section.key} className="rounded-md border border-border/70 bg-card p-3">
+                                        <p className="text-sm font-medium">{section.label}</p>
+                                        <div className="mt-2 space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-sm text-muted-foreground">Acceso</span>
+                                            <Checkbox
+                                              checked={perm?.can_view ?? false}
+                                              onCheckedChange={(checked) =>
+                                                handlePermissionChange(section.key, checked as boolean)
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
                                     );
                                   })}
-                                </TableBody>
-                              </Table>
-                              <div className="flex justify-end gap-2">
+                                </div>
+                                <div className="hidden sm:block rounded-md border border-border/70 overflow-auto">
+                                  <Table className="min-w-[520px]">
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Sección</TableHead>
+                                        <TableHead className="text-center">Acceso</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {editableSections.map((section) => {
+                                        const perm = editingPermissions.find(
+                                          (p) => p.section_key === section.key
+                                        );
+                                        return (
+                                          <TableRow key={section.key}>
+                                            <TableCell className="font-medium">
+                                              {section.label}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <Checkbox
+                                                checked={perm?.can_view ?? false}
+                                                onCheckedChange={(checked) =>
+                                                  handlePermissionChange(section.key, checked as boolean)
+                                                }
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </div>
+                              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                                 <Button variant="outline" onClick={() => setSelectedUser(null)}>
                                   Cancelar
                                 </Button>

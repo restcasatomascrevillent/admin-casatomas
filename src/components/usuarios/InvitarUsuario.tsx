@@ -22,52 +22,123 @@ import {
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
+import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
+
+const EDITABLE_SECTIONS = SECTIONS.filter((section) => section.key !== "usuarios");
+const MANUAL_OPTION = "manual";
+const PRESET_OPTION_PREFIX = "preset:";
+
+const DEFAULT_STAFF_PERMISSIONS = EDITABLE_SECTIONS.map((section) => ({
+  section_key: section.key,
+  can_view: section.key === "dashboard",
+  can_edit: false,
+}));
 
 export function InvitarUsuario() {
+  const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AppRole>("staff");
   const [loading, setLoading] = useState(false);
+  const [selectedAccessConfig, setSelectedAccessConfig] = useState(MANUAL_OPTION);
   const [permissions, setPermissions] = useState<
     { section_key: string; can_view: boolean; can_edit: boolean }[]
-  >(
-    SECTIONS.filter((s) => s.key !== "usuarios").map((s) => ({
-      section_key: s.key,
-      can_view: s.key === "dashboard",
-      can_edit: false,
-    }))
-  );
+  >(DEFAULT_STAFF_PERMISSIONS);
 
-  const handlePermissionChange = (
-    sectionKey: string,
-    field: "can_view" | "can_edit",
-    value: boolean
-  ) => {
+  const applyPermissions = (incomingPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
+    setPermissions(
+      EDITABLE_SECTIONS.map((section) => {
+        const existing = incomingPermissions.find((permission) => permission.section_key === section.key);
+        return {
+          section_key: section.key,
+          can_view: existing?.can_edit ? true : (existing?.can_view ?? false),
+          can_edit: false,
+        };
+      })
+    );
+  };
+
+  const handlePermissionChange = (sectionKey: string, value: boolean) => {
+    if (selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX)) {
+      setSelectedAccessConfig(MANUAL_OPTION);
+    }
+
     setPermissions((prev) =>
       prev.map((p) =>
         p.section_key === sectionKey
-          ? { ...p, [field]: value, ...(field === "can_edit" && value ? { can_view: true } : {}) }
+          ? {
+              ...p,
+              can_view: value,
+              can_edit: false,
+            }
           : p
       )
     );
   };
 
-  const handleRoleChange = (newRole: AppRole) => {
-    setRole(newRole);
-    // Preset permissions based on role
-    if (newRole === "manager") {
-      setPermissions((prev) =>
-        prev.map((p) => ({ ...p, can_view: true, can_edit: false }))
-      );
-    } else if (newRole === "staff") {
-      setPermissions((prev) =>
-        prev.map((p) => ({
-          ...p,
-          can_view: p.section_key === "dashboard" || p.section_key === "reservas",
-          can_edit: false,
-        }))
-      );
+  const applyPreset = (preset: UserRolePreset) => {
+    setSelectedAccessConfig(`${PRESET_OPTION_PREFIX}${preset.id}`);
+    setRole(preset.base_role);
+    applyPermissions(preset.permissions);
+  };
+
+  const handleCreatePresetOnly = async (
+    name: string,
+    baseRole: "manager" | "staff",
+    presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
+  ) => {
+    const createdPreset = await createPreset(name, baseRole, presetPermissions);
+    if (createdPreset) {
+      setSelectedAccessConfig(MANUAL_OPTION);
+      setRole("staff");
+      setPermissions(DEFAULT_STAFF_PERMISSIONS);
     }
+    return createdPreset;
+  };
+
+  const handleDeletePresetOnly = async (presetId: string) => {
+    const deleted = await deletePreset(presetId);
+    if (!deleted) return false;
+
+    if (selectedAccessConfig === `${PRESET_OPTION_PREFIX}${presetId}`) {
+      setSelectedAccessConfig(MANUAL_OPTION);
+      setRole("staff");
+      setPermissions(DEFAULT_STAFF_PERMISSIONS);
+    }
+    return true;
+  };
+
+  const handleUpdatePresetOnly = async (
+    presetId: string,
+    name: string,
+    baseRole: "manager" | "staff",
+    presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
+  ) => {
+    const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
+    if (!updatedPreset) return null;
+
+    if (selectedAccessConfig === `${PRESET_OPTION_PREFIX}${presetId}`) {
+      applyPreset(updatedPreset);
+    }
+
+    return updatedPreset;
+  };
+
+  const handleAccessConfigChange = (value: string) => {
+    setSelectedAccessConfig(value);
+    if (value === MANUAL_OPTION) {
+      setRole("staff");
+      setPermissions(DEFAULT_STAFF_PERMISSIONS);
+      return;
+    }
+    if (!value.startsWith(PRESET_OPTION_PREFIX)) return;
+
+    const presetId = value.replace(PRESET_OPTION_PREFIX, "");
+    const selectedPreset = presets.find((preset) => preset.id === presetId);
+    if (!selectedPreset) return;
+
+    applyPreset(selectedPreset);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,46 +170,39 @@ export function InvitarUsuario() {
         return;
       }
 
-      // Call edge function to create user
-      const response = await fetch(
-        "https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/admin-create-user",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            username,
-            password,
-            role,
-            permissions,
-          }),
-        }
-      );
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+      }>("admin-create-user", {
+        body: {
+          username,
+          password,
+          role,
+          permissions,
+        },
+      });
 
-      const result = await response.json();
+      if (error) {
+        throw new Error(error.message || "Error al crear el usuario");
+      }
 
-      if (!response.ok) {
-        throw new Error(result.error || "Error al crear el usuario");
+      if (!data?.success) {
+        throw new Error(data?.error || "Error al crear el usuario");
       }
 
       toast.success("Usuario creado correctamente");
+      window.dispatchEvent(new Event("users-management-refresh"));
       
       // Reset form
       setUsername("");
       setPassword("");
       setRole("staff");
-      setPermissions(
-        SECTIONS.filter((s) => s.key !== "usuarios").map((s) => ({
-          section_key: s.key,
-          can_view: s.key === "dashboard",
-          can_edit: false,
-        }))
-      );
-    } catch (error: any) {
+      setSelectedAccessConfig(MANUAL_OPTION);
+      setPermissions(DEFAULT_STAFF_PERMISSIONS);
+    } catch (error: unknown) {
       console.error("Error creating user:", error);
-      toast.error(error.message || "Error al crear el usuario");
+      const message = error instanceof Error ? error.message : "Error al crear el usuario";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -175,20 +239,32 @@ export function InvitarUsuario() {
       </div>
 
       <div className="space-y-2">
-        <Label>Rol</Label>
-        <Select value={role} onValueChange={(v) => handleRoleChange(v as AppRole)}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label>Configuración de acceso</Label>
+          <ConfigurarRolesModal
+            currentPermissions={permissions}
+            presets={presets}
+            presetsLoading={presetsLoading}
+            onCreatePreset={handleCreatePresetOnly}
+            onUpdatePreset={handleUpdatePresetOnly}
+            onDeletePreset={handleDeletePresetOnly}
+          />
+        </div>
+        <Select value={selectedAccessConfig} onValueChange={handleAccessConfigChange} disabled={presetsLoading}>
+          <SelectTrigger className="w-full md:w-[360px]">
+            <SelectValue placeholder={presetsLoading ? "Cargando roles..." : "Sin rol preconfigurado"} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="staff">Staff</SelectItem>
+            <SelectItem value={MANUAL_OPTION}>Configuración manual</SelectItem>
+            {presets.map((preset) => (
+              <SelectItem key={preset.id} value={`${PRESET_OPTION_PREFIX}${preset.id}`}>
+                {preset.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          {role === "manager"
-            ? "Los managers tienen acceso de lectura a todas las secciones por defecto"
-            : "El staff tiene acceso limitado por defecto"}
+          Usa una opción manual o una preconfiguración en un único desplegable.
         </p>
       </div>
 
@@ -199,12 +275,11 @@ export function InvitarUsuario() {
             <TableHeader>
               <TableRow>
                 <TableHead>Sección</TableHead>
-                <TableHead className="text-center w-24">Ver</TableHead>
-                <TableHead className="text-center w-24">Editar</TableHead>
+                <TableHead className="text-center w-24">Acceso</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {SECTIONS.filter((s) => s.key !== "usuarios").map((section) => {
+              {EDITABLE_SECTIONS.map((section) => {
                 const perm = permissions.find((p) => p.section_key === section.key);
                 return (
                   <TableRow key={section.key}>
@@ -212,17 +287,7 @@ export function InvitarUsuario() {
                     <TableCell className="text-center">
                       <Checkbox
                         checked={perm?.can_view ?? false}
-                        onCheckedChange={(checked) =>
-                          handlePermissionChange(section.key, "can_view", checked as boolean)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={perm?.can_edit ?? false}
-                        onCheckedChange={(checked) =>
-                          handlePermissionChange(section.key, "can_edit", checked as boolean)
-                        }
+                        onCheckedChange={(checked) => handlePermissionChange(section.key, checked as boolean)}
                       />
                     </TableCell>
                   </TableRow>

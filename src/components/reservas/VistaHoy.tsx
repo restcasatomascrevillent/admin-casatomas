@@ -67,10 +67,10 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-5">
                 <div className="h-16 bg-muted rounded" />
               </CardContent>
             </Card>
@@ -109,67 +109,67 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
       </div>
 
       {/* Stats cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
 
         <Card className="border-l-4 border-l-primary">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Reservas Hoy
                 </p>
-                <p className="text-3xl font-bold">{resumen?.totalReservas || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalReservas || 0}</p>
               </div>
-              <div className="p-3 rounded-full bg-primary/10">
-                <CalendarCheck className="h-5 w-5 text-primary" />
+              <div className="p-2 sm:p-3 rounded-full bg-primary/10">
+                <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-accent">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Comensales Esperados
                 </p>
-                <p className="text-3xl font-bold">{resumen?.totalComensales || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalComensales || 0}</p>
               </div>
-              <div className="p-3 rounded-full bg-accent/10">
-                <Users className="h-5 w-5 text-accent" />
+              <div className="p-2 sm:p-3 rounded-full bg-accent/10">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-secondary">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Capacidad Total
                 </p>
-                <p className="text-3xl font-bold">{resumen?.capacidadTotal || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold">{resumen?.capacidadTotal || 0}</p>
               </div>
-              <div className="p-3 rounded-full bg-secondary/10">
-                <MapPin className="h-5 w-5 text-secondary" />
+              <div className="p-2 sm:p-3 rounded-full bg-secondary/10">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
                   Ocupación Media
                 </p>
-                <p className="text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
+                <p className="text-2xl sm:text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
               </div>
-              <div className="p-3 rounded-full bg-green-500/10">
-                <TrendingUp className="h-5 w-5 text-green-500" />
+              <div className="p-2 sm:p-3 rounded-full bg-green-500/10">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               </div>
             </div>
           </CardContent>

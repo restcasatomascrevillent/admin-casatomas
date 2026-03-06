@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole, AppRole, SECTIONS } from "./useUserRole";
 import { toast } from "sonner";
@@ -21,8 +21,9 @@ export function useUsersManagement() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!isAdmin) {
+      setUsers([]);
       setLoading(false);
       return;
     }
@@ -33,17 +34,26 @@ export function useUsersManagement() {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
-      let authUsersMap = new Map<string, { email: string; display_name: string | null }>();
-      
+      const authUsersMap = new Map<
+        string,
+        { email: string; display_name: string | null; created_at: string }
+      >();
+
       if (token) {
         try {
-          const response = await supabase.functions.invoke("list-users", {
+          const response = await supabase.functions.invoke<{
+            users: Array<{ id: string; email: string | null; display_name: string | null; created_at: string }>;
+          }>("list-users", {
             headers: { Authorization: `Bearer ${token}` },
           });
-          
+
           if (response.data?.users) {
-            response.data.users.forEach((u: { id: string; email: string; display_name: string | null }) => {
-              authUsersMap.set(u.id, { email: u.email, display_name: u.display_name });
+            response.data.users.forEach((u) => {
+              authUsersMap.set(u.id, {
+                email: u.email ?? "",
+                display_name: u.display_name,
+                created_at: u.created_at,
+              });
             });
           }
         } catch (e) {
@@ -51,48 +61,78 @@ export function useUsersManagement() {
         }
       }
 
-      // Obtener roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("user_id, role, created_at");
+      const [{ data: rolesData, error: rolesError }, { data: permissionsData, error: permError }] =
+        await Promise.all([
+          supabase.from("user_roles").select("user_id, role, created_at"),
+          supabase.from("user_permissions").select("user_id, section_key, can_view, can_edit"),
+        ]);
 
       if (rolesError) throw rolesError;
-
-      // Obtener todos los permisos
-      const { data: permissionsData, error: permError } = await supabase
-        .from("user_permissions")
-        .select("user_id, section_key, can_view, can_edit");
-
       if (permError) throw permError;
 
-      // Agrupar por usuario
       const userMap = new Map<string, ManagedUser>();
 
+      authUsersMap.forEach((authUser, userId) => {
+        userMap.set(userId, {
+          id: userId,
+          email: authUser.email,
+          display_name: authUser.display_name,
+          role: null,
+          created_at: authUser.created_at,
+          permissions: [],
+        });
+      });
+
       rolesData?.forEach((r) => {
-        const authUser = authUsersMap.get(r.user_id);
+        const existing = userMap.get(r.user_id);
+        if (existing) {
+          existing.role = r.role as AppRole;
+          if (!existing.created_at && r.created_at) {
+            existing.created_at = r.created_at;
+          }
+          return;
+        }
+
         userMap.set(r.user_id, {
           id: r.user_id,
-          email: authUser?.email || "",
-          display_name: authUser?.display_name || null,
+          email: "",
+          display_name: null,
           role: r.role as AppRole,
-          created_at: r.created_at,
+          created_at: r.created_at || "",
           permissions: [],
         });
       });
 
       permissionsData?.forEach((p) => {
-        const user = userMap.get(p.user_id);
-        if (user) {
-          user.permissions.push({
-            section_key: p.section_key,
-            can_view: p.can_view,
-            can_edit: p.can_edit,
-          });
+        let user = userMap.get(p.user_id);
+        if (!user) {
+          user = {
+            id: p.user_id,
+            email: "",
+            display_name: null,
+            role: null,
+            created_at: "",
+            permissions: [],
+          };
+          userMap.set(p.user_id, user);
         }
+
+        const canEdit = Boolean(p.can_edit);
+        const canView = Boolean(p.can_view) || canEdit;
+
+        user.permissions.push({
+          section_key: p.section_key,
+          can_view: canView,
+          can_edit: canEdit,
+        });
       });
 
-      const usersArray = Array.from(userMap.values());
-      
+      const usersArray = Array.from(userMap.values()).sort((a, b) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeB - timeA;
+      });
+
       setUsers(usersArray);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -100,17 +140,17 @@ export function useUsersManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [isAdmin]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   const updateUserRole = async (userId: string, newRole: AppRole) => {
     try {
       const { error } = await supabase
         .from("user_roles")
-        .upsert({ user_id: userId, role: newRole }, { onConflict: "user_id,role" });
+        .upsert({ user_id: userId, role: newRole }, { onConflict: "user_id" });
 
       if (error) throw error;
 
@@ -135,8 +175,8 @@ export function useUsersManagement() {
           {
             user_id: userId,
             section_key: sectionKey,
-            can_view: canView,
-            can_edit: canEdit,
+            can_view: canEdit ? true : canView,
+            can_edit: false,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,section_key" }
@@ -155,24 +195,26 @@ export function useUsersManagement() {
   const setAllPermissions = async (userId: string, permissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
     try {
       // Primero eliminar permisos existentes
-      await supabase
+      const { error: deleteError } = await supabase
         .from("user_permissions")
         .delete()
         .eq("user_id", userId);
+      if (deleteError) throw deleteError;
 
-      // Insertar nuevos permisos
-      const { error } = await supabase
-        .from("user_permissions")
-        .insert(
-          permissions.map((p) => ({
-            user_id: userId,
-            section_key: p.section_key,
-            can_view: p.can_view,
-            can_edit: p.can_edit,
-          }))
-        );
+      const normalizedPermissions = permissions.map((p) => ({
+        user_id: userId,
+        section_key: p.section_key,
+        can_view: p.can_edit ? true : p.can_view,
+        can_edit: false,
+      }));
 
-      if (error) throw error;
+      if (normalizedPermissions.length > 0) {
+        const { error } = await supabase
+          .from("user_permissions")
+          .insert(normalizedPermissions);
+
+        if (error) throw error;
+      }
 
       toast.success("Permisos actualizados");
       fetchUsers();
@@ -203,7 +245,7 @@ export function useUsersManagement() {
     try {
       const { error } = await supabase
         .from("user_roles")
-        .insert({ user_id: userId, role });
+        .upsert({ user_id: userId, role }, { onConflict: "user_id" });
 
       if (error) throw error;
 
@@ -215,7 +257,10 @@ export function useUsersManagement() {
         can_edit: false,
       }));
 
-      await supabase.from("user_permissions").insert(defaultPermissions);
+      const { error: permissionsError } = await supabase.from("user_permissions").upsert(defaultPermissions, {
+        onConflict: "user_id,section_key",
+      });
+      if (permissionsError) throw permissionsError;
 
       return true;
     } catch (error) {
@@ -226,19 +271,26 @@ export function useUsersManagement() {
 
   const deleteUser = async (userId: string) => {
     try {
-      // Eliminar rol (los permisos se eliminan en cascada)
-      const { error } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("No hay sesión activa");
+
+      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
+        "admin-delete-user",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          body: { userId },
+        }
+      );
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "No se pudo eliminar el usuario");
 
-      toast.success("Usuario eliminado del sistema de permisos");
+      toast.success("Usuario eliminado correctamente");
       fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast.error("Error al eliminar usuario");
+      toast.error(error instanceof Error ? error.message : "Error al eliminar usuario");
     }
   };
 

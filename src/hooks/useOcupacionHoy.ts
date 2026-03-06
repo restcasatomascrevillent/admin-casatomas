@@ -14,6 +14,11 @@ export interface OcupacionEspacio {
   reservas_pendientes?: number;
 }
 
+interface EspacioCapacidad {
+  capacidad_maxima: number;
+  activa: boolean;
+}
+
 export function useOcupacionHoy() {
   return useQuery({
     queryKey: ["ocupacion_hoy"],
@@ -30,25 +35,50 @@ export function useOcupacionHoy() {
 }
 
 export function useResumenOcupacionHoy() {
-  const { data: ocupacion, ...rest } = useOcupacionHoy();
+  const ocupacionQuery = useOcupacionHoy();
+  const espaciosQuery = useQuery({
+    queryKey: ["espacios_capacidad_total"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("espacios_reserva" as any)
+        .select("capacidad_maxima, activa");
+
+      if (error) throw error;
+      return (data ?? []) as EspacioCapacidad[];
+    },
+    refetchInterval: 60000,
+  });
+
+  const ocupacion = ocupacionQuery.data;
+  const espacios = espaciosQuery.data ?? [];
+
+  const totalReservas = ocupacion?.reduce((acc, e) => acc + (e.total_reservas || 0), 0) || 0;
+  const totalComensales = ocupacion?.reduce((acc, e) => acc + (e.total_comensales || 0), 0) || 0;
+  const capacidadDesdeVista = ocupacion?.reduce((acc, e) => acc + (e.capacidad_maxima || 0), 0) || 0;
+  const capacidadConfigurada = espacios
+    .filter((espacio) => espacio.activa !== false)
+    .reduce((acc, espacio) => acc + (espacio.capacidad_maxima || 0), 0);
+  const capacidadTotal = capacidadConfigurada > 0 ? capacidadConfigurada : capacidadDesdeVista;
 
   const resumen = ocupacion
     ? {
-        totalReservas: ocupacion.reduce((acc, e) => acc + (e.total_reservas || 0), 0),
-        totalComensales: ocupacion.reduce((acc, e) => acc + (e.total_comensales || 0), 0),
-        capacidadTotal: ocupacion.reduce((acc, e) => acc + (e.capacidad_maxima || 0), 0),
-        porcentajeTotal:
-          ocupacion.length > 0
-            ? Math.round(
-                ocupacion.reduce((acc, e) => acc + (e.porcentaje_ocupacion || 0), 0) /
-                  ocupacion.length
-              )
-            : 0,
+        totalReservas,
+        totalComensales,
+        capacidadTotal,
+        // Cálculo global correcto: comensales totales / capacidad total.
+        porcentajeTotal: capacidadTotal > 0 ? Math.round((totalComensales / capacidadTotal) * 100) : 0,
         espacios: ocupacion,
       }
     : null;
 
-  return { data: resumen, ...rest };
+  return {
+    data: resumen,
+    isLoading: ocupacionQuery.isLoading || espaciosQuery.isLoading,
+    error: ocupacionQuery.error || espaciosQuery.error,
+    refetch: async () => {
+      await Promise.all([ocupacionQuery.refetch(), espaciosQuery.refetch()]);
+    },
+  };
 }
 
 export function useReservasHoyPorEspacio() {

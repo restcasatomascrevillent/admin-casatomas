@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.admin-create-user]
 verify_jwt = false
 
+[functions.admin-delete-user]
+verify_jwt = false
+
 [functions.traducir-carta]
 verify_jwt = false
 

@@ -1,4 +1,5 @@
 import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet, Star, Phone } from "lucide-react";
+import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 
-const menuItems: { title: string; url: string; icon: React.ComponentType<any>; sectionKey: SectionKey }[] = [
+const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas" },
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
@@ -27,12 +28,12 @@ const menuItems: { title: string; url: string; icon: React.ComponentType<any>; s
   { title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" },
   { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
   { title: "Gestor Bot Web", url: "/gestion-bot", icon: Bot, sectionKey: "gestion_bot" },
-  { title: "Asistente Tel.", url: "/asistente-telefonico", icon: Phone, sectionKey: "gestion_bot" },
+  { title: "Asistente Tel.", url: "/asistente-telefonico", icon: Phone, sectionKey: "asistente_telefonico" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
   { title: "Gestor Gasto", url: "/gestor-gasto", icon: Wallet, sectionKey: "gestor_gasto" },
-  { title: "Reseñas Google", url: "/resenas", icon: Star, sectionKey: "gestion_web" },
+  { title: "Reseñas Google", url: "/resenas", icon: Star, sectionKey: "resenas" },
 ];
 
 export function AppSidebar() {

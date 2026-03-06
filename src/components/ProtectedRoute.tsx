@@ -17,12 +17,15 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/espacios": "espacios",
   "/trabajadores": "trabajadores",
   "/gestor-carta": "gestor_carta",
+  "/ecommerce": "ecommerce",
   "/gestion-web": "gestion_web",
   "/gestion-bot": "gestion_bot",
+  "/asistente-telefonico": "asistente_telefonico",
+  "/resenas": "resenas",
   "/marketing": "marketing",
   "/facturas": "facturas",
-  "/analisis": "analisis",
   "/usuarios": "usuarios",
+  "/gestor-gasto": "gestor_gasto",
 };
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {

@@ -26,7 +26,7 @@ const conceptos = [
     estado: "activo",
   },
   {
-    nombre: "Newsletter & Marketing",
+    nombre: "Newsletter",
     descripcion: "Envío de campañas y newsletters",
     precio: 19.00,
     periodicidad: "Mensual",

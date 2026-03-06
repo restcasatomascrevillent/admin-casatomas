@@ -38,7 +38,7 @@ export function ResumenMarketing() {
   return (
     <Card className="col-span-2">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">Resumen de Marketing</CardTitle>
+        <CardTitle className="text-base font-medium">Resumen de Newsletter</CardTitle>
         <TrendingUp className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="space-y-4">
@@ -75,7 +75,7 @@ export function ResumenMarketing() {
             className="w-full"
             onClick={() => navigate("/marketing")}
           >
-            Ver panel completo de Marketing
+            Ver panel completo de Newsletter
             <ExternalLink className="h-3 w-3 ml-2" />
           </Button>
         </div>

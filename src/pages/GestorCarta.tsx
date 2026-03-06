@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,9 @@ export default function GestorCarta() {
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza">("todos");
   const [filtroWeb, setFiltroWeb] = useState<FiltroWeb>("todos");
   const [busqueda, setBusqueda] = useState<string>("");
+  const [usarSelectFiltroEstado, setUsarSelectFiltroEstado] = useState(false);
+  const filtroEstadoWrapperRef = useRef<HTMLDivElement | null>(null);
+  const filtroEstadoProbeRef = useRef<HTMLDivElement | null>(null);
   
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
   const [dialogBebidaOpen, setDialogBebidaOpen] = useState(false);
@@ -45,6 +48,36 @@ export default function GestorCarta() {
   const [dialogAjustePreciosOpen, setDialogAjustePreciosOpen] = useState(false);
 
   const isLoading = isLoadingPlatos || isLoadingBebidas || isLoadingVinos || isLoadingCocteles;
+
+  useEffect(() => {
+    const wrapper = filtroEstadoWrapperRef.current;
+    const probe = filtroEstadoProbeRef.current;
+    if (!wrapper || !probe) return;
+
+    const checkLayout = () => {
+      // En móvil, forzar desplegable.
+      if (window.innerWidth < 640) {
+        setUsarSelectFiltroEstado(true);
+        return;
+      }
+
+      const wrapperWidth = wrapper.clientWidth;
+      const contenidoWidth = probe.scrollWidth;
+      setUsarSelectFiltroEstado(contenidoWidth > wrapperWidth);
+    };
+
+    checkLayout();
+
+    const resizeObserver = new ResizeObserver(checkLayout);
+    resizeObserver.observe(wrapper);
+    resizeObserver.observe(probe);
+    window.addEventListener("resize", checkLayout);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", checkLayout);
+    };
+  }, []);
 
   // Inicializar la primera categoría cuando se carguen los datos
   if (categoriasPlatos.length > 0 && !categoriaPlatos) {
@@ -170,29 +203,62 @@ export default function GestorCarta() {
           </div>
         </div>
 
-        {/* Filtros de visibilidad */}
-        <ToggleGroup 
-          type="single" 
-          value={filtroEstado} 
-          onValueChange={(value) => value && setFiltroEstado(value as typeof filtroEstado)}
-          className="border rounded-md w-fit"
-        >
-          <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-            Todos
-          </ToggleGroupItem>
-          <ToggleGroupItem value="activos" aria-label="Restaurante activos" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
-            Restaurante Activos
-          </ToggleGroupItem>
-          <ToggleGroupItem value="inactivos_rest" aria-label="Restaurante inactivos" className="data-[state=on]:bg-amber-800 data-[state=on]:text-white">
-            Restaurante Inactivos
-          </ToggleGroupItem>
-          <ToggleGroupItem value="activos_touza" aria-label="Touza activos" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
-            Touza Activos
-          </ToggleGroupItem>
-          <ToggleGroupItem value="inactivos_touza" aria-label="Touza inactivos" className="data-[state=on]:bg-purple-800 data-[state=on]:text-white">
-            Touza Inactivos
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {/* Filtros de visibilidad (auto: botones o select según ancho real) */}
+        <div ref={filtroEstadoWrapperRef} className="relative w-full">
+          <div
+            ref={filtroEstadoProbeRef}
+            className="absolute -z-10 opacity-0 pointer-events-none whitespace-nowrap"
+          >
+            <ToggleGroup type="single" value={filtroEstado} className="border rounded-md w-fit">
+              <ToggleGroupItem value="todos">Todos</ToggleGroupItem>
+              <ToggleGroupItem value="activos">Restaurante Activos</ToggleGroupItem>
+              <ToggleGroupItem value="inactivos_rest">Restaurante Inactivos</ToggleGroupItem>
+              <ToggleGroupItem value="activos_touza">Touza Activos</ToggleGroupItem>
+              <ToggleGroupItem value="inactivos_touza">Touza Inactivos</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          {usarSelectFiltroEstado ? (
+            <Select
+              value={filtroEstado}
+              onValueChange={(value) => setFiltroEstado(value as typeof filtroEstado)}
+            >
+              <SelectTrigger className="w-full sm:max-w-[380px]">
+                <SelectValue placeholder="Filtrar visibilidad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="activos">Restaurante Activos</SelectItem>
+                <SelectItem value="inactivos_rest">Restaurante Inactivos</SelectItem>
+                <SelectItem value="activos_touza">Touza Activos</SelectItem>
+                <SelectItem value="inactivos_touza">Touza Inactivos</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <ToggleGroup 
+              type="single" 
+              value={filtroEstado} 
+              onValueChange={(value) => value && setFiltroEstado(value as typeof filtroEstado)}
+              className="border rounded-md w-fit"
+            >
+              <ToggleGroupItem value="todos" aria-label="Mostrar todos" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                Todos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="activos" aria-label="Restaurante activos" className="data-[state=on]:bg-amber-600 data-[state=on]:text-white">
+                Restaurante Activos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="inactivos_rest" aria-label="Restaurante inactivos" className="data-[state=on]:bg-amber-800 data-[state=on]:text-white">
+                Restaurante Inactivos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="activos_touza" aria-label="Touza activos" className="data-[state=on]:bg-purple-600 data-[state=on]:text-white">
+                Touza Activos
+              </ToggleGroupItem>
+              <ToggleGroupItem value="inactivos_touza" aria-label="Touza inactivos" className="data-[state=on]:bg-purple-800 data-[state=on]:text-white">
+                Touza Inactivos
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+        </div>
 
         {/* Buscador y Filtro Web */}
         <div className="flex gap-3 flex-col sm:flex-row">

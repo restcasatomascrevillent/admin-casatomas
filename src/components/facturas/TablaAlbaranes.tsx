@@ -127,22 +127,22 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA }: { albaran: Factura; onPre
       </CardHeader>
 
       {/* Botonera de acciones rápida unida al Header en mobile */}
-      <div className="flex bg-muted/20 border-t border-border/30 px-3 py-2 items-center justify-end gap-2">
+      <div className="grid grid-cols-2 gap-1.5 bg-muted/20 border-t border-border/30 px-3 py-2">
         {albaran.drive_url && (
           <a href={albaran.drive_url} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-md transition-colors">
-            <ExternalLink className="h-3 w-3" /> Ver Doc
+            className="inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800">
+            <ExternalLink className="h-3 w-3" /> Doc
           </a>
         )}
         {onPreguntarIA && (
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-[11px] font-medium px-2.5 text-[hsl(38,59%,45%)] hover:text-[hsl(38,59%,45%)] bg-[hsl(38,59%,45%)/0.05] hover:bg-[hsl(38,59%,45%)/0.15] border border-[hsl(38,59%,45%)/0.2] transition-colors"
+            className="h-8 w-full min-w-0 justify-center gap-1 border border-[hsl(38,59%,45%)/0.2] bg-[hsl(38,59%,45%)/0.05] px-2 text-[11px] font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.15] hover:text-[hsl(38,59%,45%)]"
             onClick={(e) => { e.stopPropagation(); onPreguntarIA(albaran); }}
           >
-            <Sparkles className="h-3 w-3 mr-1.5" /> Analizar con IA
+            <Sparkles className="h-3 w-3" /> IA
           </Button>
         )}
       </div>
@@ -233,7 +233,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA }: { albaran: Fac
 
         {/* Acciones Rápidas (IA) */}
         <TableCell className="text-right pr-4">
-          <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-end">
             {onPreguntarIA && (
               <Button
                 variant="outline"
@@ -342,7 +342,7 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
         <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{albaranesFiltrados.map((a) => <FilaAlbaranMobile key={a.id} albaran={a} onPreguntarIA={onPreguntarIA} />)}</div>
       ) : (
         <div className="rounded-xl border border-border/60 bg-background shadow-sm overflow-auto custom-scrollbar flex-1 min-h-0 relative">
-          <Table>
+          <Table className="min-w-[1080px] lg:min-w-[1260px]">
             <TableHeader className="sticky top-0 z-20 bg-muted/95 backdrop-blur supports-[backdrop-filter]:bg-muted/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
               <TableRow className="border-b-border/60 hover:bg-transparent">
                 <TableHead className="w-[40px] pl-4"></TableHead>
@@ -358,7 +358,9 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
                 {columnasVisibles.doc && <TableHead className="text-center font-semibold">Escaneo</TableHead>}
                 {columnasVisibles.procesado_en && <TableHead className="font-semibold">Procesado</TableHead>}
                 {columnasVisibles.creado && <TableHead className="font-semibold">Creado</TableHead>}
-                <TableHead className="text-right pr-4 font-semibold w-[140px]">Acciones</TableHead>
+                <TableHead className="text-right pr-4 font-semibold w-[170px]">
+                  Acciones
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

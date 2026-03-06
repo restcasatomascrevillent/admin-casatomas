@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Plus, Settings } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
@@ -21,6 +22,8 @@ export default function Reservas() {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
   const [activeTab, setActiveTab] = useState("hoy");
+  const [tabsOverflow, setTabsOverflow] = useState(false);
+  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
@@ -36,6 +39,43 @@ export default function Reservas() {
       setActiveTab(tabFromUrl);
     }
   }, [tabFromUrl]);
+
+  useEffect(() => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+
+    const checkOverflow = () => {
+      // En móvil ya usamos el Select directamente.
+      if (window.innerWidth < 640) {
+        setTabsOverflow(false);
+        return;
+      }
+
+      setTabsOverflow(el.scrollWidth > el.clientWidth + 4);
+    };
+
+    checkOverflow();
+
+    const resizeObserver = new ResizeObserver(checkOverflow);
+    resizeObserver.observe(el);
+
+    const tabsList = el.firstElementChild;
+    if (tabsList instanceof HTMLElement) {
+      resizeObserver.observe(tabsList);
+    }
+
+    window.addEventListener("resize", checkOverflow);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", checkOverflow);
+    };
+  }, [isAdmin]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    // Limpiar parámetros de URL cuando se cambia de tab manualmente
+    setSearchParams({});
+  };
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -86,24 +126,44 @@ export default function Reservas() {
           </Dialog>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => {
-          setActiveTab(value);
-          // Limpiar parámetros de URL cuando se cambia de tab manualmente
-          setSearchParams({});
-        }} className="w-full">
-          <TabsList className="flex w-full overflow-x-auto no-scrollbar">
-            <TabsTrigger value="hoy" className="flex-shrink-0">Hoy</TabsTrigger>
-            <TabsTrigger value="lista" className="flex-shrink-0">Lista</TabsTrigger>
-            <TabsTrigger value="calendario" className="flex-shrink-0">Calendario</TabsTrigger>
-            <TabsTrigger value="blacklist" className="flex-shrink-0">Blacklist</TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Configuración</span>
-                <span className="sm:hidden">Config</span>
-              </TabsTrigger>
-            )}
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          {/* Muy estrecho: selector desplegable */}
+          <div className={`mb-3 ${tabsOverflow ? "block" : "sm:hidden"}`}>
+            <Select value={activeTab} onValueChange={handleTabChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona vista" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hoy">Hoy</SelectItem>
+                <SelectItem value="lista">Lista</SelectItem>
+                <SelectItem value="calendario">Calendario</SelectItem>
+                <SelectItem value="blacklist">Blacklist</SelectItem>
+                {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Tablet/desktop: pestañas */}
+          <div
+            ref={tabsContainerRef}
+            className={`hidden sm:block overflow-x-auto no-scrollbar ${
+              tabsOverflow ? "sm:h-0 sm:overflow-hidden sm:opacity-0 sm:pointer-events-none" : ""
+            }`}
+          >
+            <TabsList className="w-max min-w-max justify-start gap-1 p-1">
+              <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
+              <TabsTrigger value="lista" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Lista</TabsTrigger>
+              <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
+              <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Configuración</span>
+                  <span className="sm:hidden">Config</span>
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
           <TabsContent value="hoy" className="space-y-6 mt-6">
             <VistaHoy onEspacioClick={handleEspacioClick} />
