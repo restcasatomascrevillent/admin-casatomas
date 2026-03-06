@@ -32,6 +32,7 @@ export interface NovedadPreview {
 interface MobilePreviewProps {
   novedades: NovedadPreview[];
   previewNovedad?: NovedadPreview | null;
+  seccionActiva?: "novedades" | "menus_diarios" | "tapas";
 }
 
 type Idioma = "es" | "en" | "fr";
@@ -74,9 +75,45 @@ const ICONOS_MAP: Record<string, React.ComponentType<{
   star: Star,
   sparkles: Sparkles
 };
+const TITULO_SECCION: Record<NonNullable<MobilePreviewProps["seccionActiva"]>, Record<Idioma, string>> = {
+  novedades: {
+    es: "Novedades",
+    en: "What's New",
+    fr: "Nouveautés",
+  },
+  menus_diarios: {
+    es: "Menús diarios",
+    en: "Daily Menus",
+    fr: "Menus du jour",
+  },
+  tapas: {
+    es: "Tapas",
+    en: "Tapas",
+    fr: "Tapas",
+  },
+};
+
+const DESCRIPCION_SECCION: Record<NonNullable<MobilePreviewProps["seccionActiva"]>, Record<Idioma, string>> = {
+  novedades: {
+    es: "Nuevas incorporaciones y experiencias que queremos compartir",
+    en: "New additions and experiences we want to share",
+    fr: "Nouvelles incorporations et expériences à partager",
+  },
+  menus_diarios: {
+    es: "Descubre el menú del día disponible en el restaurante",
+    en: "Discover today's menu available at the restaurant",
+    fr: "Découvrez le menu du jour disponible au restaurant",
+  },
+  tapas: {
+    es: "Tapas destacadas que puedes pedir hoy",
+    en: "Featured tapas you can order today",
+    fr: "Tapas à la une que vous pouvez commander aujourd'hui",
+  },
+};
 export function MobilePreview({
   novedades,
-  previewNovedad
+  previewNovedad,
+  seccionActiva = "novedades"
 }: MobilePreviewProps) {
   const [idioma, setIdioma] = useState<Idioma>("es");
   
@@ -122,14 +159,10 @@ export function MobilePreview({
             {/* Header */}
             <div className="text-center space-y-1 mb-4">
               <h2 className="text-lg font-bold text-foreground">
-                {idioma === "en" ? "What's New" : idioma === "fr" ? "Nouveautés" : "Novedades"}
+                {TITULO_SECCION[seccionActiva][idioma]}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {idioma === "en" 
-                  ? "New additions and experiences we want to share" 
-                  : idioma === "fr" 
-                    ? "Nouvelles incorporations et expériences à partager" 
-                    : "Nuevas incorporaciones y experiencias que queremos compartir"}
+                {DESCRIPCION_SECCION[seccionActiva][idioma]}
               </p>
             </div>
 
