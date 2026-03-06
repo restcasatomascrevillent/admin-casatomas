@@ -2105,6 +2105,8 @@ export type Database = {
           vapi_assistant_id: string | null
           vapi_phone_number_id: string | null
           voice_id: string | null
+          schedule_enabled: boolean | null
+          schedule: { day: number; start?: string; end?: string; mode: string }[] | null
         }
         Insert: {
           address?: string | null
@@ -2122,6 +2124,8 @@ export type Database = {
           vapi_assistant_id?: string | null
           vapi_phone_number_id?: string | null
           voice_id?: string | null
+          schedule_enabled?: boolean | null
+          schedule?: { day: number; start?: string; end?: string; mode: string }[] | null
         }
         Update: {
           address?: string | null
@@ -2139,6 +2143,8 @@ export type Database = {
           vapi_assistant_id?: string | null
           vapi_phone_number_id?: string | null
           voice_id?: string | null
+          schedule_enabled?: boolean | null
+          schedule?: { day: number; start?: string; end?: string; mode: string }[] | null
         }
         Relationships: []
       }

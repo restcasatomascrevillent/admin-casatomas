@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter } from "lucide-react";
+import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -69,6 +71,31 @@ export default function AsistenteTelefonico() {
         refetchInterval: 5000, // Refrescar cada 5s para ver llamadas y duraciones
     });
 
+    // Schedule state
+    const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const DEFAULT_SCHEDULE = [
+        { day: 0, start: "11:00", end: "16:00", mode: "human" },
+        { day: 1, mode: "bot" as const },
+        { day: 2, start: "09:30", end: "23:00", mode: "human" },
+        { day: 3, start: "09:30", end: "23:00", mode: "human" },
+        { day: 4, start: "09:30", end: "23:00", mode: "human" },
+        { day: 5, start: "09:00", end: "23:30", mode: "human" },
+        { day: 6, start: "10:30", end: "23:30", mode: "human" },
+    ];
+    const [schedule, setSchedule] = useState<any[]>(DEFAULT_SCHEDULE);
+    const [scheduleEnabled, setScheduleEnabled] = useState(false);
+    const [scheduleDirty, setScheduleDirty] = useState(false);
+
+    useEffect(() => {
+        if (config) {
+            setScheduleEnabled((config as any).schedule_enabled ?? false);
+            const s = (config as any).schedule;
+            if (s && Array.isArray(s) && s.length > 0) {
+                setSchedule(s);
+            }
+        }
+    }, [config]);
+
     // Mutations
     const updateModeMutation = useMutation({
         mutationFn: async (newMode: string) => {
@@ -95,8 +122,43 @@ export default function AsistenteTelefonico() {
         },
     });
 
+    const updateScheduleMutation = useMutation({
+        mutationFn: async ({ enabled, rules }: { enabled: boolean; rules: any[] }) => {
+            const { error } = await supabase
+                .from("phone_system_config")
+                .update({ schedule_enabled: enabled, schedule: rules } as any)
+                .eq("restaurant_id", "default");
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
+            setScheduleDirty(false);
+            toast({ title: "Horario guardado", description: "Los horarios de conmutación se han actualizado." });
+        },
+        onError: (error) => {
+            toast({ title: "Error", description: "No se pudo guardar el horario.", variant: "destructive" });
+            console.error(error);
+        },
+    });
+
     const handleModeChange = (checked: boolean) => {
         updateModeMutation.mutate(checked ? "bot" : "human");
+    };
+
+    const handleScheduleToggle = (checked: boolean) => {
+        setScheduleEnabled(checked);
+        updateScheduleMutation.mutate({ enabled: checked, rules: schedule });
+    };
+
+    const updateScheduleRule = (dayIndex: number, field: string, value: string) => {
+        setSchedule(prev => prev.map(rule =>
+            rule.day === dayIndex ? { ...rule, [field]: value } : rule
+        ));
+        setScheduleDirty(true);
+    };
+
+    const saveSchedule = () => {
+        updateScheduleMutation.mutate({ enabled: scheduleEnabled, rules: schedule });
     };
 
     const isLoading = isLoadingConfig || isLoadingCalls;
@@ -205,6 +267,86 @@ export default function AsistenteTelefonico() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Horario programado */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Calendar className="h-5 w-5" />
+                                    Horario Programado
+                                </CardTitle>
+                                <CardDescription>
+                                    Conmuta automáticamente entre bot y humano según el día y la hora.
+                                    {scheduleEnabled && " (Activo — el toggle manual se ignora)"}
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Switch
+                                    checked={scheduleEnabled}
+                                    onCheckedChange={handleScheduleToggle}
+                                />
+                                <Label className="text-sm">{scheduleEnabled ? "Activo" : "Inactivo"}</Label>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {DAY_NAMES.map((name, dayIndex) => {
+                                const rule = schedule.find((r: any) => r.day === dayIndex) || { day: dayIndex, mode: "bot" };
+                                return (
+                                    <div key={dayIndex} className={`grid grid-cols-[120px_1fr_1fr_1fr] gap-3 items-center p-2 rounded-md ${!scheduleEnabled ? "opacity-50" : ""} ${rule.mode === "bot" ? "bg-blue-50" : "bg-green-50"}`}>
+                                        <span className="font-medium text-sm">{name}</span>
+                                        <Select
+                                            value={rule.mode}
+                                            onValueChange={(v) => updateScheduleRule(dayIndex, "mode", v)}
+                                            disabled={!scheduleEnabled}
+                                        >
+                                            <SelectTrigger className="h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="human">👤 Humano</SelectItem>
+                                                <SelectItem value="bot">🤖 Bot IA</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        {rule.mode === "human" ? (
+                                            <>
+                                                <Input
+                                                    type="time"
+                                                    value={rule.start || "09:00"}
+                                                    onChange={(e) => updateScheduleRule(dayIndex, "start", e.target.value)}
+                                                    disabled={!scheduleEnabled}
+                                                    className="h-8"
+                                                />
+                                                <Input
+                                                    type="time"
+                                                    value={rule.end || "23:00"}
+                                                    onChange={(e) => updateScheduleRule(dayIndex, "end", e.target.value)}
+                                                    disabled={!scheduleEnabled}
+                                                    className="h-8"
+                                                />
+                                            </>
+                                        ) : (
+                                            <span className="col-span-2 text-xs text-muted-foreground italic pl-2">Bot IA todo el día</span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {scheduleDirty && (
+                            <Button
+                                className="mt-4 w-full"
+                                onClick={saveSchedule}
+                                disabled={updateScheduleMutation.isPending}
+                            >
+                                {updateScheduleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Guardar horarios
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card className="col-span-4">
                     <CardHeader>
