@@ -468,11 +468,27 @@ export default function AsistenteTelefonico() {
                                             </div>
                                             <div className="font-mono">{call.caller_number || "Oculto"}</div>
                                             <div>
-                                                {call.call_type === "bot" ? (
-                                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Bot className="w-3 h-3 mr-1" /> Bot</Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-slate-600"><User className="w-3 h-3 mr-1" /> Humano</Badge>
-                                                )}
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    {call.call_type === "bot" ? (
+                                                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Bot className="w-3 h-3 mr-1" /> Bot</Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-slate-600"><User className="w-3 h-3 mr-1" /> Humano</Badge>
+                                                    )}
+
+                                                    {call.tool_calls && call.tool_calls.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {call.tool_calls.some((t: any) => t.tool === 'create_reservation') && (
+                                                                <Badge variant="outline" className="text-[10px] px-1 h-4 bg-green-50 text-green-700 border-green-200">Reserva Nueva</Badge>
+                                                            )}
+                                                            {call.tool_calls.some((t: any) => t.tool === 'modify_reservation') && (
+                                                                <Badge variant="outline" className="text-[10px] px-1 h-4 bg-yellow-50 text-yellow-700 border-yellow-200">Modificación</Badge>
+                                                            )}
+                                                            {call.tool_calls.some((t: any) => t.tool === 'cancel_reservation') && (
+                                                                <Badge variant="outline" className="text-[10px] px-1 h-4 bg-red-50 text-red-700 border-red-200">Cancelación</Badge>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div>
                                                 {call.status === "completed" ? (
