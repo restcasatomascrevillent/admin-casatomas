@@ -1,0 +1,45 @@
+﻿* 21e1361 (HEAD -> main, origin/main, origin/HEAD) feat: migrate vapi dashboard and add tool calls tracking
+* 7d753dd feat: Add invoice management features including editing and table display, and review management with a dedicated page and Google review synchronization.
+* 2f5af33 feat: mejoras chat facturas - copiar, regenerar y sugerencias dinamicas; fix FK duplicada productos_factura; simplificar query facturas
+* d58e50b feat: setup metrics database and update environment configuration
+| *   dbeb3bb (origin/Reinicio) Generar reservas aleatorias
+| |\  
+| | * bb92fab A├▒adidas reservas aleatorias
+| |/  
+| *   edea061 Ajuste view m├│vil facturas
+| |\  
+| | * 1dedf7b Ajusta facturas m├│vil
+| | * 01a5467 Ajusta vista m├│vil facturas
+| |/  
+| *   054da96 Fix mobile Reserva view
+| |\  
+| | * 36ef2d3 Ajusta Reservas m├│vil
+| | * b9c0260 Optimized Reservas mobile view
+| | * f00f3d1 Mejor├│ vista Reservas en m├│vil
+| | * 05feb96 Fix Reservas mobile view
+| | * 4f9fd28 Ajusta Reservas m├│vil
+| | * 05edc35 Ajusted Reservas mobile view
+| | * 6948b71 Arregla vista Reservas m├│vil
+| |/  
+| *   c26e38f Actualiz├│ capacidades de espacios
+| |\  
+| | * 659d291 Ajust├® capacidades de espacios
+| |/  
+| *   68ba754 Cambi├│ webhook format-novedad
+| |\  
+| | * ef2985d Cambi├│ webhook format-novedad
+| |/  
+| *   cd4775f Actualiz├│ webhook traduct
+| |\  
+| | * 0679e48 Changes
+| |/  
+| * a63f11d Update webhook URL format-novedad
+|/| 
+| * fd3098c Update webhook URL target
+| * 7eb3a39 Changes
+| * f577423 Work in progress
+|/  
+* 6b3be6c (Reinicio) feat: Add a new invoice management module with chat, tables for invoices and delivery notes, upload functionality, and an advanced reservation list.
+* a581629 lcoal benito
+*   18ebeac Ajuste parsing webhook
+|\  

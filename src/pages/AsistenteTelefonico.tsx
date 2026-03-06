@@ -21,6 +21,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { VapiPromptEditor } from "@/components/VapiPromptEditor";
+import { VapiCallSimulator } from "@/components/VapiCallSimulator";
 
 // Fetchers
 async function getPhoneConfig() {
@@ -437,7 +439,12 @@ export default function AsistenteTelefonico() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-4">
+                <div className="grid gap-6 md:grid-cols-2">
+                    <VapiCallSimulator assistantId={config?.vapi_assistant_id} />
+                    <VapiPromptEditor config={config} />
+                </div>
+
+                <Card className="col-span-4 mt-6">
                     <CardHeader>
                         <CardTitle>Historial de Llamadas</CardTitle>
                         <CardDescription>
