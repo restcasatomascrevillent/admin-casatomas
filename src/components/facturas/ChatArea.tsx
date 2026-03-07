@@ -183,7 +183,7 @@ export function ChatArea({
     <div className="flex-1 flex flex-col min-h-0">
       <ScrollArea className="flex-1 px-4 py-4">
         <div className="space-y-5">
-          {isLoading ? (
+          {isLoading && mensajes.length === 0 ? (
             <div className="flex justify-center py-12">
               <TypingDots />
             </div>

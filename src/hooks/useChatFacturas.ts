@@ -157,16 +157,15 @@ export function useChatFacturas() {
 
     setIsSending(true);
 
-    // Guardar mensaje del usuario en Supabase
-    await guardarMensaje(conv.id, texto, "user");
+    // Guardar mensaje del usuario en Supabase y usar el ID real de la BD
+    const savedUserMsg = await guardarMensaje(conv.id, texto, "user");
 
-    // Añadir mensaje localmente de inmediato
     const msgUsuario: MensajeChat = {
-      id: crypto.randomUUID(),
+      id: savedUserMsg?.id ?? crypto.randomUUID(),
       contenido: texto,
       rol: "user",
       conversacion_id: conv.id,
-      created_at: new Date().toISOString(),
+      created_at: savedUserMsg?.created_at ?? new Date().toISOString(),
     };
     setMensajes((prev) => [...prev, msgUsuario]);
 
@@ -188,8 +187,8 @@ export function useChatFacturas() {
 
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
 
-      // Guardar respuesta del asistente en Supabase
-      await guardarMensaje(conv.id, respuesta, "assistant");
+      // Guardar respuesta del asistente en Supabase y usar el ID real
+      const savedAssistantMsg = await guardarMensaje(conv.id, respuesta, "assistant");
 
       // Actualizar updated_at de la conversación
       await supabase
@@ -197,13 +196,12 @@ export function useChatFacturas() {
         .update({ updated_at: new Date().toISOString() })
         .eq("id", conv.id);
 
-      // Añadir respuesta localmente
       const msgAsistente: MensajeChat = {
-        id: crypto.randomUUID(),
+        id: savedAssistantMsg?.id ?? crypto.randomUUID(),
         contenido: respuesta,
         rol: "assistant",
         conversacion_id: conv.id,
-        created_at: new Date().toISOString(),
+        created_at: savedAssistantMsg?.created_at ?? new Date().toISOString(),
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
@@ -230,8 +228,18 @@ export function useChatFacturas() {
   // ─── Eliminar conversación ────────────────────────────────────────────────────
   const eliminarConversacion = useCallback(async (convId: string) => {
     // Borrar mensajes de la conversación primero (FK)
-    await supabase.from("chat_facturas_mensajes").delete().eq("conversacion_id", convId);
-    await supabase.from("chat_facturas_conversaciones").delete().eq("id", convId);
+    const { error: msgErr } = await supabase.from("chat_facturas_mensajes").delete().eq("conversacion_id", convId);
+    if (msgErr) {
+      console.error("Error borrando mensajes:", msgErr);
+      toast({ title: "Error", description: "No se pudieron borrar los mensajes", variant: "destructive" });
+      return;
+    }
+    const { error: convErr } = await supabase.from("chat_facturas_conversaciones").delete().eq("id", convId);
+    if (convErr) {
+      console.error("Error borrando conversación:", convErr);
+      toast({ title: "Error", description: "No se pudo borrar la conversación", variant: "destructive" });
+      return;
+    }
 
     if (conversacionActiva?.id === convId) {
       setConversacionActiva(null);
@@ -239,7 +247,7 @@ export function useChatFacturas() {
     }
 
     await cargarConversaciones();
-  }, [conversacionActiva, cargarConversaciones]);
+  }, [conversacionActiva, cargarConversaciones, toast]);
 
   // ─── Regenerar última respuesta del asistente ─────────────────────────────
   const regenerarRespuesta = useCallback(async () => {
@@ -269,15 +277,15 @@ export function useChatFacturas() {
       });
       if (error) throw new Error(error.message);
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
-      await guardarMensaje(conversacionActiva.id, respuesta, "assistant");
+      const savedMsg = await guardarMensaje(conversacionActiva.id, respuesta, "assistant");
       setMensajes((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: savedMsg?.id ?? crypto.randomUUID(),
           contenido: respuesta,
           rol: "assistant",
           conversacion_id: conversacionActiva.id,
-          created_at: new Date().toISOString(),
+          created_at: savedMsg?.created_at ?? new Date().toISOString(),
         },
       ]);
     } catch {

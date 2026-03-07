@@ -44,8 +44,8 @@ const conceptos = [
 export function GestorGasto() {
   const totalMensual = conceptos.reduce((sum, c) => sum + c.precio, 0);
   const proximoPago = new Date();
-  proximoPago.setMonth(proximoPago.getMonth() + 1);
   proximoPago.setDate(1);
+  proximoPago.setMonth(proximoPago.getMonth() + 1);
 
   return (
     <Card className="border-border">

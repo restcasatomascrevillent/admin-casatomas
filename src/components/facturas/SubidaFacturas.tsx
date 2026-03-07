@@ -121,12 +121,25 @@ export function SubidaFacturas() {
     setProgreso({ total: archivos.length, actual: 0, nombreActual: 'Preparando archivos…' });
 
     // Convertir todos los archivos a base64 en paralelo
-    const archivosConBase64 = await Promise.all(
-      archivos.map(async (archivo) => ({
-        archivo,
-        base64: await convertirABase64(archivo.file),
-      }))
-    );
+    let archivosConBase64: { archivo: ArchivoFactura; base64: string }[];
+    try {
+      archivosConBase64 = await Promise.all(
+        archivos.map(async (archivo) => ({
+          archivo,
+          base64: await convertirABase64(archivo.file),
+        }))
+      );
+    } catch (err) {
+      console.error("Error convirtiendo archivos a base64:", err);
+      toast({
+        title: "Error de lectura",
+        description: "No se pudieron leer algunos archivos. Inténtelo de nuevo.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      setProgreso({ total: 0, actual: 0, nombreActual: '' });
+      return;
+    }
 
     let completados = 0;
 

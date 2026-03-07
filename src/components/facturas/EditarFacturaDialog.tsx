@@ -24,7 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Factura, useUpdateFactura } from "@/hooks/useFacturas";
 
 const formSchema = z.object({
-    proveedor: z.string().min(1, "El proveedor es obligatorio").nullable(),
+    proveedor: z.string().nullable(),
     cif: z.string().nullable(),
     numero_documento: z.string().nullable(),
     fecha: z.string().min(1, "La fecha es obligatoria"),
@@ -79,20 +79,23 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         if (!factura) return;
 
-        await updateFacturaMutation.mutateAsync({
-            id: factura.id,
-            proveedor: values.proveedor || null,
-            cif: values.cif || null,
-            numero_documento: values.numero_documento || null,
-            fecha: values.fecha,
-            subtotal: values.subtotal,
-            iva: values.iva,
-            total: values.total,
-            observaciones: values.observaciones || null,
-            verificada: values.verificada,
-        });
-
-        onOpenChange(false);
+        try {
+            await updateFacturaMutation.mutateAsync({
+                id: factura.id,
+                proveedor: values.proveedor || null,
+                cif: values.cif || null,
+                numero_documento: values.numero_documento || null,
+                fecha: values.fecha,
+                subtotal: values.subtotal,
+                iva: values.iva,
+                total: values.total,
+                observaciones: values.observaciones || null,
+                verificada: values.verificada,
+            });
+            onOpenChange(false);
+        } catch (err) {
+            console.error("Error actualizando factura:", err);
+        }
     };
 
     return (

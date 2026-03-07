@@ -54,12 +54,13 @@ serve(async (req) => {
     let webhookResponse = null;
     let tipoDocumento = null;
 
+    // Leer el body como texto primero (solo se puede consumir una vez)
+    const responseText = await response.text();
     try {
-      webhookResponse = await response.json();
-      // Extraer el tipo de documento de la respuesta
+      webhookResponse = JSON.parse(responseText);
       tipoDocumento = webhookResponse?.tipo || null;
     } catch {
-      webhookResponse = await response.text();
+      webhookResponse = responseText;
     }
 
     return new Response(

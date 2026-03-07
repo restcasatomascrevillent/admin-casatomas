@@ -41,6 +41,7 @@ const formatDateTime = (dateString: string | null): string => {
 };
 
 const truncateText = (text: string | null, maxLength: number = 40): string => {
+  if (!text) return "-";
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
 };
@@ -110,20 +111,24 @@ const FilaProducto = ({ p, isMobile, todasFacturas }: { p: ProductoFactura, isMo
   const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
   const [unidad, setUnidad] = useState(p.unidad || "");
   const [precioUnitario, setPrecioUnitario] = useState(String(p.precio_unitario ?? ""));
-  const [total, setTotal] = useState(String(p.precio));
+  const [total, setTotal] = useState(String(p.precio ?? ""));
 
   const updateMutation = useUpdateProductoFactura();
 
   const handleSave = async () => {
-    await updateMutation.mutateAsync({
-      id: p.id,
-      producto_nombre: nombre,
-      cantidad: cantidad ? Number(cantidad) : undefined,
-      unidad: unidad || null,
-      precio_unitario: Number(precioUnitario),
-      precio: Number(total),
-    });
-    setIsEditing(false);
+    try {
+      await updateMutation.mutateAsync({
+        id: p.id,
+        producto_nombre: nombre,
+        cantidad: cantidad !== "" ? Number(cantidad) : undefined,
+        unidad: unidad || null,
+        precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
+        precio: total !== "" ? Number(total) : undefined,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Error guardando producto:", err);
+    }
   };
 
   const pastPrices = todasFacturas
@@ -278,7 +283,11 @@ const FilaFacturaMobile = ({
 
   const handleToggleVerified = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+    try {
+      await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+    } catch (err) {
+      console.error("Error toggling verificada:", err);
+    }
   };
 
   return (
@@ -402,7 +411,11 @@ const FilaFacturaDesktop = ({
 
   const handleToggleVerified = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+    try {
+      await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
+    } catch (err) {
+      console.error("Error toggling verificada:", err);
+    }
   };
 
   return (
