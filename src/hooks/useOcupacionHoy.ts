@@ -44,7 +44,7 @@ export function useResumenOcupacionHoy() {
         .select("capacidad_maxima, activa");
 
       if (error) throw error;
-      return (data ?? []) as EspacioCapacidad[];
+      return (data ?? []) as unknown as EspacioCapacidad[];
     },
     refetchInterval: 60000,
   });
