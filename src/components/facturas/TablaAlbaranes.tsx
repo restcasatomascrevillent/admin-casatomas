@@ -304,7 +304,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran
               <div className="mt-4">
                 <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground"><Package className="h-3.5 w-3.5" /> Desglose ({albaran.productos.length})</p>
                 {albaran.productos.map((p) => (
-                  <FilaProducto key={p.id} p={p} isMobile todosAlbaranes={todasAlbaranes} />
+                  <FilaProducto key={p.id} p={p} isMobile todasAlbaranes={todasAlbaranes} />
                 ))}
               </div>
             )}

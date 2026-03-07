@@ -65,7 +65,7 @@ export function useUserRolePresets() {
       const mappedPresets: UserRolePreset[] = (data ?? []).map((row) => ({
         id: row.id,
         name: row.name,
-        base_role: row.base_role,
+        base_role: row.base_role as PresetBaseRole,
         permissions: parsePermissions(row.permissions),
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -102,7 +102,7 @@ export function useUserRolePresets() {
         .insert({
           name: normalizedName,
           base_role: baseRole,
-          permissions: normalizedPermissions,
+          permissions: normalizedPermissions as unknown as import('@/integrations/supabase/types').Json,
         })
         .select("id, name, base_role, permissions, created_at, updated_at")
         .single();
@@ -112,7 +112,7 @@ export function useUserRolePresets() {
       const createdPreset: UserRolePreset = {
         id: data.id,
         name: data.name,
-        base_role: data.base_role,
+        base_role: data.base_role as PresetBaseRole,
         permissions: parsePermissions(data.permissions),
         created_at: data.created_at,
         updated_at: data.updated_at,
@@ -163,7 +163,7 @@ export function useUserRolePresets() {
         .update({
           name: normalizedName,
           base_role: baseRole,
-          permissions: normalizedPermissions,
+          permissions: normalizedPermissions as unknown as import('@/integrations/supabase/types').Json,
         })
         .eq("id", presetId)
         .select("id, name, base_role, permissions, created_at, updated_at")
@@ -174,7 +174,7 @@ export function useUserRolePresets() {
       const updatedPreset: UserRolePreset = {
         id: data.id,
         name: data.name,
-        base_role: data.base_role,
+        base_role: data.base_role as PresetBaseRole,
         permissions: parsePermissions(data.permissions),
         created_at: data.created_at,
         updated_at: data.updated_at,
