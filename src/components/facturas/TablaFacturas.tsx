@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { useFacturas, Factura, useUpdateProductoFactura, ProductoFactura, useUpdateFactura } from "@/hooks/useFacturas";
+import { useFacturas, Factura, useUpdateProductoFactura, ProductoFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, CheckCircle2, Clock, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, Check } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -46,20 +46,7 @@ const truncateText = (text: string | null, maxLength: number = 40): string => {
   return text.substring(0, maxLength) + "...";
 };
 
-const getVerificationBadge = (factura: Factura, todasFacturas: Factura[]) => {
-  if (factura.verificada) {
-    return <Badge variant="default" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 text-[10px] px-1.5 py-0 gap-1 border-emerald-200 shadow-none font-medium h-5"><CheckCircle2 className="h-3 w-3" /> Verificada</Badge>;
-  }
-
-  const sub = factura.subtotal || 0;
-  const iva = factura.iva || 0;
-  const tot = factura.total || 0;
-  const mathError = Math.abs((sub + iva) - tot) > 0.05;
-
-  if (mathError) {
-    return <Badge variant="destructive" className="bg-red-500/10 text-red-600 hover:bg-red-500/20 text-[10px] px-1.5 py-0 gap-1 border-red-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Error Suma</Badge>;
-  }
-
+const getAnomaliaBadge = (factura: Factura, todasFacturas: Factura[]) => {
   const hasAnomalousProduct = factura.productos.some(p => {
     if (!p.precio_unitario) return false;
     const pastPrices = todasFacturas
@@ -75,7 +62,7 @@ const getVerificationBadge = (factura: Factura, todasFacturas: Factura[]) => {
     return <Badge variant="destructive" className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 text-[10px] px-1.5 py-0 gap-1 border-orange-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Anomalía Precio</Badge>;
   }
 
-  return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 text-[10px] px-1.5 py-0 gap-1 border-amber-200 shadow-none font-medium h-5"><Clock className="h-3 w-3" /> Pendiente</Badge>;
+  return null;
 };
 
 type ColumnaFactura = {
@@ -85,7 +72,6 @@ type ColumnaFactura = {
 
 const COLUMNAS_FACTURAS: ColumnaFactura[] = [
   { key: "numero", label: "Número" },
-  { key: "estado", label: "Estado" },
   { key: "proveedor", label: "Proveedor" },
   { key: "cif", label: "CIF" },
   { key: "fecha", label: "Fecha" },
@@ -100,12 +86,12 @@ const COLUMNAS_FACTURAS: ColumnaFactura[] = [
 ];
 
 const DEFAULTS_FACTURAS: Record<string, boolean> = {
-  numero: true, estado: true, proveedor: true, cif: false, fecha: true,
+  numero: true, proveedor: true, cif: false, fecha: true,
   subtotal: false, iva: false, total: true, observaciones: false,
   items: true, doc: true, procesado_en: false, creado: false,
 };
 
-const FilaProducto = ({ p, isMobile, todasFacturas }: { p: ProductoFactura, isMobile?: boolean, todasFacturas: Factura[] }) => {
+export const FilaProducto = ({ p, isMobile, todasFacturas }: { p: ProductoFactura, isMobile?: boolean, todasFacturas: Factura[] }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nombre, setNombre] = useState(p.producto_nombre);
   const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
@@ -279,16 +265,6 @@ const FilaFacturaMobile = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = factura.productos.length > 0;
-  const updateFactura = useUpdateFactura();
-
-  const handleToggleVerified = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
-    } catch (err) {
-      console.error("Error toggling verificada:", err);
-    }
-  };
 
   return (
     <Card className="mb-3 border-border/50 shadow-sm overflow-hidden">
@@ -306,7 +282,7 @@ const FilaFacturaMobile = ({
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
-                {getVerificationBadge(factura, todasFacturas)}
+                {getAnomaliaBadge(factura, todasFacturas)}
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 {factura.proveedor || "Sin proveedor"}
@@ -329,15 +305,6 @@ const FilaFacturaMobile = ({
             <ExternalLink className="h-3 w-3" /> Escaneo
           </a>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 w-full min-w-0 justify-center gap-1 border px-2 text-[11px] font-medium transition-colors ${factura.verificada ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 hover:text-emerald-700 border-emerald-200' : 'border-border/40 text-foreground hover:bg-muted/50'}`}
-          onClick={handleToggleVerified}
-          disabled={updateFactura.isPending}
-        >
-          <CheckCircle2 className="h-3 w-3" /> {factura.verificada ? "Verificada" : "Verificar"}
-        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -407,16 +374,6 @@ const FilaFacturaDesktop = ({
   // +1 para acciones IA
   const colSpan = 2 + Object.values(visibles).filter(Boolean).length;
 
-  const updateFactura = useUpdateFactura();
-
-  const handleToggleVerified = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await updateFactura.mutateAsync({ id: factura.id, verificada: !factura.verificada });
-    } catch (err) {
-      console.error("Error toggling verificada:", err);
-    }
-  };
 
   return (
     <>
@@ -424,8 +381,7 @@ const FilaFacturaDesktop = ({
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento}</TableCell>}
-        {visibles.estado && <TableCell>{getVerificationBadge(factura, todasFacturas)}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento} {getAnomaliaBadge(factura, todasFacturas)}</TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{factura.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{factura.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground">{formatDate(factura.fecha)}</TableCell>}
@@ -469,16 +425,6 @@ const FilaFacturaDesktop = ({
         {/* Acciones Rápidas (IA) */}
         <TableCell className="text-right pr-4">
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className={`h-8 text-xs font-medium transition-all shadow-sm ${factura.verificada ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-200' : 'border-border/40 hover:bg-muted/50'}`}
-              onClick={handleToggleVerified}
-              title={factura.verificada ? "Marcar como pendiente" : "Marcar como verificada"}
-              disabled={updateFactura.isPending}
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -600,7 +546,6 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
               <TableRow className="border-b-border/60 hover:bg-transparent">
                 <TableHead className="w-[40px] pl-4"></TableHead>
                 {columnasVisibles.numero && <TableHead className="font-semibold px-2">Nº Factura</TableHead>}
-                {columnasVisibles.estado && <TableHead className="font-semibold">Estado</TableHead>}
                 {columnasVisibles.proveedor && <TableHead className="font-semibold">Proveedor</TableHead>}
                 {columnasVisibles.cif && <TableHead className="font-semibold">CIF</TableHead>}
                 {columnasVisibles.fecha && <TableHead className="font-semibold">Fecha</TableHead>}

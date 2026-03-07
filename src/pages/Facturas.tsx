@@ -130,7 +130,7 @@ const Facturas = () => {
 
             {/* PESTAÑA 1: DOCUMENTOS */}
             <TabsContent value="documentos" className="h-full m-0 outline-none flex flex-col data-[state=inactive]:hidden">
-              <div className="flex-1 bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden flex flex-col">
+              <div className="flex-1 bg-card rounded-xl border border-border/50 shadow-sm flex flex-col min-h-0 overflow-hidden">
                 <Tabs defaultValue="facturas" className="w-full flex-1 flex flex-col">
                   <div className="shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-0 bg-muted/5 border-b border-border/30">
                     <TabsList className="flex h-9 sm:h-10 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
@@ -151,7 +151,7 @@ const Facturas = () => {
                     </TabsList>
                   </div>
 
-                  <div className="flex-1 overflow-hidden p-2 sm:p-4 md:p-6 bg-background flex flex-col min-h-0">
+                  <div className="flex-1 p-2 sm:p-4 md:p-6 bg-background flex flex-col min-h-0 overflow-hidden">
                     <TabsContent value="facturas" className="m-0 h-full flex-col min-h-0 focus-visible:outline-none data-[state=inactive]:hidden data-[state=active]:flex">
                       <TablaFacturas onPreguntarIA={(doc) => handlePreguntarIA(doc, 'factura')} />
                     </TabsContent>

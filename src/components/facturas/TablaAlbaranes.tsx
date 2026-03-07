@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { useAlbaranes, Factura } from "@/hooks/useFacturas";
+import { useAlbaranes, Factura, useUpdateProductoFactura, ProductoFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, Check, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,11 +19,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
-};
-
-const formatCantidad = (cantidad: number | undefined): string => {
-  if (cantidad === undefined || cantidad === null) return "-";
-  return new Intl.NumberFormat("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 3 }).format(cantidad);
 };
 
 const formatDate = (dateString: string | null): string => {
@@ -48,6 +43,152 @@ const truncateText = (text: string | null, maxLength: number = 40): string => {
   if (!text) return "-";
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + "...";
+};
+
+const getAnomaliaBadge = (albaran: Factura, todasAlbaranes: Factura[]) => {
+  const hasAnomalousProduct = albaran.productos.some(p => {
+    if (!p.precio_unitario) return false;
+    const pastPrices = todasAlbaranes
+      .flatMap(f => f.productos)
+      .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
+      .map(past => past.precio_unitario as number);
+    if (pastPrices.length === 0) return false;
+    const avg = pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length;
+    return p.precio_unitario > avg * 2;
+  });
+
+  if (hasAnomalousProduct) {
+    return <Badge variant="destructive" className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 text-[10px] px-1.5 py-0 gap-1 border-orange-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Anomalía Precio</Badge>;
+  }
+
+  return null;
+};
+
+// Reutilizamos FilaProducto de Facturas
+const FilaProducto = ({ p, isMobile, todasAlbaranes }: { p: ProductoFactura, isMobile?: boolean, todasAlbaranes: Factura[] }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [nombre, setNombre] = useState(p.producto_nombre);
+  const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
+  const [unidad, setUnidad] = useState(p.unidad || "");
+  const [precioUnitario, setPrecioUnitario] = useState(String(p.precio_unitario ?? ""));
+  const [total, setTotal] = useState(String(p.precio ?? ""));
+
+  const updateMutation = useUpdateProductoFactura();
+
+  const handleSave = async () => {
+    try {
+      await updateMutation.mutateAsync({
+        id: p.id,
+        producto_nombre: nombre,
+        cantidad: cantidad !== "" ? Number(cantidad) : undefined,
+        unidad: unidad || null,
+        precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
+        precio: total !== "" ? Number(total) : undefined,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Error guardando producto:", err);
+    }
+  };
+
+  const pastPrices = todasAlbaranes
+    .flatMap(f => f.productos)
+    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
+    .map(past => past.precio_unitario as number);
+
+  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
+  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
+  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
+
+  if (isMobile) {
+    if (isEditing) {
+      return (
+        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
+          <Input className="h-7 text-xs" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
+          <div className="flex gap-2">
+            <Input className="h-7 text-xs w-full" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
+            <Input className="h-7 text-xs w-full" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="w-12 text-muted-foreground">P. Unit:</span>
+            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+          </div>
+          <div className="flex gap-2 items-center">
+            <span className="w-12 font-medium">Total:</span>
+            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+          </div>
+          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium">⚠️ Anomalía Precio</p>}
+          <div className="flex gap-2 mt-1 justify-end">
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditing(false)}>Cancelar</Button>
+            <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod transition-colors">
+        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover/prod:opacity-100 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(true)}>
+          <Pencil className="h-3 w-3 text-muted-foreground" />
+        </Button>
+        <span className="font-medium text-foreground mb-1 pr-6">{p.producto_nombre}</span>
+        <div className="flex justify-between text-muted-foreground items-center">
+          <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
+          <div className="flex items-center gap-1.5">
+            {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+            <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop View
+  if (isEditing) {
+    return (
+      <TableRow className="bg-muted/30">
+        <TableCell className="py-2">
+          <Input className="h-7 text-xs max-w-[200px]" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium mt-1">⚠️ Precio anómalo</p>}
+        </TableCell>
+        <TableCell className="py-2 text-right opacity-100 flex justify-end gap-1">
+          <Input className="h-7 text-xs w-16 text-right" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
+          <Input className="h-7 text-xs w-16" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
+        </TableCell>
+        <TableCell className="py-2 text-right">
+          <Input className="h-7 text-xs text-right w-20 ml-auto" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+        </TableCell>
+        <TableCell className="py-2 text-right flex justify-end gap-1 items-center">
+          <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+          <Button size="icon" className="h-7 w-7 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending}><Check className="h-3.5 w-3.5" /></Button>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow className="hover:bg-muted/20 group/prod">
+      <TableCell className="py-2.5 font-medium">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <span className="truncate">{p.producto_nombre}</span>
+        </div>
+      </TableCell>
+      <TableCell className="py-2.5 text-right text-muted-foreground">
+        <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
+        <span className="text-xs">{p.unidad || ""}</span>
+      </TableCell>
+      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">
+        <div className="flex items-center justify-end gap-1.5">
+          {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+          <span>{formatCurrency(p.precio_unitario ?? null)}</span>
+        </div>
+      </TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
+    </TableRow>
+  );
 };
 
 type ColumnaAlbaran = { key: string; label: string };
@@ -100,7 +241,7 @@ const SelectorColumnas = ({
   </Popover>
 );
 
-const FilaAlbaranMobile = ({ albaran, onPreguntarIA }: { albaran: Factura; onPreguntarIA?: (doc: Factura) => void }) => {
+const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran: Factura; onPreguntarIA?: (doc: Factura) => void; todasAlbaranes: Factura[] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = albaran.productos.length > 0;
 
@@ -115,7 +256,10 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA }: { albaran: Factura; onPre
               <FileText className="h-4 w-4 text-muted-foreground" />
             )}
             <div>
-              <CardTitle className="text-sm font-semibold text-foreground">{albaran.numero_documento}</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold text-foreground">{albaran.numero_documento}</CardTitle>
+                {getAnomaliaBadge(albaran, todasAlbaranes)}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center">{albaran.proveedor || "Sin proveedor"}</p>
             </div>
           </div>
@@ -159,17 +303,9 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA }: { albaran: Factura; onPre
             {tieneProductos && (
               <div className="mt-4">
                 <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground"><Package className="h-3.5 w-3.5" /> Desglose ({albaran.productos.length})</p>
-                <div className="space-y-1.5">
-                  {albaran.productos.map((p) => (
-                    <div key={p.id} className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm">
-                      <span className="font-medium text-foreground mb-1">{p.producto_nombre}</span>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>{formatCantidad(p.cantidad)} {p.unidad || ""} {p.precio_unitario ? `× ${formatCurrency(p.precio_unitario)}` : ''}</span>
-                        <span className="font-semibold text-foreground">{p.precio ? formatCurrency(p.precio) : '-'}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {albaran.productos.map((p) => (
+                  <FilaProducto key={p.id} p={p} isMobile todosAlbaranes={todasAlbaranes} />
+                ))}
               </div>
             )}
           </div>
@@ -179,7 +315,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA }: { albaran: Factura; onPre
   );
 };
 
-const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA }: { albaran: Factura; visibles: Record<string, boolean>; onPreguntarIA?: (doc: Factura) => void; }) => {
+const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, todasAlbaranes }: { albaran: Factura; visibles: Record<string, boolean>; onPreguntarIA?: (doc: Factura) => void; todasAlbaranes: Factura[] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = albaran.productos.length > 0;
   const colSpan = 2 + Object.values(visibles).filter(Boolean).length;
@@ -190,7 +326,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA }: { albaran: Fac
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, todasAlbaranes)}</TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{albaran.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{albaran.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground text-center">{formatDate(albaran.fecha)}</TableCell>}
@@ -265,15 +401,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA }: { albaran: Fac
                   </TableHeader>
                   <TableBody>
                     {albaran.productos.map((p) => (
-                      <TableRow key={p.id} className="hover:bg-muted/20">
-                        <TableCell className="py-2.5 font-medium">{p.producto_nombre}</TableCell>
-                        <TableCell className="py-2.5 text-right text-muted-foreground">
-                          <span className="font-semibold text-foreground mr-1">{formatCantidad(p.cantidad)}</span>
-                          <span className="text-xs">{p.unidad || "-"}</span>
-                        </TableCell>
-                        <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">{formatCurrency(p.precio_unitario ?? null)}</TableCell>
-                        <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
-                      </TableRow>
+                      <FilaProducto key={p.id} p={p} todasAlbaranes={todasAlbaranes} />
                     ))}
                   </TableBody>
                 </Table>
@@ -339,7 +467,7 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
       ) : albaranesFiltrados.length === 0 ? (
         <Card className="border-border/50 bg-muted/10 shadow-none"><CardContent className="pt-8 pb-8 text-center"><FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" /><p className="text-muted-foreground font-medium">{busqueda ? "No se encontraron albaranes" : "No hay albaranes registrados"}</p></CardContent></Card>
       ) : isMobile ? (
-        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{albaranesFiltrados.map((a) => <FilaAlbaranMobile key={a.id} albaran={a} onPreguntarIA={onPreguntarIA} />)}</div>
+        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{albaranesFiltrados.map((a) => <FilaAlbaranMobile key={a.id} albaran={a} onPreguntarIA={onPreguntarIA} todasAlbaranes={albaranes || []} />)}</div>
       ) : (
         <div className="rounded-xl border border-border/60 bg-background shadow-sm overflow-auto custom-scrollbar flex-1 min-h-0 relative">
           <Table className="min-w-[1080px] lg:min-w-[1260px]">
@@ -364,7 +492,7 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
               </TableRow>
             </TableHeader>
             <TableBody>
-              {albaranesFiltrados.map((a) => <FilaAlbaranDesktop key={a.id} albaran={a} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} />)}
+              {albaranesFiltrados.map((a) => <FilaAlbaranDesktop key={a.id} albaran={a} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} todasAlbaranes={albaranes || []} />)}
             </TableBody>
           </Table>
         </div>
