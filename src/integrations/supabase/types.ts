@@ -463,6 +463,7 @@ export type Database = {
           started_at: string | null
           status: string | null
           summary: string | null
+          tool_calls: Json | null
           vapi_call_id: string | null
         }
         Insert: {
@@ -476,6 +477,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           summary?: string | null
+          tool_calls?: Json | null
           vapi_call_id?: string | null
         }
         Update: {
@@ -489,6 +491,7 @@ export type Database = {
           started_at?: string | null
           status?: string | null
           summary?: string | null
+          tool_calls?: Json | null
           vapi_call_id?: string | null
         }
         Relationships: []
@@ -1196,6 +1199,7 @@ export type Database = {
           tipo: string
           total: number | null
           updated_at: string | null
+          verificada: boolean | null
         }
         Insert: {
           cif?: string | null
@@ -1216,6 +1220,7 @@ export type Database = {
           tipo: string
           total?: number | null
           updated_at?: string | null
+          verificada?: boolean | null
         }
         Update: {
           cif?: string | null
@@ -1236,6 +1241,7 @@ export type Database = {
           tipo?: string
           total?: number | null
           updated_at?: string | null
+          verificada?: boolean | null
         }
         Relationships: []
       }
@@ -1583,6 +1589,24 @@ export type Database = {
             referencedColumns: ["session_id"]
           },
         ]
+      }
+      menus_diarios: {
+        Row: {
+          fecha: string
+          id: string
+          menu: Json
+        }
+        Insert: {
+          fecha: string
+          id?: string
+          menu: Json
+        }
+        Update: {
+          fecha?: string
+          id?: string
+          menu?: Json
+        }
+        Relationships: []
       }
       mesas: {
         Row: {
@@ -2101,12 +2125,13 @@ export type Database = {
           phone_number: string | null
           restaurant_id: string
           restaurant_name: string
+          schedule: Json | null
+          schedule_enabled: boolean | null
           updated_at: string | null
           vapi_assistant_id: string | null
           vapi_phone_number_id: string | null
           voice_id: string | null
-          schedule_enabled: boolean | null
-          schedule: { day: number; start?: string; end?: string; mode: string }[] | null
+          webhook_url: string | null
         }
         Insert: {
           address?: string | null
@@ -2120,12 +2145,13 @@ export type Database = {
           phone_number?: string | null
           restaurant_id: string
           restaurant_name?: string
+          schedule?: Json | null
+          schedule_enabled?: boolean | null
           updated_at?: string | null
           vapi_assistant_id?: string | null
           vapi_phone_number_id?: string | null
           voice_id?: string | null
-          schedule_enabled?: boolean | null
-          schedule?: { day: number; start?: string; end?: string; mode: string }[] | null
+          webhook_url?: string | null
         }
         Update: {
           address?: string | null
@@ -2139,12 +2165,13 @@ export type Database = {
           phone_number?: string | null
           restaurant_id?: string
           restaurant_name?: string
+          schedule?: Json | null
+          schedule_enabled?: boolean | null
           updated_at?: string | null
           vapi_assistant_id?: string | null
           vapi_phone_number_id?: string | null
           voice_id?: string | null
-          schedule_enabled?: boolean | null
-          schedule?: { day: number; start?: string; end?: string; mode: string }[] | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
@@ -2758,6 +2785,24 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      tapas: {
+        Row: {
+          fecha: string
+          id: string
+          tapas: Json
+        }
+        Insert: {
+          fecha: string
+          id?: string
+          tapas: Json
+        }
+        Update: {
+          fecha?: string
+          id?: string
+          tapas?: Json
         }
         Relationships: []
       }
@@ -3420,6 +3465,10 @@ export type Database = {
       }
     }
     Functions: {
+      append_tool_call_log: {
+        Args: { p_call_id: string; p_new_tools: Json }
+        Returns: undefined
+      }
       buscar_contexto_chatbot: {
         Args: { embedding_query: string }
         Returns: Json
