@@ -8,6 +8,7 @@ export interface Vino {
   categoria: string | null;
   precio_eur: number | null;
   descripcion: string | null;
+  ingredientes: string | null;
   denominacion_origen: string | null;
   ubicacion_pais: string | null;
   ubicacion_region: string | null;
@@ -16,6 +17,7 @@ export interface Vino {
   alergenos_notas: string | null;
   orden: string | null;
   activado: boolean | null;
+  expanded: boolean | null;
   imagen_url: string | null;
   touza: boolean | null;
   restaurante: boolean | null;
@@ -29,6 +31,7 @@ export interface NuevoVino {
   categoria: string;
   precio_eur: number;
   descripcion?: string;
+  ingredientes?: string;
   denominacion_origen?: string;
   ubicacion_pais?: string;
   ubicacion_region?: string;
@@ -77,6 +80,7 @@ export function useVinos() {
           tipo: 'vino',
           nombre: nuevoVino.nombre,
           descripcion: nuevoVino.descripcion || '',
+          ingredientes: nuevoVino.ingredientes || '',
           categoria: nuevoVino.categoria,
           ubicacion_pais: nuevoVino.ubicacion_pais || '',
           ubicacion_region: nuevoVino.ubicacion_region || '',
@@ -204,6 +208,24 @@ export function useVinos() {
     },
   });
 
+  const toggleExpanded = useMutation({
+    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
+      const { error } = await supabase
+        .from("Vinos")
+        .update({ expanded })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vinos"] });
+    },
+    onError: (error) => {
+      toast.error("Error al cambiar el estado de expandido");
+      console.error(error);
+    },
+  });
+
   const toggleRestaurante = useMutation({
     mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
       const { error } = await supabase
@@ -266,6 +288,7 @@ export function useVinos() {
     crearVino,
     actualizarVino,
     eliminarVino,
+    toggleExpanded,
     toggleRestaurante,
     toggleTouza,
   };

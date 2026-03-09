@@ -58,6 +58,7 @@ const formSchema = z.object({
   categoria: z.string().min(1, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   descripcion: z.string().optional(),
+  ingredientes: z.string().optional(),
   unidad: z.string().optional(),
   alergenos_notas: z.string().optional(),
 });
@@ -90,6 +91,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       categoria: categoriaInicial || "",
       precio_eur: 0,
       descripcion: "",
+      ingredientes: "",
       unidad: "",
       alergenos_notas: "",
     },
@@ -152,6 +154,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         body: {
           nombre: values.nombre,
           descripcion: values.descripcion || '',
+          ingredientes: values.ingredientes || '',
           categoria: values.categoria || '',
           alergenos: todosAlergenos,
           tipo: 'plato',
@@ -183,6 +186,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion,
+        ingredientes: values.ingredientes,
         unidad: values.unidad,
         alergenos_notas: values.alergenos_notas,
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
@@ -340,6 +344,25 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                     <Textarea
                       placeholder="Descripción del plato"
                       className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="ingredientes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ingredientes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ingredientes del plato"
+                      className="resize-none"
+                      rows={2}
                       {...field}
                     />
                   </FormControl>

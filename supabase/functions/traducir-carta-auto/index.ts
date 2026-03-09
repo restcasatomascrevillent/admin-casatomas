@@ -17,7 +17,7 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Received payload:", JSON.stringify(payload));
 
-    const { tipo, nombre, descripcion, categoria, alergenos, tamano, ubicacion_pais, ubicacion_region, alergenos_notas, precio, unidad } = payload;
+    const { tipo, nombre, descripcion, ingredientes, categoria, alergenos, tamano, ubicacion_pais, ubicacion_region, alergenos_notas, precio, unidad } = payload;
 
     if (!nombre) {
       return new Response(
@@ -30,6 +30,7 @@ serve(async (req) => {
     let webhookPayload: Record<string, unknown> = {
       nombre,
       descripcion: descripcion || "",
+      ingredientes: ingredientes || "",
       categoria: categoria || "",
       tipo,
     };

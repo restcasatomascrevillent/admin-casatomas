@@ -18,6 +18,7 @@ serve(async (req) => {
     const { 
       nombre, 
       descripcion, 
+      ingredientes,
       categoria, 
       tipo,
       // Platos
@@ -43,6 +44,7 @@ serve(async (req) => {
     const webhookPayload: Record<string, unknown> = {
       nombre: nombre || '',
       descripcion: descripcion || '',
+      ingredientes: ingredientes || '',
       categoria: categoria || '',
       tipo: tipo || 'plato',
     };

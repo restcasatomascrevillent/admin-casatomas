@@ -5,6 +5,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ??
+  "miguelsantiagores@gmail.com,info@casatomas.es,admin@admin.com")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isSuperAdminEmail = (email?: string | null) =>
+  !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+
 interface DeleteUserRequest {
   userId: string;
 }
@@ -47,11 +56,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
+
     const { data: isAdminResult, error: adminCheckError } = await supabaseAdmin.rpc("is_admin", {
       _user_id: currentUser.id,
     });
 
-    if (adminCheckError || !isAdminResult) {
+    if (adminCheckError || (!isAdminResult && !currentUserIsSuperAdmin)) {
       return new Response(JSON.stringify({ error: "Solo administradores pueden eliminar usuarios" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

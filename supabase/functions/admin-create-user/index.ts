@@ -5,6 +5,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ??
+  "miguelsantiagores@gmail.com,info@casatomas.es,admin@admin.com")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isSuperAdminEmail = (email?: string | null) =>
+  !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+
 interface CreateUserRequest {
   username: string;
   password: string;
@@ -59,12 +68,13 @@ Deno.serve(async (req) => {
     }
 
     console.log("Request from user:", currentUser.id);
+    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
 
     // Check if current user is admin
     const { data: isAdminResult, error: adminCheckError } = await supabaseAdmin
       .rpc("is_admin", { _user_id: currentUser.id });
 
-    if (adminCheckError) {
+    if (adminCheckError && !currentUserIsSuperAdmin) {
       console.error("Error checking admin status:", adminCheckError);
       return new Response(
         JSON.stringify({ error: "Error verificando permisos" }),
@@ -72,7 +82,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!isAdminResult) {
+    if (!isAdminResult && !currentUserIsSuperAdmin) {
       console.error("User is not admin:", currentUser.id);
       return new Response(
         JSON.stringify({ error: "Solo administradores pueden crear usuarios" }),

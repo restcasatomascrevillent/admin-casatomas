@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -28,9 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Settings, Shield, ShieldCheck, User, Trash2 } from "lucide-react";
+import { Loader2, Settings, Shield, ShieldCheck, User, Trash2, Key } from "lucide-react";
 import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
+import { toast } from "sonner";
 
 const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
   admin: { label: "Administrador", color: "bg-red-500" },
@@ -39,14 +41,36 @@ const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
 };
 
 export function ListaUsuarios() {
-  const { users, loading, updateUserRole, setAllPermissions, deleteUser, fetchUsers } = useUsersManagement();
+  const {
+    users,
+    loading,
+    updateUserRole,
+    setAllPermissions,
+    updateUserPassword,
+    deleteUser,
+    fetchUsers,
+  } = useUsersManagement();
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<
     { section_key: string; can_view: boolean; can_edit: boolean }[]
   >([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [passwordTargetUser, setPasswordTargetUser] = useState<ManagedUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
   const editableSections = SECTIONS.filter((s) => s.key !== "usuarios");
+
+  const getUserDisplayName = (user: ManagedUser | null) => {
+    if (!user) return "usuario";
+    if (user.display_name) return user.display_name;
+    if (user.email?.endsWith("@staff.local")) {
+      return user.email.replace("@staff.local", "");
+    }
+    return user.email || `${user.id.slice(0, 8)}...`;
+  };
 
   const openPermissionsDialog = (user: ManagedUser) => {
     setSelectedUser(user);
@@ -97,6 +121,43 @@ export function ListaUsuarios() {
   const handleDeleteUser = async (userId: string) => {
     if (confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")) {
       await deleteUser(userId);
+    }
+  };
+
+  const openPasswordDialog = (user: ManagedUser) => {
+    setPasswordTargetUser(user);
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordDialogOpen(true);
+  };
+
+  const closePasswordDialog = () => {
+    if (updatingPassword) return;
+    setPasswordDialogOpen(false);
+    setPasswordTargetUser(null);
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordTargetUser) return;
+
+    if (newPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+
+    setUpdatingPassword(true);
+    const updated = await updateUserPassword(passwordTargetUser.id, newPassword);
+    setUpdatingPassword(false);
+
+    if (updated) {
+      closePasswordDialog();
     }
   };
 
@@ -203,12 +264,12 @@ export function ListaUsuarios() {
                     ) : (
                       <User className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <span className="font-medium">
-                      {user.display_name || 
-                        (user.email?.endsWith("@staff.local") 
-                          ? user.email.replace("@staff.local", "") 
-                          : user.email || user.id.slice(0, 8) + "...")}
-                    </span>
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{getUserDisplayName(user)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {user.email || user.id}
+                      </span>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -246,10 +307,7 @@ export function ListaUsuarios() {
                             <DialogHeader className="pr-6">
                               <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                                 <Shield className="h-5 w-5" />
-                                Permisos de {selectedUser?.display_name || 
-                                  (selectedUser?.email?.endsWith("@staff.local") 
-                                    ? selectedUser.email.replace("@staff.local", "") 
-                                    : selectedUser?.email || selectedUser?.id.slice(0, 8))}
+                                Permisos de {getUserDisplayName(selectedUser)}
                               </DialogTitle>
                               <DialogDescription>
                                 Configura a qué secciones tiene acceso este usuario
@@ -355,6 +413,14 @@ export function ListaUsuarios() {
                           </DialogContent>
                         </Dialog>
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openPasswordDialog(user)}
+                        >
+                          <Key className="h-4 w-4 mr-1" />
+                          Contraseña
+                        </Button>
+                        <Button
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive"
@@ -371,6 +437,50 @@ export function ListaUsuarios() {
           })}
         </TableBody>
       </Table>
+
+      <Dialog open={passwordDialogOpen} onOpenChange={(open) => !open && closePasswordDialog()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>
+              Define una nueva contraseña para {getUserDisplayName(passwordTargetUser)} ({passwordTargetUser?.email || passwordTargetUser?.id}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="user-new-password">Nueva contraseña</Label>
+              <Input
+                id="user-new-password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="user-confirm-password">Confirmar contraseña</Label>
+              <Input
+                id="user-confirm-password"
+                type="password"
+                placeholder="Repite la nueva contraseña"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={closePasswordDialog} disabled={updatingPassword}>
+                Cancelar
+              </Button>
+              <Button onClick={handleChangePassword} disabled={updatingPassword}>
+                {updatingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Actualizar contraseña
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

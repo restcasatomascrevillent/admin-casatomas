@@ -21,6 +21,28 @@ export function useUsersManagement() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const extractFunctionErrorMessage = async (error: unknown, fallbackMessage: string) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "context" in error &&
+      (error as { context?: unknown }).context instanceof Response
+    ) {
+      try {
+        const payload = await (error as { context: Response }).context.clone().json() as { error?: string };
+        if (payload?.error) return payload.error;
+      } catch {
+        // ignore parse errors and fallback below
+      }
+    }
+
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    return fallbackMessage;
+  };
+
   const fetchUsers = useCallback(async () => {
     if (!isAdmin) {
       setUsers([]);
@@ -31,33 +53,43 @@ export function useUsersManagement() {
     setLoading(true);
     try {
       // Obtener usuarios desde auth.users mediante edge function
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
       const authUsersMap = new Map<
         string,
         { email: string; display_name: string | null; created_at: string }
       >();
 
-      if (token) {
-        try {
-          const response = await supabase.functions.invoke<{
-            users: Array<{ id: string; email: string | null; display_name: string | null; created_at: string }>;
-          }>("list-users", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+      try {
+        const response = await supabase.functions.invoke<{
+          users: Array<{ id: string; email: string | null; display_name: string | null; created_at: string }>;
+        }>("list-users");
 
-          if (response.data?.users) {
-            response.data.users.forEach((u) => {
-              authUsersMap.set(u.id, {
-                email: u.email ?? "",
-                display_name: u.display_name,
-                created_at: u.created_at,
-              });
+        if (response.error) {
+          throw response.error;
+        }
+
+        if (response.data?.users) {
+          response.data.users.forEach((u) => {
+            authUsersMap.set(u.id, {
+              email: u.email ?? "",
+              display_name: u.display_name,
+              created_at: u.created_at,
             });
-          }
-        } catch (e) {
-          console.error("Error fetching auth users:", e);
+          });
+        }
+      } catch (e) {
+        console.error("Error fetching auth users:", e);
+
+        const status =
+          typeof e === "object" &&
+          e !== null &&
+          "context" in e &&
+          (e as { context?: unknown }).context instanceof Response
+            ? (e as { context: Response }).context.status
+            : null;
+
+        if (status === 401 || status === 403) {
+          await supabase.auth.signOut({ scope: "local" });
+          throw new Error("Tu sesión ha expirado. Inicia sesión de nuevo.");
         }
       }
 
@@ -224,6 +256,28 @@ export function useUsersManagement() {
     }
   };
 
+  const updateUserPassword = async (userId: string, password: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
+        "admin-update-user-password",
+        {
+          body: { userId, password },
+        }
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "No se pudo actualizar la contraseña");
+
+      toast.success("Contraseña actualizada correctamente");
+      return true;
+    } catch (error) {
+      console.error("Error updating password:", error);
+      const message = await extractFunctionErrorMessage(error, "Error al actualizar la contraseña");
+      toast.error(message);
+      return false;
+    }
+  };
+
   const inviteUser = async (email: string, role: AppRole, permissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
     try {
       // Crear usuario mediante Supabase Auth Admin (requiere service role key)
@@ -271,14 +325,9 @@ export function useUsersManagement() {
 
   const deleteUser = async (userId: string) => {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("No hay sesión activa");
-
       const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
         "admin-delete-user",
         {
-          headers: { Authorization: `Bearer ${token}` },
           body: { userId },
         }
       );
@@ -302,6 +351,7 @@ export function useUsersManagement() {
     updateUserRole,
     updateUserPermission,
     setAllPermissions,
+    updateUserPassword,
     inviteUser,
     assignRoleToNewUser,
     deleteUser,

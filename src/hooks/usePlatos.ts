@@ -8,6 +8,7 @@ export interface Plato {
   categoria: string | null;
   precio_eur: number | null;
   descripcion: string | null;
+  ingredientes: string | null;
   unidad: string | null;
   alergenos_oficiales: any;
   alergenos_inferidos: any;
@@ -28,6 +29,7 @@ export interface NuevoPlato {
   categoria: string;
   precio_eur: number;
   descripcion?: string;
+  ingredientes?: string;
   unidad?: string;
   alergenos_oficiales?: any;
   alergenos_notas?: string;
@@ -69,6 +71,7 @@ export function usePlatos() {
           tipo: 'plato',
           nombre: nuevoPlato.nombre,
           descripcion: nuevoPlato.descripcion || '',
+          ingredientes: nuevoPlato.ingredientes || '',
           categoria: nuevoPlato.categoria,
           alergenos: alergenosArray,
           precio: nuevoPlato.precio_eur,

@@ -22,23 +22,66 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const clearLocalSession = async () => {
+      await supabase.auth.signOut({ scope: "local" });
+      if (!isMounted) return;
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+    };
+
+    const syncValidatedSession = async (incomingSession: Session | null) => {
+      if (!incomingSession) {
+        if (!isMounted) return;
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const status = typeof userError === "object" && userError !== null && "status" in userError
+        ? Number((userError as { status?: unknown }).status)
+        : null;
+
+      if ((status === 401 || status === 403) || (!userData.user && !userError)) {
+        await clearLocalSession();
+        return;
+      }
+
+      if (userError) {
+        // Si hay un fallo temporal de red/servicio, mantenemos la sesión local.
+        if (!isMounted) return;
+        setSession(incomingSession);
+        setUser(incomingSession.user ?? null);
+        setLoading(false);
+        return;
+      }
+
+      if (!isMounted) return;
+      setSession(incomingSession);
+      setUser(userData.user);
+      setLoading(false);
+    };
+
     // Set up auth state listener FIRST
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange((_event, incomingSession) => {
+      void syncValidatedSession(incomingSession);
     });
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+      void syncValidatedSession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (
@@ -141,6 +184,17 @@ export const useAuth = () => {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
+      const status = typeof error === "object" && error !== null && "status" in error
+        ? Number((error as { status?: unknown }).status)
+        : null;
+
+      // Si el token ya no es válido, limpiamos sesión local para evitar estado corrupto.
+      if (status === 403) {
+        await supabase.auth.signOut({ scope: "local" });
+        toast.success("Sesión cerrada correctamente");
+        return { error: null };
+      }
+
       toast.error("Error al cerrar sesión: " + error.message);
       return { error };
     }

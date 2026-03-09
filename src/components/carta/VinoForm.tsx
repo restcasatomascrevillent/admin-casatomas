@@ -33,6 +33,7 @@ const formSchema = z.object({
   categoria: z.string().min(1, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   descripcion: z.string().optional(),
+  ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
   ubicacion_pais: z.string().optional(),
   ubicacion_region: z.string().optional(),
@@ -62,6 +63,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       categoria: categoriaInicial || "",
       precio_eur: 0,
       descripcion: "",
+      ingredientes: "",
       denominacion_origen: "",
       ubicacion_pais: "",
       ubicacion_region: "",
@@ -103,6 +105,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
         body: {
           nombre: values.nombre,
           descripcion: values.descripcion || '',
+          ingredientes: values.ingredientes || '',
           categoria: values.categoria || '',
           ubicacion_pais: values.ubicacion_pais || '',
           ubicacion_region: values.ubicacion_region || '',
@@ -130,6 +133,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       categoria: values.categoria,
       precio_eur: values.precio_eur,
       descripcion: values.descripcion,
+      ingredientes: values.ingredientes,
       denominacion_origen: values.denominacion_origen,
       ubicacion_pais: values.ubicacion_pais,
       ubicacion_region: values.ubicacion_region,
@@ -296,6 +300,25 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                     <Textarea
                       placeholder="Descripción del vino"
                       className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="ingredientes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ingredientes</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ingredientes del vino"
+                      className="resize-none"
+                      rows={2}
                       {...field}
                     />
                   </FormControl>

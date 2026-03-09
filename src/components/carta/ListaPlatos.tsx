@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChefHat, Trash2 } from "lucide-react";
+import { ChefHat, Eye, Pencil, Trash2 } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
+import { EditarPlatoModal } from "./EditarPlatoModal";
 
 // Mapeo de alérgenos oficiales
 const ALERGENOS_MAP: Record<string, string> = {
@@ -45,6 +47,8 @@ interface ListaPlatosProps {
 export function ListaPlatos({ platos }: ListaPlatosProps) {
   const { toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
+  const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
+  const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
 
   const handleToggleExpanded = (plato: Plato, checked: boolean) => {
     toggleExpanded.mutate(
@@ -93,7 +97,12 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             )}
           >
             {plato.imagen_url && (
-              <div className="relative h-40 bg-muted">
+              <div
+                className={cn(
+                  "relative bg-muted transition-all duration-300",
+                  plato.expanded ? "h-64" : "h-40"
+                )}
+              >
                 <img 
                   src={plato.imagen_url} 
                   alt={plato.nombre || "Plato"} 
@@ -111,17 +120,24 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {plato.nombre}
                 </h3>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Foto expandida
-                  </span>
-                  <Switch
-                    checked={plato.expanded || false}
-                    onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
-                    disabled={toggleExpanded.isPending}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                </div>
+                {plato.imagen_url && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Ver foto"
+                      onClick={() =>
+                        setFotoAVisualizar({
+                          url: plato.imagen_url!,
+                          nombre: plato.nombre || "Plato",
+                        })
+                      }
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Visibilidad Web */}
@@ -133,9 +149,27 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 isPending={toggleRestaurante.isPending || toggleTouza.isPending}
                 compact
               />
+
+              {plato.imagen_url && (
+                <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
+                  <span className="text-xs text-muted-foreground">Foto expandida en carta web</span>
+                  <Switch
+                    checked={plato.expanded ?? false}
+                    onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
+                    disabled={toggleExpanded.isPending}
+                    className="scale-90 data-[state=checked]:bg-amber-600"
+                  />
+                </div>
+              )}
+
               {plato.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {plato.descripcion}
+                </p>
+              )}
+              {plato.ingredientes && (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  <span className="font-medium text-foreground/80">Ingredientes:</span> {plato.ingredientes}
                 </p>
               )}
 
@@ -179,11 +213,20 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               )}
 
               {/* Botón eliminar */}
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t flex gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => setPlatoAEditar(plato)}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setPlatoAEliminar(plato)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -215,6 +258,34 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditarPlatoModal
+        open={!!platoAEditar}
+        onOpenChange={(open) => {
+          if (!open) setPlatoAEditar(null);
+        }}
+        plato={platoAEditar}
+      />
+
+      <Dialog
+        open={!!fotoAVisualizar}
+        onOpenChange={(open) => {
+          if (!open) setFotoAVisualizar(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{fotoAVisualizar?.nombre || "Foto"}</DialogTitle>
+          </DialogHeader>
+          {fotoAVisualizar && (
+            <img
+              src={fotoAVisualizar.url}
+              alt={fotoAVisualizar.nombre}
+              className="max-h-[75vh] w-full rounded-md object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

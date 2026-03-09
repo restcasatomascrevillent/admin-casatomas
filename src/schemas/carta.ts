@@ -34,6 +34,11 @@ export const platoSchema = z.object({
         .max(1000, "La descripción no puede exceder 1000 caracteres")
         .optional(),
 
+    ingredientes: z
+        .string()
+        .max(1000, "Los ingredientes no pueden exceder 1000 caracteres")
+        .optional(),
+
     unidad: z
         .string()
         .max(50, "La unidad no puede exceder 50 caracteres")
@@ -90,6 +95,11 @@ export const bebidaSchema = z.object({
     descripcion: z
         .string()
         .max(1000, "La descripción no puede exceder 1000 caracteres")
+        .optional(),
+
+    ingredientes: z
+        .string()
+        .max(1000, "Los ingredientes no pueden exceder 1000 caracteres")
         .optional(),
 
     imagen_url: urlSchema,

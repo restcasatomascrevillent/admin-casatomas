@@ -5,23 +5,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UtensilsCrossed } from "lucide-react";
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn } = useAuth();
   const [loading, setLoading] = useState(false);
 
   // Login form
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-
-  // Signup form
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [nombreRestaurante, setNombreRestaurante] = useState("");
-  const [telefono, setTelefono] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -32,26 +25,14 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const normalizedInput = loginEmail.trim();
     // If no @ in login, assume it's a username and append @staff.local
-    const loginIdentifier = loginEmail.includes("@") 
-      ? loginEmail 
-      : `${loginEmail}@staff.local`;
+    const loginIdentifier = normalizedInput.includes("@")
+      ? normalizedInput.toLowerCase()
+      : `${normalizedInput.toLowerCase()}@staff.local`;
     const { error } = await signIn(loginIdentifier, loginPassword);
     if (!error) {
       navigate("/dashboard");
-    }
-    setLoading(false);
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await signUp(signupEmail, signupPassword, nombreRestaurante, telefono);
-    if (!error) {
-      setSignupEmail("");
-      setSignupPassword("");
-      setNombreRestaurante("");
-      setTelefono("");
     }
     setLoading(false);
   };
@@ -73,106 +54,45 @@ export default function Auth() {
           <CardHeader>
             <CardTitle>Acceso al Sistema</CardTitle>
             <CardDescription>
-              Inicia sesión o crea una cuenta para tu restaurante
+              Inicia sesión para acceder al panel
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
-                <TabsTrigger value="signup">Registrarse</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email o Usuario</Label>
-                    <Input
-                      id="login-email"
-                      type="text"
-                      placeholder="tu@email.com o nombre.usuario"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Empleados: usa solo tu nombre de usuario
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Contraseña</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-nombre">Nombre del Restaurante</Label>
-                    <Input
-                      id="signup-nombre"
-                      type="text"
-                      placeholder="Mi Restaurante"
-                      value={nombreRestaurante}
-                      onChange={(e) => setNombreRestaurante(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-telefono">Teléfono</Label>
-                    <Input
-                      id="signup-telefono"
-                      type="tel"
-                      placeholder="+34 600 000 000"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={signupEmail}
-                      onChange={(e) => setSignupEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Contraseña</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Mínimo 6 caracteres"
-                      value={signupPassword}
-                      onChange={(e) => setSignupPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Creando cuenta..." : "Crear Cuenta"}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email o Usuario</Label>
+                <Input
+                  id="login-email"
+                  type="text"
+                  placeholder="tu@email.com o nombre.usuario"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Empleados: usa solo tu nombre de usuario
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Contraseña</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
+              </Button>
+            </form>
           </CardContent>
         </Card>
-
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          Al crear una cuenta, aceptas nuestros términos y condiciones
-        </p>
       </div>
     </div>
   );
