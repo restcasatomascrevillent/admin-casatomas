@@ -110,7 +110,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {vino.nombre}
                 </h3>
-                {vino.imagen_url && (
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Button
                     type="button"
                     variant="ghost"
@@ -124,7 +124,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                       <Eye className="h-4 w-4" />
                     )}
                   </Button>
-                )}
+                </div>
               </div>
 
               {/* Visibilidad Web */}
