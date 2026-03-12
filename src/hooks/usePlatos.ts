@@ -17,6 +17,7 @@ export interface Plato {
   activado: boolean | null;
   expanded: boolean | null;
   imagen_url: string | null;
+  imagen_posicion_y: number | null;
   touza: boolean | null;
   restaurante: boolean | null;
   featured: boolean | null;
