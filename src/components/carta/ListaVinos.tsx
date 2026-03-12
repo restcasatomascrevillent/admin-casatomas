@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { Wine, Trash2, Pencil, Eye } from "lucide-react";
+import { Wine, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
