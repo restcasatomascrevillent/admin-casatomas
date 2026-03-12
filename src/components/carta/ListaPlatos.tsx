@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChefHat, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
+import { ChefHat, Eye, EyeOff, Move, Pencil, Trash2 } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarPlatoModal } from "./EditarPlatoModal";
+import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 
 // Mapeo de alérgenos oficiales
 const ALERGENOS_MAP: Record<string, string> = {
@@ -40,16 +41,20 @@ const ALERGENOS_MAP: Record<string, string> = {
   soja: "Soja",
 };
 
+// Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
+const CARTA_CARD_ASPECT_RATIO = 300 / 160;
+
 interface ListaPlatosProps {
   platos: Plato[];
 }
 
 export function ListaPlatos({ platos }: ListaPlatosProps) {
-  const { toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza } = usePlatos();
+  const { toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza, actualizarPlato } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
   const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+  const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
@@ -80,6 +85,18 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
       eliminarPlato.mutate(platoAEliminar.id);
       setPlatoAEliminar(null);
     }
+  };
+
+  const handlePositionChange = (position: number) => {
+    if (!posicionPlato) return;
+    actualizarPlato.mutate(
+      { id: posicionPlato.id, imagen_posicion_y: position },
+      {
+        onSuccess: () => {
+          toast.success("Posición de imagen actualizada");
+        },
+      }
+    );
   };
 
   if (platos.length === 0) {
@@ -123,6 +140,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                   src={plato.imagen_url} 
                   alt={plato.nombre || "Plato"} 
                   className="w-full h-full object-cover"
+                  style={{ objectPosition: `center ${plato.imagen_posicion_y ?? 50}%` }}
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
@@ -131,12 +149,23 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             )}
             
             <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y toggle visibilidad foto */}
+              {/* Header con nombre y controles de foto */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {plato.nombre}
                 </h3>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {plato.imagen_url && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Ajustar posición de imagen"
+                      onClick={() => setPosicionPlato(plato)}
+                    >
+                      <Move className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
@@ -297,6 +326,19 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {posicionPlato && posicionPlato.imagen_url && (
+        <ImagePositionSelector
+          open={!!posicionPlato}
+          onOpenChange={(open) => {
+            if (!open) setPosicionPlato(null);
+          }}
+          imageUrl={posicionPlato.imagen_url}
+          currentPosition={posicionPlato.imagen_posicion_y ?? 50}
+          onPositionChange={handlePositionChange}
+          aspectRatio={CARTA_CARD_ASPECT_RATIO}
+        />
+      )}
     </>
   );
 }
