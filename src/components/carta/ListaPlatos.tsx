@@ -49,6 +49,16 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
   const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+
+  const toggleFotoVisible = (id: string) => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleToggleExpanded = (plato: Plato, checked: boolean) => {
     toggleExpanded.mutate(
