@@ -30,6 +30,16 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+
+  const toggleFotoVisible = (id: string) => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleToggleExpanded = (vino: Vino, checked: boolean) => {
     toggleExpanded.mutate(
