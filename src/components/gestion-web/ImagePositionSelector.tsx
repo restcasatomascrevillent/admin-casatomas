@@ -10,6 +10,7 @@ interface ImagePositionSelectorProps {
   imageUrl: string;
   currentPosition: number; // 0-100 (porcentaje Y)
   onPositionChange: (position: number) => void;
+  aspectRatio?: number; // Override default aspect ratio
 }
 
 export function ImagePositionSelector({
