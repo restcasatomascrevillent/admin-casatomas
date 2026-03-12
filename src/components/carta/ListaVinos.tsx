@@ -136,17 +136,15 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 isPending={toggleRestaurante.isPending || toggleTouza.isPending}
                 compact
               />
-              {vino.imagen_url && (
-                <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
-                  <span className="text-xs text-muted-foreground">Foto expandida en carta web</span>
-                  <Switch
-                    checked={vino.expanded ?? false}
-                    onCheckedChange={(checked) => handleToggleExpanded(vino, checked)}
-                    disabled={toggleExpanded.isPending}
-                    className="scale-90 data-[state=checked]:bg-amber-600"
-                  />
-                </div>
-              )}
+              <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
+                <span className="text-xs text-muted-foreground">Foto expandida en carta web</span>
+                <Switch
+                  checked={vino.expanded ?? false}
+                  onCheckedChange={(checked) => handleToggleExpanded(vino, checked)}
+                  disabled={toggleExpanded.isPending}
+                  className="scale-90 data-[state=checked]:bg-amber-600"
+                />
+              </div>
               {vino.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {vino.descripcion}
