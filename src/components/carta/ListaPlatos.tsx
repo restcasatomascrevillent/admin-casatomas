@@ -54,6 +54,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(platos.map(p => p.id)));
+  const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
 
   useEffect(() => {
     setFotosOcultas(prev => {
