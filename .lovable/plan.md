@@ -1,63 +1,34 @@
 
 
-# Plan: Gestor de Reservas con Kanban por Espacios
+## Analysis
 
-## Resumen
+After reviewing the code, here's the current state:
 
-Se creara un nuevo componente "Gestor de Reservas" con una vista Kanban que muestra los espacios (Comedor, Salon, Terraza) como columnas, permitiendo arrastrar y soltar reservas entre ellos para asignarlas. Se anadira un boton de acceso encima de la tarjeta de "Ocupacion Media" en la vista Hoy.
+1. **Image upload in edit modals** -- Already works correctly for both Platos and Vinos. Images upload to Supabase storage buckets (`platos`, `vinos`) and the public URL is saved to `imagen_url`.
 
-## Cambios necesarios
+2. **Expanded/collapsed toggle** -- Already exists on each card as a Switch labeled "Foto expandida en carta web". This controls how the image displays on the public website.
 
-### 1. Base de datos: nueva columna `espacio_id` en `reservas`
+3. **Eye icon behavior** -- Currently the Eye icon opens a full-screen preview dialog. The user wants it to act as a **toggle to show/hide the photo on the card itself** within the Gestor de Carta view.
 
-Crear una migracion que anade la columna `espacio_id` (uuid, nullable, FK a `espacios_reserva`) a la tabla `reservas`. Las reservas sin espacio asignado apareceran en una columna "Sin asignar".
+## Plan
 
-### 2. Nuevo componente: `GestorReservasKanban.tsx`
+### Changes to `ListaPlatos.tsx`
 
-Crear `src/components/reservas/GestorReservasKanban.tsx`:
+- Add local state `fotosOcultas` (a `Set<string>` of plato IDs) to track which cards have their photo hidden.
+- Change the Eye button from opening a preview to toggling the photo visibility on the card. Use `Eye` when visible, `EyeOff` when hidden.
+- When a photo is hidden, the image section of the card is not rendered.
+- Keep the existing preview functionality accessible by clicking directly on the image itself (when visible).
 
-- **Columnas del Kanban**: Una columna "Sin asignar" + una columna por cada espacio activo (Comedor, Salon, Terraza)
-- **Cabecera de columna**: Nombre del espacio, capacidad actual vs. maxima, barra de progreso
-- **Tarjetas de reserva**: Nombre, hora, numero comensales, estado (badge de color), icono importante
-- **Drag & Drop**: Usando `@dnd-kit/core` y `@dnd-kit/sortable` (ya instalados) para mover reservas entre columnas
-- **Al soltar**: Se actualiza `espacio_id` en la base de datos
-- **Filtros**: Solo reservas de hoy, excluyendo canceladas
-- **Validacion de capacidad**: Aviso si se excede la capacidad maxima del espacio
+### Changes to `ListaVinos.tsx`
 
-### 3. Modificar `VistaHoy.tsx`
+- Same pattern: add `fotosOcultas` local state, toggle Eye/EyeOff icon, hide/show the image section.
+- Image click opens the preview dialog (existing behavior moved to the image element).
 
-Anadir un boton "Gestor Reservas" con icono `LayoutGrid` justo encima de la tarjeta de "Ocupacion Media" (la cuarta card del grid de stats). Al hacer clic, se abre un Dialog/Sheet a pantalla completa con el componente Kanban.
+### No backend changes needed
 
-### 4. Actualizar tipos de Supabase
+The eye toggle is purely a local UI control for the gestor view -- it does not need to persist to the database. The `expanded` toggle (already working) handles the web-facing behavior.
 
-Actualizar `src/integrations/supabase/types.ts` para reflejar la nueva columna `espacio_id` en la tabla `reservas`.
-
-## Detalle tecnico
-
-```text
-Vista Hoy
-+-------------------------------------------+
-| Stats cards (4 columnas)                  |
-| [Reservas] [Comensales] [Capacidad]       |
-|                                           |
-| [Boton: Gestor Reservas]  [Ocupacion %]   |
-+-------------------------------------------+
-|                                           |
-| Click "Gestor Reservas" abre:             |
-+-------------------------------------------+
-
-Kanban (Dialog fullscreen)
-+-------------+-------------+-------------+-------------+
-| Sin asignar | Comedor     | Salon       | Terraza     |
-| (12 res.)   | 24/40 pax   | 10/25 pax   | 15/40 pax   |
-|             | [===----]   | [==-----]   | [==-----]   |
-| [Card]      | [Card]      | [Card]      | [Card]      |
-| [Card]      | [Card]      |             |             |
-| [Card]      |             |             |             |
-+-------------+-------------+-------------+-------------+
-```
-
-- Las tarjetas se arrastran entre columnas con `@dnd-kit`
-- Al soltar, se ejecuta `UPDATE reservas SET espacio_id = ? WHERE id = ?`
-- Actualizacion optimista del estado local para fluidez visual
+### Summary of files to edit
+- `src/components/carta/ListaPlatos.tsx` -- Eye toggle + click-on-image preview
+- `src/components/carta/ListaVinos.tsx` -- Same changes
 
