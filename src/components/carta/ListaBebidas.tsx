@@ -27,6 +27,14 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
 
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      bebidas.forEach(b => next.add(b.id));
+      return next;
+    });
+  }, [bebidas]);
+
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
       const next = new Set(prev);

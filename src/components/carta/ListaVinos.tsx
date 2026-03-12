@@ -37,6 +37,14 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(vinos.map(v => v.id)));
   const [posicionVino, setPosicionVino] = useState<Vino | null>(null);
 
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      vinos.forEach(v => next.add(v.id));
+      return next;
+    });
+  }, [vinos]);
+
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
       const next = new Set(prev);

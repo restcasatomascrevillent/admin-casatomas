@@ -26,6 +26,14 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
   const [coctelAEliminar, setCoctelAEliminar] = useState<Coctel | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(cocteles.map(c => c.id)));
 
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      cocteles.forEach(c => next.add(c.id));
+      return next;
+    });
+  }, [cocteles]);
+
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
       const next = new Set(prev);
