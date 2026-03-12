@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { GlassWater, Trash2 } from "lucide-react";
+import { GlassWater, Trash2, Eye, EyeOff } from "lucide-react";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,16 @@ interface ListaBebidasProps {
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
+
+  const toggleFotoVisible = (id: string) => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (bebidas.length === 0) {
     return (
