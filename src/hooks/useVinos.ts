@@ -153,7 +153,7 @@ export function useVinos() {
     mutationFn: async ({ id, ...cambios }: Partial<Vino> & { id: string }) => {
       const { data, error } = await supabase
         .from("Vinos")
-        .update(cambios)
+        .update(cambios as any)
         .eq("id", id)
         .select()
         .single();

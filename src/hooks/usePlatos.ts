@@ -101,7 +101,7 @@ export function usePlatos() {
     mutationFn: async ({ id, ...cambios }: Partial<Plato> & { id: string }) => {
       const { data, error } = await supabase
         .from("Platos")
-        .update(cambios)
+        .update(cambios as any)
         .eq("id", id)
         .select()
         .single();
