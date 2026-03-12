@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { GlassWater, Trash2, Eye, EyeOff } from "lucide-react";
