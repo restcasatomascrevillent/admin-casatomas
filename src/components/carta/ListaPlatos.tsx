@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChefHat, Eye, Pencil, Trash2 } from "lucide-react";
+import { ChefHat, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 
