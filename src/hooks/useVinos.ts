@@ -51,7 +51,7 @@ export function useVinos() {
         .order("orden", { ascending: true });
 
       if (error) throw error;
-      return data as Vino[];
+      return data as unknown as Vino[];
     },
   });
 
@@ -153,7 +153,7 @@ export function useVinos() {
     mutationFn: async ({ id, ...cambios }: Partial<Vino> & { id: string }) => {
       const { data, error } = await supabase
         .from("Vinos")
-        .update(cambios)
+        .update(cambios as any)
         .eq("id", id)
         .select()
         .single();
@@ -212,7 +212,7 @@ export function useVinos() {
     mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
       const { error } = await supabase
         .from("Vinos")
-        .update({ expanded })
+        .update({ expanded } as any)
         .eq("id", id);
 
       if (error) throw error;
