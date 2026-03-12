@@ -19,6 +19,7 @@ export function ImagePositionSelector({
   imageUrl,
   currentPosition,
   onPositionChange,
+  aspectRatio,
 }: ImagePositionSelectorProps) {
   const [position, setPosition] = useState(currentPosition);
   const [isDragging, setIsDragging] = useState(false);
