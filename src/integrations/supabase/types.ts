@@ -2244,6 +2244,7 @@ export type Database = {
           featured: boolean | null
           id: string
           imagen_url: string | null
+          ingredientes: string | null
           nombre: string | null
           nombre_en: string | null
           nombre_fr: string | null
@@ -2273,6 +2274,7 @@ export type Database = {
           featured?: boolean | null
           id: string
           imagen_url?: string | null
+          ingredientes?: string | null
           nombre?: string | null
           nombre_en?: string | null
           nombre_fr?: string | null
@@ -2302,6 +2304,7 @@ export type Database = {
           featured?: boolean | null
           id?: string
           imagen_url?: string | null
+          ingredientes?: string | null
           nombre?: string | null
           nombre_en?: string | null
           nombre_fr?: string | null
@@ -3029,9 +3032,11 @@ export type Database = {
           created_at: string | null
           denominacion_origen: string | null
           descripcion: string | null
+          expanded: boolean | null
           featured: boolean | null
           id: string
           imagen_url: string | null
+          ingredientes: string | null
           nombre: string | null
           nombre_en: string | null
           nombre_fr: string | null
@@ -3061,9 +3066,11 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
+          expanded?: boolean | null
           featured?: boolean | null
           id: string
           imagen_url?: string | null
+          ingredientes?: string | null
           nombre?: string | null
           nombre_en?: string | null
           nombre_fr?: string | null
@@ -3093,9 +3100,11 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
+          expanded?: boolean | null
           featured?: boolean | null
           id?: string
           imagen_url?: string | null
+          ingredientes?: string | null
           nombre?: string | null
           nombre_en?: string | null
           nombre_fr?: string | null
