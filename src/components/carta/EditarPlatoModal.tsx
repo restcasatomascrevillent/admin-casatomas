@@ -193,7 +193,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage.from("platos").getPublicUrl(fileName);
-        imageUrlUpdate = urlData.publicUrl;
+        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
       } else if (removeImage) {
         imageUrlUpdate = null;
       }

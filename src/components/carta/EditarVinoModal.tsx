@@ -131,7 +131,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage.from("vinos").getPublicUrl(fileName);
-        imageUrlUpdate = urlData.publicUrl;
+        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
       } else if (removeImage) {
         imageUrlUpdate = null;
       }
