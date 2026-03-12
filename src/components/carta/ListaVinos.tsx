@@ -34,7 +34,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza, actualizarVino } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
-  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(vinos.map(v => v.id)));
   const [posicionVino, setPosicionVino] = useState<Vino | null>(null);
 
   const toggleFotoVisible = (id: string) => {
