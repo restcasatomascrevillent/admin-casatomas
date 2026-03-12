@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { Wine, Trash2, Pencil, Eye, EyeOff, Move } from "lucide-react";
@@ -36,6 +36,14 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(vinos.map(v => v.id)));
   const [posicionVino, setPosicionVino] = useState<Vino | null>(null);
+
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      vinos.forEach(v => next.add(v.id));
+      return next;
+    });
+  }, [vinos]);
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {

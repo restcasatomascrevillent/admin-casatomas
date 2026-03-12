@@ -1,34 +1,63 @@
 
 
-## Problem
+# Plan: Gestor de Reservas con Kanban por Espacios
 
-All four list components (`ListaPlatos`, `ListaVinos`, `ListaBebidas`, `ListaCocteles`) initialize `fotosOcultas` with `new Set(items.map(i => i.id))` inside `useState`. But `useState`'s initializer only runs **once on mount**. Since data loads asynchronously via React Query, the items array is empty at mount time, resulting in an empty Set — meaning all photos appear visible by default.
+## Resumen
 
-## Solution
+Se creara un nuevo componente "Gestor de Reservas" con una vista Kanban que muestra los espacios (Comedor, Salon, Terraza) como columnas, permitiendo arrastrar y soltar reservas entre ellos para asignarlas. Se anadira un boton de acceso encima de la tarjeta de "Ocupacion Media" en la vista Hoy.
 
-Add a `useEffect` in each component that watches the items array and adds any new IDs to `fotosOcultas`. This ensures that when data loads (or when items change due to filtering/adding), all new items start with hidden photos.
+## Cambios necesarios
 
-## Files to Edit (4)
+### 1. Base de datos: nueva columna `espacio_id` en `reservas`
 
-1. **`src/components/carta/ListaPlatos.tsx`** — Add `useEffect` watching `platos` to populate `fotosOcultas` with all IDs.
+Crear una migracion que anade la columna `espacio_id` (uuid, nullable, FK a `espacios_reserva`) a la tabla `reservas`. Las reservas sin espacio asignado apareceran en una columna "Sin asignar".
 
-2. **`src/components/carta/ListaVinos.tsx`** — Same pattern watching `vinos`.
+### 2. Nuevo componente: `GestorReservasKanban.tsx`
 
-3. **`src/components/carta/ListaBebidas.tsx`** — Same pattern watching `bebidas`.
+Crear `src/components/reservas/GestorReservasKanban.tsx`:
 
-4. **`src/components/carta/ListaCocteles.tsx`** — Same pattern watching `cocteles`.
+- **Columnas del Kanban**: Una columna "Sin asignar" + una columna por cada espacio activo (Comedor, Salon, Terraza)
+- **Cabecera de columna**: Nombre del espacio, capacidad actual vs. maxima, barra de progreso
+- **Tarjetas de reserva**: Nombre, hora, numero comensales, estado (badge de color), icono importante
+- **Drag & Drop**: Usando `@dnd-kit/core` y `@dnd-kit/sortable` (ya instalados) para mover reservas entre columnas
+- **Al soltar**: Se actualiza `espacio_id` en la base de datos
+- **Filtros**: Solo reservas de hoy, excluyendo canceladas
+- **Validacion de capacidad**: Aviso si se excede la capacidad maxima del espacio
 
-### Code Pattern (applied to all four)
+### 3. Modificar `VistaHoy.tsx`
 
-```tsx
-useEffect(() => {
-  setFotosOcultas(prev => {
-    const next = new Set(prev);
-    items.forEach(item => next.add(item.id));
-    return next;
-  });
-}, [items]);
+Anadir un boton "Gestor Reservas" con icono `LayoutGrid` justo encima de la tarjeta de "Ocupacion Media" (la cuarta card del grid de stats). Al hacer clic, se abre un Dialog/Sheet a pantalla completa con el componente Kanban.
+
+### 4. Actualizar tipos de Supabase
+
+Actualizar `src/integrations/supabase/types.ts` para reflejar la nueva columna `espacio_id` en la tabla `reservas`.
+
+## Detalle tecnico
+
+```text
+Vista Hoy
++-------------------------------------------+
+| Stats cards (4 columnas)                  |
+| [Reservas] [Comensales] [Capacidad]       |
+|                                           |
+| [Boton: Gestor Reservas]  [Ocupacion %]   |
++-------------------------------------------+
+|                                           |
+| Click "Gestor Reservas" abre:             |
++-------------------------------------------+
+
+Kanban (Dialog fullscreen)
++-------------+-------------+-------------+-------------+
+| Sin asignar | Comedor     | Salon       | Terraza     |
+| (12 res.)   | 24/40 pax   | 10/25 pax   | 15/40 pax   |
+|             | [===----]   | [==-----]   | [==-----]   |
+| [Card]      | [Card]      | [Card]      | [Card]      |
+| [Card]      | [Card]      |             |             |
+| [Card]      |             |             |             |
++-------------+-------------+-------------+-------------+
 ```
 
-This preserves any manual toggle the user made (items already in the set stay) while ensuring newly loaded items default to hidden.
+- Las tarjetas se arrastran entre columnas con `@dnd-kit`
+- Al soltar, se ejecuta `UPDATE reservas SET espacio_id = ? WHERE id = ?`
+- Actualizacion optimista del estado local para fluidez visual
 

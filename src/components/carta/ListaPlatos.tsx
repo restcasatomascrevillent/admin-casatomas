@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,15 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(platos.map(p => p.id)));
   const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
+
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      platos.forEach(p => next.add(p.id));
+      return next;
+    });
+  }, [platos]);
+
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {

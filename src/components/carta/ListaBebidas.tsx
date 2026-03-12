@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
 import { GlassWater, Trash2, Eye, EyeOff } from "lucide-react";
@@ -26,6 +26,14 @@ interface ListaBebidasProps {
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
+
+  useEffect(() => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      bebidas.forEach(b => next.add(b.id));
+      return next;
+    });
+  }, [bebidas]);
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
