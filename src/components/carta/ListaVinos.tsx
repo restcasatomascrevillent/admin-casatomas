@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { Wine, Trash2, Pencil, Eye } from "lucide-react";
+import { Wine, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,16 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+
+  const toggleFotoVisible = (id: string) => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleToggleExpanded = (vino: Vino, checked: boolean) => {
     toggleExpanded.mutate(
@@ -70,12 +80,18 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               !vino.activado && "opacity-60"
             )}
           >
-            {vino.imagen_url && (
+            {vino.imagen_url && !fotosOcultas.has(vino.id) && (
               <div
                 className={cn(
-                  "relative bg-muted transition-all duration-300",
+                  "relative bg-muted transition-all duration-300 cursor-pointer",
                   vino.expanded ? "h-64" : "h-40"
                 )}
+                onClick={() =>
+                  setFotoAVisualizar({
+                    url: vino.imagen_url!,
+                    nombre: vino.nombre || "Vino",
+                  })
+                }
               >
                 <img 
                   src={vino.imagen_url} 
@@ -89,7 +105,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
             )}
             
             <CardContent className="p-4 space-y-3">
-              {/* Header con nombre */}
+              {/* Header con nombre y toggle visibilidad foto */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {vino.nombre}
@@ -99,15 +115,14 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() =>
-                      setFotoAVisualizar({
-                        url: vino.imagen_url!,
-                        nombre: vino.nombre || "Vino",
-                      })
-                    }
-                    title="Ver foto"
+                    title={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(vino.id)}
                   >
-                    <Eye className="h-4 w-4" />
+                    {fotosOcultas.has(vino.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                 )}
               </div>
