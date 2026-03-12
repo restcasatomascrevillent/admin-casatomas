@@ -51,7 +51,7 @@ export function useVinos() {
         .order("orden", { ascending: true });
 
       if (error) throw error;
-      return data as Vino[];
+      return data as unknown as Vino[];
     },
   });
 
