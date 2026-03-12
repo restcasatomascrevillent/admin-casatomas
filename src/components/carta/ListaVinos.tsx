@@ -80,12 +80,18 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               !vino.activado && "opacity-60"
             )}
           >
-            {vino.imagen_url && (
+            {vino.imagen_url && !fotosOcultas.has(vino.id) && (
               <div
                 className={cn(
-                  "relative bg-muted transition-all duration-300",
+                  "relative bg-muted transition-all duration-300 cursor-pointer",
                   vino.expanded ? "h-64" : "h-40"
                 )}
+                onClick={() =>
+                  setFotoAVisualizar({
+                    url: vino.imagen_url!,
+                    nombre: vino.nombre || "Vino",
+                  })
+                }
               >
                 <img 
                   src={vino.imagen_url} 
@@ -99,7 +105,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
             )}
             
             <CardContent className="p-4 space-y-3">
-              {/* Header con nombre */}
+              {/* Header con nombre y toggle visibilidad foto */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {vino.nombre}
@@ -109,15 +115,14 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={() =>
-                      setFotoAVisualizar({
-                        url: vino.imagen_url!,
-                        nombre: vino.nombre || "Vino",
-                      })
-                    }
-                    title="Ver foto"
+                    title={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(vino.id)}
                   >
-                    <Eye className="h-4 w-4" />
+                    {fotosOcultas.has(vino.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </Button>
                 )}
               </div>

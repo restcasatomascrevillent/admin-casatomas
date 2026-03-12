@@ -106,12 +106,18 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               !plato.activado && "opacity-60"
             )}
           >
-            {plato.imagen_url && (
+            {plato.imagen_url && !fotosOcultas.has(plato.id) && (
               <div
                 className={cn(
-                  "relative bg-muted transition-all duration-300",
+                  "relative bg-muted transition-all duration-300 cursor-pointer",
                   plato.expanded ? "h-64" : "h-40"
                 )}
+                onClick={() =>
+                  setFotoAVisualizar({
+                    url: plato.imagen_url!,
+                    nombre: plato.nombre || "Plato",
+                  })
+                }
               >
                 <img 
                   src={plato.imagen_url} 
@@ -125,28 +131,25 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             )}
             
             <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y toggle expandido */}
+              {/* Header con nombre y toggle visibilidad foto */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {plato.nombre}
                 </h3>
                 {plato.imagen_url && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      title="Ver foto"
-                      onClick={() =>
-                        setFotoAVisualizar({
-                          url: plato.imagen_url!,
-                          nombre: plato.nombre || "Plato",
-                        })
-                      }
-                    >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title={fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(plato.id)}
+                  >
+                    {fotosOcultas.has(plato.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
                       <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    )}
+                  </Button>
                 )}
               </div>
 

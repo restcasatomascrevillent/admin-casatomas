@@ -2240,7 +2240,6 @@ export type Database = {
           descripcion: string | null
           descripcion_en: string | null
           descripcion_fr: string | null
-          ingredientes: string | null
           expanded: boolean | null
           featured: boolean | null
           id: string
@@ -2270,7 +2269,6 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
-          ingredientes?: string | null
           expanded?: boolean | null
           featured?: boolean | null
           id: string
@@ -2300,7 +2298,6 @@ export type Database = {
           descripcion?: string | null
           descripcion_en?: string | null
           descripcion_fr?: string | null
-          ingredientes?: string | null
           expanded?: boolean | null
           featured?: boolean | null
           id?: string
@@ -3032,8 +3029,6 @@ export type Database = {
           created_at: string | null
           denominacion_origen: string | null
           descripcion: string | null
-          ingredientes: string | null
-          expanded: boolean | null
           featured: boolean | null
           id: string
           imagen_url: string | null
@@ -3066,8 +3061,6 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
-          ingredientes?: string | null
-          expanded?: boolean | null
           featured?: boolean | null
           id: string
           imagen_url?: string | null
@@ -3100,8 +3093,6 @@ export type Database = {
           created_at?: string | null
           denominacion_origen?: string | null
           descripcion?: string | null
-          ingredientes?: string | null
-          expanded?: boolean | null
           featured?: boolean | null
           id?: string
           imagen_url?: string | null
