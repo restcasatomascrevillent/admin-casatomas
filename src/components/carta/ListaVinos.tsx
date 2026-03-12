@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { Wine, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
+import { Wine, Trash2, Pencil, Eye, EyeOff, Move } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,21 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarVinoModal } from "./EditarVinoModal";
+import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
+
+// Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
+const CARTA_CARD_ASPECT_RATIO = 300 / 160;
 
 interface ListaVinosProps {
   vinos: Vino[];
 }
 
 export function ListaVinos({ vinos }: ListaVinosProps) {
-  const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza } = useVinos();
+  const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza, actualizarVino } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(new Set());
+  const [posicionVino, setPosicionVino] = useState<Vino | null>(null);
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
@@ -51,6 +56,18 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               ? `${vino.nombre} se mostrará expandido`
               : `${vino.nombre} se mostrará normal`
           );
+        },
+      }
+    );
+  };
+
+  const handlePositionChange = (position: number) => {
+    if (!posicionVino) return;
+    actualizarVino.mutate(
+      { id: posicionVino.id, imagen_posicion_y: position },
+      {
+        onSuccess: () => {
+          toast.success("Posición de imagen actualizada");
         },
       }
     );
@@ -97,6 +114,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                   src={vino.imagen_url} 
                   alt={vino.nombre || "Vino"} 
                   className="w-full h-full object-cover"
+                  style={{ objectPosition: `center ${vino.imagen_posicion_y ?? 50}%` }}
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
@@ -105,12 +123,23 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
             )}
             
             <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y toggle visibilidad foto */}
+              {/* Header con nombre y controles de foto */}
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {vino.nombre}
                 </h3>
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {vino.imagen_url && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title="Ajustar posición de imagen"
+                      onClick={() => setPosicionVino(vino)}
+                    >
+                      <Move className="h-4 w-4" />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"
@@ -253,6 +282,19 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {posicionVino && posicionVino.imagen_url && (
+        <ImagePositionSelector
+          open={!!posicionVino}
+          onOpenChange={(open) => {
+            if (!open) setPosicionVino(null);
+          }}
+          imageUrl={posicionVino.imagen_url}
+          currentPosition={posicionVino.imagen_posicion_y ?? 50}
+          onPositionChange={handlePositionChange}
+          aspectRatio={CARTA_CARD_ASPECT_RATIO}
+        />
+      )}
     </>
   );
 }

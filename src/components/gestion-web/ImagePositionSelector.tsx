@@ -10,6 +10,7 @@ interface ImagePositionSelectorProps {
   imageUrl: string;
   currentPosition: number; // 0-100 (porcentaje Y)
   onPositionChange: (position: number) => void;
+  aspectRatio?: number; // Override default aspect ratio
 }
 
 export function ImagePositionSelector({
@@ -18,6 +19,7 @@ export function ImagePositionSelector({
   imageUrl,
   currentPosition,
   onPositionChange,
+  aspectRatio,
 }: ImagePositionSelectorProps) {
   const [position, setPosition] = useState(currentPosition);
   const [isDragging, setIsDragging] = useState(false);
@@ -26,7 +28,7 @@ export function ImagePositionSelector({
   const [imageBounds, setImageBounds] = useState({ top: 0, left: 0, width: 0, height: 0 });
 
   // El marco visible debe representar lo que se verá en el preview móvil (object-cover)
-  const CARD_ASPECT_RATIO = MOBILE_PREVIEW_IMAGE_ASPECT_RATIO;
+  const CARD_ASPECT_RATIO = aspectRatio ?? MOBILE_PREVIEW_IMAGE_ASPECT_RATIO;
 
   // Altura (en % de la imagen) que realmente se verá en la tarjeta (depende del aspect ratio)
   const [frameHeightPercent, setFrameHeightPercent] = useState(25);
