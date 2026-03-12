@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { GlassWater, Trash2 } from "lucide-react";
+import { GlassWater, Trash2, Eye, EyeOff } from "lucide-react";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,16 @@ interface ListaBebidasProps {
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
+  const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
+
+  const toggleFotoVisible = (id: string) => {
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (bebidas.length === 0) {
     return (
@@ -48,7 +59,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
             !bebida.activado && "opacity-60"
           )}
         >
-          {bebida.imagen_url && (
+          {bebida.imagen_url && !fotosOcultas.has(bebida.id) && (
             <div className="relative h-40 bg-muted">
               <img 
                 src={bebida.imagen_url} 
@@ -62,6 +73,30 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
           )}
           
           <CardContent className="p-4 space-y-3">
+            {/* Header con nombre y controles de foto */}
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
+                {bebida.nombre}
+              </h3>
+              {bebida.imagen_url && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    title={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(bebida.id)}
+                  >
+                    {fotosOcultas.has(bebida.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Visibilidad Web */}
             <VisibilidadToggles
               restaurante={bebida.restaurante ?? false}
