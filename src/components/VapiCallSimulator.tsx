@@ -43,10 +43,10 @@ export function VapiCallSimulator({ assistantId }: { assistantId: string }) {
         vapi.on("error", onError);
 
         return () => {
-            vapi.off("call-start", onCallStart);
-            vapi.off("call-end", onCallEnd);
-            vapi.off("volume-level", onVolumeLevel);
-            vapi.off("error", onError);
+            (vapi as any).off("call-start", onCallStart);
+            (vapi as any).off("call-end", onCallEnd);
+            (vapi as any).off("volume-level", onVolumeLevel);
+            (vapi as any).off("error", onError);
         };
     }, []);
 

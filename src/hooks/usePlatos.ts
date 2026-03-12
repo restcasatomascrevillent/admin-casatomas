@@ -50,7 +50,7 @@ export function usePlatos() {
         .order("id", { ascending: true });
 
       if (error) throw error;
-      return data as Plato[];
+      return data as unknown as Plato[];
     },
   });
 

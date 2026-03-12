@@ -212,7 +212,7 @@ export function useVinos() {
     mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
       const { error } = await supabase
         .from("Vinos")
-        .update({ expanded })
+        .update({ expanded } as any)
         .eq("id", id);
 
       if (error) throw error;
