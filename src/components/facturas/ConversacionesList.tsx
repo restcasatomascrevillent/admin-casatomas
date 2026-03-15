@@ -1,5 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Conversacion } from "@/hooks/useChatFacturas";
@@ -89,17 +100,37 @@ export function ConversacionesList({
                   <p className="text-[10px] text-muted-foreground/50 mt-1">{fecha}</p>
                 </div>
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-2 h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEliminar(conv.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-2 h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se borrarán todos los mensajes de esta conversación. Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => onEliminar(conv.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             );
           })}

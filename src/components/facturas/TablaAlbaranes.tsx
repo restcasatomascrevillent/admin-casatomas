@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { useAlbaranes, Factura, useUpdateProductoFactura, ProductoFactura } from "@/hooks/useFacturas";
+import { useAlbaranes, Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -8,192 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, Check, Clock } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Sparkles, Pencil } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { EditarFacturaDialog } from "./EditarFacturaDialog";
+import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
+import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
+import { FilaProducto } from "./shared/FilaProducto";
 
-const formatCurrency = (value: number | null): string => {
-  if (value === null || value === undefined) return "-";
-  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
-};
-
-const formatDate = (dateString: string | null): string => {
-  if (!dateString) return "-";
-  try {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: es });
-  } catch {
-    return dateString;
-  }
-};
-
-const formatDateTime = (dateString: string | null): string => {
-  if (!dateString) return "-";
-  try {
-    return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: es });
-  } catch {
-    return dateString;
-  }
-};
-
-const truncateText = (text: string | null, maxLength: number = 40): string => {
-  if (!text) return "-";
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "...";
-};
-
-const getAnomaliaBadge = (albaran: Factura, todasAlbaranes: Factura[]) => {
-  const hasAnomalousProduct = albaran.productos.some(p => {
-    if (!p.precio_unitario) return false;
-    const pastPrices = todasAlbaranes
-      .flatMap(f => f.productos)
-      .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-      .map(past => past.precio_unitario as number);
-    if (pastPrices.length === 0) return false;
-    const avg = pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length;
-    return p.precio_unitario > avg * 2;
-  });
-
-  if (hasAnomalousProduct) {
-    return <Badge variant="destructive" className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 text-[10px] px-1.5 py-0 gap-1 border-orange-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Anomalía Precio</Badge>;
-  }
-
-  return null;
-};
-
-// Reutilizamos FilaProducto de Facturas
-const FilaProducto = ({ p, isMobile, todasAlbaranes }: { p: ProductoFactura, isMobile?: boolean, todasAlbaranes: Factura[] }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [nombre, setNombre] = useState(p.producto_nombre);
-  const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
-  const [unidad, setUnidad] = useState(p.unidad || "");
-  const [precioUnitario, setPrecioUnitario] = useState(String(p.precio_unitario ?? ""));
-  const [total, setTotal] = useState(String(p.precio ?? ""));
-
-  const updateMutation = useUpdateProductoFactura();
-
-  const handleSave = async () => {
-    try {
-      await updateMutation.mutateAsync({
-        id: p.id,
-        producto_nombre: nombre,
-        cantidad: cantidad !== "" ? Number(cantidad) : undefined,
-        unidad: unidad || null,
-        precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
-        precio: total !== "" ? Number(total) : undefined,
-      });
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Error guardando producto:", err);
-    }
-  };
-
-  const pastPrices = todasAlbaranes
-    .flatMap(f => f.productos)
-    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-    .map(past => past.precio_unitario as number);
-
-  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
-  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
-  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
-
-  if (isMobile) {
-    if (isEditing) {
-      return (
-        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
-          <Input className="h-7 text-xs" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
-          <div className="flex gap-2">
-            <Input className="h-7 text-xs w-full" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-            <Input className="h-7 text-xs w-full" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="w-12 text-muted-foreground">P. Unit:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="w-12 font-medium">Total:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          </div>
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium">⚠️ Anomalía Precio</p>}
-          <div className="flex gap-2 mt-1 justify-end">
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditing(false)}>Cancelar</Button>
-            <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod transition-colors">
-        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover/prod:opacity-100 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(true)}>
-          <Pencil className="h-3 w-3 text-muted-foreground" />
-        </Button>
-        <span className="font-medium text-foreground mb-1 pr-6">{p.producto_nombre}</span>
-        <div className="flex justify-between text-muted-foreground items-center">
-          <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
-          <div className="flex items-center gap-1.5">
-            {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
-            <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Desktop View
-  if (isEditing) {
-    return (
-      <TableRow className="bg-muted/30">
-        <TableCell className="py-2">
-          <Input className="h-7 text-xs max-w-[200px]" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium mt-1">⚠️ Precio anómalo</p>}
-        </TableCell>
-        <TableCell className="py-2 text-right opacity-100 flex justify-end gap-1">
-          <Input className="h-7 text-xs w-16 text-right" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-          <Input className="h-7 text-xs w-16" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
-        </TableCell>
-        <TableCell className="py-2 text-right">
-          <Input className="h-7 text-xs text-right w-20 ml-auto" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
-        </TableCell>
-        <TableCell className="py-2 text-right flex justify-end gap-1 items-center">
-          <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          <Button size="icon" className="h-7 w-7 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending}><Check className="h-3.5 w-3.5" /></Button>
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  return (
-    <TableRow className="hover:bg-muted/20 group/prod">
-      <TableCell className="py-2.5 font-medium">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <span className="truncate">{p.producto_nombre}</span>
-        </div>
-      </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground">
-        <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
-        <span className="text-xs">{p.unidad || ""}</span>
-      </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">
-        <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
-          <span>{formatCurrency(p.precio_unitario ?? null)}</span>
-        </div>
-      </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
-    </TableRow>
-  );
-};
-
-type ColumnaAlbaran = { key: string; label: string };
-
-const COLUMNAS_ALBARANES: ColumnaAlbaran[] = [
+const COLUMNAS_ALBARANES: ColumnaType[] = [
   { key: "numero", label: "Número" },
   { key: "proveedor", label: "Proveedor" },
   { key: "cif", label: "CIF" },
@@ -214,34 +37,7 @@ const DEFAULTS_ALBARANES: Record<string, boolean> = {
   items: true, doc: true, procesado_en: false, creado: false,
 };
 
-const SelectorColumnas = ({
-  columnas, visibles, onChange,
-}: {
-  columnas: ColumnaAlbaran[];
-  visibles: Record<string, boolean>;
-  onChange: (key: string, checked: boolean) => void;
-}) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="outline" size="sm" className="gap-1.5 border-border/50 shadow-sm hover:bg-muted/50 transition-colors">
-        <Settings2 className="h-4 w-4" /> Columnas
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-52" align="end">
-      <p className="text-sm font-medium mb-3">Columnas visibles</p>
-      <div className="space-y-2">
-        {columnas.map((col) => (
-          <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox checked={visibles[col.key]} onCheckedChange={(checked) => onChange(col.key, !!checked)} />
-            {col.label}
-          </label>
-        ))}
-      </div>
-    </PopoverContent>
-  </Popover>
-);
-
-const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran: Factura; onPreguntarIA?: (doc: Factura) => void; todasAlbaranes: Factura[] }) => {
+const FilaAlbaranMobile = ({ albaran, onPreguntarIA, allDocs, onEdit }: { albaran: Factura; onPreguntarIA?: (doc: Factura) => void; allDocs: Factura[]; onEdit: (doc: Factura) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = albaran.productos.length > 0;
 
@@ -258,7 +54,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-semibold text-foreground">{albaran.numero_documento}</CardTitle>
-                {getAnomaliaBadge(albaran, todasAlbaranes)}
+                {getAnomaliaBadge(albaran, allDocs)}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center">{albaran.proveedor || "Sin proveedor"}</p>
             </div>
@@ -279,6 +75,14 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran
             <ExternalLink className="h-3 w-3" /> Doc
           </a>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-full min-w-0 justify-center gap-1 border border-border/40 px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50"
+          onClick={(e) => { e.stopPropagation(); onEdit(albaran); }}
+        >
+          <Pencil className="h-3 w-3" /> Editar
+        </Button>
         {onPreguntarIA && (
           <Button
             variant="ghost"
@@ -304,7 +108,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran
               <div className="mt-4">
                 <p className="text-xs font-semibold mb-2 flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground"><Package className="h-3.5 w-3.5" /> Desglose ({albaran.productos.length})</p>
                 {albaran.productos.map((p) => (
-                  <FilaProducto key={p.id} p={p} isMobile todasAlbaranes={todasAlbaranes} />
+                  <FilaProducto key={p.id} p={p} isMobile allDocs={allDocs} />
                 ))}
               </div>
             )}
@@ -315,7 +119,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, todasAlbaranes }: { albaran
   );
 };
 
-const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, todasAlbaranes }: { albaran: Factura; visibles: Record<string, boolean>; onPreguntarIA?: (doc: Factura) => void; todasAlbaranes: Factura[] }) => {
+const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, allDocs, onEdit }: { albaran: Factura; visibles: Record<string, boolean>; onPreguntarIA?: (doc: Factura) => void; allDocs: Factura[]; onEdit: (doc: Factura) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
   const tieneProductos = albaran.productos.length > 0;
   const colSpan = 2 + Object.values(visibles).filter(Boolean).length;
@@ -326,7 +130,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, todasAlbaranes }
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, todasAlbaranes)}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, allDocs)}</TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{albaran.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{albaran.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground text-center">{formatDate(albaran.fecha)}</TableCell>}
@@ -367,9 +171,18 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, todasAlbaranes }
         {visibles.procesado_en && <TableCell className="text-xs text-muted-foreground">{formatDateTime(albaran.procesado_en)}</TableCell>}
         {visibles.creado && <TableCell className="text-xs text-muted-foreground">{formatDateTime(albaran.created_at)}</TableCell>}
 
-        {/* Acciones Rápidas (IA) */}
+        {/* Acciones Rápidas */}
         <TableCell className="text-right pr-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs font-medium border-border/40 hover:bg-muted/50 transition-all shadow-sm"
+              onClick={(e) => { e.stopPropagation(); onEdit(albaran); }}
+              title="Editar Albarán"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             {onPreguntarIA && (
               <Button
                 variant="outline"
@@ -401,7 +214,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, todasAlbaranes }
                   </TableHeader>
                   <TableBody>
                     {albaran.productos.map((p) => (
-                      <FilaProducto key={p.id} p={p} todasAlbaranes={todasAlbaranes} />
+                      <FilaProducto key={p.id} p={p} allDocs={allDocs} />
                     ))}
                   </TableBody>
                 </Table>
@@ -420,6 +233,13 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
   const busquedaDeferida = useDeferredValue(busqueda); // No bloquea el thread durante escritura rápida
   const isMobile = useIsMobile();
   const [columnasVisibles, setColumnasVisibles] = useState<Record<string, boolean>>(DEFAULTS_ALBARANES);
+  const [facturaEditando, setFacturaEditando] = useState<Factura | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const handleEditAlbaran = (albaran: Factura) => {
+    setFacturaEditando(albaran);
+    setIsEditDialogOpen(true);
+  };
 
   const toggleColumna = (key: string, checked: boolean) => {
     setColumnasVisibles((prev) => ({ ...prev, [key]: checked }));
@@ -467,7 +287,7 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
       ) : albaranesFiltrados.length === 0 ? (
         <Card className="border-border/50 bg-muted/10 shadow-none"><CardContent className="pt-8 pb-8 text-center"><FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" /><p className="text-muted-foreground font-medium">{busqueda ? "No se encontraron albaranes" : "No hay albaranes registrados"}</p></CardContent></Card>
       ) : isMobile ? (
-        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{albaranesFiltrados.map((a) => <FilaAlbaranMobile key={a.id} albaran={a} onPreguntarIA={onPreguntarIA} todasAlbaranes={albaranes || []} />)}</div>
+        <div className="space-y-1 overflow-auto custom-scrollbar flex-1 min-h-0 pr-1">{albaranesFiltrados.map((a) => <FilaAlbaranMobile key={a.id} albaran={a} onPreguntarIA={onPreguntarIA} allDocs={albaranes || []} onEdit={handleEditAlbaran} />)}</div>
       ) : (
         <div className="rounded-xl border border-border/60 bg-background shadow-sm overflow-auto custom-scrollbar flex-1 min-h-0 relative">
           <Table className="min-w-[1080px] lg:min-w-[1260px]">
@@ -486,19 +306,25 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
                 {columnasVisibles.doc && <TableHead className="text-center font-semibold">Escaneo</TableHead>}
                 {columnasVisibles.procesado_en && <TableHead className="font-semibold">Procesado</TableHead>}
                 {columnasVisibles.creado && <TableHead className="font-semibold">Creado</TableHead>}
-                <TableHead className="text-right pr-4 font-semibold w-[170px]">
+                <TableHead className="text-right pr-4 font-semibold w-[190px]">
                   Acciones
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {albaranesFiltrados.map((a) => <FilaAlbaranDesktop key={a.id} albaran={a} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} todasAlbaranes={albaranes || []} />)}
+              {albaranesFiltrados.map((a) => <FilaAlbaranDesktop key={a.id} albaran={a} visibles={columnasVisibles} onPreguntarIA={onPreguntarIA} allDocs={albaranes || []} onEdit={handleEditAlbaran} />)}
             </TableBody>
           </Table>
         </div>
       )}
 
       <p className="text-[12px] font-medium text-muted-foreground text-right shrink-0">{albaranesFiltrados.length} total</p>
+
+      <EditarFacturaDialog
+        factura={facturaEditando}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      />
     </div>
   );
 };

@@ -15,8 +15,7 @@ serve(async (req) => {
   try {
     const { mensaje, session_id } = await req.json();
 
-    console.log('Chat facturas - Mensaje:', mensaje);
-    console.log('Chat facturas - Session ID:', session_id);
+    console.log('Chat facturas - Mensaje:', mensaje, '- Session:', session_id);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -36,10 +35,22 @@ serve(async (req) => {
 
     console.log('Respuesta del webhook chat:', response.status);
 
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          respuesta: 'El servicio de IA no está disponible en este momento. Inténtalo de nuevo en unos minutos.',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
     let webhookData = null;
     const rawText = await response.text();
-    console.log('Raw webhook response:', rawText);
-    
+
     try {
       webhookData = JSON.parse(rawText);
     } catch {
@@ -47,11 +58,9 @@ serve(async (req) => {
       webhookData = { text: rawText };
     }
 
-    console.log('Parsed webhook data:', JSON.stringify(webhookData));
-
     // Extraer respuesta - el webhook devuelve un array: [{output: "..."}]
     const firstItem = Array.isArray(webhookData) ? webhookData[0] : webhookData;
-    
+
     const respuesta = firstItem?.output ||
       firstItem?.text ||
       firstItem?.message ||

@@ -13,9 +13,11 @@ import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanza
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
+import { GestionSolicitudes } from "@/components/reservas/GestionSolicitudes";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,6 +30,7 @@ export default function Reservas() {
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
   const isAdmin = role === "admin";
+  const { countPendientes } = useSolicitudesPendientes();
 
   // Leer parámetros de URL para controlar tab activo
   const tabFromUrl = searchParams.get("tab");
@@ -137,6 +140,9 @@ export default function Reservas() {
                 <SelectItem value="hoy">Hoy</SelectItem>
                 <SelectItem value="lista">Lista</SelectItem>
                 <SelectItem value="calendario">Calendario</SelectItem>
+                <SelectItem value="solicitudes">
+                  Solicitudes{countPendientes > 0 ? ` (${countPendientes})` : ""}
+                </SelectItem>
                 <SelectItem value="blacklist">Blacklist</SelectItem>
                 {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
               </SelectContent>
@@ -154,6 +160,14 @@ export default function Reservas() {
               <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
               <TabsTrigger value="lista" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Lista</TabsTrigger>
               <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
+              <TabsTrigger value="solicitudes" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
+                Solicitudes
+                {countPendientes > 0 && (
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full">
+                    {countPendientes}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
@@ -179,6 +193,10 @@ export default function Reservas() {
 
           <TabsContent value="calendario" className="space-y-6 mt-6">
             <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
+          </TabsContent>
+
+          <TabsContent value="solicitudes" className="space-y-6 mt-6">
+            <GestionSolicitudes />
           </TabsContent>
 
           <TabsContent value="blacklist" className="space-y-6 mt-6">

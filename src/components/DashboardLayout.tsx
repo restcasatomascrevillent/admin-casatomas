@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -25,6 +26,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     day: "numeric",
                   })}
                 </p>
+              </div>
+              <div className="shrink-0 ml-2">
+                <CentroNotificaciones />
               </div>
             </div>
           </header>

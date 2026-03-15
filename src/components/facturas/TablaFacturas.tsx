@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from "react";
-import { useFacturas, Factura, useUpdateProductoFactura, ProductoFactura } from "@/hooks/useFacturas";
+import { useFacturas, Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -8,69 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Settings2, Sparkles, Pencil, AlertCircle, Check } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { ChevronDown, ChevronRight, Search, FileText, Package, ExternalLink, Sparkles, Pencil } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EditarFacturaDialog } from "./EditarFacturaDialog";
+import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
+import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
+import { FilaProducto } from "./shared/FilaProducto";
 
-const formatCurrency = (value: number | null): string => {
-  if (value === null || value === undefined) return "-";
-  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
-};
+// Re-export FilaProducto for consumers that import from TablaFacturas
+export { FilaProducto } from "./shared/FilaProducto";
 
-const formatDate = (dateString: string | null): string => {
-  if (!dateString) return "-";
-  try {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: es });
-  } catch {
-    return dateString;
-  }
-};
-
-const formatDateTime = (dateString: string | null): string => {
-  if (!dateString) return "-";
-  try {
-    return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: es });
-  } catch {
-    return dateString;
-  }
-};
-
-const truncateText = (text: string | null, maxLength: number = 40): string => {
-  if (!text) return "-";
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "...";
-};
-
-const getAnomaliaBadge = (factura: Factura, todasFacturas: Factura[]) => {
-  const hasAnomalousProduct = factura.productos.some(p => {
-    if (!p.precio_unitario) return false;
-    const pastPrices = todasFacturas
-      .flatMap(f => f.productos)
-      .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-      .map(past => past.precio_unitario as number);
-    if (pastPrices.length === 0) return false;
-    const avg = pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length;
-    return p.precio_unitario > avg * 2;
-  });
-
-  if (hasAnomalousProduct) {
-    return <Badge variant="destructive" className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 text-[10px] px-1.5 py-0 gap-1 border-orange-200 shadow-none font-medium h-5"><AlertCircle className="h-3 w-3" /> Anomalía Precio</Badge>;
-  }
-
-  return null;
-};
-
-type ColumnaFactura = {
-  key: string;
-  label: string;
-};
-
-const COLUMNAS_FACTURAS: ColumnaFactura[] = [
+const COLUMNAS_FACTURAS: ColumnaType[] = [
   { key: "numero", label: "Número" },
   { key: "proveedor", label: "Proveedor" },
   { key: "cif", label: "CIF" },
@@ -90,167 +39,6 @@ const DEFAULTS_FACTURAS: Record<string, boolean> = {
   subtotal: false, iva: false, total: true, observaciones: false,
   items: true, doc: true, procesado_en: false, creado: false,
 };
-
-export const FilaProducto = ({ p, isMobile, todasFacturas }: { p: ProductoFactura, isMobile?: boolean, todasFacturas: Factura[] }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [nombre, setNombre] = useState(p.producto_nombre);
-  const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
-  const [unidad, setUnidad] = useState(p.unidad || "");
-  const [precioUnitario, setPrecioUnitario] = useState(String(p.precio_unitario ?? ""));
-  const [total, setTotal] = useState(String(p.precio ?? ""));
-
-  const updateMutation = useUpdateProductoFactura();
-
-  const handleSave = async () => {
-    try {
-      await updateMutation.mutateAsync({
-        id: p.id,
-        producto_nombre: nombre,
-        cantidad: cantidad !== "" ? Number(cantidad) : undefined,
-        unidad: unidad || null,
-        precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
-        precio: total !== "" ? Number(total) : undefined,
-      });
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Error guardando producto:", err);
-    }
-  };
-
-  const pastPrices = todasFacturas
-    .flatMap(f => f.productos)
-    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-    .map(past => past.precio_unitario as number);
-
-  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
-
-  // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
-  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
-  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
-
-  if (isMobile) {
-    if (isEditing) {
-      return (
-        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
-          <Input className="h-7 text-xs" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
-          <div className="flex gap-2">
-            <Input className="h-7 text-xs w-full" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-            <Input className="h-7 text-xs w-full" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="w-12 text-muted-foreground">P. Unit:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
-          </div>
-          <div className="flex gap-2 items-center">
-            <span className="w-12 font-medium">Total:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          </div>
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium">⚠️ Anomalía: Precio disparado respecto al original</p>}
-          <div className="flex gap-2 mt-1 justify-end">
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditing(false)}>Cancelar</Button>
-            <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod hover:border-[hsl(38,59%,45%)/0.3] transition-colors">
-        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover/prod:opacity-100 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(true)}>
-          <Pencil className="h-3 w-3 text-muted-foreground" />
-        </Button>
-        <span className="font-medium text-foreground mb-1 pr-6">{p.producto_nombre}</span>
-        <div className="flex justify-between text-muted-foreground items-center">
-          <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
-          <div className="flex items-center gap-1.5">
-            {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
-            <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Desktop View
-  if (isEditing) {
-    return (
-      <TableRow className="bg-muted/30">
-        <TableCell className="py-2">
-          <Input className="h-7 text-xs max-w-[200px]" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium mt-1">⚠️ Precio anómalo vs historial</p>}
-        </TableCell>
-        <TableCell className="py-2 text-right opacity-100 flex justify-end gap-1">
-          <Input className="h-7 text-xs w-16 text-right" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-          <Input className="h-7 text-xs w-16" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
-        </TableCell>
-        <TableCell className="py-2 text-right">
-          <Input className="h-7 text-xs text-right w-20 ml-auto" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
-        </TableCell>
-        <TableCell className="py-2 text-right flex justify-end gap-1 items-center">
-          <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          <Button size="icon" className="h-7 w-7 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending}><Check className="h-3.5 w-3.5" /></Button>
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  return (
-    <TableRow className="hover:bg-muted/20 group/prod">
-      <TableCell className="py-2.5 font-medium">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <span className="truncate">{p.producto_nombre}</span>
-        </div>
-      </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground">
-        <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
-        <span className="text-xs">{p.unidad || ""}</span>
-      </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">
-        <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
-          <span>{formatCurrency(p.precio_unitario ?? null)}</span>
-        </div>
-      </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
-    </TableRow>
-  );
-};
-
-const SelectorColumnas = ({
-  columnas,
-  visibles,
-  onChange,
-}: {
-  columnas: ColumnaFactura[];
-  visibles: Record<string, boolean>;
-  onChange: (key: string, checked: boolean) => void;
-}) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="outline" size="sm" className="gap-1.5 border-border/50 shadow-sm hover:bg-muted/50 transition-colors">
-        <Settings2 className="h-4 w-4" />
-        Columnas
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-52" align="end">
-      <p className="text-sm font-medium mb-3">Columnas visibles</p>
-      <div className="space-y-2">
-        {columnas.map((col) => (
-          <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
-            <Checkbox
-              checked={visibles[col.key]}
-              onCheckedChange={(checked) => onChange(col.key, !!checked)}
-            />
-            {col.label}
-          </label>
-        ))}
-      </div>
-    </PopoverContent>
-  </Popover>
-);
 
 const FilaFacturaMobile = ({
   factura,
@@ -344,7 +132,7 @@ const FilaFacturaMobile = ({
                 </p>
                 <div className="space-y-1.5">
                   {factura.productos.map((p) => (
-                    <FilaProducto key={p.id} p={p} isMobile={true} todasFacturas={todasFacturas} />
+                    <FilaProducto key={p.id} p={p} isMobile={true} allDocs={todasFacturas} />
                   ))}
                 </div>
               </div>
@@ -464,7 +252,7 @@ const FilaFacturaDesktop = ({
                   </TableHeader>
                   <TableBody>
                     {factura.productos.map((p) => (
-                      <FilaProducto key={p.id} p={p} todasFacturas={todasFacturas} />
+                      <FilaProducto key={p.id} p={p} allDocs={todasFacturas} />
                     ))}
                   </TableBody>
                 </Table>

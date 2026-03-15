@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar, Plus, Trash2 } from "lucide-react";
+import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar, Plus, Trash2, Euro, MessageSquare, RotateCcw, Save } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,111 @@ function formatDuration(seconds: number | null, startedAt: string, status: strin
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// ── Respuestas del bot — textos por defecto (espejo de vapi-webhook.js) ───────
+const DEFAULT_BOT_RESPONSES: Record<string, string> = {
+    transfer_to_human: 'Un momento, ahora mismo te paso con el restaurante.',
+    availability_found: 'Perfecto, hay disponibilidad el {fecha} a las {hora} para {comensales} personas. Espacios disponibles: {espacios}. ¿Procedemos con la reserva? Solo necesito tu nombre.',
+    availability_not_found: 'Vaya, lo siento — no tenemos hueco el {fecha} a las {hora} para {comensales} personas. ¿Quieres probar con otra fecha u hora?',
+    reservation_created: 'Listo, {nombre}, ya tengo anotada tu reserva para {comensales} personas el {fecha} a las {hora}{notas_texto}. Quedará pendiente de confirmación — te llamaremos para dártela por buena. ¿En qué más puedo ayudarte?',
+    reservation_blacklist: 'Lo siento, en este momento no podemos tramitar tu reserva por teléfono. Te animamos a contactarnos por otro medio.',
+    reservation_group_large: 'Para una mesa de más de {max} personas es mejor que lo gestionemos de forma personalizada. Dejo tu consulta anotada y alguien del restaurante te llama para encontrar la mejor opción. ¿Te parece bien?',
+    reservation_today: 'Entiendo que necesitas mesa para hoy, pero las reservas del día se gestionan directamente en el restaurante. He dejado tu petición anotada por si pueden ayudarte. ¿Puedo hacer algo más por ti?',
+    reservation_cutoff: 'Mira, el tiempo es justo — las reservas tienen que hacerse con al menos {minutos} minutos de antelación. He anotado tu petición para que el restaurante lo sepa. ¿Quieres probar con otro día?',
+    reservation_max_phone: 'Ya tienes {max} reserva(s) activa(s) para ese día con este número. He anotado la petición para que el equipo del restaurante lo vea. ¿Puedo ayudarte con otra cosa?',
+    reservation_max_email: 'Ya se ha alcanzado el límite de reservas para ese día con ese email. He dejado tu consulta anotada. ¿Necesitas algo más?',
+    reservation_no_availability: 'Lo siento, ya no queda disponibilidad el {fecha} a las {hora} para {comensales} personas. He anotado tu petición por si surge algún hueco. ¿Quieres que mire otra fecha?',
+    reservation_no_phone: 'Necesito un número de teléfono de contacto para la reserva. ¿Puedes facilitarme uno o llamar desde un número visible?',
+    reservation_error: 'Vaya, ha habido un problema al registrar la reserva. ¿Lo intentamos de nuevo, o prefieres llamar directamente al restaurante?',
+    find_no_phone: 'No puedo verificar tu número. Por favor, llama desde el teléfono con el que hiciste la reserva.',
+    find_not_found: 'No encuentro reservas activas para este número{fecha_texto}. ¿Puede que la reserva estuviera a otro nombre o teléfono?',
+    find_found_one: 'Aquí tienes tu reserva: {fecha} a las {hora}, {comensales} personas{espacio_texto}, a nombre de {nombre} — estado: {estado}. [REF_INTERNA:{id}] ¿Quieres modificarla o cancelarla?',
+    find_found_many: 'Tienes {cantidad} reservas activas:\n{lista}\n¿Cuál te gustaría modificar o cancelar? Dime la fecha o el número.',
+    find_error: 'Ha habido un problema buscando tus reservas. Inténtalo de nuevo o llama al restaurante.',
+    modify_not_found: 'No encuentro esa reserva, o puede que ya no esté activa.',
+    modify_24h: 'Lo siento, los cambios hay que hacerlos con más de 24 horas de antelación. Para urgencias, llama directamente al restaurante.',
+    modify_no_availability: 'No hay disponibilidad el {fecha} para {comensales} personas. ¿Probamos con otra fecha?',
+    modify_success: 'Hecho, he actualizado tu reserva ({cambios}). Queda pendiente de confirmación — el restaurante te avisará. ¿Algo más?',
+    modify_error: 'No he podido modificar la reserva. ¿Lo intentamos de nuevo o prefieres llamar al restaurante?',
+    cancel_not_found: 'No encuentro esa reserva, o puede que ya no esté activa.',
+    cancel_24h: 'Los cambios hay que hacerlos con más de 24 horas de antelación. Para urgencias, llama directamente al restaurante.',
+    cancel_success: 'Tu reserva del {fecha} a las {hora} para {comensales} personas ha quedado cancelada. ¿Puedo ayudarte en algo más?',
+    cancel_error: 'No he podido cancelar la reserva. ¿Lo intentamos de nuevo o prefieres llamar al restaurante?',
+    validation_date_past: 'No se puede reservar para una fecha ya pasada.',
+    validation_date_today: 'Las reservas para hoy se gestionan directamente en el restaurante. ¿Quieres que anote tu petición?',
+    validation_date_too_far: 'Solo podemos aceptar reservas con un máximo de {dias} días de antelación.',
+    validation_cutoff: 'Las reservas deben hacerse con al menos {minutos} minutos de antelación. ¿Quieres que anote tu petición?',
+    validation_party_range: 'El número de comensales debe estar entre {min} y {max} personas.',
+    transfer_call: 'Te paso con el restaurante, un momento.',
+};
+
+const BOT_RESPONSE_GROUPS: { label: string; keys: string[] }[] = [
+    { label: 'General', keys: ['transfer_to_human', 'transfer_call'] },
+    { label: 'Disponibilidad', keys: ['availability_found', 'availability_not_found'] },
+    {
+        label: 'Crear reserva', keys: [
+            'reservation_created', 'reservation_blacklist', 'reservation_group_large',
+            'reservation_today', 'reservation_cutoff', 'reservation_max_phone',
+            'reservation_max_email', 'reservation_no_availability', 'reservation_no_phone', 'reservation_error',
+        ],
+    },
+    { label: 'Buscar reserva', keys: ['find_no_phone', 'find_not_found', 'find_found_one', 'find_found_many', 'find_error'] },
+    { label: 'Modificar reserva', keys: ['modify_not_found', 'modify_24h', 'modify_no_availability', 'modify_success', 'modify_error'] },
+    { label: 'Cancelar reserva', keys: ['cancel_not_found', 'cancel_24h', 'cancel_success', 'cancel_error'] },
+    { label: 'Validaciones', keys: ['validation_date_past', 'validation_date_today', 'validation_date_too_far', 'validation_cutoff', 'validation_party_range'] },
+];
+
+const BOT_RESPONSE_LABELS: Record<string, string> = {
+    transfer_to_human: 'Transferir a humano', transfer_call: 'Pasar llamada',
+    availability_found: 'Hay disponibilidad', availability_not_found: 'Sin disponibilidad',
+    reservation_created: 'Reserva creada', reservation_blacklist: 'Cliente en blacklist',
+    reservation_group_large: 'Grupo demasiado grande', reservation_today: 'Reserva para hoy',
+    reservation_cutoff: 'Demasiado tarde (corte horario)', reservation_max_phone: 'Límite por teléfono',
+    reservation_max_email: 'Límite por email', reservation_no_availability: 'Sin disponibilidad al crear',
+    reservation_no_phone: 'Sin teléfono', reservation_error: 'Error al crear reserva',
+    find_no_phone: 'Sin número verificado', find_not_found: 'Reserva no encontrada',
+    find_found_one: 'Una reserva encontrada', find_found_many: 'Varias reservas', find_error: 'Error al buscar',
+    modify_not_found: 'Reserva no encontrada (modificar)', modify_24h: 'Regla 24h (modificar)',
+    modify_no_availability: 'Sin disponibilidad (modificar)', modify_success: 'Modificación exitosa', modify_error: 'Error al modificar',
+    cancel_not_found: 'Reserva no encontrada (cancelar)', cancel_24h: 'Regla 24h (cancelar)',
+    cancel_success: 'Cancelación exitosa', cancel_error: 'Error al cancelar',
+    validation_date_past: 'Fecha pasada', validation_date_today: 'Fecha hoy',
+    validation_date_too_far: 'Fecha demasiado lejana', validation_cutoff: 'Corte horario (validación)',
+    validation_party_range: 'Rango de comensales',
+};
+
+const BOT_RESPONSE_VARS: Record<string, string> = {
+    availability_found: '{fecha}, {hora}, {comensales}, {espacios}',
+    availability_not_found: '{fecha}, {hora}, {comensales}',
+    reservation_created: '{nombre}, {fecha}, {hora}, {comensales}, {notas_texto}',
+    reservation_group_large: '{max}', reservation_cutoff: '{minutos}',
+    reservation_max_phone: '{max}', reservation_max_email: '{max}',
+    reservation_no_availability: '{fecha}, {hora}, {comensales}',
+    find_not_found: '{fecha_texto}',
+    find_found_one: '{fecha}, {hora}, {comensales}, {espacio_texto}, {nombre}, {estado}, {id}',
+    find_found_many: '{cantidad}, {lista}',
+    modify_no_availability: '{fecha}, {comensales}', modify_success: '{cambios}',
+    validation_date_too_far: '{dias}', validation_cutoff: '{minutos}',
+    validation_party_range: '{min}, {max}',
+};
+
+// Razón de fin de llamada → etiqueta legible
+const ENDED_REASON_LABELS: Record<string, { label: string; color: string }> = {
+    'customer-ended-call': { label: 'Cliente colgó', color: 'bg-gray-100 text-gray-700' },
+    'assistant-ended-call': { label: 'Bot despidió', color: 'bg-blue-100 text-blue-700' },
+    'silence-timed-out': { label: 'Silencio', color: 'bg-yellow-100 text-yellow-700' },
+    'max-duration-exceeded': { label: 'Duración máx.', color: 'bg-orange-100 text-orange-700' },
+    'exceeded-max-duration': { label: 'Duración máx.', color: 'bg-orange-100 text-orange-700' },
+    'pipeline-error': { label: 'Error pipeline', color: 'bg-red-100 text-red-700' },
+    'assistant-error': { label: 'Error bot', color: 'bg-red-100 text-red-700' },
+    'voicemail': { label: 'Buzón voz', color: 'bg-purple-100 text-purple-700' },
+    'error': { label: 'Error', color: 'bg-red-100 text-red-700' },
+};
+
+const COST_COMPONENT_LABELS: Record<string, string> = {
+    model: 'Modelo IA', transcriber: 'Transcripción', voice: 'Voz (ElevenLabs)',
+    vapi: 'VAPI', telephony: 'Telefonía',
+};
+
 export default function AsistenteTelefonico() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -87,6 +193,11 @@ export default function AsistenteTelefonico() {
     const [schedule, setSchedule] = useState<any[]>(DEFAULT_SCHEDULE);
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [scheduleDirty, setScheduleDirty] = useState(false);
+
+    // Bot responses editor state
+    const [botResponses, setBotResponses] = useState<Record<string, string>>({});
+    const [botResponsesDirty, setBotResponsesDirty] = useState(false);
+    const [openBotGroup, setOpenBotGroup] = useState<string | null>(null);
 
     const normalizeSchedule = (rawSchedule: any[]) => {
         if (!rawSchedule) return DEFAULT_SCHEDULE;
@@ -124,6 +235,10 @@ export default function AsistenteTelefonico() {
             } else {
                 setSchedule(normalizeSchedule(DEFAULT_SCHEDULE));
             }
+            // Load saved bot responses
+            const br = (config as any).bot_responses;
+            setBotResponses(br && typeof br === 'object' ? br : {});
+            setBotResponsesDirty(false);
         }
     }, [config]);
 
@@ -169,6 +284,24 @@ export default function AsistenteTelefonico() {
         onError: (error) => {
             toast({ title: "Error", description: "No se pudo guardar el horario.", variant: "destructive" });
             console.error(error);
+        },
+    });
+
+    const updateBotResponsesMutation = useMutation({
+        mutationFn: async (responses: Record<string, string>) => {
+            const { error } = await supabase
+                .from("phone_system_config")
+                .update({ bot_responses: responses } as any)
+                .eq("restaurant_id", "default");
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
+            setBotResponsesDirty(false);
+            toast({ title: "Respuestas guardadas", description: "Los textos del bot se han actualizado correctamente." });
+        },
+        onError: () => {
+            toast({ title: "Error", description: "No se pudieron guardar los textos.", variant: "destructive" });
         },
     });
 
@@ -238,6 +371,20 @@ export default function AsistenteTelefonico() {
     const avgDurationSeconds = completedCalls.length > 0
         ? Math.round(completedCalls.reduce((sum: number, c: any) => sum + parseInt(c.duration_seconds), 0) / completedCalls.length)
         : 0;
+
+    // Cost metrics
+    const todayCostEur = todayCalls.reduce((sum: number, c: any) => sum + (Number(c.cost_total_eur) || 0), 0);
+    const thisMonthStart = new Date(); thisMonthStart.setDate(1); thisMonthStart.setHours(0, 0, 0, 0);
+    const monthCalls = calls.filter((c: any) => c.started_at && new Date(c.started_at) >= thisMonthStart);
+    const monthCostEur = monthCalls.reduce((sum: number, c: any) => sum + (Number(c.cost_total_eur) || 0), 0);
+    const callsWithCost = calls.filter((c: any) => Number(c.cost_total_eur) > 0);
+    const avgCostEur = callsWithCost.length > 0
+        ? callsWithCost.reduce((sum: number, c: any) => sum + Number(c.cost_total_eur), 0) / callsWithCost.length
+        : 0;
+    const monthVapiMinutes = monthCalls.reduce((sum: number, c: any) => {
+        const mins = (c.cost_breakdown as any)?.vapi?.minutes;
+        return sum + (Number(mins) || 0);
+    }, 0);
 
     if (isLoading && !config) {
         return (
@@ -323,6 +470,50 @@ export default function AsistenteTelefonico() {
                             <p className="text-xs text-muted-foreground">
                                 De las llamadas completadas por el bot hoy
                             </p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Tarjetas de costes */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Gasto Hoy</CardTitle>
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">€{todayCostEur.toFixed(3)}</div>
+                            <p className="text-xs text-muted-foreground">Coste total de llamadas de hoy</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Gasto Este Mes</CardTitle>
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">€{monthCostEur.toFixed(2)}</div>
+                            <p className="text-xs text-muted-foreground">Acumulado mes actual</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Coste Medio</CardTitle>
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{callsWithCost.length > 0 ? `€${avgCostEur.toFixed(3)}` : '—'}</div>
+                            <p className="text-xs text-muted-foreground">Por llamada (con coste registrado)</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Min. IA Este Mes</CardTitle>
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{monthVapiMinutes.toFixed(1)}</div>
+                            <p className="text-xs text-muted-foreground">Minutos facturados por VAPI</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -444,6 +635,93 @@ export default function AsistenteTelefonico() {
                     <VapiPromptEditor config={config} />
                 </div>
 
+                {/* Editor de respuestas del bot */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <MessageSquare className="h-5 w-5" />
+                                    Respuestas del Bot
+                                </CardTitle>
+                                <CardDescription>
+                                    Personaliza los textos que dice el asistente en cada situación. Usa {"{ variable }"} como placeholder. Si dejas un campo vacío, se usará el texto por defecto.
+                                </CardDescription>
+                            </div>
+                            {botResponsesDirty && (
+                                <Button
+                                    onClick={() => updateBotResponsesMutation.mutate(botResponses)}
+                                    disabled={updateBotResponsesMutation.isPending}
+                                    className="shrink-0"
+                                >
+                                    {updateBotResponsesMutation.isPending
+                                        ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        : <Save className="h-4 w-4 mr-2" />}
+                                    Guardar respuestas
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {BOT_RESPONSE_GROUPS.map((group) => (
+                            <div key={group.label} className="border rounded-lg overflow-hidden">
+                                <button
+                                    className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
+                                    onClick={() => setOpenBotGroup(openBotGroup === group.label ? null : group.label)}
+                                >
+                                    <span className="font-medium text-sm">{group.label}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {group.keys.filter(k => botResponses[k]).length}/{group.keys.length} personalizados
+                                    </span>
+                                </button>
+                                {openBotGroup === group.label && (
+                                    <div className="divide-y">
+                                        {group.keys.map((key) => (
+                                            <div key={key} className="p-4 space-y-2">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <label className="text-sm font-medium">{BOT_RESPONSE_LABELS[key] || key}</label>
+                                                        {BOT_RESPONSE_VARS[key] && (
+                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                                Variables: <code className="bg-muted px-1 rounded">{BOT_RESPONSE_VARS[key]}</code>
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    {botResponses[key] && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                                                            onClick={() => {
+                                                                const newBR = { ...botResponses };
+                                                                delete newBR[key];
+                                                                setBotResponses(newBR);
+                                                                setBotResponsesDirty(true);
+                                                            }}
+                                                        >
+                                                            <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <Textarea
+                                                    rows={2}
+                                                    placeholder={DEFAULT_BOT_RESPONSES[key]}
+                                                    value={botResponses[key] || ''}
+                                                    onChange={(e) => {
+                                                        setBotResponses(prev => ({ ...prev, [key]: e.target.value }));
+                                                        setBotResponsesDirty(true);
+                                                    }}
+                                                    className="text-sm resize-none"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+
                 <Card className="col-span-4 mt-6">
                     <CardHeader>
                         <CardTitle>Historial de Llamadas</CardTitle>
@@ -456,18 +734,19 @@ export default function AsistenteTelefonico() {
                             <div className="text-center py-6 text-muted-foreground">No hay llamadas registradas.</div>
                         ) : (
                             <div className="rounded-md border">
-                                <div className="grid grid-cols-5 bg-muted/50 p-3 text-sm font-medium">
+                                <div className="grid grid-cols-6 bg-muted/50 p-3 text-sm font-medium">
                                     <div>Fecha y Hora</div>
                                     <div>Número</div>
                                     <div>Tipo</div>
                                     <div>Estado</div>
                                     <div className="text-right">Duración</div>
+                                    <div className="text-right">Coste</div>
                                 </div>
                                 <ScrollArea className="h-[400px]">
                                     {calls.map((call: any) => (
                                         <div
                                             key={call.id}
-                                            className={`grid grid-cols-5 items-center border-t p-3 text-sm transition-colors hover:bg-muted/50 cursor-pointer ${call.call_type === 'bot' && call.tool_calls && call.tool_calls.length > 0 ? 'bg-primary/5' : ''}`}
+                                            className={`grid grid-cols-6 items-center border-t p-3 text-sm transition-colors hover:bg-muted/50 cursor-pointer ${call.call_type === 'bot' && call.tool_calls && call.tool_calls.length > 0 ? 'bg-primary/5' : ''}`}
                                             onClick={() => setSelectedCall(call)}
                                         >
                                             <div className="font-medium text-muted-foreground">
@@ -509,6 +788,11 @@ export default function AsistenteTelefonico() {
                                             <div className="text-right font-mono">
                                                 {formatDuration(call.duration_seconds, call.started_at, call.status)}
                                             </div>
+                                            <div className="text-right font-mono text-muted-foreground">
+                                                {call.cost_total_eur != null
+                                                    ? `€${Number(call.cost_total_eur).toFixed(3)}`
+                                                    : '—'}
+                                            </div>
                                         </div>
                                     ))}
                                 </ScrollArea>
@@ -536,7 +820,51 @@ export default function AsistenteTelefonico() {
                             </DialogDescription>
                         </DialogHeader>
 
-                        <ScrollArea className="flex-1 mt-4 p-4 border rounded-md">
+                        <ScrollArea className="flex-1 mt-4 p-4 border rounded-md space-y-4">
+                            {/* Coste y razón de fin */}
+                            {selectedCall?.call_type === "bot" && (selectedCall?.cost_total_eur != null || selectedCall?.ended_reason) && (
+                                <div className="mb-6 space-y-3">
+                                    <h4 className="font-semibold flex items-center gap-2 text-primary">
+                                        <Euro className="w-4 h-4" />
+                                        Coste de la llamada
+                                    </h4>
+                                    <div className="flex flex-wrap gap-3 items-center">
+                                        {selectedCall?.cost_total_eur != null && (
+                                            <span className="text-lg font-bold">
+                                                €{Number(selectedCall.cost_total_eur).toFixed(4)}
+                                            </span>
+                                        )}
+                                        {selectedCall?.ended_reason && (() => {
+                                            const r = ENDED_REASON_LABELS[selectedCall.ended_reason];
+                                            return (
+                                                <Badge className={`${r?.color || 'bg-gray-100 text-gray-700'} border-0 font-normal`}>
+                                                    {r?.label || selectedCall.ended_reason}
+                                                </Badge>
+                                            );
+                                        })()}
+                                    </div>
+                                    {selectedCall?.cost_breakdown && Object.keys(selectedCall.cost_breakdown).length > 0 && (
+                                        <div className="rounded-md border overflow-hidden text-sm">
+                                            <div className="grid grid-cols-2 bg-muted/50 px-3 py-2 font-medium text-xs">
+                                                <div>Componente</div>
+                                                <div className="text-right">Coste</div>
+                                            </div>
+                                            {Object.entries(selectedCall.cost_breakdown as Record<string, any>).map(([key, val]) => (
+                                                <div key={key} className="grid grid-cols-2 px-3 py-1.5 border-t text-xs">
+                                                    <div className="text-muted-foreground">{COST_COMPONENT_LABELS[key] || key}</div>
+                                                    <div className="text-right font-mono">
+                                                        €{Number(val.cost_eur || 0).toFixed(4)}
+                                                        {val.promptTokens && <span className="text-muted-foreground ml-1">({val.promptTokens}+{val.completionTokens} tok)</span>}
+                                                        {val.minutes && <span className="text-muted-foreground ml-1">({Number(val.minutes).toFixed(2)} min)</span>}
+                                                        {val.characters && <span className="text-muted-foreground ml-1">({val.characters} chars)</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {selectedCall?.call_type === "human" ? (
                                 <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-3">
                                     <User className="w-12 h-12 text-slate-200" />
