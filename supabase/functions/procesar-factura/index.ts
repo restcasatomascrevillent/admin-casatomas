@@ -22,12 +22,7 @@ serve(async (req) => {
       throw new Error('No se recibió ningún archivo');
     }
 
-    console.log('Procesando archivo:', {
-      nombre: payload.archivo.nombre,
-      tipo: payload.archivo.tipo,
-      size: payload.archivo.size,
-      fecha: payload.fecha,
-    });
+    console.log(`[procesar-factura] ${payload.archivo.nombre} (${payload.archivo.tipo})`);
 
     // Crear FormData para enviar el archivo
     const formData = new FormData();
@@ -49,12 +44,25 @@ serve(async (req) => {
       body: formData,
     });
 
-    console.log('Respuesta del webhook:', response.status);
+    // Verificar que el webhook respondió correctamente
+    if (!response.ok) {
+      console.error(`[procesar-factura] Webhook error: ${response.status}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          nombre: payload.archivo.nombre,
+          error: `El servicio de procesamiento no está disponible (${response.status}). Inténtalo de nuevo en unos minutos.`,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200, // 200 para que el frontend pueda leer el error
+        }
+      );
+    }
 
     let webhookResponse = null;
     let tipoDocumento = null;
 
-    // Leer el body como texto primero (solo se puede consumir una vez)
     const responseText = await response.text();
     try {
       webhookResponse = JSON.parse(responseText);
