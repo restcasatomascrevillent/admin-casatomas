@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type PresetBaseRole = "manager" | "staff";
+export type PresetBaseRole = "admin" | "manager" | "staff";
 
 export interface RolePresetPermission {
   section_key: string;
