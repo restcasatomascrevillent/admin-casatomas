@@ -186,6 +186,20 @@ export function ConfigurarRolesModal({
                 </div>
 
                 <div className="space-y-2">
+                  <Label>Rol base</Label>
+                  <Select value={draftBaseRole} onValueChange={(v) => setDraftBaseRole(v as PresetBaseRole)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Permisos</Label>
                   <div className="space-y-2 sm:hidden max-h-[34vh] overflow-y-auto rounded-md border border-border/70 p-2">
                     {EDITABLE_SECTIONS.map((section) => {
