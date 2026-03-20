@@ -127,8 +127,8 @@ export function ConfigurarRolesModal({
     setSaving(true);
     try {
       const savedPreset = editingPresetId
-        ? await onUpdatePreset(editingPresetId, normalizedName, "staff", draftPermissions)
-        : await onCreatePreset(normalizedName, "staff", draftPermissions);
+        ? await onUpdatePreset(editingPresetId, normalizedName, draftBaseRole, draftPermissions)
+        : await onCreatePreset(normalizedName, draftBaseRole, draftPermissions);
       if (!savedPreset) return;
 
       resetEditor(currentPermissions);
