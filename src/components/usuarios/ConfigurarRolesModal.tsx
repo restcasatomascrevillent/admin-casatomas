@@ -116,6 +116,7 @@ export function ConfigurarRolesModal({
   const startEditingPreset = (preset: UserRolePreset) => {
     setEditingPresetId(preset.id);
     setPresetName(preset.name);
+    setDraftBaseRole(preset.base_role);
     setDraftPermissions(normalizePermissions(preset.permissions));
   };
 
