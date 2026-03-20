@@ -76,6 +76,7 @@ export function ConfigurarRolesModal({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [draftBaseRole, setDraftBaseRole] = useState<PresetBaseRole>("staff");
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [draftPermissions, setDraftPermissions] = useState<RolePresetPermission[]>(
     normalizePermissions(currentPermissions)
@@ -89,6 +90,7 @@ export function ConfigurarRolesModal({
   const resetEditor = (permissions: RolePresetPermission[]) => {
     setEditingPresetId(null);
     setPresetName("");
+    setDraftBaseRole("staff");
     setDraftPermissions(normalizePermissions(permissions));
   };
 
