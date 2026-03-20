@@ -1841,6 +1841,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notificaciones_dashboard: {
+        Row: {
+          created_at: string | null
+          id: string
+          leida: boolean
+          mensaje: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          leida?: boolean
+          mensaje?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          leida?: boolean
+          mensaje?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
       novedades: {
         Row: {
           activo: boolean | null
@@ -2128,7 +2161,7 @@ export type Database = {
         Row: {
           address: string | null
           bot_greeting: string | null
-          bot_responses: Json | null
+          bot_responses: Json
           created_at: string | null
           forward_phone: string | null
           id: string
@@ -2149,7 +2182,7 @@ export type Database = {
         Insert: {
           address?: string | null
           bot_greeting?: string | null
-          bot_responses?: Json | null
+          bot_responses?: Json
           created_at?: string | null
           forward_phone?: string | null
           id?: string
@@ -2170,7 +2203,7 @@ export type Database = {
         Update: {
           address?: string | null
           bot_greeting?: string | null
-          bot_responses?: Json | null
+          bot_responses?: Json
           created_at?: string | null
           forward_phone?: string | null
           id?: string
@@ -2654,90 +2687,6 @@ export type Database = {
         }
         Relationships: []
       }
-      notificaciones_dashboard: {
-        Row: {
-          id: string
-          tipo: string
-          titulo: string
-          mensaje: string | null
-          referencia_id: string | null
-          referencia_tipo: string | null
-          leida: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          tipo: string
-          titulo: string
-          mensaje?: string | null
-          referencia_id?: string | null
-          referencia_tipo?: string | null
-          leida?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          tipo?: string
-          titulo?: string
-          mensaje?: string | null
-          referencia_id?: string | null
-          referencia_tipo?: string | null
-          leida?: boolean
-          created_at?: string
-        }
-        Relationships: []
-      }
-      solicitudes_pendientes: {
-        Row: {
-          id: string
-          nombre: string | null
-          telefono: string | null
-          email: string | null
-          fecha_solicitada: string | null
-          hora_solicitada: string | null
-          numero_comensales: number | null
-          notas_cliente: string | null
-          motivo_rechazo: string
-          descripcion_rechazo: string | null
-          estado: string
-          notas_internas: string | null
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          nombre?: string | null
-          telefono?: string | null
-          email?: string | null
-          fecha_solicitada?: string | null
-          hora_solicitada?: string | null
-          numero_comensales?: number | null
-          notas_cliente?: string | null
-          motivo_rechazo: string
-          descripcion_rechazo?: string | null
-          estado?: string
-          notas_internas?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          nombre?: string | null
-          telefono?: string | null
-          email?: string | null
-          fecha_solicitada?: string | null
-          hora_solicitada?: string | null
-          numero_comensales?: number | null
-          notas_cliente?: string | null
-          motivo_rechazo?: string
-          descripcion_rechazo?: string | null
-          estado?: string
-          notas_internas?: string | null
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       reservas: {
         Row: {
           canal: string | null
@@ -2890,6 +2839,57 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      solicitudes_pendientes: {
+        Row: {
+          created_at: string | null
+          descripcion_rechazo: string | null
+          email: string | null
+          estado: string
+          fecha_solicitada: string | null
+          hora_solicitada: string | null
+          id: string
+          motivo_rechazo: string
+          nombre: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          numero_comensales: number | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descripcion_rechazo?: string | null
+          email?: string | null
+          estado?: string
+          fecha_solicitada?: string | null
+          hora_solicitada?: string | null
+          id?: string
+          motivo_rechazo: string
+          nombre?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descripcion_rechazo?: string | null
+          email?: string | null
+          estado?: string
+          fecha_solicitada?: string | null
+          hora_solicitada?: string | null
+          id?: string
+          motivo_rechazo?: string
+          nombre?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
