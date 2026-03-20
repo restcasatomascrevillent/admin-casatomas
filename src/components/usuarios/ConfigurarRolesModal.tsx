@@ -309,6 +309,7 @@ export function ConfigurarRolesModal({
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
+                            <Badge variant="outline" className="mr-1 text-[10px] px-1.5 py-0">{preset.base_role}</Badge>
                             {presetAccessCount} secciones con acceso
                           </p>
                           <div className="flex items-center justify-end gap-2">
