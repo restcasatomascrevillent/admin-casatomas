@@ -11,6 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -69,6 +76,7 @@ export function ConfigurarRolesModal({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [draftBaseRole, setDraftBaseRole] = useState<PresetBaseRole>("staff");
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [draftPermissions, setDraftPermissions] = useState<RolePresetPermission[]>(
     normalizePermissions(currentPermissions)
@@ -82,6 +90,7 @@ export function ConfigurarRolesModal({
   const resetEditor = (permissions: RolePresetPermission[]) => {
     setEditingPresetId(null);
     setPresetName("");
+    setDraftBaseRole("staff");
     setDraftPermissions(normalizePermissions(permissions));
   };
 
@@ -107,6 +116,7 @@ export function ConfigurarRolesModal({
   const startEditingPreset = (preset: UserRolePreset) => {
     setEditingPresetId(preset.id);
     setPresetName(preset.name);
+    setDraftBaseRole(preset.base_role);
     setDraftPermissions(normalizePermissions(preset.permissions));
   };
 
@@ -117,8 +127,8 @@ export function ConfigurarRolesModal({
     setSaving(true);
     try {
       const savedPreset = editingPresetId
-        ? await onUpdatePreset(editingPresetId, normalizedName, "staff", draftPermissions)
-        : await onCreatePreset(normalizedName, "staff", draftPermissions);
+        ? await onUpdatePreset(editingPresetId, normalizedName, draftBaseRole, draftPermissions)
+        : await onCreatePreset(normalizedName, draftBaseRole, draftPermissions);
       if (!savedPreset) return;
 
       resetEditor(currentPermissions);
@@ -173,6 +183,20 @@ export function ConfigurarRolesModal({
                     placeholder="Ej: Sala principal"
                   />
                   <p className="text-xs text-muted-foreground">{accessCount} secciones con acceso</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Rol base</Label>
+                  <Select value={draftBaseRole} onValueChange={(v) => setDraftBaseRole(v as PresetBaseRole)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -285,6 +309,7 @@ export function ConfigurarRolesModal({
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
+                            <Badge variant="outline" className="mr-1 text-[10px] px-1.5 py-0">{preset.base_role}</Badge>
                             {presetAccessCount} secciones con acceso
                           </p>
                           <div className="flex items-center justify-end gap-2">
