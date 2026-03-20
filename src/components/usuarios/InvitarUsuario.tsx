@@ -85,7 +85,7 @@ export function InvitarUsuario() {
 
   const handleCreatePresetOnly = async (
     name: string,
-    baseRole: "manager" | "staff",
+    baseRole: PresetBaseRole,
     presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
   ) => {
     const createdPreset = await createPreset(name, baseRole, presetPermissions);
