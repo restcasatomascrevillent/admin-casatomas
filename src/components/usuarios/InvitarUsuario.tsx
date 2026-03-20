@@ -112,7 +112,7 @@ export function InvitarUsuario() {
   const handleUpdatePresetOnly = async (
     presetId: string,
     name: string,
-    baseRole: "manager" | "staff",
+    baseRole: PresetBaseRole,
     presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
   ) => {
     const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
