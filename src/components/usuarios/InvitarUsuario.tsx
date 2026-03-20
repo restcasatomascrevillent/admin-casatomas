@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
+import { useUserRolePresets, UserRolePreset, PresetBaseRole } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 
 const EDITABLE_SECTIONS = SECTIONS.filter((section) => section.key !== "usuarios");
