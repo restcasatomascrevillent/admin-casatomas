@@ -165,6 +165,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         const { data, error } = await sb
           .from("menus_diarios")
           .select("id, fecha, menu")
+          .eq("idiom", "es")
           .order("fecha", { ascending: false });
         if (error) throw error;
         setMenuRows((data ?? []) as MenuDiarioRow[]);
@@ -174,6 +175,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       const { data, error } = await sb
         .from("tapas")
         .select("id, fecha, tapas")
+        .eq("idiom", "es")
         .order("fecha", { ascending: false });
       if (error) throw error;
       setTapasRows((data ?? []) as TapasRow[]);
