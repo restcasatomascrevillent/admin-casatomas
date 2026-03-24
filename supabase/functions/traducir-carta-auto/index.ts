@@ -46,6 +46,8 @@ serve(async (req) => {
       webhookPayload.ubicacion_pais = ubicacion_pais || "";
       webhookPayload.ubicacion_region = ubicacion_region || "";
       webhookPayload.alergenos_notas = alergenos_notas || "";
+    } else if (tipo === "menu_diario" || tipo === "tapa") {
+      webhookPayload.fecha = payload.fecha || "";
     }
 
     console.log("Sending to webhook:", JSON.stringify(webhookPayload));
