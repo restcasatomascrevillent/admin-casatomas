@@ -217,12 +217,12 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     });
   };
 
-  const enviarWebhookTraduccion = async (tipo: "menu_diario" | "tapa", contenido: Record<string, unknown>) => {
+  const enviarWebhookTraduccion = async (contenido: Record<string, unknown>) => {
     try {
       const { error } = await supabase.functions.invoke("traducir-carta-auto", {
         body: {
-          tipo,
-          nombre: tipo === "menu_diario" ? "Menú del día" : "Tapas del día",
+          tipo: "menu",
+          nombre: seccionActiva === "menus_diarios" ? "Menú del día" : "Tapas del día",
           ...contenido,
         },
       });
@@ -264,7 +264,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         if (error) throw error;
 
         if (!estabaEditando) {
-          enviarWebhookTraduccion("menu_diario", {
+          enviarWebhookTraduccion({
             fecha: menuForm.fecha,
             descripcion: `Primero: ${menuData.primero}. Segundo: ${menuData.segundo}. Postre: ${menuData.postre}`,
           });
@@ -289,7 +289,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         if (error) throw error;
 
         if (!estabaEditando) {
-          enviarWebhookTraduccion("tapa", {
+          enviarWebhookTraduccion({
             fecha: tapasForm.fecha,
             descripcion: tapas.join(", "),
           });
