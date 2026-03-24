@@ -217,12 +217,12 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     });
   };
 
-  const enviarWebhookTraduccion = async (tipo: "menu_diario" | "tapa", contenido: Record<string, unknown>) => {
+  const enviarWebhookTraduccion = async (contenido: Record<string, unknown>) => {
     try {
       const { error } = await supabase.functions.invoke("traducir-carta-auto", {
         body: {
-          tipo,
-          nombre: tipo === "menu_diario" ? "Menú del día" : "Tapas del día",
+          tipo: "menu",
+          nombre: seccionActiva === "menus_diarios" ? "Menú del día" : "Tapas del día",
           ...contenido,
         },
       });
