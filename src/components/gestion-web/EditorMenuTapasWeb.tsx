@@ -165,6 +165,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         const { data, error } = await sb
           .from("menus_diarios")
           .select("id, fecha, menu")
+          .eq("idiom", "es")
           .order("fecha", { ascending: false });
         if (error) throw error;
         setMenuRows((data ?? []) as MenuDiarioRow[]);
@@ -174,6 +175,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       const { data, error } = await sb
         .from("tapas")
         .select("id, fecha, tapas")
+        .eq("idiom", "es")
         .order("fecha", { ascending: false });
       if (error) throw error;
       setTapasRows((data ?? []) as TapasRow[]);
@@ -215,6 +217,21 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     });
   };
 
+  const enviarWebhookTraduccion = async (tipo: "menu_diario" | "tapa", contenido: Record<string, unknown>) => {
+    try {
+      const { error } = await supabase.functions.invoke("traducir-carta-auto", {
+        body: {
+          tipo,
+          nombre: tipo === "menu_diario" ? "Menú del día" : "Tapas del día",
+          ...contenido,
+        },
+      });
+      if (error) console.error("Error enviando webhook de traducción:", error);
+    } catch (err) {
+      console.error("Error en webhook de traducción:", err);
+    }
+  };
+
   const handleSubmit = async () => {
     const sb = supabase as any;
     const estabaEditando = !!editingId;
@@ -228,13 +245,16 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           return;
         }
 
+        const menuData = {
+          primero: menuForm.primero.trim(),
+          segundo: menuForm.segundo.trim(),
+          postre: menuForm.postre.trim(),
+        };
+
         const payload = {
           fecha: menuForm.fecha,
-          menu: {
-            primero: menuForm.primero.trim(),
-            segundo: menuForm.segundo.trim(),
-            postre: menuForm.postre.trim(),
-          },
+          menu: menuData,
+          idiom: "es",
         };
 
         const query = editingId
@@ -242,6 +262,13 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           : sb.from("menus_diarios").insert(payload);
         const { error } = await query;
         if (error) throw error;
+
+        if (!estabaEditando) {
+          enviarWebhookTraduccion("menu_diario", {
+            fecha: menuForm.fecha,
+            descripcion: `Primero: ${menuData.primero}. Segundo: ${menuData.segundo}. Postre: ${menuData.postre}`,
+          });
+        }
       } else {
         const tapas = getTapasList(tapasForm.tapasTexto);
         if (tapas.length === 0) {
@@ -252,6 +279,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         const payload = {
           fecha: tapasForm.fecha,
           tapas,
+          idiom: "es",
         };
 
         const query = editingId
@@ -259,6 +287,13 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           : sb.from("tapas").insert(payload);
         const { error } = await query;
         if (error) throw error;
+
+        if (!estabaEditando) {
+          enviarWebhookTraduccion("tapa", {
+            fecha: tapasForm.fecha,
+            descripcion: tapas.join(", "),
+          });
+        }
       }
 
       toast.success(estabaEditando ? `${config.singular} actualizado` : `${config.singular} guardado`);
