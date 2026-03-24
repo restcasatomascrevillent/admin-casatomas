@@ -264,7 +264,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         if (error) throw error;
 
         if (!estabaEditando) {
-          enviarWebhookTraduccion("menu_diario", {
+          enviarWebhookTraduccion({
             fecha: menuForm.fecha,
             descripcion: `Primero: ${menuData.primero}. Segundo: ${menuData.segundo}. Postre: ${menuData.postre}`,
           });
