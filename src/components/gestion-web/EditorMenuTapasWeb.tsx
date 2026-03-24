@@ -289,7 +289,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         if (error) throw error;
 
         if (!estabaEditando) {
-          enviarWebhookTraduccion("tapa", {
+          enviarWebhookTraduccion({
             fecha: tapasForm.fecha,
             descripcion: tapas.join(", "),
           });
