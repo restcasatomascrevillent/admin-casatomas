@@ -2900,16 +2900,19 @@ export type Database = {
         Row: {
           fecha: string
           id: string
+          idiom: string | null
           tapas: Json
         }
         Insert: {
           fecha: string
           id?: string
+          idiom?: string | null
           tapas: Json
         }
         Update: {
           fecha?: string
           id?: string
+          idiom?: string | null
           tapas?: Json
         }
         Relationships: []
