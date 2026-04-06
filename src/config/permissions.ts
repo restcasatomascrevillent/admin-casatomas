@@ -1,8 +1,4 @@
-export const SUPER_ADMIN_EMAILS = [
-    "miguelsantiagores@gmail.com", // Email del desarrollador/dueño
-    "info@casatomas.es",           // Email corporativo probable
-    "admin@admin.com"              // Email genérico por si acaso
-];
+export const SUPER_ADMIN_EMAILS = (import.meta.env.VITE_SUPER_ADMIN_EMAILS || '').split(',').map((e: string) => e.trim()).filter(Boolean);
 
 export const isSuperAdmin = (email?: string | null): boolean => {
     if (!email) return false;
