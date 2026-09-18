@@ -1,32 +1,54 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Phone, PhoneCall, Bot, User, Clock, Info, Search, ListFilter, Calendar, Plus, Trash2, Euro, MessageSquare, RotateCcw, Save, Settings, BarChart3 } from "lucide-react";
+import {
+    Loader2,
+    Phone,
+    Bot,
+    Calendar,
+    Plus,
+    Trash2,
+    MessageSquare,
+    RotateCcw,
+    Save,
+    Settings,
+    BarChart3,
+    PhoneCall,
+    BellRing,
+    Info,
+} from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { VapiPromptEditor } from "@/components/VapiPromptEditor";
 import { VapiCallSimulator } from "@/components/VapiCallSimulator";
 
-// Fetchers
+// Telefonía dashboard components
+import { TelefoniaKpiCards } from "@/components/telefonia/TelefoniaKpiCards";
+import { TelefoniaIntentChart } from "@/components/telefonia/TelefoniaIntentChart";
+import { TelefoniaSentimentChart } from "@/components/telefonia/TelefoniaSentimentChart";
+import { TelefoniaEndedReasonChart } from "@/components/telefonia/TelefoniaEndedReasonChart";
+import { TelefoniaCallsTimeline } from "@/components/telefonia/TelefoniaCallsTimeline";
+import { TelefoniaMotivoFalloChart } from "@/components/telefonia/TelefoniaMotivoFalloChart";
+import { TelefoniaRecentCallsTable } from "@/components/telefonia/TelefoniaRecentCallsTable";
+import { TelefoniaCallDetailDialog } from "@/components/telefonia/TelefoniaCallDetailDialog";
+import { TelefoniaDateRangePicker } from "@/components/telefonia/TelefoniaDateRangePicker";
+import { TelefoniaFilters } from "@/components/telefonia/TelefoniaFilters";
+import type { CallLogFilters, DateRange, PresetRange } from "@/components/telefonia/types";
+
+// Hooks (creados por el otro agente — si aún no existen, el build fallará hasta
+// que se integren. Los nombres son fijos por contrato.)
+import { useCallLogs } from "@/hooks/useCallLogs";
+import { useCallLogsAnalytics } from "@/hooks/useCallLogsAnalytics";
+
+// ── Config fetcher ──────────────────────────────────────────────────────────
 async function getPhoneConfig() {
     const { data, error } = await supabase
         .from("phone_system_config")
@@ -37,28 +59,7 @@ async function getPhoneConfig() {
     return data;
 }
 
-async function getCallLogs() {
-    const { data, error } = await supabase
-        .from("call_logs")
-        .select("*")
-        .order("started_at", { ascending: false })
-        .limit(100);
-    if (error) throw error;
-    return data;
-}
-
-function formatDuration(seconds: number | null, startedAt: string, status: string) {
-    let secs = seconds;
-    if (status === 'active' && startedAt) {
-        secs = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-    }
-    if (secs === null || secs === undefined) return '—';
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// ── Respuestas del bot — textos por defecto (espejo de vapi-webhook.js) ───────
+// ── Respuestas del bot — textos por defecto ─────────────────────────────────
 const DEFAULT_BOT_RESPONSES: Record<string, string> = {
     transfer_to_human: 'Un momento, ahora mismo te paso con el restaurante.',
     availability_found: 'Perfecto, hay disponibilidad el {fecha} a las {hora} para {comensales} personas. Espacios disponibles: {espacios}. ¿Procedemos con la reserva? Solo necesito tu nombre.',
@@ -145,48 +146,75 @@ const BOT_RESPONSE_VARS: Record<string, string> = {
     validation_party_range: '{min}, {max}',
 };
 
-// Razón de fin de llamada → etiqueta legible
-const ENDED_REASON_LABELS: Record<string, { label: string; color: string }> = {
-    'customer-ended-call': { label: 'Cliente colgó', color: 'bg-gray-100 text-gray-700' },
-    'assistant-ended-call': { label: 'Bot despidió', color: 'bg-blue-100 text-blue-700' },
-    'silence-timed-out': { label: 'Silencio', color: 'bg-yellow-100 text-yellow-700' },
-    'max-duration-exceeded': { label: 'Duración máx.', color: 'bg-orange-100 text-orange-700' },
-    'exceeded-max-duration': { label: 'Duración máx.', color: 'bg-orange-100 text-orange-700' },
-    'pipeline-error': { label: 'Error pipeline', color: 'bg-red-100 text-red-700' },
-    'assistant-error': { label: 'Error bot', color: 'bg-red-100 text-red-700' },
-    'voicemail': { label: 'Buzón voz', color: 'bg-purple-100 text-purple-700' },
-    'error': { label: 'Error', color: 'bg-red-100 text-red-700' },
-};
-
-const COST_COMPONENT_LABELS: Record<string, string> = {
-    model: 'Modelo IA', transcriber: 'Transcripción', voice: 'Voz (ElevenLabs)',
-    vapi: 'VAPI', telephony: 'Telefonía',
-};
+// ── Helpers rango ───────────────────────────────────────────────────────────
+function startOfDay(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function endOfDay(d: Date) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
+function defaultRange(): DateRange {
+    const now = new Date();
+    return {
+        dateFrom: startOfDay(new Date(now.getTime() - 6 * 86400000)),
+        dateTo: endOfDay(now),
+    };
+}
 
 export default function AsistenteTelefonico() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
+
+    // ── Estado del dashboard ────────────────────────────────────────────────
+    const [range, setRange] = useState<DateRange>(defaultRange());
+    const [preset, setPreset] = useState<PresetRange>("7d");
+    const [filters, setFilters] = useState<CallLogFilters>({
+        intent: "all",
+        sentiment: "all",
+        success: "all",
+        callType: "all",
+    });
     const [selectedCall, setSelectedCall] = useState<any | null>(null);
 
-    // Queries
+    // ── Queries dashboard ───────────────────────────────────────────────────
+    const { data: analytics, isLoading: isLoadingAnalytics } = useCallLogsAnalytics({
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
+        callType: filters.callType === "all" ? undefined : filters.callType,
+    });
+
+    const { data: calls = [], isLoading: isLoadingCalls } = useCallLogs({
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
+        intent: filters.intent === "all" ? undefined : filters.intent,
+        sentiment: filters.sentiment === "all" ? undefined : filters.sentiment,
+        success: filters.success === "all" ? undefined : filters.success,
+        callType: filters.callType === "all" ? undefined : filters.callType,
+    });
+
+    // ── Config query (para la pestaña de configuración) ─────────────────────
     const { data: config, isLoading: isLoadingConfig } = useQuery({
         queryKey: ["phoneConfig"],
         queryFn: getPhoneConfig,
     });
 
-    const { data: calls = [], isLoading: isLoadingCalls } = useQuery({
-        queryKey: ["callLogs"],
-        queryFn: getCallLogs,
-        refetchInterval: 5000, // Refrescar cada 5s para ver llamadas y duraciones
+    // ── Notificaciones tipo 'llamada' para tab Alertas ──────────────────────
+    const { data: alertNotifs = [] } = useQuery({
+        queryKey: ["notificacionesLlamada"],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from("notificaciones_dashboard")
+                .select("*")
+                .eq("tipo", "llamada")
+                .order("created_at", { ascending: false })
+                .limit(20);
+            if (error) return [] as any[];
+            return data || [];
+        },
     });
 
-    // Schedule state
+    // ═════════════════════════════════════════════════════════════════════════
+    // Estado Configuración (horario + bot responses)
+    // ═════════════════════════════════════════════════════════════════════════
     const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-
-    // Generador de ID corto local
     const genId = () => Math.random().toString(36).substring(2, 9);
-
-    const DEFAULT_SCHEDULE = DAY_NAMES.map((name, i) => ({
+    const DEFAULT_SCHEDULE = DAY_NAMES.map((_, i) => ({
         day: i,
         ranges: i === 1 ? [] : [{ id: genId(), start: "09:30", end: "23:00", mode: "human" }]
     }));
@@ -194,35 +222,23 @@ export default function AsistenteTelefonico() {
     const [schedule, setSchedule] = useState<any[]>(DEFAULT_SCHEDULE);
     const [scheduleEnabled, setScheduleEnabled] = useState(false);
     const [scheduleDirty, setScheduleDirty] = useState(false);
-
-    // Bot responses editor state
     const [botResponses, setBotResponses] = useState<Record<string, string>>({});
     const [botResponsesDirty, setBotResponsesDirty] = useState(false);
     const [openBotGroup, setOpenBotGroup] = useState<string | null>(null);
 
     const normalizeSchedule = (rawSchedule: any[]) => {
         if (!rawSchedule) return DEFAULT_SCHEDULE;
-        return DAY_NAMES.map((name, i) => {
+        return DAY_NAMES.map((_, i) => {
             const existing = rawSchedule.find(r => r.day === i);
             if (!existing) return { day: i, ranges: [] };
-
-            // Backward compatibility para datos viejos
             if (!existing.ranges) {
                 if (existing.start && existing.end) {
                     return { day: i, ranges: [{ id: genId(), start: existing.start, end: existing.end, mode: existing.mode || "human" }] };
                 } else if (existing.mode === "human") {
                     return { day: i, ranges: [{ id: genId(), start: "00:00", end: "23:59", mode: "human" }] };
-                } else {
-                    return { day: i, ranges: [] };
-                }
+                } else { return { day: i, ranges: [] }; }
             }
-
-            // Asegurar que cada rango tiene id
-            const ranges = existing.ranges.map((r: any) => ({
-                ...r,
-                id: r.id || genId()
-            }));
-
+            const ranges = existing.ranges.map((r: any) => ({ ...r, id: r.id || genId() }));
             return { ...existing, ranges };
         });
     };
@@ -231,19 +247,15 @@ export default function AsistenteTelefonico() {
         if (config) {
             setScheduleEnabled((config as any).schedule_enabled ?? false);
             const s = (config as any).schedule;
-            if (s && Array.isArray(s) && s.length > 0) {
-                setSchedule(normalizeSchedule(s));
-            } else {
-                setSchedule(normalizeSchedule(DEFAULT_SCHEDULE));
-            }
-            // Load saved bot responses
+            if (s && Array.isArray(s) && s.length > 0) setSchedule(normalizeSchedule(s));
+            else setSchedule(normalizeSchedule(DEFAULT_SCHEDULE));
             const br = (config as any).bot_responses;
             setBotResponses(br && typeof br === 'object' ? br : {});
             setBotResponsesDirty(false);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config]);
 
-    // Mutations
     const updateModeMutation = useMutation({
         mutationFn: async (newMode: string) => {
             const { error } = await supabase
@@ -254,19 +266,9 @@ export default function AsistenteTelefonico() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
-            toast({
-                title: "Modo actualizado",
-                description: "El modo del asistente telefónico se ha guardado correctamente.",
-            });
+            toast({ title: "Modo actualizado", description: "El modo se ha guardado correctamente." });
         },
-        onError: (error) => {
-            toast({
-                title: "Error",
-                description: "No se pudo actualizar el modo.",
-                variant: "destructive",
-            });
-            console.error(error);
-        },
+        onError: () => toast({ title: "Error", description: "No se pudo actualizar el modo.", variant: "destructive" }),
     });
 
     const updateScheduleMutation = useMutation({
@@ -280,12 +282,9 @@ export default function AsistenteTelefonico() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
             setScheduleDirty(false);
-            toast({ title: "Horario guardado", description: "Los horarios de conmutación se han actualizado." });
+            toast({ title: "Horario guardado", description: "Los horarios se han actualizado." });
         },
-        onError: (error) => {
-            toast({ title: "Error", description: "No se pudo guardar el horario.", variant: "destructive" });
-            console.error(error);
-        },
+        onError: () => toast({ title: "Error", description: "No se pudo guardar el horario.", variant: "destructive" }),
     });
 
     const updateBotResponsesMutation = useMutation({
@@ -299,322 +298,182 @@ export default function AsistenteTelefonico() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
             setBotResponsesDirty(false);
-            toast({ title: "Respuestas guardadas", description: "Los textos del bot se han actualizado correctamente." });
+            toast({ title: "Respuestas guardadas", description: "Los textos se han actualizado." });
         },
-        onError: () => {
-            toast({ title: "Error", description: "No se pudieron guardar los textos.", variant: "destructive" });
-        },
+        onError: () => toast({ title: "Error", description: "No se pudieron guardar los textos.", variant: "destructive" }),
     });
 
-    const handleModeChange = (checked: boolean) => {
-        updateModeMutation.mutate(checked ? "bot" : "human");
+    const addRange = (dayIndex: number) => {
+        setSchedule(prev => prev.map(rule => rule.day === dayIndex
+            ? { ...rule, ranges: [...(rule.ranges || []), { id: genId(), start: "12:00", end: "16:00", mode: "human" }] }
+            : rule));
+        setScheduleDirty(true);
+    };
+    const removeRange = (dayIndex: number, rangeId: string) => {
+        setSchedule(prev => prev.map(rule => rule.day === dayIndex && rule.ranges
+            ? { ...rule, ranges: rule.ranges.filter((r: any) => r.id !== rangeId) }
+            : rule));
+        setScheduleDirty(true);
+    };
+    const updateRangeRule = (dayIndex: number, rangeId: string, field: string, value: string) => {
+        setSchedule(prev => prev.map(rule => rule.day === dayIndex && rule.ranges
+            ? { ...rule, ranges: rule.ranges.map((r: any) => r.id === rangeId ? { ...r, [field]: value } : r) }
+            : rule));
+        setScheduleDirty(true);
     };
 
+    const handleModeChange = (checked: boolean) => updateModeMutation.mutate(checked ? "bot" : "human");
     const handleScheduleToggle = (checked: boolean) => {
         setScheduleEnabled(checked);
         updateScheduleMutation.mutate({ enabled: checked, rules: schedule });
     };
+    const saveSchedule = () => updateScheduleMutation.mutate({ enabled: scheduleEnabled, rules: schedule });
 
-    // Funciones Helper para Rangos
-    const addRange = (dayIndex: number) => {
-        setSchedule(prev => prev.map(rule => {
-            if (rule.day === dayIndex) {
-                const newRanges = [...(rule.ranges || []), { id: genId(), start: "12:00", end: "16:00", mode: "human" }];
-                return { ...rule, ranges: newRanges };
-            }
-            return rule;
-        }));
-        setScheduleDirty(true);
-    };
-
-    const removeRange = (dayIndex: number, rangeId: string) => {
-        setSchedule(prev => prev.map(rule => {
-            if (rule.day === dayIndex && rule.ranges) {
-                return { ...rule, ranges: rule.ranges.filter((r: any) => r.id !== rangeId) };
-            }
-            return rule;
-        }));
-        setScheduleDirty(true);
-    };
-
-    const updateRangeRule = (dayIndex: number, rangeId: string, field: string, value: string) => {
-        setSchedule(prev => prev.map(rule => {
-            if (rule.day === dayIndex && rule.ranges) {
-                return {
-                    ...rule,
-                    ranges: rule.ranges.map((r: any) => r.id === rangeId ? { ...r, [field]: value } : r)
-                };
-            }
-            return rule;
-        }));
-        setScheduleDirty(true);
-    };
-
-    const saveSchedule = () => {
-        updateScheduleMutation.mutate({ enabled: scheduleEnabled, rules: schedule });
-    };
-
-    const isLoading = isLoadingConfig || isLoadingCalls;
-
-    // Stats (calculados usando la zona horaria de Madrid)
-    const todayMadrid = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date());
-
-    const todayCalls = calls.filter((c: any) => {
-        if (!c.started_at) return false;
-        const callDateMadrid = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid" }).format(new Date(c.started_at));
-        return callDateMadrid === todayMadrid;
-    });
-
-    const botCalls = todayCalls.filter((c: any) => c.call_type === 'bot').length;
-    const humanCalls = todayCalls.filter((c: any) => c.call_type === 'human').length;
-
-    const completedCalls = todayCalls.filter((c: any) => c.status === 'completed' && c.duration_seconds !== null);
-    const avgDurationSeconds = completedCalls.length > 0
-        ? Math.round(completedCalls.reduce((sum: number, c: any) => sum + parseInt(c.duration_seconds), 0) / completedCalls.length)
-        : 0;
-
-    // Cost metrics
-    const todayCostEur = todayCalls.reduce((sum: number, c: any) => sum + (Number(c.cost_total_eur) || 0), 0);
-    const thisMonthStart = new Date(); thisMonthStart.setDate(1); thisMonthStart.setHours(0, 0, 0, 0);
-    const monthCalls = calls.filter((c: any) => c.started_at && new Date(c.started_at) >= thisMonthStart);
-    const monthCostEur = monthCalls.reduce((sum: number, c: any) => sum + (Number(c.cost_total_eur) || 0), 0);
-    const callsWithCost = calls.filter((c: any) => Number(c.cost_total_eur) > 0);
-    const avgCostEur = callsWithCost.length > 0
-        ? callsWithCost.reduce((sum: number, c: any) => sum + Number(c.cost_total_eur), 0) / callsWithCost.length
-        : 0;
-    const monthVapiMinutes = monthCalls.reduce((sum: number, c: any) => {
-        const mins = (c.cost_breakdown as any)?.vapi?.minutes;
-        return sum + (Number(mins) || 0);
-    }, 0);
-
-    if (isLoading && !config) {
+    // ── KPI header badge: modo actual ───────────────────────────────────────
+    const modeBadge = useMemo(() => {
+        if (isLoadingConfig) return null;
+        const mode = (config as any)?.mode;
         return (
-            <DashboardLayout>
-                <div className="flex h-[50vh] items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            </DashboardLayout>
+            <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5">
+                <Switch
+                    id="mode-switch-header"
+                    checked={mode === "bot"}
+                    onCheckedChange={handleModeChange}
+                    disabled={updateModeMutation.isPending}
+                />
+                <Label htmlFor="mode-switch-header" className="text-xs font-medium">
+                    {mode === "bot" ? "🤖 Bot IA" : "👤 Humano"}
+                </Label>
+            </div>
         );
-    }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [config, isLoadingConfig, updateModeMutation.isPending]);
 
     return (
         <DashboardLayout>
             <div className="space-y-6">
-                <div>
-                    <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Asistente Telefónico</h2>
-                    <p className="text-muted-foreground">
-                        Gestiona las llamadas entrantes y audita las interacciones del asistente de Voz (IA).
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Asistente Telefónico</h2>
+                        <p className="text-muted-foreground text-sm">
+                            Monitorización en tiempo real del bot de voz y la atención telefónica.
+                        </p>
+                    </div>
+                    {modeBadge}
                 </div>
 
-                <Tabs defaultValue="dashboard" className="w-full">
-                    <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1">
-                        <TabsTrigger
-                            value="dashboard"
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
-                        >
-                            <BarChart3 className="h-4 w-4" />
-                            Dashboard
+                <Tabs defaultValue="resumen" className="w-full">
+                    <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
+                        <TabsTrigger value="resumen" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                            <BarChart3 className="h-4 w-4" /> Resumen
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="configuracion"
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
-                        >
-                            <Settings className="h-4 w-4" />
-                            Configuración
+                        <TabsTrigger value="llamadas" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                            <PhoneCall className="h-4 w-4" /> Llamadas
+                        </TabsTrigger>
+                        <TabsTrigger value="alertas" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                            <BellRing className="h-4 w-4" /> Alertas
+                        </TabsTrigger>
+                        <TabsTrigger value="configuracion" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                            <Settings className="h-4 w-4" /> Configuración
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* ═══════════ TAB: DASHBOARD ═══════════ */}
-                    <TabsContent value="dashboard" className="space-y-6 mt-6">
-                        {/* Stats cards */}
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Modo Actual</CardTitle>
-                                    <Phone className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-center space-x-2 mt-2">
-                                        <Switch
-                                            id="mode-switch"
-                                            checked={config?.mode === "bot"}
-                                            onCheckedChange={handleModeChange}
-                                            disabled={updateModeMutation.isPending}
-                                        />
-                                        <Label htmlFor="mode-switch" className="font-semibold text-lg">
-                                            {config?.mode === "bot" ? "🤖 Bot IA" : "👤 Humano"}
-                                        </Label>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        {config?.mode === "bot"
-                                            ? "Las llamadas son atendidas por el asistente virtual."
-                                            : "Las llamadas se desvían a tu número personal."}
-                                    </p>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Llamadas Hoy</CardTitle>
-                                    <PhoneCall className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{todayCalls.length}</div>
-                                    <p className="text-xs text-muted-foreground">Total de llamadas recibidas hoy</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Atendidas por IA / Humano</CardTitle>
-                                    <Bot className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{botCalls} / {humanCalls}</div>
-                                    <p className="text-xs text-muted-foreground">Distribución de llamadas de hoy</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Duración Media (IA)</CardTitle>
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">
-                                        {completedCalls.length ? formatDuration(avgDurationSeconds, "", "completed") : "—"}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">De las llamadas completadas por el bot hoy</p>
-                                </CardContent>
-                            </Card>
+                    {/* ═══════════ RESUMEN ═══════════ */}
+                    <TabsContent value="resumen" className="space-y-6 mt-6">
+                        <div className="flex justify-end">
+                            <TelefoniaDateRangePicker
+                                value={range}
+                                preset={preset}
+                                onChange={(r, p) => { setRange(r); setPreset(p); }}
+                            />
                         </div>
 
-                        {/* Cost cards */}
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Gasto Hoy</CardTitle>
-                                    <Euro className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">€{todayCostEur.toFixed(3)}</div>
-                                    <p className="text-xs text-muted-foreground">Coste total de llamadas de hoy</p>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Gasto Este Mes</CardTitle>
-                                    <Euro className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">€{monthCostEur.toFixed(2)}</div>
-                                    <p className="text-xs text-muted-foreground">Acumulado mes actual</p>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Coste Medio</CardTitle>
-                                    <Euro className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{callsWithCost.length > 0 ? `€${avgCostEur.toFixed(3)}` : '—'}</div>
-                                    <p className="text-xs text-muted-foreground">Por llamada (con coste registrado)</p>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium">Min. IA Este Mes</CardTitle>
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-2xl font-bold">{monthVapiMinutes.toFixed(1)}</div>
-                                    <p className="text-xs text-muted-foreground">Minutos facturados por VAPI</p>
-                                </CardContent>
-                            </Card>
+                        <TelefoniaKpiCards analytics={analytics} isLoading={isLoadingAnalytics} />
+
+                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                            <TelefoniaIntentChart data={analytics?.byIntent} isLoading={isLoadingAnalytics} />
+                            <TelefoniaSentimentChart data={analytics?.bySentiment} isLoading={isLoadingAnalytics} />
+                            <TelefoniaEndedReasonChart data={analytics?.byEndedReason} isLoading={isLoadingAnalytics} />
+                            <TelefoniaMotivoFalloChart data={analytics?.byMotivoFallo} isLoading={isLoadingAnalytics} />
                         </div>
 
-                        {/* Call history */}
+                        <TelefoniaCallsTimeline data={analytics?.callsPerDay} isLoading={isLoadingAnalytics} />
+                    </TabsContent>
+
+                    {/* ═══════════ LLAMADAS ═══════════ */}
+                    <TabsContent value="llamadas" className="space-y-4 mt-6">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            <TelefoniaFilters value={filters} onChange={setFilters} />
+                            <TelefoniaDateRangePicker
+                                value={range}
+                                preset={preset}
+                                onChange={(r, p) => { setRange(r); setPreset(p); }}
+                            />
+                        </div>
+
+                        <TelefoniaRecentCallsTable
+                            calls={calls}
+                            isLoading={isLoadingCalls}
+                            onSelect={setSelectedCall}
+                        />
+                    </TabsContent>
+
+                    {/* ═══════════ ALERTAS ═══════════ */}
+                    <TabsContent value="alertas" className="space-y-4 mt-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Historial de Llamadas</CardTitle>
+                                <CardTitle className="flex items-center gap-2">
+                                    <BellRing className="h-5 w-5" /> Alertas de telefonía
+                                </CardTitle>
                                 <CardDescription>
-                                    Últimas 100 llamadas registradas en el sistema. Selecciona una para ver los detalles.
+                                    Eventos e incidencias detectadas en el flujo de llamadas.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {calls.length === 0 ? (
-                                    <div className="text-center py-6 text-muted-foreground">No hay llamadas registradas.</div>
+                                {alertNotifs.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center gap-3 text-muted-foreground">
+                                        <Info className="h-10 w-10 opacity-40" />
+                                        <p className="text-sm">
+                                            No hay alertas activas en este momento.
+                                        </p>
+                                        <p className="text-xs max-w-md">
+                                            Próximamente: monitores de VAPI en tiempo real — latencia, tasa de error
+                                            del webhook y saturación de llamadas.
+                                        </p>
+                                    </div>
                                 ) : (
-                                    <div className="rounded-md border">
-                                        <div className="grid grid-cols-6 bg-muted/50 p-3 text-sm font-medium">
-                                            <div>Fecha y Hora</div>
-                                            <div>Número</div>
-                                            <div>Tipo</div>
-                                            <div>Estado</div>
-                                            <div className="text-right">Duración</div>
-                                            <div className="text-right">Coste</div>
-                                        </div>
-                                        <ScrollArea className="h-[400px]">
-                                            {calls.map((call: any) => (
-                                                <div
-                                                    key={call.id}
-                                                    className={`grid grid-cols-6 items-center border-t p-3 text-sm transition-colors hover:bg-muted/50 cursor-pointer ${call.call_type === 'bot' && call.tool_calls && call.tool_calls.length > 0 ? 'bg-primary/5' : ''}`}
-                                                    onClick={() => setSelectedCall(call)}
-                                                >
-                                                    <div className="font-medium text-muted-foreground">
-                                                        {format(new Date(call.started_at), "dd MMM, HH:mm", { locale: es })}
-                                                    </div>
-                                                    <div className="font-mono">{call.caller_number || "Oculto"}</div>
-                                                    <div>
-                                                        <div className="flex flex-col gap-1 items-start">
-                                                            {call.call_type === "bot" ? (
-                                                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Bot className="w-3 h-3 mr-1" /> Bot</Badge>
-                                                            ) : (
-                                                                <Badge variant="outline" className="text-slate-600"><User className="w-3 h-3 mr-1" /> Humano</Badge>
-                                                            )}
-                                                            {call.tool_calls && call.tool_calls.length > 0 && (
-                                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                                    {call.tool_calls.some((t: any) => t.tool === 'create_reservation') && (
-                                                                        <Badge variant="outline" className="text-[10px] px-1 h-4 bg-green-50 text-green-700 border-green-200">Reserva Nueva</Badge>
-                                                                    )}
-                                                                    {call.tool_calls.some((t: any) => t.tool === 'modify_reservation') && (
-                                                                        <Badge variant="outline" className="text-[10px] px-1 h-4 bg-yellow-50 text-yellow-700 border-yellow-200">Modificación</Badge>
-                                                                    )}
-                                                                    {call.tool_calls.some((t: any) => t.tool === 'cancel_reservation') && (
-                                                                        <Badge variant="outline" className="text-[10px] px-1 h-4 bg-red-50 text-red-700 border-red-200">Cancelación</Badge>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                    <div className="space-y-2">
+                                        {alertNotifs.map((n: any) => (
+                                            <div
+                                                key={n.id}
+                                                className="flex items-start gap-3 p-3 border rounded-md bg-card"
+                                            >
+                                                <BellRing className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium">{n.titulo || "Alerta"}</div>
+                                                    {n.mensaje && (
+                                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                                            {n.mensaje}
                                                         </div>
-                                                    </div>
-                                                    <div>
-                                                        {call.status === "completed" ? (
-                                                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Completada</Badge>
-                                                        ) : call.status === "active" ? (
-                                                            <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 animate-pulse">En curso</Badge>
-                                                        ) : (
-                                                            <Badge variant="outline">{call.status}</Badge>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-right font-mono">
-                                                        {formatDuration(call.duration_seconds, call.started_at, call.status)}
-                                                    </div>
-                                                    <div className="text-right font-mono text-muted-foreground">
-                                                        {call.cost_total_eur != null
-                                                            ? `€${Number(call.cost_total_eur).toFixed(3)}`
-                                                            : '—'}
-                                                    </div>
+                                                    )}
                                                 </div>
-                                            ))}
-                                        </ScrollArea>
+                                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                    {new Intl.DateTimeFormat("es-ES", {
+                                                        day: "2-digit",
+                                                        month: "short",
+                                                        hour: "2-digit",
+                                                        minute: "2-digit",
+                                                    }).format(new Date(n.created_at))}
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
                     </TabsContent>
 
-                    {/* ═══════════ TAB: CONFIGURACIÓN ═══════════ */}
+                    {/* ═══════════ CONFIGURACIÓN ═══════════ */}
                     <TabsContent value="configuracion" className="space-y-6 mt-6">
                         {/* Horario programado */}
                         <Card>
@@ -622,8 +481,7 @@ export default function AsistenteTelefonico() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
-                                            <Calendar className="h-5 w-5" />
-                                            Horario Programado
+                                            <Calendar className="h-5 w-5" /> Horario Programado
                                         </CardTitle>
                                         <CardDescription>
                                             Conmuta automáticamente entre bot y humano según el día y la hora.
@@ -631,10 +489,7 @@ export default function AsistenteTelefonico() {
                                         </CardDescription>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Switch
-                                            checked={scheduleEnabled}
-                                            onCheckedChange={handleScheduleToggle}
-                                        />
+                                        <Switch checked={scheduleEnabled} onCheckedChange={handleScheduleToggle} />
                                         <Label className="text-sm">{scheduleEnabled ? "Activo" : "Inactivo"}</Label>
                                     </div>
                                 </div>
@@ -644,18 +499,11 @@ export default function AsistenteTelefonico() {
                                     {DAY_NAMES.map((name, dayIndex) => {
                                         const defaultRule = { day: dayIndex, ranges: [] };
                                         const rule = schedule.find((r: any) => r.day === dayIndex) || defaultRule;
-
                                         return (
                                             <div key={dayIndex} className={`p-4 rounded-lg border bg-card transition-opacity ${!scheduleEnabled ? "opacity-50" : ""}`}>
                                                 <div className="flex items-center justify-between mb-3">
                                                     <h4 className="font-medium text-sm sm:text-base">{name}</h4>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => addRange(dayIndex)}
-                                                        disabled={!scheduleEnabled}
-                                                        className="h-8 shadow-sm"
-                                                    >
+                                                    <Button variant="outline" size="sm" onClick={() => addRange(dayIndex)} disabled={!scheduleEnabled} className="h-8 shadow-sm">
                                                         <Plus className="w-3 h-3 mr-1" /> Añadir franja
                                                     </Button>
                                                 </div>
@@ -666,45 +514,21 @@ export default function AsistenteTelefonico() {
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-2">
-                                                        {rule.ranges.map((range: any) => (
-                                                            <div key={range.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${range.mode === "bot" ? "bg-blue-50/50 border-blue-100" : "bg-green-50/50 border-green-100"}`}>
-                                                                <Select
-                                                                    value={range.mode}
-                                                                    onValueChange={(v) => updateRangeRule(dayIndex, range.id, "mode", v)}
-                                                                    disabled={!scheduleEnabled}
-                                                                >
-                                                                    <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background">
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
+                                                        {rule.ranges.map((r: any) => (
+                                                            <div key={r.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${r.mode === "bot" ? "bg-blue-50/50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/40" : "bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900/40"}`}>
+                                                                <Select value={r.mode} onValueChange={(v) => updateRangeRule(dayIndex, r.id, "mode", v)} disabled={!scheduleEnabled}>
+                                                                    <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background"><SelectValue /></SelectTrigger>
                                                                     <SelectContent>
                                                                         <SelectItem value="human">👤 Humano</SelectItem>
                                                                         <SelectItem value="bot">🤖 Bot IA</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
                                                                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                                                                    <Input
-                                                                        type="time"
-                                                                        value={range.start}
-                                                                        onChange={(e) => updateRangeRule(dayIndex, range.id, "start", e.target.value)}
-                                                                        disabled={!scheduleEnabled}
-                                                                        className="h-9 w-full sm:w-auto bg-background"
-                                                                    />
+                                                                    <Input type="time" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-9 w-full sm:w-auto bg-background" />
                                                                     <span className="text-muted-foreground text-sm">a</span>
-                                                                    <Input
-                                                                        type="time"
-                                                                        value={range.end}
-                                                                        onChange={(e) => updateRangeRule(dayIndex, range.id, "end", e.target.value)}
-                                                                        disabled={!scheduleEnabled}
-                                                                        className="h-9 w-full sm:w-auto bg-background"
-                                                                    />
+                                                                    <Input type="time" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-9 w-full sm:w-auto bg-background" />
                                                                 </div>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="text-destructive h-9 w-9 sm:ml-auto hover:bg-destructive/10"
-                                                                    onClick={() => removeRange(dayIndex, range.id)}
-                                                                    disabled={!scheduleEnabled}
-                                                                >
+                                                                <Button variant="ghost" size="icon" className="text-destructive h-9 w-9 sm:ml-auto hover:bg-destructive/10" onClick={() => removeRange(dayIndex, r.id)} disabled={!scheduleEnabled}>
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>
                                                             </div>
@@ -716,11 +540,7 @@ export default function AsistenteTelefonico() {
                                     })}
                                 </div>
                                 {scheduleDirty && (
-                                    <Button
-                                        className="mt-6 w-full shadow-sm"
-                                        onClick={saveSchedule}
-                                        disabled={updateScheduleMutation.isPending}
-                                    >
+                                    <Button className="mt-6 w-full shadow-sm" onClick={saveSchedule} disabled={updateScheduleMutation.isPending}>
                                         {updateScheduleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                                         Guardar horarios
                                     </Button>
@@ -728,34 +548,25 @@ export default function AsistenteTelefonico() {
                             </CardContent>
                         </Card>
 
-                        {/* VAPI Simulator + Prompt Editor */}
                         <div className="grid gap-6 md:grid-cols-2">
-                            <VapiCallSimulator assistantId={config?.vapi_assistant_id} />
+                            <VapiCallSimulator assistantId={(config as any)?.vapi_assistant_id} />
                             <VapiPromptEditor config={config} />
                         </div>
 
-                        {/* Editor de respuestas del bot */}
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
-                                            <MessageSquare className="h-5 w-5" />
-                                            Respuestas del Bot
+                                            <MessageSquare className="h-5 w-5" /> Respuestas del Bot
                                         </CardTitle>
                                         <CardDescription>
-                                            Personaliza los textos que dice el asistente en cada situación. Usa {"{ variable }"} como placeholder. Si dejas un campo vacío, se usará el texto por defecto.
+                                            Personaliza los textos del asistente. Usa {"{variable}"} como placeholder.
                                         </CardDescription>
                                     </div>
                                     {botResponsesDirty && (
-                                        <Button
-                                            onClick={() => updateBotResponsesMutation.mutate(botResponses)}
-                                            disabled={updateBotResponsesMutation.isPending}
-                                            className="shrink-0"
-                                        >
-                                            {updateBotResponsesMutation.isPending
-                                                ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                                : <Save className="h-4 w-4 mr-2" />}
+                                        <Button onClick={() => updateBotResponsesMutation.mutate(botResponses)} disabled={updateBotResponsesMutation.isPending} className="shrink-0">
+                                            {updateBotResponsesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                                             Guardar respuestas
                                         </Button>
                                     )}
@@ -787,17 +598,13 @@ export default function AsistenteTelefonico() {
                                                                 )}
                                                             </div>
                                                             {botResponses[key] && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-7 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                                                                <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                                                                     onClick={() => {
                                                                         const newBR = { ...botResponses };
                                                                         delete newBR[key];
                                                                         setBotResponses(newBR);
                                                                         setBotResponsesDirty(true);
-                                                                    }}
-                                                                >
+                                                                    }}>
                                                                     <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
                                                                 </Button>
                                                             )}
@@ -823,136 +630,7 @@ export default function AsistenteTelefonico() {
                     </TabsContent>
                 </Tabs>
 
-                {/* Modal de Detalle de Llamada */}
-                <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
-                    <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                Detalle de Llamada
-                                {selectedCall?.call_type === "bot" ? (
-                                    <Badge variant="secondary" className="bg-blue-100 text-blue-800"><Bot className="w-3 h-3 mr-1" /> Bot</Badge>
-                                ) : (
-                                    <Badge variant="outline"><User className="w-3 h-3 mr-1" /> Humano</Badge>
-                                )}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Número: <span className="font-mono font-medium text-foreground">{selectedCall?.caller_number || "Oculto"}</span> •
-                                Fecha: {selectedCall && format(new Date(selectedCall.started_at), "dd/MM/yyyy HH:mm")} •
-                                Duración: {selectedCall && formatDuration(selectedCall.duration_seconds, selectedCall.started_at, selectedCall.status)}
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <ScrollArea className="flex-1 mt-4 p-4 border rounded-md space-y-4">
-                            {selectedCall?.call_type === "bot" && (selectedCall?.cost_total_eur != null || selectedCall?.ended_reason) && (
-                                <div className="mb-6 space-y-3">
-                                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                                        <Euro className="w-4 h-4" />
-                                        Coste de la llamada
-                                    </h4>
-                                    <div className="flex flex-wrap gap-3 items-center">
-                                        {selectedCall?.cost_total_eur != null && (
-                                            <span className="text-lg font-bold">
-                                                €{Number(selectedCall.cost_total_eur).toFixed(4)}
-                                            </span>
-                                        )}
-                                        {selectedCall?.ended_reason && (() => {
-                                            const r = ENDED_REASON_LABELS[selectedCall.ended_reason];
-                                            return (
-                                                <Badge className={`${r?.color || 'bg-gray-100 text-gray-700'} border-0 font-normal`}>
-                                                    {r?.label || selectedCall.ended_reason}
-                                                </Badge>
-                                            );
-                                        })()}
-                                    </div>
-                                    {selectedCall?.cost_breakdown && Object.keys(selectedCall.cost_breakdown).length > 0 && (
-                                        <div className="rounded-md border overflow-hidden text-sm">
-                                            <div className="grid grid-cols-2 bg-muted/50 px-3 py-2 font-medium text-xs">
-                                                <div>Componente</div>
-                                                <div className="text-right">Coste</div>
-                                            </div>
-                                            {Object.entries(selectedCall.cost_breakdown as Record<string, any>).map(([key, val]) => (
-                                                <div key={key} className="grid grid-cols-2 px-3 py-1.5 border-t text-xs">
-                                                    <div className="text-muted-foreground">{COST_COMPONENT_LABELS[key] || key}</div>
-                                                    <div className="text-right font-mono">
-                                                        €{Number(val.cost_eur || 0).toFixed(4)}
-                                                        {val.promptTokens && <span className="text-muted-foreground ml-1">({val.promptTokens}+{val.completionTokens} tok)</span>}
-                                                        {val.minutes && <span className="text-muted-foreground ml-1">({Number(val.minutes).toFixed(2)} min)</span>}
-                                                        {val.characters && <span className="text-muted-foreground ml-1">({val.characters} chars)</span>}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {selectedCall?.call_type === "human" ? (
-                                <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-3">
-                                    <User className="w-12 h-12 text-slate-200" />
-                                    <p>Llamada transferida directamente al teléfono físico gestionado por un humano.</p>
-                                    <p className="text-sm">El asistente de IA no procesó ninguna intención en esta llamada.</p>
-                                </div>
-                            ) : selectedCall?.summary ? (
-                                <div className="mb-6 space-y-2">
-                                    <h4 className="font-semibold flex items-center gap-2 text-primary">
-                                        <Info className="w-4 h-4" />
-                                        Resumen generado por la IA
-                                    </h4>
-                                    <p className="text-sm bg-muted p-3 rounded-md">{selectedCall.summary}</p>
-                                </div>
-                            ) : null}
-
-                            {selectedCall?.call_type === "bot" && (
-                                <div>
-                                    <h4 className="font-semibold flex items-center gap-2 mb-4">
-                                        <ListFilter className="w-4 h-4" />
-                                        Registro de Herramientas Usadas
-                                    </h4>
-
-                                    {(!selectedCall.tool_calls || selectedCall.tool_calls.length === 0) ? (
-                                        <p className="text-sm text-muted-foreground italic">El asistente no utilizó ninguna herramienta en esta llamada.</p>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {selectedCall.tool_calls.map((tool: any, idx: number) => (
-                                                <div key={idx} className="border rounded-md overflow-hidden text-sm">
-                                                    <div className="bg-muted px-3 py-2 border-b flex justify-between items-center">
-                                                        <span className="font-mono font-medium text-primary">{tool.tool}</span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {tool.timestamp ? format(new Date(tool.timestamp), "HH:mm:ss") : ""}
-                                                        </span>
-                                                    </div>
-                                                    <div className="p-3 border-b border-dashed border-border/50 bg-slate-50">
-                                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Parámetros enviados (IA → Sistema)</span>
-                                                        {Object.keys(tool.params || {}).length > 0 ? (
-                                                            <pre className="text-xs bg-white p-2 text-slate-800 rounded border font-mono overflow-x-auto">
-                                                                {JSON.stringify(tool.params, null, 2)}
-                                                            </pre>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400 italic">Ningún parámetro</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-3 bg-white">
-                                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 block">Resultado (Sistema → IA)</span>
-                                                        {tool.result ? (
-                                                            <div className="text-xs p-2 bg-green-50 text-green-900 rounded border border-green-100 max-h-40 overflow-y-auto">
-                                                                {typeof tool.result === 'string'
-                                                                    ? tool.result
-                                                                    : <pre className="font-mono">{JSON.stringify(tool.result, null, 2)}</pre>}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-400 italic">Sin resultado</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </DialogContent>
-                </Dialog>
-
+                <TelefoniaCallDetailDialog call={selectedCall} onClose={() => setSelectedCall(null)} />
             </div>
         </DashboardLayout>
     );
