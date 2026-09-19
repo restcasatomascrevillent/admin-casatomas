@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { desglosarIvaIncluido, redondearCentimos } from "@/config/fiscal";
 
 export interface LineaTPV {
   producto_id: string;
@@ -115,30 +116,34 @@ export function useTPV() {
   }, []);
 
   // Calcular totales
+  // Los precios de ComidaVENTA / BebidasVENTA son PVP: ya llevan el IVA incluido.
+  // Por eso el importe de las líneas es lo que paga el cliente (total) y el IVA
+  // se desglosa hacia atrás; sumarlo encima cobraría de más.
   const totales = useMemo((): TotalesTPV => {
-    const subtotal = lineas.reduce((acc, linea) => {
+    const subtotalBruto = lineas.reduce((acc, linea) => {
       const precioLinea = linea.precio * linea.cantidad;
       const descuentoLinea = linea.descuento ? (precioLinea * linea.descuento / 100) : 0;
       return acc + (precioLinea - descuentoLinea);
     }, 0);
 
-    const descuentoTotal = subtotal * descuentoGlobal / 100;
-    const baseImponible = subtotal - descuentoTotal;
-    const iva = baseImponible * 0.21; // 21% IVA
-    const total = baseImponible + iva;
+    // Se redondea antes de desglosar para que el ticket cuadre también en la
+    // resta de arriba: subtotal - descuento === total.
+    const subtotal = redondearCentimos(subtotalBruto);
+    const descuentoTotal = redondearCentimos(subtotalBruto * descuentoGlobal / 100);
+    const { baseImponible, iva, total } = desglosarIvaIncluido(subtotal - descuentoTotal);
 
     return {
       subtotal,
       descuentoTotal,
       baseImponible,
       iva,
-      total: Math.round(total * 100) / 100,
+      total,
     };
   }, [lineas, descuentoGlobal]);
 
   // Calcular cambio
   const calcularCambio = useCallback((importeRecibido: number): number => {
-    return Math.max(0, importeRecibido - totales.total);
+    return redondearCentimos(Math.max(0, importeRecibido - totales.total));
   }, [totales.total]);
 
   // Limpiar carrito
@@ -171,6 +176,9 @@ export function useTPV() {
           vendedor_id: user.user.id,
           caja,
           numero_ticket: numeroTicket,
+          // `subtotal` guarda la base imponible (sin IVA); `total` es el PVP que
+          // paga el cliente. Con el desglose hacia atrás se cumple siempre
+          // subtotal + iva === total.
           subtotal: totales.baseImponible,
           iva: totales.iva,
           total: totales.total,
@@ -199,7 +207,9 @@ export function useTPV() {
         nombre_producto: linea.nombre,
         cantidad: linea.cantidad,
         precio_unitario: linea.precio,
-        total_linea: linea.precio * linea.cantidad * (1 - (linea.descuento || 0) / 100),
+        total_linea: redondearCentimos(
+          linea.precio * linea.cantidad * (1 - (linea.descuento || 0) / 100)
+        ),
       }));
 
       const { error: lineasError } = await supabase

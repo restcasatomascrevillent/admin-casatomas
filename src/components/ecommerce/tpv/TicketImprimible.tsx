@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { LineaTPV, TotalesTPV, MetodoPago } from "@/hooks/useTPV";
+import { DATOS_FISCALES, TIPO_IVA_RESTAURACION_ETIQUETA } from "@/config/fiscal";
 
 interface TicketImprimibleProps {
   numeroTicket: string;
@@ -32,12 +33,13 @@ export const TicketImprimible = forwardRef<HTMLDivElement, TicketImprimibleProps
         className="bg-white text-black p-4 font-mono text-sm max-w-[300px] mx-auto"
         style={{ fontFamily: 'monospace' }}
       >
-        {/* Cabecera */}
+        {/* Cabecera: solo se imprimen los datos fiscales configurados (ver
+            src/config/fiscal.ts). Sin configuración no se imprime la línea. */}
         <div className="text-center mb-4">
-          <h1 className="text-lg font-bold">ESTABLECIMIENTO</h1>
-          <p className="text-xs">CIF: B12345678</p>
-          <p className="text-xs">Dirección del local</p>
-          <p className="text-xs">Tel: 900 123 456</p>
+          <h1 className="text-lg font-bold uppercase">{DATOS_FISCALES.nombre}</h1>
+          {DATOS_FISCALES.cif && <p className="text-xs">CIF: {DATOS_FISCALES.cif}</p>}
+          {DATOS_FISCALES.direccion && <p className="text-xs">{DATOS_FISCALES.direccion}</p>}
+          {DATOS_FISCALES.telefono && <p className="text-xs">Tel: {DATOS_FISCALES.telefono}</p>}
         </div>
 
         <div className="border-t border-dashed border-black my-2" />
@@ -97,7 +99,7 @@ export const TicketImprimible = forwardRef<HTMLDivElement, TicketImprimibleProps
             <span>{formatCurrency(totales.baseImponible)}</span>
           </div>
           <div className="flex justify-between text-xs">
-            <span>IVA (21%):</span>
+            <span>IVA ({TIPO_IVA_RESTAURACION_ETIQUETA}):</span>
             <span>{formatCurrency(totales.iva)}</span>
           </div>
           <div className="flex justify-between font-bold text-base pt-1 border-t border-black">

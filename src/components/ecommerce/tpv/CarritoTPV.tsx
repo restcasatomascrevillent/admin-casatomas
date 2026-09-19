@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, Plus, Minus, Percent, Wine, Utensils } from "lucide-react";
 import { LineaTPV, TotalesTPV } from "@/hooks/useTPV";
+import { TIPO_IVA_RESTAURACION_ETIQUETA } from "@/config/fiscal";
 import { useState } from "react";
 import {
   Popover,
@@ -200,7 +201,7 @@ export function CarritoTPV({
             <span>{formatCurrency(totales.baseImponible)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">IVA (21%)</span>
+            <span className="text-muted-foreground">IVA ({TIPO_IVA_RESTAURACION_ETIQUETA})</span>
             <span>{formatCurrency(totales.iva)}</span>
           </div>
           <div className="flex justify-between text-lg font-bold pt-2 border-t">
