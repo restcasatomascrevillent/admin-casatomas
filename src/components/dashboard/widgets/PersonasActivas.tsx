@@ -1,9 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, ChefHat, ConciergeBell } from "lucide-react";
 import { useActiveStaff } from "@/hooks/useDashboardStats";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 export function PersonasActivas() {
-  const { data: activeStaff } = useActiveStaff();
+  const { data: activeStaff, isError, error, refetch } = useActiveStaff();
+
+  // Un fallo aquí pintaba "Personal Activo: 0" en plena cena, sin ningún aviso.
+  if (isError) {
+    return <EstadoErrorCarga titulo="el personal activo" error={error} onReintentar={() => refetch()} className="h-full" />;
+  }
 
   const cocina = activeStaff?.filter((s) => {
     const puesto = (s.trabajadores as any)?.puesto;

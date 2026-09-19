@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 export function CurvaReservasPorHora() {
-  const { data: reservas } = useTodayConfirmedReservations();
+  const { data: reservas, isError, error, refetch } = useTodayConfirmedReservations();
 
   const calcularReservasPorHora = () => {
     if (!reservas || reservas.length === 0) return [];
@@ -36,6 +37,11 @@ export function CurvaReservasPorHora() {
     : 0;
   const yMax = Math.ceil((maxComensales + 5) / 5) * 5;
   const yTicks = Array.from({ length: yMax / 5 + 1 }, (_, i) => i * 5);
+
+  // Sin esto, un fallo de consulta dibujaba una curva vacía como si no hubiera reservas.
+  if (isError) {
+    return <EstadoErrorCarga titulo="la curva de reservas por hora" error={error} onReintentar={() => refetch()} />;
+  }
 
   return (
     <Card>

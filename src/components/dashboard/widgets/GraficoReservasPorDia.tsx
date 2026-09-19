@@ -4,11 +4,12 @@ import { useDashboardFilters } from "@/contexts/DashboardContext";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 export function GraficoReservasPorDia() {
   const { getDateRange } = useDashboardFilters();
   const { start, end } = getDateRange();
-  const { data } = useDashboardStats(start, end);
+  const { data, isError, error, refetch } = useDashboardStats(start, end);
 
   const calcularReservasPorDia = () => {
     if (!data?.reservas) return [];
@@ -31,6 +32,11 @@ export function GraficoReservasPorDia() {
   };
 
   const datos = calcularReservasPorDia();
+
+  // Sin esto, un fallo de consulta dibujaba un gráfico plano a cero.
+  if (isError) {
+    return <EstadoErrorCarga titulo="las reservas por día" error={error} onReintentar={() => refetch()} />;
+  }
 
   return (
     <Card>

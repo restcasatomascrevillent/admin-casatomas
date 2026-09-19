@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
+import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -32,7 +33,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">{children}</main>
+          <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">
+            {/* El sidebar y la cabecera sobreviven a un fallo del contenido: el usuario puede navegar a otra sección. */}
+            <RouteErrorBoundary>{children}</RouteErrorBoundary>
+          </main>
         </div>
       </div>
     </SidebarProvider>

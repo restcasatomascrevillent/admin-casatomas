@@ -10,26 +10,32 @@ export function useDashboardStats(startDate: Date, endDate: Date) {
       const end = format(endDate, "yyyy-MM-dd");
 
       // Fetch hours data
-      const { data: horasData } = await supabase
+      const { data: horasData, error: horasError } = await supabase
         .from("registro_horas")
         .select("*, trabajadores(nombre, apellidos, puesto)")
         .gte("fecha", start)
         .lte("fecha", end);
 
+      if (horasError) throw horasError;
+
       // Fetch reservations - solo confirmadas para métricas
-      const { data: reservasData } = await supabase
+      const { data: reservasData, error: reservasError } = await supabase
         .from("reservas")
         .select("*")
         .gte("fecha", start)
         .lte("fecha", end)
         .eq("estado", "confirmada");
 
+      if (reservasError) throw reservasError;
+
       // Fetch turnos with worker info
-      const { data: turnosData } = await supabase
+      const { data: turnosData, error: turnosError } = await supabase
         .from("turnos")
         .select("*, trabajadores(nombre, apellidos, puesto)")
         .gte("fecha", start)
         .lte("fecha", end);
+
+      if (turnosError) throw turnosError;
 
       // Calculate hours from turnos if registro_horas is empty
       const horasFromTurnos = (turnosData || []).map((turno: any) => {
@@ -66,23 +72,27 @@ export function useActiveStaff() {
       const currentTime = format(now, "HH:mm:ss");
       
       // First try registro_horas for actual clocked-in staff
-      const { data: registroData } = await supabase
+      const { data: registroData, error: registroError } = await supabase
         .from("registro_horas")
         .select("*, trabajadores(nombre, apellidos, puesto), turnos(hora_inicio, hora_fin)")
         .eq("fecha", today)
         .is("hora_salida", null);
+
+      if (registroError) throw registroError;
 
       if (registroData && registroData.length > 0) {
         return registroData;
       }
 
       // Fallback to turnos - get today's scheduled shifts
-      const { data: turnosData } = await supabase
+      const { data: turnosData, error: turnosError } = await supabase
         .from("turnos")
         .select("*, trabajadores(nombre, apellidos, puesto)")
         .eq("fecha", today)
         .lte("hora_inicio", currentTime)
         .gte("hora_fin", currentTime);
+
+      if (turnosError) throw turnosError;
 
       // Transform turnos to match expected format
       return (turnosData || []).map((turno: any) => ({
@@ -109,13 +119,14 @@ export function useTodayReservations() {
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reservas")
         .select("*")
         .eq("fecha", today)
         .neq("estado", "cancelada");
 
-      return data || [];
+      if (error) throw error;
+      return data ?? [];
     },
   });
 }
@@ -127,13 +138,14 @@ export function useTodayConfirmedReservations() {
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("reservas")
         .select("*")
         .eq("fecha", today)
         .eq("estado", "confirmada");
 
-      return data || [];
+      if (error) throw error;
+      return data ?? [];
     },
   });
 }

@@ -28,6 +28,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
 import { BlacklistModal } from "./BlacklistModal";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 interface Reservation {
   id: string;
@@ -57,6 +58,9 @@ export function ListaReservasAvanzada({
 }: ListaReservasAvanzadaProps) {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  // Sin este estado, un fallo de carga se pintaba como
+  // "No se encontraron reservas con los filtros aplicados".
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
@@ -65,10 +69,13 @@ export function ListaReservasAvanzada({
   const toggleImportante = async (reservation: Reservation) => {
     const nuevoValor = !(reservation as any).importante;
     const { error } = await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reservation.id);
-    if (!error) {
-      toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
-      fetchReservations();
+    if (error) {
+      console.error("Error actualizando la reserva:", error);
+      toast.error("No se pudo actualizar la reserva: " + error.message);
+      return;
     }
+    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
+    fetchReservations();
   };
 
   // Filtros - inicializar con props si vienen de URL
@@ -97,7 +104,9 @@ export function ListaReservasAvanzada({
     if (error) {
       toast.error("Error al cargar reservas");
       console.error(error);
+      setLoadError(error);
     } else {
+      setLoadError(null);
       setReservations((data as any) || []);
     }
     setLoading(false);
@@ -240,6 +249,16 @@ export function ListaReservasAvanzada({
           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <EstadoErrorCarga
+        titulo="el listado de reservas"
+        error={loadError}
+        onReintentar={() => fetchReservations()}
+      />
     );
   }
 
