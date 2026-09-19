@@ -141,6 +141,82 @@ export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) =>
   });
 };
 
+// Hora que separa el turno de comida del de cena.
+// IMPORTANTE: debe coincidir con el trigger `trg_validar_capacidad` de la base de datos
+// (función `validar_capacidad_reserva`, que usa `NEW.hora < '17:00:00'`). Si se cambia
+// aquí sin cambiarlo allí, el panel dirá que hay hueco donde la base de datos lo rechaza.
+export const HORA_CORTE_TURNO = "17:00";
+
+// Estados que ocupan plaza. Mismo criterio que el trigger `trg_validar_capacidad`.
+const ESTADOS_QUE_OCUPAN = ["pendiente", "verificada", "confirmada"];
+
+export interface AforoTurno {
+  disponible: boolean;
+  capacidadMaxima: number;
+  comensalesActuales: number;
+  capacidadDisponible: number;
+  esComida: boolean;
+  mensaje: string;
+}
+
+/**
+ * Verifica el aforo del turno (comida/cena) de una fecha, replicando exactamente la
+ * regla que aplica el trigger `trg_validar_capacidad` en producción: suma de comensales
+ * de las reservas del mismo turno frente a la suma de `capacidad_maxima` de los espacios
+ * activos.
+ *
+ * Es una comprobación previa para dar feedback en el formulario: la autoridad sigue
+ * siendo la base de datos, que además usa un advisory lock para evitar condiciones de
+ * carrera. Por eso el INSERT puede fallar aunque esta función diga que hay hueco.
+ */
+export const verificarAforoTurno = async (
+  fecha: string,
+  hora: string,
+  comensales: number
+): Promise<AforoTurno> => {
+  const esComida = hora < HORA_CORTE_TURNO;
+
+  const [{ data: espacios, error: espaciosError }, { data: reservas, error: reservasError }] =
+    await Promise.all([
+      supabase
+        .from("espacios_reserva" as any)
+        .select("capacidad_maxima")
+        .eq("activa", true),
+      supabase
+        .from("reservas" as any)
+        .select("hora, numero_comensales")
+        .eq("fecha", fecha)
+        .in("estado", ESTADOS_QUE_OCUPAN),
+    ]);
+
+  if (espaciosError) throw espaciosError;
+  if (reservasError) throw reservasError;
+
+  const capacidadMaxima = (espacios ?? []).reduce(
+    (acc: number, espacio: any) => acc + (espacio.capacidad_maxima || 0),
+    0
+  );
+
+  const comensalesActuales = (reservas ?? [])
+    .filter((reserva: any) => (reserva.hora < HORA_CORTE_TURNO) === esComida)
+    .reduce((acc: number, reserva: any) => acc + (reserva.numero_comensales || 0), 0);
+
+  const capacidadDisponible = Math.max(0, capacidadMaxima - comensalesActuales);
+  const disponible = comensalesActuales + comensales <= capacidadMaxima;
+  const turno = esComida ? "comida" : "cena";
+
+  return {
+    disponible,
+    capacidadMaxima,
+    comensalesActuales,
+    capacidadDisponible,
+    esComida,
+    mensaje: disponible
+      ? `Quedan ${capacidadDisponible} plazas en el turno de ${turno} (${comensalesActuales}/${capacidadMaxima} ocupadas)`
+      : `Aforo superado en el turno de ${turno}: quedan ${capacidadDisponible} plazas de ${capacidadMaxima} y se piden ${comensales}`,
+  };
+};
+
 // Hook para verificar disponibilidad específica por espacio (basado en capacidad)
 export const verificarDisponibilidadSala = async (
   fecha: string,

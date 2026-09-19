@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { Plus, Settings } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +30,10 @@ export default function Reservas() {
   const { role } = useUserRole();
   const isAdmin = role === "admin";
   const { countPendientes } = useSolicitudesPendientes();
+
+  // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,
+  // el formulario reescribiría la fecha continuamente.
+  const datosNuevaReserva = useMemo(() => ({ fecha: new Date() }), [openDialog]);
 
   // Leer parámetros de URL para controlar tab activo
   const tabFromUrl = searchParams.get("tab");
@@ -120,10 +123,8 @@ export default function Reservas() {
                 <DialogTitle>Crear Nueva Reserva</DialogTitle>
               </DialogHeader>
               <FormularioReserva
-                onSuccess={() => {
-                  setOpenDialog(false);
-                  toast.success("Reserva creada correctamente");
-                }}
+                datosPreseleccionados={datosNuevaReserva}
+                onSuccess={() => setOpenDialog(false)}
               />
             </DialogContent>
           </Dialog>
