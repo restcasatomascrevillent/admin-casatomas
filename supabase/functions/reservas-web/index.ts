@@ -1,0 +1,1334 @@
+// ============================================================
+// RESERVAS WEB — Edge Function
+// ============================================================
+// Sustituye al workflow n8n "Reservas web" (5 webhooks: consulta de
+// disponibilidad, crear reserva, notificar cambio de estado,
+// confirmar, cancelar). Reutiliza fielmente la lógica YA PROBADA de
+// restaurante-phone/api/vapi-webhook.js (aforo por turno, normalización
+// de teléfono, blacklist, hora Madrid, solicitudes pendientes) en vez
+// de reinventarla. Ver el informe de la migración para el detalle de
+// qué se corrigió al portar (tokens de confirmar/cancelar, blacklist
+// rota, datos falsos en la página de confirmación, plantillas
+// intercambiadas, columna sala_id inexistente, etc.).
+//
+// Rutas (todas bajo /functions/v1/reservas-web/...):
+//   POST /disponibilidad        JSON  -> aforo por turno y por hora
+//   POST /crear                 JSON  -> crea una reserva 'pendiente'
+//   POST /notificar-estado      JSON  -> envía el email según estado
+//   GET  /confirmar?token=...   HTML  -> confirma la reserva (1 uso)
+//   GET  /cancelar?token=...    HTML  -> pantalla "¿seguro?" (no muta)
+//   GET  /cancelar/ejecutar?token=...  HTML -> cancela de verdad
+//
+// Secrets requeridos (Deno.env — nunca hardcodeados en el código):
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (ya los inyecta la plataforma)
+//   RESEND_API_KEY                            (ya existe en el proyecto)
+//   RESERVAS_WEB_TOKEN_SECRET                 (NUEVO — firma HMAC de los tokens)
+// Opcionales:
+//   RESEND_FROM_EMAIL            (por defecto: sandbox de Resend, ver informe)
+//   RESERVAS_WEB_SHARED_SECRET   (si se define, exige header x-webhook-secret
+//                                 en las 3 acciones POST — el frontend YA
+//                                 envía ese header hoy, ver ReservationForm.tsx)
+//   RESERVAS_WEB_ALLOWED_ORIGIN  (CORS; por defecto '*', igual que el resto
+//                                 de funciones de este proyecto)
+//   RESERVAS_WEB_PUBLIC_URL      (base para los enlaces de los emails; por
+//                                 defecto se deriva de SUPABASE_URL)
+// ============================================================
+
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
+
+// ------------------------------------------------------------
+// CONFIGURACIÓN
+// ------------------------------------------------------------
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
+const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Casa Tomás <onboarding@resend.dev>";
+const TOKEN_SECRET = Deno.env.get("RESERVAS_WEB_TOKEN_SECRET") ?? "";
+const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
+const ALLOWED_ORIGIN = Deno.env.get("RESERVAS_WEB_ALLOWED_ORIGIN") || "*";
+const PUBLIC_BASE_URL = Deno.env.get("RESERVAS_WEB_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/reservas-web`;
+
+const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const resend = new Resend(RESEND_API_KEY);
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+const RESTAURANTE_TEL_TEXTO = "966 10 78 87";
+const RESTAURANTE_TEL_HREF = "966107887";
+
+// ------------------------------------------------------------
+// HELPERS DE RESPUESTA
+// ------------------------------------------------------------
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+function html(body: string, status = 200): Response {
+  return new Response(body, {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+// Bug corregido al portar: la página de cancelar interpolaba
+// $json.query.nombre (y fecha/hora/comensales) SIN escapar dentro de HTML
+// — un enlace manipulado podía inyectar HTML/JS (XSS reflejado). Toda
+// interpolación de datos que vienen de fuera se pasa por aquí.
+function escapeHtml(value: unknown): string {
+  const str = value === null || value === undefined ? "" : String(value);
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function checkSharedSecret(req: Request): boolean {
+  if (!SHARED_SECRET) return true; // no configurado -> no bloquea (ver informe)
+  return req.headers.get("x-webhook-secret") === SHARED_SECRET;
+}
+
+// ============================================================
+// LÓGICA PORTADA DE restaurante-phone/api/vapi-webhook.js
+// (fiel al original citado entre paréntesis; ajustes de porting anotados)
+// ============================================================
+
+// --- normalizePhone (vapi-webhook.js:142) ---
+function normalizePhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  let normalized = phone.replace(/[\s\-\(\)\+\.]/g, "");
+  if (normalized.startsWith("0034")) normalized = normalized.slice(4);
+  if (normalized.startsWith("34") && normalized.length === 11) normalized = normalized.slice(2);
+  return normalized;
+}
+
+// --- hora Madrid (vapi-webhook.js:734,750) — Deno Deploy también corre en UTC ---
+function parseFechaHoraMadrid(fecha: string, hora: string): Date {
+  const utcRef = new Date(`${fecha}T${hora}:00.000Z`);
+  const madridStr = utcRef.toLocaleString("sv-SE", { timeZone: "Europe/Madrid" });
+  const madridAsUTC = new Date(madridStr.replace(" ", "T") + "Z");
+  const offsetMs = utcRef.getTime() - madridAsUTC.getTime();
+  return new Date(utcRef.getTime() + offsetMs);
+}
+function hoyEnMadrid(): Date {
+  const madridStr = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Madrid" });
+  return new Date(madridStr.split(" ")[0] + "T00:00:00Z");
+}
+
+// --- sanitizeForIlike (vapi-webhook.js:908) ---
+function sanitizeForIlike(str: string | null | undefined): string {
+  if (!str) return "";
+  return str.replace(/[%_().,*\\]/g, "\\$&");
+}
+
+// --- configuracion_reservas (vapi-webhook.js:655 getReservationConfig) ---
+interface ReservationConfig {
+  minutos_corte_antes_servicio: number;
+  max_reservas_por_telefono_dia: number;
+  max_reservas_por_email_dia: number;
+  max_comensales_por_reserva: number;
+  min_comensales_por_reserva: number;
+  dias_max_antelacion: number;
+  telefono_obligatorio: boolean;
+  email_obligatorio: boolean;
+  auto_confirmar: boolean;
+}
+async function getReservationConfig(): Promise<ReservationConfig> {
+  const { data } = await supabase.from("configuracion_reservas").select("*").limit(1).single();
+  return (data as ReservationConfig) || ({} as ReservationConfig);
+}
+
+// --- Blacklist ---
+// El encargo cita `isBlacklisted`, pero esa función (vapi-webhook.js:665)
+// SOLO mira teléfono (tipo='telefono', comparación exacta tras normalizar) y
+// se usa en fnFindReservation. La que de verdad se usa al CREAR una reserva
+// —el caso análogo a esta acción— es `verificarBlacklist` (vapi-webhook.js:915),
+// que sí comprueba teléfono Y email. Es la que se porta aquí.
+// Fix de porting: si ambos valores sanitizan a cadena vacía (input basura),
+// el array `queries` queda vacío y `.or('')` lanzaría un error de PostgREST;
+// se corta antes con un `return false` explícito.
+async function verificarBlacklist(telefono: string | null, email: string | null): Promise<boolean> {
+  if (!telefono && !email) return false;
+  const telefonoSanitizado = telefono ? telefono.replace(/[^\d+]/g, "") : "";
+  const emailSanitizado = email ? email.replace(/[^a-zA-Z0-9@._-]/g, "") : "";
+  const queries: string[] = [];
+  if (telefonoSanitizado) {
+    queries.push(`valor.ilike.%${sanitizeForIlike(telefonoSanitizado)}%`);
+    const norm = normalizePhone(telefonoSanitizado);
+    if (norm && norm !== telefonoSanitizado) queries.push(`valor.ilike.%${sanitizeForIlike(norm)}%`);
+  }
+  if (emailSanitizado) {
+    queries.push(`valor.ilike.%${sanitizeForIlike(emailSanitizado)}%`);
+  }
+  if (queries.length === 0) return false; // fix: evita .or('') con input solo-basura
+  try {
+    const { data, error } = await supabase.from("blacklist").select("motivo").or(queries.join(",")).limit(1);
+    if (error) throw error;
+    if (data && data.length > 0) return true;
+  } catch (err) {
+    console.error("[BLACKLIST] Error verificando:", (err as Error)?.message || err);
+  }
+  return false;
+}
+
+// --- solicitudes_pendientes (vapi-webhook.js:812 registrarSolicitudPendiente) ---
+interface SolicitudPendienteInput {
+  nombre?: string | null;
+  telefono?: string | null;
+  email?: string | null;
+  fecha?: string | null;
+  hora?: string | null;
+  comensales?: number | null;
+  notas?: string | null;
+  motivo: string;
+  descripcion?: string;
+}
+async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Promise<void> {
+  try {
+    const { error } = await supabase.from("solicitudes_pendientes").insert({
+      nombre: input.nombre || null,
+      telefono: input.telefono || null,
+      email: input.email || null,
+      fecha_solicitada: input.fecha || null,
+      hora_solicitada: input.hora || null,
+      numero_comensales: input.comensales || null,
+      notas_cliente: input.notas || null,
+      motivo_rechazo: input.motivo,
+      descripcion_rechazo: input.descripcion || null,
+      estado: "pendiente",
+    });
+    if (error) console.error("[SOLICITUD] Error al registrar:", error.message);
+  } catch (err) {
+    console.error("[SOLICITUD] Error inesperado:", (err as Error)?.message || err);
+  }
+}
+
+// --- Aforo por turno (vapi-webhook.js:680 getEspaciosConOcupacion) ---
+// MISMO criterio de turno que el trigger `trg_validar_capacidad` (comida
+// < 17:00, cena >= 17:00) que ya protege `reservas` en producción — no se
+// duplica su autoridad, solo se anticipa el resultado para dar una
+// respuesta clara antes del INSERT.
+// Deliberadamente NO se usa `vista_ocupacion`/`ocupacion_diaria`: en
+// producción están desincronizadas (mayoría de filas huérfanas, ocupación
+// fantasma) y el trigger que las mantiene usa un umbral de turno distinto
+// (<16:00) al del trigger de aforo (<17:00). Ver informe.
+interface EspacioOcupacion {
+  id: string;
+  nombre: string;
+  capacidad_maxima: number;
+  disponible: number;
+  ocupacion: number;
+}
+interface OcupacionResultado {
+  espacios: EspacioOcupacion[];
+  capacidadTotal: number;
+  ocupacionTotal: number;
+}
+async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | null): Promise<OcupacionResultado> {
+  const { data: espacios } = await supabase
+    .from("espacios_reserva")
+    .select("id, nombre, capacidad_maxima")
+    .eq("activa", true);
+
+  const { data: reservas } = await supabase
+    .from("reservas")
+    .select("espacio_id, numero_comensales, hora")
+    .eq("fecha", fecha)
+    .in("estado", ["pendiente", "verificada", "confirmada"]);
+
+  const esTurnoComida = horaConsulta ? horaConsulta < "17:00" : null;
+  const reservasMismoTurno = (reservas || []).filter((r: { hora: string }) => {
+    if (esTurnoComida === null) return true;
+    const rEsComida = r.hora < "17:00:00";
+    return rEsComida === esTurnoComida;
+  });
+
+  const ocupacionPorEspacio: Record<string, number> = {};
+  for (const r of reservasMismoTurno as Array<{ espacio_id: string | null; numero_comensales: number }>) {
+    if (r.espacio_id) ocupacionPorEspacio[r.espacio_id] = (ocupacionPorEspacio[r.espacio_id] || 0) + r.numero_comensales;
+  }
+
+  const resultado: EspacioOcupacion[] = (espacios || []).map((e: { id: string; nombre: string; capacidad_maxima: number }) => ({
+    id: e.id,
+    nombre: e.nombre,
+    capacidad_maxima: e.capacidad_maxima,
+    ocupacion: ocupacionPorEspacio[e.id] || 0,
+    disponible: e.capacidad_maxima - (ocupacionPorEspacio[e.id] || 0),
+  }));
+
+  const capacidadTotal = resultado.reduce((s, e) => s + e.capacidad_maxima, 0);
+  const ocupacionTotal = (reservasMismoTurno as Array<{ numero_comensales: number }>).reduce((s, r) => s + (r.numero_comensales || 0), 0);
+
+  return { espacios: resultado, capacidadTotal, ocupacionTotal };
+}
+
+// ============================================================
+// TOKENS DE UN SOLO USO (confirmar / cancelar)
+// ============================================================
+// FALLO GRAVE corregido: hoy confirmar/cancelar filtran por nombre
+// (y a veces fecha/hora) tomados de la query string, sin ningún secreto
+// — cualquiera puede confirmar o cancelar la reserva de otro con solo
+// adivinar/editar la URL.
+//
+// Diseño elegido: HMAC-SHA256 (Web Crypto, sin dependencias) sobre un
+// payload { id, action, exp, fp }, SIN estado en base de datos (no hace
+// falta una migración nueva ni tocar nada fuera de esta carpeta):
+//   - `exp`: caducidad (14 días — cubre de sobra el tiempo entre el email
+//     de "confirma tu asistencia" y la fecha de la reserva).
+//   - `fp` ("fingerprint"): `estado + '|' + updated_at` de la reserva EN
+//     EL MOMENTO de generar el token (justo cuando se manda el email).
+//     Al verificar se recalcula `fp` desde el estado ACTUAL en BD; si no
+//     coincide, el token se rechaza. Como confirmar/cancelar siempre
+//     cambian `estado` (y el trigger `update_reservas_updated_at` cambia
+//     `updated_at` en cualquier UPDATE), el primer uso invalida el token
+//     para cualquier reintento — de un solo uso sin tabla de tokens.
+// La firma se verifica con `crypto.subtle.verify` (comparación segura
+// frente a timing attacks; no se compara con `===` a mano).
+const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 días
+
+function b64urlEncode(bytes: Uint8Array): string {
+  let str = "";
+  for (const b of bytes) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(str: string): Uint8Array {
+  const padded = str + "=".repeat((4 - (str.length % 4)) % 4);
+  const bin = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function hmacKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+
+type TokenAction = "confirmar" | "cancelar";
+interface ReservaTokenPayload {
+  id: string;
+  action: TokenAction;
+  exp: number;
+  fp: string;
+}
+
+async function signReservaToken(id: string, action: TokenAction, fp: string): Promise<string> {
+  const payload: ReservaTokenPayload = { id, action, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS, fp };
+  const payloadB64 = b64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const key = await hmacKey(TOKEN_SECRET);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadB64));
+  return `${payloadB64}.${b64urlEncode(new Uint8Array(sig))}`;
+}
+
+async function verifyReservaToken(token: string, action: TokenAction): Promise<ReservaTokenPayload | null> {
+  if (!TOKEN_SECRET) {
+    console.error("[TOKEN] RESERVAS_WEB_TOKEN_SECRET no configurado — rechazando token (fail closed)");
+    return null;
+  }
+  const parts = (token || "").split(".");
+  if (parts.length !== 2) return null;
+  const [payloadB64, sigB64] = parts;
+  try {
+    const key = await hmacKey(TOKEN_SECRET);
+    const valid = await crypto.subtle.verify("HMAC", key, b64urlDecode(sigB64), new TextEncoder().encode(payloadB64));
+    if (!valid) return null;
+    const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(payloadB64))) as ReservaTokenPayload;
+    if (payload.action !== action) return null;
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function fingerprint(estado: string, updatedAt: string): string {
+  return `${estado}|${updatedAt}`;
+}
+
+// ============================================================
+// RESERVA: tipo + lookup
+// ============================================================
+interface Reserva {
+  id: string;
+  nombre: string | null;
+  telefono: string | null;
+  email: string | null;
+  fecha: string;
+  hora: string;
+  numero_comensales: number;
+  estado: string;
+  notas_cliente: string | null;
+  espacio_id: string | null;
+  canal: string | null;
+  updated_at: string;
+}
+async function fetchReserva(id: string): Promise<Reserva | null> {
+  const { data, error } = await supabase.from("reservas").select("*").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return data as Reserva;
+}
+
+// ============================================================
+// EMAIL — Resend (plantillas HTML de Gmail/n8n, preservadas tal cual)
+// ============================================================
+async function sendEmail(to: string, subject: string, htmlBody: string): Promise<{ ok: boolean; error?: string }> {
+  if (!RESEND_API_KEY) {
+    console.error("[EMAIL] RESEND_API_KEY no configurado — email no enviado");
+    return { ok: false, error: "resend_not_configured" };
+  }
+  try {
+    const { error } = await resend.emails.send({ from: RESEND_FROM_EMAIL, to: [to], subject, html: htmlBody });
+    if (error) {
+      console.error("[EMAIL] Resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[EMAIL] Excepción enviando email:", (err as Error)?.message || err);
+    return { ok: false, error: (err as Error)?.message || "unknown" };
+  }
+}
+
+// ------------------------------------------------------------
+// PLANTILLA: Solicitud recibida (email positivo tras crear con éxito)
+// ------------------------------------------------------------
+function tplSolicitudRecibida(nombre: string, fecha: string, hora: string, comensales: number): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitud Recibida - Casa Tomás</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
+          <tr>
+            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
+              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
+              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 48px 0;text-align:center;">
+              <span style="display:inline-block;background:#F7F3EE;border:1px solid #E8E0D5;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Solicitud recibida</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 48px 0;">
+              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Hola, ${escapeHtml(nombre)}</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Hemos recibido tu solicitud de reserva en <strong style="color:#1C1F22;">Casa Tomás</strong>. Nuestro equipo la revisará y te confirmaremos la disponibilidad a la mayor brevedad posible.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 40px;">
+              <p style="margin:0;font-size:13px;color:#6B6560;line-height:1.6;border-left:2px solid #B8936A;padding-left:16px;">No es necesario que hagas nada más. Recibirás un correo de confirmación en cuanto esté todo listo.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
+              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
+              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ------------------------------------------------------------
+// PLANTILLA: Solicitud no procesada (rechazo genérico, no revela motivo)
+// ------------------------------------------------------------
+function tplSolicitudNoProcesada(nombre: string, fecha: string, hora: string, comensales: number): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitud no procesada - Casa Tomás</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #1C1F22;">
+          <tr>
+            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
+              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
+              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 48px 0;text-align:center;">
+              <span style="display:inline-block;background:#F0EDEA;border:1px solid #DDD5CC;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Solicitud no procesada</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 48px 0;">
+              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Estimado/a ${escapeHtml(nombre)}</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Gracias por su interés en visitarnos. Lamentamos informarle que no nos ha sido posible formalizar su solicitud de reserva de acuerdo con nuestras políticas internas de organización.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;">
+                <tr>
+                  <td style="padding:14px 20px;border-bottom:1px solid #E8E0D5;background:#FAFAF8;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Fecha solicitada</span>
+                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${escapeHtml(fecha)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 20px;border-bottom:1px solid #E8E0D5;background:#FAFAF8;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Hora</span>
+                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${escapeHtml(hora)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 20px;background:#FAFAF8;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Comensales</span>
+                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${comensales} personas</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 40px;">
+              <p style="margin:0;font-size:14px;color:#6B6560;line-height:1.7;">Agradecemos su comprensión y esperamos poder recibirle en otra ocasión.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
+              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
+              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ------------------------------------------------------------
+// PLANTILLA: Confirma tu asistencia (lleva los 2 enlaces con token)
+// ------------------------------------------------------------
+function tplConfirmaAsistencia(nombre: string, fecha: string, hora: string, comensales: number, confirmUrl: string, cancelUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmación requerida - Casa Tomás</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
+          <tr>
+            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
+              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
+              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 48px 0;text-align:center;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1C1F22;font-weight:normal;margin-bottom:12px;">Confirma tu asistencia</div>
+              <p style="margin:0;font-size:15px;color:#6B6560;line-height:1.7;">Hola, <strong style="color:#1C1F22;">${escapeHtml(nombre)}</strong>. Tu mesa está casi lista. Solo necesitamos que confirmes tu asistencia para garantizar tu reserva.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 48px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 16px;">
+              <a href="${confirmUrl}" style="display:block;text-align:center;background:#B8936A;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;margin-bottom:12px;">
+                Sí, confirmo mi asistencia
+              </a>
+              <a href="${cancelUrl}" style="display:block;text-align:center;background:transparent;color:#6B6560;text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:14px 0;border:1px solid #E8E0D5;">
+                Cancelar reserva
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 40px;">
+              <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">Si no confirmas, la mesa puede quedar disponible para otros clientes.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
+              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
+              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ------------------------------------------------------------
+// PLANTILLA: Sin disponibilidad (revisión manual del restaurante)
+// ------------------------------------------------------------
+function tplSinDisponibilidad(nombre: string, fecha: string, hora: string, comensales: number): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sin disponibilidad - Casa Tomás</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
+          <tr>
+            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
+              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
+              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
+              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 48px 0;text-align:center;">
+              <span style="display:inline-block;background:#F0EDEA;border:1px solid #DDD5CC;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Sin disponibilidad</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 48px 0;">
+              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Estimado/a ${escapeHtml(nombre)}</p>
+              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Lamentamos informarle que el restaurante se encuentra completo para la fecha y hora solicitadas. No podremos confirmar su reserva para los siguientes datos:</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 32px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
+                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 16px;">
+              <a href="tel:+34966107887" style="display:block;text-align:center;background:#1C1F22;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;">
+                Llamar al restaurante
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 48px 40px;">
+              <p style="margin:0;font-size:13px;color:#9B948E;text-align:center;line-height:1.6;">Puedes contactarnos por teléfono para encontrar una alternativa. Disculpe las molestias.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
+              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
+              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ------------------------------------------------------------
+// PÁGINAS HTML (respuesta directa al navegador, no emails)
+// ------------------------------------------------------------
+
+// Bug corregido: mostraba "Elena Morales", "2025-11-16", "21:00", "7
+// comensales" escritos a fuego. Ahora los datos vienen de una lectura
+// fresca de `reservas` (ver handleConfirmar), no de la query string.
+function pageReservaConfirmada(nombre: string, fecha: string, hora: string, comensales: number): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reserva confirmada - Casa Tomás Crevillente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5, #e8efe4); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #ffffff; border-radius: 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); max-width: 480px; width: 100%; padding: 32px 28px; text-align: center; }
+    .check-circle { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #2c7a33; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px; color: #2c7a33; }
+    h1 { margin: 12px 0 8px; font-size: 24px; color: #333; }
+    p { margin: 6px 0; color: #555; line-height: 1.5; font-size: 14px; }
+    .details { margin-top: 18px; padding: 14px 16px; background: #f7faf7; border-radius: 8px; text-align: left; font-size: 14px; color: #333; }
+    .details b { color: #2c7a33; }
+    .footer { margin-top: 22px; font-size: 12px; color: #777; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="check-circle">✓</div>
+    <h1>¡Reserva confirmada!</h1>
+    <p>Gracias, <b>${escapeHtml(nombre)}</b>. Hemos confirmado tu reserva en <b>Casa Tomás Crevillente</b>.</p>
+    <div class="details">
+      <p><b>Fecha:</b> ${escapeHtml(fecha)}</p>
+      <p><b>Hora:</b> ${escapeHtml(hora.slice(0, 5))}</p>
+      <p><b>Número de comensales:</b> ${comensales}</p>
+    </div>
+    <p class="footer">Si necesitas modificar o cancelar la reserva, ponte en contacto con nosotros.<br />¡Te esperamos!</p>
+  </div>
+</body>
+</html>`;
+}
+
+// Bug corregido: la página original interpolaba $json.query.* (nombre,
+// fecha, hora, comensales) SIN escapar y SIN comprobar que la reserva
+// existiera — un enlace manipulado podía mostrar datos falsos o inyectar
+// HTML. Ahora todo sale de una lectura fresca de la reserva por el id
+// del token, escapada.
+function pageCancelarPreview(nombre: string, fecha: string, hora: string, comensales: number, ejecutarUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cancelar Reserva - Casa Tomás Crevillente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #ffffff; border-radius: 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); max-width: 480px; width: 100%; padding: 32px 28px; text-align: center; border-top: 6px solid #e04f5f; }
+    .icon-warning { width: 60px; height: 60px; border-radius: 50%; background-color: #fff5f5; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px; color: #e04f5f; font-weight: bold; }
+    h1 { margin: 12px 0 8px; font-size: 24px; color: #333; }
+    p { margin: 6px 0; color: #555; line-height: 1.5; font-size: 14px; }
+    .details { margin-top: 20px; padding: 16px; background: #f9f9f9; border-left: 4px solid #e04f5f; border-radius: 4px; text-align: left; font-size: 14px; color: #333; }
+    .details p { margin: 4px 0; }
+    .btn-container { margin-top: 30px; display: flex; flex-direction: column; gap: 10px; }
+    .btn-delete { display: block; width: 100%; padding: 14px 0; background-color: #e04f5f; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px; border: none; cursor: pointer; box-sizing: border-box; }
+    .btn-delete:hover { background-color: #c03947; }
+    .btn-keep { display: block; width: 100%; padding: 14px 0; background-color: transparent; color: #777; text-decoration: none; border-radius: 4px; font-size: 14px; border: 1px solid #ddd; box-sizing: border-box; }
+    .btn-keep:hover { background-color: #f5f5f5; color: #333; }
+    .footer { margin-top: 22px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-warning">!</div>
+    <h1>¿Quieres cancelar tu reserva?</h1>
+    <p>Estás a punto de cancelar la siguiente reserva en <b>Casa Tomás Crevillente</b>. Esta acción no se puede deshacer.</p>
+    <div class="details">
+      <p><b>Nombre:</b> ${escapeHtml(nombre)}</p>
+      <p><b>Fecha:</b> ${escapeHtml(fecha)}</p>
+      <p><b>Hora:</b> ${escapeHtml(hora.slice(0, 5))}</p>
+      <p><b>Comensales:</b> ${comensales}</p>
+    </div>
+    <div class="btn-container">
+      <a href="${ejecutarUrl}" class="btn-delete">Sí, cancelar reserva definitivamente</a>
+      <a href="javascript:window.close()" class="btn-keep">No, mantener mi reserva</a>
+    </div>
+    <p class="footer">Si tienes dudas, llámanos al ${RESTAURANTE_TEL_TEXTO}.</p>
+  </div>
+</body>
+</html>`;
+}
+
+// Estática (sin datos dinámicos), igual que el original. Se corrigió la
+// frase "tus datos eliminados de esta reserva": no es cierto, solo se
+// marca estado='cancelada', no se borra nada.
+function pageCancelada(): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reserva Cancelada - Casa Tomás Crevillente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #ffffff; border-radius: 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); max-width: 480px; width: 100%; padding: 40px 28px; text-align: center; border-top: 6px solid #394247; }
+    .icon-check { width: 70px; height: 70px; border-radius: 50%; border: 3px solid #394247; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 36px; color: #394247; font-weight: bold; }
+    h1 { margin: 12px 0 15px; font-size: 26px; color: #333; }
+    p { margin: 10px 0; color: #555; line-height: 1.6; font-size: 16px; }
+    .message-box { margin-top: 25px; padding: 20px; background: #f4f4f4; border-radius: 8px; color: #666; font-size: 15px; }
+    .footer { margin-top: 30px; font-size: 13px; color: #999; }
+    .btn-close { display: inline-block; margin-top: 20px; padding: 10px 20px; color: #888; text-decoration: none; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+    .btn-close:hover { background-color: #f9f9f9; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-check">✓</div>
+    <h1>Operación realizada</h1>
+    <p>La reserva ha sido cancelada correctamente.</p>
+    <div class="message-box">Tu mesa ha quedado liberada.</div>
+    <p>Ya puedes cerrar esta ventana o salir de la página.</p>
+    <p class="footer">Esperamos verte pronto en <b>Casa Tomás Crevillente</b>.</p>
+    <a href="javascript:window.close()" class="btn-close">Cerrar ventana</a>
+  </div>
+</body>
+</html>`;
+}
+
+// Página nueva: no existía en el flujo original (que no contemplaba
+// tokens caducados/reutilizados). Hace falta porque ahora confirmar y
+// cancelar SÍ pueden rechazar un enlace.
+function pageTokenInvalido(): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Enlace no válido - Casa Tomás Crevillente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #ffffff; border-radius: 10px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); max-width: 480px; width: 100%; padding: 32px 28px; text-align: center; border-top: 6px solid #9B948E; }
+    .icon { width: 60px; height: 60px; border-radius: 50%; background-color: #F0EDEA; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 30px; color: #6B6560; }
+    h1 { margin: 12px 0 8px; font-size: 22px; color: #333; }
+    p { margin: 6px 0; color: #555; line-height: 1.6; font-size: 14px; }
+    .footer { margin-top: 22px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">i</div>
+    <h1>Este enlace ya no es válido</h1>
+    <p>Puede que ya se haya usado o que haya caducado.</p>
+    <p>Si necesitas ayuda con tu reserva, llámanos al <a href="tel:${RESTAURANTE_TEL_HREF}">${RESTAURANTE_TEL_TEXTO}</a>.</p>
+    <p class="footer">Casa Tomás · Crevillente</p>
+  </div>
+</body>
+</html>`;
+}
+
+// ============================================================
+// ACCIÓN: disponibilidad
+// ============================================================
+// Contrato NUEVO (documentado en el informe): sustituye el volcado en
+// crudo de `vista_ocupacion` + `configuracion_turnos` (sin lógica,
+// y hoy con datos fantasma — ver informe) por un cálculo de aforo real,
+// con el mismo criterio de turno que el trigger de la base de datos.
+//
+// FORMA DE LA RESPUESTA (B-2) — en éxito SIEMPRE un ARRAY PLANO de nivel
+// superior, nunca un objeto. n8n respondía con `responseWith:
+// allIncomingItems` (un array) y el consumidor hace `JSON.parse(text)` y
+// después `rawData.map(...)`: devolver `{ fecha, periodos, ocupacion,
+// aforo_turno }` rompía con `TypeError: rawData.map is not a function`.
+//
+// Cada elemento lleva un discriminador explícito `kind` (no hace falta
+// adivinar por presencia de campos):
+//   kind: "meta"      -> 1 elemento, SIEMPRE el primero del array.
+//                        Lleva `fecha`, `aforo_turno` (comida/cena) y
+//                        `cerrado` (M-2: día sin turnos activos != error).
+//   kind: "periodo"   -> 0..n, una fila de `configuracion_turnos` activa
+//                        para el día de la semana de `fecha`.
+//   kind: "ocupacion" -> 0..n, una hora con reservas vivas ese día.
+// Además `fecha` se repite en TODOS los elementos, para que el consumidor
+// pueda filtrar por un solo `kind` sin perder el contexto del día.
+// En error (4xx/5xx) el cuerpo sigue siendo el objeto `{ ok:false, error }`
+// habitual: el consumidor debe comprobar `response.ok` ANTES de mapear.
+async function handleDisponibilidad(req: Request): Promise<Response> {
+  if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 400);
+  }
+  const fecha = typeof body?.fecha === "string" ? body.fecha : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
+
+  const diaSemana = new Date(fecha + "T12:00:00Z").getUTCDay();
+
+  const { data: turnosRaw } = await supabase
+    .from("configuracion_turnos")
+    .select("id, nombre_periodo, hora_inicio, hora_fin, intervalo_base_minutos, umbral_apertura_secundario, dias_semana, ocultar_primario_si_secundario, espacio_id")
+    .eq("activo", true);
+
+  const periodos = (turnosRaw || []).filter(
+    (t: { dias_semana: number[] | null }) => !t.dias_semana || t.dias_semana.length === 0 || t.dias_semana.includes(diaSemana)
+  );
+
+  const { data: reservasDia } = await supabase
+    .from("reservas")
+    .select("hora, numero_comensales")
+    .eq("fecha", fecha)
+    .in("estado", ["pendiente", "verificada", "confirmada"]);
+
+  const porHora = new Map<string, { total_reservas: number; total_comensales: number }>();
+  for (const r of (reservasDia || []) as Array<{ hora: string; numero_comensales: number }>) {
+    const cur = porHora.get(r.hora) || { total_reservas: 0, total_comensales: 0 };
+    cur.total_reservas += 1;
+    cur.total_comensales += r.numero_comensales;
+    porHora.set(r.hora, cur);
+  }
+
+  const comida = await getEspaciosConOcupacion(fecha, "13:00");
+  const cena = await getEspaciosConOcupacion(fecha, "20:00");
+  const aforoTurno = {
+    comida: { capacidad_maxima: comida.capacidadTotal, ocupacion: comida.ocupacionTotal, disponible: comida.capacidadTotal - comida.ocupacionTotal },
+    cena: { capacidad_maxima: cena.capacidadTotal, ocupacion: cena.ocupacionTotal, disponible: cena.capacidadTotal - cena.ocupacionTotal },
+  };
+
+  const ocupacion = Array.from(porHora.entries())
+    .map(([hora, v]) => {
+      const esComida = hora < "17:00:00";
+      const t = esComida ? aforoTurno.comida : aforoTurno.cena;
+      return {
+        kind: "ocupacion" as const,
+        fecha,
+        hora,
+        turno: esComida ? "comida" : "cena",
+        total_reservas: v.total_reservas,
+        total_comensales: v.total_comensales,
+        capacidad_maxima: t.capacidad_maxima,
+        capacidad_disponible: t.disponible,
+        porcentaje_ocupacion: t.capacidad_maxima > 0 ? Math.round((t.ocupacion / t.capacidad_maxima) * 100) : 0,
+      };
+    })
+    .sort((a, b) => a.hora.localeCompare(b.hora));
+
+  // `kind` va AL FINAL del literal, después del spread, para que una
+  // columna futura de `configuracion_turnos` con ese nombre no pueda
+  // pisar el discriminador. `fecha` se adjunta a cada periodo porque el
+  // consumidor puede quedarse solo con los elementos kind==="periodo".
+  const periodosOut = (periodos as Array<Record<string, unknown>>).map((t) => ({
+    ...t,
+    fecha,
+    kind: "periodo" as const,
+  }));
+
+  // M-2: hasta ahora un día CERRADO (sin turnos activos para ese día de la
+  // semana) se devolvía como `periodos: []`, indistinguible de un error
+  // para el consumidor. `cerrado` lo hace explícito sin romper el contrato
+  // de array plano: viaja en el elemento `meta`, que siempre existe.
+  const meta = {
+    kind: "meta" as const,
+    fecha,
+    cerrado: periodosOut.length === 0,
+    aforo_turno: aforoTurno,
+    total_periodos: periodosOut.length,
+    total_ocupacion: ocupacion.length,
+  };
+
+  return json([meta, ...periodosOut, ...ocupacion]);
+}
+
+// ============================================================
+// ACCIÓN: crear
+// ============================================================
+async function handleCrear(req: Request): Promise<Response> {
+  if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 400);
+  }
+
+  const nombre = typeof body?.nombre === "string" ? body.nombre.trim().slice(0, 200) : "";
+  const fecha = typeof body?.fecha === "string" ? body.fecha : "";
+  const hora = typeof body?.hora === "string" ? body.hora : "";
+  const partySize = parseInt(String(body?.numero_comensales), 10);
+  const notas = typeof body?.notas_cliente === "string" ? body.notas_cliente.slice(0, 500) : null;
+  const salaNombre = typeof body?.sala === "string" ? body.sala : null;
+  const espacioIdInput = typeof body?.espacio_id === "string" ? body.espacio_id : null;
+
+  if (!nombre) return json({ ok: false, error: "nombre_requerido" }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
+  if (!/^\d{2}:\d{2}$/.test(hora)) return json({ ok: false, error: "hora_invalida" }, 400);
+  if (isNaN(partySize) || partySize < 1 || partySize > 100) return json({ ok: false, error: "numero_comensales_invalido" }, 400);
+
+  const telefonoRaw = typeof body?.telefono === "string" ? body.telefono.trim() : "";
+  const emailRaw = typeof body?.email === "string" ? body.email.trim() : "";
+  if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) return json({ ok: false, error: "email_invalido" }, 400);
+  if (telefonoRaw && !/^\d{9,15}$/.test(normalizePhone(telefonoRaw))) return json({ ok: false, error: "telefono_invalido" }, 400);
+
+  const config = await getReservationConfig();
+  const maxComensales = config.max_comensales_por_reserva || 12;
+  const minComensales = config.min_comensales_por_reserva || 1;
+  const maxPorTelDia = config.max_reservas_por_telefono_dia || 2;
+
+  let telefono: string | null = null;
+  if (telefonoRaw) {
+    const norm = normalizePhone(telefonoRaw);
+    telefono = norm.length === 9 ? `+34${norm}` : `+${norm}`;
+  }
+  const email = emailRaw || null;
+
+  if (config.telefono_obligatorio && !telefono) return json({ ok: false, error: "telefono_requerido" }, 400);
+  if (config.email_obligatorio && !email) return json({ ok: false, error: "email_requerido" }, 400);
+
+  const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas };
+  // B-3: antes esto devolvía SIEMPRE HTTP 200. El frontend solo mira
+  // `response.ok` y nunca lee el cuerpo, así que un cliente RECHAZADO veía
+  // el diálogo de "¡Reserva confirmada!" a la vez que recibía el email de
+  // rechazo que se manda dos líneas más abajo. Ahora `status` es
+  // OBLIGATORIO en cada llamada y el 200 queda reservado al éxito real:
+  //   403 -> blacklist (mensaje neutro, no se le revela el motivo)
+  //   422 -> regla de negocio que el cliente PUEDE corregir en el formulario
+  //   409 -> conflicto con el estado actual que el cliente NO puede corregir
+  // El cuerpo NO cambia: sigue llevando `motivo` y `mensaje` legibles, y
+  // el envío de email y el registro de solicitud pendiente son idénticos.
+  const avisar = async (motivo: string, descripcion: string, mensajeCliente: string, status: number, log = true) => {
+    if (log) await registrarSolicitudPendiente({ ...datosSolicitud, motivo, descripcion });
+    if (email) await sendEmail(email, "Estado de reserva Casa Tomás", tplSolicitudNoProcesada(nombre, fecha, hora, partySize));
+    return json({ ok: false, motivo, mensaje: mensajeCliente }, status);
+  };
+
+  // Blacklist — igual que fnCreateReservation: NO se registra en
+  // solicitudes_pendientes (ya está fichado) y el motivo devuelto al
+  // cliente es genérico, para no confirmarle que está en la lista.
+  if (await verificarBlacklist(telefono, email)) {
+    return await avisar("no_disponible", "Blacklist.", "No ha sido posible formalizar la solicitud.", 403, false);
+  }
+
+  // Comensales fuera de rango
+  if (partySize < minComensales || partySize > maxComensales) {
+    if (partySize > maxComensales) {
+      return await avisar(
+        "grupo_grande",
+        `Quiso reservar para ${partySize} personas (máximo automático: ${maxComensales}).`,
+        `Para más de ${maxComensales} personas contacta directamente con el restaurante.`,
+        422
+      );
+    }
+    // Por debajo del mínimo: input bien formado que incumple una regla de
+    // negocio que el cliente puede corregir -> 422, no 400. Se añade
+    // `mensaje` (antes no había ninguno) para que el frontend tenga algo
+    // que mostrar, igual que en el resto de rechazos.
+    return json(
+      {
+        ok: false,
+        error: "numero_comensales_fuera_de_rango",
+        mensaje: `Las reservas web son para un mínimo de ${minComensales} y un máximo de ${maxComensales} personas.`,
+        min: minComensales,
+        max: maxComensales,
+      },
+      422
+    );
+  }
+
+  // Fecha: "hoy" primero (con aviso), luego validación genérica (sin aviso)
+  const hoyRef = hoyEnMadrid();
+  const reservaDateRef = new Date(fecha + "T00:00:00Z");
+  const diffDiasRef = Math.ceil((reservaDateRef.getTime() - hoyRef.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDiasRef === 0) {
+    return await avisar("reserva_hoy", "Intentó reservar para hoy desde la web.", "Las reservas para hoy se gestionan por teléfono.", 422);
+  }
+  // Fecha pasada y fecha demasiado lejana: la fecha es válida y parseable,
+  // lo que incumple es una regla de negocio corregible -> 422, no 400.
+  if (diffDiasRef < 0) {
+    return json({ ok: false, error: "fecha_pasada", mensaje: "La fecha seleccionada ya ha pasado." }, 422);
+  }
+  const diasMaxAntelacion = config.dias_max_antelacion || 60;
+  if (diffDiasRef > diasMaxAntelacion) {
+    return json(
+      {
+        ok: false,
+        error: "fecha_demasiado_lejana",
+        mensaje: `Solo se pueden reservar fechas con un máximo de ${diasMaxAntelacion} días de antelación.`,
+        dias_max: diasMaxAntelacion,
+      },
+      422
+    );
+  }
+
+  // Corte horario (con aviso)
+  const minutosCorte = config.minutos_corte_antes_servicio || 60;
+  const fechaHoraRef = parseFechaHoraMadrid(fecha, hora);
+  const diffMinRef = (fechaHoraRef.getTime() - Date.now()) / (1000 * 60);
+  if (diffMinRef < minutosCorte) {
+    return await avisar("corte_horario", `Reserva con menos de ${minutosCorte} minutos de antelación.`, `Las reservas deben hacerse con al menos ${minutosCorte} minutos de antelación.`, 422);
+  }
+
+  // Rate limit por teléfono
+  if (telefono) {
+    const normPhone = normalizePhone(telefono);
+    const variantes = Array.from(new Set([telefono, normPhone, `+34${normPhone}`].filter(Boolean)));
+    const { data: existentesTel } = await supabase
+      .from("reservas")
+      .select("id")
+      .in("telefono", variantes)
+      .eq("fecha", fecha)
+      .in("estado", ["pendiente", "verificada", "confirmada"]);
+    if ((existentesTel || []).length >= maxPorTelDia) {
+      return await avisar("max_reservas_telefono", `Ya tiene ${maxPorTelDia} reserva(s) activas para ${fecha}.`, "Ya hay reservas activas con este teléfono para esa fecha.", 409);
+    }
+  }
+  // Rate limit por email
+  if (email && config.max_reservas_por_email_dia) {
+    const { data: existentesEmail } = await supabase
+      .from("reservas")
+      .select("id")
+      .eq("email", email)
+      .eq("fecha", fecha)
+      .in("estado", ["pendiente", "verificada", "confirmada"]);
+    if ((existentesEmail || []).length >= config.max_reservas_por_email_dia) {
+      return await avisar("max_reservas_email", `Ya tiene el máximo de reservas por email para ${fecha}.`, "Ya hay reservas activas con este email para esa fecha.", 409);
+    }
+  }
+
+  // Aforo (mismo criterio que el trigger `trg_validar_capacidad`; se
+  // anticipa aquí para dar una respuesta clara, no sustituye al trigger)
+  const { espacios, capacidadTotal, ocupacionTotal } = await getEspaciosConOcupacion(fecha, hora);
+  const disponibleGlobal = ocupacionTotal + partySize <= capacidadTotal;
+  const espaciosLibres = espacios.filter((e) => e.disponible >= partySize);
+  if (!disponibleGlobal || espaciosLibres.length === 0) {
+    return await avisar(
+      "sin_disponibilidad",
+      `Sin hueco el ${fecha} a las ${hora} para ${partySize} personas. Capacidad: ${capacidadTotal}, ocupación: ${ocupacionTotal}.`,
+      "No queda disponibilidad para esa fecha y hora.",
+      409
+    );
+  }
+
+  // Espacio opcional por nombre o id — si no se indica se deja sin asignar
+  // (igual que el canal telefónico: el staff lo asigna presencialmente).
+  // Fix de porting: el n8n original insertaba en una columna `sala_id` que
+  // NO existe en `reservas` (la columna real es `espacio_id`) — con el
+  // formulario actual, que ya no envía `sala`, esa reserva quedaba sin
+  // espacio de todos modos, así que aquí simplemente se hace explícito.
+  let espacioId: string | null = espacioIdInput;
+  if (!espacioId && salaNombre) {
+    const { data: espacio } = await supabase.from("espacios_reserva").select("id").eq("nombre", salaNombre).eq("activa", true).maybeSingle();
+    if (!espacio) return json({ ok: false, error: "espacio_invalido" }, 400);
+    espacioId = espacio.id as string;
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("reservas")
+    .insert({
+      nombre,
+      telefono,
+      email,
+      fecha,
+      hora,
+      numero_comensales: partySize,
+      notas_cliente: notas,
+      estado: "pendiente",
+      espacio_id: espacioId,
+      canal: "web",
+      en_blacklist: false,
+      importante: false,
+    })
+    .select("id")
+    .single();
+
+  if (insertError) {
+    // Red de seguridad: si `trg_validar_capacidad` salta por una carrera
+    // entre el chequeo de arriba y este INSERT, se traduce a una
+    // respuesta de negocio normal en vez de un 500 genérico.
+    const esAforo = insertError.code === "23514" || /aforo/i.test(insertError.message || "");
+    if (esAforo) {
+      return await avisar("sin_disponibilidad", "Rechazada por el trigger de aforo (carrera con otra reserva simultánea).", "No queda disponibilidad para esa fecha y hora.", 409);
+    }
+    console.error("[CREAR] Error insertando reserva:", insertError.message);
+    return json({ ok: false, error: "internal_error" }, 500);
+  }
+
+  if (email) await sendEmail(email, "Estado de reserva Casa Tomás", tplSolicitudRecibida(nombre, fecha, hora, partySize));
+
+  return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
+}
+
+// ============================================================
+// ACCIÓN: notificar-estado
+// ============================================================
+// Sustituye al webhook n8n 79fc330e. Hoy lo dispara `notify-reservation-
+// change` (sin auth, solo al CAMBIAR estado desde el panel) reenviando a
+// ese webhook n8n — habrá que repuntarlo a esta acción (ver informe; no
+// se toca ese fichero desde aquí, es de otro dominio).
+async function handleNotificarEstado(req: Request): Promise<Response> {
+  if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 400);
+  }
+  const reservaId = typeof body?.reserva_id === "string" ? body.reserva_id : null;
+  if (!reservaId) return json({ ok: false, error: "reserva_id_requerido" }, 400);
+
+  const reserva = await fetchReserva(reservaId);
+  if (!reserva) return json({ ok: false, error: "reserva_no_encontrada" }, 404);
+  if (!reserva.email) return json({ ok: false, error: "reserva_sin_email" });
+
+  if (reserva.estado === "verificada") {
+    const fp = fingerprint(reserva.estado, reserva.updated_at);
+    const confirmToken = await signReservaToken(reserva.id, "confirmar", fp);
+    const cancelToken = await signReservaToken(reserva.id, "cancelar", fp);
+    const confirmUrl = `${PUBLIC_BASE_URL}/confirmar?token=${encodeURIComponent(confirmToken)}`;
+    const cancelUrl = `${PUBLIC_BASE_URL}/cancelar?token=${encodeURIComponent(cancelToken)}`;
+    const result = await sendEmail(
+      reserva.email,
+      "Estado de reserva Casa Tomás",
+      tplConfirmaAsistencia(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, confirmUrl, cancelUrl)
+    );
+    return json({ ok: result.ok, email_enviado: "confirma_asistencia" });
+  }
+
+  const result = await sendEmail(
+    reserva.email,
+    "Estado de reserva Casa Tomás",
+    tplSinDisponibilidad(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales)
+  );
+  return json({ ok: result.ok, email_enviado: "sin_disponibilidad" });
+}
+
+// ============================================================
+// ACCIÓN: confirmar
+// ============================================================
+async function handleConfirmar(req: Request): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token") || "";
+  const payload = await verifyReservaToken(token, "confirmar");
+  if (!payload) return html(pageTokenInvalido());
+
+  const reserva = await fetchReserva(payload.id);
+  if (!reserva) return html(pageTokenInvalido());
+  if (reserva.estado !== "verificada" || fingerprint(reserva.estado, reserva.updated_at) !== payload.fp) {
+    return html(pageTokenInvalido());
+  }
+
+  const { error } = await supabase.from("reservas").update({ estado: "confirmada" }).eq("id", reserva.id).eq("estado", "verificada");
+  if (error) {
+    console.error("[CONFIRMAR] Error actualizando:", error.message);
+    return html(pageTokenInvalido());
+  }
+  return html(pageReservaConfirmada(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales));
+}
+
+// ============================================================
+// ACCIÓN: cancelar (paso 1 — pantalla "¿seguro?", NO muta nada)
+// ============================================================
+// Se mantienen los dos pasos del diseño original a propósito: muchos
+// clientes de correo PRE-CARGAN (prefetch) los enlaces de un email para
+// escanearlos. Si cancelar fuera de un solo paso, ese escaneo cancelaría
+// la reserva solo. Aquí el paso 1 es de solo lectura.
+async function handleCancelarPreview(req: Request): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token") || "";
+  const payload = await verifyReservaToken(token, "cancelar");
+  if (!payload) return html(pageTokenInvalido());
+  const reserva = await fetchReserva(payload.id);
+  if (!reserva || fingerprint(reserva.estado, reserva.updated_at) !== payload.fp) return html(pageTokenInvalido());
+
+  const ejecutarUrl = `${PUBLIC_BASE_URL}/cancelar/ejecutar?token=${encodeURIComponent(token)}`;
+  return html(pageCancelarPreview(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, ejecutarUrl));
+}
+
+// ============================================================
+// ACCIÓN: cancelar (paso 2 — ejecuta la cancelación)
+// ============================================================
+async function handleCancelarEjecutar(req: Request): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token") || "";
+  const payload = await verifyReservaToken(token, "cancelar");
+  if (!payload) return html(pageTokenInvalido());
+  const reserva = await fetchReserva(payload.id);
+  if (!reserva || fingerprint(reserva.estado, reserva.updated_at) !== payload.fp) return html(pageTokenInvalido());
+  if (reserva.estado === "cancelada") return html(pageCancelada());
+
+  const { error } = await supabase.from("reservas").update({ estado: "cancelada" }).eq("id", reserva.id);
+  if (error) {
+    console.error("[CANCELAR] Error actualizando:", error.message);
+    return html(pageTokenInvalido());
+  }
+  return html(pageCancelada());
+}
+
+// ============================================================
+// ROUTER
+// ============================================================
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const url = new URL(req.url);
+  const segments = url.pathname.split("/").filter(Boolean);
+  const idx = segments.indexOf("reservas-web");
+  const route = (idx === -1 ? segments : segments.slice(idx + 1)).join("/");
+
+  try {
+    if (req.method === "POST" && route === "disponibilidad") return await handleDisponibilidad(req);
+    if (req.method === "POST" && route === "crear") return await handleCrear(req);
+    if (req.method === "POST" && route === "notificar-estado") return await handleNotificarEstado(req);
+    if (req.method === "GET" && route === "confirmar") return await handleConfirmar(req);
+    if (req.method === "GET" && route === "cancelar") return await handleCancelarPreview(req);
+    if (req.method === "GET" && route === "cancelar/ejecutar") return await handleCancelarEjecutar(req);
+    return json({ ok: false, error: "not_found", route }, 404);
+  } catch (err) {
+    console.error("[RESERVAS-WEB] Error no controlado:", (err as Error)?.message, (err as Error)?.stack);
+    return json({ ok: false, error: "internal_error" }, 500);
+  }
+});
