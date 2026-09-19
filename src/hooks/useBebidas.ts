@@ -28,6 +28,36 @@ export interface NuevaBebida {
   orden?: number;
 }
 
+/** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
+ * caller guarda la bebida igualmente sin traducción (ver informe, TAREA 2). */
+async function traducirBebida(datos: {
+  nombre: string;
+  descripcion: string;
+  categoria: string;
+}): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("traducir-contenido", {
+      body: { tipo: "bebida", datos },
+    });
+    if (error || !data?.ok) {
+      console.error("Traducción de bebida no disponible:", error || data?.error);
+      return null;
+    }
+    return data.translations as Record<string, unknown>;
+  } catch (err) {
+    console.error("Error llamando a traducir-contenido:", err);
+    return null;
+  }
+}
+
+/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
+ * guardado: si falla, solo se registra en consola (ver informe). */
+function dispararRebuildWebs(origen: string) {
+  supabase.functions
+    .invoke("rebuild-webs", { body: { origen } })
+    .catch((err) => console.error("rebuild-webs no disponible:", err));
+}
+
 export function useBebidas() {
   const queryClient = useQueryClient();
 
@@ -46,31 +76,47 @@ export function useBebidas() {
 
   const crearBebida = useMutation({
     mutationFn: async (nuevaBebida: NuevaBebida) => {
-      // Solo enviar al webhook, sin insertar en base de datos
-      const { data, error } = await supabase.functions.invoke('traducir-carta-auto', {
-        body: {
-          tipo: 'bebida',
-          nombre: nuevaBebida.nombre,
-          categoria: nuevaBebida.categoria,
-          tamano: nuevaBebida.tamano || '',
-          precio: nuevaBebida.precio_eur,
-        }
+      const traducciones = await traducirBebida({
+        nombre: nuevaBebida.nombre,
+        descripcion: nuevaBebida.descripcion || "",
+        categoria: nuevaBebida.categoria,
       });
 
-      if (error) {
-        console.error('Error enviando al webhook:', error);
-        throw error;
+      const { data, error } = await supabase
+        .from("Bebidas")
+        .insert([
+          {
+            id: crypto.randomUUID(),
+            nombre: nuevaBebida.nombre,
+            categoria: nuevaBebida.categoria,
+            precio_eur: nuevaBebida.precio_eur,
+            tamano: nuevaBebida.tamano || null,
+            orden: nuevaBebida.orden ?? 0,
+            activado: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...(traducciones || {}),
+          } as any,
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (!traducciones) {
+        toast.warning("Bebida guardada sin traducción automática. Revísala más tarde en inglés/francés.");
       }
 
-      console.log('Respuesta del webhook:', data);
+      dispararRebuildWebs("bebida");
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      toast.success("Bebida enviada correctamente");
+      toast.success("Bebida creada. Se publicará en la web en unos minutos.");
     },
     onError: (error) => {
-      toast.error("Error al enviar la bebida");
+      toast.error("Error al crear la bebida");
       console.error(error);
     },
   });
@@ -90,6 +136,7 @@ export function useBebidas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
       toast.success("Bebida actualizada");
+      dispararRebuildWebs("bebida");
     },
     onError: (error) => {
       toast.error("Error al actualizar la bebida");
@@ -109,6 +156,7 @@ export function useBebidas() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
       toast.success("Bebida eliminada");
+      dispararRebuildWebs("bebida");
     },
     onError: (error) => {
       toast.error("Error al eliminar la bebida");
@@ -127,6 +175,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+      dispararRebuildWebs("bebida");
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -145,6 +194,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+      dispararRebuildWebs("bebida");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -163,6 +213,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+      dispararRebuildWebs("bebida");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");

@@ -37,6 +37,49 @@ export interface NuevoPlato {
   orden?: string;
 }
 
+function normalizarAlergenos(alergenos_oficiales: unknown): string[] {
+  if (!alergenos_oficiales) return [];
+  if (Array.isArray(alergenos_oficiales)) return alergenos_oficiales;
+  if (typeof alergenos_oficiales === "object") {
+    return Object.keys(alergenos_oficiales as Record<string, unknown>).filter(
+      (k) => (alergenos_oficiales as Record<string, unknown>)[k],
+    );
+  }
+  return [];
+}
+
+/** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
+ * caller guarda el plato igualmente sin traducción (ver informe, TAREA 2). */
+async function traducirPlato(datos: {
+  nombre: string;
+  descripcion: string;
+  ingredientes: string;
+  categoria: string;
+  alergenos: string[];
+}): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("traducir-contenido", {
+      body: { tipo: "plato", datos },
+    });
+    if (error || !data?.ok) {
+      console.error("Traducción de plato no disponible:", error || data?.error);
+      return null;
+    }
+    return data.translations as Record<string, unknown>;
+  } catch (err) {
+    console.error("Error llamando a traducir-contenido:", err);
+    return null;
+  }
+}
+
+/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
+ * guardado: si falla, solo se registra en consola (ver informe). */
+function dispararRebuildWebs(origen: string) {
+  supabase.functions
+    .invoke("rebuild-webs", { body: { origen } })
+    .catch((err) => console.error("rebuild-webs no disponible:", err));
+}
+
 export function usePlatos() {
   const queryClient = useQueryClient();
 
@@ -57,43 +100,58 @@ export function usePlatos() {
 
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
-      // Solo enviar al webhook, sin insertar en base de datos
-      let alergenosArray: string[] = [];
-      if (nuevoPlato.alergenos_oficiales) {
-        if (Array.isArray(nuevoPlato.alergenos_oficiales)) {
-          alergenosArray = nuevoPlato.alergenos_oficiales;
-        } else if (typeof nuevoPlato.alergenos_oficiales === 'object') {
-          alergenosArray = Object.keys(nuevoPlato.alergenos_oficiales).filter(k => nuevoPlato.alergenos_oficiales[k]);
-        }
-      }
+      const alergenosArray = normalizarAlergenos(nuevoPlato.alergenos_oficiales);
 
-      const { data, error } = await supabase.functions.invoke('traducir-carta-auto', {
-        body: {
-          tipo: 'plato',
-          nombre: nuevoPlato.nombre,
-          descripcion: nuevoPlato.descripcion || '',
-          ingredientes: nuevoPlato.ingredientes || '',
-          categoria: nuevoPlato.categoria,
-          alergenos: alergenosArray,
-          precio: nuevoPlato.precio_eur,
-          unidad: nuevoPlato.unidad || '',
-        }
+      // 1. Traducir primero (no escribe nada; solo devuelve las columnas *_en/*_fr).
+      const traducciones = await traducirPlato({
+        nombre: nuevoPlato.nombre,
+        descripcion: nuevoPlato.descripcion || "",
+        ingredientes: nuevoPlato.ingredientes || "",
+        categoria: nuevoPlato.categoria,
+        alergenos: alergenosArray,
       });
 
-      if (error) {
-        console.error('Error enviando al webhook:', error);
-        throw error;
+      // 2. El panel escribe su propia carta directamente contra Supabase (RLS detrás).
+      const { data, error } = await supabase
+        .from("Platos")
+        .insert([
+          {
+            id: crypto.randomUUID(),
+            nombre: nuevoPlato.nombre,
+            categoria: nuevoPlato.categoria,
+            precio_eur: nuevoPlato.precio_eur,
+            descripcion: nuevoPlato.descripcion || null,
+            ingredientes: nuevoPlato.ingredientes || null,
+            unidad: nuevoPlato.unidad || null,
+            alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
+            alergenos_notas: nuevoPlato.alergenos_notas || null,
+            orden: nuevoPlato.orden ?? "0",
+            activado: true,
+            expanded: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...(traducciones || {}),
+          } as any,
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (!traducciones) {
+        toast.warning("Plato guardado sin traducción automática. Revísala más tarde en inglés/francés.");
       }
 
-      console.log('Respuesta del webhook:', data);
+      dispararRebuildWebs("plato");
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Plato enviado correctamente");
+      toast.success("Plato creado. Se publicará en la web en unos minutos.");
     },
     onError: (error) => {
-      toast.error("Error al enviar el plato");
+      toast.error("Error al crear el plato");
       console.error(error);
     },
   });
@@ -113,6 +171,7 @@ export function usePlatos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
       toast.success("Plato actualizado");
+      dispararRebuildWebs("plato");
     },
     onError: (error) => {
       toast.error("Error al actualizar el plato");
@@ -132,6 +191,7 @@ export function usePlatos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
       toast.success("Plato eliminado");
+      dispararRebuildWebs("plato");
     },
     onError: (error) => {
       toast.error("Error al eliminar el plato");
@@ -150,6 +210,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
+      dispararRebuildWebs("plato");
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -224,6 +285,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
+      dispararRebuildWebs("plato");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -242,6 +304,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
+      dispararRebuildWebs("plato");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");

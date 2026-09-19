@@ -111,22 +111,61 @@ export function useNovedades() {
 
       if (error) throw error;
 
-      // Llamar al webhook de traducciones con el ID de la novedad creada
+      // Traducción automática al crear.
+      //
+      // Antes: 'traducir-novedad-auto', que era un proxy al webhook
+      // /webhook/traducciones de n8n. Era n8n quien ESCRIBÍA las traducciones
+      // en la fila (por eso aquí se descartaba la respuesta).
+      // Ahora: 'traducir-contenido' (tipo 'novedad'), que SOLO traduce y
+      // devuelve {ok, translations}. Como ya no hay nadie detrás que escriba,
+      // la escritura en la tabla la hace este hook — si no, la traducción se
+      // calcularía y se tiraría.
+      //
+      // Se mantiene el carácter no bloqueante del original: si la traducción
+      // falla, la novedad queda creada en español y no se rompe el flujo.
       try {
-        await supabase.functions.invoke('traducir-novedad-auto', {
-          body: {
-            tipo: 'novedad',
-            id: data.id,
-            titulo: data.titulo,
-            badge_text: data.badge_text,
-            descripcion: data.descripcion,
-            bullets: data.bullets,
-            tags: data.tags,
+        const { data: tradRes, error: tradError } = await supabase.functions.invoke(
+          'traducir-contenido',
+          {
+            body: {
+              tipo: 'novedad',
+              datos: {
+                titulo: data.titulo,
+                descripcion: data.descripcion,
+                badge_text: data.badge_text,
+                bullets: data.bullets,
+                tags: data.tags,
+              },
+            },
           }
-        });
-      } catch (webhookError) {
-        console.error("Error al enviar al webhook de traducciones:", webhookError);
-        // No bloqueamos el flujo si el webhook falla
+        );
+
+        const t = !tradError && tradRes?.ok ? tradRes.translations : null;
+        if (t) {
+          const { error: updateError } = await supabase
+            .from("novedades")
+            .update({
+              titulo_en: t.titulo_en,
+              titulo_fr: t.titulo_fr,
+              descripcion_en: t.descripcion_en,
+              descripcion_fr: t.descripcion_fr,
+              badge_text_en: t.badge_text_en,
+              badge_text_fr: t.badge_text_fr,
+              bullets_en: t.bullets_en,
+              bullets_fr: t.bullets_fr,
+              tags_en: t.tags_en,
+              tags_fr: t.tags_fr,
+            })
+            .eq("id", data.id);
+          if (updateError) {
+            console.error("Error al guardar las traducciones de la novedad:", updateError);
+          }
+        } else if (tradError) {
+          console.error("Error al traducir la novedad:", tradError);
+        }
+      } catch (tradException) {
+        console.error("Error al traducir la novedad:", tradException);
+        // No bloqueamos el flujo si la traducción falla
       }
 
       return data;

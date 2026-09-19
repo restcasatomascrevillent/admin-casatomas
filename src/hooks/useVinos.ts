@@ -40,6 +40,51 @@ export interface NuevoVino {
   orden?: string;
 }
 
+/**
+ * Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
+ * caller guarda el vino igualmente sin traducción (ver informe, TAREA 2).
+ *
+ * OJO (TAREA 4): a diferencia de Platos/Bebidas/Cocteles, la tabla Vinos NO
+ * tiene columnas descripcion_en/descripcion_fr ni denominacion_origen_en/fr.
+ * El código anterior (y el propio nodo "Nueva Fila Vino" de n8n) escribía
+ * descripcion_en/fr igualmente, lo que Postgrest rechaza con "column does
+ * not exist" y tumbaba el UPDATE ENTERO — ninguna traducción se guardaba
+ * nunca, ni siquiera nombre_en/categoria_en, que sí tienen columna. La
+ * función traducir-contenido (ver prompts.ts) ya devuelve solo las columnas
+ * que existen de verdad en Vinos, así que aquí no hace falta filtrar nada.
+ */
+async function traducirVino(datos: {
+  nombre: string;
+  descripcion: string;
+  ingredientes: string;
+  categoria: string;
+  ubicacion_pais: string;
+  ubicacion_region: string;
+  alergenos_notas: string;
+}): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("traducir-contenido", {
+      body: { tipo: "vino", datos },
+    });
+    if (error || !data?.ok) {
+      console.error("Traducción de vino no disponible:", error || data?.error);
+      return null;
+    }
+    return data.translations as Record<string, unknown>;
+  } catch (err) {
+    console.error("Error llamando a traducir-contenido:", err);
+    return null;
+  }
+}
+
+/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
+ * guardado: si falla, solo se registra en consola (ver informe). */
+function dispararRebuildWebs(origen: string) {
+  supabase.functions
+    .invoke("rebuild-webs", { body: { origen } })
+    .catch((err) => console.error("rebuild-webs no disponible:", err));
+}
+
 export function useVinos() {
   const queryClient = useQueryClient();
 
@@ -58,91 +103,57 @@ export function useVinos() {
 
   const crearVino = useMutation({
     mutationFn: async (nuevoVino: NuevoVino) => {
-      const vinoId = crypto.randomUUID();
+      // 1. Traducir primero (columnas ya filtradas a lo que existe en Vinos).
+      const traducciones = await traducirVino({
+        nombre: nuevoVino.nombre,
+        descripcion: nuevoVino.descripcion || "",
+        ingredientes: nuevoVino.ingredientes || "",
+        categoria: nuevoVino.categoria,
+        ubicacion_pais: nuevoVino.ubicacion_pais || "",
+        ubicacion_region: nuevoVino.ubicacion_region || "",
+        alergenos_notas: nuevoVino.alergenos_notas || "",
+      });
 
-      // 1. Crear el vino primero
+      // 2. Insertar directamente (antes: solo esto, sin traducción — el resto
+      // del flujo viejo dependía de un webhook de n8n roto). Un solo INSERT,
+      // sin el UPDATE en segundo plano que fallaba por la columna inexistente.
       const { data, error } = await supabase
         .from("Vinos")
-        .insert([{
-          ...nuevoVino,
-          activado: true,
-          id: vinoId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }])
+        .insert([
+          {
+            id: crypto.randomUUID(),
+            nombre: nuevoVino.nombre,
+            categoria: nuevoVino.categoria,
+            precio_eur: nuevoVino.precio_eur,
+            descripcion: nuevoVino.descripcion || null,
+            ingredientes: nuevoVino.ingredientes || null,
+            denominacion_origen: nuevoVino.denominacion_origen || null,
+            ubicacion_pais: nuevoVino.ubicacion_pais || null,
+            ubicacion_region: nuevoVino.ubicacion_region || null,
+            alergenos_notas: nuevoVino.alergenos_notas || null,
+            orden: nuevoVino.orden ?? "0",
+            activado: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...(traducciones || {}),
+          } as any,
+        ])
         .select()
         .single();
 
       if (error) throw error;
 
-      // 2. Llamar al webhook de traducción en background
-      supabase.functions.invoke('traducir-carta-auto', {
-        body: {
-          tipo: 'vino',
-          nombre: nuevoVino.nombre,
-          descripcion: nuevoVino.descripcion || '',
-          ingredientes: nuevoVino.ingredientes || '',
-          categoria: nuevoVino.categoria,
-          ubicacion_pais: nuevoVino.ubicacion_pais || '',
-          ubicacion_region: nuevoVino.ubicacion_region || '',
-          alergenos_notas: nuevoVino.alergenos_notas || '',
-        }
-      }).then(async ({ data: traducciones, error: tradError }) => {
-        if (tradError) {
-          console.error('Error en traducción automática:', tradError);
-          return;
-        }
+      if (!traducciones) {
+        toast.warning("Vino guardado sin traducción automática. Revísalo más tarde en inglés/francés.");
+      }
 
-        console.log('Traducciones recibidas:', traducciones);
-
-        // Parsear respuesta del webhook
-        const traduccion = Array.isArray(traducciones) ? traducciones[0] : traducciones;
-        if (!traduccion) return;
-
-        const updateData: Record<string, string | null> = {};
-
-        // Inglés
-        if (traduccion['traduccion ingles']) {
-          const en = traduccion['traduccion ingles'];
-          updateData.nombre_en = en.nombre || null;
-          updateData.descripcion_en = en.descripcion || null;
-          updateData.categoria_en = en.categoria || null;
-          updateData.alergenos_en = en.alergenos_notas || en.alergenos || null;
-          updateData.ubicacion_pais_en = en.ubicacion_pais || null;
-          updateData.ubicacion_region_en = en.ubicacion_region || null;
-        }
-
-        // Francés
-        if (traduccion['traduccion_fr']) {
-          const fr = traduccion['traduccion_fr'];
-          updateData.nombre_fr = fr.nombre || null;
-          updateData.descripcion_fr = fr.descripcion || null;
-          updateData.categoria_fr = fr['catégorie'] || fr.categoria || null;
-          updateData.alergenos_fr = fr.allergenes_notes || fr.alergenos_notas || null;
-          updateData.ubicacion_pais_fr = fr.ubicacion_pais || fr['pays'] || null;
-          updateData.ubicacion_region_fr = fr.ubicacion_region || fr['région'] || null;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          const { error: updateError } = await supabase
-            .from("Vinos")
-            .update(updateData)
-            .eq("id", vinoId);
-
-          if (updateError) {
-            console.error('Error guardando traducciones:', updateError);
-          } else {
-            console.log('Traducciones guardadas correctamente');
-            queryClient.invalidateQueries({ queryKey: ["vinos"] });
-          }
-        }
-      });
+      dispararRebuildWebs("vino");
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      toast.success("Vino añadido correctamente");
+      toast.success("Vino añadido. Se publicará en la web en unos minutos.");
     },
     onError: (error) => {
       toast.error("Error al añadir el vino");
@@ -165,6 +176,7 @@ export function useVinos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
       toast.success("Vino actualizado");
+      dispararRebuildWebs("vino");
     },
     onError: (error) => {
       toast.error("Error al actualizar el vino");
@@ -184,6 +196,7 @@ export function useVinos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
       toast.success("Vino eliminado");
+      dispararRebuildWebs("vino");
     },
     onError: (error) => {
       toast.error("Error al eliminar el vino");
@@ -202,6 +215,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      dispararRebuildWebs("vino");
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -238,6 +252,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      dispararRebuildWebs("vino");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -256,6 +271,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      dispararRebuildWebs("vino");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");

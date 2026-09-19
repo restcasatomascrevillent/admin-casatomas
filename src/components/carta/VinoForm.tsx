@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Globe, Loader2, Camera, X } from "lucide-react";
+import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,6 @@ import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useVinos, NuevoVino } from "@/hooks/useVinos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
 import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
@@ -49,8 +48,6 @@ interface VinoFormProps {
 export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps) {
   const { crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
   const queryClient = useQueryClient();
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [traducciones, setTraducciones] = useState<Json | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -91,43 +88,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
     }
   };
 
-  const handleTranslate = async () => {
-    const values = form.getValues();
-    
-    if (!values.nombre) {
-      toast.error("Introduce el nombre antes de traducir");
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('traducir-carta', {
-        body: {
-          nombre: values.nombre,
-          descripcion: values.descripcion || '',
-          ingredientes: values.ingredientes || '',
-          categoria: values.categoria || '',
-          ubicacion_pais: values.ubicacion_pais || '',
-          ubicacion_region: values.ubicacion_region || '',
-          alergenos_notas: values.alergenos_notas || '',
-          tipo: 'vino',
-        },
-      });
-
-      if (error) throw error;
-
-      console.log('Translation response:', data);
-      setTraducciones(data);
-      toast.success("Traducción completada");
-    } catch (error) {
-      console.error('Translation error:', error);
-      toast.error("Error al traducir");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // La traducción ya no se genera aquí: crearVino (usePlatos.ts) llama a
+    // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const vinoData: NuevoVino = {
       nombre: values.nombre,
       categoria: values.categoria,
@@ -138,9 +101,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       ubicacion_pais: values.ubicacion_pais,
       ubicacion_region: values.ubicacion_region,
       alergenos_notas: values.alergenos_notas,
-      ...(traducciones && { traducciones }),
     };
-    
+
     const nuevoVino = await crearVino.mutateAsync(vinoData);
 
     // Upload image if selected
@@ -175,18 +137,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
     }
 
     form.reset();
-    setTraducciones(null);
     clearImage();
     onOpenChange(false);
   };
-
-  // Extract translation data for display
-  const traduccionIngles = traducciones && typeof traducciones === 'object' 
-    ? (traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string> | undefined
-    : undefined;
-  const traduccionFrances = traducciones && typeof traducciones === 'object'
-    ? (traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string> | undefined
-    : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -406,47 +359,6 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                 </FormItem>
               )}
             />
-
-            {/* Translations display */}
-            {traducciones && (traduccionIngles || traduccionFrances) && (
-              <div className="p-4 bg-muted/50 rounded-lg space-y-3 border">
-                <p className="text-sm font-medium text-muted-foreground">Traducciones generadas:</p>
-                
-                {traduccionIngles && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-blue-600">🇬🇧 English</p>
-                    <div className="text-sm pl-2 border-l-2 border-blue-400 space-y-0.5">
-                      {traduccionIngles.nombre && (
-                        <p><span className="text-muted-foreground">Name:</span> {traduccionIngles.nombre}</p>
-                      )}
-                      {traduccionIngles.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {traduccionIngles.descripcion}</p>
-                      )}
-                      {traduccionIngles.categoria && (
-                        <p><span className="text-muted-foreground">Category:</span> {traduccionIngles.categoria}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {traduccionFrances && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-red-600">🇫🇷 Français</p>
-                    <div className="text-sm pl-2 border-l-2 border-red-400 space-y-0.5">
-                      {traduccionFrances.nombre && (
-                        <p><span className="text-muted-foreground">Nom:</span> {traduccionFrances.nombre}</p>
-                      )}
-                      {traduccionFrances.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {traduccionFrances.descripcion}</p>
-                      )}
-                      {(traduccionFrances['catégorie'] || traduccionFrances.categoria) && (
-                        <p><span className="text-muted-foreground">Catégorie:</span> {traduccionFrances['catégorie'] || traduccionFrances.categoria}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             <div className="flex justify-end gap-2">
               <Button

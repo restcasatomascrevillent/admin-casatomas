@@ -81,19 +81,22 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
 
     setIsTranslating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('traducir-carta', {
+      const { data, error } = await supabase.functions.invoke('traducir-contenido', {
         body: {
           tipo: 'coctel',
-          nombre: values.nombre,
-          categoria: values.categoria,
-          descripcion: values.descripcion || '',
-          ingredientes: values.ingredientes || '',
-        }
+          datos: {
+            nombre: values.nombre,
+            categoria: values.categoria,
+            descripcion: values.descripcion || '',
+            ingredientes: values.ingredientes || '',
+          },
+        },
       });
 
       if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || 'Traducción no disponible');
 
-      setTraducciones(data?.traducciones || null);
+      setTraducciones(data.translations || null);
       toast.success("Traducciones generadas");
     } catch (error) {
       console.error('Error traduciendo:', error);
@@ -310,11 +313,11 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                 <p className="font-medium">Traducciones generadas:</p>
                 {typeof traducciones === 'object' && traducciones !== null && (
                   <>
-                    {(traducciones as any).en && (
-                      <p><span className="font-medium">🇬🇧 EN:</span> {(traducciones as any).en.nombre}</p>
+                    {(traducciones as any).nombre_en && (
+                      <p><span className="font-medium">🇬🇧 EN:</span> {(traducciones as any).nombre_en}</p>
                     )}
-                    {(traducciones as any).fr && (
-                      <p><span className="font-medium">🇫🇷 FR:</span> {(traducciones as any).fr.nombre}</p>
+                    {(traducciones as any).nombre_fr && (
+                      <p><span className="font-medium">🇫🇷 FR:</span> {(traducciones as any).nombre_fr}</p>
                     )}
                   </>
                 )}

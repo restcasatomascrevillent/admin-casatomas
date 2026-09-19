@@ -178,22 +178,30 @@ export function NovedadForm({
 
     setIsTranslating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("traducir-carta", {
+      // Antes: llamaba a traducir-carta enviando `nombre` (n8n esperaba
+      // `body.titulo`) y leyendo `data.nombre_en` (n8n devolvía `titulo_en`):
+      // el botón nunca rellenó nada. Repuntado a traducir-contenido con las
+      // claves reales de la tabla novedades.
+      const { data, error } = await supabase.functions.invoke("traducir-contenido", {
         body: {
-          nombre: formData.titulo,
-          descripcion: formData.descripcion || "",
           tipo: "novedad",
+          datos: {
+            titulo: formData.titulo,
+            descripcion: formData.descripcion || "",
+          },
         },
       });
 
       if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error || "Traducción no disponible");
 
+      const t = data.translations || {};
       setFormData({
         ...formData,
-        titulo_en: data.nombre_en || "",
-        titulo_fr: data.nombre_fr || "",
-        descripcion_en: data.descripcion_en || "",
-        descripcion_fr: data.descripcion_fr || "",
+        titulo_en: t.titulo_en || "",
+        titulo_fr: t.titulo_fr || "",
+        descripcion_en: t.descripcion_en || "",
+        descripcion_fr: t.descripcion_fr || "",
       });
       setTraduccionesOpen(true);
       toast.success("Traducciones generadas");

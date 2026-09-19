@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Globe, Loader2, Camera, X, Plus } from "lucide-react";
+import { Loader2, Camera, X, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
@@ -33,7 +33,6 @@ import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
 
 // Alérgenos oficiales de la UE
 const ALERGENOS_OFICIALES = [
@@ -72,8 +71,6 @@ interface PlatoFormProps {
 export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
   const { crearPlato, categorias, unidades } = usePlatos();
   const queryClient = useQueryClient();
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [traducciones, setTraducciones] = useState<Json | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -137,43 +134,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
     }
   };
 
-  const handleTranslate = async () => {
-    const values = form.getValues();
-    
-    if (!values.nombre) {
-      toast.error("Introduce el nombre antes de traducir");
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      // Combinar alérgenos oficiales seleccionados + personalizados
-      const todosAlergenos = [...alergenosSeleccionados, ...alergenosPersonalizados];
-      
-      const { data, error } = await supabase.functions.invoke('traducir-carta', {
-        body: {
-          nombre: values.nombre,
-          descripcion: values.descripcion || '',
-          ingredientes: values.ingredientes || '',
-          categoria: values.categoria || '',
-          alergenos: todosAlergenos,
-          tipo: 'plato',
-        },
-      });
-
-      if (error) throw error;
-
-      console.log('Translation response:', data);
-      setTraducciones(data);
-      toast.success("Traducción completada");
-    } catch (error) {
-      console.error('Translation error:', error);
-      toast.error("Error al traducir");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsUploading(true);
     try {
@@ -190,9 +150,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         unidad: values.unidad,
         alergenos_notas: values.alergenos_notas,
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
-        ...(traducciones && { traducciones }),
       };
-      
+      // La traducción ya no se genera aquí: crearPlato (usePlatos.ts) llama a
+      // traducir-contenido internamente al guardar (ver informe, TAREA 2).
       const nuevoPlato = await crearPlato.mutateAsync(platoData);
       
       // 2. Si hay imagen, subirla a Storage
@@ -230,7 +190,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       }
       
       form.reset();
-      setTraducciones(null);
       clearImage();
       setAlergenosSeleccionados([]);
       setAlergenosPersonalizados([]);
@@ -505,47 +464,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                 </FormItem>
               )}
             />
-
-            {/* Mostrar traducciones */}
-            {traducciones && typeof traducciones === 'object' && (
-              <div className="p-4 bg-muted/50 rounded-lg space-y-3 border">
-                <p className="text-sm font-medium text-muted-foreground">Traducciones generadas:</p>
-                
-                {/* Inglés */}
-                {(traducciones as Record<string, unknown>)['traduccion ingles'] && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-blue-600">🇬🇧 English</p>
-                    <div className="text-sm pl-2 border-l-2 border-blue-400">
-                      <p><span className="text-muted-foreground">Name:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.nombre}</p>
-                      {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.descripcion}</p>
-                      )}
-                      <p><span className="text-muted-foreground">Category:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.categoria}</p>
-                      {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.alergenos && (
-                        <p><span className="text-muted-foreground">Allergens:</span> {((traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string>)?.alergenos}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Francés */}
-                {(traducciones as Record<string, unknown>)['traduccion_fr'] && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-red-600">🇫🇷 Français</p>
-                    <div className="text-sm pl-2 border-l-2 border-red-400">
-                      <p><span className="text-muted-foreground">Nom:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.nombre}</p>
-                      {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.descripcion}</p>
-                      )}
-                      <p><span className="text-muted-foreground">Catégorie:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.['catégorie'] || ((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.categoria}</p>
-                      {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.allergenes && (
-                        <p><span className="text-muted-foreground">Allergènes:</span> {((traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string>)?.allergenes}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             <div className="flex justify-end gap-2">
               <Button

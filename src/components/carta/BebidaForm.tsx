@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Globe, Loader2, Camera, X } from "lucide-react";
+import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +25,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { Json } from "@/integrations/supabase/types";
 import { useQueryClient } from "@tanstack/react-query";
 
 const UNIDADES_MEDIDA = ["cl", "ml", "L"];
@@ -48,8 +47,6 @@ interface BebidaFormProps {
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
   const { crearBebida, actualizarBebida, categorias } = useBebidas();
   const queryClient = useQueryClient();
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [traducciones, setTraducciones] = useState<Json | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -87,51 +84,18 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     }
   };
 
-  const handleTranslate = async () => {
-    const values = form.getValues();
-    
-    if (!values.nombre) {
-      toast.error("Introduce el nombre antes de traducir");
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      const tamano = values.cantidad && values.unidad ? `${values.cantidad}${values.unidad}` : '';
-      const { data, error } = await supabase.functions.invoke('traducir-carta', {
-        body: {
-          nombre: values.nombre,
-          descripcion: values.descripcion || '',
-          categoria: values.categoria || '',
-          tamano: tamano,
-          tipo: 'bebida',
-        },
-      });
-
-      if (error) throw error;
-
-      console.log('Translation response:', data);
-      setTraducciones(data);
-      toast.success("Traducción completada");
-    } catch (error) {
-      console.error('Translation error:', error);
-      toast.error("Error al traducir");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     const tamano = values.cantidad && values.unidad ? `${values.cantidad}${values.unidad}` : undefined;
+    // La traducción ya no se genera aquí: crearBebida (useBebidas.ts) llama a
+    // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const bebidaData: NuevaBebida = {
       nombre: values.nombre,
       categoria: values.categoria,
       precio_eur: values.precio_eur,
       descripcion: values.descripcion,
       tamano: tamano,
-      ...(traducciones && { traducciones }),
     };
-    
+
     const nuevaBebida = await crearBebida.mutateAsync(bebidaData);
 
     // Upload image if selected
@@ -166,18 +130,9 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     }
 
     form.reset();
-    setTraducciones(null);
     clearImage();
     onOpenChange(false);
   };
-
-  // Extract translation data for display
-  const traduccionIngles = traducciones && typeof traducciones === 'object' 
-    ? (traducciones as Record<string, unknown>)['traduccion ingles'] as Record<string, string> | undefined
-    : undefined;
-  const traduccionFrances = traducciones && typeof traducciones === 'object'
-    ? (traducciones as Record<string, unknown>)['traduccion_fr'] as Record<string, string> | undefined
-    : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -345,47 +300,6 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 </FormItem>
               )}
             />
-
-            {/* Translations display */}
-            {traducciones && (traduccionIngles || traduccionFrances) && (
-              <div className="p-4 bg-muted/50 rounded-lg space-y-3 border">
-                <p className="text-sm font-medium text-muted-foreground">Traducciones generadas:</p>
-                
-                {traduccionIngles && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-blue-600">🇬🇧 English</p>
-                    <div className="text-sm pl-2 border-l-2 border-blue-400 space-y-0.5">
-                      {traduccionIngles.nombre && (
-                        <p><span className="text-muted-foreground">Name:</span> {traduccionIngles.nombre}</p>
-                      )}
-                      {traduccionIngles.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {traduccionIngles.descripcion}</p>
-                      )}
-                      {traduccionIngles.categoria && (
-                        <p><span className="text-muted-foreground">Category:</span> {traduccionIngles.categoria}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                
-                {traduccionFrances && (
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-red-600">🇫🇷 Français</p>
-                    <div className="text-sm pl-2 border-l-2 border-red-400 space-y-0.5">
-                      {traduccionFrances.nombre && (
-                        <p><span className="text-muted-foreground">Nom:</span> {traduccionFrances.nombre}</p>
-                      )}
-                      {traduccionFrances.descripcion && (
-                        <p><span className="text-muted-foreground">Description:</span> {traduccionFrances.descripcion}</p>
-                      )}
-                      {(traduccionFrances['catégorie'] || traduccionFrances.categoria) && (
-                        <p><span className="text-muted-foreground">Catégorie:</span> {traduccionFrances['catégorie'] || traduccionFrances.categoria}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             <div className="flex justify-end gap-2">
               <Button

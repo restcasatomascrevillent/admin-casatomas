@@ -40,6 +40,40 @@ export interface NuevoCoctel {
   preparacion?: string;
 }
 
+/** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
+ * caller guarda el cóctel igualmente sin traducción (ver informe, TAREA 2).
+ * NOTA: "coctel" no existía como tipo en el switch de n8n (TraducirIA.json),
+ * así que hasta ahora nunca se traducía NI se insertaba nada en Cocteles;
+ * de ahí 0/13 cócteles traducidos. */
+async function traducirCoctel(datos: {
+  nombre: string;
+  descripcion: string;
+  ingredientes: string;
+  categoria: string;
+}): Promise<Record<string, unknown> | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke("traducir-contenido", {
+      body: { tipo: "coctel", datos },
+    });
+    if (error || !data?.ok) {
+      console.error("Traducción de cóctel no disponible:", error || data?.error);
+      return null;
+    }
+    return data.translations as Record<string, unknown>;
+  } catch (err) {
+    console.error("Error llamando a traducir-contenido:", err);
+    return null;
+  }
+}
+
+/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
+ * guardado: si falla, solo se registra en consola (ver informe). */
+function dispararRebuildWebs(origen: string) {
+  supabase.functions
+    .invoke("rebuild-webs", { body: { origen } })
+    .catch((err) => console.error("rebuild-webs no disponible:", err));
+}
+
 export function useCocteles() {
   const queryClient = useQueryClient();
 
@@ -58,32 +92,50 @@ export function useCocteles() {
 
   const crearCoctel = useMutation({
     mutationFn: async (nuevoCoctel: NuevoCoctel) => {
-      // Enviar al webhook de traducción
-      const { data, error } = await supabase.functions.invoke('traducir-carta-auto', {
-        body: {
-          tipo: 'coctel',
-          nombre: nuevoCoctel.nombre,
-          categoria: nuevoCoctel.categoria,
-          descripcion: nuevoCoctel.descripcion || '',
-          ingredientes: nuevoCoctel.ingredientes || '',
-          precio: nuevoCoctel.precio_eur,
-        }
+      const traducciones = await traducirCoctel({
+        nombre: nuevoCoctel.nombre,
+        descripcion: nuevoCoctel.descripcion || "",
+        ingredientes: nuevoCoctel.ingredientes || "",
+        categoria: nuevoCoctel.categoria,
       });
 
-      if (error) {
-        console.error('Error enviando al webhook:', error);
-        throw error;
+      const { data, error } = await supabase
+        .from("Cocteles")
+        .insert([
+          {
+            id: crypto.randomUUID(),
+            nombre: nuevoCoctel.nombre,
+            categoria: nuevoCoctel.categoria,
+            precio_eur: nuevoCoctel.precio_eur,
+            descripcion: nuevoCoctel.descripcion || null,
+            ingredientes: nuevoCoctel.ingredientes || null,
+            preparacion: nuevoCoctel.preparacion || null,
+            activado: true,
+            orden: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...(traducciones || {}),
+          } as any,
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (!traducciones) {
+        toast.warning("Cóctel guardado sin traducción automática. Revísalo más tarde en inglés/francés.");
       }
 
-      console.log('Respuesta del webhook:', data);
+      dispararRebuildWebs("coctel");
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      toast.success("Cóctel enviado correctamente");
+      toast.success("Cóctel creado. Se publicará en la web en unos minutos.");
     },
     onError: (error) => {
-      toast.error("Error al enviar el cóctel");
+      toast.error("Error al crear el cóctel");
       console.error(error);
     },
   });
@@ -103,6 +155,7 @@ export function useCocteles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
       toast.success("Cóctel actualizado");
+      dispararRebuildWebs("coctel");
     },
     onError: (error) => {
       toast.error("Error al actualizar el cóctel");
@@ -122,6 +175,7 @@ export function useCocteles() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
       toast.success("Cóctel eliminado");
+      dispararRebuildWebs("coctel");
     },
     onError: (error) => {
       toast.error("Error al eliminar el cóctel");
@@ -140,6 +194,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+      dispararRebuildWebs("coctel");
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -158,6 +213,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+      dispararRebuildWebs("coctel");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -176,6 +232,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+      dispararRebuildWebs("coctel");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");
