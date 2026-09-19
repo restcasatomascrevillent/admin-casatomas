@@ -1,1 +1,4102 @@
-{"types": "export type Json =\n  | string\n  | number\n  | boolean\n  | null\n  | { [key: string]: Json | undefined }\n  | Json[]\n\nexport type Database = {\n  // Allows to automatically instantiate createClient with right options\n  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)\n  __InternalSupabase: {\n    PostgrestVersion: \"13.0.5\"\n  }\n  public: {\n    Tables: {\n      alertas_stock: {\n        Row: {\n          created_at: string | null\n          id: string\n          notificar_email: boolean | null\n          producto_id: string\n          producto_tipo: string\n          stock_minimo: number | null\n          updated_at: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          notificar_email?: boolean | null\n          producto_id: string\n          producto_tipo: string\n          stock_minimo?: number | null\n          updated_at?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          notificar_email?: boolean | null\n          producto_id?: string\n          producto_tipo?: string\n          stock_minimo?: number | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      areas_trabajo: {\n        Row: {\n          activa: boolean | null\n          created_at: string | null\n          descripcion: string | null\n          id: string\n          nombre: string\n          tipo: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activa?: boolean | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string\n          nombre: string\n          tipo?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activa?: boolean | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string\n          nombre?: string\n          tipo?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      asignaciones_area: {\n        Row: {\n          area_id: string\n          created_at: string | null\n          id: string\n          turno_id: string\n        }\n        Insert: {\n          area_id: string\n          created_at?: string | null\n          id?: string\n          turno_id: string\n        }\n        Update: {\n          area_id?: string\n          created_at?: string | null\n          id?: string\n          turno_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"asignaciones_area_area_id_fkey\"\n            columns: [\"area_id\"]\n            isOneToOne: false\n            referencedRelation: \"areas_trabajo\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"asignaciones_area_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"turnos\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"asignaciones_area_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_turnos_con_areas\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      asignaciones_mesa: {\n        Row: {\n          created_at: string | null\n          id: string\n          mesa_id: string\n          reserva_id: string\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          mesa_id: string\n          reserva_id: string\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          mesa_id?: string\n          reserva_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"asignaciones_mesa_mesa_id_fkey\"\n            columns: [\"mesa_id\"]\n            isOneToOne: false\n            referencedRelation: \"mesas\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"asignaciones_mesa_reserva_id_fkey\"\n            columns: [\"reserva_id\"]\n            isOneToOne: false\n            referencedRelation: \"reservas\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"asignaciones_mesa_reserva_id_fkey\"\n            columns: [\"reserva_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_reservas_pendientes\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      asignaciones_sala: {\n        Row: {\n          created_at: string | null\n          id: string\n          sala_id: string\n          turno_id: string\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          sala_id: string\n          turno_id: string\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          sala_id?: string\n          turno_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"asignaciones_sala_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"turnos\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"asignaciones_sala_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_turnos_con_areas\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      Bebidas: {\n        Row: {\n          activado: boolean | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          featured: boolean | null\n          id: string\n          imagen_url: string | null\n          nombre: string | null\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: number | null\n          precio_eur: number | null\n          restaurante: boolean | null\n          tag: string | null\n          tamano: string | null\n          tipo: string | null\n          touza: boolean | null\n          traducciones: Json | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id: string\n          imagen_url?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          tag?: string | null\n          tamano?: string | null\n          tipo?: string | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          tag?: string | null\n          tamano?: string | null\n          tipo?: string | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      BebidasVENTA: {\n        Row: {\n          activado: boolean | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          denominacion_origen: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          featured: boolean | null\n          id: string\n          imagen_url: string | null\n          nombre: string\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: number | null\n          precio_coste: number | null\n          precio_eur: number | null\n          stock: number | null\n          ubicacion_pais: string | null\n          ubicacion_region: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          denominacion_origen?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          nombre: string\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_coste?: number | null\n          precio_eur?: number | null\n          stock?: number | null\n          ubicacion_pais?: string | null\n          ubicacion_region?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          denominacion_origen?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          nombre?: string\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_coste?: number | null\n          precio_eur?: number | null\n          stock?: number | null\n          ubicacion_pais?: string | null\n          ubicacion_region?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      bew: {\n        Row: {\n          activado: boolean | null\n          alergenos_inferidos: Json | null\n          alergenos_notas: string | null\n          alergenos_oficiales: Json | null\n          categoria: string | null\n          contiene_carne: boolean | null\n          contiene_gluten: boolean | null\n          contiene_huevo: boolean | null\n          contiene_lacteos: boolean | null\n          contiene_lactosa: boolean | null\n          contiene_marisco: boolean | null\n          contiene_pescado: boolean | null\n          created_at: string | null\n          descripcion: string | null\n          id: string | null\n          imagen_url: string | null\n          nombre: string | null\n          orden: string | null\n          precio_eur: number | null\n          unidad: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          contiene_carne?: boolean | null\n          contiene_gluten?: boolean | null\n          contiene_huevo?: boolean | null\n          contiene_lacteos?: boolean | null\n          contiene_lactosa?: boolean | null\n          contiene_marisco?: boolean | null\n          contiene_pescado?: boolean | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string | null\n          imagen_url?: string | null\n          nombre?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          unidad?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          contiene_carne?: boolean | null\n          contiene_gluten?: boolean | null\n          contiene_huevo?: boolean | null\n          contiene_lacteos?: boolean | null\n          contiene_lactosa?: boolean | null\n          contiene_marisco?: boolean | null\n          contiene_pescado?: boolean | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string | null\n          imagen_url?: string | null\n          nombre?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          unidad?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      blacklist: {\n        Row: {\n          created_at: string\n          id: string\n          motivo: string | null\n          nombre: string | null\n          tipo: string\n          updated_at: string\n          valor: string\n        }\n        Insert: {\n          created_at?: string\n          id?: string\n          motivo?: string | null\n          nombre?: string | null\n          tipo: string\n          updated_at?: string\n          valor: string\n        }\n        Update: {\n          created_at?: string\n          id?: string\n          motivo?: string | null\n          nombre?: string | null\n          tipo?: string\n          updated_at?: string\n          valor?: string\n        }\n        Relationships: []\n      }\n      call_logs: {\n        Row: {\n          audio_metrics: Json | null\n          call_success: boolean | null\n          call_type: string | null\n          caller_number: string | null\n          cost_breakdown: Json | null\n          cost_total_eur: number | null\n          cost_total_usd: number | null\n          created_at: string | null\n          duration_seconds: number | null\n          ended_at: string | null\n          ended_reason: string | null\n          id: string\n          reservation_extraction: Json | null\n          restaurant_id: string\n          sentiment: string | null\n          started_at: string | null\n          status: string | null\n          structured_data: Json | null\n          structured_outputs: Json | null\n          success_evaluation: string | null\n          summary: string | null\n          tool_calls: Json | null\n          vapi_call_id: string | null\n        }\n        Insert: {\n          audio_metrics?: Json | null\n          call_success?: boolean | null\n          call_type?: string | null\n          caller_number?: string | null\n          cost_breakdown?: Json | null\n          cost_total_eur?: number | null\n          cost_total_usd?: number | null\n          created_at?: string | null\n          duration_seconds?: number | null\n          ended_at?: string | null\n          ended_reason?: string | null\n          id?: string\n          reservation_extraction?: Json | null\n          restaurant_id: string\n          sentiment?: string | null\n          started_at?: string | null\n          status?: string | null\n          structured_data?: Json | null\n          structured_outputs?: Json | null\n          success_evaluation?: string | null\n          summary?: string | null\n          tool_calls?: Json | null\n          vapi_call_id?: string | null\n        }\n        Update: {\n          audio_metrics?: Json | null\n          call_success?: boolean | null\n          call_type?: string | null\n          caller_number?: string | null\n          cost_breakdown?: Json | null\n          cost_total_eur?: number | null\n          cost_total_usd?: number | null\n          created_at?: string | null\n          duration_seconds?: number | null\n          ended_at?: string | null\n          ended_reason?: string | null\n          id?: string\n          reservation_extraction?: Json | null\n          restaurant_id?: string\n          sentiment?: string | null\n          started_at?: string | null\n          status?: string | null\n          structured_data?: Json | null\n          structured_outputs?: Json | null\n          success_evaluation?: string | null\n          summary?: string | null\n          tool_calls?: Json | null\n          vapi_call_id?: string | null\n        }\n        Relationships: []\n      }\n      campanas_marketing: {\n        Row: {\n          canal: string\n          clics: number | null\n          created_at: string | null\n          estado: string | null\n          fecha_fin: string | null\n          fecha_inicio: string\n          id: string\n          nombre: string\n          presupuesto: number | null\n          reservas_generadas: number | null\n          updated_at: string | null\n          visitas_web: number | null\n        }\n        Insert: {\n          canal: string\n          clics?: number | null\n          created_at?: string | null\n          estado?: string | null\n          fecha_fin?: string | null\n          fecha_inicio: string\n          id?: string\n          nombre: string\n          presupuesto?: number | null\n          reservas_generadas?: number | null\n          updated_at?: string | null\n          visitas_web?: number | null\n        }\n        Update: {\n          canal?: string\n          clics?: number | null\n          created_at?: string | null\n          estado?: string | null\n          fecha_fin?: string | null\n          fecha_inicio?: string\n          id?: string\n          nombre?: string\n          presupuesto?: number | null\n          reservas_generadas?: number | null\n          updated_at?: string | null\n          visitas_web?: number | null\n        }\n        Relationships: []\n      }\n      carrito: {\n        Row: {\n          cantidad: number\n          created_at: string\n          id: string\n          producto_id: string\n          producto_tipo: string\n          updated_at: string\n          user_id: string\n        }\n        Insert: {\n          cantidad?: number\n          created_at?: string\n          id?: string\n          producto_id: string\n          producto_tipo?: string\n          updated_at?: string\n          user_id: string\n        }\n        Update: {\n          cantidad?: number\n          created_at?: string\n          id?: string\n          producto_id?: string\n          producto_tipo?: string\n          updated_at?: string\n          user_id?: string\n        }\n        Relationships: []\n      }\n      Cocteles: {\n        Row: {\n          activado: boolean | null\n          alergenos_notas: string | null\n          alergenos_oficiales: Json | null\n          base: string | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          featured: boolean | null\n          id: string\n          imagen_url: string | null\n          ingredientes: string | null\n          ingredientes_en: string | null\n          ingredientes_fr: string | null\n          nombre: string | null\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: number | null\n          precio_eur: number | null\n          preparacion: string | null\n          restaurante: boolean | null\n          touza: boolean | null\n          traducciones: Json | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          base?: string | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          ingredientes?: string | null\n          ingredientes_en?: string | null\n          ingredientes_fr?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_eur?: number | null\n          preparacion?: string | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          base?: string | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          ingredientes?: string | null\n          ingredientes_en?: string | null\n          ingredientes_fr?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          precio_eur?: number | null\n          preparacion?: string | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      ComidaVENTA: {\n        Row: {\n          activado: boolean | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          featured: boolean | null\n          id: string\n          imagen_url: string | null\n          nombre: string\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: number | null\n          origen: string | null\n          peso: string | null\n          precio_coste: number | null\n          precio_eur: number | null\n          stock: number | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          nombre: string\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          origen?: string | null\n          peso?: string | null\n          precio_coste?: number | null\n          precio_eur?: number | null\n          stock?: number | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          featured?: boolean | null\n          id?: string\n          imagen_url?: string | null\n          nombre?: string\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: number | null\n          origen?: string | null\n          peso?: string | null\n          precio_coste?: number | null\n          precio_eur?: number | null\n          stock?: number | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      config_google_places: {\n        Row: {\n          created_at: string | null\n          direccion: string | null\n          id: string\n          place_id: string\n          place_name: string\n          rating_promedio: number | null\n          telefono: string | null\n          total_resenas: number | null\n          ultima_sincronizacion: string | null\n          updated_at: string | null\n          website: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          direccion?: string | null\n          id?: string\n          place_id: string\n          place_name: string\n          rating_promedio?: number | null\n          telefono?: string | null\n          total_resenas?: number | null\n          ultima_sincronizacion?: string | null\n          updated_at?: string | null\n          website?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          direccion?: string | null\n          id?: string\n          place_id?: string\n          place_name?: string\n          rating_promedio?: number | null\n          telefono?: string | null\n          total_resenas?: number | null\n          ultima_sincronizacion?: string | null\n          updated_at?: string | null\n          website?: string | null\n        }\n        Relationships: []\n      }\n      config_redes_sociales: {\n        Row: {\n          access_token: string | null\n          account_id: string | null\n          activo: boolean | null\n          created_at: string | null\n          id: string\n          page_id: string | null\n          red_social: string\n          updated_at: string | null\n          user_id: string | null\n        }\n        Insert: {\n          access_token?: string | null\n          account_id?: string | null\n          activo?: boolean | null\n          created_at?: string | null\n          id?: string\n          page_id?: string | null\n          red_social: string\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          access_token?: string | null\n          account_id?: string | null\n          activo?: boolean | null\n          created_at?: string | null\n          id?: string\n          page_id?: string | null\n          red_social?: string\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Relationships: []\n      }\n      configBotWeb: {\n        Row: {\n          created_at: string\n          frases_personalizadas: string | null\n          id: string\n          idioma: string | null\n          instrucciones_extra: string | null\n          mensaje_bienvenida: string | null\n          platos_recomendados: string | null\n          tono: string | null\n          updated_at: string\n          vinos_recomendados: string | null\n        }\n        Insert: {\n          created_at?: string\n          frases_personalizadas?: string | null\n          id?: string\n          idioma?: string | null\n          instrucciones_extra?: string | null\n          mensaje_bienvenida?: string | null\n          platos_recomendados?: string | null\n          tono?: string | null\n          updated_at?: string\n          vinos_recomendados?: string | null\n        }\n        Update: {\n          created_at?: string\n          frases_personalizadas?: string | null\n          id?: string\n          idioma?: string | null\n          instrucciones_extra?: string | null\n          mensaje_bienvenida?: string | null\n          platos_recomendados?: string | null\n          tono?: string | null\n          updated_at?: string\n          vinos_recomendados?: string | null\n        }\n        Relationships: []\n      }\n      configuracion_reservas: {\n        Row: {\n          auto_confirmar: boolean\n          created_at: string\n          dias_max_antelacion: number\n          email_obligatorio: boolean\n          id: string\n          max_comensales_por_reserva: number\n          max_reservas_por_email_dia: number\n          max_reservas_por_telefono_dia: number\n          min_comensales_por_reserva: number\n          minutos_corte_antes_servicio: number\n          telefono_obligatorio: boolean\n          updated_at: string\n        }\n        Insert: {\n          auto_confirmar?: boolean\n          created_at?: string\n          dias_max_antelacion?: number\n          email_obligatorio?: boolean\n          id?: string\n          max_comensales_por_reserva?: number\n          max_reservas_por_email_dia?: number\n          max_reservas_por_telefono_dia?: number\n          min_comensales_por_reserva?: number\n          minutos_corte_antes_servicio?: number\n          telefono_obligatorio?: boolean\n          updated_at?: string\n        }\n        Update: {\n          auto_confirmar?: boolean\n          created_at?: string\n          dias_max_antelacion?: number\n          email_obligatorio?: boolean\n          id?: string\n          max_comensales_por_reserva?: number\n          max_reservas_por_email_dia?: number\n          max_reservas_por_telefono_dia?: number\n          min_comensales_por_reserva?: number\n          minutos_corte_antes_servicio?: number\n          telefono_obligatorio?: boolean\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      configuracion_turnos: {\n        Row: {\n          activo: boolean\n          created_at: string\n          dias_semana: number[]\n          espacio_id: string | null\n          hora_fin: string\n          hora_inicio: string\n          id: string\n          intervalo_base_minutos: number\n          nombre_periodo: string\n          ocultar_primario_si_secundario: boolean\n          umbral_apertura_secundario: number\n          updated_at: string\n        }\n        Insert: {\n          activo?: boolean\n          created_at?: string\n          dias_semana?: number[]\n          espacio_id?: string | null\n          hora_fin: string\n          hora_inicio: string\n          id?: string\n          intervalo_base_minutos?: number\n          nombre_periodo: string\n          ocultar_primario_si_secundario?: boolean\n          umbral_apertura_secundario?: number\n          updated_at?: string\n        }\n        Update: {\n          activo?: boolean\n          created_at?: string\n          dias_semana?: number[]\n          espacio_id?: string | null\n          hora_fin?: string\n          hora_inicio?: string\n          id?: string\n          intervalo_base_minutos?: number\n          nombre_periodo?: string\n          ocultar_primario_si_secundario?: boolean\n          umbral_apertura_secundario?: number\n          updated_at?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"configuracion_turnos_espacio_id_fkey\"\n            columns: [\"espacio_id\"]\n            isOneToOne: false\n            referencedRelation: \"espacios_reserva\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      consultas_chatbot: {\n        Row: {\n          created_at: string | null\n          embedding: string | null\n          id: number\n          pregunta: string\n          respuesta: string | null\n          resultados: Json | null\n          sql_generado: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          embedding?: string | null\n          id?: number\n          pregunta: string\n          respuesta?: string | null\n          resultados?: Json | null\n          sql_generado?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          embedding?: string | null\n          id?: number\n          pregunta?: string\n          respuesta?: string | null\n          resultados?: Json | null\n          sql_generado?: string | null\n        }\n        Relationships: []\n      }\n      conversaciones: {\n        Row: {\n          created_at: string | null\n          id: string\n          session_id: string\n          titulo: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          session_id: string\n          titulo?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          session_id?: string\n          titulo?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      dashboard_config: {\n        Row: {\n          created_at: string | null\n          id: string\n          is_default: boolean | null\n          nombre_vista: string\n          orden_widgets: Json\n          updated_at: string | null\n          user_id: string\n          widgets_activos: Json\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          is_default?: boolean | null\n          nombre_vista: string\n          orden_widgets?: Json\n          updated_at?: string | null\n          user_id: string\n          widgets_activos?: Json\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          is_default?: boolean | null\n          nombre_vista?: string\n          orden_widgets?: Json\n          updated_at?: string | null\n          user_id?: string\n          widgets_activos?: Json\n        }\n        Relationships: []\n      }\n      documentos: {\n        Row: {\n          created_at: string\n          fecha: string | null\n          id: string\n          importe_total: number | null\n          moneda: string | null\n          nombre_archivo: string | null\n          numero_documento: string\n          proveedor: string | null\n          tipo: string\n        }\n        Insert: {\n          created_at?: string\n          fecha?: string | null\n          id?: string\n          importe_total?: number | null\n          moneda?: string | null\n          nombre_archivo?: string | null\n          numero_documento: string\n          proveedor?: string | null\n          tipo: string\n        }\n        Update: {\n          created_at?: string\n          fecha?: string | null\n          id?: string\n          importe_total?: number | null\n          moneda?: string | null\n          nombre_archivo?: string | null\n          numero_documento?: string\n          proveedor?: string | null\n          tipo?: string\n        }\n        Relationships: []\n      }\n      email_eventos: {\n        Row: {\n          created_at: string | null\n          email_destinatario: string | null\n          email_id: string\n          id: string\n          metadata: Json | null\n          timestamp_evento: string | null\n          tipo_evento: string\n        }\n        Insert: {\n          created_at?: string | null\n          email_destinatario?: string | null\n          email_id: string\n          id?: string\n          metadata?: Json | null\n          timestamp_evento?: string | null\n          tipo_evento: string\n        }\n        Update: {\n          created_at?: string | null\n          email_destinatario?: string | null\n          email_id?: string\n          id?: string\n          metadata?: Json | null\n          timestamp_evento?: string | null\n          tipo_evento?: string\n        }\n        Relationships: []\n      }\n      espacios_reserva: {\n        Row: {\n          activa: boolean | null\n          capacidad_maxima: number\n          caracteristicas: Json | null\n          created_at: string | null\n          descripcion: string | null\n          id: string\n          nombre: string\n          updated_at: string | null\n        }\n        Insert: {\n          activa?: boolean | null\n          capacidad_maxima: number\n          caracteristicas?: Json | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string\n          nombre: string\n          updated_at?: string | null\n        }\n        Update: {\n          activa?: boolean | null\n          capacidad_maxima?: number\n          caracteristicas?: Json | null\n          created_at?: string | null\n          descripcion?: string | null\n          id?: string\n          nombre?: string\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      estadisticas_redes: {\n        Row: {\n          alcance: number | null\n          comentarios_totales: number | null\n          created_at: string | null\n          engagement_rate: number | null\n          fecha: string\n          id: string\n          likes_totales: number | null\n          publicaciones_mes: number | null\n          red_social: string\n          seguidores: number | null\n          updated_at: string | null\n          user_id: string | null\n        }\n        Insert: {\n          alcance?: number | null\n          comentarios_totales?: number | null\n          created_at?: string | null\n          engagement_rate?: number | null\n          fecha?: string\n          id?: string\n          likes_totales?: number | null\n          publicaciones_mes?: number | null\n          red_social: string\n          seguidores?: number | null\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          alcance?: number | null\n          comentarios_totales?: number | null\n          created_at?: string | null\n          engagement_rate?: number | null\n          fecha?: string\n          id?: string\n          likes_totales?: number | null\n          publicaciones_mes?: number | null\n          red_social?: string\n          seguidores?: number | null\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Relationships: []\n      }\n      facturas: {\n        Row: {\n          cif: string | null\n          created_at: string | null\n          drive_url: string | null\n          embedding: string | null\n          embedding_observaciones: string | null\n          fecha: string\n          id: number\n          iva: number | null\n          numero_documento: string\n          observaciones: string | null\n          procesado_en: string | null\n          proveedor: string | null\n          proveedor_normalizado: string | null\n          resumen: string | null\n          subtotal: number | null\n          tipo: string\n          total: number | null\n          updated_at: string | null\n          verificada: boolean | null\n        }\n        Insert: {\n          cif?: string | null\n          created_at?: string | null\n          drive_url?: string | null\n          embedding?: string | null\n          embedding_observaciones?: string | null\n          fecha: string\n          id?: number\n          iva?: number | null\n          numero_documento: string\n          observaciones?: string | null\n          procesado_en?: string | null\n          proveedor?: string | null\n          proveedor_normalizado?: string | null\n          resumen?: string | null\n          subtotal?: number | null\n          tipo: string\n          total?: number | null\n          updated_at?: string | null\n          verificada?: boolean | null\n        }\n        Update: {\n          cif?: string | null\n          created_at?: string | null\n          drive_url?: string | null\n          embedding?: string | null\n          embedding_observaciones?: string | null\n          fecha?: string\n          id?: number\n          iva?: number | null\n          numero_documento?: string\n          observaciones?: string | null\n          procesado_en?: string | null\n          proveedor?: string | null\n          proveedor_normalizado?: string | null\n          resumen?: string | null\n          subtotal?: number | null\n          tipo?: string\n          total?: number | null\n          updated_at?: string | null\n          verificada?: boolean | null\n        }\n        Relationships: []\n      }\n      favoritos: {\n        Row: {\n          created_at: string\n          id: string\n          producto_id: string\n          producto_tipo: string\n          user_id: string\n        }\n        Insert: {\n          created_at?: string\n          id?: string\n          producto_id: string\n          producto_tipo?: string\n          user_id: string\n        }\n        Update: {\n          created_at?: string\n          id?: string\n          producto_id?: string\n          producto_tipo?: string\n          user_id?: string\n        }\n        Relationships: []\n      }\n      gdpr_audit_log: {\n        Row: {\n          accion: string\n          created_at: string | null\n          detalles: Json | null\n          ejecutado_por: string | null\n          id: string\n          registros_afectados: number | null\n          tabla: string\n        }\n        Insert: {\n          accion: string\n          created_at?: string | null\n          detalles?: Json | null\n          ejecutado_por?: string | null\n          id?: string\n          registros_afectados?: number | null\n          tabla: string\n        }\n        Update: {\n          accion?: string\n          created_at?: string | null\n          detalles?: Json | null\n          ejecutado_por?: string | null\n          id?: string\n          registros_afectados?: number | null\n          tabla?: string\n        }\n        Relationships: []\n      }\n      gdpr_config: {\n        Row: {\n          accion: string\n          activo: boolean | null\n          campos_anonimizar: string[] | null\n          created_at: string | null\n          descripcion: string | null\n          dias_retencion: number\n          id: string\n          tabla: string\n          updated_at: string | null\n        }\n        Insert: {\n          accion: string\n          activo?: boolean | null\n          campos_anonimizar?: string[] | null\n          created_at?: string | null\n          descripcion?: string | null\n          dias_retencion: number\n          id?: string\n          tabla: string\n          updated_at?: string | null\n        }\n        Update: {\n          accion?: string\n          activo?: boolean | null\n          campos_anonimizar?: string[] | null\n          created_at?: string | null\n          descripcion?: string | null\n          dias_retencion?: number\n          id?: string\n          tabla?: string\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      historial_ajustes_precios: {\n        Row: {\n          categoria: string\n          created_at: string\n          fecha: string\n          id: string\n          items_afectados: number\n          porcentaje: number\n          snapshot: Json\n          tipo_carta: string\n          user_id: string | null\n        }\n        Insert: {\n          categoria: string\n          created_at?: string\n          fecha?: string\n          id?: string\n          items_afectados?: number\n          porcentaje: number\n          snapshot?: Json\n          tipo_carta: string\n          user_id?: string | null\n        }\n        Update: {\n          categoria?: string\n          created_at?: string\n          fecha?: string\n          id?: string\n          items_afectados?: number\n          porcentaje?: number\n          snapshot?: Json\n          tipo_carta?: string\n          user_id?: string | null\n        }\n        Relationships: []\n      }\n      historial_precios: {\n        Row: {\n          created_at: string | null\n          factura_id: number | null\n          fecha: string | null\n          id: string\n          precio: number | null\n          producto_nombre: string | null\n          proveedor: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          factura_id?: number | null\n          fecha?: string | null\n          id?: string\n          precio?: number | null\n          producto_nombre?: string | null\n          proveedor?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          factura_id?: number | null\n          fecha?: string | null\n          id?: string\n          precio?: number | null\n          producto_nombre?: string | null\n          proveedor?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"historial_precios_factura_id_fkey\"\n            columns: [\"factura_id\"]\n            isOneToOne: false\n            referencedRelation: \"facturas\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"historial_precios_factura_id_fkey\"\n            columns: [\"factura_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_ultimos_documentos\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      imagenes_base64: {\n        Row: {\n          categoria: string | null\n          contenido_base64: string\n          created_at: string\n          descripcion: string | null\n          id: string\n          nombre: string\n          tamano_bytes: number | null\n          tipo_mime: string\n          updated_at: string\n        }\n        Insert: {\n          categoria?: string | null\n          contenido_base64: string\n          created_at?: string\n          descripcion?: string | null\n          id?: string\n          nombre: string\n          tamano_bytes?: number | null\n          tipo_mime: string\n          updated_at?: string\n        }\n        Update: {\n          categoria?: string | null\n          contenido_base64?: string\n          created_at?: string\n          descripcion?: string | null\n          id?: string\n          nombre?: string\n          tamano_bytes?: number | null\n          tipo_mime?: string\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      items_documento: {\n        Row: {\n          cantidad: number | null\n          descripcion: string\n          documento_id: string\n          embedding: string | null\n          id: string\n          importe_linea: number | null\n          precio_unitario: number | null\n        }\n        Insert: {\n          cantidad?: number | null\n          descripcion: string\n          documento_id: string\n          embedding?: string | null\n          id?: string\n          importe_linea?: number | null\n          precio_unitario?: number | null\n        }\n        Update: {\n          cantidad?: number | null\n          descripcion?: string\n          documento_id?: string\n          embedding?: string | null\n          id?: string\n          importe_linea?: number | null\n          precio_unitario?: number | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"items_documento_documento_id_fkey\"\n            columns: [\"documento_id\"]\n            isOneToOne: false\n            referencedRelation: \"documentos\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      lineas_pedido: {\n        Row: {\n          cantidad: number\n          created_at: string | null\n          id: string\n          nombre_producto: string\n          pedido_id: string\n          precio_unitario: number\n          producto_id: string\n          producto_tipo: string\n          total_linea: number\n        }\n        Insert: {\n          cantidad?: number\n          created_at?: string | null\n          id?: string\n          nombre_producto: string\n          pedido_id: string\n          precio_unitario: number\n          producto_id: string\n          producto_tipo: string\n          total_linea: number\n        }\n        Update: {\n          cantidad?: number\n          created_at?: string | null\n          id?: string\n          nombre_producto?: string\n          pedido_id?: string\n          precio_unitario?: number\n          producto_id?: string\n          producto_tipo?: string\n          total_linea?: number\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"lineas_pedido_pedido_id_fkey\"\n            columns: [\"pedido_id\"]\n            isOneToOne: false\n            referencedRelation: \"pedidos_ecommerce\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      mensajes_chat: {\n        Row: {\n          content: string\n          conversacion_id: string | null\n          created_at: string | null\n          id: string\n          role: string\n          session_id: string\n        }\n        Insert: {\n          content: string\n          conversacion_id?: string | null\n          created_at?: string | null\n          id?: string\n          role: string\n          session_id: string\n        }\n        Update: {\n          content?: string\n          conversacion_id?: string | null\n          created_at?: string | null\n          id?: string\n          role?: string\n          session_id?: string\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"mensajes_chat_conversacion_id_fkey\"\n            columns: [\"conversacion_id\"]\n            isOneToOne: false\n            referencedRelation: \"chat_facturas_conversaciones\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_conversacion_id_fkey\"\n            columns: [\"conversacion_id\"]\n            isOneToOne: false\n            referencedRelation: \"conversaciones\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_session_id_fkey\"\n            columns: [\"session_id\"]\n            isOneToOne: false\n            referencedRelation: \"chat_facturas_conversaciones\"\n            referencedColumns: [\"session_id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_session_id_fkey\"\n            columns: [\"session_id\"]\n            isOneToOne: false\n            referencedRelation: \"conversaciones\"\n            referencedColumns: [\"session_id\"]\n          },\n        ]\n      }\n      menus_diarios: {\n        Row: {\n          fecha: string\n          id: string\n          idiom: string | null\n          menu: Json\n        }\n        Insert: {\n          fecha: string\n          id?: string\n          idiom?: string | null\n          menu: Json\n        }\n        Update: {\n          fecha?: string\n          id?: string\n          idiom?: string | null\n          menu?: Json\n        }\n        Relationships: []\n      }\n      mesas: {\n        Row: {\n          activa: boolean | null\n          alto: number | null\n          ancho: number | null\n          capacidad: number\n          created_at: string | null\n          espacio_id: string\n          etiqueta: string | null\n          forma: string\n          id: string\n          is_merged: boolean | null\n          nombre: string\n          original_mesas: Json | null\n          pos_x: number | null\n          pos_y: number | null\n          rotacion: number | null\n          updated_at: string | null\n        }\n        Insert: {\n          activa?: boolean | null\n          alto?: number | null\n          ancho?: number | null\n          capacidad?: number\n          created_at?: string | null\n          espacio_id: string\n          etiqueta?: string | null\n          forma?: string\n          id?: string\n          is_merged?: boolean | null\n          nombre: string\n          original_mesas?: Json | null\n          pos_x?: number | null\n          pos_y?: number | null\n          rotacion?: number | null\n          updated_at?: string | null\n        }\n        Update: {\n          activa?: boolean | null\n          alto?: number | null\n          ancho?: number | null\n          capacidad?: number\n          created_at?: string | null\n          espacio_id?: string\n          etiqueta?: string | null\n          forma?: string\n          id?: string\n          is_merged?: boolean | null\n          nombre?: string\n          original_mesas?: Json | null\n          pos_x?: number | null\n          pos_y?: number | null\n          rotacion?: number | null\n          updated_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"mesas_espacio_id_fkey\"\n            columns: [\"espacio_id\"]\n            isOneToOne: false\n            referencedRelation: \"espacios_reserva\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      movimientos_stock: {\n        Row: {\n          cantidad: number\n          created_at: string | null\n          id: string\n          motivo: string | null\n          producto_id: string\n          producto_tipo: string\n          referencia: string | null\n          stock_anterior: number | null\n          stock_nuevo: number | null\n          tipo_movimiento: string\n          usuario_id: string | null\n        }\n        Insert: {\n          cantidad: number\n          created_at?: string | null\n          id?: string\n          motivo?: string | null\n          producto_id: string\n          producto_tipo: string\n          referencia?: string | null\n          stock_anterior?: number | null\n          stock_nuevo?: number | null\n          tipo_movimiento: string\n          usuario_id?: string | null\n        }\n        Update: {\n          cantidad?: number\n          created_at?: string | null\n          id?: string\n          motivo?: string | null\n          producto_id?: string\n          producto_tipo?: string\n          referencia?: string | null\n          stock_anterior?: number | null\n          stock_nuevo?: number | null\n          tipo_movimiento?: string\n          usuario_id?: string | null\n        }\n        Relationships: []\n      }\n      n8n_chat_histories: {\n        Row: {\n          id: number\n          message: Json\n          session_id: string\n        }\n        Insert: {\n          id?: number\n          message: Json\n          session_id: string\n        }\n        Update: {\n          id?: number\n          message?: Json\n          session_id?: string\n        }\n        Relationships: []\n      }\n      newsletter_envios: {\n        Row: {\n          asunto: string\n          created_at: string\n          enviado_por: string | null\n          estado: string | null\n          id: string\n          mensaje: string\n          tipo_newsletter: string | null\n          total_destinatarios: number\n        }\n        Insert: {\n          asunto: string\n          created_at?: string\n          enviado_por?: string | null\n          estado?: string | null\n          id?: string\n          mensaje: string\n          tipo_newsletter?: string | null\n          total_destinatarios?: number\n        }\n        Update: {\n          asunto?: string\n          created_at?: string\n          enviado_por?: string | null\n          estado?: string | null\n          id?: string\n          mensaje?: string\n          tipo_newsletter?: string | null\n          total_destinatarios?: number\n        }\n        Relationships: []\n      }\n      newsletter_suscriptores: {\n        Row: {\n          activo: boolean\n          created_at: string\n          email: string\n          id: string\n          nombre: string | null\n          updated_at: string\n        }\n        Insert: {\n          activo?: boolean\n          created_at?: string\n          email: string\n          id?: string\n          nombre?: string | null\n          updated_at?: string\n        }\n        Update: {\n          activo?: boolean\n          created_at?: string\n          email?: string\n          id?: string\n          nombre?: string | null\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      noticias_hosteleria: {\n        Row: {\n          categoria: string\n          created_at: string\n          descripcion: string | null\n          enlace: string\n          fecha: string\n          fuente: string\n          id: string\n          titulo: string\n          updated_at: string\n        }\n        Insert: {\n          categoria: string\n          created_at?: string\n          descripcion?: string | null\n          enlace: string\n          fecha?: string\n          fuente: string\n          id?: string\n          titulo: string\n          updated_at?: string\n        }\n        Update: {\n          categoria?: string\n          created_at?: string\n          descripcion?: string | null\n          enlace?: string\n          fecha?: string\n          fuente?: string\n          id?: string\n          titulo?: string\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      notificaciones_dashboard: {\n        Row: {\n          created_at: string | null\n          id: string\n          leida: boolean\n          mensaje: string | null\n          referencia_id: string | null\n          referencia_tipo: string | null\n          tipo: string\n          titulo: string\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          leida?: boolean\n          mensaje?: string | null\n          referencia_id?: string | null\n          referencia_tipo?: string | null\n          tipo: string\n          titulo: string\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          leida?: boolean\n          mensaje?: string | null\n          referencia_id?: string | null\n          referencia_tipo?: string | null\n          tipo?: string\n          titulo?: string\n        }\n        Relationships: []\n      }\n      novedades: {\n        Row: {\n          activo: boolean | null\n          badge_text: string | null\n          badge_text_en: string | null\n          badge_text_fr: string | null\n          bebida_id: string | null\n          bullets: string[] | null\n          bullets_en: string[] | null\n          bullets_fr: string[] | null\n          created_at: string | null\n          created_by: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          destacado: boolean | null\n          fecha_fin: string | null\n          fecha_inicio: string\n          icono: string | null\n          id: string\n          imagen_posicion_y: number | null\n          imagen_url: string | null\n          orden: number | null\n          plato_id: string | null\n          seccion: string | null\n          tags: string[] | null\n          tags_en: string[] | null\n          tags_fr: string[] | null\n          tipo: string\n          tipo_asociacion: string | null\n          titulo: string\n          titulo_en: string | null\n          titulo_fr: string | null\n          updated_at: string | null\n          vino_id: string | null\n        }\n        Insert: {\n          activo?: boolean | null\n          badge_text?: string | null\n          badge_text_en?: string | null\n          badge_text_fr?: string | null\n          bebida_id?: string | null\n          bullets?: string[] | null\n          bullets_en?: string[] | null\n          bullets_fr?: string[] | null\n          created_at?: string | null\n          created_by?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          destacado?: boolean | null\n          fecha_fin?: string | null\n          fecha_inicio?: string\n          icono?: string | null\n          id?: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          orden?: number | null\n          plato_id?: string | null\n          seccion?: string | null\n          tags?: string[] | null\n          tags_en?: string[] | null\n          tags_fr?: string[] | null\n          tipo?: string\n          tipo_asociacion?: string | null\n          titulo: string\n          titulo_en?: string | null\n          titulo_fr?: string | null\n          updated_at?: string | null\n          vino_id?: string | null\n        }\n        Update: {\n          activo?: boolean | null\n          badge_text?: string | null\n          badge_text_en?: string | null\n          badge_text_fr?: string | null\n          bebida_id?: string | null\n          bullets?: string[] | null\n          bullets_en?: string[] | null\n          bullets_fr?: string[] | null\n          created_at?: string | null\n          created_by?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          destacado?: boolean | null\n          fecha_fin?: string | null\n          fecha_inicio?: string\n          icono?: string | null\n          id?: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          orden?: number | null\n          plato_id?: string | null\n          seccion?: string | null\n          tags?: string[] | null\n          tags_en?: string[] | null\n          tags_fr?: string[] | null\n          tipo?: string\n          tipo_asociacion?: string | null\n          titulo?: string\n          titulo_en?: string | null\n          titulo_fr?: string | null\n          updated_at?: string | null\n          vino_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"novedades_bebida_id_fkey\"\n            columns: [\"bebida_id\"]\n            isOneToOne: false\n            referencedRelation: \"Bebidas\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"novedades_plato_id_fkey\"\n            columns: [\"plato_id\"]\n            isOneToOne: false\n            referencedRelation: \"Platos\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"novedades_vino_id_fkey\"\n            columns: [\"vino_id\"]\n            isOneToOne: false\n            referencedRelation: \"Vinos\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      ocupacion_diaria: {\n        Row: {\n          comensales_confirmados: number | null\n          created_at: string | null\n          dia_semana: number | null\n          fecha: string\n          hora: string | null\n          id: string\n          reservas_canceladas: number | null\n          reservas_confirmadas: number | null\n          reservas_no_show: number | null\n          total_comensales: number\n          total_reservas: number\n          turno: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          comensales_confirmados?: number | null\n          created_at?: string | null\n          dia_semana?: number | null\n          fecha: string\n          hora?: string | null\n          id?: string\n          reservas_canceladas?: number | null\n          reservas_confirmadas?: number | null\n          reservas_no_show?: number | null\n          total_comensales?: number\n          total_reservas?: number\n          turno?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          comensales_confirmados?: number | null\n          created_at?: string | null\n          dia_semana?: number | null\n          fecha?: string\n          hora?: string | null\n          id?: string\n          reservas_canceladas?: number | null\n          reservas_confirmadas?: number | null\n          reservas_no_show?: number | null\n          total_comensales?: number\n          total_reservas?: number\n          turno?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      pedidos_ecommerce: {\n        Row: {\n          caja: string | null\n          ciudad_envio: string | null\n          codigo_postal_envio: string | null\n          created_at: string | null\n          descuento: number | null\n          direccion_envio: string | null\n          email: string | null\n          estado: string | null\n          fecha_entrega: string | null\n          fecha_envio: string | null\n          fecha_pago: string | null\n          gastos_envio: number | null\n          id: string\n          iva: number | null\n          metodo_pago: string | null\n          nombre_completo: string | null\n          notas_cliente: string | null\n          notas_internas: string | null\n          numero_pedido: string\n          numero_seguimiento: string | null\n          numero_ticket: string | null\n          pagado: boolean | null\n          pais_envio: string | null\n          referencia_pago: string | null\n          subtotal: number\n          telefono: string | null\n          tipo_venta: string | null\n          total: number\n          transportista: string | null\n          updated_at: string | null\n          user_id: string | null\n          vendedor_id: string | null\n        }\n        Insert: {\n          caja?: string | null\n          ciudad_envio?: string | null\n          codigo_postal_envio?: string | null\n          created_at?: string | null\n          descuento?: number | null\n          direccion_envio?: string | null\n          email?: string | null\n          estado?: string | null\n          fecha_entrega?: string | null\n          fecha_envio?: string | null\n          fecha_pago?: string | null\n          gastos_envio?: number | null\n          id?: string\n          iva?: number | null\n          metodo_pago?: string | null\n          nombre_completo?: string | null\n          notas_cliente?: string | null\n          notas_internas?: string | null\n          numero_pedido: string\n          numero_seguimiento?: string | null\n          numero_ticket?: string | null\n          pagado?: boolean | null\n          pais_envio?: string | null\n          referencia_pago?: string | null\n          subtotal?: number\n          telefono?: string | null\n          tipo_venta?: string | null\n          total?: number\n          transportista?: string | null\n          updated_at?: string | null\n          user_id?: string | null\n          vendedor_id?: string | null\n        }\n        Update: {\n          caja?: string | null\n          ciudad_envio?: string | null\n          codigo_postal_envio?: string | null\n          created_at?: string | null\n          descuento?: number | null\n          direccion_envio?: string | null\n          email?: string | null\n          estado?: string | null\n          fecha_entrega?: string | null\n          fecha_envio?: string | null\n          fecha_pago?: string | null\n          gastos_envio?: number | null\n          id?: string\n          iva?: number | null\n          metodo_pago?: string | null\n          nombre_completo?: string | null\n          notas_cliente?: string | null\n          notas_internas?: string | null\n          numero_pedido?: string\n          numero_seguimiento?: string | null\n          numero_ticket?: string | null\n          pagado?: boolean | null\n          pais_envio?: string | null\n          referencia_pago?: string | null\n          subtotal?: number\n          telefono?: string | null\n          tipo_venta?: string | null\n          total?: number\n          transportista?: string | null\n          updated_at?: string | null\n          user_id?: string | null\n          vendedor_id?: string | null\n        }\n        Relationships: []\n      }\n      phone_system_config: {\n        Row: {\n          address: string | null\n          bot_greeting: string | null\n          bot_responses: Json\n          created_at: string | null\n          forward_phone: string | null\n          id: string\n          max_party_size: number | null\n          mode: string\n          opening_hours: string | null\n          phone_number: string | null\n          restaurant_id: string\n          restaurant_name: string\n          schedule: Json | null\n          schedule_enabled: boolean | null\n          updated_at: string | null\n          vapi_assistant_id: string | null\n          vapi_phone_number_id: string | null\n          voice_id: string | null\n          webhook_url: string | null\n        }\n        Insert: {\n          address?: string | null\n          bot_greeting?: string | null\n          bot_responses?: Json\n          created_at?: string | null\n          forward_phone?: string | null\n          id?: string\n          max_party_size?: number | null\n          mode?: string\n          opening_hours?: string | null\n          phone_number?: string | null\n          restaurant_id: string\n          restaurant_name?: string\n          schedule?: Json | null\n          schedule_enabled?: boolean | null\n          updated_at?: string | null\n          vapi_assistant_id?: string | null\n          vapi_phone_number_id?: string | null\n          voice_id?: string | null\n          webhook_url?: string | null\n        }\n        Update: {\n          address?: string | null\n          bot_greeting?: string | null\n          bot_responses?: Json\n          created_at?: string | null\n          forward_phone?: string | null\n          id?: string\n          max_party_size?: number | null\n          mode?: string\n          opening_hours?: string | null\n          phone_number?: string | null\n          restaurant_id?: string\n          restaurant_name?: string\n          schedule?: Json | null\n          schedule_enabled?: boolean | null\n          updated_at?: string | null\n          vapi_assistant_id?: string | null\n          vapi_phone_number_id?: string | null\n          voice_id?: string | null\n          webhook_url?: string | null\n        }\n        Relationships: []\n      }\n      planos_espacio: {\n        Row: {\n          alto: number | null\n          alto_metros: number | null\n          ancho: number | null\n          ancho_metros: number | null\n          configuracion: Json | null\n          created_at: string | null\n          espacio_id: string\n          id: string\n          metros_cuadrados: number | null\n          pixels_per_meter: number | null\n          updated_at: string | null\n        }\n        Insert: {\n          alto?: number | null\n          alto_metros?: number | null\n          ancho?: number | null\n          ancho_metros?: number | null\n          configuracion?: Json | null\n          created_at?: string | null\n          espacio_id: string\n          id?: string\n          metros_cuadrados?: number | null\n          pixels_per_meter?: number | null\n          updated_at?: string | null\n        }\n        Update: {\n          alto?: number | null\n          alto_metros?: number | null\n          ancho?: number | null\n          ancho_metros?: number | null\n          configuracion?: Json | null\n          created_at?: string | null\n          espacio_id?: string\n          id?: string\n          metros_cuadrados?: number | null\n          pixels_per_meter?: number | null\n          updated_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"planos_espacio_espacio_id_fkey\"\n            columns: [\"espacio_id\"]\n            isOneToOne: true\n            referencedRelation: \"espacios_reserva\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      Platos: {\n        Row: {\n          activado: boolean | null\n          alergenos_en: string | null\n          alergenos_fr: string | null\n          alergenos_inferidos: Json | null\n          alergenos_notas: string | null\n          alergenos_oficiales: Json | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          descripcion: string | null\n          descripcion_en: string | null\n          descripcion_fr: string | null\n          expanded: boolean | null\n          featured: boolean | null\n          id: string\n          imagen_posicion_y: number | null\n          imagen_url: string | null\n          ingredientes: string | null\n          nombre: string | null\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: string | null\n          precio_eur: number | null\n          restaurante: boolean | null\n          touza: boolean | null\n          traducciones: Json | null\n          unidad: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          alergenos_en?: string | null\n          alergenos_fr?: string | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          expanded?: boolean | null\n          featured?: boolean | null\n          id: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          ingredientes?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          unidad?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          alergenos_en?: string | null\n          alergenos_fr?: string | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          descripcion?: string | null\n          descripcion_en?: string | null\n          descripcion_fr?: string | null\n          expanded?: boolean | null\n          featured?: boolean | null\n          id?: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          ingredientes?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          unidad?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      productos_catalogo: {\n        Row: {\n          activo: boolean | null\n          categoria: string | null\n          created_at: string | null\n          id: number\n          nombre: string\n          notas: string | null\n          precio_actual: number | null\n          proveedor_habitual_id: number | null\n          unidad_medida: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activo?: boolean | null\n          categoria?: string | null\n          created_at?: string | null\n          id?: number\n          nombre: string\n          notas?: string | null\n          precio_actual?: number | null\n          proveedor_habitual_id?: number | null\n          unidad_medida?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activo?: boolean | null\n          categoria?: string | null\n          created_at?: string | null\n          id?: number\n          nombre?: string\n          notas?: string | null\n          precio_actual?: number | null\n          proveedor_habitual_id?: number | null\n          unidad_medida?: string | null\n          updated_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"productos_catalogo_proveedor_habitual_id_fkey\"\n            columns: [\"proveedor_habitual_id\"]\n            isOneToOne: false\n            referencedRelation: \"proveedores\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      productos_factura: {\n        Row: {\n          cantidad: number\n          created_at: string | null\n          embedding: string | null\n          factura_id: number\n          id: number\n          nombre: string\n          nombre_normalizado: string | null\n          precio_unitario: number | null\n          total: number | null\n          unidad: string | null\n        }\n        Insert: {\n          cantidad?: number\n          created_at?: string | null\n          embedding?: string | null\n          factura_id: number\n          id?: number\n          nombre: string\n          nombre_normalizado?: string | null\n          precio_unitario?: number | null\n          total?: number | null\n          unidad?: string | null\n        }\n        Update: {\n          cantidad?: number\n          created_at?: string | null\n          embedding?: string | null\n          factura_id?: number\n          id?: number\n          nombre?: string\n          nombre_normalizado?: string | null\n          precio_unitario?: number | null\n          total?: number | null\n          unidad?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"productos_factura_factura_id_fkey\"\n            columns: [\"factura_id\"]\n            isOneToOne: false\n            referencedRelation: \"facturas\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"productos_factura_factura_id_fkey\"\n            columns: [\"factura_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_ultimos_documentos\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      proveedores: {\n        Row: {\n          activo: boolean | null\n          categoria: string | null\n          cif: string | null\n          created_at: string | null\n          direccion: string | null\n          email: string | null\n          id: number\n          nombre: string\n          notas: string | null\n          telefono: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activo?: boolean | null\n          categoria?: string | null\n          cif?: string | null\n          created_at?: string | null\n          direccion?: string | null\n          email?: string | null\n          id?: number\n          nombre: string\n          notas?: string | null\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activo?: boolean | null\n          categoria?: string | null\n          cif?: string | null\n          created_at?: string | null\n          direccion?: string | null\n          email?: string | null\n          id?: number\n          nombre?: string\n          notas?: string | null\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      publicaciones_redes: {\n        Row: {\n          contenido: string\n          created_at: string | null\n          error_mensaje: string | null\n          estado: string | null\n          fecha_programada: string | null\n          fecha_publicacion: string | null\n          id: string\n          imagen_url: string | null\n          post_id_facebook: string | null\n          post_id_instagram: string | null\n          red_social: string\n          updated_at: string | null\n          user_id: string | null\n        }\n        Insert: {\n          contenido: string\n          created_at?: string | null\n          error_mensaje?: string | null\n          estado?: string | null\n          fecha_programada?: string | null\n          fecha_publicacion?: string | null\n          id?: string\n          imagen_url?: string | null\n          post_id_facebook?: string | null\n          post_id_instagram?: string | null\n          red_social: string\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          contenido?: string\n          created_at?: string | null\n          error_mensaje?: string | null\n          estado?: string | null\n          fecha_programada?: string | null\n          fecha_publicacion?: string | null\n          id?: string\n          imagen_url?: string | null\n          post_id_facebook?: string | null\n          post_id_instagram?: string | null\n          red_social?: string\n          updated_at?: string | null\n          user_id?: string | null\n        }\n        Relationships: []\n      }\n      rate_limit_log: {\n        Row: {\n          created_at: string\n          id: string\n          identifier: string\n        }\n        Insert: {\n          created_at?: string\n          id?: string\n          identifier: string\n        }\n        Update: {\n          created_at?: string\n          id?: string\n          identifier?: string\n        }\n        Relationships: []\n      }\n      registro_horas: {\n        Row: {\n          created_at: string | null\n          fecha: string\n          hora_entrada: string\n          hora_salida: string | null\n          horas_trabajadas: number | null\n          id: string\n          notas: string | null\n          trabajador_id: string\n          turno_id: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          fecha: string\n          hora_entrada: string\n          hora_salida?: string | null\n          horas_trabajadas?: number | null\n          id?: string\n          notas?: string | null\n          trabajador_id: string\n          turno_id?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          fecha?: string\n          hora_entrada?: string\n          hora_salida?: string | null\n          horas_trabajadas?: number | null\n          id?: string\n          notas?: string | null\n          trabajador_id?: string\n          turno_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"registro_horas_trabajador_id_fkey\"\n            columns: [\"trabajador_id\"]\n            isOneToOne: false\n            referencedRelation: \"trabajadores\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"registro_horas_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"turnos\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"registro_horas_turno_id_fkey\"\n            columns: [\"turno_id\"]\n            isOneToOne: false\n            referencedRelation: \"vista_turnos_con_areas\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      resenas: {\n        Row: {\n          comentario: string | null\n          created_at: string | null\n          email: string | null\n          estado: string | null\n          fecha: string\n          fecha_respuesta: string | null\n          fuente: string | null\n          google_rating: number | null\n          google_review_id: string | null\n          id: string\n          nombre_cliente: string\n          respuesta: string | null\n          updated_at: string | null\n          valoracion: number\n        }\n        Insert: {\n          comentario?: string | null\n          created_at?: string | null\n          email?: string | null\n          estado?: string | null\n          fecha?: string\n          fecha_respuesta?: string | null\n          fuente?: string | null\n          google_rating?: number | null\n          google_review_id?: string | null\n          id?: string\n          nombre_cliente: string\n          respuesta?: string | null\n          updated_at?: string | null\n          valoracion: number\n        }\n        Update: {\n          comentario?: string | null\n          created_at?: string | null\n          email?: string | null\n          estado?: string | null\n          fecha?: string\n          fecha_respuesta?: string | null\n          fuente?: string | null\n          google_rating?: number | null\n          google_review_id?: string | null\n          id?: string\n          nombre_cliente?: string\n          respuesta?: string | null\n          updated_at?: string | null\n          valoracion?: number\n        }\n        Relationships: []\n      }\n      reservas: {\n        Row: {\n          canal: string | null\n          created_at: string | null\n          email: string | null\n          en_blacklist: boolean | null\n          espacio_id: string | null\n          estado: string\n          fecha: string\n          hora: string\n          id: string\n          importante: boolean\n          nombre: string | null\n          notas_cliente: string | null\n          numero_comensales: number\n          telefono: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          canal?: string | null\n          created_at?: string | null\n          email?: string | null\n          en_blacklist?: boolean | null\n          espacio_id?: string | null\n          estado?: string\n          fecha: string\n          hora: string\n          id?: string\n          importante?: boolean\n          nombre?: string | null\n          notas_cliente?: string | null\n          numero_comensales: number\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          canal?: string | null\n          created_at?: string | null\n          email?: string | null\n          en_blacklist?: boolean | null\n          espacio_id?: string | null\n          estado?: string\n          fecha?: string\n          hora?: string\n          id?: string\n          importante?: boolean\n          nombre?: string | null\n          notas_cliente?: string | null\n          numero_comensales?: number\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"reservas_espacio_id_fkey\"\n            columns: [\"espacio_id\"]\n            isOneToOne: false\n            referencedRelation: \"espacios_reserva\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      scope_prices: {\n        Row: {\n          currency: string\n          scope_name: string\n          unit_price_cents: number\n        }\n        Insert: {\n          currency?: string\n          scope_name: string\n          unit_price_cents: number\n        }\n        Update: {\n          currency?: string\n          scope_name?: string\n          unit_price_cents?: number\n        }\n        Relationships: []\n      }\n      security_log: {\n        Row: {\n          created_at: string\n          details: Json | null\n          id: string\n          ip_address: string | null\n          type: string\n        }\n        Insert: {\n          created_at?: string\n          details?: Json | null\n          id?: string\n          ip_address?: string | null\n          type: string\n        }\n        Update: {\n          created_at?: string\n          details?: Json | null\n          id?: string\n          ip_address?: string | null\n          type?: string\n        }\n        Relationships: []\n      }\n      sell_users: {\n        Row: {\n          acepta_marketing: boolean | null\n          apellidos: string | null\n          avatar_url: string | null\n          ciudad: string | null\n          codigo_postal: string | null\n          created_at: string | null\n          direccion: string | null\n          fecha_nacimiento: string | null\n          id: string\n          nombre: string | null\n          pais: string | null\n          telefono: string | null\n          updated_at: string | null\n          user_id: string\n        }\n        Insert: {\n          acepta_marketing?: boolean | null\n          apellidos?: string | null\n          avatar_url?: string | null\n          ciudad?: string | null\n          codigo_postal?: string | null\n          created_at?: string | null\n          direccion?: string | null\n          fecha_nacimiento?: string | null\n          id?: string\n          nombre?: string | null\n          pais?: string | null\n          telefono?: string | null\n          updated_at?: string | null\n          user_id: string\n        }\n        Update: {\n          acepta_marketing?: boolean | null\n          apellidos?: string | null\n          avatar_url?: string | null\n          ciudad?: string | null\n          codigo_postal?: string | null\n          created_at?: string | null\n          direccion?: string | null\n          fecha_nacimiento?: string | null\n          id?: string\n          nombre?: string | null\n          pais?: string | null\n          telefono?: string | null\n          updated_at?: string | null\n          user_id?: string\n        }\n        Relationships: []\n      }\n      solicitudes_pendientes: {\n        Row: {\n          created_at: string | null\n          descripcion_rechazo: string | null\n          email: string | null\n          estado: string\n          fecha_solicitada: string | null\n          hora_solicitada: string | null\n          id: string\n          motivo_rechazo: string\n          nombre: string | null\n          notas_cliente: string | null\n          notas_internas: string | null\n          numero_comensales: number | null\n          telefono: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          descripcion_rechazo?: string | null\n          email?: string | null\n          estado?: string\n          fecha_solicitada?: string | null\n          hora_solicitada?: string | null\n          id?: string\n          motivo_rechazo: string\n          nombre?: string | null\n          notas_cliente?: string | null\n          notas_internas?: string | null\n          numero_comensales?: number | null\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          descripcion_rechazo?: string | null\n          email?: string | null\n          estado?: string\n          fecha_solicitada?: string | null\n          hora_solicitada?: string | null\n          id?: string\n          motivo_rechazo?: string\n          nombre?: string | null\n          notas_cliente?: string | null\n          notas_internas?: string | null\n          numero_comensales?: number | null\n          telefono?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      tapas: {\n        Row: {\n          fecha: string\n          id: string\n          idiom: string | null\n          tapas: Json\n        }\n        Insert: {\n          fecha: string\n          id?: string\n          idiom?: string | null\n          tapas: Json\n        }\n        Update: {\n          fecha?: string\n          id?: string\n          idiom?: string | null\n          tapas?: Json\n        }\n        Relationships: []\n      }\n      trabajadores: {\n        Row: {\n          activo: boolean | null\n          apellidos: string\n          created_at: string | null\n          email: string | null\n          fecha_contratacion: string\n          foto_url: string | null\n          id: string\n          nombre: string\n          notas: string | null\n          puesto: Database[\"public\"][\"Enums\"][\"puesto_trabajo\"]\n          salario_hora: number | null\n          telefono: string\n          updated_at: string | null\n        }\n        Insert: {\n          activo?: boolean | null\n          apellidos: string\n          created_at?: string | null\n          email?: string | null\n          fecha_contratacion?: string\n          foto_url?: string | null\n          id?: string\n          nombre: string\n          notas?: string | null\n          puesto: Database[\"public\"][\"Enums\"][\"puesto_trabajo\"]\n          salario_hora?: number | null\n          telefono: string\n          updated_at?: string | null\n        }\n        Update: {\n          activo?: boolean | null\n          apellidos?: string\n          created_at?: string | null\n          email?: string | null\n          fecha_contratacion?: string\n          foto_url?: string | null\n          id?: string\n          nombre?: string\n          notas?: string | null\n          puesto?: Database[\"public\"][\"Enums\"][\"puesto_trabajo\"]\n          salario_hora?: number | null\n          telefono?: string\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      turnos: {\n        Row: {\n          created_at: string | null\n          estado: Database[\"public\"][\"Enums\"][\"estado_turno\"] | null\n          fecha: string\n          hora_fin: string\n          hora_inicio: string\n          id: string\n          notas: string | null\n          trabajador_id: string\n          updated_at: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          estado?: Database[\"public\"][\"Enums\"][\"estado_turno\"] | null\n          fecha: string\n          hora_fin: string\n          hora_inicio: string\n          id?: string\n          notas?: string | null\n          trabajador_id: string\n          updated_at?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          estado?: Database[\"public\"][\"Enums\"][\"estado_turno\"] | null\n          fecha?: string\n          hora_fin?: string\n          hora_inicio?: string\n          id?: string\n          notas?: string | null\n          trabajador_id?: string\n          updated_at?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"turnos_trabajador_id_fkey\"\n            columns: [\"trabajador_id\"]\n            isOneToOne: false\n            referencedRelation: \"trabajadores\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      usage_events: {\n        Row: {\n          client_id: string\n          id: number\n          installation_id: string | null\n          metadata: Json | null\n          occurred_at: string\n          scope_name: string\n          status: string\n          unit_price_cents: number\n          workflow_name: string | null\n        }\n        Insert: {\n          client_id: string\n          id?: number\n          installation_id?: string | null\n          metadata?: Json | null\n          occurred_at?: string\n          scope_name: string\n          status?: string\n          unit_price_cents: number\n          workflow_name?: string | null\n        }\n        Update: {\n          client_id?: string\n          id?: number\n          installation_id?: string | null\n          metadata?: Json | null\n          occurred_at?: string\n          scope_name?: string\n          status?: string\n          unit_price_cents?: number\n          workflow_name?: string | null\n        }\n        Relationships: []\n      }\n      user_permissions: {\n        Row: {\n          can_edit: boolean | null\n          can_view: boolean | null\n          created_at: string | null\n          id: string\n          section_key: string\n          updated_at: string | null\n          user_id: string\n        }\n        Insert: {\n          can_edit?: boolean | null\n          can_view?: boolean | null\n          created_at?: string | null\n          id?: string\n          section_key: string\n          updated_at?: string | null\n          user_id: string\n        }\n        Update: {\n          can_edit?: boolean | null\n          can_view?: boolean | null\n          created_at?: string | null\n          id?: string\n          section_key?: string\n          updated_at?: string | null\n          user_id?: string\n        }\n        Relationships: []\n      }\n      user_role_presets: {\n        Row: {\n          base_role: Database[\"public\"][\"Enums\"][\"app_role\"]\n          created_at: string\n          created_by: string | null\n          id: string\n          name: string\n          permissions: Json\n          updated_at: string\n        }\n        Insert: {\n          base_role?: Database[\"public\"][\"Enums\"][\"app_role\"]\n          created_at?: string\n          created_by?: string | null\n          id?: string\n          name: string\n          permissions?: Json\n          updated_at?: string\n        }\n        Update: {\n          base_role?: Database[\"public\"][\"Enums\"][\"app_role\"]\n          created_at?: string\n          created_by?: string | null\n          id?: string\n          name?: string\n          permissions?: Json\n          updated_at?: string\n        }\n        Relationships: []\n      }\n      user_roles: {\n        Row: {\n          created_at: string | null\n          id: string\n          role: Database[\"public\"][\"Enums\"][\"app_role\"]\n          user_id: string\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string\n          role?: Database[\"public\"][\"Enums\"][\"app_role\"]\n          user_id: string\n        }\n        Update: {\n          created_at?: string | null\n          id?: string\n          role?: Database[\"public\"][\"Enums\"][\"app_role\"]\n          user_id?: string\n        }\n        Relationships: []\n      }\n      Vinos: {\n        Row: {\n          activado: boolean | null\n          alergenos_en: string | null\n          alergenos_fr: string | null\n          alergenos_inferidos: Json | null\n          alergenos_notas: string | null\n          alergenos_oficiales: Json | null\n          categoria: string | null\n          categoria_en: string | null\n          categoria_fr: string | null\n          created_at: string | null\n          denominacion_origen: string | null\n          descripcion: string | null\n          expanded: boolean | null\n          featured: boolean | null\n          id: string\n          imagen_posicion_y: number | null\n          imagen_url: string | null\n          ingredientes: string | null\n          nombre: string | null\n          nombre_en: string | null\n          nombre_fr: string | null\n          orden: string | null\n          precio_eur: number | null\n          restaurante: boolean | null\n          touza: boolean | null\n          traducciones: Json | null\n          ubicacion_pais: string | null\n          ubicacion_pais_en: string | null\n          ubicacion_pais_fr: string | null\n          ubicacion_region: string | null\n          ubicacion_region_en: string | null\n          ubicacion_region_fr: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          activado?: boolean | null\n          alergenos_en?: string | null\n          alergenos_fr?: string | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          denominacion_origen?: string | null\n          descripcion?: string | null\n          expanded?: boolean | null\n          featured?: boolean | null\n          id: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          ingredientes?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          ubicacion_pais?: string | null\n          ubicacion_pais_en?: string | null\n          ubicacion_pais_fr?: string | null\n          ubicacion_region?: string | null\n          ubicacion_region_en?: string | null\n          ubicacion_region_fr?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          activado?: boolean | null\n          alergenos_en?: string | null\n          alergenos_fr?: string | null\n          alergenos_inferidos?: Json | null\n          alergenos_notas?: string | null\n          alergenos_oficiales?: Json | null\n          categoria?: string | null\n          categoria_en?: string | null\n          categoria_fr?: string | null\n          created_at?: string | null\n          denominacion_origen?: string | null\n          descripcion?: string | null\n          expanded?: boolean | null\n          featured?: boolean | null\n          id?: string\n          imagen_posicion_y?: number | null\n          imagen_url?: string | null\n          ingredientes?: string | null\n          nombre?: string | null\n          nombre_en?: string | null\n          nombre_fr?: string | null\n          orden?: string | null\n          precio_eur?: number | null\n          restaurante?: boolean | null\n          touza?: boolean | null\n          traducciones?: Json | null\n          ubicacion_pais?: string | null\n          ubicacion_pais_en?: string | null\n          ubicacion_pais_fr?: string | null\n          ubicacion_region?: string | null\n          ubicacion_region_en?: string | null\n          ubicacion_region_fr?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      visitas_producto: {\n        Row: {\n          ciudad: string | null\n          created_at: string | null\n          id: string\n          ip_address: string | null\n          pais: string | null\n          producto_id: string\n          producto_tipo: string\n          referer: string | null\n          session_id: string | null\n          user_agent: string | null\n          user_id: string | null\n        }\n        Insert: {\n          ciudad?: string | null\n          created_at?: string | null\n          id?: string\n          ip_address?: string | null\n          pais?: string | null\n          producto_id: string\n          producto_tipo: string\n          referer?: string | null\n          session_id?: string | null\n          user_agent?: string | null\n          user_id?: string | null\n        }\n        Update: {\n          ciudad?: string | null\n          created_at?: string | null\n          id?: string\n          ip_address?: string | null\n          pais?: string | null\n          producto_id?: string\n          producto_tipo?: string\n          referer?: string | null\n          session_id?: string | null\n          user_agent?: string | null\n          user_id?: string | null\n        }\n        Relationships: []\n      }\n    }\n    Views: {\n      vista_calidad_audio: {\n        Row: {\n          audio_metrics: Json | null\n          audio_score: number | null\n          call_success: boolean | null\n          created_at: string | null\n          duration_seconds: number | null\n          early_hangup: boolean | null\n          ended_reason: string | null\n          interruption_count: number | null\n          interruption_rate: number | null\n          latency_avg_ms: number | null\n          latency_first_ms: number | null\n          latency_max_ms: number | null\n          latency_p50_ms: number | null\n          latency_p95_ms: number | null\n          long_silences: number | null\n          number_cutoffs: number | null\n          sentiment: string | null\n          turn_count: number | null\n          vapi_call_id: string | null\n        }\n        Relationships: []\n      }\n      chat_facturas_conversaciones: {\n        Row: {\n          created_at: string | null\n          id: string | null\n          session_id: string | null\n          titulo: string | null\n          updated_at: string | null\n        }\n        Insert: {\n          created_at?: string | null\n          id?: string | null\n          session_id?: string | null\n          titulo?: string | null\n          updated_at?: string | null\n        }\n        Update: {\n          created_at?: string | null\n          id?: string | null\n          session_id?: string | null\n          titulo?: string | null\n          updated_at?: string | null\n        }\n        Relationships: []\n      }\n      chat_facturas_mensajes: {\n        Row: {\n          contenido: string | null\n          conversacion_id: string | null\n          created_at: string | null\n          id: string | null\n          rol: string | null\n          session_id: string | null\n        }\n        Insert: {\n          contenido?: string | null\n          conversacion_id?: string | null\n          created_at?: string | null\n          id?: string | null\n          rol?: string | null\n          session_id?: string | null\n        }\n        Update: {\n          contenido?: string | null\n          conversacion_id?: string | null\n          created_at?: string | null\n          id?: string | null\n          rol?: string | null\n          session_id?: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"mensajes_chat_conversacion_id_fkey\"\n            columns: [\"conversacion_id\"]\n            isOneToOne: false\n            referencedRelation: \"chat_facturas_conversaciones\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_conversacion_id_fkey\"\n            columns: [\"conversacion_id\"]\n            isOneToOne: false\n            referencedRelation: \"conversaciones\"\n            referencedColumns: [\"id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_session_id_fkey\"\n            columns: [\"session_id\"]\n            isOneToOne: false\n            referencedRelation: \"chat_facturas_conversaciones\"\n            referencedColumns: [\"session_id\"]\n          },\n          {\n            foreignKeyName: \"mensajes_chat_session_id_fkey\"\n            columns: [\"session_id\"]\n            isOneToOne: false\n            referencedRelation: \"conversaciones\"\n            referencedColumns: [\"session_id\"]\n          },\n        ]\n      }\n      vista_estadisticas_mensuales: {\n        Row: {\n          comensales_confirmados: number | null\n          mes_fin: string | null\n          mes_inicio: string | null\n          reservas_canceladas: number | null\n          reservas_confirmadas: number | null\n          total_comensales: number | null\n          total_reservas: number | null\n        }\n        Relationships: []\n      }\n      vista_estadisticas_semanales: {\n        Row: {\n          comensales_confirmados: number | null\n          reservas_canceladas: number | null\n          reservas_cena: number | null\n          reservas_comida: number | null\n          reservas_confirmadas: number | null\n          reservas_no_show: number | null\n          semana_fin: string | null\n          semana_inicio: string | null\n          total_comensales: number | null\n          total_reservas: number | null\n        }\n        Relationships: []\n      }\n      vista_gastos_mensuales: {\n        Row: {\n          mes: string | null\n          num_albaranes: number | null\n          num_facturas: number | null\n          num_proveedores: number | null\n          promedio_factura: number | null\n          total_facturas: number | null\n        }\n        Relationships: []\n      }\n      vista_gastos_proveedor_mes: {\n        Row: {\n          mes: string | null\n          num_facturas: number | null\n          promedio_factura: number | null\n          proveedor_nombre: string | null\n          proveedor_normalizado: string | null\n          total_mes: number | null\n        }\n        Relationships: []\n      }\n      vista_ocupacion: {\n        Row: {\n          dia_semana: number | null\n          fecha: string | null\n          hora: string | null\n          total_comensales: number | null\n          total_reservas: number | null\n          turno: string | null\n        }\n        Insert: {\n          dia_semana?: number | null\n          fecha?: string | null\n          hora?: string | null\n          total_comensales?: number | null\n          total_reservas?: number | null\n          turno?: string | null\n        }\n        Update: {\n          dia_semana?: number | null\n          fecha?: string | null\n          hora?: string | null\n          total_comensales?: number | null\n          total_reservas?: number | null\n          turno?: string | null\n        }\n        Relationships: []\n      }\n      vista_ocupacion_hoy: {\n        Row: {\n          comensales_confirmados: number | null\n          reservas_canceladas: number | null\n          reservas_confirmadas: number | null\n          reservas_pendientes: number | null\n          total_comensales: number | null\n          total_reservas: number | null\n        }\n        Relationships: []\n      }\n      vista_productos_top: {\n        Row: {\n          cantidad_total: number | null\n          nombre_completo: string | null\n          nombre_normalizado: string | null\n          num_proveedores: number | null\n          precio_maximo: number | null\n          precio_minimo: number | null\n          precio_promedio: number | null\n          unidad: string | null\n          veces_comprado: number | null\n          veces_con_precio: number | null\n        }\n        Relationships: []\n      }\n      vista_productos_vendidos: {\n        Row: {\n          nombre_producto: string | null\n          producto_id: string | null\n          producto_tipo: string | null\n          total_ingresos: number | null\n          unidades_vendidas: number | null\n        }\n        Relationships: []\n      }\n      vista_proveedores_resumen: {\n        Row: {\n          cif: string | null\n          num_albaranes: number | null\n          num_documentos: number | null\n          num_facturas: number | null\n          primera_compra: string | null\n          proveedor_nombre_completo: string | null\n          proveedor_normalizado: string | null\n          ticket_promedio: number | null\n          total_gastado: number | null\n          ultima_compra: string | null\n        }\n        Relationships: []\n      }\n      vista_reservas_pendientes: {\n        Row: {\n          email: string | null\n          estado: string | null\n          fecha: string | null\n          fecha_solicitud: string | null\n          hora: string | null\n          id: string | null\n          nombre_cliente: string | null\n          numero_comensales: number | null\n          telefono: string | null\n        }\n        Insert: {\n          email?: string | null\n          estado?: string | null\n          fecha?: string | null\n          fecha_solicitud?: string | null\n          hora?: string | null\n          id?: string | null\n          nombre_cliente?: string | null\n          numero_comensales?: number | null\n          telefono?: string | null\n        }\n        Update: {\n          email?: string | null\n          estado?: string | null\n          fecha?: string | null\n          fecha_solicitud?: string | null\n          hora?: string | null\n          id?: string | null\n          nombre_cliente?: string | null\n          numero_comensales?: number | null\n          telefono?: string | null\n        }\n        Relationships: []\n      }\n      vista_stock_consolidado: {\n        Row: {\n          activado: boolean | null\n          categoria: string | null\n          id: string | null\n          nombre: string | null\n          precio_eur: number | null\n          stock: number | null\n          tipo: string | null\n        }\n        Relationships: []\n      }\n      vista_turnos_con_areas: {\n        Row: {\n          areas_asignadas: string[] | null\n          areas_ids: string[] | null\n          created_at: string | null\n          estado: Database[\"public\"][\"Enums\"][\"estado_turno\"] | null\n          fecha: string | null\n          hora_fin: string | null\n          hora_inicio: string | null\n          id: string | null\n          notas: string | null\n          puesto: Database[\"public\"][\"Enums\"][\"puesto_trabajo\"] | null\n          trabajador_id: string | null\n          trabajador_nombre: string | null\n          updated_at: string | null\n        }\n        Relationships: [\n          {\n            foreignKeyName: \"turnos_trabajador_id_fkey\"\n            columns: [\"trabajador_id\"]\n            isOneToOne: false\n            referencedRelation: \"trabajadores\"\n            referencedColumns: [\"id\"]\n          },\n        ]\n      }\n      vista_ultimos_documentos: {\n        Row: {\n          drive_url: string | null\n          fecha: string | null\n          fecha_procesado: string | null\n          id: number | null\n          num_productos: number | null\n          numero_documento: string | null\n          proveedor: string | null\n          proveedor_normalizado: string | null\n          tipo: string | null\n          total: number | null\n        }\n        Relationships: []\n      }\n      vista_ventas_diarias: {\n        Row: {\n          fecha: string | null\n          num_pedidos: number | null\n          ticket_medio: number | null\n          total_ventas: number | null\n        }\n        Relationships: []\n      }\n    }\n    Functions: {\n      append_tool_call_log: {\n        Args: { p_call_id: string; p_new_tools: Json }\n        Returns: undefined\n      }\n      buscar_contexto_chatbot: {\n        Args: { embedding_query: string }\n        Returns: Json\n      }\n      buscar_facturas_agente: {\n        Args: { embedding_query: string; limite?: number; umbral?: number }\n        Returns: Json\n      }\n      buscar_facturas_por_contexto: {\n        Args: { limite?: number; query_embedding: string }\n        Returns: {\n          fecha: string\n          id: number\n          numero_documento: string\n          observaciones: string\n          proveedor: string\n          similitud: number\n          tipo: string\n        }[]\n      }\n      buscar_producto: {\n        Args: { termino: string }\n        Returns: {\n          nombre: string\n          precio_promedio: number\n          ultima_fecha: string\n          ultimo_precio: number\n          veces_comprado: number\n        }[]\n      }\n      buscar_productos_agente: {\n        Args: { embedding_query: string; limite?: number; umbral?: number }\n        Returns: Json\n      }\n      buscar_productos_similares: {\n        Args: { limite?: number; query_embedding: string }\n        Returns: {\n          cantidad: number\n          fecha: string\n          id: number\n          nombre: string\n          precio_unitario: number\n          proveedor: string\n          similitud: number\n        }[]\n      }\n      bytea_to_text: { Args: { data: string }; Returns: string }\n      cleanup_old_security_logs: { Args: never; Returns: undefined }\n      cleanup_rate_limit_log: { Args: never; Returns: undefined }\n      ejecutar_consulta_chatbot: { Args: { query_sql: string }; Returns: Json }\n      ejecutar_limpieza_gdpr: {\n        Args: never\n        Returns: {\n          accion: string\n          registros_procesados: number\n          tabla: string\n        }[]\n      }\n      estadisticas_globales_agente: { Args: never; Returns: Json }\n      gastos_periodo: {\n        Args: { fecha_fin: string; fecha_inicio: string }\n        Returns: {\n          num_facturas: number\n          proveedor_principal: string\n          ticket_promedio: number\n          total_gastado: number\n        }[]\n      }\n      get_user_role: {\n        Args: { _user_id: string }\n        Returns: Database[\"public\"][\"Enums\"][\"app_role\"]\n      }\n      has_section_permission: {\n        Args: { _permission: string; _section: string; _user_id: string }\n        Returns: boolean\n      }\n      http: {\n        Args: { request: Database[\"public\"][\"CompositeTypes\"][\"http_request\"] }\n        Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n        SetofOptions: {\n          from: \"http_request\"\n          to: \"http_response\"\n          isOneToOne: true\n          isSetofReturn: false\n        }\n      }\n      http_delete:\n        | {\n            Args: { uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n        | {\n            Args: { content: string; content_type: string; uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n      http_get:\n        | {\n            Args: { uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n        | {\n            Args: { data: Json; uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n      http_head: {\n        Args: { uri: string }\n        Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n        SetofOptions: {\n          from: \"*\"\n          to: \"http_response\"\n          isOneToOne: true\n          isSetofReturn: false\n        }\n      }\n      http_header: {\n        Args: { field: string; value: string }\n        Returns: Database[\"public\"][\"CompositeTypes\"][\"http_header\"]\n        SetofOptions: {\n          from: \"*\"\n          to: \"http_header\"\n          isOneToOne: true\n          isSetofReturn: false\n        }\n      }\n      http_list_curlopt: {\n        Args: never\n        Returns: {\n          curlopt: string\n          value: string\n        }[]\n      }\n      http_patch: {\n        Args: { content: string; content_type: string; uri: string }\n        Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n        SetofOptions: {\n          from: \"*\"\n          to: \"http_response\"\n          isOneToOne: true\n          isSetofReturn: false\n        }\n      }\n      http_post:\n        | {\n            Args: { content: string; content_type: string; uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n        | {\n            Args: { data: Json; uri: string }\n            Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n            SetofOptions: {\n              from: \"*\"\n              to: \"http_response\"\n              isOneToOne: true\n              isSetofReturn: false\n            }\n          }\n      http_put: {\n        Args: { content: string; content_type: string; uri: string }\n        Returns: Database[\"public\"][\"CompositeTypes\"][\"http_response\"]\n        SetofOptions: {\n          from: \"*\"\n          to: \"http_response\"\n          isOneToOne: true\n          isSetofReturn: false\n        }\n      }\n      http_reset_curlopt: { Args: never; Returns: boolean }\n      http_set_curlopt: {\n        Args: { curlopt: string; value: string }\n        Returns: boolean\n      }\n      is_admin: { Args: { _user_id: string }; Returns: boolean }\n      normalizar_nombre_producto: {\n        Args: { p_nombre: string }\n        Returns: string\n      }\n      normalizar_proveedor: { Args: { p_proveedor: string }; Returns: string }\n      normalizar_texto: { Args: { p_texto: string }; Returns: string }\n      recalcular_ocupacion_historica: {\n        Args: { fecha_desde?: string; fecha_hasta?: string }\n        Returns: number\n      }\n      text_to_bytea: { Args: { data: string }; Returns: string }\n      unaccent: { Args: { \"\": string }; Returns: string }\n      urlencode:\n        | { Args: { data: Json }; Returns: string }\n        | {\n            Args: { string: string }\n            Returns: {\n              error: true\n            } & \"Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved\"\n          }\n        | {\n            Args: { string: string }\n            Returns: {\n              error: true\n            } & \"Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved\"\n          }\n      verificar_duplicado_factura: {\n        Args: {\n          p_fecha: string\n          p_numero_documento: string\n          p_proveedor: string\n          p_total: number\n        }\n        Returns: Json\n      }\n      withdraw_stock_inventory: {\n        Args: { p_product_id: string; p_quantity: number }\n        Returns: undefined\n      }\n    }\n    Enums: {\n      app_role: \"admin\" | \"manager\" | \"staff\"\n      estado_turno: \"programado\" | \"activo\" | \"completado\" | \"cancelado\"\n      puesto_trabajo:\n        | \"gerente\"\n        | \"camarero\"\n        | \"ayudante_camarero\"\n        | \"cocinero\"\n        | \"ayudante_cocina\"\n        | \"recepcionista\"\n        | \"limpieza\"\n    }\n    CompositeTypes: {\n      http_header: {\n        field: string | null\n        value: string | null\n      }\n      http_request: {\n        method: unknown\n        uri: string | null\n        headers: Database[\"public\"][\"CompositeTypes\"][\"http_header\"][] | null\n        content_type: string | null\n        content: string | null\n      }\n      http_response: {\n        status: number | null\n        content_type: string | null\n        headers: Database[\"public\"][\"CompositeTypes\"][\"http_header\"][] | null\n        content: string | null\n      }\n    }\n  }\n}\n\ntype DatabaseWithoutInternals = Omit<Database, \"__InternalSupabase\">\n\ntype DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, \"public\">]\n\nexport type Tables<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof (DefaultSchema[\"Tables\"] & DefaultSchema[\"Views\"])\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"] &\n        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Views\"])\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"] &\n      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Views\"])[TableName] extends {\n      Row: infer R\n    }\n    ? R\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema[\"Tables\"] &\n        DefaultSchema[\"Views\"])\n    ? (DefaultSchema[\"Tables\"] &\n        DefaultSchema[\"Views\"])[DefaultSchemaTableNameOrOptions] extends {\n        Row: infer R\n      }\n      ? R\n      : never\n    : never\n\nexport type TablesInsert<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof DefaultSchema[\"Tables\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"]\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"][TableName] extends {\n      Insert: infer I\n    }\n    ? I\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema[\"Tables\"]\n    ? DefaultSchema[\"Tables\"][DefaultSchemaTableNameOrOptions] extends {\n        Insert: infer I\n      }\n      ? I\n      : never\n    : never\n\nexport type TablesUpdate<\n  DefaultSchemaTableNameOrOptions extends\n    | keyof DefaultSchema[\"Tables\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  TableName extends DefaultSchemaTableNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"]\n    : never = never,\n> = DefaultSchemaTableNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions[\"schema\"]][\"Tables\"][TableName] extends {\n      Update: infer U\n    }\n    ? U\n    : never\n  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema[\"Tables\"]\n    ? DefaultSchema[\"Tables\"][DefaultSchemaTableNameOrOptions] extends {\n        Update: infer U\n      }\n      ? U\n      : never\n    : never\n\nexport type Enums<\n  DefaultSchemaEnumNameOrOptions extends\n    | keyof DefaultSchema[\"Enums\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  EnumName extends DefaultSchemaEnumNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions[\"schema\"]][\"Enums\"]\n    : never = never,\n> = DefaultSchemaEnumNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions[\"schema\"]][\"Enums\"][EnumName]\n  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema[\"Enums\"]\n    ? DefaultSchema[\"Enums\"][DefaultSchemaEnumNameOrOptions]\n    : never\n\nexport type CompositeTypes<\n  PublicCompositeTypeNameOrOptions extends\n    | keyof DefaultSchema[\"CompositeTypes\"]\n    | { schema: keyof DatabaseWithoutInternals },\n  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {\n    schema: keyof DatabaseWithoutInternals\n  }\n    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions[\"schema\"]][\"CompositeTypes\"]\n    : never = never,\n> = PublicCompositeTypeNameOrOptions extends {\n  schema: keyof DatabaseWithoutInternals\n}\n  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions[\"schema\"]][\"CompositeTypes\"][CompositeTypeName]\n  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema[\"CompositeTypes\"]\n    ? DefaultSchema[\"CompositeTypes\"][PublicCompositeTypeNameOrOptions]\n    : never\n\nexport const Constants = {\n  public: {\n    Enums: {\n      app_role: [\"admin\", \"manager\", \"staff\"],\n      estado_turno: [\"programado\", \"activo\", \"completado\", \"cancelado\"],\n      puesto_trabajo: [\n        \"gerente\",\n        \"camarero\",\n        \"ayudante_camarero\",\n        \"cocinero\",\n        \"ayudante_cocina\",\n        \"recepcionista\",\n        \"limpieza\",\n      ],\n    },\n  },\n} as const\n"}
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      alertas_stock: {
+        Row: {
+          created_at: string | null
+          id: string
+          notificar_email: boolean | null
+          producto_id: string
+          producto_tipo: string
+          stock_minimo: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notificar_email?: boolean | null
+          producto_id: string
+          producto_tipo: string
+          stock_minimo?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notificar_email?: boolean | null
+          producto_id?: string
+          producto_tipo?: string
+          stock_minimo?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      areas_trabajo: {
+        Row: {
+          activa: boolean | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+          tipo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activa?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activa?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          tipo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      asignaciones_area: {
+        Row: {
+          area_id: string
+          created_at: string | null
+          id: string
+          turno_id: string
+        }
+        Insert: {
+          area_id: string
+          created_at?: string | null
+          id?: string
+          turno_id: string
+        }
+        Update: {
+          area_id?: string
+          created_at?: string | null
+          id?: string
+          turno_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_area_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas_trabajo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_area_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_area_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vista_turnos_con_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asignaciones_mesa: {
+        Row: {
+          created_at: string | null
+          id: string
+          mesa_id: string
+          reserva_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mesa_id: string
+          reserva_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mesa_id?: string
+          reserva_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_mesa_mesa_id_fkey"
+            columns: ["mesa_id"]
+            isOneToOne: false
+            referencedRelation: "mesas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "vista_reservas_pendientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asignaciones_sala: {
+        Row: {
+          created_at: string | null
+          id: string
+          sala_id: string
+          turno_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          sala_id: string
+          turno_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          sala_id?: string
+          turno_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_sala_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_sala_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vista_turnos_con_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      Bebidas: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          nombre: string | null
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          precio_eur: number | null
+          restaurante: boolean | null
+          tag: string | null
+          tamano: string | null
+          tipo: string | null
+          touza: boolean | null
+          traducciones: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id: string
+          imagen_url?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          tag?: string | null
+          tamano?: string | null
+          tipo?: string | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          tag?: string | null
+          tamano?: string | null
+          tipo?: string | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      BebidasVENTA: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          denominacion_origen: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          nombre: string
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          precio_coste: number | null
+          precio_eur: number | null
+          stock: number | null
+          ubicacion_pais: string | null
+          ubicacion_region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_coste?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre?: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_coste?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          ubicacion_pais?: string | null
+          ubicacion_region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      bew: {
+        Row: {
+          activado: boolean | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          contiene_carne: boolean | null
+          contiene_gluten: boolean | null
+          contiene_huevo: boolean | null
+          contiene_lacteos: boolean | null
+          contiene_lactosa: boolean | null
+          contiene_marisco: boolean | null
+          contiene_pescado: boolean | null
+          created_at: string | null
+          descripcion: string | null
+          id: string | null
+          imagen_url: string | null
+          nombre: string | null
+          orden: string | null
+          precio_eur: number | null
+          unidad: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          contiene_carne?: boolean | null
+          contiene_gluten?: boolean | null
+          contiene_huevo?: boolean | null
+          contiene_lacteos?: boolean | null
+          contiene_lactosa?: boolean | null
+          contiene_marisco?: boolean | null
+          contiene_pescado?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string | null
+          imagen_url?: string | null
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          contiene_carne?: boolean | null
+          contiene_gluten?: boolean | null
+          contiene_huevo?: boolean | null
+          contiene_lacteos?: boolean | null
+          contiene_lactosa?: boolean | null
+          contiene_marisco?: boolean | null
+          contiene_pescado?: boolean | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string | null
+          imagen_url?: string | null
+          nombre?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          motivo: string | null
+          nombre: string | null
+          tipo: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          nombre?: string | null
+          tipo: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          motivo?: string | null
+          nombre?: string | null
+          tipo?: string
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
+      call_logs: {
+        Row: {
+          audio_metrics: Json | null
+          call_success: boolean | null
+          call_type: string | null
+          caller_number: string | null
+          cost_breakdown: Json | null
+          cost_total_eur: number | null
+          cost_total_usd: number | null
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          ended_reason: string | null
+          id: string
+          reservation_extraction: Json | null
+          restaurant_id: string
+          sentiment: string | null
+          started_at: string | null
+          status: string | null
+          structured_data: Json | null
+          structured_outputs: Json | null
+          success_evaluation: string | null
+          summary: string | null
+          tool_calls: Json | null
+          vapi_call_id: string | null
+        }
+        Insert: {
+          audio_metrics?: Json | null
+          call_success?: boolean | null
+          call_type?: string | null
+          caller_number?: string | null
+          cost_breakdown?: Json | null
+          cost_total_eur?: number | null
+          cost_total_usd?: number | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          reservation_extraction?: Json | null
+          restaurant_id: string
+          sentiment?: string | null
+          started_at?: string | null
+          status?: string | null
+          structured_data?: Json | null
+          structured_outputs?: Json | null
+          success_evaluation?: string | null
+          summary?: string | null
+          tool_calls?: Json | null
+          vapi_call_id?: string | null
+        }
+        Update: {
+          audio_metrics?: Json | null
+          call_success?: boolean | null
+          call_type?: string | null
+          caller_number?: string | null
+          cost_breakdown?: Json | null
+          cost_total_eur?: number | null
+          cost_total_usd?: number | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          ended_reason?: string | null
+          id?: string
+          reservation_extraction?: Json | null
+          restaurant_id?: string
+          sentiment?: string | null
+          started_at?: string | null
+          status?: string | null
+          structured_data?: Json | null
+          structured_outputs?: Json | null
+          success_evaluation?: string | null
+          summary?: string | null
+          tool_calls?: Json | null
+          vapi_call_id?: string | null
+        }
+        Relationships: []
+      }
+      campanas_marketing: {
+        Row: {
+          canal: string
+          clics: number | null
+          created_at: string | null
+          estado: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          nombre: string
+          presupuesto: number | null
+          reservas_generadas: number | null
+          updated_at: string | null
+          visitas_web: number | null
+        }
+        Insert: {
+          canal: string
+          clics?: number | null
+          created_at?: string | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          nombre: string
+          presupuesto?: number | null
+          reservas_generadas?: number | null
+          updated_at?: string | null
+          visitas_web?: number | null
+        }
+        Update: {
+          canal?: string
+          clics?: number | null
+          created_at?: string | null
+          estado?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          nombre?: string
+          presupuesto?: number | null
+          reservas_generadas?: number | null
+          updated_at?: string | null
+          visitas_web?: number | null
+        }
+        Relationships: []
+      }
+      carrito: {
+        Row: {
+          cantidad: number
+          created_at: string
+          id: string
+          producto_id: string
+          producto_tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string
+          id?: string
+          producto_id: string
+          producto_tipo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          id?: string
+          producto_id?: string
+          producto_tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      client_messages: {
+        Row: {
+          client_id: string
+          created_at: string
+          file_name: string | null
+          file_url: string | null
+          id: string
+          is_read: boolean
+          message: string
+          sender_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          sender_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          is_read?: boolean
+          message?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      Cocteles: {
+        Row: {
+          activado: boolean | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          base: string | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          ingredientes: string | null
+          ingredientes_en: string | null
+          ingredientes_fr: string | null
+          nombre: string | null
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          precio_eur: number | null
+          preparacion: string | null
+          restaurante: boolean | null
+          touza: boolean | null
+          traducciones: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          base?: string | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          ingredientes?: string | null
+          ingredientes_en?: string | null
+          ingredientes_fr?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          preparacion?: string | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          base?: string | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          ingredientes?: string | null
+          ingredientes_en?: string | null
+          ingredientes_fr?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          precio_eur?: number | null
+          preparacion?: string | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ComidaVENTA: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          featured: boolean | null
+          id: string
+          imagen_url: string | null
+          nombre: string
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: number | null
+          origen: string | null
+          peso: string | null
+          precio_coste: number | null
+          precio_eur: number | null
+          stock: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          origen?: string | null
+          peso?: string | null
+          precio_coste?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          featured?: boolean | null
+          id?: string
+          imagen_url?: string | null
+          nombre?: string
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: number | null
+          origen?: string | null
+          peso?: string | null
+          precio_coste?: number | null
+          precio_eur?: number | null
+          stock?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      config_google_places: {
+        Row: {
+          created_at: string | null
+          direccion: string | null
+          id: string
+          place_id: string
+          place_name: string
+          rating_promedio: number | null
+          telefono: string | null
+          total_resenas: number | null
+          ultima_sincronizacion: string | null
+          updated_at: string | null
+          website: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          place_id: string
+          place_name: string
+          rating_promedio?: number | null
+          telefono?: string | null
+          total_resenas?: number | null
+          ultima_sincronizacion?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          direccion?: string | null
+          id?: string
+          place_id?: string
+          place_name?: string
+          rating_promedio?: number | null
+          telefono?: string | null
+          total_resenas?: number | null
+          ultima_sincronizacion?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      config_redes_sociales: {
+        Row: {
+          access_token: string | null
+          account_id: string | null
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          page_id: string | null
+          red_social: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          account_id?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          page_id?: string | null
+          red_social: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          account_id?: string | null
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          page_id?: string | null
+          red_social?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      configBotWeb: {
+        Row: {
+          created_at: string
+          frases_personalizadas: string | null
+          id: string
+          idioma: string | null
+          instrucciones_extra: string | null
+          mensaje_bienvenida: string | null
+          platos_recomendados: string | null
+          tono: string | null
+          updated_at: string
+          vinos_recomendados: string | null
+        }
+        Insert: {
+          created_at?: string
+          frases_personalizadas?: string | null
+          id?: string
+          idioma?: string | null
+          instrucciones_extra?: string | null
+          mensaje_bienvenida?: string | null
+          platos_recomendados?: string | null
+          tono?: string | null
+          updated_at?: string
+          vinos_recomendados?: string | null
+        }
+        Update: {
+          created_at?: string
+          frases_personalizadas?: string | null
+          id?: string
+          idioma?: string | null
+          instrucciones_extra?: string | null
+          mensaje_bienvenida?: string | null
+          platos_recomendados?: string | null
+          tono?: string | null
+          updated_at?: string
+          vinos_recomendados?: string | null
+        }
+        Relationships: []
+      }
+      configuracion_reservas: {
+        Row: {
+          auto_confirmar: boolean
+          created_at: string
+          dias_max_antelacion: number
+          email_obligatorio: boolean
+          id: string
+          max_comensales_por_reserva: number
+          max_reservas_por_email_dia: number
+          max_reservas_por_telefono_dia: number
+          min_comensales_por_reserva: number
+          minutos_corte_antes_servicio: number
+          telefono_obligatorio: boolean
+          updated_at: string
+        }
+        Insert: {
+          auto_confirmar?: boolean
+          created_at?: string
+          dias_max_antelacion?: number
+          email_obligatorio?: boolean
+          id?: string
+          max_comensales_por_reserva?: number
+          max_reservas_por_email_dia?: number
+          max_reservas_por_telefono_dia?: number
+          min_comensales_por_reserva?: number
+          minutos_corte_antes_servicio?: number
+          telefono_obligatorio?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auto_confirmar?: boolean
+          created_at?: string
+          dias_max_antelacion?: number
+          email_obligatorio?: boolean
+          id?: string
+          max_comensales_por_reserva?: number
+          max_reservas_por_email_dia?: number
+          max_reservas_por_telefono_dia?: number
+          min_comensales_por_reserva?: number
+          minutos_corte_antes_servicio?: number
+          telefono_obligatorio?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      configuracion_turnos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          dias_semana: number[]
+          espacio_id: string | null
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          intervalo_base_minutos: number
+          nombre_periodo: string
+          ocultar_primario_si_secundario: boolean
+          umbral_apertura_secundario: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          dias_semana?: number[]
+          espacio_id?: string | null
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          intervalo_base_minutos?: number
+          nombre_periodo: string
+          ocultar_primario_si_secundario?: boolean
+          umbral_apertura_secundario?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          dias_semana?: number[]
+          espacio_id?: string | null
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          intervalo_base_minutos?: number
+          nombre_periodo?: string
+          ocultar_primario_si_secundario?: boolean
+          umbral_apertura_secundario?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "configuracion_turnos_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consultas_chatbot: {
+        Row: {
+          created_at: string | null
+          embedding: string | null
+          id: number
+          pregunta: string
+          respuesta: string | null
+          resultados: Json | null
+          sql_generado: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          embedding?: string | null
+          id?: number
+          pregunta: string
+          respuesta?: string | null
+          resultados?: Json | null
+          sql_generado?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          embedding?: string | null
+          id?: number
+          pregunta?: string
+          respuesta?: string | null
+          resultados?: Json | null
+          sql_generado?: string | null
+        }
+        Relationships: []
+      }
+      conversaciones: {
+        Row: {
+          created_at: string | null
+          id: string
+          session_id: string
+          titulo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          session_id: string
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          session_id?: string
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      dashboard_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          nombre_vista: string
+          orden_widgets: Json
+          updated_at: string | null
+          user_id: string
+          widgets_activos: Json
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nombre_vista: string
+          orden_widgets?: Json
+          updated_at?: string | null
+          user_id: string
+          widgets_activos?: Json
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          nombre_vista?: string
+          orden_widgets?: Json
+          updated_at?: string | null
+          user_id?: string
+          widgets_activos?: Json
+        }
+        Relationships: []
+      }
+      documentos: {
+        Row: {
+          created_at: string
+          fecha: string | null
+          id: string
+          importe_total: number | null
+          moneda: string | null
+          nombre_archivo: string | null
+          numero_documento: string
+          proveedor: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          fecha?: string | null
+          id?: string
+          importe_total?: number | null
+          moneda?: string | null
+          nombre_archivo?: string | null
+          numero_documento: string
+          proveedor?: string | null
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          fecha?: string | null
+          id?: string
+          importe_total?: number | null
+          moneda?: string | null
+          nombre_archivo?: string | null
+          numero_documento?: string
+          proveedor?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      email_eventos: {
+        Row: {
+          created_at: string | null
+          email_destinatario: string | null
+          email_id: string
+          id: string
+          metadata: Json | null
+          timestamp_evento: string | null
+          tipo_evento: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_destinatario?: string | null
+          email_id: string
+          id?: string
+          metadata?: Json | null
+          timestamp_evento?: string | null
+          tipo_evento: string
+        }
+        Update: {
+          created_at?: string | null
+          email_destinatario?: string | null
+          email_id?: string
+          id?: string
+          metadata?: Json | null
+          timestamp_evento?: string | null
+          tipo_evento?: string
+        }
+        Relationships: []
+      }
+      espacios_reserva: {
+        Row: {
+          activa: boolean | null
+          capacidad_maxima: number
+          caracteristicas: Json | null
+          created_at: string | null
+          descripcion: string | null
+          id: string
+          nombre: string
+          updated_at: string | null
+        }
+        Insert: {
+          activa?: boolean | null
+          capacidad_maxima: number
+          caracteristicas?: Json | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string | null
+        }
+        Update: {
+          activa?: boolean | null
+          capacidad_maxima?: number
+          caracteristicas?: Json | null
+          created_at?: string | null
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      estadisticas_redes: {
+        Row: {
+          alcance: number | null
+          comentarios_totales: number | null
+          created_at: string | null
+          engagement_rate: number | null
+          fecha: string
+          id: string
+          likes_totales: number | null
+          publicaciones_mes: number | null
+          red_social: string
+          seguidores: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          alcance?: number | null
+          comentarios_totales?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          fecha?: string
+          id?: string
+          likes_totales?: number | null
+          publicaciones_mes?: number | null
+          red_social: string
+          seguidores?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          alcance?: number | null
+          comentarios_totales?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          fecha?: string
+          id?: string
+          likes_totales?: number | null
+          publicaciones_mes?: number | null
+          red_social?: string
+          seguidores?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      facturas: {
+        Row: {
+          alertas_validacion: Json | null
+          archivo_path: string | null
+          cif: string | null
+          created_at: string | null
+          drive_url: string | null
+          embedding: string | null
+          embedding_observaciones: string | null
+          fecha: string
+          id: number
+          iva: number | null
+          numero_documento: string
+          observaciones: string | null
+          procesado_en: string | null
+          proveedor: string | null
+          proveedor_normalizado: string | null
+          resumen: string | null
+          subtotal: number | null
+          tipo: string
+          total: number | null
+          updated_at: string | null
+          verificada: boolean | null
+        }
+        Insert: {
+          alertas_validacion?: Json | null
+          archivo_path?: string | null
+          cif?: string | null
+          created_at?: string | null
+          drive_url?: string | null
+          embedding?: string | null
+          embedding_observaciones?: string | null
+          fecha: string
+          id?: number
+          iva?: number | null
+          numero_documento: string
+          observaciones?: string | null
+          procesado_en?: string | null
+          proveedor?: string | null
+          proveedor_normalizado?: string | null
+          resumen?: string | null
+          subtotal?: number | null
+          tipo: string
+          total?: number | null
+          updated_at?: string | null
+          verificada?: boolean | null
+        }
+        Update: {
+          alertas_validacion?: Json | null
+          archivo_path?: string | null
+          cif?: string | null
+          created_at?: string | null
+          drive_url?: string | null
+          embedding?: string | null
+          embedding_observaciones?: string | null
+          fecha?: string
+          id?: number
+          iva?: number | null
+          numero_documento?: string
+          observaciones?: string | null
+          procesado_en?: string | null
+          proveedor?: string | null
+          proveedor_normalizado?: string | null
+          resumen?: string | null
+          subtotal?: number | null
+          tipo?: string
+          total?: number | null
+          updated_at?: string | null
+          verificada?: boolean | null
+        }
+        Relationships: []
+      }
+      favoritos: {
+        Row: {
+          created_at: string
+          id: string
+          producto_id: string
+          producto_tipo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          producto_id: string
+          producto_tipo?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          producto_id?: string
+          producto_tipo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gdpr_audit_log: {
+        Row: {
+          accion: string
+          created_at: string | null
+          detalles: Json | null
+          ejecutado_por: string | null
+          id: string
+          registros_afectados: number | null
+          tabla: string
+        }
+        Insert: {
+          accion: string
+          created_at?: string | null
+          detalles?: Json | null
+          ejecutado_por?: string | null
+          id?: string
+          registros_afectados?: number | null
+          tabla: string
+        }
+        Update: {
+          accion?: string
+          created_at?: string | null
+          detalles?: Json | null
+          ejecutado_por?: string | null
+          id?: string
+          registros_afectados?: number | null
+          tabla?: string
+        }
+        Relationships: []
+      }
+      gdpr_config: {
+        Row: {
+          accion: string
+          activo: boolean | null
+          campos_anonimizar: string[] | null
+          created_at: string | null
+          descripcion: string | null
+          dias_retencion: number
+          id: string
+          tabla: string
+          updated_at: string | null
+        }
+        Insert: {
+          accion: string
+          activo?: boolean | null
+          campos_anonimizar?: string[] | null
+          created_at?: string | null
+          descripcion?: string | null
+          dias_retencion: number
+          id?: string
+          tabla: string
+          updated_at?: string | null
+        }
+        Update: {
+          accion?: string
+          activo?: boolean | null
+          campos_anonimizar?: string[] | null
+          created_at?: string | null
+          descripcion?: string | null
+          dias_retencion?: number
+          id?: string
+          tabla?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      historial_ajustes_precios: {
+        Row: {
+          categoria: string
+          created_at: string
+          fecha: string
+          id: string
+          items_afectados: number
+          porcentaje: number
+          snapshot: Json
+          tipo_carta: string
+          user_id: string | null
+        }
+        Insert: {
+          categoria: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          items_afectados?: number
+          porcentaje: number
+          snapshot?: Json
+          tipo_carta: string
+          user_id?: string | null
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          items_afectados?: number
+          porcentaje?: number
+          snapshot?: Json
+          tipo_carta?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      historial_precios: {
+        Row: {
+          created_at: string | null
+          factura_id: number | null
+          fecha: string | null
+          id: string
+          precio: number | null
+          producto_nombre: string | null
+          proveedor: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha?: string | null
+          id?: string
+          precio?: number | null
+          producto_nombre?: string | null
+          proveedor?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          factura_id?: number | null
+          fecha?: string | null
+          id?: string
+          precio?: number | null
+          producto_nombre?: string | null
+          proveedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historial_precios_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      imagenes_base64: {
+        Row: {
+          categoria: string | null
+          contenido_base64: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          tamano_bytes: number | null
+          tipo_mime: string
+          updated_at: string
+        }
+        Insert: {
+          categoria?: string | null
+          contenido_base64: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          tamano_bytes?: number | null
+          tipo_mime: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string | null
+          contenido_base64?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          tamano_bytes?: number | null
+          tipo_mime?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      items_documento: {
+        Row: {
+          cantidad: number | null
+          descripcion: string
+          documento_id: string
+          embedding: string | null
+          id: string
+          importe_linea: number | null
+          precio_unitario: number | null
+        }
+        Insert: {
+          cantidad?: number | null
+          descripcion: string
+          documento_id: string
+          embedding?: string | null
+          id?: string
+          importe_linea?: number | null
+          precio_unitario?: number | null
+        }
+        Update: {
+          cantidad?: number | null
+          descripcion?: string
+          documento_id?: string
+          embedding?: string | null
+          id?: string
+          importe_linea?: number | null
+          precio_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "items_documento_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lineas_pedido: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          id: string
+          nombre_producto: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_tipo: string
+          total_linea: number
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          nombre_producto: string
+          pedido_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_tipo: string
+          total_linea: number
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          nombre_producto?: string
+          pedido_id?: string
+          precio_unitario?: number
+          producto_id?: string
+          producto_tipo?: string
+          total_linea?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineas_pedido_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_ecommerce"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mensajes_chat: {
+        Row: {
+          content: string
+          conversacion_id: string | null
+          created_at: string | null
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["session_id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
+      menus_diarios: {
+        Row: {
+          fecha: string
+          id: string
+          idiom: string | null
+          menu: Json
+        }
+        Insert: {
+          fecha: string
+          id?: string
+          idiom?: string | null
+          menu: Json
+        }
+        Update: {
+          fecha?: string
+          id?: string
+          idiom?: string | null
+          menu?: Json
+        }
+        Relationships: []
+      }
+      mesas: {
+        Row: {
+          activa: boolean | null
+          alto: number | null
+          ancho: number | null
+          capacidad: number
+          created_at: string | null
+          espacio_id: string
+          etiqueta: string | null
+          forma: string
+          id: string
+          is_merged: boolean | null
+          nombre: string
+          original_mesas: Json | null
+          pos_x: number | null
+          pos_y: number | null
+          rotacion: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          activa?: boolean | null
+          alto?: number | null
+          ancho?: number | null
+          capacidad?: number
+          created_at?: string | null
+          espacio_id: string
+          etiqueta?: string | null
+          forma?: string
+          id?: string
+          is_merged?: boolean | null
+          nombre: string
+          original_mesas?: Json | null
+          pos_x?: number | null
+          pos_y?: number | null
+          rotacion?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          activa?: boolean | null
+          alto?: number | null
+          ancho?: number | null
+          capacidad?: number
+          created_at?: string | null
+          espacio_id?: string
+          etiqueta?: string | null
+          forma?: string
+          id?: string
+          is_merged?: boolean | null
+          nombre?: string
+          original_mesas?: Json | null
+          pos_x?: number | null
+          pos_y?: number | null
+          rotacion?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mesas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimientos_stock: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          id: string
+          motivo: string | null
+          producto_id: string
+          producto_tipo: string
+          referencia: string | null
+          stock_anterior: number | null
+          stock_nuevo: number | null
+          tipo_movimiento: string
+          usuario_id: string | null
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id: string
+          producto_tipo: string
+          referencia?: string | null
+          stock_anterior?: number | null
+          stock_nuevo?: number | null
+          tipo_movimiento: string
+          usuario_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id?: string
+          producto_tipo?: string
+          referencia?: string | null
+          stock_anterior?: number | null
+          stock_nuevo?: number | null
+          tipo_movimiento?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      n8n_chat_histories: {
+        Row: {
+          id: number
+          message: Json
+          session_id: string
+        }
+        Insert: {
+          id?: number
+          message: Json
+          session_id: string
+        }
+        Update: {
+          id?: number
+          message?: Json
+          session_id?: string
+        }
+        Relationships: []
+      }
+      newsletter_envios: {
+        Row: {
+          asunto: string
+          created_at: string
+          enviado_por: string | null
+          estado: string | null
+          id: string
+          mensaje: string
+          tipo_newsletter: string | null
+          total_destinatarios: number
+        }
+        Insert: {
+          asunto: string
+          created_at?: string
+          enviado_por?: string | null
+          estado?: string | null
+          id?: string
+          mensaje: string
+          tipo_newsletter?: string | null
+          total_destinatarios?: number
+        }
+        Update: {
+          asunto?: string
+          created_at?: string
+          enviado_por?: string | null
+          estado?: string | null
+          id?: string
+          mensaje?: string
+          tipo_newsletter?: string | null
+          total_destinatarios?: number
+        }
+        Relationships: []
+      }
+      newsletter_suscriptores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          email: string
+          id: string
+          nombre: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          nombre?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          nombre?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notificaciones_dashboard: {
+        Row: {
+          created_at: string | null
+          id: string
+          leida: boolean
+          mensaje: string | null
+          referencia_id: string | null
+          referencia_tipo: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          leida?: boolean
+          mensaje?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          leida?: boolean
+          mensaje?: string | null
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
+      novedades: {
+        Row: {
+          activo: boolean | null
+          badge_text: string | null
+          badge_text_en: string | null
+          badge_text_fr: string | null
+          bebida_id: string | null
+          bullets: string[] | null
+          bullets_en: string[] | null
+          bullets_fr: string[] | null
+          created_at: string | null
+          created_by: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          destacado: boolean | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          icono: string | null
+          id: string
+          imagen_posicion_y: number | null
+          imagen_url: string | null
+          orden: number | null
+          plato_id: string | null
+          seccion: string | null
+          tags: string[] | null
+          tags_en: string[] | null
+          tags_fr: string[] | null
+          tipo: string
+          tipo_asociacion: string | null
+          titulo: string
+          titulo_en: string | null
+          titulo_fr: string | null
+          updated_at: string | null
+          vino_id: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          badge_text?: string | null
+          badge_text_en?: string | null
+          badge_text_fr?: string | null
+          bebida_id?: string | null
+          bullets?: string[] | null
+          bullets_en?: string[] | null
+          bullets_fr?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          destacado?: boolean | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          icono?: string | null
+          id?: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          orden?: number | null
+          plato_id?: string | null
+          seccion?: string | null
+          tags?: string[] | null
+          tags_en?: string[] | null
+          tags_fr?: string[] | null
+          tipo?: string
+          tipo_asociacion?: string | null
+          titulo: string
+          titulo_en?: string | null
+          titulo_fr?: string | null
+          updated_at?: string | null
+          vino_id?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          badge_text?: string | null
+          badge_text_en?: string | null
+          badge_text_fr?: string | null
+          bebida_id?: string | null
+          bullets?: string[] | null
+          bullets_en?: string[] | null
+          bullets_fr?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          destacado?: boolean | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          icono?: string | null
+          id?: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          orden?: number | null
+          plato_id?: string | null
+          seccion?: string | null
+          tags?: string[] | null
+          tags_en?: string[] | null
+          tags_fr?: string[] | null
+          tipo?: string
+          tipo_asociacion?: string | null
+          titulo?: string
+          titulo_en?: string | null
+          titulo_fr?: string | null
+          updated_at?: string | null
+          vino_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "novedades_bebida_id_fkey"
+            columns: ["bebida_id"]
+            isOneToOne: false
+            referencedRelation: "Bebidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "novedades_plato_id_fkey"
+            columns: ["plato_id"]
+            isOneToOne: false
+            referencedRelation: "Platos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "novedades_vino_id_fkey"
+            columns: ["vino_id"]
+            isOneToOne: false
+            referencedRelation: "Vinos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ocupacion_diaria: {
+        Row: {
+          comensales_confirmados: number | null
+          created_at: string | null
+          dia_semana: number | null
+          fecha: string
+          hora: string | null
+          id: string
+          reservas_canceladas: number | null
+          reservas_confirmadas: number | null
+          reservas_no_show: number | null
+          total_comensales: number
+          total_reservas: number
+          turno: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          comensales_confirmados?: number | null
+          created_at?: string | null
+          dia_semana?: number | null
+          fecha: string
+          hora?: string | null
+          id?: string
+          reservas_canceladas?: number | null
+          reservas_confirmadas?: number | null
+          reservas_no_show?: number | null
+          total_comensales?: number
+          total_reservas?: number
+          turno?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          comensales_confirmados?: number | null
+          created_at?: string | null
+          dia_semana?: number | null
+          fecha?: string
+          hora?: string | null
+          id?: string
+          reservas_canceladas?: number | null
+          reservas_confirmadas?: number | null
+          reservas_no_show?: number | null
+          total_comensales?: number
+          total_reservas?: number
+          turno?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      pedidos_ecommerce: {
+        Row: {
+          caja: string | null
+          ciudad_envio: string | null
+          codigo_postal_envio: string | null
+          created_at: string | null
+          descuento: number | null
+          direccion_envio: string | null
+          email: string | null
+          estado: string | null
+          fecha_entrega: string | null
+          fecha_envio: string | null
+          fecha_pago: string | null
+          gastos_envio: number | null
+          id: string
+          iva: number | null
+          metodo_pago: string | null
+          nombre_completo: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          numero_pedido: string
+          numero_seguimiento: string | null
+          numero_ticket: string | null
+          pagado: boolean | null
+          pais_envio: string | null
+          referencia_pago: string | null
+          subtotal: number
+          telefono: string | null
+          tipo_venta: string | null
+          total: number
+          transportista: string | null
+          updated_at: string | null
+          user_id: string | null
+          vendedor_id: string | null
+        }
+        Insert: {
+          caja?: string | null
+          ciudad_envio?: string | null
+          codigo_postal_envio?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          direccion_envio?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha_entrega?: string | null
+          fecha_envio?: string | null
+          fecha_pago?: string | null
+          gastos_envio?: number | null
+          id?: string
+          iva?: number | null
+          metodo_pago?: string | null
+          nombre_completo?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_pedido: string
+          numero_seguimiento?: string | null
+          numero_ticket?: string | null
+          pagado?: boolean | null
+          pais_envio?: string | null
+          referencia_pago?: string | null
+          subtotal?: number
+          telefono?: string | null
+          tipo_venta?: string | null
+          total?: number
+          transportista?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vendedor_id?: string | null
+        }
+        Update: {
+          caja?: string | null
+          ciudad_envio?: string | null
+          codigo_postal_envio?: string | null
+          created_at?: string | null
+          descuento?: number | null
+          direccion_envio?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha_entrega?: string | null
+          fecha_envio?: string | null
+          fecha_pago?: string | null
+          gastos_envio?: number | null
+          id?: string
+          iva?: number | null
+          metodo_pago?: string | null
+          nombre_completo?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_pedido?: string
+          numero_seguimiento?: string | null
+          numero_ticket?: string | null
+          pagado?: boolean | null
+          pais_envio?: string | null
+          referencia_pago?: string | null
+          subtotal?: number
+          telefono?: string | null
+          tipo_venta?: string | null
+          total?: number
+          transportista?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          vendedor_id?: string | null
+        }
+        Relationships: []
+      }
+      phone_system_config: {
+        Row: {
+          address: string | null
+          bot_greeting: string | null
+          bot_responses: Json
+          created_at: string | null
+          forward_phone: string | null
+          id: string
+          max_party_size: number | null
+          mode: string
+          opening_hours: string | null
+          phone_number: string | null
+          restaurant_id: string
+          restaurant_name: string
+          schedule: Json | null
+          schedule_enabled: boolean | null
+          updated_at: string | null
+          vapi_assistant_id: string | null
+          vapi_phone_number_id: string | null
+          voice_id: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          bot_greeting?: string | null
+          bot_responses?: Json
+          created_at?: string | null
+          forward_phone?: string | null
+          id?: string
+          max_party_size?: number | null
+          mode?: string
+          opening_hours?: string | null
+          phone_number?: string | null
+          restaurant_id: string
+          restaurant_name?: string
+          schedule?: Json | null
+          schedule_enabled?: boolean | null
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          voice_id?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          bot_greeting?: string | null
+          bot_responses?: Json
+          created_at?: string | null
+          forward_phone?: string | null
+          id?: string
+          max_party_size?: number | null
+          mode?: string
+          opening_hours?: string | null
+          phone_number?: string | null
+          restaurant_id?: string
+          restaurant_name?: string
+          schedule?: Json | null
+          schedule_enabled?: boolean | null
+          updated_at?: string | null
+          vapi_assistant_id?: string | null
+          vapi_phone_number_id?: string | null
+          voice_id?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      planos_espacio: {
+        Row: {
+          alto: number | null
+          alto_metros: number | null
+          ancho: number | null
+          ancho_metros: number | null
+          configuracion: Json | null
+          created_at: string | null
+          espacio_id: string
+          id: string
+          metros_cuadrados: number | null
+          pixels_per_meter: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          alto?: number | null
+          alto_metros?: number | null
+          ancho?: number | null
+          ancho_metros?: number | null
+          configuracion?: Json | null
+          created_at?: string | null
+          espacio_id: string
+          id?: string
+          metros_cuadrados?: number | null
+          pixels_per_meter?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          alto?: number | null
+          alto_metros?: number | null
+          ancho?: number | null
+          ancho_metros?: number | null
+          configuracion?: Json | null
+          created_at?: string | null
+          espacio_id?: string
+          id?: string
+          metros_cuadrados?: number | null
+          pixels_per_meter?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_espacio_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: true
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      Platos: {
+        Row: {
+          activado: boolean | null
+          alergenos_en: string | null
+          alergenos_fr: string | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          descripcion: string | null
+          descripcion_en: string | null
+          descripcion_fr: string | null
+          expanded: boolean | null
+          featured: boolean | null
+          id: string
+          imagen_posicion_y: number | null
+          imagen_url: string | null
+          ingredientes: string | null
+          nombre: string | null
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: string | null
+          precio_eur: number | null
+          restaurante: boolean | null
+          touza: boolean | null
+          traducciones: Json | null
+          unidad: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_en?: string | null
+          alergenos_fr?: string | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          expanded?: boolean | null
+          featured?: boolean | null
+          id: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          ingredientes?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_en?: string | null
+          alergenos_fr?: string | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          descripcion?: string | null
+          descripcion_en?: string | null
+          descripcion_fr?: string | null
+          expanded?: boolean | null
+          featured?: boolean | null
+          id?: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          ingredientes?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          unidad?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      productos_catalogo: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          created_at: string | null
+          id: number
+          nombre: string
+          notas: string | null
+          precio_actual: number | null
+          proveedor_habitual_id: number | null
+          unidad_medida: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          id?: number
+          nombre: string
+          notas?: string | null
+          precio_actual?: number | null
+          proveedor_habitual_id?: number | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          created_at?: string | null
+          id?: number
+          nombre?: string
+          notas?: string | null
+          precio_actual?: number | null
+          proveedor_habitual_id?: number | null
+          unidad_medida?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_catalogo_proveedor_habitual_id_fkey"
+            columns: ["proveedor_habitual_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_factura: {
+        Row: {
+          cantidad: number
+          created_at: string | null
+          embedding: string | null
+          factura_id: number
+          id: number
+          nombre: string
+          nombre_normalizado: string | null
+          precio_unitario: number | null
+          total: number | null
+          unidad: string | null
+        }
+        Insert: {
+          cantidad?: number
+          created_at?: string | null
+          embedding?: string | null
+          factura_id: number
+          id?: number
+          nombre: string
+          nombre_normalizado?: string | null
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string | null
+          embedding?: string | null
+          factura_id?: number
+          id?: number
+          nombre?: string
+          nombre_normalizado?: string | null
+          precio_unitario?: number | null
+          total?: number | null
+          unidad?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_factura_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_factura_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "vista_ultimos_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proveedores: {
+        Row: {
+          activo: boolean | null
+          categoria: string | null
+          cif: string | null
+          created_at: string | null
+          direccion: string | null
+          email: string | null
+          id: number
+          nombre: string
+          notas: string | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          categoria?: string | null
+          cif?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: number
+          nombre: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          categoria?: string | null
+          cif?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          email?: string | null
+          id?: number
+          nombre?: string
+          notas?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      publicaciones_redes: {
+        Row: {
+          contenido: string
+          created_at: string | null
+          error_mensaje: string | null
+          estado: string | null
+          fecha_programada: string | null
+          fecha_publicacion: string | null
+          id: string
+          imagen_url: string | null
+          post_id_facebook: string | null
+          post_id_instagram: string | null
+          red_social: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          contenido: string
+          created_at?: string | null
+          error_mensaje?: string | null
+          estado?: string | null
+          fecha_programada?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          imagen_url?: string | null
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
+          red_social: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          contenido?: string
+          created_at?: string | null
+          error_mensaje?: string | null
+          estado?: string | null
+          fecha_programada?: string | null
+          fecha_publicacion?: string | null
+          id?: string
+          imagen_url?: string | null
+          post_id_facebook?: string | null
+          post_id_instagram?: string | null
+          red_social?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      rate_limit_log: {
+        Row: {
+          created_at: string
+          id: string
+          identifier: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          identifier: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          identifier?: string
+        }
+        Relationships: []
+      }
+      registro_horas: {
+        Row: {
+          created_at: string | null
+          fecha: string
+          hora_entrada: string
+          hora_salida: string | null
+          horas_trabajadas: number | null
+          id: string
+          notas: string | null
+          trabajador_id: string
+          turno_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          fecha: string
+          hora_entrada: string
+          hora_salida?: string | null
+          horas_trabajadas?: number | null
+          id?: string
+          notas?: string | null
+          trabajador_id: string
+          turno_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          fecha?: string
+          hora_entrada?: string
+          hora_salida?: string | null
+          horas_trabajadas?: number | null
+          id?: string
+          notas?: string | null
+          trabajador_id?: string
+          turno_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registro_horas_trabajador_id_fkey"
+            columns: ["trabajador_id"]
+            isOneToOne: false
+            referencedRelation: "trabajadores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_horas_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_horas_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vista_turnos_con_areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resenas: {
+        Row: {
+          comentario: string | null
+          created_at: string | null
+          email: string | null
+          estado: string | null
+          fecha: string
+          fecha_respuesta: string | null
+          fuente: string | null
+          google_rating: number | null
+          google_review_id: string | null
+          id: string
+          nombre_cliente: string
+          respuesta: string | null
+          updated_at: string | null
+          valoracion: number
+        }
+        Insert: {
+          comentario?: string | null
+          created_at?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha?: string
+          fecha_respuesta?: string | null
+          fuente?: string | null
+          google_rating?: number | null
+          google_review_id?: string | null
+          id?: string
+          nombre_cliente: string
+          respuesta?: string | null
+          updated_at?: string | null
+          valoracion: number
+        }
+        Update: {
+          comentario?: string | null
+          created_at?: string | null
+          email?: string | null
+          estado?: string | null
+          fecha?: string
+          fecha_respuesta?: string | null
+          fuente?: string | null
+          google_rating?: number | null
+          google_review_id?: string | null
+          id?: string
+          nombre_cliente?: string
+          respuesta?: string | null
+          updated_at?: string | null
+          valoracion?: number
+        }
+        Relationships: []
+      }
+      reservas: {
+        Row: {
+          canal: string | null
+          created_at: string | null
+          email: string | null
+          en_blacklist: boolean | null
+          espacio_id: string | null
+          estado: string
+          fecha: string
+          hora: string
+          id: string
+          importante: boolean
+          nombre: string | null
+          notas_cliente: string | null
+          numero_comensales: number
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          canal?: string | null
+          created_at?: string | null
+          email?: string | null
+          en_blacklist?: boolean | null
+          espacio_id?: string | null
+          estado?: string
+          fecha: string
+          hora: string
+          id?: string
+          importante?: boolean
+          nombre?: string | null
+          notas_cliente?: string | null
+          numero_comensales: number
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          canal?: string | null
+          created_at?: string | null
+          email?: string | null
+          en_blacklist?: boolean | null
+          espacio_id?: string | null
+          estado?: string
+          fecha?: string
+          hora?: string
+          id?: string
+          importante?: boolean
+          nombre?: string | null
+          notas_cliente?: string | null
+          numero_comensales?: number
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scope_prices: {
+        Row: {
+          currency: string
+          scope_name: string
+          unit_price_cents: number
+        }
+        Insert: {
+          currency?: string
+          scope_name: string
+          unit_price_cents: number
+        }
+        Update: {
+          currency?: string
+          scope_name?: string
+          unit_price_cents?: number
+        }
+        Relationships: []
+      }
+      security_log: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
+      sell_users: {
+        Row: {
+          acepta_marketing: boolean | null
+          apellidos: string | null
+          avatar_url: string | null
+          ciudad: string | null
+          codigo_postal: string | null
+          created_at: string | null
+          direccion: string | null
+          fecha_nacimiento: string | null
+          id: string
+          nombre: string | null
+          pais: string | null
+          telefono: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          acepta_marketing?: boolean | null
+          apellidos?: string | null
+          avatar_url?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          id?: string
+          nombre?: string | null
+          pais?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          acepta_marketing?: boolean | null
+          apellidos?: string | null
+          avatar_url?: string | null
+          ciudad?: string | null
+          codigo_postal?: string | null
+          created_at?: string | null
+          direccion?: string | null
+          fecha_nacimiento?: string | null
+          id?: string
+          nombre?: string | null
+          pais?: string | null
+          telefono?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      solicitudes_pendientes: {
+        Row: {
+          created_at: string | null
+          descripcion_rechazo: string | null
+          email: string | null
+          estado: string
+          fecha_solicitada: string | null
+          hora_solicitada: string | null
+          id: string
+          motivo_rechazo: string
+          nombre: string | null
+          notas_cliente: string | null
+          notas_internas: string | null
+          numero_comensales: number | null
+          telefono: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descripcion_rechazo?: string | null
+          email?: string | null
+          estado?: string
+          fecha_solicitada?: string | null
+          hora_solicitada?: string | null
+          id?: string
+          motivo_rechazo: string
+          nombre?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descripcion_rechazo?: string | null
+          email?: string | null
+          estado?: string
+          fecha_solicitada?: string | null
+          hora_solicitada?: string | null
+          id?: string
+          motivo_rechazo?: string
+          nombre?: string | null
+          notas_cliente?: string | null
+          notas_internas?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tapas: {
+        Row: {
+          fecha: string
+          id: string
+          idiom: string | null
+          tapas: Json
+        }
+        Insert: {
+          fecha: string
+          id?: string
+          idiom?: string | null
+          tapas: Json
+        }
+        Update: {
+          fecha?: string
+          id?: string
+          idiom?: string | null
+          tapas?: Json
+        }
+        Relationships: []
+      }
+      trabajadores: {
+        Row: {
+          activo: boolean | null
+          apellidos: string
+          created_at: string | null
+          email: string | null
+          fecha_contratacion: string
+          foto_url: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          puesto: Database["public"]["Enums"]["puesto_trabajo"]
+          salario_hora: number | null
+          telefono: string
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          apellidos: string
+          created_at?: string | null
+          email?: string | null
+          fecha_contratacion?: string
+          foto_url?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          puesto: Database["public"]["Enums"]["puesto_trabajo"]
+          salario_hora?: number | null
+          telefono: string
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          apellidos?: string
+          created_at?: string | null
+          email?: string | null
+          fecha_contratacion?: string
+          foto_url?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          puesto?: Database["public"]["Enums"]["puesto_trabajo"]
+          salario_hora?: number | null
+          telefono?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      turnos: {
+        Row: {
+          created_at: string | null
+          estado: Database["public"]["Enums"]["estado_turno"] | null
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          notas: string | null
+          trabajador_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estado?: Database["public"]["Enums"]["estado_turno"] | null
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          notas?: string | null
+          trabajador_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estado?: Database["public"]["Enums"]["estado_turno"] | null
+          fecha?: string
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          notas?: string | null
+          trabajador_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turnos_trabajador_id_fkey"
+            columns: ["trabajador_id"]
+            isOneToOne: false
+            referencedRelation: "trabajadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_events: {
+        Row: {
+          client_id: string
+          id: number
+          installation_id: string | null
+          metadata: Json | null
+          occurred_at: string
+          scope_name: string
+          status: string
+          unit_price_cents: number
+          workflow_name: string | null
+        }
+        Insert: {
+          client_id: string
+          id?: number
+          installation_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          scope_name: string
+          status?: string
+          unit_price_cents: number
+          workflow_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          id?: number
+          installation_id?: string | null
+          metadata?: Json | null
+          occurred_at?: string
+          scope_name?: string
+          status?: string
+          unit_price_cents?: number
+          workflow_name?: string | null
+        }
+        Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          can_edit: boolean | null
+          can_view: boolean | null
+          created_at: string | null
+          id: string
+          section_key: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          section_key: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          created_at?: string | null
+          id?: string
+          section_key?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_role_presets: {
+        Row: {
+          base_role: Database["public"]["Enums"]["app_role"]
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          permissions: Json
+          updated_at: string
+        }
+        Insert: {
+          base_role?: Database["public"]["Enums"]["app_role"]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          permissions?: Json
+          updated_at?: string
+        }
+        Update: {
+          base_role?: Database["public"]["Enums"]["app_role"]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          permissions?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      Vinos: {
+        Row: {
+          activado: boolean | null
+          alergenos_en: string | null
+          alergenos_fr: string | null
+          alergenos_inferidos: Json | null
+          alergenos_notas: string | null
+          alergenos_oficiales: Json | null
+          categoria: string | null
+          categoria_en: string | null
+          categoria_fr: string | null
+          created_at: string | null
+          denominacion_origen: string | null
+          descripcion: string | null
+          expanded: boolean | null
+          featured: boolean | null
+          id: string
+          imagen_posicion_y: number | null
+          imagen_url: string | null
+          ingredientes: string | null
+          nombre: string | null
+          nombre_en: string | null
+          nombre_fr: string | null
+          orden: string | null
+          precio_eur: number | null
+          restaurante: boolean | null
+          touza: boolean | null
+          traducciones: Json | null
+          ubicacion_pais: string | null
+          ubicacion_pais_en: string | null
+          ubicacion_pais_fr: string | null
+          ubicacion_region: string | null
+          ubicacion_region_en: string | null
+          ubicacion_region_fr: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activado?: boolean | null
+          alergenos_en?: string | null
+          alergenos_fr?: string | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          expanded?: boolean | null
+          featured?: boolean | null
+          id: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          ingredientes?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          ubicacion_pais?: string | null
+          ubicacion_pais_en?: string | null
+          ubicacion_pais_fr?: string | null
+          ubicacion_region?: string | null
+          ubicacion_region_en?: string | null
+          ubicacion_region_fr?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activado?: boolean | null
+          alergenos_en?: string | null
+          alergenos_fr?: string | null
+          alergenos_inferidos?: Json | null
+          alergenos_notas?: string | null
+          alergenos_oficiales?: Json | null
+          categoria?: string | null
+          categoria_en?: string | null
+          categoria_fr?: string | null
+          created_at?: string | null
+          denominacion_origen?: string | null
+          descripcion?: string | null
+          expanded?: boolean | null
+          featured?: boolean | null
+          id?: string
+          imagen_posicion_y?: number | null
+          imagen_url?: string | null
+          ingredientes?: string | null
+          nombre?: string | null
+          nombre_en?: string | null
+          nombre_fr?: string | null
+          orden?: string | null
+          precio_eur?: number | null
+          restaurante?: boolean | null
+          touza?: boolean | null
+          traducciones?: Json | null
+          ubicacion_pais?: string | null
+          ubicacion_pais_en?: string | null
+          ubicacion_pais_fr?: string | null
+          ubicacion_region?: string | null
+          ubicacion_region_en?: string | null
+          ubicacion_region_fr?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      visitas_producto: {
+        Row: {
+          ciudad: string | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          pais: string | null
+          producto_id: string
+          producto_tipo: string
+          referer: string | null
+          session_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          ciudad?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          pais?: string | null
+          producto_id: string
+          producto_tipo: string
+          referer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          ciudad?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          pais?: string | null
+          producto_id?: string
+          producto_tipo?: string
+          referer?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      chat_facturas_conversaciones: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          session_id: string | null
+          titulo: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          session_id?: string | null
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          session_id?: string | null
+          titulo?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      chat_facturas_mensajes: {
+        Row: {
+          contenido: string | null
+          conversacion_id: string | null
+          created_at: string | null
+          id: string | null
+          rol: string | null
+          session_id: string | null
+        }
+        Insert: {
+          contenido?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rol?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          contenido?: string | null
+          conversacion_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rol?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_conversacion_id_fkey"
+            columns: ["conversacion_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_facturas_conversaciones"
+            referencedColumns: ["session_id"]
+          },
+          {
+            foreignKeyName: "mensajes_chat_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "conversaciones"
+            referencedColumns: ["session_id"]
+          },
+        ]
+      }
+      vista_calidad_audio: {
+        Row: {
+          audio_metrics: Json | null
+          audio_score: number | null
+          call_success: boolean | null
+          created_at: string | null
+          duration_seconds: number | null
+          early_hangup: boolean | null
+          ended_reason: string | null
+          interruption_count: number | null
+          interruption_rate: number | null
+          latency_avg_ms: number | null
+          latency_first_ms: number | null
+          latency_max_ms: number | null
+          latency_p50_ms: number | null
+          latency_p95_ms: number | null
+          long_silences: number | null
+          number_cutoffs: number | null
+          sentiment: string | null
+          turn_count: number | null
+          vapi_call_id: string | null
+        }
+        Insert: {
+          audio_metrics?: Json | null
+          audio_score?: never
+          call_success?: boolean | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          early_hangup?: never
+          ended_reason?: string | null
+          interruption_count?: never
+          interruption_rate?: never
+          latency_avg_ms?: never
+          latency_first_ms?: never
+          latency_max_ms?: never
+          latency_p50_ms?: never
+          latency_p95_ms?: never
+          long_silences?: never
+          number_cutoffs?: never
+          sentiment?: string | null
+          turn_count?: never
+          vapi_call_id?: string | null
+        }
+        Update: {
+          audio_metrics?: Json | null
+          audio_score?: never
+          call_success?: boolean | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          early_hangup?: never
+          ended_reason?: string | null
+          interruption_count?: never
+          interruption_rate?: never
+          latency_avg_ms?: never
+          latency_first_ms?: never
+          latency_max_ms?: never
+          latency_p50_ms?: never
+          latency_p95_ms?: never
+          long_silences?: never
+          number_cutoffs?: never
+          sentiment?: string | null
+          turn_count?: never
+          vapi_call_id?: string | null
+        }
+        Relationships: []
+      }
+      vista_estadisticas_mensuales: {
+        Row: {
+          comensales_confirmados: number | null
+          mes_fin: string | null
+          mes_inicio: string | null
+          reservas_canceladas: number | null
+          reservas_confirmadas: number | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: []
+      }
+      vista_estadisticas_semanales: {
+        Row: {
+          comensales_confirmados: number | null
+          reservas_canceladas: number | null
+          reservas_cena: number | null
+          reservas_comida: number | null
+          reservas_confirmadas: number | null
+          reservas_no_show: number | null
+          semana_fin: string | null
+          semana_inicio: string | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: []
+      }
+      vista_gastos_mensuales: {
+        Row: {
+          mes: string | null
+          num_albaranes: number | null
+          num_facturas: number | null
+          num_proveedores: number | null
+          promedio_factura: number | null
+          total_facturas: number | null
+        }
+        Relationships: []
+      }
+      vista_gastos_proveedor_mes: {
+        Row: {
+          mes: string | null
+          num_facturas: number | null
+          promedio_factura: number | null
+          proveedor_nombre: string | null
+          proveedor_normalizado: string | null
+          total_mes: number | null
+        }
+        Relationships: []
+      }
+      vista_ocupacion: {
+        Row: {
+          dia_semana: number | null
+          fecha: string | null
+          hora: string | null
+          total_comensales: number | null
+          total_reservas: number | null
+          turno: string | null
+        }
+        Insert: {
+          dia_semana?: number | null
+          fecha?: string | null
+          hora?: string | null
+          total_comensales?: number | null
+          total_reservas?: number | null
+          turno?: string | null
+        }
+        Update: {
+          dia_semana?: number | null
+          fecha?: string | null
+          hora?: string | null
+          total_comensales?: number | null
+          total_reservas?: number | null
+          turno?: string | null
+        }
+        Relationships: []
+      }
+      vista_ocupacion_hoy: {
+        Row: {
+          comensales_activos: number | null
+          comensales_confirmados: number | null
+          reservas_activas: number | null
+          reservas_canceladas: number | null
+          reservas_completadas: number | null
+          reservas_confirmadas: number | null
+          reservas_no_show: number | null
+          reservas_pendientes: number | null
+          reservas_verificadas: number | null
+          total_comensales: number | null
+          total_reservas: number | null
+        }
+        Relationships: []
+      }
+      vista_productos_top: {
+        Row: {
+          cantidad_total: number | null
+          nombre_completo: string | null
+          nombre_normalizado: string | null
+          num_proveedores: number | null
+          precio_maximo: number | null
+          precio_minimo: number | null
+          precio_promedio: number | null
+          unidad: string | null
+          veces_comprado: number | null
+          veces_con_precio: number | null
+        }
+        Relationships: []
+      }
+      vista_productos_vendidos: {
+        Row: {
+          nombre_producto: string | null
+          producto_id: string | null
+          producto_tipo: string | null
+          total_ingresos: number | null
+          unidades_vendidas: number | null
+        }
+        Relationships: []
+      }
+      vista_proveedores_resumen: {
+        Row: {
+          cif: string | null
+          num_albaranes: number | null
+          num_documentos: number | null
+          num_facturas: number | null
+          primera_compra: string | null
+          proveedor_nombre_completo: string | null
+          proveedor_normalizado: string | null
+          ticket_promedio: number | null
+          total_gastado: number | null
+          ultima_compra: string | null
+        }
+        Relationships: []
+      }
+      vista_reservas_pendientes: {
+        Row: {
+          email: string | null
+          estado: string | null
+          fecha: string | null
+          fecha_solicitud: string | null
+          hora: string | null
+          id: string | null
+          nombre_cliente: string | null
+          numero_comensales: number | null
+          telefono: string | null
+        }
+        Insert: {
+          email?: string | null
+          estado?: string | null
+          fecha?: string | null
+          fecha_solicitud?: string | null
+          hora?: string | null
+          id?: string | null
+          nombre_cliente?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+        }
+        Update: {
+          email?: string | null
+          estado?: string | null
+          fecha?: string | null
+          fecha_solicitud?: string | null
+          hora?: string | null
+          id?: string | null
+          nombre_cliente?: string | null
+          numero_comensales?: number | null
+          telefono?: string | null
+        }
+        Relationships: []
+      }
+      vista_stock_consolidado: {
+        Row: {
+          activado: boolean | null
+          categoria: string | null
+          id: string | null
+          nombre: string | null
+          precio_eur: number | null
+          stock: number | null
+          tipo: string | null
+        }
+        Relationships: []
+      }
+      vista_turnos_con_areas: {
+        Row: {
+          areas_asignadas: string[] | null
+          areas_ids: string[] | null
+          created_at: string | null
+          estado: Database["public"]["Enums"]["estado_turno"] | null
+          fecha: string | null
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string | null
+          notas: string | null
+          puesto: Database["public"]["Enums"]["puesto_trabajo"] | null
+          trabajador_id: string | null
+          trabajador_nombre: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turnos_trabajador_id_fkey"
+            columns: ["trabajador_id"]
+            isOneToOne: false
+            referencedRelation: "trabajadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vista_ultimos_documentos: {
+        Row: {
+          drive_url: string | null
+          fecha: string | null
+          fecha_procesado: string | null
+          id: number | null
+          num_productos: number | null
+          numero_documento: string | null
+          proveedor: string | null
+          proveedor_normalizado: string | null
+          tipo: string | null
+          total: number | null
+        }
+        Relationships: []
+      }
+      vista_ventas_diarias: {
+        Row: {
+          fecha: string | null
+          num_pedidos: number | null
+          ticket_medio: number | null
+          total_ventas: number | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      append_tool_call_log: {
+        Args: { p_call_id: string; p_new_tools: Json }
+        Returns: undefined
+      }
+      buscar_contexto_chatbot: {
+        Args: { embedding_query: string }
+        Returns: Json
+      }
+      buscar_facturas_agente: {
+        Args: { embedding_query: string; limite?: number; umbral?: number }
+        Returns: Json
+      }
+      buscar_facturas_por_contexto: {
+        Args: { limite?: number; query_embedding: string }
+        Returns: {
+          fecha: string
+          id: number
+          numero_documento: string
+          observaciones: string
+          proveedor: string
+          similitud: number
+          tipo: string
+        }[]
+      }
+      buscar_producto: {
+        Args: { termino: string }
+        Returns: {
+          nombre: string
+          precio_promedio: number
+          ultima_fecha: string
+          ultimo_precio: number
+          veces_comprado: number
+        }[]
+      }
+      buscar_productos_agente: {
+        Args: { embedding_query: string; limite?: number; umbral?: number }
+        Returns: Json
+      }
+      buscar_productos_similares: {
+        Args: { limite?: number; query_embedding: string }
+        Returns: {
+          cantidad: number
+          fecha: string
+          id: number
+          nombre: string
+          precio_unitario: number
+          proveedor: string
+          similitud: number
+        }[]
+      }
+      bytea_to_text: { Args: { data: string }; Returns: string }
+      can_read_section: { Args: { _section: string }; Returns: boolean }
+      can_write_section: { Args: { _section: string }; Returns: boolean }
+      cleanup_old_security_logs: { Args: never; Returns: undefined }
+      cleanup_rate_limit_log: { Args: never; Returns: undefined }
+      ejecutar_consulta_chatbot: { Args: { query_sql: string }; Returns: Json }
+      ejecutar_limpieza_gdpr: {
+        Args: never
+        Returns: {
+          accion: string
+          registros_procesados: number
+          tabla: string
+        }[]
+      }
+      estadisticas_globales_agente: { Args: never; Returns: Json }
+      gastos_periodo: {
+        Args: { fecha_fin: string; fecha_inicio: string }
+        Returns: {
+          num_facturas: number
+          proveedor_principal: string
+          ticket_promedio: number
+          total_gastado: number
+        }[]
+      }
+      get_call_logs_analytics: {
+        Args: { p_call_type?: string; p_date_from: string; p_date_to: string }
+        Returns: Json
+      }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_section_permission: {
+        Args: { _permission: string; _section: string; _user_id: string }
+        Returns: boolean
+      }
+      http: {
+        Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "http_request"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_delete:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_get:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_head: {
+        Args: { uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_header: {
+        Args: { field: string; value: string }
+        Returns: Database["public"]["CompositeTypes"]["http_header"]
+        SetofOptions: {
+          from: "*"
+          to: "http_header"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_list_curlopt: {
+        Args: never
+        Returns: {
+          curlopt: string
+          value: string
+        }[]
+      }
+      http_patch: {
+        Args: { content: string; content_type: string; uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_post:
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_put: {
+        Args: { content: string; content_type: string; uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_reset_curlopt: { Args: never; Returns: boolean }
+      http_set_curlopt: {
+        Args: { curlopt: string; value: string }
+        Returns: boolean
+      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
+      normalizar_nombre_producto: {
+        Args: { p_nombre: string }
+        Returns: string
+      }
+      normalizar_proveedor: { Args: { p_proveedor: string }; Returns: string }
+      normalizar_texto: { Args: { p_texto: string }; Returns: string }
+      recalcular_ocupacion_historica: {
+        Args: { fecha_desde?: string; fecha_hasta?: string }
+        Returns: number
+      }
+      text_to_bytea: { Args: { data: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
+      urlencode:
+        | { Args: { data: Json }; Returns: string }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+      verificar_duplicado_factura: {
+        Args: {
+          p_fecha: string
+          p_numero_documento: string
+          p_proveedor: string
+          p_total: number
+        }
+        Returns: Json
+      }
+      withdraw_stock_inventory: {
+        Args: { p_product_id: string; p_quantity: number }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      app_role: "admin" | "manager" | "staff"
+      estado_turno: "programado" | "activo" | "completado" | "cancelado"
+      puesto_trabajo:
+        | "gerente"
+        | "camarero"
+        | "ayudante_camarero"
+        | "cocinero"
+        | "ayudante_cocina"
+        | "recepcionista"
+        | "limpieza"
+    }
+    CompositeTypes: {
+      http_header: {
+        field: string | null
+        value: string | null
+      }
+      http_request: {
+        method: unknown
+        uri: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content_type: string | null
+        content: string | null
+      }
+      http_response: {
+        status: number | null
+        content_type: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content: string | null
+      }
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "manager", "staff"],
+      estado_turno: ["programado", "activo", "completado", "cancelado"],
+      puesto_trabajo: [
+        "gerente",
+        "camarero",
+        "ayudante_camarero",
+        "cocinero",
+        "ayudante_cocina",
+        "recepcionista",
+        "limpieza",
+      ],
+    },
+  },
+} as const
