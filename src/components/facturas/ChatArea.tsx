@@ -250,6 +250,19 @@ export function ChatArea({
                           isUser ? "text-white/60" : "text-muted-foreground/60"
                         )}
                       >
+                        {/* `persistido === false` = se pinto pero no se guardo en BD.
+                            Se avisa aqui para que no parezca que el hilo quedo grabado. */}
+                        {msg.persistido === false && (
+                          <span
+                            className={cn(
+                              "mr-1.5 font-medium",
+                              isUser ? "text-white/90" : "text-destructive"
+                            )}
+                            title="No se pudo guardar en el historial: se perdera al recargar y el asistente no lo recordara"
+                          >
+                            sin guardar ·
+                          </span>
+                        )}
                         {new Date(msg.created_at).toLocaleTimeString("es-ES", {
                           hour: "2-digit",
                           minute: "2-digit",

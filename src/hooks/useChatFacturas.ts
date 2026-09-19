@@ -19,6 +19,12 @@ export interface MensajeChat {
   rol: "user" | "assistant";
   conversacion_id: string;
   created_at: string;
+  /**
+   * `false` cuando el mensaje se pinta en pantalla pero NO se pudo escribir en
+   * la base de datos. Permite avisar al usuario de que esa parte del hilo se
+   * perdera al recargar, en lugar de fingir que todo fue bien.
+   */
+  persistido?: boolean;
 }
 
 export function useChatFacturas() {
@@ -65,6 +71,7 @@ export function useChatFacturas() {
       rol: m.rol as "user" | "assistant",
       conversacion_id: m.conversacion_id,
       created_at: m.created_at,
+      persistido: true,
     }));
 
     setMensajes(mapped);
@@ -104,24 +111,43 @@ export function useChatFacturas() {
   }, [cargarConversaciones, toast]);
 
   // ─── Guardar mensaje en Supabase ──────────────────────────────────────────────
-  // Tabla: chat_facturas_mensajes (id, conversacion_id, rol, contenido, created_at)
+  // `chat_facturas_mensajes` es una VISTA sobre la tabla `mensajes_chat`, cuya
+  // columna `session_id` es NOT NULL. Omitirla hacia que TODOS los INSERT
+  // fallasen con 23502 y, como el error solo iba a console.error, el chat
+  // parecia funcionar mientras no guardaba ni un mensaje desde marzo de 2026.
+  // Por eso `guardarMensaje` recibe la conversacion completa: necesita su
+  // `session_id`, no solo el id.
   const guardarMensaje = useCallback(async (
-    conversacionId: string,
+    conversacion: Pick<Conversacion, "id" | "session_id">,
     contenido: string,
     rol: "user" | "assistant"
   ) => {
     const { data, error } = await supabase
       .from("chat_facturas_mensajes")
-      .insert({ conversacion_id: conversacionId, contenido, rol })
+      .insert({
+        conversacion_id: conversacion.id,
+        session_id: conversacion.session_id,
+        contenido,
+        rol,
+      })
       .select()
       .single();
 
     if (error) {
-      console.error("Error guardando mensaje:", error);
+      // Fallo VISIBLE: sin persistencia no hay memoria conversacional, asi que
+      // el usuario tiene que enterarse en vez de descubrirlo al recargar.
+      console.error("[chat-facturas] Error guardando mensaje:", error);
+      toast({
+        title: "El mensaje no se ha guardado",
+        description:
+          "La respuesta se muestra aqui, pero no quedara en el historial ni el asistente la recordara. " +
+          (error.message || "Error desconocido"),
+        variant: "destructive",
+      });
       return null;
     }
     return data;
-  }, []);
+  }, [toast]);
 
   // ─── Actualizar título de conversación ────────────────────────────────────────
   const actualizarTitulo = useCallback(async (convId: string, primerMensaje: string) => {
@@ -144,7 +170,7 @@ export function useChatFacturas() {
     await cargarConversaciones();
   }, [cargarConversaciones]);
 
-  // ─── Enviar mensaje al chatbot (edge function → webhook n8n) ─────────────────
+  // ─── Enviar mensaje al chatbot (Edge Function `chat-facturas`) ───────────────
   const enviarMensaje = useCallback(async (texto: string) => {
     if (!texto.trim() || isSending) return;
 
@@ -158,7 +184,7 @@ export function useChatFacturas() {
     setIsSending(true);
 
     // Guardar mensaje del usuario en Supabase y usar el ID real de la BD
-    const savedUserMsg = await guardarMensaje(conv.id, texto, "user");
+    const savedUserMsg = await guardarMensaje(conv, texto, "user");
 
     const msgUsuario: MensajeChat = {
       id: savedUserMsg?.id ?? crypto.randomUUID(),
@@ -166,6 +192,7 @@ export function useChatFacturas() {
       rol: "user",
       conversacion_id: conv.id,
       created_at: savedUserMsg?.created_at ?? new Date().toISOString(),
+      persistido: !!savedUserMsg,
     };
     setMensajes((prev) => [...prev, msgUsuario]);
 
@@ -188,7 +215,7 @@ export function useChatFacturas() {
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
 
       // Guardar respuesta del asistente en Supabase y usar el ID real
-      const savedAssistantMsg = await guardarMensaje(conv.id, respuesta, "assistant");
+      const savedAssistantMsg = await guardarMensaje(conv, respuesta, "assistant");
 
       // Actualizar updated_at de la conversación
       await supabase
@@ -202,6 +229,7 @@ export function useChatFacturas() {
         rol: "assistant",
         conversacion_id: conv.id,
         created_at: savedAssistantMsg?.created_at ?? new Date().toISOString(),
+        persistido: !!savedAssistantMsg,
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
@@ -261,11 +289,14 @@ export function useChatFacturas() {
     const lastAssistantMsg = [...mensajes].reverse().find((m) => m.rol === "assistant");
     if (lastAssistantMsg) {
       setMensajes((prev) => prev.filter((m) => m.id !== lastAssistantMsg.id));
-      await supabase
-        .from("chat_facturas_mensajes")
-        .delete()
-        .eq("id", lastAssistantMsg.id)
-        .eq("conversacion_id", conversacionActiva?.id ?? "");
+      // Solo tiene sentido borrar en BD lo que llego a escribirse en BD.
+      if (lastAssistantMsg.persistido) {
+        await supabase
+          .from("chat_facturas_mensajes")
+          .delete()
+          .eq("id", lastAssistantMsg.id)
+          .eq("conversacion_id", conversacionActiva?.id ?? "");
+      }
     }
 
     // Reenviar el mensaje del usuario (sin guardarlo de nuevo en DB ni en el estado)
@@ -277,7 +308,12 @@ export function useChatFacturas() {
       });
       if (error) throw new Error(error.message);
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
-      const savedMsg = await guardarMensaje(conversacionActiva.id, respuesta, "assistant");
+      const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant");
+      // Mantener la conversacion arriba en la lista tras regenerar.
+      await supabase
+        .from("chat_facturas_conversaciones")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conversacionActiva.id);
       setMensajes((prev) => [
         ...prev,
         {
@@ -286,6 +322,7 @@ export function useChatFacturas() {
           rol: "assistant",
           conversacion_id: conversacionActiva.id,
           created_at: savedMsg?.created_at ?? new Date().toISOString(),
+          persistido: !!savedMsg,
         },
       ]);
     } catch {

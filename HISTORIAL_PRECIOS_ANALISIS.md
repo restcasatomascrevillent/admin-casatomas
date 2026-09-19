@@ -1,3 +1,21 @@
+> ## ⛔ AVISO (2026-09-19): ESTE DOCUMENTO ES INCORRECTO
+>
+> **La tabla `historial_precios` NO fue eliminada. Existe, tiene 26 filas y sigue
+> llenandose** por el trigger `trigger_historial_precios` (AFTER INSERT sobre
+> `productos_factura`, solo para documentos de tipo `factura` y con
+> `precio_unitario IS NOT NULL`). Verificado contra produccion.
+>
+> Lo unico cierto de este informe es que **nada en `src/` la lee**.
+>
+> La consulta de evolucion de precios del chatbot (`historial_precios_agente`)
+> NO usa esta tabla, sino `productos_factura` + `facturas`, porque el trigger es
+> insert-only: si alguien corrige un precio desde el panel, `historial_precios`
+> queda desfasada, y ademas nunca registra albaranes.
+>
+> Se conserva el texto original solo como registro historico de la decision.
+
+---
+
 # 📊 Decisión sobre `historial_precios` - ELIMINADA
 
 ## 📅 Fecha: 2026-02-08
