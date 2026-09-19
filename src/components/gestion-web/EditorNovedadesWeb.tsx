@@ -503,13 +503,20 @@ export function EditorNovedadesWeb({
     
     setIsTranslating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("traducir-novedad", {
+      // Antes: 'traducir-novedad', proxy al webhook de n8n, que devolvía las
+      // claves planas (data.titulo_en, ...). Ahora: 'traducir-contenido' con
+      // tipo 'novedad', que las devuelve anidadas en {ok, translations}.
+      // Mismas claves dentro de translations, así que solo cambia el nivel.
+      const { data, error } = await supabase.functions.invoke("traducir-contenido", {
         body: {
-          titulo: formData.titulo,
-          descripcion: formData.descripcion,
-          badge_text: formData.badge_text,
-          bullets: formData.bullets,
-          tags: formData.tags,
+          tipo: "novedad",
+          datos: {
+            titulo: formData.titulo,
+            descripcion: formData.descripcion,
+            badge_text: formData.badge_text,
+            bullets: formData.bullets,
+            tags: formData.tags,
+          },
         }
       });
 
@@ -519,21 +526,29 @@ export function EditorNovedadesWeb({
         return;
       }
 
-      console.log("Traducciones recibidas:", data);
+      // traducir-contenido responde 200 con {ok:false, error} cuando falla
+      // OpenAI, a propósito, para no romper el flujo de guardado.
+      if (!data?.ok) {
+        console.error("Error al traducir:", data?.error);
+        toast.error("Error al traducir la novedad");
+        return;
+      }
+
+      const t = data.translations || {};
 
       // Actualizar formData con las traducciones
       setFormData(prev => ({
         ...prev,
-        titulo_en: data.titulo_en || prev.titulo_en,
-        titulo_fr: data.titulo_fr || prev.titulo_fr,
-        descripcion_en: data.descripcion_en || prev.descripcion_en,
-        descripcion_fr: data.descripcion_fr || prev.descripcion_fr,
-        badge_text_en: data.badge_text_en || prev.badge_text_en,
-        badge_text_fr: data.badge_text_fr || prev.badge_text_fr,
-        bullets_en: data.bullets_en || prev.bullets_en,
-        bullets_fr: data.bullets_fr || prev.bullets_fr,
-        tags_en: data.tags_en || prev.tags_en,
-        tags_fr: data.tags_fr || prev.tags_fr,
+        titulo_en: t.titulo_en || prev.titulo_en,
+        titulo_fr: t.titulo_fr || prev.titulo_fr,
+        descripcion_en: t.descripcion_en || prev.descripcion_en,
+        descripcion_fr: t.descripcion_fr || prev.descripcion_fr,
+        badge_text_en: t.badge_text_en || prev.badge_text_en,
+        badge_text_fr: t.badge_text_fr || prev.badge_text_fr,
+        bullets_en: t.bullets_en || prev.bullets_en,
+        bullets_fr: t.bullets_fr || prev.bullets_fr,
+        tags_en: t.tags_en || prev.tags_en,
+        tags_fr: t.tags_fr || prev.tags_fr,
       }));
 
       toast.success("¡Traducción completada! 🌍");

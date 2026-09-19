@@ -190,48 +190,82 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seccionActiva]);
 
+  // Antes: esto solo llamaba a traducir-carta-auto (URL de pruebas de n8n,
+  // rota) y no insertaba nada en menus_diarios ni en tapas — n8n debía
+  // escribirlo y, para "tapas", ni siquiera lo hacía en la tabla correcta
+  // (ver informe). Ahora el panel traduce vía traducir-contenido y escribe
+  // directamente las 3 filas (es/en/fr), igual que el resto de la carta.
   const enviarAlBackend = async () => {
     try {
       setIsSending(true);
-
-      let contenido: Record<string, unknown> = {};
+      const sb = supabase as any;
+      let traduccionFallo = false;
 
       if (seccionActiva === "menus_diarios") {
-        if (!menuForm.primero.trim() || !menuForm.segundo.trim() || !menuForm.postre.trim()) {
+        const primero = menuForm.primero.trim();
+        const segundo = menuForm.segundo.trim();
+        const postre = menuForm.postre.trim();
+        if (!primero || !segundo || !postre) {
           toast.error("Completa primero, segundo y postre");
           return;
         }
-        contenido = {
-          fecha: menuForm.fecha,
-          descripcion: `Primero: ${menuForm.primero.trim()}. Segundo: ${menuForm.segundo.trim()}. Postre: ${menuForm.postre.trim()}`,
-        };
+
+        const { data: tradRes, error: tradError } = await supabase.functions.invoke("traducir-contenido", {
+          body: { tipo: "menu", datos: { primero, segundo, postre } },
+        });
+        const traducciones = !tradError && tradRes?.ok ? tradRes.translations : null;
+        traduccionFallo = !traducciones;
+
+        const filas: Record<string, unknown>[] = [
+          { id: crypto.randomUUID(), fecha: menuForm.fecha, idiom: "es", menu: { primero, segundo, postre } },
+        ];
+        if (traducciones) {
+          filas.push({ id: crypto.randomUUID(), fecha: menuForm.fecha, idiom: "en", menu: traducciones.menu_en });
+          filas.push({ id: crypto.randomUUID(), fecha: menuForm.fecha, idiom: "fr", menu: traducciones.menu_fr });
+        }
+
+        const { error } = await sb.from("menus_diarios").insert(filas);
+        if (error) throw error;
       } else {
         const tapas = getTapasList(tapasForm.tapasTexto);
         if (tapas.length === 0) {
           toast.error("Escribe al menos una tapa");
           return;
         }
-        contenido = {
-          fecha: tapasForm.fecha,
-          descripcion: tapas.join(", "),
-        };
+
+        const { data: tradRes, error: tradError } = await supabase.functions.invoke("traducir-contenido", {
+          body: { tipo: "tapas", datos: { tapas } },
+        });
+        const traducciones = !tradError && tradRes?.ok ? tradRes.translations : null;
+        traduccionFallo = !traducciones;
+
+        const filas: Record<string, unknown>[] = [
+          { id: crypto.randomUUID(), fecha: tapasForm.fecha, idiom: "es", tapas },
+        ];
+        if (traducciones) {
+          filas.push({ id: crypto.randomUUID(), fecha: tapasForm.fecha, idiom: "en", tapas: traducciones.tapas_en });
+          filas.push({ id: crypto.randomUUID(), fecha: tapasForm.fecha, idiom: "fr", tapas: traducciones.tapas_fr });
+        }
+
+        const { error } = await sb.from("tapas").insert(filas);
+        if (error) throw error;
       }
 
-      const { error } = await supabase.functions.invoke("traducir-carta-auto", {
-        body: {
-          tipo: "menu",
-          nombre: seccionActiva === "menus_diarios" ? "Menú del día" : "Tapas del día",
-          ...contenido,
-        },
-      });
+      if (traduccionFallo) {
+        toast.warning("Guardado en español. La traducción automática no está disponible ahora mismo.");
+      } else {
+        toast.success("Guardado correctamente. Se publicará en la web en unos minutos.");
+      }
 
-      if (error) throw error;
+      supabase.functions
+        .invoke("rebuild-webs", { body: { origen: seccionActiva === "menus_diarios" ? "menu" : "tapas" } })
+        .catch((err) => console.error("rebuild-webs no disponible:", err));
 
-      toast.success("Enviado al backend correctamente");
       resetForm();
+      await cargarDatos();
     } catch (error) {
       console.error(error);
-      toast.error("Error al enviar al backend");
+      toast.error("Error al guardar");
     } finally {
       setIsSending(false);
     }
@@ -392,7 +426,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       </Card>
 
       <p className="text-xs text-muted-foreground text-center">
-        El backend guarda los datos en la base de datos. Pulsa «Recargar» para ver los últimos registros.
+        Se guarda en español, inglés y francés. Los cambios se publican en la web en unos minutos. Pulsa «Recargar» para ver los últimos registros.
       </p>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
