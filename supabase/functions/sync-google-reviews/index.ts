@@ -6,6 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// LIMITACIÓN DE GOOGLE (no es un bug nuestro):
+// Places API (Details) devuelve como MÁXIMO 5 reseñas por lugar y no admite
+// paginación. No existe parámetro para pedir más. Para traer el histórico
+// completo de la ficha hace falta Google Business Profile API (OAuth como
+// propietario verificado de la ficha), que es otra integración distinta.
+const GOOGLE_MAX_REVIEWS = 5;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -38,7 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const placeId = config.place_id;
+    const placeId: string = config.place_id;
 
     // ── Google Places API (New) → Place Details ─────────────────────────────
     // Usamos la API v1 que devuelve los campos de reseñas
@@ -67,49 +74,93 @@ serve(async (req) => {
     // ── Upsert reseñas ───────────────────────────────────────────────────────
     let synced = 0;
     let updated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
 
     for (const review of reviews) {
-      // El ID único en Google Places (New) viene en review.name  p.ej. places/ChIJ.../reviews/Axxxxxxxxx
-      const googleReviewId = review.name ?? `${placeId}_${review.authorAttribution?.displayName}_${review.publishTime}`;
+      // review.name viene como "places/{placeId}/reviews/{reviewId}".
+      // Guardamos SOLO el último segmento: así la deduplicación sigue funcionando
+      // aunque Google migre el place_id de la ficha (si guardásemos el nombre
+      // completo, un cambio de place_id duplicaría todas las reseñas).
+      const rawName: string | undefined = review.name;
+      const googleReviewId = rawName
+        ? rawName.split("/").pop()!
+        : `${placeId}_${review.authorAttribution?.displayName ?? "anon"}_${review.publishTime ?? ""}`;
+
       const authorName: string = review.authorAttribution?.displayName ?? "Anónimo";
-      const rating: number = review.rating ?? 0;
       const text: string = review.text?.text ?? review.originalText?.text ?? "";
       const publishTime: string = review.publishTime ?? new Date().toISOString();
       const fecha = publishTime.split("T")[0];
 
-      const upsertPayload = {
+      // La tabla tiene CHECK (valoracion >= 1 AND valoracion <= 5). Si Google no
+      // manda rating, el antiguo `?? 0` producía un INSERT que la BD rechazaba
+      // en silencio (el error nunca se leía) y el contador mentía.
+      const rawRating = Number(review.rating);
+      if (!Number.isFinite(rawRating) || rawRating < 1 || rawRating > 5) {
+        skipped++;
+        errors.push(`Reseña ${googleReviewId} descartada: valoración inválida (${review.rating})`);
+        continue;
+      }
+      const rating = Math.round(rawRating);
+
+      const insertPayload = {
         nombre_cliente: authorName,
         valoracion: rating,
-        comentario: text,
+        // Mejor NULL que cadena vacía: las reseñas sin texto no deben pintarse
+        // como tarjetas vacías en la web.
+        comentario: text.trim() ? text : null,
         fuente: "google",
         fecha,
         google_review_id: googleReviewId,
-        google_rating: rating,
+        google_rating: rawRating,
         estado: "publicada",
         updated_at: new Date().toISOString(),
       };
 
-      const { data: existing } = await supabaseClient
+      // No usamos .maybeSingle(): google_review_id NO tiene índice UNIQUE, así
+      // que si alguna vez hubiera dos filas con el mismo id, maybeSingle()
+      // reventaría la sincronización entera. Con limit(1) es tolerante.
+      const { data: existingRows, error: selectError } = await supabaseClient
         .from("resenas")
-        .select("id, comentario")
+        .select("id, comentario, valoracion")
         .eq("google_review_id", googleReviewId)
-        .maybeSingle();
+        .limit(1);
+
+      if (selectError) {
+        errors.push(`Error buscando ${googleReviewId}: ${selectError.message}`);
+        continue;
+      }
+
+      const existing = existingRows?.[0];
 
       if (!existing) {
-        await supabaseClient.from("resenas").insert(upsertPayload);
+        const { error: insertError } = await supabaseClient.from("resenas").insert(insertPayload);
+        if (insertError) {
+          errors.push(`Error insertando ${googleReviewId}: ${insertError.message}`);
+          continue;
+        }
         synced++;
-      } else if (existing.comentario !== text) {
-        // Si el texto cambió, actualizamos
-        await supabaseClient
+      } else if (existing.comentario !== insertPayload.comentario || existing.valoracion !== rating) {
+        // Si el texto o la puntuación cambiaron, actualizamos SOLO esa fila.
+        const { error: updateError } = await supabaseClient
           .from("resenas")
-          .update({ comentario: text, google_rating: rating, updated_at: new Date().toISOString() })
-          .eq("google_review_id", googleReviewId);
+          .update({
+            comentario: insertPayload.comentario,
+            valoracion: rating,
+            google_rating: rawRating,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+        if (updateError) {
+          errors.push(`Error actualizando ${googleReviewId}: ${updateError.message}`);
+          continue;
+        }
         updated++;
       }
     }
 
     // ── Actualizar estadísticas en config ────────────────────────────────────
-    await supabaseClient
+    const { error: configUpdateError } = await supabaseClient
       .from("config_google_places")
       .update({
         total_resenas: totalCount,
@@ -119,14 +170,23 @@ serve(async (req) => {
       })
       .eq("id", config.id);
 
+    if (configUpdateError) {
+      errors.push(`Error actualizando config: ${configUpdateError.message}`);
+    }
+
     return new Response(
       JSON.stringify({
-        success: true,
+        success: errors.length === 0,
         reviews_found: reviews.length,
         reviews_inserted: synced,
         reviews_updated: updated,
+        reviews_skipped: skipped,
+        errors,
+        // `total_count` es el nº de reseñas que Google dice que tiene la ficha;
+        // `reviews_found` es cuántas nos deja descargar (tope de 5).
         overall_rating: overallRating,
         total_count: totalCount,
+        google_api_limit: GOOGLE_MAX_REVIEWS,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
