@@ -27,6 +27,13 @@ const G_REFRESH_TOKEN = Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "";
 const G_PARENT_FOLDER = Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "";
 const DRIVE_ENABLED = !!(G_CLIENT_ID && G_CLIENT_SECRET && G_REFRESH_TOKEN && G_PARENT_FOLDER);
 
+// Fallback de archivo: bucket PRIVADO de Supabase Storage.
+// Mientras los secrets GOOGLE_* no existan, DRIVE_ENABLED es false y el
+// original se perdia con un console.warn. Con esto siempre queda guardado en
+// algun sitio, y `facturas.archivo_path` apunta a el.
+// Creado por la migracion 20260919110000_facturas_archivo_original_y_validacion.sql
+const STORAGE_BUCKET = "facturas-originales";
+
 // Prompt de Vision — COPIADO VERBATIM del workflow n8n "OCR Facturas".
 const VISION_SYSTEM_PROMPT = `Eres un sistema experto de análisis documental para contabilidad en España.
 
@@ -235,7 +242,8 @@ async function subirADrive(
   fecha: string,
 ): Promise<string | null> {
   if (!DRIVE_ENABLED) {
-    console.warn("[Drive] Variables de Google no configuradas → se omite la subida.");
+    // No es un error: simplemente Drive no esta configurado. Quien llama debe
+    // recurrir al fallback de Storage, nunca descartar el fichero.
     return null;
   }
   const token = await driveToken();
@@ -262,9 +270,180 @@ async function subirADrive(
   return (await up.json()).webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
 }
 
+// ─── Supabase Storage (fallback del archivo original) ────────────────────────
+
+// Marcas diacriticas (U+0300–U+036F) que deja sueltas `normalize("NFD")`.
+// Se construye con fromCharCode para no depender de secuencias de escape en el
+// fichero fuente, que es facil que se corrompan al editarlo.
+const DIACRITICOS = new RegExp(
+  "[" + String.fromCharCode(0x300) + "-" + String.fromCharCode(0x36f) + "]",
+  "g",
+);
+
+/** Nombre de fichero seguro para una clave de Storage. */
+function nombreSeguro(nombre: string): string {
+  const limpio = (nombre || "documento")
+    .normalize("NFD")
+    .replace(DIACRITICOS, "")         // "Factura Nº Ángel" -> "Factura N Angel"
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(-120);                     // por la cola: conserva la extension
+  return limpio || "documento";
+}
+
+/**
+ * Guarda el original en el bucket privado. Devuelve la ruta dentro del bucket.
+ * Misma jerarquia año/mes que Drive, tomada de la FECHA DEL DOCUMENTO.
+ */
+// deno-lint-ignore no-explicit-any
+async function guardarEnStorage(
+  supabase: any,
+  bytes: Uint8Array,
+  fileName: string,
+  mimeType: string,
+  fecha: string,
+  facturaId: number,
+): Promise<string> {
+  const path = `${fecha.slice(0, 4)}/${fecha.slice(5, 7)}/${facturaId}-${nombreSeguro(fileName)}`;
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, new Blob([bytes], { type: mimeType }), {
+      contentType: mimeType,
+      upsert: true,
+    });
+  if (error) throw new Error(`Storage upload: ${error.message}`);
+  return path;
+}
+
+/**
+ * Archiva el documento original. Drive si esta configurado, Supabase Storage si
+ * no (o si Drive falla). Nunca lanza: el documento ya esta en base de datos y
+ * un fallo de archivado no debe invalidar el procesado. Devuelve que se logro.
+ */
+// deno-lint-ignore no-explicit-any
+async function archivarOriginal(
+  supabase: any,
+  b64: string,
+  fileName: string,
+  mimeType: string,
+  fecha: string,
+  facturaId: number,
+): Promise<{ drive_url: string | null; archivo_path: string | null; error: string | null }> {
+  let bytes: Uint8Array;
+  try {
+    const bin = atob(b64);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "base64 invalido";
+    console.error("[archivo] No se pudo decodificar el base64:", msg);
+    return { drive_url: null, archivo_path: null, error: msg };
+  }
+
+  // 1) Google Drive, si hay secrets.
+  if (DRIVE_ENABLED) {
+    try {
+      const driveUrl = await subirADrive(bytes, fileName, mimeType, fecha);
+      if (driveUrl) return { drive_url: driveUrl, archivo_path: null, error: null };
+    } catch (e) {
+      console.error("[Drive] Fallo la subida, se intenta Storage:", e);
+    }
+  } else {
+    console.warn(
+      "[Drive] Secrets GOOGLE_* no configurados → el original va a Supabase Storage.",
+    );
+  }
+
+  // 2) Fallback: bucket privado de Supabase.
+  try {
+    const path = await guardarEnStorage(supabase, bytes, fileName, mimeType, fecha, facturaId);
+    return { drive_url: null, archivo_path: path, error: null };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "error desconocido";
+    // Este SI es un problema serio: se ha perdido el original.
+    console.error(
+      `[archivo] PERDIDA DEL ORIGINAL de la factura ${facturaId} (${fileName}): ${msg}`,
+    );
+    return { drive_url: null, archivo_path: null, error: msg };
+  }
+}
+
+// ─── Autenticación / autorización ────────────────────────────────────────────
+// ⚠️ `verify_jwt` NO sirve como autenticación en este proyecto: la anon key es
+// un JWT válido y viaja en el bundle público del panel. Hay que comprobar que
+// detrás del token hay un USUARIO real y que ese usuario tiene acceso a la
+// sección `facturas`. Mismo patrón que las funciones `admin-*`.
+//
+// El panel llama con `supabase.functions.invoke()` desde una sesión iniciada,
+// así que el JWT de usuario llega en la cabecera Authorization.
+async function autenticar(req: Request): Promise<
+  { ok: true; userId: string } | { ok: false; response: Response }
+> {
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    console.error("[procesar-factura] Sin cabecera Authorization");
+    return { ok: false, response: json({ success: false, error: "No autorizado" }, 401) };
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // Cliente con el token del llamante: resuelve QUIÉN es.
+  const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+  if (userError || !user) {
+    // Aquí cae la anon key suelta: es un JWT válido pero sin usuario detrás.
+    console.error("[procesar-factura] Token sin usuario:", userError?.message);
+    return { ok: false, response: json({ success: false, error: "Usuario no autenticado" }, 401) };
+  }
+
+  // Cliente service role solo para comprobar permisos.
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // `has_section_permission` ya devuelve true para administradores.
+  // Se exige 'view' (no 'edit') porque es exactamente lo que exige el panel
+  // para entrar en /facturas (ProtectedRoute.tsx:63-65) y el uploader no está
+  // gateado por can_edit. Subir a 'edit' requiere antes gatear la UI.
+  const { data: permitido, error: permError } = await supabaseAdmin.rpc(
+    "has_section_permission",
+    { _user_id: user.id, _section: "facturas", _permission: "view" },
+  );
+
+  if (permError) {
+    console.error("[procesar-factura] Error comprobando permisos:", permError.message);
+    return { ok: false, response: json({ success: false, error: "Error verificando permisos" }, 500) };
+  }
+
+  if (!permitido) {
+    console.error("[procesar-factura] Usuario sin acceso a facturas:", user.id);
+    return {
+      ok: false,
+      response: json({ success: false, error: "Sin permisos sobre la sección de facturas" }, 403),
+    };
+  }
+
+  return { ok: true, userId: user.id };
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Autenticación ANTES de tocar OpenAI, Drive o la base de datos.
+  const auth = await autenticar(req);
+  if (!auth.ok) return auth.response;
 
   try {
     const payload = await req.json();
@@ -277,7 +456,7 @@ serve(async (req) => {
       ? archivo.contenido_base64.split(",")[1]
       : archivo.contenido_base64;
 
-    console.log(`[procesar-factura] ${archivo.nombre} (${mimeType})`);
+    console.log(`[procesar-factura] ${archivo.nombre} (${mimeType}) — user ${auth.userId}`);
 
     // 1) Bloque de contenido para Vision
     const contentBlock = isPdf
@@ -380,32 +559,80 @@ serve(async (req) => {
       if (prodErr) throw new Error(`insert productos: ${prodErr.message}`);
     }
 
-    // 8) Subir archivo a Drive y guardar el enlace (no bloquea la respuesta si falla)
+    // 8) Validación de cordura de los importes (T5)
+    //    No corrige ni bloquea: deja constancia de lo que un humano deberia
+    //    mirar. Se hace DESPUES de insertar las lineas porque la funcion SQL
+    //    usa `nombre_normalizado`, que es una columna generada.
+    // deno-lint-ignore no-explicit-any
+    let alertas: any[] = [];
     try {
-      const bin = atob(b64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const driveUrl = await subirADrive(bytes, archivo.nombre, mimeType, datos.fecha);
-      if (driveUrl) {
-        await supabase.from("facturas").update({ drive_url: driveUrl }).eq("id", facturaId);
+      const { data: alertasData, error: valErr } = await supabase.rpc(
+        "validar_cordura_factura",
+        { p_factura_id: facturaId },
+      );
+      if (valErr) throw new Error(valErr.message);
+      alertas = Array.isArray(alertasData) ? alertasData : [];
+      if (alertas.length > 0) {
+        console.warn(
+          `[validacion] ${datos.tipo} ${datos.numero_documento} con ${alertas.length} alerta(s):`,
+          alertas.map((a) => a?.codigo).join(", "),
+        );
+        const { error: updErr } = await supabase
+          .from("facturas")
+          .update({ alertas_validacion: alertas })
+          .eq("id", facturaId);
+        if (updErr) console.error("[validacion] No se pudieron guardar las alertas:", updErr.message);
       }
-    } catch (driveError) {
-      console.error("[Drive] Error subiendo (la factura YA está guardada):", driveError);
+    } catch (valError) {
+      // Que falle la validacion no invalida el documento, pero tiene que verse.
+      console.error("[validacion] Error validando importes:", valError);
     }
 
-    console.log(`[procesar-factura] OK ${datos.tipo} ${datos.numero_documento} · ${datos.productos.length} productos`);
+    // 9) Archivar el original: Drive si esta configurado, Supabase Storage si no.
+    const archivado = await archivarOriginal(
+      supabase, b64, archivo.nombre, mimeType, datos.fecha, facturaId,
+    );
+    if (archivado.drive_url || archivado.archivo_path) {
+      const { error: archErr } = await supabase
+        .from("facturas")
+        .update({
+          ...(archivado.drive_url ? { drive_url: archivado.drive_url } : {}),
+          ...(archivado.archivo_path ? { archivo_path: archivado.archivo_path } : {}),
+        })
+        .eq("id", facturaId);
+      if (archErr) {
+        console.error("[archivo] No se pudo guardar la referencia al original:", archErr.message);
+      }
+    }
+
+    const alertasAltas = alertas.filter((a) => a?.severidad === "alta").length;
+    console.log(
+      `[procesar-factura] OK ${datos.tipo} ${datos.numero_documento} · ` +
+      `${datos.productos.length} productos · alertas: ${alertas.length} · ` +
+      `original: ${archivado.drive_url ? "drive" : archivado.archivo_path ? "storage" : "NO GUARDADO"}`,
+    );
+
     return new Response(
       JSON.stringify({
         success: true,
         nombre: archivo.nombre,
         tipo: datos.tipo,
-        message: "Documento procesado correctamente",
+        message: alertas.length > 0
+          ? `Documento procesado. Revisa ${alertas.length} aviso(s) sobre los importes.`
+          : "Documento procesado correctamente",
+        // Avisos para que SubidaFacturas.tsx pueda pintarlos.
+        alertas,
+        archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
+        archivo_error: archivado.error,
         webhookResponse: {
           tipo: datos.tipo,
           numero_documento: datos.numero_documento,
           proveedor: datos.proveedor,
           total: datos.total,
           factura_id: facturaId,
+          alertas: alertas.length,
+          alertas_graves: alertasAltas,
+          archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },

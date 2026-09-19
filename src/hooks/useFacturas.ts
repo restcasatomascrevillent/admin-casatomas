@@ -12,6 +12,14 @@ export interface ProductoFactura {
   precio_unitario?: number;
 }
 
+/** Una anomalia de importes detectada por `procesar-factura` al cargar el documento. */
+export interface AlertaValidacion {
+  codigo: string;
+  severidad: "alta" | "media" | string;
+  mensaje: string;
+  detalle?: Record<string, unknown>;
+}
+
 export interface Factura {
   id: number;
   tipo: string;
@@ -25,6 +33,10 @@ export interface Factura {
   observaciones: string | null;
   productos: ProductoFactura[];
   drive_url: string | null;
+  /** Ruta del original en el bucket privado `facturas-originales` (fallback de Drive). */
+  archivo_path: string | null;
+  /** Avisos de cordura de importes. Array vacio = sin anomalias. */
+  alertas: AlertaValidacion[];
   procesado_en: string | null;
   created_at: string | null;
   verificada: boolean;
@@ -38,8 +50,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     .from('facturas')
     .select(`
       id, tipo, numero_documento, proveedor, cif, fecha,
-      subtotal, iva, total, observaciones, drive_url,
-      procesado_en, created_at, verificada,
+      subtotal, iva, total, observaciones, drive_url, archivo_path,
+      alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total
       )
@@ -79,6 +91,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       observaciones: doc.observaciones,
       productos,
       drive_url: doc.drive_url ?? null,
+      archivo_path: doc.archivo_path ?? null,
+      alertas: Array.isArray(doc.alertas_validacion) ? doc.alertas_validacion : [],
       procesado_en: doc.procesado_en ?? null,
       created_at: doc.created_at ?? null,
       verificada: doc.verificada ?? false,

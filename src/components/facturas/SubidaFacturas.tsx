@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning } from "lucide-react";
+import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +23,14 @@ interface ResultadoProcesamiento {
   error?: string;
   respuesta?: any;
   tipo?: 'factura' | 'albaran' | string;
+  /** Avisos de cordura de importes devueltos por procesar-factura (T5). */
+  alertas?: AlertaValidacion[];
+  /**
+   * `false` = el documento se guardo en base de datos pero el PDF/imagen
+   * original NO se pudo archivar ni en Drive ni en Storage. Es perdida de
+   * datos y el usuario tiene que verlo, no solo los logs de la funcion.
+   */
+  archivoGuardado?: boolean;
 }
 
 export function SubidaFacturas() {
@@ -182,6 +191,8 @@ export function SubidaFacturas() {
           success: true,
           respuesta: data.webhookResponse,
           tipo: data.webhookResponse?.tipo || data.tipo,
+          alertas: Array.isArray(data.alertas) ? data.alertas : [],
+          archivoGuardado: data.archivo_guardado !== false,
         } as ResultadoProcesamiento;
       })
     );
@@ -221,9 +232,22 @@ export function SubidaFacturas() {
         variant: "destructive",
       });
     } else {
+      const conAlertas = exitosos.filter(r => (r.alertas?.length ?? 0) > 0).length;
       toast({
         title: "Todos los documentos procesados",
-        description: `${exitosos.length} documento(s) procesados correctamente`,
+        description: conAlertas > 0
+          ? `${exitosos.length} documento(s) procesados. ${conAlertas} con importes que conviene revisar.`
+          : `${exitosos.length} documento(s) procesados correctamente`,
+      });
+    }
+
+    // El original perdido es un fallo serio aunque los datos se hayan guardado.
+    const sinArchivo = exitosos.filter(r => r.archivoGuardado === false);
+    if (sinArchivo.length > 0) {
+      toast({
+        title: `No se ha podido archivar ${sinArchivo.length} original(es)`,
+        description: "Los datos estan guardados, pero el fichero original no. Guarda una copia a mano y avisa al administrador.",
+        variant: "destructive",
       });
     }
 
@@ -407,6 +431,23 @@ export function SubidaFacturas() {
                     {!r.success && r.error && (
                       <span className="text-xs text-muted-foreground truncate">
                         - {r.error}
+                      </span>
+                    )}
+                    {r.success && r.archivoGuardado === false && (
+                      <span
+                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-destructive"
+                        title="Los datos se han guardado, pero el fichero original no se ha podido archivar"
+                      >
+                        <FileWarning className="h-3 w-3" /> sin archivar
+                      </span>
+                    )}
+                    {r.success && (r.alertas?.length ?? 0) > 0 && (
+                      <span
+                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600"
+                        title={r.alertas!.map(a => `· ${a.mensaje}`).join("\n")}
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        {r.alertas!.length} aviso{r.alertas!.length > 1 ? 's' : ''}
                       </span>
                     )}
                   </div>

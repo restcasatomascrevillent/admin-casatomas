@@ -15,6 +15,7 @@ import { EditarFacturaDialog } from "./EditarFacturaDialog";
 import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
+import { BotonOriginal, BadgeAlertas } from "./shared/BotonOriginal";
 
 const COLUMNAS_ALBARANES: ColumnaType[] = [
   { key: "numero", label: "Número" },
@@ -55,6 +56,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, allDocs, onEdit }: { albara
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-semibold text-foreground">{albaran.numero_documento}</CardTitle>
                 {getAnomaliaBadge(albaran, allDocs)}
+                <BadgeAlertas alertas={albaran.alertas} />
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center">{albaran.proveedor || "Sin proveedor"}</p>
             </div>
@@ -68,13 +70,12 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, allDocs, onEdit }: { albara
 
       {/* Botonera de acciones rápida unida al Header en mobile */}
       <div className="grid grid-cols-2 gap-1.5 bg-muted/20 border-t border-border/30 px-3 py-2">
-        {albaran.drive_url && (
-          <a href={albaran.drive_url} target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800">
-            <ExternalLink className="h-3 w-3" /> Doc
-          </a>
-        )}
+        <BotonOriginal
+          driveUrl={albaran.drive_url}
+          archivoPath={albaran.archivo_path}
+          variant="mobile"
+          label="Doc"
+        />
         <Button
           variant="ghost"
           size="sm"
@@ -130,7 +131,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, allDocs, onEdit 
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, allDocs)}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, allDocs)} <BadgeAlertas alertas={albaran.alertas} /></TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{albaran.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{albaran.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground text-center">{formatDate(albaran.fecha)}</TableCell>}
@@ -158,14 +159,11 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, allDocs, onEdit 
         )}
         {visibles.doc && (
           <TableCell className="text-center">
-            {albaran.drive_url && (
-              <a href={albaran.drive_url} target="_blank" rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-                title="Ver Albarán original">
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            )}
+            <BotonOriginal
+              driveUrl={albaran.drive_url}
+              archivoPath={albaran.archivo_path}
+              variant="desktop"
+            />
           </TableCell>
         )}
         {visibles.procesado_en && <TableCell className="text-xs text-muted-foreground">{formatDateTime(albaran.procesado_en)}</TableCell>}

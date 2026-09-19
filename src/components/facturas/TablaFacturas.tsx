@@ -15,6 +15,7 @@ import { EditarFacturaDialog } from "./EditarFacturaDialog";
 import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
+import { BotonOriginal, BadgeAlertas } from "./shared/BotonOriginal";
 
 // Re-export FilaProducto for consumers that import from TablaFacturas
 export { FilaProducto } from "./shared/FilaProducto";
@@ -71,6 +72,7 @@ const FilaFacturaMobile = ({
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
                 {getAnomaliaBadge(factura, todasFacturas)}
+                <BadgeAlertas alertas={factura.alertas} />
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 {factura.proveedor || "Sin proveedor"}
@@ -86,13 +88,12 @@ const FilaFacturaMobile = ({
 
       {/* Botonera de acciones rápida unida al Header en mobile */}
       <div className="grid grid-cols-2 gap-1.5 bg-muted/20 border-t border-border/30 px-3 py-2">
-        {factura.drive_url && (
-          <a href={factura.drive_url} target="_blank" rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800">
-            <ExternalLink className="h-3 w-3" /> Escaneo
-          </a>
-        )}
+        <BotonOriginal
+          driveUrl={factura.drive_url}
+          archivoPath={factura.archivo_path}
+          variant="mobile"
+          label="Escaneo"
+        />
         <Button
           variant="ghost"
           size="sm"
@@ -169,7 +170,7 @@ const FilaFacturaDesktop = ({
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento} {getAnomaliaBadge(factura, todasFacturas)}</TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento} {getAnomaliaBadge(factura, todasFacturas)} <BadgeAlertas alertas={factura.alertas} /></TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{factura.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{factura.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground">{formatDate(factura.fecha)}</TableCell>}
@@ -197,14 +198,11 @@ const FilaFacturaDesktop = ({
         )}
         {visibles.doc && (
           <TableCell className="text-center">
-            {factura.drive_url && (
-              <a href={factura.drive_url} target="_blank" rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors"
-                title="Ver Escaneo original">
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            )}
+            <BotonOriginal
+              driveUrl={factura.drive_url}
+              archivoPath={factura.archivo_path}
+              variant="desktop"
+            />
           </TableCell>
         )}
         {visibles.procesado_en && <TableCell className="text-xs text-muted-foreground">{formatDateTime(factura.procesado_en)}</TableCell>}
