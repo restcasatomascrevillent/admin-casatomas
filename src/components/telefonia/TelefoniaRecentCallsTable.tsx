@@ -10,7 +10,7 @@ interface CallLog {
     id: string;
     started_at: string;
     caller_number?: string | null;
-    call_type?: "bot" | "human" | null;
+    call_type?: string | null;
     status?: string | null;
     duration_seconds?: number | null;
     cost_total_eur?: number | null;

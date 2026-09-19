@@ -174,14 +174,14 @@ export default function AsistenteTelefonico() {
 
     // ── Queries dashboard ───────────────────────────────────────────────────
     const { data: analytics, isLoading: isLoadingAnalytics } = useCallLogsAnalytics({
-        dateFrom: range.dateFrom,
-        dateTo: range.dateTo,
+        dateFrom: range.dateFrom.toISOString(),
+        dateTo: range.dateTo.toISOString(),
         callType: filters.callType === "all" ? undefined : filters.callType,
     });
 
     const { data: calls = [], isLoading: isLoadingCalls } = useCallLogs({
-        dateFrom: range.dateFrom,
-        dateTo: range.dateTo,
+        dateFrom: range.dateFrom.toISOString(),
+        dateTo: range.dateTo.toISOString(),
         intent: filters.intent === "all" ? undefined : filters.intent,
         sentiment: filters.sentiment === "all" ? undefined : filters.sentiment,
         success: filters.success === "all" ? undefined : filters.success,
