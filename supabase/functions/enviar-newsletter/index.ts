@@ -9,6 +9,37 @@ const corsHeaders = {
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// ============================================================================
+// Firma HMAC para los enlaces de baja (RGPD)
+// ----------------------------------------------------------------------------
+// El enlace de baja ya no lleva el email en claro en la query string (antes
+// apuntaba a un webhook de n8n con ?email=... y sin firmar: cualquiera podía
+// dar de baja a cualquier suscriptor, y los prefetchers de los clientes de
+// correo disparaban bajas fantasma sin que nadie hiciera clic).
+// Ahora se firma "<id_suscriptor>:<via>" con HMAC-SHA256 y se verifica en
+// supabase/functions/newsletter-baja, que es quien ejecuta la baja real.
+// Misma implementación duplicada allí a propósito (este proyecto no usa un
+// directorio _shared/ entre funciones).
+// ============================================================================
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function hmacSign(payload: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return base64UrlEncode(new Uint8Array(sigBuf));
+}
+
 interface NewsletterPayload {
   tipo: 'anuncio' | 'nuevo_menu' | 'oferta';
   titulo: string;
@@ -186,7 +217,7 @@ serve(async (req) => {
     // Obtener suscriptores activos
     const { data: suscriptores, error: dbError } = await supabase
       .from("newsletter_suscriptores")
-      .select("email, nombre")
+      .select("id, email, nombre")
       .eq("activo", true);
 
     if (dbError) {
@@ -206,6 +237,12 @@ serve(async (req) => {
 
     console.log(`Sending newsletter to ${suscriptores.length} subscribers`);
 
+    // Secreto para firmar los enlaces de baja. Si no se configura un secreto
+    // dedicado (NEWSLETTER_UNSUB_SECRET), se usa la service role key: nunca se
+    // expone al cliente y ya se trata como secreto en este mismo proyecto.
+    const unsubSecret = Deno.env.get('NEWSLETTER_UNSUB_SECRET') || supabaseKey;
+    const newsletterBajaUrl = `${supabaseUrl}/functions/v1/newsletter-baja`;
+
     // Determinar asunto según tipo
     let subject = payload.titulo;
     if (payload.tipo === 'nuevo_menu') {
@@ -219,8 +256,14 @@ serve(async (req) => {
     
     for (const suscriptor of suscriptores) {
       try {
-        // Generar link de baja personalizado (webhook n8n)
-        const unsubscribeLink = `https://n8npersonal.miguelbenito.space/webhook/76c66543-ffec-4cda-aea3-dfd95a020776?email=${encodeURIComponent(suscriptor.email)}`;
+        // Enlace de baja para el pie del email (clic humano -> página de confirmación)
+        const sigBody = await hmacSign(`${suscriptor.id}:body`, unsubSecret);
+        const unsubscribeLink = `${newsletterBajaUrl}?sid=${suscriptor.id}&via=body&sig=${sigBody}`;
+
+        // Enlace para la cabecera List-Unsubscribe (RFC 8058, "one-click": Gmail y
+        // Outlook hacen POST directo a esta URL sin pasar por la página de confirmación)
+        const sigHeader = await hmacSign(`${suscriptor.id}:header`, unsubSecret);
+        const listUnsubscribeUrl = `${newsletterBajaUrl}?sid=${suscriptor.id}&via=header&sig=${sigHeader}`;
 
         // Generar HTML según tipo
         let html: string;
@@ -239,11 +282,18 @@ serve(async (req) => {
         }
 
         // Enviar con Resend
+        // NOTA: "onboarding@resend.dev" es el sandbox de Resend y solo entrega al dueño
+        // de la cuenta. Pendiente del dueño: verificar un dominio propio en Resend y
+        // cambiar el "from" (ver informe).
         const emailResponse = await resend.emails.send({
           from: "Casa Tomás <onboarding@resend.dev>", // Cambiar a tu dominio verificado
           to: [suscriptor.email],
           subject: subject,
           html: html,
+          headers: {
+            "List-Unsubscribe": `<${listUnsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
         });
 
         console.log(`Email sent to ${suscriptor.email}:`, emailResponse);
@@ -261,6 +311,27 @@ serve(async (req) => {
     const fallidos = resultados.filter(r => !r.success).length;
 
     console.log(`Newsletter sent: ${exitosos} success, ${fallidos} failed`);
+
+    // Registrar el envío en el historial. Antes esta tabla nunca se escribía
+    // (existía desde el principio, pero enviar-newsletter no insertaba en ella),
+    // así que el panel de estadísticas no tenía forma de mostrar envíos pasados.
+    // Un fallo aquí no tumba la respuesta: el email ya se ha enviado igualmente.
+    try {
+      const estado = fallidos === 0 ? 'completado' : (exitosos === 0 ? 'fallido' : 'parcial');
+      const { error: envioError } = await supabase.from('newsletter_envios').insert({
+        asunto: subject,
+        mensaje: payload.mensaje,
+        total_destinatarios: suscriptores.length,
+        enviado_por: user.id,
+        tipo_newsletter: payload.tipo,
+        estado,
+      });
+      if (envioError) {
+        console.error('No se pudo registrar el envío en newsletter_envios:', envioError);
+      }
+    } catch (logError) {
+      console.error('Error registrando historial de newsletter_envios:', logError);
+    }
 
     return new Response(
       JSON.stringify({ 
