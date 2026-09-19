@@ -6,8 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ??
-  "miguelsantiagores@gmail.com,info@casatomas.es,admin@admin.com")
+// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
+// ningún super admin y la autorización recae por completo en is_admin()
+// (rol en user_roles). Nunca conceder acceso por defecto — fail-closed.
+const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
