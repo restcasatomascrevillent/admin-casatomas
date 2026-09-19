@@ -1,0 +1,14 @@
+-- ============================================================================
+--  MOVIDO. Este fichero ya no es la fuente de verdad y no debe ejecutarse.
+--
+--  El esquema de memoria conversacional y rate limiting persistente de
+--  `chat-web` vive ahora en:
+--
+--      supabase/migrations/20260919150000_chat_web_memoria.sql
+--
+--  Motivo (B-5 de docs/REVISION-PUERTOS-N8N.md): mientras estuvo aquí nadie lo
+--  copió a migrations/, así que `chat_web_conversaciones` y `chat_web_mensajes`
+--  nunca llegaron a existir en la base de datos.
+--
+--  Esa migración DEBE aplicarse ANTES de desplegar la función `chat-web`.
+-- ============================================================================
