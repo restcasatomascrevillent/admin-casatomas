@@ -6,7 +6,6 @@ import { GraficoReservasPorDia } from "@/components/dashboard/widgets/GraficoRes
 import { CurvaReservasPorHora } from "@/components/dashboard/widgets/CurvaReservasPorHora";
 import { PersonasActivas } from "@/components/dashboard/widgets/PersonasActivas";
 import { ResenasRecientes } from "@/components/dashboard/widgets/ResenasRecientes";
-import { NoticiasHosteleria } from "@/components/dashboard/widgets/NoticiasHosteleria";
 
 export default function Dashboard() {
   return (
@@ -25,10 +24,10 @@ export default function Dashboard() {
             <CurvaReservasPorHora />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ResenasRecientes />
-            <NoticiasHosteleria />
-          </div>
+          {/* Reseñas ocupaba media fila junto al widget de Noticias del Sector.
+              Eliminada la funcionalidad de noticias, se deja a ancho completo
+              en vez de dejar la columna derecha vacía. */}
+          <ResenasRecientes />
         </div>
       </DashboardLayout>
     </DashboardProvider>
