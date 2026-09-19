@@ -1,49 +1,165 @@
 project_id = "jeamoczmbfsnwkfjxcyo"
 
-[functions.enviar-imagen-webhook]
+# ============================================================================
+# verify_jwt — criterio de este proyecto
+# ----------------------------------------------------------------------------
+# LEER ANTES DE TOCAR NADA: `verify_jwt = true` NO ES AUTENTICACIÓN.
+# La anon/publishable key es un JWT válido y viaja en el bundle público de las
+# webs y del panel, así que cualquiera puede copiarla y pasar el filtro. Lo
+# único que hace `true` es descartar en la pasarela las peticiones que no traen
+# NINGUNA cabecera (bots, curl a pelo, escáneres). Es un filtro barato, no una
+# barrera. La autorización de verdad la tiene que hacer cada función.
+#
+# Regla aplicada aquí:
+#   · false  SOLO si la función necesita ser alcanzable SIN cabeceras
+#            (enlaces GET dentro de un correo, webhooks de terceros) Y lleva su
+#            propia autenticación real (HMAC, firma svix).  -> 3 funciones.
+#   · true   en todo lo demás. Todos sus llamadores usan
+#            `supabase.functions.invoke()` con sesión iniciada, o `fetch` con
+#            `apikey` + `Authorization`, así que el filtro no les afecta.
+#
+# TODA función desplegable tiene entrada explícita abajo. Si falta una, la CLI
+# asume `verify_jwt = true` al desplegarla y puede romperla en silencio.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = false — las tres que TIENEN que responder sin cabeceras
+# ----------------------------------------------------------------------------
+
+# Rutas GET dentro de un correo electrónico: el cliente pulsa "Confirmar" o
+# "Cancelar" desde Gmail y el navegador NO manda `Authorization` ni `apikey`.
+# Con verify_jwt = true la pasarela devuelve 401 antes de ejecutar la función y
+# el flujo de confirmación de reservas queda muerto.
+# La autenticación real es un token HMAC-SHA256 de un solo uso por reserva
+# (RESERVAS_WEB_TOKEN_SECRET, firma sobre id+acción+huella de la fila; el
+# primer uso mueve `updated_at` e invalida el token). Ver index.ts:275-345.
+# Las 3 rutas POST (/disponibilidad, /crear, /notificar-estado) sí reciben
+# `apikey` + `Authorization` desde casa-tomas-story, así que no pierden nada.
+[functions.reservas-web]
 verify_jwt = false
+
+# Pública sin JWT: la visitan destinatarios anónimos del newsletter (enlace de
+# baja en el email / cabecera List-Unsubscribe). Se autoriza con un HMAC propio
+# en vez de con Supabase Auth (ver supabase/functions/newsletter-baja/index.ts).
+[functions.newsletter-baja]
+verify_jwt = false
+
+# La llama Resend, no el panel: nunca va a traer un JWT de Supabase. Verifica
+# la firma svix de la petición, que es su autenticación de verdad.
+[functions.resend-webhook]
+verify_jwt = false
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = true — autenticación propia REAL + filtro barato encima
+# ----------------------------------------------------------------------------
+# Estas validan un usuario real (`auth.getUser()`) y, casi todas, el permiso
+# concreto. `true` es solo el prefiltro del gateway.
+
+# JWT de usuario + `is_admin()` + allowlist SUPER_ADMIN_EMAILS.
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-update-user-password]
+verify_jwt = true
+
+[functions.list-users]
+verify_jwt = true
+
+# JWT de usuario + has_section_permission().
+[functions.chat-facturas]
+verify_jwt = true
+
+[functions.procesar-factura]
+verify_jwt = true
 
 [functions.notify-reservation-change]
 verify_jwt = true
 
-[functions.procesar-factura]
-verify_jwt = false
-
-[functions.admin-create-user]
-verify_jwt = false
-
-[functions.admin-delete-user]
-verify_jwt = false
-
-[functions.admin-update-user-password]
-verify_jwt = false
-
-[functions.traducir-carta]
-verify_jwt = false
-
-[functions.enviar-newsletter]
-verify_jwt = false
-
-[functions.resend-webhook]
-verify_jwt = false
-
+# Proxy de OpenAI. La autenticación REAL la hace la propia función
+# (usuario autenticado + has_section_permission 'gestion_web').
 [functions.format-novedad]
-verify_jwt = false
+verify_jwt = true
 
-[functions.traducir-novedad]
-verify_jwt = false
+# JWT de usuario + has_section_permission('gestor_carta'). Además cada llamada
+# puede disparar builds de pago en Vercel, así que el prefiltro interesa.
+[functions.rebuild-webs]
+verify_jwt = true
 
-[functions.traducir-carta-auto]
-verify_jwt = false
-
-[functions.traducir-novedad-auto]
-verify_jwt = false
-
-[functions.chat-facturas]
-verify_jwt = false
+# JWT de usuario (`auth.getUser()`), sin comprobación de permiso: cualquier
+# usuario autenticado pasa. PENDIENTE: añadirle is_admin/has_section_permission.
+# La anon key NO cuela aquí, porque no tiene usuario asociado.
+[functions.enviar-newsletter]
+verify_jwt = true
 
 [functions.registrar-metrica]
-verify_jwt = false
+verify_jwt = true
 
 [functions.leer-metricas]
-verify_jwt = false
+verify_jwt = true
+
+[functions.vapi-analytics]
+verify_jwt = true
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = true — SIN autenticación propia: el gateway es lo único delante
+# ----------------------------------------------------------------------------
+# Todas se invocan solo desde el panel con sesión, así que `true` no molesta.
+# Casi todas queman crédito de un tercero de pago por llamada, de modo que
+# dejarlas en `false` es regalar la factura a quien encuentre la URL.
+# PENDIENTE (no es despliegue, es deuda): darles una comprobación de permiso
+# propia al estilo de `rebuild-webs`.
+
+# Crédito de Perplexity por llamada.
+[functions.buscar-precios-mercado]
+verify_jwt = true
+
+# Crédito de Lovable/Gemini por llamada.
+[functions.procesar-dibujo-perimetro]
+verify_jwt = true
+
+# Crédito de OpenAI por llamada. El modo `bulk` sí exige la service role key.
+[functions.traducir-contenido]
+verify_jwt = true
+
+[functions.traducir-carta]
+verify_jwt = true
+
+[functions.traducir-carta-auto]
+verify_jwt = true
+
+[functions.traducir-novedad]
+verify_jwt = true
+
+[functions.traducir-novedad-auto]
+verify_jwt = true
+
+# Escribe en `resenas` y `config_google_places` con service role y consume
+# cuota de Google Places. Nunca comprueba `req.method` ni lee el body: un GET
+# pelado a la URL dispara la sincronización entera. Es la más expuesta del lote.
+[functions.sync-google-reviews]
+verify_jwt = true
+
+# Endpoint público del chatbot de casa-tomas-story. No tiene autenticación
+# propia (es deliberado: los visitantes no están autenticados), pero su cliente
+# SIEMPRE manda `apikey` + `Authorization` con la publishable key, así que
+# `true` sale gratis y descarta bots sin cabeceras. La protección real es su
+# limitador de tasa persistente, que es fail-closed (503 si no puede consultarlo).
+[functions.chat-web]
+verify_jwt = true
+
+# Huérfanas: cero llamadores en los cuatro repos. Se dejan a `true` para que no
+# queden como endpoints abiertos mientras se decide si se borran.
+# - enviar-imagen-webhook: sin llamadores y sin variables de entorno.
+# - notify-config-bot-change: relay sin autenticar a un webhook de n8n
+#   hardcodeado en el código (index.ts:8).
+[functions.enviar-imagen-webhook]
+verify_jwt = true
+
+[functions.notify-config-bot-change]
+verify_jwt = true
