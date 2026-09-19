@@ -18,25 +18,34 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { BlacklistModal } from "./BlacklistModal";
 import { GestorReservasKanban } from "./GestorReservasKanban";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
 }
 
+// Estados admitidos por el CHECK `reservas_estado_check` de la base de datos.
+// Ojo: la clave de "no show" es `no_show` (con guion bajo); antes era "no-show"
+// y el filtro no casaba nunca. "rechazada" no existe y se ha eliminado.
 const ESTADOS_RESERVA = {
   pendiente: { label: "Pendiente", color: "bg-yellow-500" },
   verificada: { label: "Verificada", color: "bg-blue-500" },
   confirmada: { label: "Confirmada", color: "bg-green-500" },
   cancelada: { label: "Cancelada", color: "bg-red-500" },
-  rechazada: { label: "Rechazada", color: "bg-destructive" },
   completada: { label: "Completada", color: "bg-primary" },
-  "no-show": { label: "No Show", color: "bg-gray-500" },
+  no_show: { label: "No Show", color: "bg-gray-500" },
 };
 
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: resumen, isLoading } = useResumenOcupacionHoy();
+  const {
+    data: resumen,
+    isLoading,
+    isError: errorResumen,
+    error: errorResumenDetalle,
+    refetch: refetchResumen,
+  } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
   const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
@@ -45,12 +54,30 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
 
   const toggleImportante = async (reserva: any) => {
     const nuevoValor = !reserva.importante;
-    await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reserva.id);
+    // Antes no se comprobaba el error: si RLS o la red fallaban, el empleado leía
+    // "marcada como importante" y la estrella se quedaba apagada.
+    const { error } = await supabase
+      .from("reservas")
+      .update({ importante: nuevoValor })
+      .eq("id", reserva.id);
+
+    if (error) {
+      console.error("Error actualizando la reserva:", error);
+      toast.error("No se pudo actualizar la reserva: " + error.message);
+      return;
+    }
+
     queryClient.invalidateQueries({ queryKey: ["reservas-hoy"] });
     toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
   };
 
-  const { data: reservasHoy, isLoading: loadingReservas } = useQuery({
+  const {
+    data: reservasHoy,
+    isLoading: loadingReservas,
+    isError: errorReservas,
+    error: errorReservasDetalle,
+    refetch: refetchReservas,
+  } = useQuery({
     queryKey: ["reservas-hoy", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -80,7 +107,18 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
     );
   }
 
+  if (errorResumen) {
+    return (
+      <EstadoErrorCarga
+        titulo="el resumen de ocupación de hoy"
+        error={errorResumenDetalle}
+        onReintentar={() => refetchResumen()}
+      />
+    );
+  }
+
   const today = new Date();
+  const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
 
   return (
     <div className="space-y-6">
@@ -119,6 +157,9 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                   Reservas Hoy
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalReservas || 0}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  activas{reservasCanceladas > 0 ? ` · ${reservasCanceladas} cancelada(s)` : ""}
+                </p>
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-primary/10">
                 <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -135,6 +176,9 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                   Comensales Esperados
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalComensales || 0}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  sin canceladas
+                </p>
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-accent/10">
                 <Users className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
@@ -164,9 +208,12 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Ocupación Media
+                  Ocupación del día
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  {resumen?.totalComensales || 0}/{resumen?.capacidadTotal || 0} plazas
+                </p>
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-green-500/10">
                 <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
@@ -211,6 +258,12 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         <CardContent>
           {loadingReservas ? (
             <div className="text-center py-8 text-muted-foreground">Cargando reservas...</div>
+          ) : errorReservas ? (
+            <EstadoErrorCarga
+              titulo="las reservas de hoy"
+              error={errorReservasDetalle}
+              onReintentar={() => refetchReservas()}
+            />
           ) : !reservasHoy?.length ? (
             <div className="text-center py-8 text-muted-foreground">
               <CalendarCheck className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -341,9 +394,11 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                   </>
                 );
               })()}
+              {/* Este pie cuadra la lista con la tarjeta "Reservas Hoy": la tarjeta
+                  cuenta solo las activas y aquí se listan todos los estados. */}
               <div className="mt-4 text-sm text-muted-foreground text-center">
-                {filtroEstado === "todos" 
-                  ? `${reservasHoy.length} reservas en total`
+                {filtroEstado === "todos"
+                  ? `${reservasHoy.length} reservas en total (${reservasHoy.filter(r => !["cancelada", "no_show"].includes(r.estado)).length} activas)`
                   : `${reservasHoy.filter(r => r.estado === filtroEstado).length} de ${reservasHoy.length} reservas`
                 }
               </div>

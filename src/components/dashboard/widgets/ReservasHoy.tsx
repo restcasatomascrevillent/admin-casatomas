@@ -8,16 +8,19 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 
 function useOcupacionData() {
   return useQuery({
     queryKey: ["ocupacion-reservas-hoy"],
     queryFn: async () => {
-      const { data: espacios } = await supabase
+      const { data: espacios, error } = await supabase
         .from("espacios_reserva")
         .select("capacidad_maxima")
         .eq("activa", true);
-      return (espacios || []).reduce((s, e) => s + (e.capacidad_maxima || 0), 0);
+
+      if (error) throw error;
+      return (espacios ?? []).reduce((s, e) => s + (e.capacidad_maxima || 0), 0);
     },
     refetchInterval: 60000,
   });
@@ -25,23 +28,37 @@ function useOcupacionData() {
 
 export function ReservasHoy() {
   const navigate = useNavigate();
-  const { data: todasReservas } = useTodayReservations();
-  const { data: reservasConfirmadas } = useTodayConfirmedReservations();
-  const { data: capacidadTotal = 0 } = useOcupacionData();
+  const todasQuery = useTodayReservations();
+  const confirmadasQuery = useTodayConfirmedReservations();
+  const capacidadQuery = useOcupacionData();
+
+  const { data: todasReservas } = todasQuery;
+  const { data: reservasConfirmadas } = confirmadasQuery;
+  const capacidadTotal = capacidadQuery.data ?? 0;
+
+  const hayError = todasQuery.isError || confirmadasQuery.isError || capacidadQuery.isError;
+  const errorDetalle = todasQuery.error || confirmadasQuery.error || capacidadQuery.error;
 
   const ahora = new Date();
   const horaActual = ahora.getHours();
   const horaActualStr = format(ahora, "HH:mm:ss");
 
-  // Confirmadas por turno
-  const reservasComidaConf = reservasConfirmadas?.filter(r => parseInt(r.hora.split(':')[0]) < 17) || [];
-  const reservasCenaConf = reservasConfirmadas?.filter(r => parseInt(r.hora.split(':')[0]) >= 17) || [];
-  const comensalesComida = reservasComidaConf.reduce((acc, r) => acc + r.numero_comensales, 0);
-  const comensalesCena = reservasCenaConf.reduce((acc, r) => acc + r.numero_comensales, 0);
-  const totalComensalesConf = (reservasConfirmadas || []).reduce((acc, r) => acc + r.numero_comensales, 0);
+  // Reservas que ocupan plaza. Mismo criterio que el trigger `trg_validar_capacidad`
+  // de la base de datos y que la pestaña "Hoy" de Reservas: antes la barra de ocupación
+  // contaba solo confirmadas mientras las tarjetas de al lado contaban otra cosa.
+  const reservasActivas = todasReservas?.filter(r =>
+    ["pendiente", "verificada", "confirmada"].includes(r.estado)
+  ) || [];
+
+  // Desglose por turno (umbral 17:00, el mismo que usa el trigger)
+  const reservasComida = reservasActivas.filter(r => parseInt(r.hora.split(':')[0]) < 17);
+  const reservasCena = reservasActivas.filter(r => parseInt(r.hora.split(':')[0]) >= 17);
+  const comensalesComida = reservasComida.reduce((acc, r) => acc + r.numero_comensales, 0);
+  const comensalesCena = reservasCena.reduce((acc, r) => acc + r.numero_comensales, 0);
+  const comensalesActivos = reservasActivas.reduce((acc, r) => acc + r.numero_comensales, 0);
 
   // Ocupación
-  const porcentajeOcupacion = capacidadTotal > 0 ? Math.round((totalComensalesConf / capacidadTotal) * 100) : 0;
+  const porcentajeOcupacion = capacidadTotal > 0 ? Math.round((comensalesActivos / capacidadTotal) * 100) : 0;
   const getStatusColor = (p: number) => {
     if (p < 50) return { bg: "bg-green-500/10", text: "text-green-600", bar: "bg-green-500", label: "Baja" };
     if (p < 80) return { bg: "bg-amber-500/10", text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
@@ -57,6 +74,22 @@ export function ReservasHoy() {
   const numConfirmadas = todasReservas?.filter(r => r.estado === "confirmada").length || 0;
   const reservasPendientes = todasReservas?.filter(r => r.estado === "pendiente").length || 0;
   const reservasVerificadas = todasReservas?.filter(r => r.estado === "verificada").length || 0;
+
+  // Un fallo de red o de permisos no puede pintarse como "0 reservas, 0% de ocupación".
+  if (hayError) {
+    return (
+      <EstadoErrorCarga
+        titulo="las reservas de hoy"
+        error={errorDetalle}
+        onReintentar={() => {
+          todasQuery.refetch();
+          confirmadasQuery.refetch();
+          capacidadQuery.refetch();
+        }}
+        className="h-full"
+      />
+    );
+  }
 
   // Reservas en riesgo
   const reservasEnRiesgo = todasReservas?.filter(r => {
@@ -140,7 +173,7 @@ export function ReservasHoy() {
               </Badge>
             </div>
             <span className="text-xs text-muted-foreground">
-              {totalComensalesConf}/{capacidadTotal} pax confirmados
+              {comensalesActivos}/{capacidadTotal} pax sin canceladas
             </span>
           </div>
           <div className="h-2 bg-background/50 rounded-full overflow-hidden">
@@ -149,6 +182,10 @@ export function ReservasHoy() {
               style={{ width: `${Math.min(100, porcentajeOcupacion)}%` }}
             />
           </div>
+          <p className="mt-1.5 text-[10px] text-muted-foreground">
+            {reservasActivas.length} reservas activas = {numConfirmadas} confirmadas
+            + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
+          </p>
         </div>
 
         {/* Desglose por turno */}
@@ -160,7 +197,7 @@ export function ReservasHoy() {
               {horaActual < 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasComidaConf.length}</span>
+              <span className="text-xl sm:text-2xl font-bold">{reservasComida.length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
@@ -176,7 +213,7 @@ export function ReservasHoy() {
               {horaActual >= 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasCenaConf.length}</span>
+              <span className="text-xl sm:text-2xl font-bold">{reservasCena.length}</span>
               <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
@@ -189,11 +226,11 @@ export function ReservasHoy() {
         {/* Estados + Próxima reserva */}
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-primary">{todasReservas?.length || 0}</div>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Total</p>
+            <div className="text-lg sm:text-2xl font-bold text-primary">{reservasActivas.length}</div>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Activas</p>
           </div>
           <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas + reservasVerificadas}</div>
+            <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas}</div>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Confirmadas</p>
           </div>
           <div
