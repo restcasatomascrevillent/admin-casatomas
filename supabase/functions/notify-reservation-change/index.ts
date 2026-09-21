@@ -4,33 +4,44 @@
 // https://n8npersonal.miguelbenito.space/webhook/79fc330e-... que reenviaba el
 // payload TAL CUAL y siempre respondía {success:true}.
 //
-// Ahora: repuntado a la Edge Function `reservas-web`, acción POST
-// /notificar-estado, que es su sustituto.
+// Después: se repuntó a la Edge Function `reservas-web`, acción POST
+// /notificar-estado.
 //
-// CONTRATO DE `reservas-web` (verificado leyendo reservas-web/index.ts, no
-// supuesto):
-//   · Router (:1236-1243): la ruta sale del path, POST "notificar-estado".
-//   · handleNotificarEstado (:1134): exige checkSharedSecret(req), que compara
-//     la cabecera `x-webhook-secret` con RESERVAS_WEB_SHARED_SECRET.
-//   · (:1141) `const reservaId = typeof body?.reserva_id === "string" ? ... : null;`
-//     (:1142) `if (!reservaId) return json({ok:false, error:"reserva_id_requerido"}, 400);`
-//     → el campo se llama **reserva_id** y tiene que ser **string**.
-//   · `reservas-web` NO tiene entrada en config.toml, así que hereda
-//     verify_jwt = true → hay que mandar un JWT en Authorization.
+// AHORA (este cambio): se repunta a la Edge Function `emails-reserva`,
+// acción POST /notificar — el sistema profesional de correos de reserva
+// (contraoferta, plantillas editables, recordatorio T-2, ausencias). No se
+// toca `reservas-web` (es de otro agente en este mismo encargo); su acción
+// `notificar-estado` queda sin llamadores tras este cambio, pero sigue
+// existiendo — no es mía para borrar ni para arreglar.
 //
-// BUG QUE ESTO ARREGLA
-// --------------------
+// CONTRATO DE `emails-reserva` (ver supabase/functions/emails-reserva/index.ts):
+//   · Router: la ruta sale del path, POST "notificar".
+//   · handleNotificar exige `x-webhook-secret` == EMAILS_RESERVA_SHARED_SECRET,
+//     y FALLA CERRADO si esa env var no está puesta (a diferencia de
+//     checkSharedSecret en reservas-web, que fallaba abierto — ver
+//     docs/REVISION-PUERTOS-N8N.md A-3).
+//   · `const reservaId = typeof body?.reserva_id === "string" ? ... : null;`
+//     → el campo se sigue llamando **reserva_id** y tiene que ser **string**
+//     (mismo contrato que tenía reservas-web, sin cambios para los llamadores).
+//   · `emails-reserva` SÍ tiene entrada en config.toml con
+//     `verify_jwt = false` (necesita responder sin cabeceras en sus rutas
+//     GET de aceptar/rechazar) — la autenticación real de /notificar es el
+//     shared secret, no el JWT. Se sigue mandando el Bearer de todos modos
+//     por si el día de mañana eso cambia; no estorba.
+//
+// BUG QUE ARREGLÓ EL CAMBIO A reservas-web (se conserva aquí)
+// -------------------------------------------------------------------------
 // Los dos llamadores (ModalVerificacionReserva.tsx, ListaReservasAvanzada.tsx)
 // hacen `body: {...reserva}`, es decir mandan el campo **id** (que es el que
-// usaba n8n). Reenviarlo tal cual a reservas-web daba 400 reserva_id_requerido
+// usaba n8n). Reenviarlo tal cual sin mapear daría 400 reserva_id_requerido
 // en el 100% de los casos. Y como los dos llamadores son fire-and-forget
-// (`.catch(console.error)`), ningún cliente habría recibido el enlace de
-// confirmar/cancelar y nadie se habría enterado. Aquí se mapea id → reserva_id.
+// (`.catch(console.error)`), ningún cliente habría recibido el correo y
+// nadie se habría enterado. Aquí se sigue mapeando id → reserva_id.
 //
-// Además, la versión anterior devolvía {success:true} aunque el webhook
-// contestara 500: eso es la mitad del fallo silencioso. Ahora la respuesta
-// refleja el resultado real (success:false + status) y se loguea. Se sigue sin
-// lanzar nunca, porque los llamadores no esperan la respuesta.
+// Además, la versión de n8n devolvía {success:true} aunque el webhook
+// contestara 500: eso es la mitad del fallo silencioso. La respuesta sigue
+// reflejando el resultado real (success:false + status) y se loguea. Se
+// sigue sin lanzar nunca, porque los llamadores no esperan la respuesta.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -43,9 +54,9 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
+const SHARED_SECRET = Deno.env.get("EMAILS_RESERVA_SHARED_SECRET") ?? "";
 
-const RESERVAS_WEB_URL = `${SUPABASE_URL}/functions/v1/reservas-web/notificar-estado`;
+const EMAILS_RESERVA_URL = `${SUPABASE_URL}/functions/v1/emails-reserva/notificar`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -139,11 +150,16 @@ serve(async (req) => {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      // reservas-web hereda verify_jwt = true (no está en config.toml).
+      // emails-reserva tiene verify_jwt = false explícito en config.toml
+      // (sus rutas GET de aceptar/rechazar tienen que responder sin
+      // cabeceras). Se manda igualmente por si el día de mañana cambia.
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
     };
-    // checkSharedSecret falla abierto si la variable no está puesta en
-    // reservas-web; se manda solo si aquí la tenemos configurada.
+    // A diferencia de checkSharedSecret en reservas-web (que fallaba
+    // abierto), comprobarSecretoCompartido en emails-reserva RECHAZA la
+    // petición si EMAILS_RESERVA_SHARED_SECRET no está configurado. Se
+    // manda solo si aquí la tenemos configurada — si no, la llamada
+    // devolverá 401 y quedará logueada abajo, en vez de fallar en silencio.
     if (SHARED_SECRET) headers["x-webhook-secret"] = SHARED_SECRET;
 
     const controller = new AbortController();
@@ -151,7 +167,7 @@ serve(async (req) => {
 
     let response: Response;
     try {
-      response = await fetch(RESERVAS_WEB_URL, {
+      response = await fetch(EMAILS_RESERVA_URL, {
         method: "POST",
         headers,
         body: JSON.stringify({ reserva_id: reservaId }),
@@ -166,7 +182,7 @@ serve(async (req) => {
     if (!response.ok) {
       // Antes esto devolvía success:true igualmente. Se loguea y se informa.
       console.error(
-        `[notify-reservation-change] reservas-web respondió ${response.status}: ${texto}`,
+        `[notify-reservation-change] emails-reserva respondió ${response.status}: ${texto}`,
       );
       return json({ success: false, status: response.status, error: texto }, 200);
     }

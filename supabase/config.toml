@@ -50,6 +50,19 @@ verify_jwt = false
 [functions.resend-webhook]
 verify_jwt = false
 
+# Rutas GET dentro de un correo electrónico: el cliente pulsa "Sí, confirmo
+# mi asistencia" o "No puedo, cancelar reserva" desde Gmail y el navegador
+# NO manda `Authorization` ni `apikey`. Mismo motivo exacto que
+# reservas-web arriba. La autenticación real es un token HMAC-SHA256 de un
+# solo uso por reserva (EMAILS_RESERVA_TOKEN_SECRET, ver
+# supabase/functions/emails-reserva/tokens.ts). Las 3 rutas POST
+# (/notificar, /recordatorios, /detectar-ausencias) se autentican con
+# EMAILS_RESERVA_SHARED_SECRET (cabecera x-webhook-secret) y FALLAN CERRADO
+# si esa env var falta — a diferencia de checkSharedSecret en reservas-web,
+# que falla abierto (ver docs/REVISION-PUERTOS-N8N.md A-3).
+[functions.emails-reserva]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
@@ -75,6 +88,12 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.procesar-factura]
+verify_jwt = true
+
+# Proxy de OpenAI (antes Lovable/Gemini). La autenticación REAL la hace la
+# propia función (usuario autenticado + has_section_permission 'espacios'),
+# mismo patrón que procesar-factura.
+[functions.procesar-dibujo-perimetro]
 verify_jwt = true
 
 [functions.notify-reservation-change]
@@ -117,10 +136,6 @@ verify_jwt = true
 
 # Crédito de Perplexity por llamada.
 [functions.buscar-precios-mercado]
-verify_jwt = true
-
-# Crédito de Lovable/Gemini por llamada.
-[functions.procesar-dibujo-perimetro]
 verify_jwt = true
 
 # Crédito de OpenAI por llamada. El modo `bulk` sí exige la service role key.
