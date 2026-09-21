@@ -30,7 +30,7 @@ interface CoctelFormProps {
 }
 
 export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormProps) {
-  const { crearCoctel, categorias } = useCocteles();
+  const { crearCoctel, actualizarCoctel, categorias } = useCocteles();
   const [isTranslating, setIsTranslating] = useState(false);
   const [traducciones, setTraducciones] = useState<Json | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -108,7 +108,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await crearCoctel.mutateAsync({
+      const nuevoCoctel = await crearCoctel.mutateAsync({
         nombre: values.nombre,
         categoria: values.categoria,
         precio_eur: values.precio_eur,
@@ -117,21 +117,36 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
         preparacion: values.preparacion,
       });
 
-      // Si hay imagen, subirla después de crear el cóctel
-      if (imageFile) {
+      // Si hay imagen, subirla después de crear el cóctel.
+      // Antes se subía al bucket y NUNCA se escribía `imagen_url`: la foto
+      // quedaba huérfana en storage y el cóctel salía sin imagen en la web.
+      if (imageFile && nuevoCoctel?.id) {
         setIsUploading(true);
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('cocteles')
-          .upload(fileName, imageFile);
+        try {
+          const fileExt = imageFile.name.split('.').pop() || 'jpg';
+          const fileName = `${nuevoCoctel.id}.${fileExt}`;
 
-        if (uploadError) {
+          const { error: uploadError } = await supabase.storage
+            .from('cocteles')
+            .upload(fileName, imageFile, { upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from('cocteles')
+            .getPublicUrl(fileName);
+
+          // Vía el hook, para que invalide la caché y republique las webs.
+          await actualizarCoctel.mutateAsync({
+            id: nuevoCoctel.id,
+            imagen_url: urlData.publicUrl,
+          });
+        } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
-          toast.error("Error al subir la imagen");
+          toast.error("Cóctel creado, pero error al subir la imagen");
+        } finally {
+          setIsUploading(false);
         }
-        setIsUploading(false);
       }
 
       form.reset();
