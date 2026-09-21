@@ -1,5 +1,5 @@
 import { Switch } from "@/components/ui/switch";
-import { UtensilsCrossed, Wine } from "lucide-react";
+import { EyeOff, UtensilsCrossed, Wine } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VisibilidadTogglesProps {
@@ -9,6 +9,13 @@ interface VisibilidadTogglesProps {
   onTouzaChange: (checked: boolean) => void;
   isPending?: boolean;
   compact?: boolean;
+  /**
+   * Estado de publicación (columna `activado`). Es opcional para no romper
+   * usos antiguos: si no se pasa `onActivadoChange`, el control no se pinta.
+   */
+  activado?: boolean;
+  onActivadoChange?: (checked: boolean) => void;
+  isActivadoPending?: boolean;
 }
 
 export function VisibilidadToggles({
@@ -18,38 +25,91 @@ export function VisibilidadToggles({
   onTouzaChange,
   isPending = false,
   compact = false,
+  activado,
+  onActivadoChange,
+  isActivadoPending = false,
 }: VisibilidadTogglesProps) {
+  const estaActivado = activado ?? true;
+
   return (
-    <div className={cn(
-      "flex gap-3 py-2 px-3 rounded-md bg-muted/50",
-      compact && "gap-2 py-1.5 px-2"
-    )}>
-      <div className="flex items-center gap-2">
-        <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Restaurante</span>
-        <Switch
-          checked={restaurante}
-          onCheckedChange={onRestauranteChange}
-          disabled={isPending}
-          className={cn(
-            "data-[state=checked]:bg-amber-600",
-            compact && "scale-90"
-          )}
-        />
+    <div className="space-y-1.5">
+      <div
+        className={cn(
+          "flex gap-3 py-2 px-3 rounded-md bg-muted/50",
+          compact && "gap-2 py-1.5 px-2"
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Restaurante</span>
+          <Switch
+            checked={restaurante}
+            onCheckedChange={onRestauranteChange}
+            disabled={isPending}
+            className={cn(
+              "data-[state=checked]:bg-amber-600",
+              compact && "scale-90"
+            )}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Touza</span>
+          <Switch
+            checked={touza}
+            onCheckedChange={onTouzaChange}
+            disabled={isPending}
+            className={cn(
+              "data-[state=checked]:bg-purple-600",
+              compact && "scale-90"
+            )}
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Touza</span>
-        <Switch
-          checked={touza}
-          onCheckedChange={onTouzaChange}
-          disabled={isPending}
+
+      {/*
+        Despublicar sin borrar. Hasta ahora `toggleActivado` existía en los
+        hooks pero no se exportaba, así que la única forma de quitar algo de la
+        web era eliminarlo. Un elemento despublicado sigue en el panel y en la
+        base de datos; simplemente deja de salir en las webs.
+      */}
+      {onActivadoChange && (
+        <div
           className={cn(
-            "data-[state=checked]:bg-purple-600",
-            compact && "scale-90"
+            "flex items-center justify-between gap-2 py-2 px-3 rounded-md",
+            compact && "py-1.5 px-2",
+            estaActivado ? "bg-muted/50" : "bg-destructive/10"
           )}
-        />
-      </div>
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <EyeOff
+              className={cn(
+                estaActivado ? "text-muted-foreground" : "text-destructive",
+                compact ? "h-3.5 w-3.5" : "h-4 w-4"
+              )}
+            />
+            <span
+              className={cn(
+                "truncate",
+                compact ? "text-xs" : "text-sm",
+                estaActivado ? "text-muted-foreground" : "text-destructive font-medium"
+              )}
+            >
+              {estaActivado ? "Activo (se publica en la web)" : "Despublicado (no sale en la web)"}
+            </span>
+          </div>
+          <Switch
+            checked={estaActivado}
+            onCheckedChange={onActivadoChange}
+            disabled={isActivadoPending}
+            aria-label={estaActivado ? "Despublicar de la web" : "Volver a publicar en la web"}
+            className={cn(
+              "data-[state=checked]:bg-emerald-600",
+              compact && "scale-90"
+            )}
+          />
+        </div>
+      )}
     </div>
   );
 }

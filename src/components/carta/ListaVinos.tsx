@@ -31,7 +31,14 @@ interface ListaVinosProps {
 }
 
 export function ListaVinos({ vinos }: ListaVinosProps) {
-  const { eliminarVino, toggleExpanded, toggleRestaurante, toggleTouza, actualizarVino } = useVinos();
+  const {
+    eliminarVino,
+    toggleExpanded,
+    toggleActivado,
+    toggleRestaurante,
+    toggleTouza,
+    actualizarVino,
+  } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(vinos.map(v => v.id)));
@@ -55,18 +62,12 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   };
 
   const handleToggleExpanded = (vino: Vino, checked: boolean) => {
-    toggleExpanded.mutate(
-      { id: vino.id, expanded: checked },
-      {
-        onSuccess: () => {
-          toast.success(
-            checked
-              ? `${vino.nombre} se mostrará expandido`
-              : `${vino.nombre} se mostrará normal`
-          );
-        },
-      }
-    );
+    // El toast (y el aviso de si se ha publicado o no) lo emite el hook.
+    toggleExpanded.mutate({
+      id: vino.id,
+      expanded: checked,
+      nombre: vino.nombre ?? undefined,
+    });
   };
 
   const handlePositionChange = (position: number) => {
@@ -171,6 +172,15 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
                 onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
                 isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                activado={vino.activado ?? true}
+                onActivadoChange={(checked) =>
+                  toggleActivado.mutate({
+                    id: vino.id,
+                    activado: checked,
+                    nombre: vino.nombre ?? undefined,
+                  })
+                }
+                isActivadoPending={toggleActivado.isPending}
                 compact
               />
               <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">

@@ -24,7 +24,7 @@ interface ListaBebidasProps {
 }
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
-  const { eliminarBebida, toggleRestaurante, toggleTouza } = useBebidas();
+  const { eliminarBebida, toggleActivado, toggleRestaurante, toggleTouza } = useBebidas();
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
 
   useEffect(() => {
@@ -112,14 +112,15 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
               onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
               onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
               isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-              compact
-            />
-            <VisibilidadToggles
-              restaurante={bebida.restaurante ?? false}
-              touza={bebida.touza ?? false}
-              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
-              onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
-              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+              activado={bebida.activado ?? true}
+              onActivadoChange={(checked) =>
+                toggleActivado.mutate({
+                  id: bebida.id,
+                  activado: checked,
+                  nombre: bebida.nombre ?? undefined,
+                })
+              }
+              isActivadoPending={toggleActivado.isPending}
               compact
             />
             {bebida.descripcion && (
