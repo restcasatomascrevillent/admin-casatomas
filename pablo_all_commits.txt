@@ -1,3 +1,0 @@
-﻿220e5a8 feat: enviar configuracion del bot a webhook
-e974aae feat: enviar configuracion del bot a webhook
-ed9e8cd feat: setup metrics database and update environment configuration
