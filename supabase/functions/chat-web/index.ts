@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { firmarSessionToken, verificarSessionToken } from "./session-token.ts";
 
 // ============================================================================
 //  chat-web  ·  Chatbot público de la web del restaurante, SIN n8n
@@ -21,17 +22,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 //    Además, si el cuerpo trae un campo `body` con el payload entero
 //    re-serializado como JSON (lo que manda hoy AIChatbot.tsx, herencia del
 //    webhook n8n), ESE objeto manda y los campos planos quedan de respaldo.
-//    Campos: { mensaje: string, idiom?: "es"|"en"|"fr", id: string }
+//    Campos: { mensaje: string, idiom?: "es"|"en"|"fr", id?: string }
 //    - mensaje: obligatorio, no vacío, máx. MAX_MSG_LEN caracteres.
 //    - idiom: opcional, por defecto "es"; cualquier valor fuera de es/en/fr cae
 //      a "es". Se aceptan `idioma` y `language` como alias de entrada.
-//    - id: id de sesión/visitante que ya genera el frontend (p.ej. localStorage).
-//      Si falta o es inválido, se genera uno server-side (se pierde memoria
-//      entre turnos solo en ese caso límite).
+//    - id: el `sessionToken` FIRMADO que devolvió la respuesta ANTERIOR de
+//      esta misma función (ver session-token.ts). NO es un id libre: si
+//      falta, no verifica, o es el id "a pelo" de otra persona sin su firma,
+//      se trata como visitante nuevo (id y token propios, memoria vacía) —
+//      nunca da acceso al historial de una sesión ajena. Antes cualquier
+//      string sin firmar servía como id, lo que dejaba leer la conversación
+//      de otro con solo pasar su id (ver docs/AUDITORIA-WEBS-2026-09-21.md §4).
 //
-//  OUT: SIEMPRE { success: boolean, respuesta: string } con texto humano en el
-//  idioma correcto, listo para pintar tal cual — nunca una página en blanco ni
-//  un stacktrace. El status HTTP distingue el motivo:
+//  OUT: SIEMPRE { success: boolean, respuesta: string, sessionToken: string }
+//  con texto humano en el idioma correcto, listo para pintar tal cual — nunca
+//  una página en blanco ni un stacktrace. `sessionToken` es el id de sesión
+//  firmado (confirmado si el que llegó ya era válido, o uno nuevo si no): el
+//  frontend debe guardarlo y mandarlo como `id` en la siguiente petición. El
+//  status HTTP distingue el motivo:
 //    - 200: caso normal y errores "blandos" (mensaje vacío, mensaje demasiado
 //      largo, fast-path en memoria, fallo técnico de OpenAI/DB).
 //    - 429 + { codigo: "rate_limited" }: límite persistente realmente superado.
@@ -77,6 +85,36 @@ const MODEL = "gpt-4.1-mini"; // mismo modelo que usaban las 3 ramas del workflo
 const MAX_MSG_LEN = 600; // el workflow n8n no tenía límite; lo añadimos: gasta OpenAI por petición
 const MAX_HISTORIAL = 10; // igual que contextWindowLength:10 en memoryPostgresChat del workflow
 const MAX_PASOS_TOOLS = 4; // tope del loop de function-calling (igual idea que chat-facturas, cap 5)
+// Sin tope, una respuesta podía crecer todo lo que OpenAI dejara (miles de
+// tokens): coste y latencia sin control en un endpoint público sin
+// autenticar. ~700 tokens es de sobra para el formato que pide el prompt
+// ("1–2 frases + viñetas, máx. ~6 líneas"); el único caso que se resiente es
+// pedir la carta COMPLETA enumerada dentro del chat, algo que la web ya
+// cubre en /carta y que no es la función de un asistente conversacional.
+const MAX_TOKENS_RESPUESTA = 700;
+// Antes cada llamada a consultar_carta/consultar_vinos SIN filtro devolvía
+// las 128/185 filas enteras, y ese JSON se queda en `messages` para TODAS
+// las llamadas a OpenAI que queden en el loop (hasta MAX_PASOS_TOOLS, cada
+// una reenvía el historial completo). Con tope no se pierde capacidad de
+// recomendar: nada queda inalcanzable — el propio prompt ya le dice al
+// modelo que repita la llamada con categoria/busqueda para acotar cuando
+// haga falta (ver buildSystemPrompt, "vuelve a llamar a la herramienta").
+const LIMITE_FILAS_TOOL = 30;
+
+// ── Secreto de firma del id de sesión ───────────────────────────────────
+// Ver justificación completa en session-token.ts. A diferencia del rate
+// limiter (fail-closed a propósito), esto NO bloquea el chat si falta: las
+// sesiones se siguen firmando igual, solo que con una clave aleatoria por
+// cold start. Un reinicio de isolate hace que esa sesión concreta deje de
+// reconocerse (se trata como conversación nueva, memoria vacía) — nunca que
+// se deje de firmar ni que se vuelva a confiar en el id "a pelo" del cliente.
+const CHAT_WEB_SESSION_SECRET = Deno.env.get("CHAT_WEB_SESSION_SECRET");
+if (!CHAT_WEB_SESSION_SECRET) {
+  console.warn(
+    "[chat-web] CHAT_WEB_SESSION_SECRET no configurado: firmando sesiones con una clave aleatoria por cold start.",
+  );
+}
+const SESSION_SECRET = CHAT_WEB_SESSION_SECRET || crypto.randomUUID();
 
 const RATE_LIMIT_SESSION_POR_MIN = 8; // mensajes de usuario por sesión en 60s
 const RATE_LIMIT_IP_POR_MIN = 15; // mensajes de usuario por IP en 60s
@@ -569,13 +607,21 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, idiom: Idi
         const excl = args.excluir_alergenos.map((a: string) => String(a).toLowerCase());
         rows = rows.filter((r: any) => !alergenosDe(r).some((a) => excl.includes(String(a).toLowerCase())));
       }
-      const salida = rows.map((r: any) => ({
+      const totalCoincidencias = rows.length;
+      const salida = rows.slice(0, LIMITE_FILAS_TOOL).map((r: any) => ({
         nombre: localizar(r, "nombre", idiom),
         categoria: localizar(r, "categoria", idiom),
         precio_eur: r.precio_eur,
         alergenos: alergenosDe(r),
       }));
-      return JSON.stringify({ total: salida.length, platos: salida });
+      return JSON.stringify({
+        total: totalCoincidencias,
+        mostrados: salida.length,
+        ...(totalCoincidencias > salida.length
+          ? { aviso: "Hay más platos que no se muestran: repite la llamada con categoria o busqueda para acotar." }
+          : {}),
+        platos: salida,
+      });
     }
 
     if (nombre === "consultar_vinos") {
@@ -596,14 +642,22 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, idiom: Idi
         const excl = args.excluir_alergenos.map((a: string) => String(a).toLowerCase());
         rows = rows.filter((r: any) => !alergenosDe(r).some((a) => excl.includes(String(a).toLowerCase())));
       }
-      const salida = rows.map((r: any) => ({
+      const totalCoincidencias = rows.length;
+      const salida = rows.slice(0, LIMITE_FILAS_TOOL).map((r: any) => ({
         nombre: localizar(r, "nombre", idiom),
         categoria: localizar(r, "categoria", idiom),
         precio_eur: r.precio_eur,
         denominacion_origen: r.denominacion_origen,
         alergenos: alergenosDe(r),
       }));
-      return JSON.stringify({ total: salida.length, vinos: salida });
+      return JSON.stringify({
+        total: totalCoincidencias,
+        mostrados: salida.length,
+        ...(totalCoincidencias > salida.length
+          ? { aviso: "Hay más vinos que no se muestran: repite la llamada con categoria, denominacion_origen o busqueda para acotar." }
+          : {}),
+        vinos: salida,
+      });
     }
 
     return JSON.stringify({ error: `Herramienta desconocida: ${nombre}` });
@@ -615,8 +669,14 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, idiom: Idi
   }
 }
 
-function responder(success: boolean, respuesta: string) {
-  return new Response(JSON.stringify({ success, respuesta }), {
+// `sessionToken` va en TODAS las respuestas (ver session-token.ts): es lo
+// que el frontend debe reenviar como `id` la próxima vez. Se omite del JSON
+// solo si, por lo que sea, no se llegó a firmar ninguno (ver el `catch`
+// exterior del handler).
+function responder(success: boolean, respuesta: string, sessionToken?: string | null) {
+  const cuerpo: Record<string, unknown> = { success, respuesta };
+  if (sessionToken) cuerpo.sessionToken = sessionToken;
+  return new Response(JSON.stringify(cuerpo), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -626,8 +686,16 @@ function responder(success: boolean, respuesta: string) {
 // sí debe distinguir "te has pasado" (429) de "el limitador está caído" (503).
 // El cuerpo mantiene {success, respuesta} y añade `codigo` para que el frontend
 // pueda distinguirlos sin tener que mirar el texto.
-function responderConEstado(status: number, codigo: string, respuesta: string, retryAfterSegundos: number) {
-  return new Response(JSON.stringify({ success: false, respuesta, codigo }), {
+function responderConEstado(
+  status: number,
+  codigo: string,
+  respuesta: string,
+  retryAfterSegundos: number,
+  sessionToken?: string | null,
+) {
+  const cuerpo: Record<string, unknown> = { success: false, respuesta, codigo };
+  if (sessionToken) cuerpo.sessionToken = sessionToken;
+  return new Response(JSON.stringify(cuerpo), {
     status,
     headers: {
       ...corsHeaders,
@@ -739,6 +807,9 @@ serve(async (req) => {
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let idiom: Idioma = "es";
+  // Visible también desde el `catch` exterior para poder devolver el
+  // `sessionToken` incluso si algo revienta después de calcularlo.
+  let sessionToken: string | null = null;
 
   try {
     const body = await parsearCuerpo(req);
@@ -749,30 +820,40 @@ serve(async (req) => {
     // usa `idioma` cuando habla con Supabase REST y `idiom` cuando habla con
     // esta función, así que cualquiera de los tres resuelve igual.
     idiom = idiomaValido(body.idiom ?? body.idioma ?? body.language);
-    const idCrudo = body.id;
-    const id = typeof idCrudo === "string" && idCrudo.trim() ? idCrudo.trim().slice(0, 128) : crypto.randomUUID();
+
+    // `id` YA NO es de fiar tal cual (ver session-token.ts): tiene que venir
+    // firmado por ESTA función. Sin un token que verifique — falta, formato
+    // roto, o el id de otra persona sin su firma — se trata como visitante
+    // nuevo: id y token propios, nunca se reutiliza el historial ajeno.
+    const tokenEntrante = typeof body.id === "string" ? body.id.trim().slice(0, 512) : "";
+    const idVerificado = tokenEntrante ? await verificarSessionToken(SESSION_SECRET, tokenEntrante) : null;
+    const id = idVerificado ?? crypto.randomUUID();
+    sessionToken = idVerificado ? tokenEntrante : await firmarSessionToken(SESSION_SECRET, id);
+
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
-    console.log("[chat-web] idiom:", idiom, "· id:", id, "· len(mensaje):", mensaje.length);
+    console.log(
+      "[chat-web] idiom:", idiom, "· id:", id, "· sesión nueva:", !idVerificado, "· len(mensaje):", mensaje.length,
+    );
 
-    if (!mensaje) return responder(false, MENSAJES_FIJOS[idiom].vacio);
-    if (mensaje.length > MAX_MSG_LEN) return responder(false, MENSAJES_FIJOS[idiom].largo);
+    if (!mensaje) return responder(false, MENSAJES_FIJOS[idiom].vacio, sessionToken);
+    if (mensaje.length > MAX_MSG_LEN) return responder(false, MENSAJES_FIJOS[idiom].largo, sessionToken);
 
     const sessionId = `${id}_${idiom}`;
 
     // ── Rate limit: capa rápida en memoria, luego capa persistente ──
     // La capa rápida se queda tal cual: no es autoritativa (por isolate), así
     // que sigue devolviendo 200 + mensaje amable.
-    if (fastPathBloqueado(ip ?? sessionId)) return responder(false, MENSAJES_FIJOS[idiom].rapido);
+    if (fastPathBloqueado(ip ?? sessionId)) return responder(false, MENSAJES_FIJOS[idiom].rapido, sessionToken);
 
     // La capa persistente SÍ es autoritativa y falla CERRADA: si no se puede
     // consultar, no se atiende la petición (ver comprobarLimitePersistente).
     const estadoLimite = await comprobarLimitePersistente(supabase, sessionId, ip);
     if (estadoLimite === "limite_superado") {
-      return responderConEstado(429, "rate_limited", MENSAJES_FIJOS[idiom].rapido, 60);
+      return responderConEstado(429, "rate_limited", MENSAJES_FIJOS[idiom].rapido, 60, sessionToken);
     }
     if (estadoLimite === "limitador_no_disponible") {
-      return responderConEstado(503, "rate_limit_unavailable", MENSAJES_FIJOS[idiom].no_disponible, 30);
+      return responderConEstado(503, "rate_limit_unavailable", MENSAJES_FIJOS[idiom].no_disponible, 30, sessionToken);
     }
 
     // ── Config dinámica por idioma (fallback a defaults si falla o no existe fila) ──
@@ -844,7 +925,13 @@ serve(async (req) => {
         const res = await fetch(`${OPENAI}/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-          body: JSON.stringify({ model: MODEL, messages, tools: TOOLS, temperature: 0.4 }),
+          body: JSON.stringify({
+            model: MODEL,
+            messages,
+            tools: TOOLS,
+            temperature: 0.4,
+            max_tokens: MAX_TOKENS_RESPUESTA,
+          }),
         });
         if (!res.ok) throw new Error(`OpenAI chat ${res.status}: ${await res.text()}`);
         const choice = (await res.json()).choices[0];
@@ -870,7 +957,7 @@ serve(async (req) => {
       }
     } catch (e) {
       console.error("[chat-web] OpenAI falló:", e);
-      return responder(false, MENSAJES_FIJOS[idiom].generico);
+      return responder(false, MENSAJES_FIJOS[idiom].generico, sessionToken);
     }
 
     // ── Persistir el turno (solo tras una respuesta real del modelo) ──
@@ -889,9 +976,9 @@ serve(async (req) => {
       console.error("[chat-web] no se pudo guardar el turno en memoria:", e);
     }
 
-    return responder(true, respuesta);
+    return responder(true, respuesta, sessionToken);
   } catch (error) {
     console.error("[chat-web] Error:", error);
-    return responder(false, MENSAJES_FIJOS[idiom].generico);
+    return responder(false, MENSAJES_FIJOS[idiom].generico, sessionToken);
   }
 });
