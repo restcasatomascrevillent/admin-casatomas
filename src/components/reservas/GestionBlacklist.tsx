@@ -9,16 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Edit, Mail, Phone, ShieldBan } from "lucide-react";
+import { Plus, Trash2, Edit, Mail, Phone, ShieldBan, ShieldCheck, CalendarOff } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { 
-  useBlacklist, 
-  useCrearBlacklist, 
-  useActualizarBlacklist, 
+import {
+  useBlacklist,
+  useCrearBlacklist,
+  useActualizarBlacklist,
   useEliminarBlacklist,
-  BlacklistEntry 
+  BlacklistEntry
 } from "@/hooks/useBlacklist";
+import { SugerenciasBlacklist } from "./SugerenciasBlacklist";
 
 export function GestionBlacklist() {
   const { data: blacklist, isLoading } = useBlacklist();
@@ -98,7 +99,13 @@ export function GestionBlacklist() {
   }
 
   return (
-    <Card>
+    <div className="space-y-6">
+      {/* El sistema propone (ausencias detectadas por el cron diario), una
+          persona decide. Va encima de la tabla: son las que necesitan
+          revisión ahora, la tabla de abajo es el registro ya resuelto. */}
+      <SugerenciasBlacklist />
+
+      <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -200,6 +207,7 @@ export function GestionBlacklist() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Motivo</TableHead>
                 <TableHead>Fecha</TableHead>
+                <TableHead>Caduca</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -218,11 +226,30 @@ export function GestionBlacklist() {
                   </TableCell>
                   <TableCell className="font-mono text-sm">{entry.valor}</TableCell>
                   <TableCell>{entry.nombre || "-"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {entry.motivo || "-"}
+                  <TableCell className="max-w-[200px]">
+                    <p className="truncate">{entry.motivo || "-"}</p>
+                    {entry.aprobada_en && (
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <ShieldCheck className="h-3 w-3 shrink-0" />
+                        Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {entry.caduca_el ? (
+                      <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-300 font-normal gap-1">
+                        <ShieldCheck className="h-3 w-3" />
+                        {format(new Date(`${entry.caduca_el}T00:00:00`), "dd MMM yyyy", { locale: es })}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground font-normal gap-1">
+                        <CalendarOff className="h-3 w-3" />
+                        Sin caducidad
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -262,6 +289,7 @@ export function GestionBlacklist() {
           </Table>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }

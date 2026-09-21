@@ -10,6 +10,17 @@ export interface BlacklistEntry {
   motivo: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * NUEVO (migración 20260920010000_sistema_emails_reserva.sql, aún no
+   * aplicada). Todas opcionales a propósito: una entrada dada de alta a mano
+   * desde GestionBlacklist.tsx (no pasa por una sugerencia) nunca las tiene,
+   * y si la migración no está aplicada tampoco existen en la fila — esto usa
+   * `select("*")` así que sencillamente no vienen, sin romper la consulta.
+   */
+  aprobado_por?: string | null;
+  aprobada_en?: string | null;
+  /** Fecha (YYYY-MM-DD) a partir de la cual esta entrada deja de aplicar. */
+  caduca_el?: string | null;
 }
 
 export function useBlacklist() {

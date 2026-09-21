@@ -5,10 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   CheckCircle,
+  CheckCheck,
   XCircle,
   Clock,
   Search,
@@ -29,19 +31,18 @@ import { cn } from "@/lib/utils";
 import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
 import { BlacklistModal } from "./BlacklistModal";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import {
+  type ReservaParaVerificar,
+  aceptarComoSolicitado,
+  aceptarVariasComoSolicitado,
+} from "@/hooks/useVerificacionReservas";
 
-interface Reservation {
-  id: string;
-  fecha: string;
-  hora: string;
-  numero_comensales: number;
-  estado: string;
-  notas_cliente: string | null;
-  nombre: string;
-  telefono: string;
-  email: string | null;
-  canal: 'telefono' | 'web' | 'manual' | null;
-}
+// Mismo tipo que consume ModalVerificacionReserva.tsx — fuente única del
+// contrato con `reservas` (incluye espacio_id y, si la migración
+// 20260920010000 ya está aplicada, hora_solicitada/espacio_solicitado_id
+// para la comparación "pedido vs. ofrecido").
+type Reservation = ReservaParaVerificar;
 
 interface ListaReservasAvanzadaProps {
   onEditReserva?: (reserva: Reservation) => void;
@@ -65,6 +66,11 @@ export function ListaReservasAvanzada({
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<Reservation | null>(null);
+  // Selección para aceptar en bloque — solo pendientes participan.
+  const [seleccionadas, setSeleccionadas] = useState<Set<string>>(new Set());
+  const [aceptandoBloque, setAceptandoBloque] = useState(false);
+
+  const { canAccess: canEdit } = useCanAccessSection("reservas", "edit");
 
   const toggleImportante = async (reservation: Reservation) => {
     const nuevoValor = !(reservation as any).importante;
@@ -90,14 +96,24 @@ export function ListaReservasAvanzada({
     fetchReservations();
   }, []);
 
+  // `select("*")` a propósito, no una lista de columnas: `hora_solicitada`/
+  // `espacio_solicitado_id` (migración 20260920010000) todavía no están en
+  // los tipos generados, y nombrarlas explícitamente en un `.select(...)`
+  // literal hace que el propio compilador de Supabase infiera
+  // `SelectQueryError<"column ... does not exist">` para TODA la consulta
+  // (falla en build, no solo en runtime). `*` no tiene ese problema — trae
+  // lo que exista en la tabla en cada momento, ni más ni menos — y es el
+  // mismo patrón que ya usa `useBlacklist.ts` para las columnas nuevas de
+  // `blacklist`. Si la migración no está aplicada, las dos columnas
+  // simplemente no vienen en cada fila: `ReservaParaVerificar` las declara
+  // opcionales y el resto del código (objetivoAceptarComoSolicitado,
+  // difiereSolicitudDeOferta) ya trata su ausencia como "sin contraoferta
+  // todavía", no como un error.
   const fetchReservations = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("reservas")
-      .select(`
-        id, fecha, hora, numero_comensales, estado, notas_cliente,
-        nombre, telefono, email, canal
-      `)
+      .select("*")
       .order("fecha", { ascending: false })
       .order("hora", { ascending: true });
 
@@ -137,6 +153,55 @@ export function ListaReservasAvanzada({
       fetchReservations();
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  // Un clic: acepta una solicitud pendiente exactamente como la pidió el
+  // cliente (ver useVerificacionReservas.ts). Requisito explícito del dueño
+  // ("hay mucho volumen"): esto NO abre el modal de contraoferta.
+  const handleAceptarUnaClic = async (reservation: Reservation) => {
+    setUpdatingId(reservation.id);
+    try {
+      const resultado = await aceptarComoSolicitado(reservation);
+      if (resultado.ok) fetchReservations();
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const toggleSeleccion = (id: string) => {
+    setSeleccionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const pendientesVisibles = () => filteredReservations.filter((r) => r.estado === "pendiente");
+
+  const toggleSeleccionarTodasPendientes = () => {
+    const pendientes = pendientesVisibles();
+    setSeleccionadas((prev) => {
+      const todasYaSeleccionadas = pendientes.length > 0 && pendientes.every((r) => prev.has(r.id));
+      if (todasYaSeleccionadas) return new Set();
+      return new Set(pendientes.map((r) => r.id));
+    });
+  };
+
+  // Acción en bloque: no navega ni cambia de filtro al terminar, así que la
+  // lista no "salta" — las filas aceptadas simplemente desaparecen del
+  // filtro "Pendiente" al refrescar, sin perder el sitio en el resto.
+  const handleAceptarSeleccionadas = async () => {
+    const elegidas = reservations.filter((r) => seleccionadas.has(r.id));
+    if (elegidas.length === 0) return;
+    setAceptandoBloque(true);
+    try {
+      await aceptarVariasComoSolicitado(elegidas);
+      setSeleccionadas(new Set());
+      fetchReservations();
+    } finally {
+      setAceptandoBloque(false);
     }
   };
 
@@ -359,6 +424,27 @@ export function ListaReservasAvanzada({
         </CardContent>
       </Card>
 
+      {/* Barra de acción en bloque — aceptar varias solicitudes pendientes a
+          la vez sin abrir una ficha por cada una. Solo con permiso de edición. */}
+      {canEdit && seleccionadas.size > 0 && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm font-medium">
+              {seleccionadas.size} solicitud{seleccionadas.size === 1 ? "" : "es"} seleccionada{seleccionadas.size === 1 ? "" : "s"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSeleccionadas(new Set())} disabled={aceptandoBloque}>
+                Quitar selección
+              </Button>
+              <Button size="sm" onClick={handleAceptarSeleccionadas} disabled={aceptandoBloque}>
+                {aceptandoBloque ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCheck className="h-4 w-4 mr-1" />}
+                Aceptar seleccionadas tal cual
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Mobile card view */}
       <div className="sm:hidden space-y-3">
         {filteredReservations.length === 0 ? (
@@ -373,6 +459,14 @@ export function ListaReservasAvanzada({
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    {reservation.estado === "pendiente" && canEdit && (
+                      <Checkbox
+                        checked={seleccionadas.has(reservation.id)}
+                        onCheckedChange={() => toggleSeleccion(reservation.id)}
+                        className="shrink-0"
+                        aria-label="Seleccionar para aceptar en bloque"
+                      />
+                    )}
                     <button onClick={() => toggleImportante(reservation)} className="shrink-0">
                       <Star className={cn("h-4 w-4", (reservation as any).importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
                     </button>
@@ -391,19 +485,25 @@ export function ListaReservasAvanzada({
                     <Phone className="h-3 w-3" />{reservation.telefono}
                   </p>
                 )}
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1 flex-wrap">
+                  {reservation.estado === "pendiente" && canEdit && (
+                    <Button size="sm" className="h-7 text-xs" disabled={updatingId === reservation.id || aceptandoBloque} onClick={() => handleAceptarUnaClic(reservation)}>
+                      {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                      Aceptar
+                    </Button>
+                  )}
                   {reservation.estado === "pendiente" && (
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
                       setSelectedReservaForVerification(reservation);
                       setVerificacionModalOpen(true);
                     }}>Verificar</Button>
                   )}
-                  {reservation.estado === "verificada" && (
+                  {reservation.estado === "verificada" && canEdit && (
                     <Button size="sm" className="h-7 text-xs" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "confirmada")}>
                       {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirmar"}
                     </Button>
                   )}
-                  {reservation.estado !== "cancelada" && (
+                  {reservation.estado !== "cancelada" && canEdit && (
                     <Button size="sm" variant="destructive" className="h-7 text-xs" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "cancelada")}>
                       {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancelar"}
                     </Button>
@@ -424,6 +524,16 @@ export function ListaReservasAvanzada({
           <Table>
             <TableHeader>
               <TableRow>
+                {canEdit && (
+                  <TableHead className="w-[36px]">
+                    <Checkbox
+                      checked={pendientesVisibles().length > 0 && pendientesVisibles().every((r) => seleccionadas.has(r.id))}
+                      onCheckedChange={toggleSeleccionarTodasPendientes}
+                      disabled={pendientesVisibles().length === 0}
+                      aria-label="Seleccionar todas las pendientes visibles"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Fecha</TableHead>
                 <TableHead>Hora</TableHead>
                 <TableHead>Cliente</TableHead>
@@ -437,13 +547,24 @@ export function ListaReservasAvanzada({
             <TableBody>
               {filteredReservations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-8 text-muted-foreground">
                     No se encontraron reservas con los filtros aplicados
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredReservations.map((reservation) => (
                   <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
+                    {canEdit && (
+                      <TableCell>
+                        {reservation.estado === "pendiente" && (
+                          <Checkbox
+                            checked={seleccionadas.has(reservation.id)}
+                            onCheckedChange={() => toggleSeleccion(reservation.id)}
+                            aria-label="Seleccionar para aceptar en bloque"
+                          />
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       {new Date(reservation.fecha).toLocaleDateString("es-ES")}
                     </TableCell>
@@ -465,19 +586,25 @@ export function ListaReservasAvanzada({
                     <TableCell>{getCanalBadge(reservation.canal)}</TableCell>
                     <TableCell>{getStatusBadge(reservation.estado)}</TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {reservation.estado === "pendiente" && canEdit && (
+                          <Button size="sm" disabled={updatingId === reservation.id || aceptandoBloque} onClick={() => handleAceptarUnaClic(reservation)}>
+                            {updatingId === reservation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                            Aceptar
+                          </Button>
+                        )}
                         {reservation.estado === "pendiente" && (
                           <Button size="sm" variant="outline" onClick={() => {
                             setSelectedReservaForVerification(reservation);
                             setVerificacionModalOpen(true);
                           }}>Verificar</Button>
                         )}
-                        {reservation.estado === "verificada" && (
+                        {reservation.estado === "verificada" && canEdit && (
                           <Button size="sm" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "confirmada")}>
                             {updatingId === reservation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar"}
                           </Button>
                         )}
-                        {reservation.estado !== "cancelada" && (
+                        {reservation.estado !== "cancelada" && canEdit && (
                           <Button size="sm" variant="destructive" disabled={updatingId === reservation.id} onClick={() => updateReservationStatus(reservation.id, "cancelada")}>
                             {updatingId === reservation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancelar"}
                           </Button>
