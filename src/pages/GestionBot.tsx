@@ -7,12 +7,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Loader2, Save, Bot, Utensils, Wine, MessageSquare, X, Search } from "lucide-react";
-import { useConfigBotWeb } from "@/hooks/useConfigBotWeb";
+import { useConfigBotWeb, type IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useVinos } from "@/hooks/useVinos";
 
+const IDIOMAS: { value: IdiomaBotWeb; label: string }[] = [
+  { value: "es", label: "🇪🇸 Español" },
+  { value: "en", label: "🇬🇧 English" },
+  { value: "fr", label: "🇫🇷 Français" },
+];
+
 export default function GestionBot() {
-  const { config, isLoading, updateConfig } = useConfigBotWeb();
+  const [idioma, setIdioma] = useState<IdiomaBotWeb>("es");
+  const { config, isLoading, updateConfig } = useConfigBotWeb(idioma);
   const { platos, isLoading: loadingPlatos } = usePlatos();
   const { vinos, isLoading: loadingVinos } = useVinos();
 
@@ -26,16 +33,17 @@ export default function GestionBot() {
   const [buscarVino, setBuscarVino] = useState("");
 
   useEffect(() => {
-    if (config) {
-      setTono(config.tono ?? "");
-      setMensajeBienvenida(config.mensaje_bienvenida ?? "");
-      const platosStr = config.platos_recomendados ?? "";
-      setPlatosSeleccionados(platosStr ? platosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-      const vinosStr = config.vinos_recomendados ?? "";
-      setVinosSeleccionados(vinosStr ? vinosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-      setInstruccionesExtra(config.instrucciones_extra ?? "");
-      setFrasesPersonalizadas(config.frases_personalizadas ?? "");
-    }
+    // Sin "if (config)": al cambiar de idioma config pasa por null/undefined
+    // mientras carga o si esa fila todavía no existe, y el formulario debe
+    // limpiarse en vez de seguir mostrando los datos del idioma anterior.
+    setTono(config?.tono ?? "");
+    setMensajeBienvenida(config?.mensaje_bienvenida ?? "");
+    const platosStr = config?.platos_recomendados ?? "";
+    setPlatosSeleccionados(platosStr ? platosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
+    const vinosStr = config?.vinos_recomendados ?? "";
+    setVinosSeleccionados(vinosStr ? vinosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
+    setInstruccionesExtra(config?.instrucciones_extra ?? "");
+    setFrasesPersonalizadas(config?.frases_personalizadas ?? "");
   }, [config]);
 
   const handleSaveAll = async () => {
@@ -123,6 +131,24 @@ export default function GestionBot() {
             Guardar todo
           </Button>
         </div>
+
+        {/* Selector de idioma: configBotWeb tiene una fila por idioma */}
+        <ToggleGroup
+          type="single"
+          value={idioma}
+          onValueChange={(val) => val && setIdioma(val as IdiomaBotWeb)}
+          className="flex flex-wrap gap-2">
+
+          {IDIOMAS.map((i) =>
+          <ToggleGroupItem
+            key={i.value}
+            value={i.value}
+            className="px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+
+              {i.label}
+            </ToggleGroupItem>
+          )}
+        </ToggleGroup>
 
         {/* Pregunta 1: Tono */}
         <Card>
