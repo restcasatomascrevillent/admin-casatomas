@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 export interface Plato {
   id: string;
@@ -37,15 +39,15 @@ export interface NuevoPlato {
   orden?: string;
 }
 
+/**
+ * Deja la lista de alérgenos en el vocabulario canónico (ver
+ * `src/lib/alergenos.ts`): acepta snake_case antiguo, acentos, mayúsculas y
+ * singular/plural, y devuelve siempre la misma forma sin duplicados. Es la
+ * última barrera antes de escribir en BD, para que ningún formulario cuele
+ * `frutos_cascara` junto a `frutos de cáscara`.
+ */
 function normalizarAlergenos(alergenos_oficiales: unknown): string[] {
-  if (!alergenos_oficiales) return [];
-  if (Array.isArray(alergenos_oficiales)) return alergenos_oficiales;
-  if (typeof alergenos_oficiales === "object") {
-    return Object.keys(alergenos_oficiales as Record<string, unknown>).filter(
-      (k) => (alergenos_oficiales as Record<string, unknown>)[k],
-    );
-  }
-  return [];
+  return combinarAlergenos(parseAlergenos(alergenos_oficiales));
 }
 
 /** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
@@ -72,12 +74,11 @@ async function traducirPlato(datos: {
   }
 }
 
-/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
- * guardado: si falla, solo se registra en consola (ver informe). */
-function dispararRebuildWebs(origen: string) {
-  supabase.functions
-    .invoke("rebuild-webs", { body: { origen } })
-    .catch((err) => console.error("rebuild-webs no disponible:", err));
+/** Avisa a rebuild-webs de que hay contenido nuevo y cuenta al usuario si el
+ * cambio se ha publicado o solo se ha guardado (ver `src/lib/rebuild-webs.ts`).
+ * Nunca bloquea ni rompe el guardado. */
+function avisar(mensajeBase: string) {
+  notificarGuardadoYPublicacion("plato", mensajeBase);
 }
 
 export function usePlatos() {
@@ -142,13 +143,11 @@ export function usePlatos() {
         toast.warning("Plato guardado sin traducción automática. Revísala más tarde en inglés/francés.");
       }
 
-      dispararRebuildWebs("plato");
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Plato creado. Se publicará en la web en unos minutos.");
+      avisar("Plato creado");
     },
     onError: (error) => {
       toast.error("Error al crear el plato");
@@ -158,6 +157,12 @@ export function usePlatos() {
 
   const actualizarPlato = useMutation({
     mutationFn: async ({ id, ...cambios }: Partial<Plato> & { id: string }) => {
+      // Si la edición toca alérgenos, se guarda en vocabulario canónico.
+      if ("alergenos_oficiales" in cambios) {
+        const normalizados = normalizarAlergenos(cambios.alergenos_oficiales);
+        cambios.alergenos_oficiales = normalizados.length > 0 ? normalizados : null;
+      }
+
       const { data, error } = await supabase
         .from("Platos")
         .update(cambios as any)
@@ -170,8 +175,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Plato actualizado");
-      dispararRebuildWebs("plato");
+      avisar("Plato actualizado");
     },
     onError: (error) => {
       toast.error("Error al actualizar el plato");
@@ -190,8 +194,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Plato eliminado");
-      dispararRebuildWebs("plato");
+      avisar("Plato eliminado");
     },
     onError: (error) => {
       toast.error("Error al eliminar el plato");
@@ -200,7 +203,7 @@ export function usePlatos() {
   });
 
   const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean }) => {
+    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Platos")
         .update({ activado })
@@ -208,9 +211,13 @@ export function usePlatos() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { activado, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      dispararRebuildWebs("plato");
+      avisar(
+        activado
+          ? `${nombre || "Plato"} vuelve a estar activo`
+          : `${nombre || "Plato"} despublicado: deja de verse en la web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -219,7 +226,7 @@ export function usePlatos() {
   });
 
   const toggleExpanded = useMutation({
-    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
+    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Platos")
         .update({ expanded })
@@ -227,8 +234,13 @@ export function usePlatos() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    // `expanded` se prerenderiza en la carta web, así que también hay que
+    // republicar (antes no se hacía y el cambio no llegaba nunca a la web).
+    onSuccess: (_data, { expanded, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
+      avisar(
+        `${nombre || "Plato"} se mostrará ${expanded ? "expandido" : "normal"} en la carta web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado de expandido");
@@ -247,7 +259,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Todas las fotos expandidas");
+      avisar("Todas las fotos expandidas");
     },
     onError: (error) => {
       toast.error("Error al expandir las fotos");
@@ -266,7 +278,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      toast.success("Todas las fotos contraídas");
+      avisar("Todas las fotos contraídas");
     },
     onError: (error) => {
       toast.error("Error al contraer las fotos");
@@ -285,7 +297,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      dispararRebuildWebs("plato");
+      avisar("Visibilidad en Restaurante actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -304,7 +316,7 @@ export function usePlatos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      dispararRebuildWebs("plato");
+      avisar("Visibilidad en Touza actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");
@@ -328,6 +340,7 @@ export function usePlatos() {
     crearPlato,
     actualizarPlato,
     eliminarPlato,
+    toggleActivado,
     toggleExpanded,
     expandirTodos,
     contraerTodos,

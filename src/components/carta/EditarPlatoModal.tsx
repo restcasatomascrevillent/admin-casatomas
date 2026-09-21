@@ -32,25 +32,12 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
-
-const ALERGENOS_OFICIALES = [
-  { id: "gluten", label: "Gluten" },
-  { id: "crustaceos", label: "Crustáceos" },
-  { id: "huevo", label: "Huevo" },
-  { id: "pescado", label: "Pescado" },
-  { id: "cacahuetes", label: "Cacahuetes" },
-  { id: "frutos_cascara", label: "Frutos de cáscara" },
-  { id: "lacteos", label: "Lácteos" },
-  { id: "apio", label: "Apio" },
-  { id: "mostaza", label: "Mostaza" },
-  { id: "sesamo", label: "Sésamo" },
-  { id: "sulfitos", label: "Sulfitos" },
-  { id: "altramuces", label: "Altramuces" },
-  { id: "moluscos", label: "Moluscos" },
-  { id: "soja", label: "Soja" },
-];
-
-const ALERGENOS_OFICIALES_IDS = new Set(ALERGENOS_OFICIALES.map((item) => item.id));
+import {
+  ALERGENOS_OFICIALES,
+  combinarAlergenos,
+  normalizarAlergeno,
+  separarAlergenos,
+} from "@/lib/alergenos";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -67,20 +54,6 @@ interface EditarPlatoModalProps {
   onOpenChange: (open: boolean) => void;
   plato: Plato | null;
 }
-
-const parseAlergenos = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-
-  if (value && typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>)
-      .filter(([, enabled]) => Boolean(enabled))
-      .map(([key]) => key);
-  }
-
-  return [];
-};
 
 export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModalProps) {
   const { actualizarPlato, categorias, unidades } = usePlatos();
@@ -110,7 +83,10 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
   useEffect(() => {
     if (!open || !plato) return;
 
-    const alergenos = parseAlergenos(plato.alergenos_oficiales);
+    // Clasifica lo guardado en oficiales (ya en forma canónica, para que las
+    // casillas se marquen solas aunque en BD estuviera `frutos_cascara` o
+    // `Frutos de Cáscara`) y personalizados de verdad.
+    const { oficiales, personalizados } = separarAlergenos(plato.alergenos_oficiales);
 
     form.reset({
       nombre: plato.nombre ?? "",
@@ -122,8 +98,8 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       alergenos_notas: plato.alergenos_notas ?? "",
     });
 
-    setAlergenosSeleccionados(alergenos.filter((item) => ALERGENOS_OFICIALES_IDS.has(item)));
-    setAlergenosPersonalizados(alergenos.filter((item) => !ALERGENOS_OFICIALES_IDS.has(item)));
+    setAlergenosSeleccionados(oficiales);
+    setAlergenosPersonalizados(personalizados);
     setNuevoAlergeno("");
 
     setImageFile(null);
@@ -142,8 +118,23 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
 
   const addAlergenoPersonalizado = () => {
     const trimmed = nuevoAlergeno.trim();
-    if (!trimmed || alergenosPersonalizados.includes(trimmed)) return;
-    setAlergenosPersonalizados((prev) => [...prev, trimmed]);
+    if (!trimmed) return;
+
+    // Si lo escrito a mano es en realidad un alérgeno oficial (con o sin
+    // acentos, singular o plural), se marca su casilla en lugar de añadir una
+    // entrada suelta que acabaría duplicada en la web.
+    const canonico = normalizarAlergeno(trimmed);
+    if (canonico) {
+      setAlergenosSeleccionados((prev) =>
+        prev.includes(canonico) ? prev : [...prev, canonico]
+      );
+      setNuevoAlergeno("");
+      return;
+    }
+
+    if (!alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
+    }
     setNuevoAlergeno("");
   };
 
@@ -179,7 +170,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
 
     setIsUploadingImage(true);
     try {
-      const alergenos = [...alergenosSeleccionados, ...alergenosPersonalizados];
+      const alergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
       let imageUrlUpdate: string | null | undefined = undefined;
 
       if (imageFile) {

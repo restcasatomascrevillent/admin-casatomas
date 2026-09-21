@@ -22,24 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarPlatoModal } from "./EditarPlatoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
-
-// Mapeo de alérgenos oficiales
-const ALERGENOS_MAP: Record<string, string> = {
-  gluten: "Gluten",
-  crustaceos: "Crustáceos",
-  huevo: "Huevo",
-  pescado: "Pescado",
-  cacahuetes: "Cacahuetes",
-  frutos_cascara: "Frutos de cáscara",
-  lacteos: "Lácteos",
-  apio: "Apio",
-  mostaza: "Mostaza",
-  sesamo: "Sésamo",
-  sulfitos: "Sulfitos",
-  altramuces: "Altramuces",
-  moluscos: "Moluscos",
-  soja: "Soja",
-};
+import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -49,7 +32,14 @@ interface ListaPlatosProps {
 }
 
 export function ListaPlatos({ platos }: ListaPlatosProps) {
-  const { toggleExpanded, eliminarPlato, toggleRestaurante, toggleTouza, actualizarPlato } = usePlatos();
+  const {
+    toggleExpanded,
+    toggleActivado,
+    eliminarPlato,
+    toggleRestaurante,
+    toggleTouza,
+    actualizarPlato,
+  } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
   const [platoAEditar, setPlatoAEditar] = useState<Plato | null>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
@@ -75,18 +65,12 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   };
 
   const handleToggleExpanded = (plato: Plato, checked: boolean) => {
-    toggleExpanded.mutate(
-      { id: plato.id, expanded: checked },
-      {
-        onSuccess: () => {
-          toast.success(
-            checked 
-              ? `${plato.nombre} se mostrará expandido` 
-              : `${plato.nombre} se mostrará normal`
-          );
-        },
-      }
-    );
+    // El toast (y el aviso de si se ha publicado o no) lo emite el hook.
+    toggleExpanded.mutate({
+      id: plato.id,
+      expanded: checked,
+      nombre: plato.nombre ?? undefined,
+    });
   };
 
   const handleEliminar = () => {
@@ -198,6 +182,15 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: plato.id, restaurante: checked })}
                 onTouzaChange={(checked) => toggleTouza.mutate({ id: plato.id, touza: checked })}
                 isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                activado={plato.activado ?? true}
+                onActivadoChange={(checked) =>
+                  toggleActivado.mutate({
+                    id: plato.id,
+                    activado: checked,
+                    nombre: plato.nombre ?? undefined,
+                  })
+                }
+                isActivadoPending={toggleActivado.isPending}
                 compact
               />
 
@@ -238,20 +231,17 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               </div>
 
               {/* Mostrar alérgenos oficiales como badges */}
-              {plato.alergenos_oficiales && Array.isArray(plato.alergenos_oficiales) && plato.alergenos_oficiales.length > 0 && (
+              {parseAlergenos(plato.alergenos_oficiales).length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-2 border-t">
-                  {(plato.alergenos_oficiales as string[]).map((alergeno) => {
-                    const label = ALERGENOS_MAP[alergeno] || alergeno;
-                    return (
-                      <Badge 
-                        key={alergeno} 
-                        variant="outline" 
-                        className="text-xs py-0 px-1.5"
-                      >
-                        {label}
-                      </Badge>
-                    );
-                  })}
+                  {parseAlergenos(plato.alergenos_oficiales).map((alergeno) => (
+                    <Badge
+                      key={alergeno}
+                      variant="outline"
+                      className="text-xs py-0 px-1.5"
+                    >
+                      {etiquetaAlergeno(alergeno)}
+                    </Badge>
+                  ))}
                 </div>
               )}
 

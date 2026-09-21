@@ -16,13 +16,14 @@ import {
 import { useCocteles, Coctel } from "@/hooks/useCocteles";
 import { cn } from "@/lib/utils";
 import { VisibilidadToggles } from "./VisibilidadToggles";
+import { etiquetaAlergeno } from "@/lib/alergenos";
 
 interface ListaCoctelesProps {
   cocteles: Coctel[];
 }
 
 export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
-  const { eliminarCoctel, toggleRestaurante, toggleTouza } = useCocteles();
+  const { eliminarCoctel, toggleActivado, toggleRestaurante, toggleTouza } = useCocteles();
   const [coctelAEliminar, setCoctelAEliminar] = useState<Coctel | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(cocteles.map(c => c.id)));
 
@@ -123,6 +124,15 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
                 onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
                 isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                activado={coctel.activado ?? true}
+                onActivadoChange={(checked) =>
+                  toggleActivado.mutate({
+                    id: coctel.id,
+                    activado: checked,
+                    nombre: coctel.nombre ?? undefined,
+                  })
+                }
+                isActivadoPending={toggleActivado.isPending}
                 compact
               />
 
@@ -132,7 +142,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 <div className="flex flex-wrap gap-1 pt-2 border-t">
                   {(coctel.alergenos_oficiales as string[]).map((alergeno) => (
                     <Badge key={alergeno} variant="outline" className="text-[10px]">
-                      {alergeno}
+                      {etiquetaAlergeno(alergeno)}
                     </Badge>
                   ))}
                 </div>

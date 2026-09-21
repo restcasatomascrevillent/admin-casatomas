@@ -2,8 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Camera, X, Plus } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Camera, X, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,24 +32,11 @@ import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-// Alérgenos oficiales de la UE
-const ALERGENOS_OFICIALES = [
-  { id: "gluten", label: "Gluten" },
-  { id: "crustaceos", label: "Crustáceos" },
-  { id: "huevo", label: "Huevo" },
-  { id: "pescado", label: "Pescado" },
-  { id: "cacahuetes", label: "Cacahuetes" },
-  { id: "frutos_cascara", label: "Frutos de cáscara" },
-  { id: "lacteos", label: "Lácteos" },
-  { id: "apio", label: "Apio" },
-  { id: "mostaza", label: "Mostaza" },
-  { id: "sesamo", label: "Sésamo" },
-  { id: "sulfitos", label: "Sulfitos" },
-  { id: "altramuces", label: "Altramuces" },
-  { id: "moluscos", label: "Moluscos" },
-  { id: "soja", label: "Soja" },
-];
+import {
+  ALERGENOS_OFICIALES,
+  combinarAlergenos,
+  normalizarAlergeno,
+} from "@/lib/alergenos";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -69,8 +55,7 @@ interface PlatoFormProps {
 }
 
 export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
-  const { crearPlato, categorias, unidades } = usePlatos();
-  const queryClient = useQueryClient();
+  const { crearPlato, actualizarPlato, categorias, unidades } = usePlatos();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -104,10 +89,24 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
 
   const addAlergenoPersonalizado = () => {
     const trimmed = nuevoAlergeno.trim();
-    if (trimmed && !alergenosPersonalizados.includes(trimmed)) {
-      setAlergenosPersonalizados(prev => [...prev, trimmed]);
+    if (!trimmed) return;
+
+    // Si lo escrito a mano es en realidad un alérgeno oficial (escrito con o
+    // sin acentos, en singular o plural), se marca su casilla en vez de crear
+    // una entrada suelta: así no se guardan dos veces lo mismo.
+    const canonico = normalizarAlergeno(trimmed);
+    if (canonico) {
+      setAlergenosSeleccionados(prev =>
+        prev.includes(canonico) ? prev : [...prev, canonico]
+      );
       setNuevoAlergeno("");
+      return;
     }
+
+    if (!alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados(prev => [...prev, trimmed]);
+    }
+    setNuevoAlergeno("");
   };
 
   const removeAlergenoPersonalizado = (alergeno: string) => {
@@ -137,8 +136,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsUploading(true);
     try {
-      // Combinar alérgenos oficiales seleccionados + personalizados
-      const todosAlergenos = [...alergenosSeleccionados, ...alergenosPersonalizados];
+      // Combinar oficiales + personalizados en vocabulario canónico y sin
+      // duplicados (ver src/lib/alergenos.ts).
+      const todosAlergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
       
       // 1. Crear el plato primero
       const platoData: NuevoPlato = {
@@ -179,13 +179,13 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
             .from('platos')
             .getPublicUrl(fileName);
           
-          // Actualizar el plato con la URL de imagen
-          await supabase
-            .from('Platos')
-            .update({ imagen_url: urlData.publicUrl })
-            .eq('id', nuevoPlato.id);
-          
-          queryClient.invalidateQueries({ queryKey: ['platos'] });
+          // Se pasa por la mutación del hook (antes era un UPDATE directo a
+          // Supabase): así se invalida la caché y, sobre todo, se dispara la
+          // republicación de las webs — sin esto la foto no llegaba nunca.
+          await actualizarPlato.mutateAsync({
+            id: nuevoPlato.id,
+            imagen_url: urlData.publicUrl,
+          });
         }
       }
       
