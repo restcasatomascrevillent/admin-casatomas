@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 export interface Coctel {
   id: string;
@@ -66,12 +67,11 @@ async function traducirCoctel(datos: {
   }
 }
 
-/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
- * guardado: si falla, solo se registra en consola (ver informe). */
-function dispararRebuildWebs(origen: string) {
-  supabase.functions
-    .invoke("rebuild-webs", { body: { origen } })
-    .catch((err) => console.error("rebuild-webs no disponible:", err));
+/** Avisa a rebuild-webs de que hay contenido nuevo y cuenta al usuario si el
+ * cambio se ha publicado o solo se ha guardado (ver `src/lib/rebuild-webs.ts`).
+ * Nunca bloquea ni rompe el guardado. */
+function avisar(mensajeBase: string) {
+  notificarGuardadoYPublicacion("coctel", mensajeBase);
 }
 
 export function useCocteles() {
@@ -126,13 +126,11 @@ export function useCocteles() {
         toast.warning("Cóctel guardado sin traducción automática. Revísalo más tarde en inglés/francés.");
       }
 
-      dispararRebuildWebs("coctel");
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      toast.success("Cóctel creado. Se publicará en la web en unos minutos.");
+      avisar("Cóctel creado");
     },
     onError: (error) => {
       toast.error("Error al crear el cóctel");
@@ -154,8 +152,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      toast.success("Cóctel actualizado");
-      dispararRebuildWebs("coctel");
+      avisar("Cóctel actualizado");
     },
     onError: (error) => {
       toast.error("Error al actualizar el cóctel");
@@ -174,8 +171,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      toast.success("Cóctel eliminado");
-      dispararRebuildWebs("coctel");
+      avisar("Cóctel eliminado");
     },
     onError: (error) => {
       toast.error("Error al eliminar el cóctel");
@@ -184,7 +180,7 @@ export function useCocteles() {
   });
 
   const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean }) => {
+    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Cocteles")
         .update({ activado })
@@ -192,9 +188,13 @@ export function useCocteles() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { activado, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      dispararRebuildWebs("coctel");
+      avisar(
+        activado
+          ? `${nombre || "Cóctel"} vuelve a estar activo`
+          : `${nombre || "Cóctel"} despublicado: deja de verse en la web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -213,7 +213,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      dispararRebuildWebs("coctel");
+      avisar("Visibilidad en Restaurante actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -232,7 +232,7 @@ export function useCocteles() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cocteles"] });
-      dispararRebuildWebs("coctel");
+      avisar("Visibilidad en Touza actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");
@@ -251,6 +251,7 @@ export function useCocteles() {
     crearCoctel,
     actualizarCoctel,
     eliminarCoctel,
+    toggleActivado,
     toggleRestaurante,
     toggleTouza,
   };

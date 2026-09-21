@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 export interface Vino {
   id: string;
@@ -77,12 +78,11 @@ async function traducirVino(datos: {
   }
 }
 
-/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
- * guardado: si falla, solo se registra en consola (ver informe). */
-function dispararRebuildWebs(origen: string) {
-  supabase.functions
-    .invoke("rebuild-webs", { body: { origen } })
-    .catch((err) => console.error("rebuild-webs no disponible:", err));
+/** Avisa a rebuild-webs de que hay contenido nuevo y cuenta al usuario si el
+ * cambio se ha publicado o solo se ha guardado (ver `src/lib/rebuild-webs.ts`).
+ * Nunca bloquea ni rompe el guardado. */
+function avisar(mensajeBase: string) {
+  notificarGuardadoYPublicacion("vino", mensajeBase);
 }
 
 export function useVinos() {
@@ -147,13 +147,11 @@ export function useVinos() {
         toast.warning("Vino guardado sin traducción automática. Revísalo más tarde en inglés/francés.");
       }
 
-      dispararRebuildWebs("vino");
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      toast.success("Vino añadido. Se publicará en la web en unos minutos.");
+      avisar("Vino añadido");
     },
     onError: (error) => {
       toast.error("Error al añadir el vino");
@@ -175,8 +173,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      toast.success("Vino actualizado");
-      dispararRebuildWebs("vino");
+      avisar("Vino actualizado");
     },
     onError: (error) => {
       toast.error("Error al actualizar el vino");
@@ -195,8 +192,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      toast.success("Vino eliminado");
-      dispararRebuildWebs("vino");
+      avisar("Vino eliminado");
     },
     onError: (error) => {
       toast.error("Error al eliminar el vino");
@@ -205,7 +201,7 @@ export function useVinos() {
   });
 
   const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean }) => {
+    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Vinos")
         .update({ activado })
@@ -213,9 +209,13 @@ export function useVinos() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { activado, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      dispararRebuildWebs("vino");
+      avisar(
+        activado
+          ? `${nombre || "Vino"} vuelve a estar activo`
+          : `${nombre || "Vino"} despublicado: deja de verse en la web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -224,7 +224,7 @@ export function useVinos() {
   });
 
   const toggleExpanded = useMutation({
-    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean }) => {
+    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Vinos")
         .update({ expanded } as any)
@@ -232,8 +232,13 @@ export function useVinos() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    // `expanded` se prerenderiza en la carta web, así que también hay que
+    // republicar (antes no se hacía y el cambio no llegaba nunca a la web).
+    onSuccess: (_data, { expanded, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      avisar(
+        `${nombre || "Vino"} se mostrará ${expanded ? "expandido" : "normal"} en la carta web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado de expandido");
@@ -252,7 +257,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      dispararRebuildWebs("vino");
+      avisar("Visibilidad en Restaurante actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -271,7 +276,7 @@ export function useVinos() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      dispararRebuildWebs("vino");
+      avisar("Visibilidad en Touza actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");
@@ -305,6 +310,7 @@ export function useVinos() {
     crearVino,
     actualizarVino,
     eliminarVino,
+    toggleActivado,
     toggleExpanded,
     toggleRestaurante,
     toggleTouza,

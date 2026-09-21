@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 export interface Bebida {
   id: string;
@@ -50,12 +51,11 @@ async function traducirBebida(datos: {
   }
 }
 
-/** Avisa a rebuild-webs de que hay contenido nuevo. Nunca bloquea ni rompe el
- * guardado: si falla, solo se registra en consola (ver informe). */
-function dispararRebuildWebs(origen: string) {
-  supabase.functions
-    .invoke("rebuild-webs", { body: { origen } })
-    .catch((err) => console.error("rebuild-webs no disponible:", err));
+/** Avisa a rebuild-webs de que hay contenido nuevo y cuenta al usuario si el
+ * cambio se ha publicado o solo se ha guardado (ver `src/lib/rebuild-webs.ts`).
+ * Nunca bloquea ni rompe el guardado. */
+function avisar(mensajeBase: string) {
+  notificarGuardadoYPublicacion("bebida", mensajeBase);
 }
 
 export function useBebidas() {
@@ -90,6 +90,9 @@ export function useBebidas() {
             nombre: nuevaBebida.nombre,
             categoria: nuevaBebida.categoria,
             precio_eur: nuevaBebida.precio_eur,
+            // El formulario pide descripción y hasta ahora no se escribía
+            // nunca: se perdía en cada alta (y la web la muestra).
+            descripcion: nuevaBebida.descripcion || null,
             tamano: nuevaBebida.tamano || null,
             orden: nuevaBebida.orden ?? 0,
             activado: true,
@@ -107,13 +110,11 @@ export function useBebidas() {
         toast.warning("Bebida guardada sin traducción automática. Revísala más tarde en inglés/francés.");
       }
 
-      dispararRebuildWebs("bebida");
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      toast.success("Bebida creada. Se publicará en la web en unos minutos.");
+      avisar("Bebida creada");
     },
     onError: (error) => {
       toast.error("Error al crear la bebida");
@@ -135,8 +136,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      toast.success("Bebida actualizada");
-      dispararRebuildWebs("bebida");
+      avisar("Bebida actualizada");
     },
     onError: (error) => {
       toast.error("Error al actualizar la bebida");
@@ -155,8 +155,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      toast.success("Bebida eliminada");
-      dispararRebuildWebs("bebida");
+      avisar("Bebida eliminada");
     },
     onError: (error) => {
       toast.error("Error al eliminar la bebida");
@@ -165,7 +164,7 @@ export function useBebidas() {
   });
 
   const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean }) => {
+    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Bebidas")
         .update({ activado })
@@ -173,9 +172,13 @@ export function useBebidas() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { activado, nombre }) => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      dispararRebuildWebs("bebida");
+      avisar(
+        activado
+          ? `${nombre || "Bebida"} vuelve a estar activa`
+          : `${nombre || "Bebida"} despublicada: deja de verse en la web`,
+      );
     },
     onError: (error) => {
       toast.error("Error al cambiar el estado");
@@ -194,7 +197,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      dispararRebuildWebs("bebida");
+      avisar("Visibilidad en Restaurante actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Restaurante");
@@ -213,7 +216,7 @@ export function useBebidas() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-      dispararRebuildWebs("bebida");
+      avisar("Visibilidad en Touza actualizada");
     },
     onError: (error) => {
       toast.error("Error al cambiar visibilidad Touza");
@@ -232,6 +235,7 @@ export function useBebidas() {
     crearBebida,
     actualizarBebida,
     eliminarBebida,
+    toggleActivado,
     toggleRestaurante,
     toggleTouza,
   };

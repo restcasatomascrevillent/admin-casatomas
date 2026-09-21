@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, RefreshCw, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 type SeccionEspecial = "menus_diarios" | "tapas";
 
@@ -68,6 +69,8 @@ interface TapasFormData {
 
 interface RegistroLista {
   id: string;
+  /** Clave real del registro: es/en/fr comparten fecha, no id. */
+  fecha: string;
   titulo: string;
   detalle: string;
 }
@@ -122,7 +125,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const [tapasRows, setTapasRows] = useState<TapasRow[]>([]);
   const [menuForm, setMenuForm] = useState<MenuFormData>(initialMenuFormData());
   const [tapasForm, setTapasForm] = useState<TapasFormData>(initialTapasFormData());
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [registroAEliminar, setRegistroAEliminar] = useState<RegistroLista | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
@@ -132,6 +135,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         const menu = parseMenuJson(row.menu);
         return {
           id: row.id,
+          fecha: row.fecha,
           titulo: `Menú del día ${row.fecha}`,
           detalle: `Primero: ${menu.primero} | Segundo: ${menu.segundo} | Postre: ${menu.postre}`,
         };
@@ -142,6 +146,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       const tapas = parseTapasJson(row.tapas);
       return {
         id: row.id,
+        fecha: row.fecha,
         titulo: `Tapas del día ${row.fecha}`,
         detalle: tapas.join(", "),
       };
@@ -253,13 +258,12 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
 
       if (traduccionFallo) {
         toast.warning("Guardado en español. La traducción automática no está disponible ahora mismo.");
-      } else {
-        toast.success("Guardado correctamente. Se publicará en la web en unos minutos.");
       }
 
-      supabase.functions
-        .invoke("rebuild-webs", { body: { origen: seccionActiva === "menus_diarios" ? "menu" : "tapas" } })
-        .catch((err) => console.error("rebuild-webs no disponible:", err));
+      notificarGuardadoYPublicacion(
+        seccionActiva === "menus_diarios" ? "menu" : "tapas",
+        "Guardado correctamente",
+      );
 
       resetForm();
       await cargarDatos();
@@ -272,15 +276,26 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!registroAEliminar) return;
 
     try {
       const sb = supabase as any;
-      const { error } = await sb.from(config.table).delete().eq("id", deleteId);
+      // La lista solo muestra las filas en español, pero cada guardado crea
+      // TRES (es/en/fr) con ids distintos y la misma fecha. Borrando solo por
+      // id quedaban huérfanas las de inglés y francés, que se seguían
+      // sirviendo en esos idiomas. Se borra por fecha, que es lo que las une.
+      const { error } = await sb
+        .from(config.table)
+        .delete()
+        .eq("fecha", registroAEliminar.fecha)
+        .in("idiom", ["es", "en", "fr"]);
       if (error) throw error;
 
-      setDeleteId(null);
-      toast.success(`${config.singular} eliminado`);
+      setRegistroAEliminar(null);
+      notificarGuardadoYPublicacion(
+        seccionActiva === "menus_diarios" ? "menu" : "tapas",
+        `${config.singular} eliminado en los tres idiomas`,
+      );
       await cargarDatos();
     } catch (error) {
       console.error(error);
@@ -329,7 +344,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 text-destructive"
-                  onClick={() => setDeleteId(registro.id)}
+                  onClick={() => setRegistroAEliminar(registro)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -429,12 +444,14 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         Se guarda en español, inglés y francés. Los cambios se publican en la web en unos minutos. Pulsa «Recargar» para ver los últimos registros.
       </p>
 
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog open={!!registroAEliminar} onOpenChange={() => setRegistroAEliminar(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar {config.singular.toLowerCase()}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. El registro se eliminará permanentemente.
+              Esta acción no se puede deshacer. Se eliminarán las versiones en
+              español, inglés y francés del {config.singular.toLowerCase()} del{" "}
+              {registroAEliminar?.fecha}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
