@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet, Star, Phone } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet, Star, Phone, Mail } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -22,6 +22,7 @@ import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas" },
+  { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas" },
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
   { title: "Personal", url: "/trabajadores", icon: Users, sectionKey: "trabajadores" },
   { title: "Gestor Carta", url: "/gestor-carta", icon: BookOpen, sectionKey: "gestor_carta" },

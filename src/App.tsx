@@ -10,6 +10,7 @@ import type { SectionKey } from "@/hooks/useUserRole";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
+import PlantillasEmail from "./pages/PlantillasEmail";
 
 import Espacios from "./pages/Espacios";
 import Trabajadores from "./pages/Trabajadores";
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/" element={pagina(<Dashboard />)} />
             <Route path="/dashboard" element={pagina(<Dashboard />)} />
             <Route path="/reservas" element={pagina(<Reservas />)} />
+            <Route path="/plantillas-email" element={pagina(<PlantillasEmail />, "reservas")} />
             <Route path="/espacios" element={pagina(<Espacios />)} />
             <Route path="/trabajadores" element={pagina(<Trabajadores />)} />
             <Route path="/gestor-carta" element={pagina(<GestorCarta />)} />
