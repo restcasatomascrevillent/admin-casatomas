@@ -1,6 +1,57 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ConfiguracionTurno } from "./useConfiguracionTurnos";
+// ============================================================
+// EL MOTOR NO VIVE AQUÍ.
+// ------------------------------------------------------------
+// La regla de negocio de "qué horas se ofrecen" está en
+// `supabase/functions/_shared/disponibilidad.ts`, el MISMO fichero que
+// importa la edge function `reservas-web`. Este hook solo LEE de Supabase
+// y le pasa los datos al motor. Si hay que cambiar la regla, se cambia
+// allí y cambia en los dos sitios a la vez.
+//
+// (Se importa SIN extensión: Vite/vitest resuelven `.ts` solos, mientras
+// que Deno exige la extensión explícita. Es el mismo fichero.)
+// ============================================================
+import {
+  calcularDisponibilidad,
+  ahoraEnMadrid,
+  HORA_CORTE_TURNO as CORTE_TURNO,
+  ESTADOS_QUE_OCUPAN as ESTADOS_OCUPAN,
+  turnoDeHora,
+  horaAMinutos,
+  minutosAHora,
+  type ConfiguracionTurnoInput,
+  type ReservaOcupante,
+  type ResultadoDisponibilidad,
+  type HuecoCalculado,
+} from "../../supabase/functions/_shared/disponibilidad";
+
+export {
+  calcularDisponibilidad,
+  ahoraEnMadrid,
+  turnoDeHora,
+  type ResultadoDisponibilidad,
+  type HuecoCalculado,
+};
+
+/**
+ * Hora que separa el turno de comida del de cena.
+ *
+ * Ya no se define aquí: se reexporta del módulo compartido, que a su vez
+ * copia literalmente el `NEW.hora < '17:00:00'` del trigger
+ * `trg_validar_capacidad`. Antes estaba escrita a mano en tres sitios.
+ *
+ * OJO con la incoherencia conocida: el trigger que rellena
+ * `ocupacion_diaria.turno` usa `< '16:00'`, no `< '17:00'`. Este motor
+ * NUNCA lee `ocupacion_diaria` ni `vista_ocupacion` (724 de sus 784 filas
+ * están huérfanas): calcula siempre desde `reservas`, como el webhook
+ * telefónico.
+ */
+export const HORA_CORTE_TURNO = CORTE_TURNO;
+
+/** Estados que ocupan plaza. Mismo criterio que el trigger. */
+const ESTADOS_QUE_OCUPAN = ESTADOS_OCUPAN as unknown as string[];
 
 export interface DisponibilidadSala {
   fecha: string;
@@ -17,6 +68,7 @@ export interface DisponibilidadSala {
 }
 
 export interface DisponibilidadHora {
+  fecha: string;
   hora: string;
   salas: {
     sala_id: string;
@@ -25,9 +77,17 @@ export interface DisponibilidadHora {
     comensales_actuales: number;
     capacidad_disponible: number;
     porcentaje_ocupacion: number;
+    /** Alias que ya leía `CalendarioDisponibilidad.tsx` y que no existía. */
+    porcentaje_ocupacion_sala: number;
   }[];
   capacidad_total_disponible: number;
   porcentaje_ocupacion_global: number;
+  /** Alias/campos que ya leían los calendarios y que antes salían siempre a 0. */
+  capacidad_disponible: number;
+  capacidad_maxima: number;
+  total_comensales: number;
+  total_reservas: number;
+  turno: "comida" | "cena";
 }
 
 export interface TurnoDinamico {
@@ -39,116 +99,266 @@ export interface TurnoDinamico {
   esTurnoSecundario: boolean;
   motivoApertura?: string;
   porcentajeOcupacion: number;
+  /** NUEVO: 0 = hora en punto, 1 = media, 2 = cuarto… */
+  nivel?: number;
+  /** NUEVO: paso del nivel en minutos (60/30/15…). Sustituye al "+15" fijo. */
+  minutosNivel?: number;
+  etiquetaNivel?: string;
 }
 
-export const useDisponibilidadPorFecha = (fecha: string) => {
+// ------------------------------------------------------------
+// LECTURAS DE BASE DE DATOS
+// ------------------------------------------------------------
+
+interface DatosDelDia {
+  configuraciones: ConfiguracionTurnoInput[];
+  reservas: ReservaOcupante[];
+  capacidadTotal: number;
+  espacios: { id: string; nombre: string; capacidad_maxima: number }[];
+}
+
+/**
+ * Los tres SELECT que necesita el motor para un día.
+ *
+ * Antes `generarTurnosDinamicos` hacía UNA consulta POR HUECO (N+1: con
+ * comida + cena eran ~24 round-trips por render, y el doble porque hacía
+ * dos pasadas). Ahora son 3 consultas fijas.
+ */
+async function leerDatosDelDia(fecha: string): Promise<DatosDelDia> {
+  const [turnosRes, espaciosRes, reservasRes] = await Promise.all([
+    supabase.from("configuracion_turnos").select("*").eq("activo", true),
+    supabase.from("espacios_reserva" as any).select("id, nombre, capacidad_maxima").eq("activa", true),
+    supabase
+      .from("reservas" as any)
+      .select("hora, numero_comensales, espacio_id")
+      .eq("fecha", fecha)
+      .in("estado", ESTADOS_QUE_OCUPAN),
+  ]);
+
+  if (turnosRes.error) throw turnosRes.error;
+  if (espaciosRes.error) throw espaciosRes.error;
+  if (reservasRes.error) throw reservasRes.error;
+
+  const espacios = ((espaciosRes.data ?? []) as any[]).map((e) => ({
+    id: e.id as string,
+    nombre: e.nombre as string,
+    capacidad_maxima: Number(e.capacidad_maxima) || 0,
+  }));
+
+  return {
+    configuraciones: (turnosRes.data ?? []) as unknown as ConfiguracionTurnoInput[],
+    reservas: (reservasRes.data ?? []) as unknown as ReservaOcupante[],
+    capacidadTotal: espacios.reduce((s, e) => s + e.capacidad_maxima, 0),
+    espacios,
+  };
+}
+
+/**
+ * Disponibilidad ya calculada de un día, para el panel.
+ *
+ * El panel SÍ puede reservar para hoy (lo hace el personal por teléfono),
+ * así que `permitirMismoDia: true` — al revés que la web.
+ */
+export const useDisponibilidadCalculada = (
+  fecha: string,
+  opciones?: { comensales?: number; espacioId?: string | null },
+) => {
+  const comensales = opciones?.comensales ?? 1;
+  const espacioId = opciones?.espacioId ?? null;
+
   return useQuery({
-    queryKey: ["disponibilidad", fecha],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vista_ocupacion" as any)
-        .select("*")
-        .eq("fecha", fecha)
-        .order("hora", { ascending: true });
-      
-      if (error) throw error;
-      return data as any[];
+    queryKey: ["disponibilidad-calculada", fecha, comensales, espacioId],
+    queryFn: async (): Promise<ResultadoDisponibilidad> => {
+      const datos = await leerDatosDelDia(fecha);
+      return calcularDisponibilidad({
+        fecha,
+        comensales,
+        espacioId,
+        configuraciones: datos.configuraciones,
+        reservas: datos.reservas,
+        capacidadTotal: datos.capacidadTotal,
+        ahora: ahoraEnMadrid(),
+        politica: { permitirMismoDia: true, minutosCorte: 0 },
+      });
     },
     enabled: !!fecha,
   });
 };
 
+/**
+ * Ocupación por hora de un día.
+ *
+ * Calculada desde `reservas`, NO desde `vista_ocupacion`. La vista tiene
+ * 724 de 784 filas huérfanas (ocupación fantasma de reservas que ya no
+ * existen) y su columna `turno` usa el corte de las 16:00 en vez del de
+ * las 17:00 que aplica el trigger de aforo. Se mantiene la misma forma de
+ * salida para no tocar los componentes que la consumen.
+ */
+export const useDisponibilidadPorFecha = (fecha: string) => {
+  return useQuery({
+    queryKey: ["disponibilidad", fecha],
+    queryFn: async () => {
+      const datos = await leerDatosDelDia(fecha);
+      const resultado = calcularDisponibilidad({
+        fecha,
+        configuraciones: datos.configuraciones,
+        reservas: datos.reservas,
+        capacidadTotal: datos.capacidadTotal,
+        ahora: null,
+      });
+      return resultado.ocupacion.map((o) => ({
+        fecha,
+        hora: o.hora,
+        dia_semana: resultado.diaSemana,
+        turno: o.turno,
+        total_reservas: o.total_reservas,
+        total_comensales: o.total_comensales,
+        capacidad_maxima: resultado.aforo[o.turno].capacidad_maxima,
+        capacidad_disponible: resultado.aforo[o.turno].disponible,
+        porcentaje_ocupacion: resultado.aforo[o.turno].porcentaje,
+        porcentaje_hora: o.porcentaje_hora,
+      }));
+    },
+    enabled: !!fecha,
+  });
+};
+
+/**
+ * Detalle por hora y por espacio de un día.
+ *
+ * Cambios respecto a la versión anterior, todos aditivos:
+ *   - Ya no recorre 8:00-23:30 a ciegas: devuelve las horas que el MOTOR
+ *     decide ofrecer más las que tengan reservas (una hora fuera de turno
+ *     con reservas seguía existiendo y antes se perdía).
+ *   - Añade `fecha`, `capacidad_disponible`, `capacidad_maxima`,
+ *     `total_comensales`, `total_reservas` y `porcentaje_ocupacion_sala`,
+ *     que `CalendarioDisponibilidad.tsx` y `CalendarioReservaPublica.tsx`
+ *     YA leían y que no existían en el objeto (salían siempre 0 / vacío).
+ */
 export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
   return useQuery({
     queryKey: ["disponibilidad-detallada", fecha],
-    queryFn: async () => {
-      // Obtener todos los espacios de reserva
-      const { data: espacios, error: espaciosError } = await supabase
-        .from("espacios_reserva" as any)
-        .select("id, nombre, capacidad_maxima")
-        .eq("activa", true) as any;
+    queryFn: async (): Promise<DisponibilidadHora[]> => {
+      const datos = await leerDatosDelDia(fecha);
+      const resultado = calcularDisponibilidad({
+        fecha,
+        configuraciones: datos.configuraciones,
+        reservas: datos.reservas,
+        capacidadTotal: datos.capacidadTotal,
+        ahora: null,
+      });
 
-      if (espaciosError) throw espaciosError;
+      const comensalesPorEspacioYHora = new Map<string, number>();
+      for (const r of datos.reservas) {
+        const minutos = horaAMinutos(r.hora);
+        if (minutos === null || !r.espacio_id) continue;
+        const clave = `${minutosAHora(minutos)}|${r.espacio_id}`;
+        comensalesPorEspacioYHora.set(
+          clave,
+          (comensalesPorEspacioYHora.get(clave) ?? 0) + (Number(r.numero_comensales) || 0),
+        );
+      }
 
-      // Obtener ocupación del día
-      const { data: ocupacion, error: ocupacionError } = await supabase
-        .from("vista_ocupacion" as any)
-        .select("*")
-        .eq("fecha", fecha)
-        .order("hora", { ascending: true });
+      const horas = new Set<string>([
+        ...resultado.huecos.map((h) => h.hora),
+        ...resultado.ocupacion.map((o) => o.hora),
+      ]);
 
-      if (ocupacionError) throw ocupacionError;
+      return Array.from(horas)
+        .sort((a, b) => a.localeCompare(b))
+        .map((hora) => {
+          const turno = turnoDeHora(hora);
+          const aforo = resultado.aforo[turno];
+          const fila = resultado.ocupacion.find((o) => o.hora === hora);
 
-      // Generar horarios cada 30 minutos de 8:00 a 23:30
-      const horarios: DisponibilidadHora[] = [];
-      for (let h = 8; h <= 23; h++) {
-        for (let m = 0; m < 60; m += 30) {
-          const hora = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-          
-          const ocupacionHora = ocupacion?.filter((o: any) => o.hora === hora) || [];
-          
-          const salasPorHora = espacios.map((espacio: any) => {
-            const ocupEspacio = ocupacionHora.filter((o: any) => o.espacio_id === espacio.id);
-            const comensales = ocupEspacio.reduce((sum: number, o: any) => sum + o.total_comensales, 0);
-            const capacidadDisponible = Math.max(0, espacio.capacidad_maxima - comensales);
-            const porcentaje = (comensales / espacio.capacidad_maxima) * 100;
-
+          const salas = datos.espacios.map((espacio) => {
+            const comensales = comensalesPorEspacioYHora.get(`${hora}|${espacio.id}`) ?? 0;
+            const porcentaje =
+              espacio.capacidad_maxima > 0 ? (comensales / espacio.capacidad_maxima) * 100 : 0;
             return {
               sala_id: espacio.id,
               sala_nombre: espacio.nombre,
               capacidad_maxima: espacio.capacidad_maxima,
               comensales_actuales: comensales,
-              capacidad_disponible: capacidadDisponible,
+              capacidad_disponible: Math.max(0, espacio.capacidad_maxima - comensales),
               porcentaje_ocupacion: porcentaje,
+              porcentaje_ocupacion_sala: porcentaje,
             };
           });
 
-          const capacidadTotalDisp = salasPorHora.reduce((sum: number, s: any) => sum + s.capacidad_disponible, 0);
-          const totalCapacidad = salasPorHora.reduce((sum: number, s: any) => sum + s.capacidad_maxima, 0);
-          const totalComensales = salasPorHora.reduce((sum: number, s: any) => sum + s.comensales_actuales, 0);
-
-          horarios.push({
+          return {
+            fecha,
             hora,
-            salas: salasPorHora,
-            capacidad_total_disponible: capacidadTotalDisp,
-            porcentaje_ocupacion_global: totalCapacidad > 0 ? (totalComensales / totalCapacidad) * 100 : 0,
-          });
-        }
-      }
-
-      return horarios;
+            turno,
+            salas,
+            capacidad_total_disponible: aforo.disponible,
+            capacidad_disponible: aforo.disponible,
+            capacidad_maxima: aforo.capacidad_maxima,
+            total_comensales: fila?.total_comensales ?? 0,
+            total_reservas: fila?.total_reservas ?? 0,
+            porcentaje_ocupacion_global: aforo.porcentaje,
+          };
+        });
     },
     enabled: !!fecha,
   });
 };
 
+/**
+ * Ocupación de un rango de fechas (vista de calendario).
+ *
+ * También sale de `reservas` en vez de `vista_ocupacion`, por lo mismo.
+ */
 export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) => {
   return useQuery({
     queryKey: ["disponibilidad-rango", fechaInicio, fechaFin],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vista_ocupacion" as any)
-        .select("*")
-        .gte("fecha", fechaInicio)
-        .lte("fecha", fechaFin)
-        .order("fecha", { ascending: true })
-        .order("hora", { ascending: true });
-      
-      if (error) throw error;
-      return data as any[];
+      const [espaciosRes, reservasRes] = await Promise.all([
+        supabase.from("espacios_reserva" as any).select("capacidad_maxima").eq("activa", true),
+        supabase
+          .from("reservas" as any)
+          .select("fecha, hora, numero_comensales")
+          .gte("fecha", fechaInicio)
+          .lte("fecha", fechaFin)
+          .in("estado", ESTADOS_QUE_OCUPAN),
+      ]);
+      if (espaciosRes.error) throw espaciosRes.error;
+      if (reservasRes.error) throw reservasRes.error;
+
+      const capacidadTotal = ((espaciosRes.data ?? []) as any[]).reduce(
+        (s, e) => s + (Number(e.capacidad_maxima) || 0),
+        0,
+      );
+
+      const acumulado = new Map<
+        string,
+        { fecha: string; hora: string; total_reservas: number; total_comensales: number }
+      >();
+      for (const r of (reservasRes.data ?? []) as any[]) {
+        const minutos = horaAMinutos(r.hora);
+        if (minutos === null) continue;
+        const hora = minutosAHora(minutos);
+        const clave = `${r.fecha}|${hora}`;
+        const actual =
+          acumulado.get(clave) ?? { fecha: r.fecha as string, hora, total_reservas: 0, total_comensales: 0 };
+        actual.total_reservas += 1;
+        actual.total_comensales += Number(r.numero_comensales) || 0;
+        acumulado.set(clave, actual);
+      }
+
+      return Array.from(acumulado.values())
+        .map((f) => ({
+          ...f,
+          turno: turnoDeHora(f.hora),
+          capacidad_maxima: capacidadTotal,
+          porcentaje_ocupacion:
+            capacidadTotal > 0 ? Math.round((f.total_comensales / capacidadTotal) * 100) : 0,
+        }))
+        .sort((a, b) => (a.fecha === b.fecha ? a.hora.localeCompare(b.hora) : a.fecha.localeCompare(b.fecha)));
     },
     enabled: !!fechaInicio && !!fechaFin,
   });
 };
-
-// Hora que separa el turno de comida del de cena.
-// IMPORTANTE: debe coincidir con el trigger `trg_validar_capacidad` de la base de datos
-// (función `validar_capacidad_reserva`, que usa `NEW.hora < '17:00:00'`). Si se cambia
-// aquí sin cambiarlo allí, el panel dirá que hay hueco donde la base de datos lo rechaza.
-export const HORA_CORTE_TURNO = "17:00";
-
-// Estados que ocupan plaza. Mismo criterio que el trigger `trg_validar_capacidad`.
-const ESTADOS_QUE_OCUPAN = ["pendiente", "verificada", "confirmada"];
 
 export interface AforoTurno {
   disponible: boolean;
@@ -160,60 +370,45 @@ export interface AforoTurno {
 }
 
 /**
- * Verifica el aforo del turno (comida/cena) de una fecha, replicando exactamente la
- * regla que aplica el trigger `trg_validar_capacidad` en producción: suma de comensales
- * de las reservas del mismo turno frente a la suma de `capacidad_maxima` de los espacios
- * activos.
+ * Verifica el aforo del turno (comida/cena) de una fecha.
  *
- * Es una comprobación previa para dar feedback en el formulario: la autoridad sigue
- * siendo la base de datos, que además usa un advisory lock para evitar condiciones de
- * carrera. Por eso el INSERT puede fallar aunque esta función diga que hay hueco.
+ * Replica la regla del trigger `trg_validar_capacidad`, pero ya NO la
+ * reimplementa a mano: delega en el motor compartido, que es quien
+ * conoce el corte de turno y los estados que ocupan.
+ *
+ * Sigue siendo una comprobación PREVIA para dar feedback en el formulario:
+ * la autoridad es la base de datos, que además usa un advisory lock. El
+ * INSERT puede fallar aunque esto diga que hay hueco, y es correcto.
  */
 export const verificarAforoTurno = async (
   fecha: string,
   hora: string,
   comensales: number
 ): Promise<AforoTurno> => {
-  const esComida = hora < HORA_CORTE_TURNO;
+  const datos = await leerDatosDelDia(fecha);
+  const resultado = calcularDisponibilidad({
+    fecha,
+    comensales,
+    configuraciones: datos.configuraciones,
+    reservas: datos.reservas,
+    capacidadTotal: datos.capacidadTotal,
+    ahora: null,
+  });
 
-  const [{ data: espacios, error: espaciosError }, { data: reservas, error: reservasError }] =
-    await Promise.all([
-      supabase
-        .from("espacios_reserva" as any)
-        .select("capacidad_maxima")
-        .eq("activa", true),
-      supabase
-        .from("reservas" as any)
-        .select("hora, numero_comensales")
-        .eq("fecha", fecha)
-        .in("estado", ESTADOS_QUE_OCUPAN),
-    ]);
-
-  if (espaciosError) throw espaciosError;
-  if (reservasError) throw reservasError;
-
-  const capacidadMaxima = (espacios ?? []).reduce(
-    (acc: number, espacio: any) => acc + (espacio.capacidad_maxima || 0),
-    0
-  );
-
-  const comensalesActuales = (reservas ?? [])
-    .filter((reserva: any) => (reserva.hora < HORA_CORTE_TURNO) === esComida)
-    .reduce((acc: number, reserva: any) => acc + (reserva.numero_comensales || 0), 0);
-
-  const capacidadDisponible = Math.max(0, capacidadMaxima - comensalesActuales);
-  const disponible = comensalesActuales + comensales <= capacidadMaxima;
-  const turno = esComida ? "comida" : "cena";
+  const turno = turnoDeHora(hora);
+  const aforo = resultado.aforo[turno];
+  const esComida = turno === "comida";
+  const disponible = !aforo.completo;
 
   return {
     disponible,
-    capacidadMaxima,
-    comensalesActuales,
-    capacidadDisponible,
+    capacidadMaxima: aforo.capacidad_maxima,
+    comensalesActuales: aforo.ocupacion,
+    capacidadDisponible: aforo.disponible,
     esComida,
     mensaje: disponible
-      ? `Quedan ${capacidadDisponible} plazas en el turno de ${turno} (${comensalesActuales}/${capacidadMaxima} ocupadas)`
-      : `Aforo superado en el turno de ${turno}: quedan ${capacidadDisponible} plazas de ${capacidadMaxima} y se piden ${comensales}`,
+      ? `Quedan ${aforo.disponible} plazas en el turno de ${turno} (${aforo.ocupacion}/${aforo.capacidad_maxima} ocupadas)`
+      : `Aforo superado en el turno de ${turno}: quedan ${aforo.disponible} plazas de ${aforo.capacidad_maxima} y se piden ${comensales}`,
   };
 };
 
@@ -223,7 +418,6 @@ export const verificarDisponibilidadSala = async (
   hora: string,
   salaId: string
 ) => {
-  // Obtener info del espacio/sala
   const { data: sala } = await supabase
     .from("espacios_reserva" as any)
     .select("capacidad_maxima")
@@ -234,243 +428,75 @@ export const verificarDisponibilidadSala = async (
     throw new Error("Sala/Espacio no encontrado");
   }
 
-  return verificarCapacidadDisponible(fecha, hora, salaId, sala.capacidad_maxima);
-};
-
-// Función auxiliar para verificar capacidad disponible
-const verificarCapacidadDisponible = async (
-  fecha: string,
-  hora: string,
-  espacioId: string,
-  capacidadMaxima: number
-) => {
-  // Obtener ocupación actual
-  const { data: ocupacion } = await supabase
-    .from("ocupacion_diaria" as any)
-    .select("total_comensales")
-    .eq("fecha", fecha)
-    .eq("hora", hora)
-    .eq("espacio_id", espacioId)
-    .maybeSingle();
-
-  const comensalesActuales = (ocupacion as any)?.total_comensales || 0;
-  const capacidadDisponible = Math.max(0, capacidadMaxima - comensalesActuales);
-
+  // El aforo real lo decide el TURNO completo (es lo que valida el trigger),
+  // no la ocupación de esa hora suelta en `ocupacion_diaria` — que además
+  // está desincronizada. Se responde con el aforo del turno.
+  const aforo = await verificarAforoTurno(fecha, hora, 1);
   return {
-    disponible: capacidadDisponible > 0,
-    capacidadDisponible,
-    capacidadMaxima,
-    comensalesActuales,
-    mensaje: capacidadDisponible > 0
-      ? `Hay capacidad para ${capacidadDisponible} comensales más`
-      : "No hay capacidad disponible en este horario",
+    disponible: aforo.capacidadDisponible > 0,
+    capacidadDisponible: aforo.capacidadDisponible,
+    capacidadMaxima: aforo.capacidadMaxima,
+    comensalesActuales: aforo.comensalesActuales,
+    mensaje:
+      aforo.capacidadDisponible > 0
+        ? `Hay capacidad para ${aforo.capacidadDisponible} comensales más`
+        : "No hay capacidad disponible en este horario",
   };
 };
 
-// Función para obtener configuración de turnos
-const obtenerConfiguracionTurnos = async (espacioId: string | null): Promise<ConfiguracionTurno[]> => {
-  const { data, error } = await supabase
-    .from("configuracion_turnos")
-    .select("*")
-    .eq("activo", true)
-    .order("hora_inicio", { ascending: true });
-  
-  if (error) throw error;
-  if (!data) return [];
-  
-  // Cast manual ya que la tabla no está en los types generados aún
-  const configuraciones = data as unknown as ConfiguracionTurno[];
-  
-  // Priorizar configuraciones específicas sobre globales
-  if (espacioId) {
-    const especificas = configuraciones.filter(c => c.espacio_id === espacioId);
-    const globales = configuraciones.filter(c => c.espacio_id === null);
-    return especificas.length > 0 ? especificas : globales;
-  }
-  
-  return configuraciones.filter(c => c.espacio_id === null);
-};
-
-// Nueva función para generar turnos dinámicos
+/**
+ * Genera los turnos ofrecidos de un día.
+ *
+ * Firma intacta para no tocar `SelectorHorasDisponibles.tsx`, pero por
+ * dentro ya no hay lógica: la pone el motor compartido.
+ *
+ * `diaSemana` se ignora a propósito: se recalcula a partir de `fecha` con
+ * aritmética UTC. El valor que llegaba venía de `fechaObj.getDay()`, que
+ * depende de la zona horaria del proceso y podía devolver el día anterior.
+ */
 export const generarTurnosDinamicos = async (
   fecha: string,
-  salaId: string,
-  diaSemana: number
+  salaId: string | null,
+  _diaSemana?: number,
+  comensales = 1,
 ): Promise<TurnoDinamico[]> => {
-  // Obtener configuración de turnos
-  const configuraciones = await obtenerConfiguracionTurnos(salaId);
-  
-  // Obtener capacidad del espacio
-  const { data: sala } = await supabase
-    .from("espacios_reserva" as any)
-    .select("capacidad_maxima")
-    .eq("id", salaId)
-    .single() as any;
+  const datos = await leerDatosDelDia(fecha);
+  const resultado = calcularDisponibilidad({
+    fecha,
+    comensales,
+    espacioId: salaId ?? null,
+    configuraciones: datos.configuraciones,
+    reservas: datos.reservas,
+    capacidadTotal: datos.capacidadTotal,
+    ahora: ahoraEnMadrid(),
+    politica: { permitirMismoDia: true, minutosCorte: 0 },
+  });
 
-  if (!sala) throw new Error("Sala no encontrada");
-
-  const capacidadMaxima = sala.capacidad_maxima;
-  const turnos: TurnoDinamico[] = [];
-
-  // Si no hay configuración, usar valores por defecto
-  if (!configuraciones || configuraciones.length === 0) {
-    const turnosPorDefecto = ["13:00", "15:00", "20:30", "22:00"];
-    for (const hora of turnosPorDefecto) {
-      const ocupacion = await verificarCapacidadDisponible(fecha, hora, salaId, capacidadMaxima);
-      turnos.push({
-        hora,
-        disponible: ocupacion.disponible,
-        capacidadDisponible: ocupacion.capacidadDisponible,
-        capacidadMaxima: ocupacion.capacidadMaxima,
-        comensalesActuales: ocupacion.comensalesActuales,
-        esTurnoSecundario: false,
-        porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
-      });
-    }
-    return turnos;
-  }
-
-  // Procesar cada configuración de periodo
-  for (const config of configuraciones) {
-    // Verificar si el periodo aplica para este día
-    if (!config.dias_semana.includes(diaSemana) || !config.activo) {
-      continue;
-    }
-
-    const [horaInicio, minInicio] = config.hora_inicio.split(":").map(Number);
-    const [horaFin, minFin] = config.hora_fin.split(":").map(Number);
-
-    let currentHour = horaInicio;
-    let currentMin = minInicio;
-
-    // Manejar periodos que cruzan medianoche
-    const finEnMinutos = horaFin * 60 + minFin;
-    const inicioEnMinutos = horaInicio * 60 + minInicio;
-    const cruzaMedianoche = finEnMinutos <= inicioEnMinutos;
-
-    // Cache para ocupación de turnos primarios (para decidir si abrir secundarios)
-    const ocupacionTurnosPrimarios: Record<string, number> = {};
-    // Set para rastrear qué turnos primarios deben ocultarse
-    const turnosPrimariosAOcultar = new Set<string>();
-
-    // Primera pasada: generar todos los turnos primarios y obtener su ocupación
-    let tempHour = currentHour;
-    let tempMin = currentMin;
-
-    while (true) {
-      const tempEnMinutos = tempHour * 60 + tempMin;
-      
-      if (cruzaMedianoche) {
-        if (tempHour >= horaFin && tempHour < horaInicio && tempEnMinutos >= finEnMinutos) break;
-      } else {
-        if (tempEnMinutos >= finEnMinutos) break;
-      }
-
-      const esTurnoPrimario = tempMin % config.intervalo_base_minutos === 0;
-      
-      if (esTurnoPrimario) {
-        const horaFormateada = `${tempHour.toString().padStart(2, "0")}:${tempMin.toString().padStart(2, "0")}`;
-        const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
-        const porcentaje = (ocupacion.comensalesActuales / capacidadMaxima) * 100;
-        ocupacionTurnosPrimarios[horaFormateada] = porcentaje;
-        
-        // Si la configuración indica ocultar primarios y la ocupación supera el umbral
-        if (config.ocultar_primario_si_secundario && porcentaje >= config.umbral_apertura_secundario) {
-          turnosPrimariosAOcultar.add(horaFormateada);
-        }
-      }
-
-      tempMin += 15;
-      if (tempMin >= 60) {
-        tempMin = 0;
-        tempHour += 1;
-        if (tempHour >= 24) tempHour = 0;
-      }
-    }
-
-    // Segunda pasada: generar turnos incluyendo secundarios si aplica
-    while (true) {
-      const currentEnMinutos = currentHour * 60 + currentMin;
-      
-      if (cruzaMedianoche) {
-        if (currentHour >= horaFin && currentHour < horaInicio && currentEnMinutos >= finEnMinutos) break;
-      } else {
-        if (currentEnMinutos >= finEnMinutos) break;
-      }
-
-      const horaFormateada = `${currentHour.toString().padStart(2, "0")}:${currentMin.toString().padStart(2, "0")}`;
-      const esTurnoPrimario = currentMin % config.intervalo_base_minutos === 0;
-
-      if (esTurnoPrimario) {
-        // Turno primario - solo se añade si no está en la lista de ocultos
-        if (!turnosPrimariosAOcultar.has(horaFormateada)) {
-          const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
-          
-          turnos.push({
-            hora: horaFormateada,
-            disponible: ocupacion.disponible,
-            capacidadDisponible: ocupacion.capacidadDisponible,
-            capacidadMaxima: ocupacion.capacidadMaxima,
-            comensalesActuales: ocupacion.comensalesActuales,
-            esTurnoSecundario: false,
-            porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
-          });
-        }
-      } else {
-        // Turno secundario - solo se añade si el turno primario anterior tiene alta ocupación
-        const minutosTurnoPrimario = Math.floor(currentMin / config.intervalo_base_minutos) * config.intervalo_base_minutos;
-        const horaTurnoPrimario = `${currentHour.toString().padStart(2, "0")}:${minutosTurnoPrimario.toString().padStart(2, "0")}`;
-        
-        const ocupacionPrimario = ocupacionTurnosPrimarios[horaTurnoPrimario];
-        
-        if (ocupacionPrimario !== undefined && ocupacionPrimario >= config.umbral_apertura_secundario) {
-          const ocupacion = await verificarCapacidadDisponible(fecha, horaFormateada, salaId, capacidadMaxima);
-          
-          turnos.push({
-            hora: horaFormateada,
-            disponible: ocupacion.disponible,
-            capacidadDisponible: ocupacion.capacidadDisponible,
-            capacidadMaxima: ocupacion.capacidadMaxima,
-            comensalesActuales: ocupacion.comensalesActuales,
-            esTurnoSecundario: true,
-            motivoApertura: `Alta demanda en ${horaTurnoPrimario} (${Math.round(ocupacionPrimario)}%)`,
-            porcentajeOcupacion: (ocupacion.comensalesActuales / ocupacion.capacidadMaxima) * 100,
-          });
-        }
-      }
-
-      // Avanzar 15 minutos
-      currentMin += 15;
-      if (currentMin >= 60) {
-        currentMin = 0;
-        currentHour += 1;
-        if (currentHour >= 24) currentHour = 0;
-      }
-    }
-  }
-
-  // Ordenar por hora y eliminar duplicados
-  const turnosUnicos = turnos.reduce((acc, turno) => {
-    if (!acc.find(t => t.hora === turno.hora)) {
-      acc.push(turno);
-    }
-    return acc;
-  }, [] as TurnoDinamico[]);
-
-  return turnosUnicos.sort((a, b) => a.hora.localeCompare(b.hora));
+  return resultado.huecos.map((h) => ({
+    hora: h.hora,
+    disponible: h.ofrecido,
+    capacidadDisponible: h.capacidad_disponible,
+    capacidadMaxima: h.capacidad_maxima,
+    comensalesActuales: h.comensales_hora,
+    esTurnoSecundario: h.nivel > 0,
+    motivoApertura: h.abierto_por
+      ? `Alta demanda en ${h.abierto_por} (${h.abierto_con_porcentaje}%)`
+      : undefined,
+    porcentajeOcupacion: h.porcentaje_ocupacion,
+    nivel: h.nivel,
+    minutosNivel: h.minutos_nivel,
+    etiquetaNivel: h.etiqueta_nivel,
+  }));
 };
 
-// Obtener horas disponibles para una fecha y sala específica (basado en capacidad)
+/** Solo las horas reservables, en "HH:MM". */
 export const obtenerHorasDisponibles = async (
   fecha: string,
-  salaId: string
-) => {
-  const fechaObj = new Date(fecha);
-  const diaSemana = fechaObj.getDay();
-  
-  const turnos = await generarTurnosDinamicos(fecha, salaId, diaSemana);
-  
-  return turnos.filter(t => t.disponible).map(t => t.hora);
+  salaId: string | null,
+  comensales = 1,
+): Promise<string[]> => {
+  const turnos = await generarTurnosDinamicos(fecha, salaId, undefined, comensales);
+  return turnos.filter((t) => t.disponible).map((t) => t.hora);
 };
 
 // Mantener compatibilidad con código existente (espacio)
@@ -478,8 +504,10 @@ export const verificarDisponibilidad = async (
   fecha: string,
   hora: string,
   espacioId: string,
-  posicionId: string | null = null
+  _posicionId: string | null = null
 ) => {
-  // Delegar a la función principal que ahora usa capacidad en lugar de mesas
   return verificarDisponibilidadSala(fecha, hora, espacioId);
 };
+
+/** Reexportado por comodidad: el tipo de fila de `configuracion_turnos`. */
+export type { ConfiguracionTurno };

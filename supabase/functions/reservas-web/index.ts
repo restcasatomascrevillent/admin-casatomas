@@ -38,6 +38,18 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
+// Motor de disponibilidad — MISMO modulo que usa el panel (src/hooks/useDisponibilidad.ts).
+// Es TypeScript puro sin dependencias: corre igual en Deno y en el navegador.
+import {
+  calcularDisponibilidad,
+  validarHoraOfrecida,
+  ahoraEnMadrid,
+  ESTADOS_QUE_OCUPAN,
+  HORA_CORTE_TURNO,
+  type ConfiguracionTurnoInput,
+  type ReservaOcupante,
+} from "../_shared/disponibilidad.ts";
+
 // ------------------------------------------------------------
 // CONFIGURACIÓN
 // ------------------------------------------------------------
@@ -245,10 +257,12 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     .eq("fecha", fecha)
     .in("estado", ["pendiente", "verificada", "confirmada"]);
 
-  const esTurnoComida = horaConsulta ? horaConsulta < "17:00" : null;
+  // El "17:00" ya no está escrito a mano aquí: sale de `HORA_CORTE_TURNO`,
+  // la misma constante que usa el motor compartido y que copia el trigger.
+  const esTurnoComida = horaConsulta ? horaConsulta < HORA_CORTE_TURNO : null;
   const reservasMismoTurno = (reservas || []).filter((r: { hora: string }) => {
     if (esTurnoComida === null) return true;
-    const rEsComida = r.hora < "17:00:00";
+    const rEsComida = r.hora < `${HORA_CORTE_TURNO}:00`;
     return rEsComida === esTurnoComida;
   });
 
@@ -876,29 +890,37 @@ function pageTokenInvalido(): string {
 // ============================================================
 // ACCIÓN: disponibilidad
 // ============================================================
-// Contrato NUEVO (documentado en el informe): sustituye el volcado en
-// crudo de `vista_ocupacion` + `configuracion_turnos` (sin lógica,
-// y hoy con datos fantasma — ver informe) por un cálculo de aforo real,
-// con el mismo criterio de turno que el trigger de la base de datos.
+// Antes esto devolvía la ocupación y los turnos EN CRUDO, sin aplicar
+// ninguna regla: el cliente de la web recibía las filas de
+// `configuracion_turnos` y se las apañaba para deducir qué horas ofrecer.
+// El resultado era que el visitante NO veía las horas que el sistema
+// habría decidido ofrecerle (y `ReservationForm.tsx` acabó con su propia
+// copia divergente de la regla, con `secondaryOffsets = [15, 45]`).
 //
-// FORMA DE LA RESPUESTA (B-2) — en éxito SIEMPRE un ARRAY PLANO de nivel
-// superior, nunca un objeto. n8n respondía con `responseWith:
-// allIncomingItems` (un array) y el consumidor hace `JSON.parse(text)` y
-// después `rawData.map(...)`: devolver `{ fecha, periodos, ocupacion,
-// aforo_turno }` rompía con `TypeError: rawData.map is not a function`.
+// Ahora el cálculo lo hace `_shared/disponibilidad.ts`, el MISMO módulo
+// que usa el panel. Esta función solo lee de la base de datos y traduce
+// el resultado al contrato del array plano.
 //
-// Cada elemento lleva un discriminador explícito `kind` (no hace falta
-// adivinar por presencia de campos):
-//   kind: "meta"      -> 1 elemento, SIEMPRE el primero del array.
-//                        Lleva `fecha`, `aforo_turno` (comida/cena) y
-//                        `cerrado` (M-2: día sin turnos activos != error).
-//   kind: "periodo"   -> 0..n, una fila de `configuracion_turnos` activa
-//                        para el día de la semana de `fecha`.
-//   kind: "ocupacion" -> 0..n, una hora con reservas vivas ese día.
-// Además `fecha` se repite en TODOS los elementos, para que el consumidor
-// pueda filtrar por un solo `kind` sin perder el contexto del día.
-// En error (4xx/5xx) el cuerpo sigue siendo el objeto `{ ok:false, error }`
-// habitual: el consumidor debe comprobar `response.ok` ANTES de mapear.
+// FORMA DE LA RESPUESTA — en éxito SIEMPRE un ARRAY PLANO de nivel
+// superior, nunca un objeto (n8n respondía con un array y el consumidor
+// hace `rawData.map(...)`). Cada elemento lleva un discriminador `kind`:
+//
+//   kind: "meta"        -> 1 elemento, SIEMPRE el primero.
+//   kind: "periodo"     -> 0..n, fila de `configuracion_turnos` aplicable.
+//   kind: "ocupacion"   -> 0..n, una hora con reservas vivas ese día.
+//   kind: "hueco"       -> 0..n, NUEVO. Una hora YA DECIDIDA por el motor.
+//   kind: "descartado"  -> 0..n, NUEVO. Una hora que NO se ofrece, con el
+//                          motivo. Es diagnóstico: el frontend puede
+//                          ignorarlo entero.
+//
+// COMPATIBILIDAD: `meta`, `periodo` y `ocupacion` conservan todos los
+// campos que ya tenían y su mismo significado; solo se les AÑADEN campos.
+// `clasificarDisponibilidad` (casa-tomas-story) sigue funcionando sin
+// tocar nada. Lo que debería cambiar el frontend es dejar de recalcular
+// las horas y limitarse a pintar los `kind:"hueco"`.
+//
+// En error (4xx/5xx) el cuerpo sigue siendo `{ ok:false, error }`: hay
+// que comprobar `response.ok` ANTES de mapear.
 async function handleDisponibilidad(req: Request): Promise<Response> {
   if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
   let body: Record<string, unknown>;
@@ -910,80 +932,144 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   const fecha = typeof body?.fecha === "string" ? body.fecha : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
 
-  const diaSemana = new Date(fecha + "T12:00:00Z").getUTCDay();
+  const comensalesRaw = parseInt(String(body?.numero_comensales ?? body?.comensales ?? ""), 10);
+  const comensales = Number.isFinite(comensalesRaw) && comensalesRaw > 0 ? comensalesRaw : 1;
+  const espacioId = typeof body?.espacio_id === "string" && body.espacio_id ? body.espacio_id : null;
 
-  const { data: turnosRaw } = await supabase
+  // `select("*")` a propósito: el motor acepta tanto las columnas antiguas
+  // como `niveles_escalera`/`ocultar_nivel_anterior`, y así la función no
+  // hay que volver a desplegarla cuando se aplique la migración.
+  const { data: turnosRaw, error: errTurnos } = await supabase
     .from("configuracion_turnos")
-    .select("id, nombre_periodo, hora_inicio, hora_fin, intervalo_base_minutos, umbral_apertura_secundario, dias_semana, ocultar_primario_si_secundario, espacio_id")
+    .select("*")
     .eq("activo", true);
-
-  const periodos = (turnosRaw || []).filter(
-    (t: { dias_semana: number[] | null }) => !t.dias_semana || t.dias_semana.length === 0 || t.dias_semana.includes(diaSemana)
-  );
-
-  const { data: reservasDia } = await supabase
-    .from("reservas")
-    .select("hora, numero_comensales")
-    .eq("fecha", fecha)
-    .in("estado", ["pendiente", "verificada", "confirmada"]);
-
-  const porHora = new Map<string, { total_reservas: number; total_comensales: number }>();
-  for (const r of (reservasDia || []) as Array<{ hora: string; numero_comensales: number }>) {
-    const cur = porHora.get(r.hora) || { total_reservas: 0, total_comensales: 0 };
-    cur.total_reservas += 1;
-    cur.total_comensales += r.numero_comensales;
-    porHora.set(r.hora, cur);
+  if (errTurnos) {
+    console.error("[DISPONIBILIDAD] configuracion_turnos:", errTurnos.message);
+    return json({ ok: false, error: "error_configuracion" }, 500);
   }
 
-  const comida = await getEspaciosConOcupacion(fecha, "13:00");
-  const cena = await getEspaciosConOcupacion(fecha, "20:00");
-  const aforoTurno = {
-    comida: { capacidad_maxima: comida.capacidadTotal, ocupacion: comida.ocupacionTotal, disponible: comida.capacidadTotal - comida.ocupacionTotal },
-    cena: { capacidad_maxima: cena.capacidadTotal, ocupacion: cena.ocupacionTotal, disponible: cena.capacidadTotal - cena.ocupacionTotal },
-  };
+  const { data: espaciosRaw, error: errEspacios } = await supabase
+    .from("espacios_reserva")
+    .select("id, capacidad_maxima")
+    .eq("activa", true);
+  if (errEspacios) {
+    console.error("[DISPONIBILIDAD] espacios_reserva:", errEspacios.message);
+    return json({ ok: false, error: "error_configuracion" }, 500);
+  }
 
-  const ocupacion = Array.from(porHora.entries())
-    .map(([hora, v]) => {
-      const esComida = hora < "17:00:00";
-      const t = esComida ? aforoTurno.comida : aforoTurno.cena;
-      return {
-        kind: "ocupacion" as const,
-        fecha,
-        hora,
-        turno: esComida ? "comida" : "cena",
-        total_reservas: v.total_reservas,
-        total_comensales: v.total_comensales,
-        capacidad_maxima: t.capacidad_maxima,
-        capacidad_disponible: t.disponible,
-        porcentaje_ocupacion: t.capacidad_maxima > 0 ? Math.round((t.ocupacion / t.capacidad_maxima) * 100) : 0,
-      };
-    })
-    .sort((a, b) => a.hora.localeCompare(b.hora));
+  // Ocupación SIEMPRE desde `reservas`, nunca desde `vista_ocupacion`:
+  // en producción 724 de sus 784 filas son huérfanas. Mismo criterio que
+  // el webhook telefónico y que el trigger `trg_validar_capacidad`.
+  const { data: reservasDia, error: errReservas } = await supabase
+    .from("reservas")
+    .select("hora, numero_comensales, espacio_id")
+    .eq("fecha", fecha)
+    .in("estado", ESTADOS_QUE_OCUPAN as unknown as string[]);
+  if (errReservas) {
+    console.error("[DISPONIBILIDAD] reservas:", errReservas.message);
+    return json({ ok: false, error: "error_ocupacion" }, 500);
+  }
 
-  // `kind` va AL FINAL del literal, después del spread, para que una
-  // columna futura de `configuracion_turnos` con ese nombre no pueda
-  // pisar el discriminador. `fecha` se adjunta a cada periodo porque el
-  // consumidor puede quedarse solo con los elementos kind==="periodo".
-  const periodosOut = (periodos as Array<Record<string, unknown>>).map((t) => ({
-    ...t,
+  const config = await getReservationConfig();
+  const capacidadTotal = (espaciosRaw || []).reduce(
+    (suma: number, e: { capacidad_maxima: number }) => suma + (Number(e.capacidad_maxima) || 0),
+    0,
+  );
+
+  const resultado = calcularDisponibilidad({
     fecha,
-    kind: "periodo" as const,
+    comensales,
+    espacioId,
+    configuraciones: (turnosRaw || []) as unknown as ConfiguracionTurnoInput[],
+    reservas: (reservasDia || []) as unknown as ReservaOcupante[],
+    capacidadTotal,
+    ahora: ahoraEnMadrid(),
+    politica: {
+      // `/crear` rechaza SIEMPRE las reservas para hoy (motivo `reserva_hoy`).
+      // Ofrecer huecos de hoy sería mandar al visitante a un rechazo seguro.
+      permitirMismoDia: false,
+      minutosCorte: config.minutos_corte_antes_servicio || 60,
+      diasMaxAntelacion: config.dias_max_antelacion || 60,
+      maxComensales: config.max_comensales_por_reserva || null,
+    },
+  });
+
+  // --- `periodo`: las columnas EN CRUDO (compatibilidad) + lo resuelto ---
+  const resueltoPorId = new Map(resultado.periodos.map((p) => [p.id, p]));
+  const periodosOut = (turnosRaw as Array<Record<string, unknown>> | null || [])
+    .filter((t) => resueltoPorId.has(String(t.id)))
+    .map((t) => {
+      const r = resueltoPorId.get(String(t.id))!;
+      return {
+        ...t,
+        fecha,
+        escalera: r.escalera,
+        ocultar_nivel_anterior: r.ocultar_nivel_anterior,
+        origen_escalera: r.origen_escalera,
+        huecos_ofrecidos: r.huecos_ofrecidos,
+        huecos_completos: r.huecos_completos,
+        // `kind` va AL FINAL, después del spread, para que una columna
+        // futura con ese nombre no pueda pisar el discriminador.
+        kind: "periodo" as const,
+      };
+    });
+
+  // --- `ocupacion`: misma forma de siempre (hora con segundos) ---
+  const ocupacionOut = resultado.ocupacion.map((o) => ({
+    kind: "ocupacion" as const,
+    fecha,
+    hora: `${o.hora}:00`,
+    turno: o.turno,
+    total_reservas: o.total_reservas,
+    total_comensales: o.total_comensales,
+    capacidad_maxima: resultado.aforo[o.turno].capacidad_maxima,
+    capacidad_disponible: resultado.aforo[o.turno].disponible,
+    porcentaje_ocupacion: resultado.aforo[o.turno].porcentaje,
+    // NUEVO: ocupación de ESA hora concreta, no la del turno entero.
+    porcentaje_hora: o.porcentaje_hora,
   }));
 
-  // M-2: hasta ahora un día CERRADO (sin turnos activos para ese día de la
-  // semana) se devolvía como `periodos: []`, indistinguible de un error
-  // para el consumidor. `cerrado` lo hace explícito sin romper el contrato
-  // de array plano: viaja en el elemento `meta`, que siempre existe.
+  // --- `hueco`: LO QUE HAY QUE PINTAR ---
+  const huecosOut = resultado.huecos.map((h) => ({
+    ...h,
+    fecha,
+    kind: "hueco" as const,
+  }));
+
+  // --- `descartado`: por qué NO se ofrece cada hora (diagnóstico) ---
+  const descartadosOut = resultado.descartados.slice(0, 200).map((d) => ({
+    ...d,
+    fecha,
+    kind: "descartado" as const,
+  }));
+
   const meta = {
     kind: "meta" as const,
     fecha,
-    cerrado: periodosOut.length === 0,
-    aforo_turno: aforoTurno,
+    // `cerrado` conserva EXACTAMENTE su significado: el restaurante no abre
+    // ese día (cero periodos). Un turno lleno NO es un día cerrado.
+    cerrado: resultado.cerrado,
+    motivo_cierre: resultado.motivoCierre,
+    aforo_turno: {
+      comida: resultado.aforo.comida,
+      cena: resultado.aforo.cena,
+    },
     total_periodos: periodosOut.length,
-    total_ocupacion: ocupacion.length,
+    total_ocupacion: ocupacionOut.length,
+    // NUEVOS
+    dia_semana: resultado.diaSemana,
+    comensales: resultado.comensales,
+    reservable: resultado.reservable,
+    motivo_no_reservable: resultado.motivoNoReservable,
+    total_huecos: huecosOut.length,
+    huecos_ofrecidos: huecosOut.filter((h) => h.ofrecido).length,
+    huecos_completos: huecosOut.filter((h) => !h.ofrecido).length,
+    // Configuración incoherente detectada (umbrales en desorden, periodos
+    // que cruzan medianoche, franja 16:00-17:00…). El panel puede pintarlo.
+    avisos: resultado.avisos,
   };
 
-  return json([meta, ...periodosOut, ...ocupacion]);
+  return json([meta, ...periodosOut, ...ocupacionOut, ...huecosOut, ...descartadosOut]);
 }
 
 // ============================================================
@@ -1140,6 +1226,57 @@ async function handleCrear(req: Request): Promise<Response> {
     if ((existentesEmail || []).length >= config.max_reservas_por_email_dia) {
       return await avisar("max_reservas_email", `Ya tiene el máximo de reservas por email para ${fecha}.`, "Ya hay reservas activas con este email para esa fecha.", 409);
     }
+  }
+
+  // La hora tiene que ser UNA DE LAS QUE EL MOTOR OFRECE.
+  // Sin esto, `/crear` aceptaba cualquier `hora` enviada a mano: una
+  // petición directa con "03:15" entraba igual, y toda la escalera de
+  // niveles (que solo aplica la web al pintar) quedaba de adorno.
+  //
+  // Se calcula SIN `ahora` y SIN política de fechas a propósito: "hoy",
+  // corte horario y fecha pasada/lejana ya se han rechazado arriba con
+  // mensajes mejores, y volver a juzgarlos aquí los taparía. Tampoco se
+  // juzga el aforo: de eso va la comprobación siguiente.
+  try {
+    const [{ data: turnosCrear }, { data: espaciosCrear }, { data: reservasCrear }] = await Promise.all([
+      supabase.from("configuracion_turnos").select("*").eq("activo", true),
+      supabase.from("espacios_reserva").select("capacidad_maxima").eq("activa", true),
+      supabase
+        .from("reservas")
+        .select("hora, numero_comensales, espacio_id")
+        .eq("fecha", fecha)
+        .in("estado", ESTADOS_QUE_OCUPAN as unknown as string[]),
+    ]);
+
+    const disponibilidad = calcularDisponibilidad({
+      fecha,
+      comensales: partySize,
+      espacioId: espacioIdInput,
+      configuraciones: (turnosCrear || []) as unknown as ConfiguracionTurnoInput[],
+      reservas: (reservasCrear || []) as unknown as ReservaOcupante[],
+      capacidadTotal: (espaciosCrear || []).reduce(
+        (suma: number, e: { capacidad_maxima: number }) => suma + (Number(e.capacidad_maxima) || 0),
+        0,
+      ),
+      ahora: null,
+    });
+
+    const validacion = validarHoraOfrecida(disponibilidad, hora);
+    if (!validacion.ok) {
+      return await avisar(
+        validacion.motivo || "sin_disponibilidad",
+        validacion.detalle || `Hora ${hora} no ofrecida el ${fecha}.`,
+        validacion.mensaje || "No queda disponibilidad para esa fecha y hora.",
+        422,
+      );
+    }
+    if (validacion.indeterminado) {
+      console.warn("[CREAR] Sin configuracion_turnos legible: no se valida la hora, decide el trigger.");
+    }
+  } catch (err) {
+    // Fallo leyendo la configuración: NO se bloquea la reserva. El trigger
+    // `trg_validar_capacidad` sigue siendo la última palabra sobre el aforo.
+    console.error("[CREAR] No se pudo validar la hora contra el motor:", (err as Error)?.message || err);
   }
 
   // Aforo (mismo criterio que el trigger `trg_validar_capacidad`; se
