@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+// Tipos de la escalera de niveles — el MISMO módulo que usan la web y el
+// teléfono (ver `disponibilidad.ts`). `niveles_escalera` viaja tal cual el
+// jsonb de Supabase: puede ser un array ya parseado, un string, o no venir
+// (columna aún sin aplicar / fila creada antes de la migración).
+import type { NivelEscalera, BaseUmbral } from "../../supabase/functions/_shared/disponibilidad";
 
 export interface ConfiguracionTurno {
   id: string;
@@ -14,6 +19,10 @@ export interface ConfiguracionTurno {
   ocultar_primario_si_secundario: boolean;
   created_at: string;
   updated_at: string;
+  /** NUEVO (migración `20260921000000`, aún no aplicada). Ver `disponibilidad.ts`. */
+  niveles_escalera?: NivelEscalera[] | string | null;
+  ocultar_nivel_anterior?: boolean | null;
+  base_umbral?: BaseUmbral | string | null;
 }
 
 export interface ConfiguracionTurnoInsert {
@@ -26,6 +35,9 @@ export interface ConfiguracionTurnoInsert {
   activo?: boolean;
   espacio_id?: string | null;
   ocultar_primario_si_secundario?: boolean;
+  niveles_escalera?: NivelEscalera[] | null;
+  ocultar_nivel_anterior?: boolean;
+  base_umbral?: BaseUmbral;
 }
 
 export interface ConfiguracionTurnoUpdate extends Partial<ConfiguracionTurnoInsert> {
@@ -73,6 +85,38 @@ export function useConfiguracionTurnosPorEspacio(espacioId: string | null) {
   });
 }
 
+/**
+ * La migración `20260921000000_escalera_niveles_turno.sql` que añade
+ * `niveles_escalera` / `ocultar_nivel_anterior` / `base_umbral` está
+ * escrita pero NO aplicada (a propósito: no la toca esta pantalla). Los
+ * tipos generados de Supabase (`integrations/supabase/types.ts`) por tanto
+ * no conocen esas columnas — de ahí el `as any` en el payload, igual que
+ * ya hace este código con `espacios_reserva`, tabla tampoco tipada.
+ *
+ * Si esas claves llegan a un entorno donde la migración no está aplicada,
+ * Postgres/PostgREST responde "column ... does not exist" (42703) o
+ * "Could not find column" (PGRST204). Se traduce a un mensaje que se
+ * entiende sin leer un log, en vez de dejar pasar el error crudo.
+ */
+function esErrorColumnaEscaleraFaltante(error: unknown): boolean {
+  const mensaje = String((error as { message?: string } | null)?.message ?? "");
+  const codigo = String((error as { code?: string } | null)?.code ?? "");
+  return (
+    codigo === "42703" ||
+    codigo === "PGRST204" ||
+    /niveles_escalera|ocultar_nivel_anterior|base_umbral/.test(mensaje)
+  );
+}
+
+function relanzarErrorEscalera(error: unknown): never {
+  if (esErrorColumnaEscaleraFaltante(error)) {
+    throw new Error(
+      "No se pudo guardar la escalera de niveles: falta aplicar la migración pendiente en la base de datos (niveles_escalera). Pide que se aplique y vuelve a intentarlo.",
+    );
+  }
+  throw error;
+}
+
 export function useCrearConfiguracionTurno() {
   const queryClient = useQueryClient();
 
@@ -80,11 +124,11 @@ export function useCrearConfiguracionTurno() {
     mutationFn: async (config: ConfiguracionTurnoInsert) => {
       const { data, error } = await supabase
         .from("configuracion_turnos")
-        .insert(config)
+        .insert(config as any)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) relanzarErrorEscalera(error);
       return data as ConfiguracionTurno;
     },
     onSuccess: () => {
@@ -100,12 +144,12 @@ export function useActualizarConfiguracionTurno() {
     mutationFn: async ({ id, ...updates }: ConfiguracionTurnoUpdate) => {
       const { data, error } = await supabase
         .from("configuracion_turnos")
-        .update(updates)
+        .update(updates as any)
         .eq("id", id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) relanzarErrorEscalera(error);
       return data as ConfiguracionTurno;
     },
     onSuccess: () => {
@@ -132,87 +176,10 @@ export function useEliminarConfiguracionTurno() {
   });
 }
 
-// Función auxiliar para generar los turnos dinámicos basados en la configuración
-export function generarTurnosDinamicos(
-  configuraciones: ConfiguracionTurno[],
-  fecha: Date,
-  ocupacionPorHora: Record<string, { ocupacion: number; capacidadMaxima: number }>
-): { hora: string; esTurnoSecundario: boolean; motivoApertura?: string }[] {
-  const diaSemana = fecha.getDay();
-  const turnos: { hora: string; esTurnoSecundario: boolean; motivoApertura?: string }[] = [];
-
-  for (const config of configuraciones) {
-    // Verificar si el periodo aplica para este día
-    if (!config.dias_semana.includes(diaSemana) || !config.activo) {
-      continue;
-    }
-
-    const [horaInicio, minInicio] = config.hora_inicio.split(":").map(Number);
-    const [horaFin, minFin] = config.hora_fin.split(":").map(Number);
-
-    let currentHour = horaInicio;
-    let currentMin = minInicio;
-
-    // Manejar periodos que cruzan medianoche
-    const finEnMinutos = horaFin * 60 + minFin;
-    const inicioEnMinutos = horaInicio * 60 + minInicio;
-    const cruzaMedianoche = finEnMinutos <= inicioEnMinutos;
-
-    while (true) {
-      const currentEnMinutos = currentHour * 60 + currentMin;
-      
-      // Verificar si hemos llegado al final del periodo
-      if (cruzaMedianoche) {
-        if (currentHour >= horaFin && currentHour < horaInicio && currentEnMinutos >= finEnMinutos) {
-          break;
-        }
-      } else {
-        if (currentEnMinutos >= finEnMinutos) {
-          break;
-        }
-      }
-
-      const horaFormateada = `${currentHour.toString().padStart(2, "0")}:${currentMin.toString().padStart(2, "0")}`;
-      const esTurnoPrimario = currentMin % config.intervalo_base_minutos === 0;
-
-      if (esTurnoPrimario) {
-        // Turno primario - siempre se añade
-        turnos.push({
-          hora: horaFormateada,
-          esTurnoSecundario: false,
-        });
-      } else {
-        // Turno secundario - solo se añade si el turno primario anterior tiene alta ocupación
-        const minutosTurnoPrimario = Math.floor(currentMin / config.intervalo_base_minutos) * config.intervalo_base_minutos;
-        const horaTurnoPrimario = `${currentHour.toString().padStart(2, "0")}:${minutosTurnoPrimario.toString().padStart(2, "0")}`;
-        
-        const ocupacionPrimario = ocupacionPorHora[horaTurnoPrimario];
-        
-        if (ocupacionPrimario) {
-          const porcentajeOcupacion = (ocupacionPrimario.ocupacion / ocupacionPrimario.capacidadMaxima) * 100;
-          
-          if (porcentajeOcupacion >= config.umbral_apertura_secundario) {
-            turnos.push({
-              hora: horaFormateada,
-              esTurnoSecundario: true,
-              motivoApertura: `Alta demanda en ${horaTurnoPrimario} (${Math.round(porcentajeOcupacion)}%)`,
-            });
-          }
-        }
-      }
-
-      // Avanzar 15 minutos
-      currentMin += 15;
-      if (currentMin >= 60) {
-        currentMin = 0;
-        currentHour += 1;
-        if (currentHour >= 24) {
-          currentHour = 0;
-        }
-      }
-    }
-  }
-
-  // Ordenar por hora
-  return turnos.sort((a, b) => a.hora.localeCompare(b.hora));
-}
+// NOTA: existió aquí una `generarTurnosDinamicos` local (copia muerta de la
+// regla del umbral, distinta de la de `useDisponibilidad.ts` y de la del
+// motor compartido). Se confirmó sin uso — ningún import en el repo la
+// referenciaba, solo `useDisponibilidad.ts` exporta una función con ese
+// mismo nombre y es la que consume `SelectorHorasDisponibles.tsx` — y se
+// eliminó. La única fuente de esta regla es
+// `supabase/functions/_shared/disponibilidad.ts`.
