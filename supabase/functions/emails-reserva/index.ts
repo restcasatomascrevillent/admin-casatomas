@@ -14,6 +14,14 @@
 //   POST /recordatorios           JSON  -> lote de recordatorios T-2 (cron)
 //   POST /detectar-ausencias      JSON  -> marca no_show + crea sugerencias
 //                                           de lista negra (cron)
+//   POST /reintentar-fallidos     JSON  -> reintenta envíos 'fallido' con
+//                                           espera creciente (cron, NUEVO —
+//                                           ver 20260922160000_reintentos_
+//                                           emails_reserva.sql y reintentos.ts
+//                                           para el razonamiento completo:
+//                                           qué se reintenta, qué no, y la
+//                                           garantía contra duplicados vía
+//                                           Idempotency-Key de Resend)
 //   POST /enviar-prueba           JSON  -> renderiza el BORRADOR que trae el
 //                                           editor del panel (aún sin
 //                                           guardar) con datos de ejemplo y
@@ -31,7 +39,8 @@
 // true a nivel de función porque las rutas GET las pulsa el cliente desde su
 // correo, sin ninguna cabecera. La autenticación real de esas rutas es el
 // token HMAC de un solo uso (tokens.ts). Las rutas POST /notificar,
-// /recordatorios y /detectar-ausencias exigen la cabecera `x-webhook-secret`
+// /recordatorios, /detectar-ausencias y /reintentar-fallidos exigen la
+// cabecera `x-webhook-secret`
 // (comprobarSecretoCompartido, FALLA CERRADO si falta la env var — ver el
 // aviso sobre checkSharedSecret de reservas-web en
 // docs/REVISION-PUERTOS-N8N.md A-3, que aquí se decide no repetir).
@@ -86,6 +95,18 @@ import {
   esErrorSandboxResend,
   superaLimiteDePrueba,
 } from "./envio-prueba.ts";
+import {
+  clasificarErrorEnvio,
+  calcularProximoReintento,
+  seHanAgotadoLosIntentos,
+  esReintentableAhora,
+  tipoDeEmailSigueVigente,
+  claveIdempotenciaEnvio,
+  debeCrearAvisoLote,
+  construirAvisoLote,
+  MAX_INTENTOS_POR_DEFECTO,
+  type EnvioPerdido,
+} from "./reintentos.ts";
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -104,6 +125,12 @@ const TOKEN_SECRET = Deno.env.get("EMAILS_RESERVA_TOKEN_SECRET") ?? "";
 const PUBLIC_BASE_URL = Deno.env.get("EMAILS_RESERVA_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/emails-reserva`;
 const TAMANO_LOTE = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_LOTE_TAMANO"), TAMANO_LOTE_POR_DEFECTO);
 const PAUSA_LOTE_MS = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_LOTE_PAUSA_MS"), PAUSA_ENTRE_LOTES_MS_POR_DEFECTO);
+// Cuántas filas 'fallido' se evalúan como máximo en una sola ejecución de
+// /reintentar-fallidos. 50 es ya más que el día más cargado que hay
+// registrado en el sistema (ver docs/CAPACIDAD-RESERVAS-EMAIL.md, sección
+// 3: 50 reservas ese día) — de sobra para drenar cualquier atasco real en
+// una sola pasada, y el cron vuelve a pasar cada 15 minutos si algo queda.
+const MAX_FILAS_REINTENTO = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_REINTENTO_MAX_FILAS"), 50);
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 const resend = new Resend(RESEND_API_KEY);
@@ -217,7 +244,9 @@ async function construirDatosReserva(
 }
 
 // ------------------------------------------------------------
-// ENVÍO IDEMPOTENTE (ver PIEZA 3a de la migración para el razonamiento)
+// ENVÍO IDEMPOTENTE (ver PIEZA 3a de la migración para el razonamiento) +
+// REINTENTO (ver 20260922160000_reintentos_emails_reserva.sql y
+// reintentos.ts para el razonamiento completo)
 // ------------------------------------------------------------
 interface FilaEnvioAbandonable {
   id: string;
@@ -262,30 +291,130 @@ async function reclamarEnvio(
   return { id: data.id as string };
 }
 
-async function marcarResultadoEnvio(id: string, exito: boolean, detalle: { resendId?: string | null; error?: string }): Promise<void> {
-  const cambios = exito
-    ? { resultado: "enviado", resend_id: detalle.resendId ?? null, enviado_at: ahoraIso() }
-    : { resultado: "fallido", error: detalle.error ?? "error_desconocido" };
-  const { error } = await supabase.from("envios_email_reserva").update(cambios).eq("id", id);
-  if (error) console.error(`[emails-reserva] Error actualizando registro de envio ${id}:`, error.message);
+async function marcarEnviado(id: string, resendId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("envios_email_reserva")
+    .update({ resultado: "enviado", resend_id: resendId, enviado_at: ahoraIso(), ultimo_intento_at: ahoraIso() })
+    .eq("id", id);
+  if (error) console.error(`[emails-reserva] Error marcando enviado ${id}:`, error.message);
 }
 
-interface ResultadoEnvio {
-  enviado: boolean;
-  motivo?: string;
+/** Fallo transitorio: se queda 'fallido' (reintentable) con la hora del
+ * próximo intento ya calculada, para que /reintentar-fallidos no tenga que
+ * recalcularla a partir de nada más que esta misma fila. */
+async function marcarFallidoReintentable(id: string, error: string, proximoReintentoEn: string): Promise<void> {
+  const { error: errUpdate } = await supabase
+    .from("envios_email_reserva")
+    .update({ resultado: "fallido", error, proximo_reintento_en: proximoReintentoEn, ultimo_intento_at: ahoraIso() })
+    .eq("id", id);
+  if (errUpdate) console.error(`[emails-reserva] Error marcando fallido (reintentable) ${id}:`, errUpdate.message);
 }
 
-async function enviarCorreoParaReserva(reservaId: string): Promise<ResultadoEnvio> {
-  const reserva = await fetchReserva(reservaId);
-  if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
-  if (!reserva.email) return { enviado: false, motivo: "reserva_sin_email" };
+/** Fallo permanente, o transitorio que ya agotó sus intentos: estado final,
+ * distinguible de 'fallido' a propósito (punto 2 del encargo) — nada vuelve
+ * a mirar esta fila salvo un humano. */
+async function marcarFallidoDefinitivo(id: string, error: string): Promise<void> {
+  const { error: errUpdate } = await supabase
+    .from("envios_email_reserva")
+    .update({ resultado: "fallido_definitivo", error, proximo_reintento_en: null, ultimo_intento_at: ahoraIso() })
+    .eq("id", id);
+  if (errUpdate) console.error(`[emails-reserva] Error marcando fallido_definitivo ${id}:`, errUpdate.message);
+}
 
-  const tipo = tipoEmailParaEstado(reserva.estado);
-  if (!tipo) return { enviado: false, motivo: `sin_plantilla_para_estado_${reserva.estado}` };
+// ------------------------------------------------------------
+// ENVÍO REAL A RESEND — con Idempotency-Key (garantía contra duplicados)
+// ------------------------------------------------------------
+// Se llama a la API HTTP de Resend directamente con `fetch`, NO con
+// `resend.emails.send()` del SDK (que sí se sigue usando, sin cambios, en
+// handleEnviarPrueba — ese envío no se reintenta nunca, no tiene fila de
+// envios_email_reserva de la que colgar una clave de idempotencia, y no
+// tiene sentido dársela). Dos motivos, verificados ambos contra el código
+// fuente real de la versión ya fijada en este proyecto (resend-node@2.0.0,
+// esm.sh/resend@2.0.0) antes de decidir esto, no por sospecha:
+//   1. Idempotencia: `CreateEmailRequestOptions` (segundo argumento de
+//      `.send()`) en la v2.0.0 solo declara `query` — NO `idempotencyKey`
+//      (se añadió en una versión posterior del SDK). Pasarlo igualmente no
+//      lo mandaría como cabecera `Idempotency-Key`, así que daría una falsa
+//      sensación de estar protegidos. Llamando a la API HTTP directamente
+//      se controla la cabecera sin depender de que el SDK la soporte.
+//   2. Status HTTP fiable: el objeto de error del SDK no siempre trae
+//      `statusCode` (ver el comentario ya existente en envio-prueba.ts sobre
+//      resend-node#286, que aquí también aplica). Con `fetch` directo el
+//      status es el de la respuesta HTTP real, siempre presente, y es la
+//      señal que usa clasificarErrorEnvio (reintentos.ts) para decidir si
+//      vale la pena reintentar.
+// La clave de idempotencia es `claveIdempotenciaEnvio(envioId)` — el id de
+// la FILA de envios_email_reserva, que no cambia entre el intento original
+// y cada reintento posterior (el reintento hace UPDATE de la misma fila,
+// nunca INSERT de una nueva — ver reclamarReintento más abajo). Resend
+// conserva esa clave 24h; toda la ventana de reintento de este mecanismo
+// (ver MAX_INTENTOS_POR_DEFECTO/BACKOFF_* en reintentos.ts) cabe muy
+// holgadamente dentro de esas 24h.
+// ------------------------------------------------------------
+const RESEND_SEND_URL = "https://api.resend.com/emails";
+const RESEND_ENVIO_TIMEOUT_MS = 15000;
 
-  const plantilla = await obtenerPlantillaActual(tipo);
-  if (!plantilla) return { enviado: false, motivo: `plantilla_no_configurada_${tipo}` };
+interface PayloadCorreo {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}
 
+type ResultadoEnvioResend =
+  | { ok: true; resendId: string | null }
+  | { ok: false; status: number | null; name: string | null; message: string | null };
+
+async function enviarPorResendConIdempotencia(payload: PayloadCorreo, idempotencyKey: string): Promise<ResultadoEnvioResend> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RESEND_ENVIO_TIMEOUT_MS);
+  try {
+    const response = await fetch(RESEND_SEND_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    let cuerpo: Record<string, unknown> | null = null;
+    try {
+      cuerpo = (await response.json()) as Record<string, unknown>;
+    } catch {
+      cuerpo = null;
+    }
+
+    if (response.ok) {
+      const resendId = cuerpo && typeof cuerpo.id === "string" ? cuerpo.id : null;
+      return { ok: true, resendId };
+    }
+    const nombreError = cuerpo && typeof cuerpo.name === "string" ? cuerpo.name : null;
+    const mensajeError = cuerpo && typeof cuerpo.message === "string" ? cuerpo.message : `HTTP ${response.status}`;
+    return { ok: false, status: response.status, name: nombreError, message: mensajeError };
+  } catch (err) {
+    // Sin respuesta HTTP: excepción de red, timeout (AbortError), DNS...
+    // Es EXACTAMENTE el caso ambiguo (¿llegó a procesarlo Resend o no?) que
+    // justifica la Idempotency-Key de arriba.
+    const mensaje = err instanceof Error ? err.message : "excepcion_desconocida";
+    return { ok: false, status: null, name: null, message: mensaje };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/** Construye asunto+HTML para un tipo de correo dado, incluyendo los
+ * botones firmados de 'propuesta'. Extraído de enviarCorreoParaReserva para
+ * que /reintentar-fallidos pueda reconstruir el mismo contenido (recalculado
+ * con los datos VIGENTES de la reserva, no los del intento original — ver
+ * comentario sobre tipoDeEmailSigueVigente en reintentos.ts). */
+async function construirCorreoParaTipo(
+  reserva: ReservaRow,
+  tipo: TipoPlantilla,
+  plantilla: FilaPlantilla,
+): Promise<{ asunto: string; html: string }> {
   let urlsBotones: { principal?: string; secundario?: string } | undefined;
   if (tipo === "propuesta") {
     const huella = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
@@ -296,30 +425,387 @@ async function enviarCorreoParaReserva(reservaId: string): Promise<ResultadoEnvi
       secundario: `${PUBLIC_BASE_URL}/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
     };
   }
-
   const datos = await construirDatosReserva(reserva, urlsBotones);
-  const { asunto, html: cuerpoHtml } = renderPlantilla(plantilla, datos);
+  return renderPlantilla(plantilla, datos);
+}
+
+interface ResultadoIntentoEnvio {
+  enviado: boolean;
+  /** true si, tras ESTE intento, la fila ha quedado 'fallido_definitivo'
+   * (permanente, o transitorio que agotó sus intentos). */
+  agotado: boolean;
+  motivo?: string;
+}
+
+/** Pieza compartida por el primer intento y cada reintento: llama a Resend
+ * con la clave de idempotencia de `envioId` y persiste el resultado
+ * (enviado / fallido con próximo reintento / fallido_definitivo). No hace
+ * ningún I/O de más: quien llama ya dejó la fila en 'pendiente' (claim). */
+async function intentarEnviarYRegistrar(
+  envioId: string,
+  destinatario: string,
+  asunto: string,
+  cuerpoHtml: string,
+  intentosActuales: number,
+): Promise<ResultadoIntentoEnvio> {
+  const resultado = await enviarPorResendConIdempotencia(
+    { from: RESEND_FROM_EMAIL, to: [destinatario], subject: asunto, html: cuerpoHtml },
+    claveIdempotenciaEnvio(envioId),
+  );
+
+  if (resultado.ok) {
+    await marcarEnviado(envioId, resultado.resendId);
+    return { enviado: true, agotado: false };
+  }
+
+  const clasificacion = clasificarErrorEnvio({ status: resultado.status, name: resultado.name, message: resultado.message });
+  const mensajeError = resultado.message || (resultado.status ? `HTTP ${resultado.status}` : "sin_respuesta_http");
+
+  if (!clasificacion.reintentable || seHanAgotadoLosIntentos(intentosActuales, MAX_INTENTOS_POR_DEFECTO)) {
+    await marcarFallidoDefinitivo(envioId, mensajeError);
+    return { enviado: false, agotado: true, motivo: clasificacion.motivo };
+  }
+
+  const proximoReintentoEn = calcularProximoReintento(ahoraIso(), intentosActuales);
+  await marcarFallidoReintentable(envioId, mensajeError, proximoReintentoEn);
+  return { enviado: false, agotado: false, motivo: clasificacion.motivo };
+}
+
+function resumenPerdido(reserva: ReservaRow, tipo: TipoPlantilla, motivo: string): EnvioPerdido {
+  return {
+    reservaId: reserva.id,
+    nombre: reserva.nombre,
+    telefono: reserva.telefono,
+    email: reserva.email,
+    fecha: reserva.fecha,
+    hora: reserva.hora,
+    tipoEmail: tipo,
+    motivo,
+  };
+}
+
+/**
+ * Aviso interno cuando uno o más correos se dan por perdidos definitivamente
+ * (punto 3 del encargo). Reutiliza notificaciones_dashboard (la campana que
+ * ya existe, CentroNotificaciones.tsx + useNotificacionesDashboard.ts) — no
+ * se inventa ningún mecanismo nuevo. SIEMPRE se agrupa en UN aviso por
+ * llamada (construirAvisoLote, reintentos.ts), nunca uno por reserva, y
+ * además se respeta un cooldown entre avisos (debeCrearAvisoLote): si Resend
+ * cae diez minutos y arrastra a varias reservas, el resultado es un aviso
+ * (o dos, si el cron pasa dos veces durante la caída), no doscientos — es
+ * justo el escenario que el encargo pide evitar explícitamente.
+ *
+ * La comprobación del cooldown (SELECT del último aviso) y el INSERT no son
+ * atómicos — mismo trade-off ya asumido en comprobarLimitePrueba más abajo
+ * en este fichero: una carrera muy ajustada podría colar un aviso de más,
+ * nunca menos de lo razonable, y esto no es una cuota de facturación.
+ */
+async function avisarEnviosDefinitivamentePerdidos(perdidos: EnvioPerdido[]): Promise<boolean> {
+  const aviso = construirAvisoLote(perdidos);
+  if (!aviso) return false;
+
+  const ahora = ahoraIso();
+  const { data: ultimo, error: errUltimo } = await supabase
+    .from("notificaciones_dashboard")
+    .select("created_at")
+    .eq("tipo", "email_fallido")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (errUltimo) {
+    console.error("[emails-reserva] Error comprobando el ultimo aviso de email_fallido (se avisa igualmente):", errUltimo.message);
+  } else if (!debeCrearAvisoLote((ultimo?.created_at as string | undefined) ?? null, ahora)) {
+    console.log(
+      `[emails-reserva] Aviso de correos perdidos omitido por cooldown (${perdidos.length} fila(s) afectada(s) en esta pasada, ya hay un aviso reciente).`,
+    );
+    return false;
+  }
+
+  const referenciaUnica = perdidos.length === 1 ? perdidos[0] : null;
+  const { error: errInsert } = await supabase.from("notificaciones_dashboard").insert({
+    tipo: "email_fallido",
+    titulo: aviso.titulo,
+    mensaje: aviso.mensaje,
+    referencia_id: referenciaUnica?.reservaId ?? null,
+    referencia_tipo: referenciaUnica ? "reserva" : null,
+  });
+  if (errInsert) {
+    console.error("[emails-reserva] Error creando aviso de correos perdidos:", errInsert.message);
+    return false;
+  }
+  return true;
+}
+
+interface ResultadoEnvio {
+  enviado: boolean;
+  motivo?: string;
+}
+
+/**
+ * `tipoForzado` — BUG PRE-EXISTENTE ENCONTRADO Y CORREGIDO AQUÍ (no estaba
+ * en el encargo original, pero está dentro de mi territorio y socava
+ * directamente la robustez del recordatorio, que el propio informe de
+ * capacidad señala como el caso más grave a arreglar): sin este parámetro,
+ * el tipo de correo SIEMPRE se derivaba de `tipoEmailParaEstado(reserva.estado)`
+ * — y ese switch NUNCA devuelve 'recordatorio' (no hay ningún `estado` de
+ * `reservas` que se traduzca a eso; el recordatorio lo dispara el cron de
+ * T-2 días sobre reservas que YA están 'confirmada', no una transición de
+ * estado). Como resultado, handleRecordatorios llamaba a esta función y
+ * acababa reclamando tipo_email='confirmada' — la MISMA fila que ya existe
+ * 'enviado' desde que la reserva se confirmó — y chocaba siempre con
+ * uq_envio_email_reserva_activo (23505), así que reclamarEnvio devolvía
+ * null y NUNCA se llegaba a llamar a Resend: el recordatorio no fallaba de
+ * forma visible, simplemente no se intentaba nunca, con
+ * motivo="ya_enviado_o_en_curso" (que ni siquiera es un 'fallido' — no deja
+ * ninguna fila para que /reintentar-fallidos pudiera encontrar). Que
+ * `yaEnviadas` en handleRecordatorios ya consultara
+ * `tipo_email='recordatorio'` específicamente confirma que ESE era el
+ * diseño pretendido; solo faltaba pasarlo. Ahora handleRecordatorios pasa
+ * `tipoForzado: 'recordatorio'` explícitamente en vez de dejar que se
+ * derive del estado.
+ */
+async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlantilla): Promise<ResultadoEnvio> {
+  const reserva = await fetchReserva(reservaId);
+  if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
+  if (!reserva.email) return { enviado: false, motivo: "reserva_sin_email" };
+
+  const tipo = tipoForzado ?? tipoEmailParaEstado(reserva.estado);
+  if (!tipo) return { enviado: false, motivo: `sin_plantilla_para_estado_${reserva.estado}` };
+
+  const plantilla = await obtenerPlantillaActual(tipo);
+  if (!plantilla) return { enviado: false, motivo: `plantilla_no_configurada_${tipo}` };
+
+  const { asunto, html: cuerpoHtml } = await construirCorreoParaTipo(reserva, tipo, plantilla);
 
   const claim = await reclamarEnvio(reserva.id, tipo, reserva.email, plantilla.id);
   if (!claim) return { enviado: false, motivo: "ya_enviado_o_en_curso" };
 
   if (!RESEND_API_KEY) {
-    await marcarResultadoEnvio(claim.id, false, { error: "resend_no_configurado" });
+    // No es un fallo transitorio: sin API key no hay forma de que un
+    // reintento cambie nada. Directo a fallido_definitivo + aviso (con
+    // mensaje distinto: aquí no sirve "llama al cliente", sirve "revisa la
+    // configuración" — ver esProblemaDeConfiguracion en reintentos.ts).
+    await marcarFallidoDefinitivo(claim.id, "resend_no_configurado");
+    await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, tipo, "resend_no_configurado")]);
     return { enviado: false, motivo: "resend_no_configurado" };
   }
 
-  try {
-    const { data, error } = await resend.emails.send({ from: RESEND_FROM_EMAIL, to: [reserva.email], subject: asunto, html: cuerpoHtml });
-    if (error) {
-      await marcarResultadoEnvio(claim.id, false, { error: String(error) });
-      return { enviado: false, motivo: "resend_error" };
-    }
-    await marcarResultadoEnvio(claim.id, true, { resendId: (data as { id?: string } | null)?.id });
-    return { enviado: true };
-  } catch (err) {
-    await marcarResultadoEnvio(claim.id, false, { error: (err as Error)?.message ?? "excepcion" });
-    return { enviado: false, motivo: "excepcion" };
+  const resultado = await intentarEnviarYRegistrar(claim.id, reserva.email, asunto, cuerpoHtml, 1);
+  if (resultado.enviado) return { enviado: true };
+  if (resultado.agotado) {
+    await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, tipo, resultado.motivo ?? "error_desconocido")]);
+    return { enviado: false, motivo: "fallido_definitivo" };
   }
+  return { enviado: false, motivo: "fallido_reintentable" };
+}
+
+// ------------------------------------------------------------
+// REINTENTO DE ENVÍOS FALLIDOS (cron, vía pg_net — ver migración
+// 20260922160000_reintentos_emails_reserva.sql)
+// ------------------------------------------------------------
+interface FilaEnvioFallido {
+  id: string;
+  reserva_id: string;
+  tipo_email: string;
+  plantilla_id: string | null;
+  intentos: number;
+  resultado: string;
+  proximo_reintento_en: string | null;
+}
+
+async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnvioFallido[]> {
+  // Filtro grueso en SQL (resultado/intentos) por eficiencia; el filtro fino
+  // (¿ya le toca por tiempo?) es esReintentableAhora (reintentos.ts), que se
+  // aplica abajo antes de reclamar cada fila — igual que handleDetectarAusencias:
+  // SQL acota, TS decide. Deliberadamente NO se filtra proximo_reintento_en
+  // en SQL con un `.or(...)` (valor null O <= ahora): PostgREST soporta esa
+  // sintaxis, pero es más frágil de construir a mano como texto (columnas y
+  // valores separados por comas/puntos) que vale la pena aquí sin poder
+  // probarlo contra un PostgREST real desde esta sesión (sin acceso a
+  // Supabase). Se ordena por proximo_reintento_en (nulls primero, que son
+  // los fallos recién marcados) para que las filas que ya tocan salgan
+  // primero dentro del límite, y esReintentableAhora descarta en TS las que
+  // el orden haya dejado dentro del límite sin tocarles aún.
+  const { data, error } = await supabase
+    .from("envios_email_reserva")
+    .select("id, reserva_id, tipo_email, plantilla_id, intentos, resultado, proximo_reintento_en")
+    .eq("resultado", "fallido")
+    .lt("intentos", MAX_INTENTOS_POR_DEFECTO)
+    .order("proximo_reintento_en", { ascending: true, nullsFirst: true })
+    .limit(maxFilas);
+  if (error) {
+    console.error("[emails-reserva] Error consultando envios fallidos candidatos a reintento:", error.message);
+    return [];
+  }
+  return (data ?? []) as FilaEnvioFallido[];
+}
+
+/** Reclama una fila 'fallido' para reintentarla: UPDATE condicional
+ * (resultado='fallido' AND intentos=<lo que se leyó>) que la pasa a
+ * 'pendiente' e incrementa `intentos` en la misma operación atómica. Si
+ * otra ejecución ya la reclamó (o ya cambió de estado) entre la consulta y
+ * este UPDATE, la condición no casa con ninguna fila y se devuelve null —
+ * mismo patrón de "UPDATE condicional + comprobar si afectó algo" que ya
+ * usan handleAceptar/handleRechazarEjecutar en este mismo fichero, en vez de
+ * una función de base de datos nueva para esto. */
+async function reclamarReintento(fila: FilaEnvioFallido, ahoraIso_: string): Promise<{ id: string; intentos: number } | null> {
+  const nuevosIntentos = fila.intentos + 1;
+  const { data, error } = await supabase
+    .from("envios_email_reserva")
+    .update({ resultado: "pendiente", intentos: nuevosIntentos, ultimo_intento_at: ahoraIso_ })
+    .eq("id", fila.id)
+    .eq("resultado", "fallido")
+    .eq("intentos", fila.intentos)
+    .select("id, intentos")
+    .maybeSingle();
+  if (error) {
+    console.error(`[emails-reserva] Error reclamando reintento de envio ${fila.id}:`, error.message);
+    return null;
+  }
+  if (!data) return null;
+  return { id: data.id as string, intentos: data.intentos as number };
+}
+
+type ResultadoProcesarReintento =
+  | { estado: "enviado" }
+  | { estado: "fallido" }
+  | { estado: "definitivo"; perdido: EnvioPerdido | null }
+  | { estado: "obsoleto" }
+  | { estado: "omitido" };
+
+async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string): Promise<ResultadoProcesarReintento> {
+  const claim = await reclamarReintento(fila, ahoraIso_);
+  if (!claim) return { estado: "omitido" };
+
+  const reserva = await fetchReserva(fila.reserva_id);
+  if (!reserva) {
+    // No debería ocurrir (envios_email_reserva.reserva_id tiene ON DELETE
+    // CASCADE: si la reserva se borra, esta fila se borra con ella), pero se
+    // trata defensivamente sin generar aviso — no hay nada sobre lo que
+    // llamar al cliente.
+    await marcarFallidoDefinitivo(claim.id, "reserva_no_encontrada");
+    return { estado: "definitivo", perdido: null };
+  }
+
+  const tipoActual = tipoEmailParaEstado(reserva.estado);
+  if (!tipoDeEmailSigueVigente(fila.tipo_email, reserva.estado, tipoActual)) {
+    // La reserva avanzó a otro estado mientras este correo seguía fallido:
+    // reintentarlo mandaría contenido obsoleto (p.ej. una 'propuesta' de una
+    // reserva ya cancelada). Se abandona SIN aviso: no es un fallo de
+    // entrega, y el estado nuevo ya tiene (o tendrá) su propio correo a
+    // través del flujo normal de enviarCorreoParaReserva.
+    await marcarFallidoDefinitivo(claim.id, "estado_reserva_cambio_email_obsoleto");
+    return { estado: "obsoleto" };
+  }
+
+  if (!reserva.email) {
+    await marcarFallidoDefinitivo(claim.id, "reserva_sin_email");
+    return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "reserva_sin_email") };
+  }
+
+  if (!fila.plantilla_id) {
+    await marcarFallidoDefinitivo(claim.id, "plantilla_no_encontrada");
+    return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "plantilla_no_encontrada") };
+  }
+
+  // Se usa la MISMA plantilla_id que el intento original (no "la plantilla
+  // actual" del tipo): si alguien edita la plantilla desde el panel entre
+  // medias, el cliente recibe el contenido que de verdad se le prometió, no
+  // uno distinto que ni siquiera vio nadie en el momento del fallo.
+  const { data: plantillaData, error: errPlantilla } = await supabase
+    .from("plantillas_email_reserva")
+    .select("*")
+    .eq("id", fila.plantilla_id)
+    .maybeSingle();
+  if (errPlantilla || !plantillaData) {
+    await marcarFallidoDefinitivo(claim.id, "plantilla_no_encontrada");
+    return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "plantilla_no_encontrada") };
+  }
+
+  const { asunto, html: cuerpoHtml } = await construirCorreoParaTipo(
+    reserva,
+    fila.tipo_email as TipoPlantilla,
+    plantillaData as FilaPlantilla,
+  );
+
+  const resultado = await intentarEnviarYRegistrar(claim.id, reserva.email, asunto, cuerpoHtml, claim.intentos);
+  if (resultado.enviado) return { estado: "enviado" };
+  if (resultado.agotado) {
+    return {
+      estado: "definitivo",
+      perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, resultado.motivo ?? "error_desconocido"),
+    };
+  }
+  return { estado: "fallido" };
+}
+
+interface ResultadoReintentos {
+  evaluadas: number;
+  reintentados: number;
+  enviados: number;
+  fallidos_de_nuevo: number;
+  definitivamente_perdidos: number;
+  omitidos_estado_cambiado: number;
+  aviso_creado: boolean;
+}
+
+async function reintentarEnviosFallidos(maxFilas: number): Promise<ResultadoReintentos> {
+  // Libera cualquier 'pendiente' abandonado (de este mecanismo o de un envío
+  // directo que murió a media ejecución) ANTES de buscar candidatas: una
+  // fila así vuelve a 'fallido' y puede quedar elegible en esta misma pasada
+  // si ya no tiene por qué esperar más (ver el comentario sobre esto en
+  // reintentos.ts: no se le exige un backoff extra tras un abandono).
+  await liberarPendientesAbandonados({});
+
+  const ahora = ahoraIso();
+  const candidatas = await obtenerFilasFallidasCandidatas(maxFilas);
+  const elegibles = candidatas.filter((f) =>
+    esReintentableAhora({ resultado: f.resultado, intentos: f.intentos, proximo_reintento_en: f.proximo_reintento_en }, ahora),
+  );
+
+  let enviados = 0;
+  let fallidosDeNuevo = 0;
+  let definitivamentePerdidos = 0;
+  let omitidosEstadoCambiado = 0;
+  const perdidos: EnvioPerdido[] = [];
+
+  // Mismo patrón de lotes + pausa que handleRecordatorios (resend-lote.ts):
+  // un reintento masivo tampoco debe saturar el límite de 10 req/s de Resend.
+  const lotes = enLotes(elegibles, TAMANO_LOTE);
+  for (let i = 0; i < lotes.length; i++) {
+    const resultados = await Promise.allSettled(lotes[i].map((fila) => procesarReintentoDeFila(fila, ahora)));
+    for (const r of resultados) {
+      if (r.status !== "fulfilled") {
+        console.error("[emails-reserva] Excepcion procesando reintento:", r.reason);
+        fallidosDeNuevo++;
+        continue;
+      }
+      const res = r.value;
+      if (res.estado === "enviado") enviados++;
+      else if (res.estado === "fallido") fallidosDeNuevo++;
+      else if (res.estado === "obsoleto") omitidosEstadoCambiado++;
+      else if (res.estado === "definitivo") {
+        definitivamentePerdidos++;
+        if (res.perdido) perdidos.push(res.perdido);
+      }
+      // "omitido" (no se pudo reclamar, otra ejecución ganó la carrera): no
+      // cuenta en ningún contador propio, es ruido esperado de concurrencia.
+    }
+    if (i < lotes.length - 1) await esperar(PAUSA_LOTE_MS);
+  }
+
+  const avisoCreado = perdidos.length > 0 ? await avisarEnviosDefinitivamentePerdidos(perdidos) : false;
+
+  return {
+    evaluadas: candidatas.length,
+    reintentados: elegibles.length,
+    enviados,
+    fallidos_de_nuevo: fallidosDeNuevo,
+    definitivamente_perdidos: definitivamentePerdidos,
+    omitidos_estado_cambiado: omitidosEstadoCambiado,
+    aviso_creado: avisoCreado,
+  };
 }
 
 // ------------------------------------------------------------
@@ -820,7 +1306,12 @@ async function handleRecordatorios(req: Request): Promise<Response> {
   let enviados = 0;
   let fallidos = 0;
   for (let i = 0; i < lotes.length; i++) {
-    const resultados = await Promise.allSettled(lotes[i].map((r) => enviarCorreoParaReserva(r.id)));
+    // tipoForzado: "recordatorio" — ver el comentario extenso junto a
+    // enviarCorreoParaReserva sobre el bug que esto corrige: sin forzarlo,
+    // el tipo se derivaba del estado ('confirmada') y chocaba siempre con
+    // el envío de confirmación ya existente, así que el recordatorio nunca
+    // llegaba a intentarse de verdad.
+    const resultados = await Promise.allSettled(lotes[i].map((r) => enviarCorreoParaReserva(r.id, "recordatorio")));
     for (const r of resultados) {
       if (r.status === "fulfilled" && r.value.enviado) enviados++;
       else fallidos++;
@@ -920,6 +1411,16 @@ async function handleDetectarAusencias(req: Request): Promise<Response> {
 }
 
 // ------------------------------------------------------------
+// ACCIÓN: reintentar envíos fallidos (cron, vía pg_net — ver migración
+// 20260922160000_reintentos_emails_reserva.sql)
+// ------------------------------------------------------------
+async function handleReintentarFallidos(req: Request): Promise<Response> {
+  if (!comprobarSecretoCompartido(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  const resultado = await reintentarEnviosFallidos(MAX_FILAS_REINTENTO);
+  return json({ ok: true, ...resultado });
+}
+
+// ------------------------------------------------------------
 // ROUTER
 // ------------------------------------------------------------
 serve(async (req: Request) => {
@@ -934,6 +1435,7 @@ serve(async (req: Request) => {
     if (req.method === "POST" && route === "notificar") return await handleNotificar(req);
     if (req.method === "POST" && route === "recordatorios") return await handleRecordatorios(req);
     if (req.method === "POST" && route === "detectar-ausencias") return await handleDetectarAusencias(req);
+    if (req.method === "POST" && route === "reintentar-fallidos") return await handleReintentarFallidos(req);
     if (req.method === "POST" && route === "enviar-prueba") return await handleEnviarPrueba(req);
     if (req.method === "GET" && route === "aceptar") return await handleAceptar(req);
     if (req.method === "GET" && route === "rechazar") return await handleRechazarPreview(req);

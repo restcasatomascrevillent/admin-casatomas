@@ -50,6 +50,25 @@ import {
   type ReservaOcupante,
 } from "../_shared/disponibilidad.ts";
 
+// Datos de negocio (Casa Tomás / Touza), resolución de marca y las 4
+// plantillas de correo: ver `plantillas.ts` — módulo puro, sin imports de
+// Deno, separado a propósito para poder testearlo con vitest.
+import {
+  NEGOCIOS,
+  NEGOCIO_POR_DEFECTO,
+  esMarcaValida,
+  resolverMarca,
+  construirAvisoEmailFallido,
+  escapeHtml,
+  tplSolicitudRecibida,
+  tplSolicitudNoProcesada,
+  tplConfirmaAsistencia,
+  tplSinDisponibilidad,
+  type Marca,
+  type DatosNegocio,
+  type AvisoEmailFallidoInput,
+} from "./plantillas.ts";
+
 // ------------------------------------------------------------
 // CONFIGURACIÓN
 // ------------------------------------------------------------
@@ -90,19 +109,11 @@ function html(body: string, status = 200): Response {
   });
 }
 
-// Bug corregido al portar: la página de cancelar interpolaba
-// $json.query.nombre (y fecha/hora/comensales) SIN escapar dentro de HTML
-// — un enlace manipulado podía inyectar HTML/JS (XSS reflejado). Toda
-// interpolación de datos que vienen de fuera se pasa por aquí.
-function escapeHtml(value: unknown): string {
-  const str = value === null || value === undefined ? "" : String(value);
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+// escapeHtml: ver plantillas.ts (importado arriba). Bug corregido al
+// portar: la página de cancelar interpolaba $json.query.nombre (y
+// fecha/hora/comensales) SIN escapar dentro de HTML — un enlace manipulado
+// podía inyectar HTML/JS (XSS reflejado). Toda interpolación de datos que
+// vienen de fuera se pasa por `escapeHtml`.
 
 function checkSharedSecret(req: Request): boolean {
   if (!SHARED_SECRET) return true; // no configurado -> no bloquea (ver informe)
@@ -381,12 +392,24 @@ interface Reserva {
   notas_cliente: string | null;
   espacio_id: string | null;
   canal: string | null;
+  // Columna nueva (migración `20260922180000_marca_negocio_en_reservas.sql`,
+  // NO aplicada) — `text` a propósito, no `Marca`: es lo que devuelve la
+  // BD sin validar todavía. Se normaliza con `negocioDeReserva` más abajo.
+  marca: string | null;
   updated_at: string;
 }
 async function fetchReserva(id: string): Promise<Reserva | null> {
   const { data, error } = await supabase.from("reservas").select("*").eq("id", id).maybeSingle();
   if (error || !data) return null;
   return data as Reserva;
+}
+
+// Normaliza `reserva.marca` (columna `text`, podría en teoría traer un valor
+// fuera de `Marca` si algo escribió en la fila sin pasar por el CHECK — no
+// debería pasar con la migración aplicada, pero esta función es la red de
+// seguridad final: nunca deja pasar un valor no reconocido a una plantilla).
+function negocioDeReserva(reserva: Pick<Reserva, "marca">): DatosNegocio {
+  return NEGOCIOS[esMarcaValida(reserva.marca) ? reserva.marca : NEGOCIO_POR_DEFECTO];
 }
 
 // ============================================================
@@ -410,325 +433,27 @@ async function sendEmail(to: string, subject: string, htmlBody: string): Promise
   }
 }
 
-// ------------------------------------------------------------
-// PLANTILLA: Solicitud recibida (email positivo tras crear con éxito)
-// ------------------------------------------------------------
-function tplSolicitudRecibida(nombre: string, fecha: string, hora: string, comensales: number): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solicitud Recibida - Casa Tomás</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 48px 0;text-align:center;">
-              <span style="display:inline-block;background:#F7F3EE;border:1px solid #E8E0D5;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Solicitud recibida</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px 0;">
-              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Hola, ${escapeHtml(nombre)}</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Hemos recibido tu solicitud de reserva en <strong style="color:#1C1F22;">Casa Tomás</strong>. Nuestro equipo la revisará y te confirmaremos la disponibilidad a la mayor brevedad posible.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 32px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:13px;color:#6B6560;line-height:1.6;border-left:2px solid #B8936A;padding-left:16px;">No es necesario que hagas nada más. Recibirás un correo de confirmación en cuanto esté todo listo.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
-              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+// Aviso interno cuando `sendEmail` falla — ver `construirAvisoEmailFallido`
+// en plantillas.ts para el porqué y el contrato. Este wrapper es el único
+// que hace I/O (Supabase); el contenido del aviso ya viene armado y
+// probado por separado.
+async function avisarEmailFallido(params: AvisoEmailFallidoInput): Promise<void> {
+  try {
+    const { error } = await supabase.from("notificaciones_dashboard").insert(construirAvisoEmailFallido(params));
+    if (error) console.error("[EMAIL_FALLIDO] Error al registrar aviso:", error.message);
+  } catch (err) {
+    console.error("[EMAIL_FALLIDO] Excepción registrando aviso:", (err as Error)?.message || err);
+  }
 }
 
-// ------------------------------------------------------------
-// PLANTILLA: Solicitud no procesada (rechazo genérico, no revela motivo)
-// ------------------------------------------------------------
-function tplSolicitudNoProcesada(nombre: string, fecha: string, hora: string, comensales: number): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solicitud no procesada - Casa Tomás</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #1C1F22;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 48px 0;text-align:center;">
-              <span style="display:inline-block;background:#F0EDEA;border:1px solid #DDD5CC;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Solicitud no procesada</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px 0;">
-              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Estimado/a ${escapeHtml(nombre)}</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Gracias por su interés en visitarnos. Lamentamos informarle que no nos ha sido posible formalizar su solicitud de reserva de acuerdo con nuestras políticas internas de organización.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 32px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;">
-                <tr>
-                  <td style="padding:14px 20px;border-bottom:1px solid #E8E0D5;background:#FAFAF8;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Fecha solicitada</span>
-                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:14px 20px;border-bottom:1px solid #E8E0D5;background:#FAFAF8;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Hora</span>
-                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:14px 20px;background:#FAFAF8;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#9B948E;">Comensales</span>
-                    <span style="display:block;font-size:15px;color:#1C1F22;font-weight:600;margin-top:3px;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:14px;color:#6B6560;line-height:1.7;">Agradecemos su comprensión y esperamos poder recibirle en otra ocasión.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
-              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
+// Las 4 plantillas de correo (tplSolicitudRecibida, tplSolicitudNoProcesada,
+// tplConfirmaAsistencia, tplSinDisponibilidad) y `escapeHtml` viven ahora en
+// `./plantillas.ts` (importado arriba), parametrizadas por `DatosNegocio` en
+// vez de tener "Casa Tomás" escrito a fuego — ver la cabecera de ese fichero
+// para el porqué (una reserva puede ser de Casa Tomás o de Touza).
 
-// ------------------------------------------------------------
-// PLANTILLA: Confirma tu asistencia (lleva los 2 enlaces con token)
-// ------------------------------------------------------------
-function tplConfirmaAsistencia(nombre: string, fecha: string, hora: string, comensales: number, confirmUrl: string, cancelUrl: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirmación requerida - Casa Tomás</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:36px 48px 0;text-align:center;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1C1F22;font-weight:normal;margin-bottom:12px;">Confirma tu asistencia</div>
-              <p style="margin:0;font-size:15px;color:#6B6560;line-height:1.7;">Hola, <strong style="color:#1C1F22;">${escapeHtml(nombre)}</strong>. Tu mesa está casi lista. Solo necesitamos que confirmes tu asistencia para garantizar tu reserva.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 16px;">
-              <a href="${confirmUrl}" style="display:block;text-align:center;background:#B8936A;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;margin-bottom:12px;">
-                Sí, confirmo mi asistencia
-              </a>
-              <a href="${cancelUrl}" style="display:block;text-align:center;background:transparent;color:#6B6560;text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:14px 0;border:1px solid #E8E0D5;">
-                Cancelar reserva
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">Si no confirmas, la mesa puede quedar disponible para otros clientes.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
-              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-// ------------------------------------------------------------
-// PLANTILLA: Sin disponibilidad (revisión manual del restaurante)
-// ------------------------------------------------------------
-function tplSinDisponibilidad(nombre: string, fecha: string, hora: string, comensales: number): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sin disponibilidad - Casa Tomás</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">Casa Tomás</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">Crevillente</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 48px 0;text-align:center;">
-              <span style="display:inline-block;background:#F0EDEA;border:1px solid #DDD5CC;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Sin disponibilidad</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px 0;">
-              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Estimado/a ${escapeHtml(nombre)}</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Lamentamos informarle que el restaurante se encuentra completo para la fecha y hora solicitadas. No podremos confirmar su reserva para los siguientes datos:</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 32px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 16px;">
-              <a href="tel:+34966107887" style="display:block;text-align:center;background:#1C1F22;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;">
-                Llamar al restaurante
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:13px;color:#9B948E;text-align:center;line-height:1.6;">Puedes contactarnos por teléfono para encontrar una alternativa. Disculpe las molestias.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">Casa Tomás · Crevillente</div>
-              <div style="font-size:12px;color:#6B6560;">C/ Santa María de la Cabeza, 2 &nbsp;·&nbsp; <a href="tel:966107887" style="color:#6B6560;text-decoration:none;">966 10 78 87</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
+// tplConfirmaAsistencia y tplSinDisponibilidad: movidas a ./plantillas.ts
+// (ver comentario arriba, junto a las otras dos plantillas).
 
 // ------------------------------------------------------------
 // PÁGINAS HTML (respuesta directa al navegador, no emails)
@@ -1093,6 +818,17 @@ async function handleCrear(req: Request): Promise<Response> {
   const salaNombre = typeof body?.sala === "string" ? body.sala : null;
   const espacioIdInput = typeof body?.espacio_id === "string" ? body.espacio_id : null;
 
+  // Marca (Casa Tomás / Touza) — primera pasada, SIN tocar la BD: solo con
+  // `body.marca` (ningún frontend la manda hoy, pero ya se acepta) y con el
+  // sniff de `notas_cliente` (ver plantillas.ts, resolverMarca). Vale para
+  // TODOS los rechazos de aquí abajo — incluido el de blacklist, el más
+  // rápido — sin añadir una consulta a `espacios_reserva` a un camino que
+  // hoy nunca la necesita (ni Reservado.tsx ni ReservationForm.tsx mandan
+  // `espacio_id`/`sala`). Se refina con el espacio, si lo hay, justo antes
+  // del INSERT — ver más abajo — para la reserva que de verdad se guarda.
+  const marcaTemprana: Marca = resolverMarca({ marcaExplicita: body?.marca, notasCliente: notas });
+  const negocioTemprano: DatosNegocio = NEGOCIOS[marcaTemprana];
+
   if (!nombre) return json({ ok: false, error: "nombre_requerido" }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
   if (!/^\d{2}:\d{2}$/.test(hora)) return json({ ok: false, error: "hora_invalida" }, 400);
@@ -1131,7 +867,24 @@ async function handleCrear(req: Request): Promise<Response> {
   // el envío de email y el registro de solicitud pendiente son idénticos.
   const avisar = async (motivo: string, descripcion: string, mensajeCliente: string, status: number, log = true) => {
     if (log) await registrarSolicitudPendiente({ ...datosSolicitud, motivo, descripcion });
-    if (email) await sendEmail(email, "Estado de reserva Casa Tomás", tplSolicitudNoProcesada(nombre, fecha, hora, partySize));
+    if (email) {
+      const resultadoEmail = await sendEmail(
+        email,
+        `Estado de reserva ${negocioTemprano.nombre}`,
+        tplSolicitudNoProcesada(negocioTemprano, nombre, fecha, hora, partySize),
+      );
+      if (!resultadoEmail.ok) {
+        await avisarEmailFallido({
+          contexto: "solicitud no procesada",
+          negocio: negocioTemprano,
+          nombre,
+          fecha,
+          hora,
+          reservaId: null,
+          error: resultadoEmail.error,
+        });
+      }
+    }
     return json({ ok: false, motivo, mensaje: mensajeCliente }, status);
   };
 
@@ -1300,11 +1053,40 @@ async function handleCrear(req: Request): Promise<Response> {
   // formulario actual, que ya no envía `sala`, esa reserva quedaba sin
   // espacio de todos modos, así que aquí simplemente se hace explícito.
   let espacioId: string | null = espacioIdInput;
+  // `caracteristicasEspacio` alimenta el punto 2 de `resolverMarca` (ver
+  // plantillas.ts): hoy siempre queda `null` en la práctica porque ningún
+  // frontend manda `espacio_id`/`sala` todavía, pero en cuanto lo hagan
+  // (p.ej. tras aplicar `20260922150000_espacio_el_reservado_touza.sql`,
+  // que ya etiqueta 'El Reservado' con `caracteristicas.marca = "touza"`)
+  // empieza a funcionar sin tocar este fichero otra vez.
+  let caracteristicasEspacio: unknown = null;
   if (!espacioId && salaNombre) {
-    const { data: espacio } = await supabase.from("espacios_reserva").select("id").eq("nombre", salaNombre).eq("activa", true).maybeSingle();
+    const { data: espacio } = await supabase
+      .from("espacios_reserva")
+      .select("id, caracteristicas")
+      .eq("nombre", salaNombre)
+      .eq("activa", true)
+      .maybeSingle();
     if (!espacio) return json({ ok: false, error: "espacio_invalido" }, 400);
     espacioId = espacio.id as string;
+    caracteristicasEspacio = espacio.caracteristicas;
+  } else if (espacioId) {
+    const { data: espacio } = await supabase.from("espacios_reserva").select("caracteristicas").eq("id", espacioId).maybeSingle();
+    caracteristicasEspacio = espacio?.caracteristicas ?? null;
   }
+
+  // Segunda (y última) pasada de `resolverMarca`, ahora con la señal del
+  // espacio si la hay. `marcaTemprana`/`negocioTemprano` (arriba) ya sirvió
+  // para los rechazos anteriores; esta es la que se GUARDA en la fila y la
+  // que ve el email de éxito — la autoritativa para todo lo que venga
+  // después (notificar-estado/confirmar/cancelar leen `reserva.marca`, no
+  // vuelven a derivarla).
+  const marca: Marca = resolverMarca({
+    marcaExplicita: body?.marca,
+    marcaEspacio: (caracteristicasEspacio as Record<string, unknown> | null)?.marca,
+    notasCliente: notas,
+  });
+  const negocio: DatosNegocio = NEGOCIOS[marca];
 
   const { data: inserted, error: insertError } = await supabase
     .from("reservas")
@@ -1321,6 +1103,7 @@ async function handleCrear(req: Request): Promise<Response> {
       canal: "web",
       en_blacklist: false,
       importante: false,
+      marca,
     })
     .select("id")
     .single();
@@ -1337,7 +1120,24 @@ async function handleCrear(req: Request): Promise<Response> {
     return json({ ok: false, error: "internal_error" }, 500);
   }
 
-  if (email) await sendEmail(email, "Estado de reserva Casa Tomás", tplSolicitudRecibida(nombre, fecha, hora, partySize));
+  if (email) {
+    const resultadoEmail = await sendEmail(
+      email,
+      `Estado de reserva ${negocio.nombre}`,
+      tplSolicitudRecibida(negocio, nombre, fecha, hora, partySize),
+    );
+    if (!resultadoEmail.ok) {
+      await avisarEmailFallido({
+        contexto: "solicitud recibida",
+        negocio,
+        nombre,
+        fecha,
+        hora,
+        reservaId: inserted.id,
+        error: resultadoEmail.error,
+      });
+    }
+  }
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
 }
@@ -1364,6 +1164,12 @@ async function handleNotificarEstado(req: Request): Promise<Response> {
   if (!reserva) return json({ ok: false, error: "reserva_no_encontrada" }, 404);
   if (!reserva.email) return json({ ok: false, error: "reserva_sin_email" });
 
+  // `marca` ya quedó fijada al crear la reserva (ver handleCrear) — se lee
+  // tal cual de la fila, sin volver a derivarla de `notas_cliente` ni de
+  // nada más, para que un cambio posterior en Reservado.tsx no pueda
+  // desincronizar los correos de una reserva ya existente.
+  const negocio = negocioDeReserva(reserva);
+
   if (reserva.estado === "verificada") {
     const fp = fingerprint(reserva.estado, reserva.updated_at);
     const confirmToken = await signReservaToken(reserva.id, "confirmar", fp);
@@ -1372,16 +1178,16 @@ async function handleNotificarEstado(req: Request): Promise<Response> {
     const cancelUrl = `${PUBLIC_BASE_URL}/cancelar?token=${encodeURIComponent(cancelToken)}`;
     const result = await sendEmail(
       reserva.email,
-      "Estado de reserva Casa Tomás",
-      tplConfirmaAsistencia(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, confirmUrl, cancelUrl)
+      `Estado de reserva ${negocio.nombre}`,
+      tplConfirmaAsistencia(negocio, reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, confirmUrl, cancelUrl)
     );
     return json({ ok: result.ok, email_enviado: "confirma_asistencia" });
   }
 
   const result = await sendEmail(
     reserva.email,
-    "Estado de reserva Casa Tomás",
-    tplSinDisponibilidad(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales)
+    `Estado de reserva ${negocio.nombre}`,
+    tplSinDisponibilidad(negocio, reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales)
   );
   return json({ ok: result.ok, email_enviado: "sin_disponibilidad" });
 }
