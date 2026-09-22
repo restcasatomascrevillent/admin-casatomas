@@ -1,0 +1,196 @@
+-- ===========================================================================
+-- ##                                                                       ##
+-- ##                          NO APLICADA                                  ##
+-- ##                                                                       ##
+-- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
+-- ##   Queda preparado para que el dueño lo revise y decida.                ##
+-- ##   NO aplicar sin completar antes el ORDEN DE DESPLIEGUE de más abajo.  ##
+-- ##                                                                       ##
+-- ===========================================================================
+--
+-- Cierra el INSERT anónimo en `reservas`
+-- (auditoría de seguridad, sesión 2026-09-22, proyecto jeamoczmbfsnwkfjxcyo)
+-- ---------------------------------------------------------------------------
+--
+-- QUÉ HABÍA Y POR QUÉ (reconstruido migración a migración, no de oídas)
+--   `20260918084909_cerrar_fuga_rls_anonima.sql`, bloque 6 (línea 191):
+--   revoca la escritura anónima en TODO el esquema public y acto seguido
+--   concede el INSERT de vuelta solo en dos tablas:
+--
+--     revoke insert, update, delete, truncate on all tables in schema public from anon;
+--     grant insert on public."reservas" to anon;
+--     grant insert on public."visitas_producto" to anon;
+--
+--   El comentario de ese bloque documenta el motivo para `reservas`:
+--   "formulario de touza-restaurant-website (Reservado.tsx, insert sin
+--   .select())".
+--
+--   `20260918120000_rls_por_permisos_de_seccion.sql`, líneas 169-177:
+--   sustituye la política de INSERT pública de reservas -- hasta entonces
+--   `TO public`, alcanzaba también a `authenticated` -- por una acotada
+--   solo a `anon`:
+--
+--     drop policy if exists "Público puede crear reservas" on public."reservas";
+--     create policy "reservas_insert_anon_formulario_web" on public."reservas"
+--       for insert to anon
+--       with check (true);
+--
+--   Resultado vigente hoy: `reservas` acepta CUALQUIER INSERT anónimo
+--   (`with check (true)`, sin validar contenido) siempre que venga con la
+--   anon key. El único freno a nivel de base de datos es
+--   `trg_validar_capacidad` (20260305175122_trigger_concurrencia_reservas.sql,
+--   BEFORE INSERT OR UPDATE OF fecha, hora, numero_comensales, estado), y se
+--   ha leído `validar_capacidad_reserva()` completa: solo comprueba el aforo
+--   agregado, no contiene ningún chequeo de blacklist, escalera de horarios
+--   ni límite de frecuencia -- eso vive únicamente en el código de la Edge
+--   Function `reservas-web` (usa SUPABASE_SERVICE_ROLE_KEY, no pasa por RLS;
+--   verificado en `supabase/functions/reservas-web/index.ts` líneas 57 y 65).
+--
+-- CORRECCIÓN SOBRE EL ENCARGO ORIGINAL (verificado, no dado por bueno)
+--   El encargo que motiva este fichero afirmaba que la política antigua
+--   "Público puede crear reservas" (creada `TO public`, sin restricción de
+--   contenido, en 20251113161812_945de505-e6a6-4aa4-b98b-d10d9e186256.sql)
+--   "nunca se borró". Repasadas TODAS las migraciones que tocan permisos de
+--   `reservas` en orden cronológico, eso es incorrecto: la propia
+--   20260918120000_rls_por_permisos_de_seccion.sql (línea 175, citada
+--   arriba) ya la elimina y la sustituye por
+--   "reservas_insert_anon_formulario_web". Un grep de esa cadena exacta
+--   sobre las ~110 migraciones del repo solo la encuentra en esas dos
+--   líneas (crear y borrar); ninguna migración posterior la vuelve a crear.
+--   El `drop policy if exists` de más abajo para esa política antigua es
+--   por tanto un no-op defensivo -- se deja por si el historial real de la
+--   base de datos difiere del de este repositorio (no hay acceso a
+--   Supabase para comprobarlo, ver encargo) -- no una fuga real que este
+--   fichero esté cerrando.
+--
+-- OTRO ESCRITOR ANÓNIMO ENCONTRADO (el bloque 6 daba INSERT a DOS tablas)
+--   La otra tabla del bloque 6 es `visitas_producto` (contador de vistas de
+--   producto), con política "Cualquiera puede registrar visitas" (creada en
+--   20260202183521_61a4594b-7582-4110-b382-b127615b22a0.sql, `TO anon,
+--   authenticated`, `WITH CHECK (true)`). Se ha buscado `visitas_producto`
+--   en el código fuente de los 4 repos (adminpanelct, casa-tomas-story,
+--   touza-restaurant-website, restaurante-phone): ningún componente, hook
+--   ni página la usa hoy -- las únicas apariciones son en los
+--   `integrations/supabase/types.ts` autogenerados de adminpanelct y
+--   touza-restaurant-website, que son solo tipos TypeScript, no código que
+--   se ejecute. No hay ningún llamador vivo localizable por grep.
+--   AUN ASÍ este fichero NO toca su GRANT ni su política: (a) queda fuera
+--   del alcance pedido, que es cerrar `reservas`; (b) sin acceso a los logs
+--   de Supabase no se puede descartar un consumidor fuera de estos 4 repos
+--   (script de terceros, GTM, un cliente no versionado aquí...). Queda
+--   como candidato para una revisión aparte, con su propia migración.
+--
+-- OTROS ESCRITORES ANÓNIMOS DESCARTADOS (grep en los 4 repos de `.insert(`,
+-- `.upsert(`, `.rpc(` y fetch directo a `/rest/v1/`, no solo sobre `reservas`)
+--   - touza-restaurant-website/src/pages/Reservado.tsx: REESCRITO en esta
+--     misma sesión. Ya NO hace insert directo: llama a
+--     `fetch(RESERVAS_WEB_CREAR_URL, ...)` (línea 113), la Edge Function
+--     `reservas-web` con service role. El propio fichero lo documenta en su
+--     cabecera (líneas 30-40 de Reservado.tsx): "no por un insert directo".
+--   - casa-tomas-story/src/components/ReservationForm.tsx: ya usaba
+--     RESERVAS_WEB_CREAR_URL / RESERVAS_WEB_DISPONIBILIDAD_URL antes de esta
+--     sesión (no se ha tocado). Tampoco hace insert directo.
+--   - casa-tomas-story: sin formulario de newsletter en `src` (el alta a
+--     `suscriptores` la hace el trigger `agregar_suscriptor_al_reservar`
+--     sobre la propia `reservas`, no un formulario aparte); `ContactoSection`
+--     es solo datos de contacto (teléfono/email), no escribe en la base;
+--     `ReviewsSection` es de solo lectura -- las reseñas las sincroniza la
+--     edge function `sync-google-reviews`, y "dejar reseña" enlaza al Google
+--     Place real, no a la base de datos.
+--   - touza-restaurant-website: mismo patrón -- `Contacto.tsx` es un
+--     `mailto:`, no un formulario; sin newsletter en `src`.
+--   - restaurante-phone/api/{vapi-webhook,el-webhook,el-precall,
+--     el-postcall}.js: los 4 usan SUPABASE_SERVICE_ROLE_KEY (verificado
+--     línea a línea en cada `createClient()`), no la anon key -- no dependen
+--     de ningún GRANT a `anon` y no les afecta esta migración.
+--     `restaurante-phone/src/features/phone-system/services/supabaseClient.js`
+--     sí usa VITE_SUPABASE_ANON_KEY, pero su único consumidor
+--     (`supabasePhone.js`) solo hace `.update()` sobre `phone_system_config`
+--     -- ninguna tabla ni verbo que toque esta migración.
+--   - adminpanelct/src/components/reservas/FormularioReserva.tsx: inserta en
+--     `reservas`, pero es el panel interno: corre autenticado y pasa por la
+--     política `reservas_insert_seccion` (TO authenticated), no por la de
+--     `anon` que este fichero cierra.
+--
+-- QUÉ ROMPE ESTO SI SE APLICA EN EL ORDEN EQUIVOCADO
+--   Esta migración deja a `anon` sin GRANT de INSERT en `reservas` y sin
+--   ninguna política que lo cubra. Si se aplica ANTES de que el build nuevo
+--   de touza-restaurant-website (con Reservado.tsx reescrito) esté
+--   desplegado en producción, cualquier visitante que en ese momento tenga
+--   cargado el bundle VIEJO -- el que todavía hace
+--   `supabase.from('reservas').insert(...)` desde el navegador -- verá
+--   fallar su reserva de "El Reservado" en firme: Postgres devuelve 42501
+--   (permission denied / ninguna política lo permite), la promesa se
+--   rechaza y el formulario no tiene forma de recuperarse sin recargar la
+--   página nueva. Y si se aplica cuando el frontend nuevo YA está
+--   desplegado pero la Edge Function `reservas-web` (en desarrollo activo
+--   ahora mismo en `supabase/functions/reservas-web/**`, fuera del
+--   territorio de este fichero) todavía no lo está o está caída, el
+--   resultado es el mismo para TODO el sistema de reservas web -- Touza Y
+--   Casa Tomás, porque `ReservationForm.tsx` (casa-tomas-story) ya depende
+--   también de esa misma función y ninguno de los dos formularios sabe ya
+--   hacer un insert directo de respaldo.
+--
+-- ORDEN DE DESPLIEGUE (obligatorio, en este orden; confirmar cada paso antes
+-- de pasar al siguiente)
+--   1. Desplegar a producción la Edge Function `reservas-web` vigente
+--      (`supabase/functions/reservas-web/index.ts`) y confirmar con una
+--      llamada real sin sesión (curl/Postman) que `POST .../crear` acepta
+--      una reserva de prueba y la deja en `reservas`.
+--   2. Desplegar a producción el build nuevo de touza-restaurant-website (el
+--      que ya no importa un cliente Supabase en `Reservado.tsx`) y confirmar
+--      en el sitio real que "El Reservado" -> enviar solicitud completa el
+--      flujo (o cae en el motivo `grupo_grande`, que es éxito esperado, no
+--      fallo -- ver el comentario en el propio Reservado.tsx).
+--   3. Solo entonces aplicar ESTA migración (`supabase db push` o pegarla en
+--      el SQL editor).
+--   4. Repetir la CONSULTA DE VERIFICACIÓN de más abajo y confirmar que
+--      `anon` ya no puede insertar.
+--   5. Si algo se rompe, ejecutar a mano el fichero
+--      `supabase/rollbacks/20260922170000_cerrar_insert_anonimo_reservas_ROLLBACK.sql`
+--      -- reabre el INSERT anónimo exactamente como estaba.
+-- ===========================================================================
+
+begin;
+
+-- Política viva: el único camino de escritura anónima real hoy sobre
+-- `reservas` (ver "QUÉ HABÍA Y POR QUÉ" arriba).
+drop policy if exists "reservas_insert_anon_formulario_web" on public."reservas";
+
+-- No-op defensivo: esta política ya no existe -- la sustituyó la de arriba
+-- en 20260918120000 (línea 175). Se repite aquí con IF EXISTS por si el
+-- historial real de la base difiere del de este repositorio; ver
+-- "CORRECCIÓN SOBRE EL ENCARGO ORIGINAL" arriba. No se espera que borre
+-- nada.
+drop policy if exists "Público puede crear reservas" on public."reservas";
+
+-- Sin el GRANT de base, cualquier política futura "to anon" / "to public"
+-- que alguien vuelva a crear sobre reservas queda inerte hasta que alguien
+-- conceda este privilegio otra vez explícitamente.
+revoke insert on public."reservas" from anon;
+
+commit;
+
+-- ---------------------------------------------------------------------------
+-- CONSULTA DE VERIFICACIÓN -- ejecutar ANTES y DESPUÉS de aplicar esta
+-- migración. Solo lee, no escribe nada.
+-- ---------------------------------------------------------------------------
+--
+-- -- 1) Políticas de INSERT sobre reservas, y a qué rol aplican:
+-- select policyname, roles, with_check
+-- from pg_policies
+-- where schemaname = 'public' and tablename = 'reservas' and cmd = 'INSERT'
+-- order by policyname;
+--
+-- -- 2) Si el rol anon tiene el privilegio INSERT a nivel de tabla (GRANT):
+-- select has_table_privilege('anon', 'public.reservas', 'INSERT') as anon_puede_insertar;
+--
+-- ANTES de esta migración debe devolver:
+--   (1) dos filas -- "reservas_insert_anon_formulario_web" ({anon}, true)
+--       y "reservas_insert_seccion" ({authenticated}, can_write_section('reservas'))
+--   (2) true
+--
+-- DESPUÉS de esta migración debe devolver:
+--   (1) una sola fila -- "reservas_insert_seccion" ({authenticated}, ...)
+--   (2) false
+-- ---------------------------------------------------------------------------
