@@ -1,75 +1,116 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Input } from "@/components/ui/input";
-import { Loader2, Save, Bot, Utensils, Wine, MessageSquare, X, Search } from "lucide-react";
-import { useConfigBotWeb, type IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, Eye, Loader2, RefreshCw } from "lucide-react";
+import {
+  configToDraft,
+  draftToUpdate,
+  draftsIguales,
+  useConfigBotWeb,
+  type DraftBotWeb,
+  type IdiomaBotWeb,
+} from "@/hooks/useConfigBotWeb";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useVinos } from "@/hooks/useVinos";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { IDIOMAS } from "@/components/bot/constantesBot";
+import { BotIdiomaPanel } from "@/components/bot/BotIdiomaPanel";
 
-const IDIOMAS: { value: IdiomaBotWeb; label: string }[] = [
-  { value: "es", label: "🇪🇸 Español" },
-  { value: "en", label: "🇬🇧 English" },
-  { value: "fr", label: "🇫🇷 Français" },
-];
+type DraftsPorIdioma = Record<IdiomaBotWeb, DraftBotWeb>;
 
 export default function GestionBot() {
-  const [idioma, setIdioma] = useState<IdiomaBotWeb>("es");
-  const { config, isLoading, updateConfig } = useConfigBotWeb(idioma);
+  const { canAccess: canEdit } = useCanAccessSection("gestion_bot", "edit");
+  const { configs, isLoading, isError, error, refetch, updateConfig } = useConfigBotWeb();
   const { platos, isLoading: loadingPlatos } = usePlatos();
   const { vinos, isLoading: loadingVinos } = useVinos();
 
-  const [tono, setTono] = useState("");
-  const [mensajeBienvenida, setMensajeBienvenida] = useState("");
-  const [platosSeleccionados, setPlatosSeleccionados] = useState<string[]>([]);
-  const [vinosSeleccionados, setVinosSeleccionados] = useState<string[]>([]);
-  const [instruccionesExtra, setInstruccionesExtra] = useState("");
-  const [frasesPersonalizadas, setFrasesPersonalizadas] = useState("");
+  const [activeIdioma, setActiveIdioma] = useState<IdiomaBotWeb>("es");
+  const [drafts, setDrafts] = useState<DraftsPorIdioma | null>(null);
+  const [savedBaseline, setSavedBaseline] = useState<DraftsPorIdioma | null>(null);
+  const [saveErrors, setSaveErrors] = useState<Record<IdiomaBotWeb, string | null>>({ es: null, en: null, fr: null });
+  const [savingIdioma, setSavingIdioma] = useState<IdiomaBotWeb | null>(null);
   const [buscarPlato, setBuscarPlato] = useState("");
   const [buscarVino, setBuscarVino] = useState("");
 
+  // Los borradores de los 3 idiomas se cargan UNA sola vez desde el
+  // servidor y a partir de ahí viven solo en memoria: cambiar de pestaña ya
+  // no dispara una recarga ni puede perder lo que llevabas escrito en la
+  // otra — antes, al cambiar de idioma, el formulario se re-inicializaba
+  // desde la query y cualquier cambio sin guardar en el idioma anterior
+  // desaparecía sin avisar.
+  const seeded = useRef(false);
   useEffect(() => {
-    // Sin "if (config)": al cambiar de idioma config pasa por null/undefined
-    // mientras carga o si esa fila todavía no existe, y el formulario debe
-    // limpiarse en vez de seguir mostrando los datos del idioma anterior.
-    setTono(config?.tono ?? "");
-    setMensajeBienvenida(config?.mensaje_bienvenida ?? "");
-    const platosStr = config?.platos_recomendados ?? "";
-    setPlatosSeleccionados(platosStr ? platosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-    const vinosStr = config?.vinos_recomendados ?? "";
-    setVinosSeleccionados(vinosStr ? vinosStr.split(",").map((s) => s.trim()).filter(Boolean) : []);
-    setInstruccionesExtra(config?.instrucciones_extra ?? "");
-    setFrasesPersonalizadas(config?.frases_personalizadas ?? "");
-  }, [config]);
+    if (seeded.current || isLoading) return;
+    const inicial: DraftsPorIdioma = {
+      es: configToDraft(configs.es),
+      en: configToDraft(configs.en),
+      fr: configToDraft(configs.fr),
+    };
+    setDrafts(inicial);
+    setSavedBaseline(inicial);
+    seeded.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
-  const handleSaveAll = async () => {
-    await updateConfig.mutateAsync({
-      tono,
-      mensaje_bienvenida: mensajeBienvenida,
-      platos_recomendados: platosSeleccionados.join(", "),
-      vinos_recomendados: vinosSeleccionados.join(", "),
-      instrucciones_extra: instruccionesExtra,
-      frases_personalizadas: frasesPersonalizadas,
+  // Aviso nativo del navegador si se intenta cerrar/recargar con cambios sin
+  // guardar en cualquiera de los 3 idiomas.
+  useEffect(() => {
+    if (!drafts || !savedBaseline) return;
+    const hayCambios = IDIOMAS.some((i) => !draftsIguales(drafts[i.value], savedBaseline[i.value]));
+    if (!hayCambios) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [drafts, savedBaseline]);
+
+  const isDirty = (idioma: IdiomaBotWeb) => {
+    if (!drafts || !savedBaseline) return false;
+    return !draftsIguales(drafts[idioma], savedBaseline[idioma]);
+  };
+
+  const updateDraft = (idioma: IdiomaBotWeb, patch: Partial<DraftBotWeb>) => {
+    setDrafts((prev) => (prev ? { ...prev, [idioma]: { ...prev[idioma], ...patch } } : prev));
+  };
+
+  const togglePlato = (idioma: IdiomaBotWeb, nombre: string) => {
+    setDrafts((prev) => {
+      if (!prev) return prev;
+      const actual = prev[idioma].platos;
+      const platos = actual.includes(nombre) ? actual.filter((p) => p !== nombre) : [...actual, nombre];
+      return { ...prev, [idioma]: { ...prev[idioma], platos } };
     });
   };
 
-  const togglePlato = (nombre: string) => {
-    setPlatosSeleccionados((prev) =>
-    prev.includes(nombre) ? prev.filter((p) => p !== nombre) : [...prev, nombre]
-    );
+  const toggleVino = (idioma: IdiomaBotWeb, nombre: string) => {
+    setDrafts((prev) => {
+      if (!prev) return prev;
+      const actual = prev[idioma].vinos;
+      const vinos = actual.includes(nombre) ? actual.filter((v) => v !== nombre) : [...actual, nombre];
+      return { ...prev, [idioma]: { ...prev[idioma], vinos } };
+    });
   };
 
-  const toggleVino = (nombre: string) => {
-    setVinosSeleccionados((prev) =>
-    prev.includes(nombre) ? prev.filter((v) => v !== nombre) : [...prev, nombre]
-    );
+  const handleSave = async (idioma: IdiomaBotWeb) => {
+    if (!drafts) return;
+    setSavingIdioma(idioma);
+    setSaveErrors((prev) => ({ ...prev, [idioma]: null }));
+    try {
+      await updateConfig.mutateAsync({ idioma, updates: draftToUpdate(drafts[idioma]) });
+      setSavedBaseline((prev) => (prev ? { ...prev, [idioma]: drafts[idioma] } : prev));
+    } catch (e) {
+      setSaveErrors((prev) => ({ ...prev, [idioma]: e instanceof Error ? e.message : "Error desconocido al guardar" }));
+    } finally {
+      setSavingIdioma((cur) => (cur === idioma ? null : cur));
+    }
   };
 
-  // Agrupar platos por categoría
+  // Listas de la carta real — compartidas por los 3 idiomas (son el mismo
+  // restaurante); solo cambia qué nombres están marcados en cada borrador.
   const platosActivos = useMemo(() => {
     const items = (platos || []).filter((p) => p.activado !== false && p.nombre);
     if (!buscarPlato) return items;
@@ -87,7 +128,6 @@ export default function GestionBot() {
     return map;
   }, [platosActivos]);
 
-  // Agrupar vinos por categoría
   const vinosActivos = useMemo(() => {
     const items = (vinos || []).filter((v) => v.activado !== false && v.nombre);
     if (!buscarVino) return items;
@@ -105,303 +145,110 @@ export default function GestionBot() {
     return map;
   }, [vinosActivos]);
 
-  if (isLoading) {
+  if (isLoading || !drafts) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>);
-
+      </DashboardLayout>
+    );
   }
+
+  if (isError) {
+    return (
+      <DashboardLayout>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No se pudo cargar la configuración del bot</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>{error instanceof Error ? error.message : "Error desconocido al leer configBotWeb."}</p>
+            <Button size="sm" variant="outline" className="bg-background" onClick={() => refetch()}>
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              Reintentar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </DashboardLayout>
+    );
+  }
+
+  const idiomaActivo = IDIOMAS.find((i) => i.value === activeIdioma)!;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Gestor Bot</h2>
+            <h2 className="text-3xl font-bold tracking-tight">Gestor Bot Web</h2>
             <p className="text-muted-foreground">
-              Configura cómo se comporta el chatbot de la web
+              Configura cómo se comporta el chatbot de la web — estás editando la versión en{" "}
+              <span className="font-medium text-foreground">
+                {idiomaActivo.flag} {idiomaActivo.label}
+              </span>
+              .
             </p>
           </div>
-          <Button onClick={handleSaveAll} disabled={updateConfig.isPending}>
-            {updateConfig.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar todo
-          </Button>
         </div>
 
-        {/* Selector de idioma: configBotWeb tiene una fila por idioma */}
-        <ToggleGroup
-          type="single"
-          value={idioma}
-          onValueChange={(val) => val && setIdioma(val as IdiomaBotWeb)}
-          className="flex flex-wrap gap-2">
+        {!canEdit && (
+          <Alert>
+            <Eye className="h-4 w-4" />
+            <AlertTitle>Modo solo lectura</AlertTitle>
+            <AlertDescription>
+              Puedes consultar la configuración de los 3 idiomas y la vista previa, pero tu usuario no tiene
+              permiso para guardar cambios en esta sección.
+            </AlertDescription>
+          </Alert>
+        )}
 
-          {IDIOMAS.map((i) =>
-          <ToggleGroupItem
-            key={i.value}
-            value={i.value}
-            className="px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+        <Tabs value={activeIdioma} onValueChange={(v) => setActiveIdioma(v as IdiomaBotWeb)}>
+          <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
+            {IDIOMAS.map((i) => (
+              <TabsTrigger
+                key={i.value}
+                value={i.value}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
+              >
+                <span>{i.flag}</span>
+                <span>{i.label}</span>
+                {isDirty(i.value) && (
+                  <span
+                    className="h-1.5 w-1.5 rounded-full bg-amber-500"
+                    title="Tiene cambios sin guardar"
+                  />
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-              {i.label}
-            </ToggleGroupItem>
-          )}
-        </ToggleGroup>
-
-        {/* Pregunta 1: Tono */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              ¿Cómo quieres que hable el bot?
-            </CardTitle>
-            <CardDescription>Selecciona el tono de comunicación</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ToggleGroup
-              type="single"
-              value={tono}
-              onValueChange={(val) => val && setTono(val)}
-              className="flex flex-wrap gap-2">
-
-              {[
-              { value: "cercano", label: "😊 Cercano", desc: "Amigable, como un camarero que te conoce" },
-              { value: "formal", label: "👔 Formal", desc: "Profesional y elegante" },
-              { value: "divertido", label: "🎉 Divertido", desc: "Desenfadado con toques de humor" },
-              { value: "exclusivo", label: "✨ Exclusivo", desc: "Sofisticado, alta gastronomía" }].
-              map((t) =>
-              <ToggleGroupItem
-                key={t.value}
-                value={t.value}
-                className="flex flex-col items-start gap-1 h-auto py-3 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-
-                  <span className="font-medium">{t.label}</span>
-                  <span className="text-xs opacity-70">{t.desc}</span>
-                </ToggleGroupItem>
-              )}
-            </ToggleGroup>
-          </CardContent>
-        </Card>
-
-        {/* Pregunta 2: Mensaje de bienvenida */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              ¿Qué dice el bot al saludar?
-            </CardTitle>
-            <CardDescription>El primer mensaje que verá el cliente</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={mensajeBienvenida}
-              onChange={(e) => setMensajeBienvenida(e.target.value)}
-              placeholder="¡Hola! Soy el asistente virtual de Casa Tomás. ¿En qué puedo ayudarte?"
-              rows={2} />
-
-          </CardContent>
-        </Card>
-
-        {/* Pregunta 3: Platos a recomendar */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Utensils className="h-5 w-5" />
-              ¿Qué platos debe recomendar?
-            </CardTitle>
-            <CardDescription>
-              Selecciona los platos que el bot priorizará cuando un cliente pida sugerencias
-              {platosSeleccionados.length > 0 &&
-              <span className="ml-2 text-primary font-medium">
-                  ({platosSeleccionados.length} seleccionados)
-                </span>
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Chips de seleccionados */}
-            {platosSeleccionados.length > 0 &&
-            <div className="flex flex-wrap gap-2 pb-2 border-b">
-                {platosSeleccionados.map((nombre) =>
-              <span
-                key={nombre}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-
-                    {nombre}
-                    <button onClick={() => togglePlato(nombre)} className="hover:text-destructive">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-              )}
-              </div>
-            }
-
-            {/* Buscador */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar platos..."
-                value={buscarPlato}
-                onChange={(e) => setBuscarPlato(e.target.value)}
-                className="pl-9" />
-
-            </div>
-
-            {/* Lista por categorías */}
-            <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-              {loadingPlatos ?
-              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div> :
-              Object.keys(platosPorCategoria).length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos</p> :
-
-              Object.entries(platosPorCategoria).map(([cat, items]) =>
-              <div key={cat}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
-                    <div className="space-y-1">
-                      {items.map((p) =>
-                  <label
-                    key={p.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
-
-                          <Checkbox
-                      checked={platosSeleccionados.includes(p.nombre || "")}
-                      onCheckedChange={() => togglePlato(p.nombre || "")} />
-
-                          <span className="text-sm flex-1">{p.nombre}</span>
-                          {p.precio_eur != null &&
-                    <span className="text-xs text-muted-foreground">{p.precio_eur.toFixed(2)}€</span>
-                    }
-                        </label>
-                  )}
-                    </div>
-                  </div>
-              )
-              }
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pregunta 4: Vinos a recomendar */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wine className="h-5 w-5" />
-              ¿Qué vinos debe recomendar?
-            </CardTitle>
-            <CardDescription>
-              Selecciona los vinos que el bot priorizará
-              {vinosSeleccionados.length > 0 &&
-              <span className="ml-2 text-primary font-medium">
-                  ({vinosSeleccionados.length} seleccionados)
-                </span>
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Chips de seleccionados */}
-            {vinosSeleccionados.length > 0 &&
-            <div className="flex flex-wrap gap-2 pb-2 border-b">
-                {vinosSeleccionados.map((nombre) =>
-              <span
-                key={nombre}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-
-                    {nombre}
-                    <button onClick={() => toggleVino(nombre)} className="hover:text-destructive">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-              )}
-              </div>
-            }
-
-            {/* Buscador */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar vinos..."
-                value={buscarVino}
-                onChange={(e) => setBuscarVino(e.target.value)}
-                className="pl-9" />
-
-            </div>
-
-            {/* Lista por categorías */}
-            <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-              {loadingVinos ?
-              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div> :
-              Object.keys(vinosPorCategoria).length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-4">No se encontraron vinos</p> :
-
-              Object.entries(vinosPorCategoria).map(([cat, items]) =>
-              <div key={cat}>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
-                    <div className="space-y-1">
-                      {items.map((v) =>
-                  <label
-                    key={v.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors">
-
-                          <Checkbox
-                      checked={vinosSeleccionados.includes(v.nombre || "")}
-                      onCheckedChange={() => toggleVino(v.nombre || "")} />
-
-                          <span className="text-sm flex-1">{v.nombre}</span>
-                          {v.precio_eur != null &&
-                    <span className="text-xs text-muted-foreground">{v.precio_eur.toFixed(2)}€</span>
-                    }
-                        </label>
-                  )}
-                    </div>
-                  </div>
-              )
-              }
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pregunta 5: Frases que debe decir */}
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        {/* Pregunta 6: Instrucciones extra */}
-        <Card>
-          <CardHeader>
-            <CardTitle>¿Algo más que deba saber el bot?</CardTitle>
-            <CardDescription>Instrucciones libres en lenguaje natural</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={instruccionesExtra}
-              onChange={(e) => setInstruccionesExtra(e.target.value)}
-              placeholder={"Ej:\n- Si preguntan por horarios: abrimos de 13:00 a 16:00 y de 20:30 a 23:30\n- Siempre mencionar opciones veganas\n- No recomendar productos con gluten si lo piden"}
-              rows={5} />
-
-          </CardContent>
-        </Card>
-
-        {/* Botón final */}
-        <div className="flex justify-end pb-6">
-          <Button size="lg" onClick={handleSaveAll} disabled={updateConfig.isPending}>
-            {updateConfig.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar toda la configuración
-          </Button>
-        </div>
+          {IDIOMAS.map((i) => (
+            <TabsContent key={i.value} value={i.value} className="mt-6">
+              <BotIdiomaPanel
+                idioma={i.value}
+                draft={drafts[i.value]}
+                draftEspañol={drafts.es}
+                canEdit={canEdit}
+                dirty={isDirty(i.value)}
+                saving={savingIdioma === i.value}
+                saveError={saveErrors[i.value]}
+                onChange={(patch) => updateDraft(i.value, patch)}
+                onTogglePlato={(nombre) => togglePlato(i.value, nombre)}
+                onToggleVino={(nombre) => toggleVino(i.value, nombre)}
+                onSave={() => handleSave(i.value)}
+                platosPorCategoria={platosPorCategoria}
+                vinosPorCategoria={vinosPorCategoria}
+                loadingPlatos={loadingPlatos}
+                loadingVinos={loadingVinos}
+                buscarPlato={buscarPlato}
+                buscarVino={buscarVino}
+                onBuscarPlatoChange={setBuscarPlato}
+                onBuscarVinoChange={setBuscarVino}
+              />
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
-    </DashboardLayout>);
-
+    </DashboardLayout>
+  );
 }
