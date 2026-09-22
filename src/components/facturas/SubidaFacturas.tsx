@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy } from "lucide-react";
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,13 @@ interface ResultadoProcesamiento {
    * datos y el usuario tiene que verlo, no solo los logs de la funcion.
    */
   archivoGuardado?: boolean;
+  /**
+   * `true` = `procesar-factura` reconocio el documento como ya existente
+   * (mismo numero+proveedor+fecha+total) y NO lo volvio a insertar. Sin este
+   * campo la fila se pintaba con el mismo check verde que un documento
+   * nuevo: parecia "procesado" cuando en realidad no se habia creado nada.
+   */
+  duplicado?: boolean;
 }
 
 export function SubidaFacturas() {
@@ -193,6 +200,7 @@ export function SubidaFacturas() {
           tipo: data.webhookResponse?.tipo || data.tipo,
           alertas: Array.isArray(data.alertas) ? data.alertas : [],
           archivoGuardado: data.archivo_guardado !== false,
+          duplicado: data.duplicado === true,
         } as ResultadoProcesamiento;
       })
     );
@@ -233,11 +241,20 @@ export function SubidaFacturas() {
       });
     } else {
       const conAlertas = exitosos.filter(r => (r.alertas?.length ?? 0) > 0).length;
+      // Un duplicado no crea ningun documento nuevo: si se cuenta como
+      // "procesado" sin distincion, la confirmacion dice que se guardo algo
+      // que en realidad ya existia y se descarto.
+      const duplicados = exitosos.filter(r => r.duplicado).length;
+      const nuevos = exitosos.length - duplicados;
+      const partes: string[] = [];
+      if (nuevos > 0) partes.push(`${nuevos} documento(s) nuevo(s) procesado(s)`);
+      if (duplicados > 0) partes.push(`${duplicados} ya existian (no se han duplicado)`);
+      if (conAlertas > 0) partes.push(`${conAlertas} con importes que conviene revisar`);
       toast({
-        title: "Todos los documentos procesados",
-        description: conAlertas > 0
-          ? `${exitosos.length} documento(s) procesados. ${conAlertas} con importes que conviene revisar.`
-          : `${exitosos.length} documento(s) procesados correctamente`,
+        title: duplicados > 0 && nuevos === 0
+          ? "Documento(s) ya existente(s)"
+          : "Todos los documentos procesados",
+        description: partes.join('. ') + '.',
       });
     }
 
@@ -403,10 +420,14 @@ export function SubidaFacturas() {
               <div className="space-y-2">
                 {resultados.map((r, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    {r.success ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    ) : (
+                    {!r.success ? (
                       <XCircle className="h-4 w-4 text-destructive shrink-0" />
+                    ) : r.duplicado ? (
+                      // Icono distinto a proposito: un check verde aqui daria a entender
+                      // que se creo un documento nuevo, y no es el caso.
+                      <Copy className="h-4 w-4 text-blue-500 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                     )}
                     <span className={`text-sm truncate flex-1 ${!r.success ? 'text-destructive' : 'text-foreground'}`}>
                       {r.nombre}
@@ -431,6 +452,14 @@ export function SubidaFacturas() {
                     {!r.success && r.error && (
                       <span className="text-xs text-muted-foreground truncate">
                         - {r.error}
+                      </span>
+                    )}
+                    {r.success && r.duplicado && (
+                      <span
+                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600"
+                        title="Ya existia un documento con el mismo numero, proveedor, fecha y total: no se ha creado uno nuevo"
+                      >
+                        <Copy className="h-3 w-3" /> ya existía
                       </span>
                     )}
                     {r.success && r.archivoGuardado === false && (

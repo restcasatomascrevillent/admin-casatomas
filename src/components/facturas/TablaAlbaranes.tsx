@@ -15,7 +15,7 @@ import { EditarFacturaDialog } from "./EditarFacturaDialog";
 import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
-import { BotonOriginal, BadgeAlertas } from "./shared/BotonOriginal";
+import { BotonOriginal, BadgeAlertas, BadgeSinVerificar } from "./shared/BotonOriginal";
 
 const COLUMNAS_ALBARANES: ColumnaType[] = [
   { key: "numero", label: "Número" },
@@ -57,6 +57,7 @@ const FilaAlbaranMobile = ({ albaran, onPreguntarIA, allDocs, onEdit }: { albara
                 <CardTitle className="text-sm font-semibold text-foreground">{albaran.numero_documento}</CardTitle>
                 {getAnomaliaBadge(albaran, allDocs)}
                 <BadgeAlertas alertas={albaran.alertas} />
+                <BadgeSinVerificar verificada={albaran.verificada} />
               </div>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center">{albaran.proveedor || "Sin proveedor"}</p>
             </div>
@@ -131,7 +132,7 @@ const FilaAlbaranDesktop = ({ albaran, visibles, onPreguntarIA, allDocs, onEdit 
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, allDocs)} <BadgeAlertas alertas={albaran.alertas} /></TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{albaran.numero_documento} {getAnomaliaBadge(albaran, allDocs)} <BadgeAlertas alertas={albaran.alertas} /> <BadgeSinVerificar verificada={albaran.verificada} /></TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{albaran.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{albaran.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground text-center">{formatDate(albaran.fecha)}</TableCell>}

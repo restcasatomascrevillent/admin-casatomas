@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { toNumber } from "./normalizacion.ts";
 
 // ============================================================================
 //  procesar-factura  ·  OCR de facturas/albaranes SIN n8n
@@ -128,17 +129,9 @@ Estructura si es ALBARÁN:
 }`;
 
 // ─── Helpers numéricos / normalización (portado de "Parsear Respuesta IA") ───
-function toNumber(value: unknown, allowNull = false): number | null {
-  if (allowNull && (value === null || value === undefined || value === "")) return null;
-  if (value === null || value === undefined || value === "") return 0;
-  if (typeof value === "number") return value;
-  if (typeof value === "string") {
-    const cleaned = value.replace(",", ".").trim();
-    const parsed = parseFloat(cleaned);
-    return isNaN(parsed) ? (allowNull ? null : 0) : parsed;
-  }
-  return allowNull ? null : 0;
-}
+// `toNumber` (y el parseo de importes en varios formatos) vive en
+// normalizacion.ts: es lógica pura sin nada de Deno, así que se puede
+// testear con vitest (ver normalizacion.test.ts). Aquí solo se usa.
 
 function normalizarDatos(data: any) {
   if (!data || typeof data !== "object") throw new Error("Los datos extraídos no son un objeto válido");
@@ -368,6 +361,201 @@ async function archivarOriginal(
   }
 }
 
+// ─── Pipeline post-cabecera (líneas, validación, archivado) + compensación ──
+//  El paso 6 (insertar la cabecera en `facturas`) ya dejó un `facturaId` real
+//  cuando se llega aquí. Si CUALQUIER cosa de lo que sigue falla, esa fila
+//  queda huérfana: existe en `facturas` pero sin líneas, sin validar y sin
+//  archivar, y el frontend pinta `{success:false}` (ver el catch general,
+//  HTTP 200 a propósito) como si no se hubiese creado nada — cuando sí.
+//
+//  `completarFactura` aísla justo esa parte del pipeline (pasos 7-9 + la
+//  respuesta de éxito) para que el handler pueda envolverla en un único
+//  try/catch y, si algo revienta, deshacer la cabecera con
+//  `compensarFacturaHuerfana` antes de propagar el error tal cual al catch
+//  general. El paso 6 en sí NO se compensa aquí porque, si fallara, nunca se
+//  habría llegado a tener `facturaId`.
+
+/**
+ * Pasos 7 (líneas de producto), 8 (validación de cordura, T5) y 9 (archivado
+ * del original) + construcción de la respuesta de éxito. Si algo lanza,
+ * quien llama (el handler) es responsable de compensar y relanzar.
+ */
+// deno-lint-ignore no-explicit-any
+async function completarFactura(
+  supabase: any,
+  facturaId: number,
+  // deno-lint-ignore no-explicit-any
+  datos: any,
+  // deno-lint-ignore no-explicit-any
+  archivo: any,
+  b64: string,
+  mimeType: string,
+): Promise<Response> {
+  // 7) Productos: embeddings en batch (1 sola llamada) + insert masivo
+  if (datos.productos.length > 0) {
+    const embeddings = await embed(datos.productos.map((p: { nombre: string }) => p.nombre));
+    const filas = datos.productos.map((p: Record<string, unknown>, i: number) => ({
+      factura_id: facturaId,
+      nombre: p.nombre,
+      cantidad: p.cantidad,
+      unidad: p.unidad,
+      precio_unitario: p.precio_unitario,
+      total: p.total,
+      embedding: vec(embeddings[i]),
+    }));
+    const { error: prodErr } = await supabase.from("productos_factura").insert(filas);
+    if (prodErr) throw new Error(`insert productos: ${prodErr.message}`);
+  }
+
+  // 8) Validación de cordura de los importes (T5)
+  //    No corrige ni bloquea: deja constancia de lo que un humano debería
+  //    mirar. Se hace DESPUÉS de insertar las líneas porque la función SQL
+  //    usa `nombre_normalizado`, que es una columna generada.
+  // deno-lint-ignore no-explicit-any
+  let alertas: any[] = [];
+  try {
+    const { data: alertasData, error: valErr } = await supabase.rpc(
+      "validar_cordura_factura",
+      { p_factura_id: facturaId },
+    );
+    if (valErr) throw new Error(valErr.message);
+    alertas = Array.isArray(alertasData) ? alertasData : [];
+    if (alertas.length > 0) {
+      console.warn(
+        `[validacion] ${datos.tipo} ${datos.numero_documento} con ${alertas.length} alerta(s):`,
+        alertas.map((a) => a?.codigo).join(", "),
+      );
+      const { error: updErr } = await supabase
+        .from("facturas")
+        .update({ alertas_validacion: alertas })
+        .eq("id", facturaId);
+      if (updErr) console.error("[validacion] No se pudieron guardar las alertas:", updErr.message);
+    }
+  } catch (valError) {
+    // Que falle la validación no invalida el documento, pero tiene que verse.
+    console.error("[validacion] Error validando importes:", valError);
+  }
+
+  // 9) Archivar el original: Drive si está configurado, Supabase Storage si no.
+  const archivado = await archivarOriginal(
+    supabase, b64, archivo.nombre, mimeType, datos.fecha, facturaId,
+  );
+  if (archivado.drive_url || archivado.archivo_path) {
+    const { error: archErr } = await supabase
+      .from("facturas")
+      .update({
+        ...(archivado.drive_url ? { drive_url: archivado.drive_url } : {}),
+        ...(archivado.archivo_path ? { archivo_path: archivado.archivo_path } : {}),
+      })
+      .eq("id", facturaId);
+    if (archErr) {
+      console.error("[archivo] No se pudo guardar la referencia al original:", archErr.message);
+    }
+  }
+
+  const alertasAltas = alertas.filter((a) => a?.severidad === "alta").length;
+  console.log(
+    `[procesar-factura] OK ${datos.tipo} ${datos.numero_documento} · ` +
+    `${datos.productos.length} productos · alertas: ${alertas.length} · ` +
+    `original: ${archivado.drive_url ? "drive" : archivado.archivo_path ? "storage" : "NO GUARDADO"}`,
+  );
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      nombre: archivo.nombre,
+      tipo: datos.tipo,
+      message: alertas.length > 0
+        ? `Documento procesado. Revisa ${alertas.length} aviso(s) sobre los importes.`
+        : "Documento procesado correctamente",
+      // Avisos para que SubidaFacturas.tsx pueda pintarlos.
+      alertas,
+      archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
+      archivo_error: archivado.error,
+      webhookResponse: {
+        tipo: datos.tipo,
+        numero_documento: datos.numero_documento,
+        proveedor: datos.proveedor,
+        total: datos.total,
+        factura_id: facturaId,
+        alertas: alertas.length,
+        alertas_graves: alertasAltas,
+        archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
+      },
+    }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
+  );
+}
+
+/**
+ * Deshace una factura que quedó a medias: la cabecera se insertó (paso 6)
+ * pero algo del resto del pipeline falló después. Sin esto, el usuario ve
+ * `{success:false}` (HTTP 200, así lo espera el frontend) y cree que no se
+ * creó nada — pero la fila sigue en `facturas`.
+ *
+ * Best-effort y defensivo:
+ *  - Borra primero `productos_factura` por `factura_id` y LUEGO `facturas`
+ *    por `id`. El `CREATE TABLE` de ninguna de las dos está en este repo
+ *    (falta, es un problema real y aparte — ver el aviso del encargo), así
+ *    que no se puede saber desde aquí si hay `ON DELETE CASCADE` entre
+ *    ellas. Borrar explícito primero es correcto tanto si lo hay (el borrado
+ *    de líneas no encuentra nada, no pasa nada) como si no lo hay (evita
+ *    dejar líneas huérfanas o un error de FK al borrar la cabecera). En la
+ *    práctica esto va a borrar 0 filas de `productos_factura` casi siempre:
+ *    el insert del paso 7 es una única sentencia — si falló, no dejó ninguna
+ *    fila a medias.
+ *  - NO toca `historial_precios` (ni falta que hace: `procesar-factura` no
+ *    escribe ahí — lo confirma un grep sobre `supabase/functions` — así que
+ *    una factura huérfana de esta función no puede haber dejado rastro en
+ *    esa tabla). Tocar esa tabla está fuera de alcance de todos modos.
+ *  - Si el borrado mismo falla (best-effort: puede fallar, p.ej. por RLS o
+ *    por una FK inesperada desde otra tabla), NO se enmascara el error
+ *    original: se deja constancia por consola de que ha quedado una fila
+ *    huérfana CON SU ID para poder limpiarla a mano, y quien llama sigue
+ *    relanzando `causaOriginal` de todos modos.
+ */
+// deno-lint-ignore no-explicit-any
+async function compensarFacturaHuerfana(
+  supabase: any,
+  facturaId: number,
+  causaOriginal: unknown,
+): Promise<void> {
+  const causaMsg = causaOriginal instanceof Error ? causaOriginal.message : String(causaOriginal);
+  try {
+    const { error: delProdErr } = await supabase
+      .from("productos_factura")
+      .delete()
+      .eq("factura_id", facturaId);
+    if (delProdErr) {
+      // No se aborta: se sigue intentando borrar la cabecera igualmente.
+      console.error(
+        `[compensacion] factura ${facturaId}: fallo borrando sus productos_factura antes de ` +
+        `deshacer la cabecera: ${delProdErr.message}`,
+      );
+    }
+
+    const { error: delFacErr } = await supabase.from("facturas").delete().eq("id", facturaId);
+    if (delFacErr) {
+      console.error(
+        `[compensacion] FALLO AL LIMPIAR: la factura ${facturaId} quedó huérfana (pipeline ` +
+        `incompleto tras insertar la cabecera) y NO se pudo borrar: ${delFacErr.message}. ` +
+        `Revisar y borrar a mano. Causa original del fallo: ${causaMsg}`,
+      );
+      return;
+    }
+    console.warn(
+      `[compensacion] factura ${facturaId} deshecha tras un fallo posterior al insert de la ` +
+      `cabecera. Causa original: ${causaMsg}`,
+    );
+  } catch (compError) {
+    const compMsg = compError instanceof Error ? compError.message : String(compError);
+    console.error(
+      `[compensacion] FALLO AL LIMPIAR: excepción borrando la factura huérfana ${facturaId}: ` +
+      `${compMsg}. Revisar y borrar a mano. Causa original del fallo: ${causaMsg}`,
+    );
+  }
+}
+
 // ─── Autenticación / autorización ────────────────────────────────────────────
 // ⚠️ `verify_jwt` NO sirve como autenticación en este proyecto: la anon key es
 // un JWT válido y viaja en el bundle público del panel. Hay que comprobar que
@@ -543,100 +731,19 @@ serve(async (req) => {
     if (facErr) throw new Error(`insert factura: ${facErr.message}`);
     const facturaId = factura.id;
 
-    // 7) Productos: embeddings en batch (1 sola llamada) + insert masivo
-    if (datos.productos.length > 0) {
-      const embeddings = await embed(datos.productos.map((p) => p.nombre));
-      const filas = datos.productos.map((p, i) => ({
-        factura_id: facturaId,
-        nombre: p.nombre,
-        cantidad: p.cantidad,
-        unidad: p.unidad,
-        precio_unitario: p.precio_unitario,
-        total: p.total,
-        embedding: vec(embeddings[i]),
-      }));
-      const { error: prodErr } = await supabase.from("productos_factura").insert(filas);
-      if (prodErr) throw new Error(`insert productos: ${prodErr.message}`);
-    }
-
-    // 8) Validación de cordura de los importes (T5)
-    //    No corrige ni bloquea: deja constancia de lo que un humano deberia
-    //    mirar. Se hace DESPUES de insertar las lineas porque la funcion SQL
-    //    usa `nombre_normalizado`, que es una columna generada.
-    // deno-lint-ignore no-explicit-any
-    let alertas: any[] = [];
+    // Pasos 7-9 (líneas, validación, archivado) + respuesta de éxito, en su
+    // propia función para poder compensar si algo de ESO falla: la cabecera
+    // (paso 6) ya está insertada en este punto, así que un fallo posterior
+    // dejaría una fila en `facturas` sin líneas/validar/archivar si no se
+    // deshace. La compensación NUNCA sustituye el error original: se
+    // relanza `innerError` tal cual pase lo que pase con la limpieza (ver
+    // `compensarFacturaHuerfana`).
     try {
-      const { data: alertasData, error: valErr } = await supabase.rpc(
-        "validar_cordura_factura",
-        { p_factura_id: facturaId },
-      );
-      if (valErr) throw new Error(valErr.message);
-      alertas = Array.isArray(alertasData) ? alertasData : [];
-      if (alertas.length > 0) {
-        console.warn(
-          `[validacion] ${datos.tipo} ${datos.numero_documento} con ${alertas.length} alerta(s):`,
-          alertas.map((a) => a?.codigo).join(", "),
-        );
-        const { error: updErr } = await supabase
-          .from("facturas")
-          .update({ alertas_validacion: alertas })
-          .eq("id", facturaId);
-        if (updErr) console.error("[validacion] No se pudieron guardar las alertas:", updErr.message);
-      }
-    } catch (valError) {
-      // Que falle la validacion no invalida el documento, pero tiene que verse.
-      console.error("[validacion] Error validando importes:", valError);
+      return await completarFactura(supabase, facturaId, datos, archivo, b64, mimeType);
+    } catch (innerError) {
+      await compensarFacturaHuerfana(supabase, facturaId, innerError);
+      throw innerError;
     }
-
-    // 9) Archivar el original: Drive si esta configurado, Supabase Storage si no.
-    const archivado = await archivarOriginal(
-      supabase, b64, archivo.nombre, mimeType, datos.fecha, facturaId,
-    );
-    if (archivado.drive_url || archivado.archivo_path) {
-      const { error: archErr } = await supabase
-        .from("facturas")
-        .update({
-          ...(archivado.drive_url ? { drive_url: archivado.drive_url } : {}),
-          ...(archivado.archivo_path ? { archivo_path: archivado.archivo_path } : {}),
-        })
-        .eq("id", facturaId);
-      if (archErr) {
-        console.error("[archivo] No se pudo guardar la referencia al original:", archErr.message);
-      }
-    }
-
-    const alertasAltas = alertas.filter((a) => a?.severidad === "alta").length;
-    console.log(
-      `[procesar-factura] OK ${datos.tipo} ${datos.numero_documento} · ` +
-      `${datos.productos.length} productos · alertas: ${alertas.length} · ` +
-      `original: ${archivado.drive_url ? "drive" : archivado.archivo_path ? "storage" : "NO GUARDADO"}`,
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        nombre: archivo.nombre,
-        tipo: datos.tipo,
-        message: alertas.length > 0
-          ? `Documento procesado. Revisa ${alertas.length} aviso(s) sobre los importes.`
-          : "Documento procesado correctamente",
-        // Avisos para que SubidaFacturas.tsx pueda pintarlos.
-        alertas,
-        archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
-        archivo_error: archivado.error,
-        webhookResponse: {
-          tipo: datos.tipo,
-          numero_documento: datos.numero_documento,
-          proveedor: datos.proveedor,
-          total: datos.total,
-          factura_id: facturaId,
-          alertas: alertas.length,
-          alertas_graves: alertasAltas,
-          archivo_guardado: !!(archivado.drive_url || archivado.archivo_path),
-        },
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
-    );
   } catch (error) {
     console.error("[procesar-factura] Error:", error);
     const msg = error instanceof Error ? error.message : "Error desconocido";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Loader2, AlertTriangle } from "lucide-react";
+import { ExternalLink, Loader2, AlertTriangle, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -127,6 +127,39 @@ export function BadgeAlertas({ alertas }: { alertas: AlertaValidacion[] }) {
           {alertas.length > 4 && (
             <p className="mt-1 text-xs opacity-70">y {alertas.length - 4} mas…</p>
           )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * Indicador de que nadie ha marcado este documento como "verificado" desde
+ * el dialogo de edicion (campo `facturas.verificada`).
+ *
+ * Es DISTINTO de `BadgeAlertas`: un documento puede no tener ninguna alerta
+ * de cordura de importes (`alertas_validacion` vacio) y aun asi no estar
+ * revisado por una persona. Antes de esto, `verificada` solo se veia dentro
+ * de `EditarFacturaDialog`, asi que la unica forma de saber que quedaba
+ * pendiente de revisar era abrir documento por documento.
+ */
+export function BadgeSinVerificar({ verificada }: { verificada: boolean }) {
+  if (verificada) return null;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
+          >
+            <EyeOff className="h-3 w-3 shrink-0" />
+            Sin revisar
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p>Nadie ha marcado este documento como verificado todavia (interruptor "Marcar como verificada" en Editar).</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

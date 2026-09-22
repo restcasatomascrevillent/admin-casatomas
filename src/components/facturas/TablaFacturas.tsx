@@ -15,7 +15,7 @@ import { EditarFacturaDialog } from "./EditarFacturaDialog";
 import { formatCurrency, formatDate, formatDateTime, truncateText, getAnomaliaBadge } from "./shared/formatters";
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
-import { BotonOriginal, BadgeAlertas } from "./shared/BotonOriginal";
+import { BotonOriginal, BadgeAlertas, BadgeSinVerificar } from "./shared/BotonOriginal";
 
 // Re-export FilaProducto for consumers that import from TablaFacturas
 export { FilaProducto } from "./shared/FilaProducto";
@@ -73,6 +73,7 @@ const FilaFacturaMobile = ({
                 <CardTitle className="text-sm font-semibold text-foreground">{factura.numero_documento}</CardTitle>
                 {getAnomaliaBadge(factura, todasFacturas)}
                 <BadgeAlertas alertas={factura.alertas} />
+                <BadgeSinVerificar verificada={factura.verificada} />
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 {factura.proveedor || "Sin proveedor"}
@@ -170,7 +171,7 @@ const FilaFacturaDesktop = ({
         <TableCell className="w-[40px] pl-4">
           {tieneProductos ? (isOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />) : null}
         </TableCell>
-        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento} {getAnomaliaBadge(factura, todasFacturas)} <BadgeAlertas alertas={factura.alertas} /></TableCell>}
+        {visibles.numero && <TableCell className="font-semibold text-foreground">{factura.numero_documento} {getAnomaliaBadge(factura, todasFacturas)} <BadgeAlertas alertas={factura.alertas} /> <BadgeSinVerificar verificada={factura.verificada} /></TableCell>}
         {visibles.proveedor && <TableCell className="font-medium">{factura.proveedor || "-"}</TableCell>}
         {visibles.cif && <TableCell className="text-muted-foreground">{factura.cif || "-"}</TableCell>}
         {visibles.fecha && <TableCell className="text-muted-foreground">{formatDate(factura.fecha)}</TableCell>}
