@@ -21,11 +21,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useVinos, NuevoVino } from "@/hooks/useVinos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  ALERGENOS_OFICIALES,
+  combinarAlergenos,
+  normalizarAlergeno,
+} from "@/lib/alergenos";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -53,6 +59,14 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Estado para alérgenos (mismo patrón que PlatoForm.tsx). Antes este
+  // formulario no tenía ninguna casilla de alérgenos oficiales: por eso no se
+  // podía declarar ni quitar "sulfitos" (u otro alérgeno) de un vino desde el
+  // panel, solo por SQL directo.
+  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
+  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
+  const [nuevoAlergeno, setNuevoAlergeno] = useState("");
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -67,6 +81,35 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       alergenos_notas: "",
     },
   });
+
+  const toggleAlergeno = (id: string) => {
+    setAlergenosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
+  const addAlergenoPersonalizado = () => {
+    const trimmed = nuevoAlergeno.trim();
+    if (!trimmed) return;
+
+    const canonico = normalizarAlergeno(trimmed);
+    if (canonico) {
+      setAlergenosSeleccionados((prev) =>
+        prev.includes(canonico) ? prev : [...prev, canonico]
+      );
+      setNuevoAlergeno("");
+      return;
+    }
+
+    if (!alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
+    }
+    setNuevoAlergeno("");
+  };
+
+  const removeAlergenoPersonalizado = (alergeno: string) => {
+    setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,6 +134,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     // La traducción ya no se genera aquí: crearVino (usePlatos.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
+    const todosAlergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
     const vinoData: NuevoVino = {
       nombre: values.nombre,
       categoria: values.categoria,
@@ -100,6 +144,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       denominacion_origen: values.denominacion_origen,
       ubicacion_pais: values.ubicacion_pais,
       ubicacion_region: values.ubicacion_region,
+      alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
       alergenos_notas: values.alergenos_notas,
     };
 
@@ -138,6 +183,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
 
     form.reset();
     clearImage();
+    setAlergenosSeleccionados([]);
+    setAlergenosPersonalizados([]);
     onOpenChange(false);
   };
 
@@ -342,15 +389,85 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
               />
             </div>
 
+            {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}
+            <div className="space-y-3">
+              <FormLabel>Alérgenos</FormLabel>
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {ALERGENOS_OFICIALES.map((alergeno) => {
+                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
+                  return (
+                    <button
+                      key={alergeno.id}
+                      type="button"
+                      onClick={() => toggleAlergeno(alergeno.id)}
+                      className={`
+                        flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium
+                        transition-all duration-200 border
+                        ${isSelected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                        }
+                      `}
+                    >
+                      <span className="truncate">{alergeno.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={nuevoAlergeno}
+                  onChange={(e) => setNuevoAlergeno(e.target.value)}
+                  placeholder="Añadir alérgeno personalizado..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAlergenoPersonalizado();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={addAlergenoPersonalizado}
+                  disabled={!nuevoAlergeno.trim()}
+                >
+                  <span className="sr-only">Añadir</span>
+                  +
+                </Button>
+              </div>
+
+              {alergenosPersonalizados.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {alergenosPersonalizados.map((alergeno) => (
+                    <Badge key={alergeno} variant="secondary" className="gap-1 pr-1">
+                      {alergeno}
+                      <button
+                        type="button"
+                        onClick={() => removeAlergenoPersonalizado(alergeno)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="alergenos_notas"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Alérgenos / Notas</FormLabel>
+                  <FormLabel>Notas adicionales</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Información sobre alérgenos"
+                      placeholder="Ej: sin sulfitos añadidos, puede contener trazas de..."
                       className="resize-none"
                       {...field}
                     />

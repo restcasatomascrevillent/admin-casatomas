@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Wine, Trash2, Eye, EyeOff } from "lucide-react";
+import { Wine, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 import { useCocteles, Coctel } from "@/hooks/useCocteles";
 import { cn } from "@/lib/utils";
 import { VisibilidadToggles } from "./VisibilidadToggles";
+import { EditarCoctelModal } from "./EditarCoctelModal";
 import { etiquetaAlergeno } from "@/lib/alergenos";
 
 interface ListaCoctelesProps {
@@ -25,6 +26,7 @@ interface ListaCoctelesProps {
 export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
   const { eliminarCoctel, toggleActivado, toggleRestaurante, toggleTouza } = useCocteles();
   const [coctelAEliminar, setCoctelAEliminar] = useState<Coctel | null>(null);
+  const [coctelAEditar, setCoctelAEditar] = useState<Coctel | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(cocteles.map(c => c.id)));
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 </div>
               )}
 
-              {/* Precio y eliminar */}
+              {/* Precio y acciones */}
               <div className="flex items-end justify-between pt-2 border-t">
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-bold text-primary">
@@ -156,14 +158,26 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                   </span>
                   <span className="text-lg font-medium text-primary">€</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setCoctelAEliminar(coctel)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    title="Editar"
+                    onClick={() => setCoctelAEditar(coctel)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    title="Eliminar"
+                    onClick={() => setCoctelAEliminar(coctel)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -189,6 +203,14 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditarCoctelModal
+        open={!!coctelAEditar}
+        onOpenChange={(open) => {
+          if (!open) setCoctelAEditar(null);
+        }}
+        coctel={coctelAEditar}
+      />
     </>
   );
 }

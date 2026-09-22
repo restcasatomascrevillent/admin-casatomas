@@ -21,10 +21,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
+import {
+  ALERGENOS_OFICIALES,
+  combinarAlergenos,
+  normalizarAlergeno,
+  separarAlergenos,
+} from "@/lib/alergenos";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -37,6 +44,21 @@ const formSchema = z.object({
   ubicacion_region: z.string().optional(),
   alergenos_notas: z.string().optional(),
 });
+
+/**
+ * Deriva el nombre de fichero en Storage a partir de la URL pública guardada.
+ * Todas las subidas de esta carpeta usan `${id}.${extensión}` como nombre
+ * (ver más abajo, y BebidaForm/CoctelForm/PlatoForm/VinoForm), así que basta
+ * con recuperar la extensión de la URL vieja (sin el `?t=...` que se añade
+ * como cache-buster al subir) para reconstruir el path a borrar.
+ */
+function nombreArchivoStorage(id: string, imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  const sinQuery = imagenUrl.split("?")[0];
+  const ext = sinQuery.split(".").pop();
+  if (!ext) return null;
+  return `${id}.${ext}`;
+}
 
 interface EditarVinoModalProps {
   open: boolean;
@@ -51,6 +73,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
+  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
+  const [nuevoAlergeno, setNuevoAlergeno] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -70,6 +96,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   useEffect(() => {
     if (!open || !vino) return;
 
+    // Clasifica lo guardado en oficiales (ya en forma canónica) y
+    // personalizados de verdad (mismo criterio que EditarPlatoModal.tsx).
+    const { oficiales, personalizados } = separarAlergenos(vino.alergenos_oficiales);
+
     form.reset({
       nombre: vino.nombre ?? "",
       categoria: vino.categoria ?? "",
@@ -82,6 +112,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       alergenos_notas: vino.alergenos_notas ?? "",
     });
 
+    setAlergenosSeleccionados(oficiales);
+    setAlergenosPersonalizados(personalizados);
+    setNuevoAlergeno("");
+
     setImageFile(null);
     setImagePreview(vino.imagen_url ?? null);
     setRemoveImage(false);
@@ -89,6 +123,35 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       fileInputRef.current.value = "";
     }
   }, [open, vino, form]);
+
+  const toggleAlergeno = (id: string) => {
+    setAlergenosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const addAlergenoPersonalizado = () => {
+    const trimmed = nuevoAlergeno.trim();
+    if (!trimmed) return;
+
+    const canonico = normalizarAlergeno(trimmed);
+    if (canonico) {
+      setAlergenosSeleccionados((prev) =>
+        prev.includes(canonico) ? prev : [...prev, canonico]
+      );
+      setNuevoAlergeno("");
+      return;
+    }
+
+    if (!alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
+    }
+    setNuevoAlergeno("");
+  };
+
+  const removeAlergenoPersonalizado = (alergeno: string) => {
+    setAlergenosPersonalizados((prev) => prev.filter((item) => item !== alergeno));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -118,6 +181,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
     setIsUploadingImage(true);
     try {
+      const alergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
       let imageUrlUpdate: string | null | undefined = undefined;
 
       if (imageFile) {
@@ -134,6 +198,20 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
       } else if (removeImage) {
         imageUrlUpdate = null;
+
+        // Borrado defensivo: si falla (fichero ya no existe, red, permisos...)
+        // no debe impedir que se guarde el resto de cambios del registro.
+        const nombreArchivo = nombreArchivoStorage(vino.id, vino.imagen_url);
+        if (nombreArchivo) {
+          try {
+            const { error: removeError } = await supabase.storage.from("vinos").remove([nombreArchivo]);
+            if (removeError) {
+              console.error("No se pudo borrar la imagen antigua de Storage (vinos):", removeError);
+            }
+          } catch (removeErr) {
+            console.error("Error borrando imagen antigua de Storage (vinos):", removeErr);
+          }
+        }
       }
 
       await actualizarVino.mutateAsync({
@@ -147,6 +225,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         ubicacion_region: values.ubicacion_region?.trim() || null,
         ubicacion_pais: values.ubicacion_pais?.trim() || null,
         alergenos_notas: values.alergenos_notas?.trim() || null,
+        alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
       });
 
@@ -364,15 +443,80 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               />
             </div>
 
+            {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}
+            <div className="space-y-3">
+              <FormLabel>Alérgenos</FormLabel>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {ALERGENOS_OFICIALES.map((alergeno) => {
+                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
+                  return (
+                    <button
+                      key={alergeno.id}
+                      type="button"
+                      onClick={() => toggleAlergeno(alergeno.id)}
+                      className={[
+                        "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border",
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted",
+                      ].join(" ")}
+                    >
+                      <span className="truncate">{alergeno.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  value={nuevoAlergeno}
+                  onChange={(e) => setNuevoAlergeno(e.target.value)}
+                  placeholder="Añadir alérgeno personalizado..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAlergenoPersonalizado();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addAlergenoPersonalizado}
+                  disabled={!nuevoAlergeno.trim()}
+                >
+                  Añadir
+                </Button>
+              </div>
+
+              {alergenosPersonalizados.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {alergenosPersonalizados.map((alergeno) => (
+                    <Badge key={alergeno} variant="secondary" className="gap-1 pr-1">
+                      {alergeno}
+                      <button
+                        type="button"
+                        onClick={() => removeAlergenoPersonalizado(alergeno)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="alergenos_notas"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Alérgenos / Notas</FormLabel>
+                  <FormLabel>Notas adicionales</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Información sobre alérgenos"
+                      placeholder="Ej: sin sulfitos añadidos, puede contener trazas de..."
                       className="resize-none"
                       {...field}
                     />

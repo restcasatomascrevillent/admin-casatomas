@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { GlassWater, Trash2, Eye, EyeOff } from "lucide-react";
+import { GlassWater, Trash2, Pencil, Eye, EyeOff } from "lucide-react";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
+import { EditarBebidaModal } from "./EditarBebidaModal";
 
 interface ListaBebidasProps {
   bebidas: Bebida[];
@@ -25,6 +26,7 @@ interface ListaBebidasProps {
 
 export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   const { eliminarBebida, toggleActivado, toggleRestaurante, toggleTouza } = useBebidas();
+  const [bebidaAEditar, setBebidaAEditar] = useState<Bebida | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(bebidas.map(b => b.id)));
 
   useEffect(() => {
@@ -58,125 +60,146 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {bebidas.map((bebida) => (
-        <Card 
-          key={bebida.id} 
-          className={cn(
-            "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
-            !bebida.activado && "opacity-60"
-          )}
-        >
-          {bebida.imagen_url && !fotosOcultas.has(bebida.id) && (
-            <div className="relative h-40 bg-muted">
-              <img 
-                src={bebida.imagen_url} 
-                alt={bebida.nombre || "Bebida"} 
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-          
-          <CardContent className="p-4 space-y-3">
-            {/* Header con nombre y controles de foto */}
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
-                {bebida.nombre}
-              </h3>
-              {bebida.imagen_url && (
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    title={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
-                    onClick={() => toggleFotoVisible(bebida.id)}
-                  >
-                    {fotosOcultas.has(bebida.id) ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Visibilidad Web */}
-            <VisibilidadToggles
-              restaurante={bebida.restaurante ?? false}
-              touza={bebida.touza ?? false}
-              onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
-              onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
-              isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-              activado={bebida.activado ?? true}
-              onActivadoChange={(checked) =>
-                toggleActivado.mutate({
-                  id: bebida.id,
-                  activado: checked,
-                  nombre: bebida.nombre ?? undefined,
-                })
-              }
-              isActivadoPending={toggleActivado.isPending}
-              compact
-            />
-            {bebida.descripcion && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {bebida.descripcion}
-              </p>
+    <>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {bebidas.map((bebida) => (
+          <Card
+            key={bebida.id}
+            className={cn(
+              "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
+              !bebida.activado && "opacity-60"
+            )}
+          >
+            {bebida.imagen_url && !fotosOcultas.has(bebida.id) && (
+              <div className="relative h-40 bg-muted">
+                <img
+                  src={bebida.imagen_url}
+                  alt={bebida.nombre || "Bebida"}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
             )}
 
-            {/* Precio y tamaño */}
-            <div className="flex items-end justify-between pt-2 border-t">
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold text-primary">
-                  {bebida.precio_eur ? `${bebida.precio_eur.toFixed(2)}` : "—"}
-                </span>
-                <span className="text-lg font-medium text-primary">€</span>
+            <CardContent className="p-4 space-y-3">
+              {/* Header con nombre y controles de foto */}
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
+                  {bebida.nombre}
+                </h3>
+                {bebida.imagen_url && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      title={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
+                      onClick={() => toggleFotoVisible(bebida.id)}
+                    >
+                      {fotosOcultas.has(bebida.id) ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
-              {bebida.tamano && (
-                <span className="text-xs text-muted-foreground">
-                  {bebida.tamano}
-                </span>
-              )}
-            </div>
 
-            {/* Botón eliminar */}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+              {/* Visibilidad Web */}
+              <VisibilidadToggles
+                restaurante={bebida.restaurante ?? false}
+                touza={bebida.touza ?? false}
+                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
+                onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
+                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                activado={bebida.activado ?? true}
+                onActivadoChange={(checked) =>
+                  toggleActivado.mutate({
+                    id: bebida.id,
+                    activado: checked,
+                    nombre: bebida.nombre ?? undefined,
+                  })
+                }
+                isActivadoPending={toggleActivado.isPending}
+                compact
+              />
+              {bebida.descripcion && (
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {bebida.descripcion}
+                </p>
+              )}
+
+              {/* Precio y tamaño */}
+              <div className="flex items-end justify-between pt-2 border-t">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-primary">
+                    {bebida.precio_eur ? `${bebida.precio_eur.toFixed(2)}` : "—"}
+                  </span>
+                  <span className="text-lg font-medium text-primary">€</span>
+                </div>
+                {bebida.tamano && (
+                  <span className="text-xs text-muted-foreground">
+                    {bebida.tamano}
+                  </span>
+                )}
+              </div>
+
+              {/* Botones editar / eliminar */}
+              <div className="pt-2 border-t flex gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => setBebidaAEditar(bebida)}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Editar
                 </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción eliminará permanentemente "{bebida.nombre}" de la carta. Esta acción no se puede deshacer.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => eliminarBebida.mutate(bebida.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Eliminar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción eliminará permanentemente "{bebida.nombre}" de la carta. Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => eliminarBebida.mutate(bebida.id)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <EditarBebidaModal
+        open={!!bebidaAEditar}
+        onOpenChange={(open) => {
+          if (!open) setBebidaAEditar(null);
+        }}
+        bebida={bebidaAEditar}
+      />
+    </>
   );
 }

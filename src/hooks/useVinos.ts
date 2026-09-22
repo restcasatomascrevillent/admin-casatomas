@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
 
 export interface Vino {
   id: string;
@@ -37,8 +38,21 @@ export interface NuevoVino {
   denominacion_origen?: string;
   ubicacion_pais?: string;
   ubicacion_region?: string;
+  alergenos_oficiales?: any;
   alergenos_notas?: string;
   orden?: string;
+}
+
+/**
+ * Deja la lista de alérgenos en el vocabulario canónico (ver
+ * `src/lib/alergenos.ts`), igual que hace `usePlatos.ts`. Antes de este
+ * arreglo, Vinos era la única de las 4 tablas de carta cuyo hook nunca
+ * normalizaba ni escribía `alergenos_oficiales`: el dato solo se podía tocar
+ * por SQL directo (ver migración `20260921180000_declarar_sulfitos_vinos.sql`,
+ * que documenta este mismo hueco).
+ */
+function normalizarAlergenos(alergenos_oficiales: unknown): string[] {
+  return combinarAlergenos(parseAlergenos(alergenos_oficiales));
 }
 
 /**
@@ -85,6 +99,25 @@ function avisar(mensajeBase: string) {
   notificarGuardadoYPublicacion("vino", mensajeBase);
 }
 
+/** Deriva la ruta del objeto dentro del bucket "vinos" a partir de la
+ * imagen_url pública (formato de Supabase Storage: `.../object/public/<bucket>/<ruta>`,
+ * posiblemente con `?t=` de cache-busting detrás, ver `EditarVinoModal.tsx`).
+ * Devuelve null si no hay imagen o si la URL no encaja con ese patrón, para
+ * no intentar borrar nada por error (ver informe, TAREA 2). */
+function rutaStorageDesdeUrl(imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  try {
+    const sinQuery = imagenUrl.split("?")[0].split("#")[0];
+    const marcador = "/object/public/vinos/";
+    const indice = sinQuery.indexOf(marcador);
+    if (indice === -1) return null;
+    const ruta = sinQuery.slice(indice + marcador.length);
+    return ruta ? decodeURIComponent(ruta) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useVinos() {
   const queryClient = useQueryClient();
 
@@ -103,6 +136,8 @@ export function useVinos() {
 
   const crearVino = useMutation({
     mutationFn: async (nuevoVino: NuevoVino) => {
+      const alergenosArray = normalizarAlergenos(nuevoVino.alergenos_oficiales);
+
       // 1. Traducir primero (columnas ya filtradas a lo que existe en Vinos).
       const traducciones = await traducirVino({
         nombre: nuevoVino.nombre,
@@ -130,6 +165,7 @@ export function useVinos() {
             denominacion_origen: nuevoVino.denominacion_origen || null,
             ubicacion_pais: nuevoVino.ubicacion_pais || null,
             ubicacion_region: nuevoVino.ubicacion_region || null,
+            alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden: nuevoVino.orden ?? "0",
             activado: true,
@@ -161,14 +197,82 @@ export function useVinos() {
 
   const actualizarVino = useMutation({
     mutationFn: async ({ id, ...cambios }: Partial<Vino> & { id: string }) => {
+      // Si la edición toca alérgenos, se guarda en vocabulario canónico
+      // (mismo criterio que `usePlatos.ts`).
+      if ("alergenos_oficiales" in cambios) {
+        const normalizados = normalizarAlergenos(cambios.alergenos_oficiales);
+        cambios.alergenos_oficiales = normalizados.length > 0 ? normalizados : null;
+      }
+
+      // Retraducir SOLO si cambia un campo que de verdad alimenta alguna
+      // columna *_en/*_fr de Vinos: nombre, categoria, ubicacion_pais,
+      // ubicacion_region o alergenos_notas (-> alergenos_en/fr, ojo: es
+      // alergenos_notas y NO alergenos_oficiales, ver `traducirVino` más
+      // abajo). Vinos NO tiene descripcion_en/fr ni ingredientes_en/fr (TAREA
+      // 4), así que cambiar descripcion o ingredientes NUNCA dispara
+      // traducción aquí, aunque sí se le sigan pasando a `traducirVino` (la
+      // función ya los ignora al mapear la respuesta). Comparamos contra el
+      // valor anterior en caché, no solo "está presente en cambios", para
+      // que un guardado de precio o de imagen_url/imagen_posicion_y (que
+      // reenvían solo esa clave) nunca llame a la función de traducción.
+      const anterior = queryClient.getQueryData<Vino[]>(["vinos"])?.find((v) => v.id === id);
+
+      // GUARDA: si no hay `anterior` (caché fría, invalidada, o el id aún no
+      // se cargó), NO se puede rellenar con seguridad lo que falte en
+      // `cambios` -quedaría en "" al traducir- ni comparar "¿cambió de
+      // verdad?". Traducir con huecos machacaría nombre_en/categoria_en/
+      // ubicacion_pais_en/ubicacion_region_en/alergenos_en BUENOS con la
+      // traducción de un payload vacío (mismo patrón de corrupción silenciosa
+      // que el motor de OCR). Mejor una traducción desactualizada que una
+      // corrompida: se guarda igual con `cambios`, solo se salta la
+      // retraducción.
+      const tocaCampoTraducible =
+        "nombre" in cambios ||
+        "categoria" in cambios ||
+        "ubicacion_pais" in cambios ||
+        "ubicacion_region" in cambios ||
+        "alergenos_notas" in cambios;
+      if (tocaCampoTraducible && !anterior) {
+        console.warn(`useVinos.actualizarVino: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      const cambiaTraducible = Boolean(
+        anterior &&
+          (("nombre" in cambios && cambios.nombre !== anterior.nombre) ||
+            ("categoria" in cambios && cambios.categoria !== anterior.categoria) ||
+            ("ubicacion_pais" in cambios && cambios.ubicacion_pais !== anterior.ubicacion_pais) ||
+            ("ubicacion_region" in cambios && cambios.ubicacion_region !== anterior.ubicacion_region) ||
+            ("alergenos_notas" in cambios && cambios.alergenos_notas !== anterior.alergenos_notas)),
+      );
+
+      // Traducir primero (no escribe nada), igual que en la creación. Si
+      // falla, `traducciones` queda null y el guardado sigue igual (TAREA 2).
+      let traducciones: Record<string, unknown> | null = null;
+      if (cambiaTraducible) {
+        traducciones = await traducirVino({
+          nombre: (cambios.nombre ?? anterior?.nombre) || "",
+          descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
+          ingredientes: (cambios.ingredientes ?? anterior?.ingredientes) || "",
+          categoria: (cambios.categoria ?? anterior?.categoria) || "",
+          ubicacion_pais: (cambios.ubicacion_pais ?? anterior?.ubicacion_pais) || "",
+          ubicacion_region: (cambios.ubicacion_region ?? anterior?.ubicacion_region) || "",
+          alergenos_notas: (cambios.alergenos_notas ?? anterior?.alergenos_notas) || "",
+        });
+      }
+
       const { data, error } = await supabase
         .from("Vinos")
-        .update(cambios as any)
+        .update({ ...cambios, ...(traducciones || {}) } as any)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
+
+      if (cambiaTraducible && !traducciones) {
+        toast.warning("Vino actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -183,6 +287,22 @@ export function useVinos() {
 
   const eliminarVino = useMutation({
     mutationFn: async (id: string) => {
+      // Best-effort: borramos la foto de Storage ANTES de borrar la fila
+      // (después ya no hay dónde consultar imagen_url). Si algo falla aquí
+      // -no se puede derivar la ruta, o el propio borrado del objeto falla-
+      // NO debe impedir que se borre el registro; solo dejamos constancia
+      // por consola (ver informe, TAREA 2).
+      const anterior = queryClient.getQueryData<Vino[]>(["vinos"])?.find((v) => v.id === id);
+      const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
+      if (ruta) {
+        const { error: storageError } = await supabase.storage.from("vinos").remove([ruta]);
+        if (storageError) {
+          console.error("No se pudo borrar la imagen del vino en Storage:", storageError);
+        }
+      } else if (anterior?.imagen_url) {
+        console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
+      }
+
       const { error } = await supabase
         .from("Vinos")
         .delete()

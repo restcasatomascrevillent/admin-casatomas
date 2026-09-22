@@ -81,6 +81,32 @@ function avisar(mensajeBase: string) {
   notificarGuardadoYPublicacion("plato", mensajeBase);
 }
 
+/** Firma canónica (orden alfabético, deduplicada) de una lista de alérgenos,
+ * para comparar "¿cambió de verdad el conjunto?" sin que un mero reordenado
+ * (p. ej. checkboxes repintadas en otro orden) dispare una retraducción. */
+function alergenosKey(valor: unknown): string {
+  return normalizarAlergenos(valor).slice().sort().join("|");
+}
+
+/** Deriva la ruta del objeto dentro del bucket "platos" a partir de la
+ * imagen_url pública (formato de Supabase Storage: `.../object/public/<bucket>/<ruta>`,
+ * posiblemente con `?t=` de cache-busting detrás, ver `EditarPlatoModal.tsx`).
+ * Devuelve null si no hay imagen o si la URL no encaja con ese patrón, para
+ * no intentar borrar nada por error (ver informe, TAREA 2). */
+function rutaStorageDesdeUrl(imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  try {
+    const sinQuery = imagenUrl.split("?")[0].split("#")[0];
+    const marcador = "/object/public/platos/";
+    const indice = sinQuery.indexOf(marcador);
+    if (indice === -1) return null;
+    const ruta = sinQuery.slice(indice + marcador.length);
+    return ruta ? decodeURIComponent(ruta) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function usePlatos() {
   const queryClient = useQueryClient();
 
@@ -163,14 +189,65 @@ export function usePlatos() {
         cambios.alergenos_oficiales = normalizados.length > 0 ? normalizados : null;
       }
 
+      // Retraducir SOLO si cambia un campo que de verdad alimenta alguna
+      // columna *_en/*_fr de Platos: nombre, descripcion, categoria o
+      // alergenos_oficiales (-> alergenos_en/fr). `ingredientes` NO tiene
+      // columna traducida en esta tabla (ver `traducir-contenido/prompts.ts`),
+      // así que cambiarlo no dispara traducción. Comparamos contra el valor
+      // anterior en caché (no contra "está presente en cambios") para que un
+      // guardado de precio o de imagen_url/imagen_posicion_y (que reenvían
+      // solo esa clave) nunca llame a la función de traducción.
+      const anterior = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === id);
+
+      // GUARDA: si no hay `anterior` (caché fría, invalidada, o el id aún no
+      // se cargó), NO se puede rellenar con seguridad lo que falte en
+      // `cambios` -quedaría en "" o [] al traducir- ni comparar "¿cambió de
+      // verdad?". Traducir con huecos machacaría nombre_en/categoria_en/
+      // descripcion_en/alergenos_en BUENOS con la traducción de un payload
+      // vacío (mismo patrón de corrupción silenciosa que el motor de OCR).
+      // Mejor una traducción desactualizada que una corrompida: se guarda
+      // igual con `cambios`, solo se salta la retraducción.
+      const tocaCampoTraducible =
+        "nombre" in cambios || "descripcion" in cambios || "categoria" in cambios || "alergenos_oficiales" in cambios;
+      if (tocaCampoTraducible && !anterior) {
+        console.warn(`usePlatos.actualizarPlato: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      const cambiaTraducible = Boolean(
+        anterior &&
+          (("nombre" in cambios && cambios.nombre !== anterior.nombre) ||
+            ("descripcion" in cambios && cambios.descripcion !== anterior.descripcion) ||
+            ("categoria" in cambios && cambios.categoria !== anterior.categoria) ||
+            ("alergenos_oficiales" in cambios &&
+              alergenosKey(cambios.alergenos_oficiales) !== alergenosKey(anterior.alergenos_oficiales))),
+      );
+
+      // Traducir primero (no escribe nada), igual que en la creación. Si
+      // falla, `traducciones` queda null y el guardado sigue igual (TAREA 2).
+      let traducciones: Record<string, unknown> | null = null;
+      if (cambiaTraducible) {
+        traducciones = await traducirPlato({
+          nombre: (cambios.nombre ?? anterior?.nombre) || "",
+          descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
+          ingredientes: (cambios.ingredientes ?? anterior?.ingredientes) || "",
+          categoria: (cambios.categoria ?? anterior?.categoria) || "",
+          alergenos: normalizarAlergenos(cambios.alergenos_oficiales ?? anterior?.alergenos_oficiales),
+        });
+      }
+
       const { data, error } = await supabase
         .from("Platos")
-        .update(cambios as any)
+        .update({ ...cambios, ...(traducciones || {}) } as any)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
+
+      if (cambiaTraducible && !traducciones) {
+        toast.warning("Plato actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -185,6 +262,22 @@ export function usePlatos() {
 
   const eliminarPlato = useMutation({
     mutationFn: async (id: string) => {
+      // Best-effort: borramos la foto de Storage ANTES de borrar la fila
+      // (después ya no hay dónde consultar imagen_url). Si algo falla aquí
+      // -no se puede derivar la ruta, o el propio borrado del objeto falla-
+      // NO debe impedir que se borre el registro; solo dejamos constancia
+      // por consola (ver informe, TAREA 2).
+      const anterior = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === id);
+      const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
+      if (ruta) {
+        const { error: storageError } = await supabase.storage.from("platos").remove([ruta]);
+        if (storageError) {
+          console.error("No se pudo borrar la imagen del plato en Storage:", storageError);
+        }
+      } else if (anterior?.imagen_url) {
+        console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
+      }
+
       const { error } = await supabase
         .from("Platos")
         .delete()

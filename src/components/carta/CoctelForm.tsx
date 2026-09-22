@@ -7,12 +7,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useCocteles } from "@/hooks/useCocteles";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Languages } from "lucide-react";
-import { Json } from "@/integrations/supabase/types";
+import { Loader2, Upload, X, Plus } from "lucide-react";
+import {
+  ALERGENOS_OFICIALES,
+  combinarAlergenos,
+  normalizarAlergeno,
+} from "@/lib/alergenos";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es requerido"),
@@ -21,6 +26,7 @@ const formSchema = z.object({
   descripcion: z.string().optional(),
   ingredientes: z.string().optional(),
   preparacion: z.string().optional(),
+  alergenos_notas: z.string().optional(),
 });
 
 interface CoctelFormProps {
@@ -31,11 +37,17 @@ interface CoctelFormProps {
 
 export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormProps) {
   const { crearCoctel, actualizarCoctel, categorias } = useCocteles();
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [traducciones, setTraducciones] = useState<Json | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Estado para alérgenos (mismo patrón que PlatoForm.tsx / VinoForm.tsx).
+  // Antes este formulario no tenía ninguna casilla de alérgenos oficiales: los
+  // 12 cócteles existentes declaraban "no consta", incumpliendo el Reglamento
+  // UE 1169/2011.
+  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
+  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
+  const [nuevoAlergeno, setNuevoAlergeno] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,6 +58,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
       descripcion: "",
       ingredientes: "",
       preparacion: "",
+      alergenos_notas: "",
     },
   });
 
@@ -54,6 +67,38 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
       form.setValue("categoria", categoriaInicial);
     }
   }, [categoriaInicial, form]);
+
+  const toggleAlergeno = (id: string) => {
+    setAlergenosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
+  const addAlergenoPersonalizado = () => {
+    const trimmed = nuevoAlergeno.trim();
+    if (!trimmed) return;
+
+    // Si lo escrito a mano es en realidad un alérgeno oficial (con o sin
+    // acentos, singular o plural), se marca su casilla en vez de crear una
+    // entrada suelta que acabaría duplicada en la web.
+    const canonico = normalizarAlergeno(trimmed);
+    if (canonico) {
+      setAlergenosSeleccionados((prev) =>
+        prev.includes(canonico) ? prev : [...prev, canonico]
+      );
+      setNuevoAlergeno("");
+      return;
+    }
+
+    if (!alergenosPersonalizados.includes(trimmed)) {
+      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
+    }
+    setNuevoAlergeno("");
+  };
+
+  const removeAlergenoPersonalizado = (alergeno: string) => {
+    setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,42 +117,16 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
     setImagePreview(null);
   };
 
-  const handleTranslate = async () => {
-    const values = form.getValues();
-    if (!values.nombre) {
-      toast.error("Introduce un nombre antes de traducir");
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('traducir-contenido', {
-        body: {
-          tipo: 'coctel',
-          datos: {
-            nombre: values.nombre,
-            categoria: values.categoria,
-            descripcion: values.descripcion || '',
-            ingredientes: values.ingredientes || '',
-          },
-        },
-      });
-
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || 'Traducción no disponible');
-
-      setTraducciones(data.translations || null);
-      toast.success("Traducciones generadas");
-    } catch (error) {
-      console.error('Error traduciendo:', error);
-      toast.error("Error al traducir");
-    } finally {
-      setIsTranslating(false);
-    }
-  };
-
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      const todosAlergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
+
+      // Alérgenos van directos en el alta: crearCoctel (useCocteles.ts) ya
+      // los acepta y normaliza en el propio INSERT, igual que
+      // crearPlato/crearVino. Antes hacía falta un segundo actualizarCoctel
+      // solo para esto, con una ventana en la que un fallo ahí dejaba el
+      // cóctel guardado sin alérgenos declarados (obligatorios por el
+      // Reglamento UE 1169/2011) aunque el usuario creyera que sí.
       const nuevoCoctel = await crearCoctel.mutateAsync({
         nombre: values.nombre,
         categoria: values.categoria,
@@ -115,9 +134,11 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
         descripcion: values.descripcion,
         ingredientes: values.ingredientes,
         preparacion: values.preparacion,
+        alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : undefined,
+        alergenos_notas: values.alergenos_notas?.trim() || undefined,
       });
 
-      // Si hay imagen, subirla después de crear el cóctel.
+      // Si hay imagen, subirla después de crear el cóctel (hace falta el id).
       // Antes se subía al bucket y NUNCA se escribía `imagen_url`: la foto
       // quedaba huérfana en storage y el cóctel salía sin imagen en la web.
       if (imageFile && nuevoCoctel?.id) {
@@ -150,7 +171,9 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
       }
 
       form.reset();
-      setTraducciones(null);
+      setAlergenosSeleccionados([]);
+      setAlergenosPersonalizados([]);
+      setNuevoAlergeno("");
       clearImage();
       onOpenChange(false);
     } catch (error) {
@@ -225,10 +248,10 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                 <FormItem>
                   <FormLabel>Descripción</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Descripción del cóctel..."
                       className="min-h-[80px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -243,10 +266,10 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                 <FormItem>
                   <FormLabel>Ingredientes</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Ron, menta, lima, azúcar, soda..."
                       className="min-h-[60px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -261,10 +284,10 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                 <FormItem>
                   <FormLabel>Preparación (opcional)</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Pasos de preparación..."
                       className="min-h-[60px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -277,9 +300,9 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
               <FormLabel>Imagen</FormLabel>
               {imagePreview ? (
                 <div className="relative w-32 h-32">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
                     className="w-full h-full object-cover rounded-md"
                   />
                   <Button
@@ -306,45 +329,105 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
               )}
             </div>
 
-            {/* Botón traducir */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTranslate}
-              disabled={isTranslating}
-              className="w-full"
-            >
-              {isTranslating ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Languages className="h-4 w-4 mr-2" />
-              )}
-              Generar traducciones
-            </Button>
+            {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}
+            <div className="space-y-3">
+              <FormLabel>Alérgenos</FormLabel>
 
-            {/* Mostrar traducciones */}
-            {traducciones && (
-              <div className="p-3 bg-muted rounded-md text-sm space-y-2">
-                <p className="font-medium">Traducciones generadas:</p>
-                {typeof traducciones === 'object' && traducciones !== null && (
-                  <>
-                    {(traducciones as any).nombre_en && (
-                      <p><span className="font-medium">🇬🇧 EN:</span> {(traducciones as any).nombre_en}</p>
-                    )}
-                    {(traducciones as any).nombre_fr && (
-                      <p><span className="font-medium">🇫🇷 FR:</span> {(traducciones as any).nombre_fr}</p>
-                    )}
-                  </>
-                )}
+              {/* Grid de alérgenos oficiales */}
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {ALERGENOS_OFICIALES.map((alergeno) => {
+                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
+                  return (
+                    <button
+                      key={alergeno.id}
+                      type="button"
+                      onClick={() => toggleAlergeno(alergeno.id)}
+                      className={[
+                        "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border",
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted",
+                      ].join(" ")}
+                    >
+                      <span className="truncate">{alergeno.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
+
+              {/* Añadir alérgeno personalizado */}
+              <div className="flex gap-2">
+                <Input
+                  value={nuevoAlergeno}
+                  onChange={(e) => setNuevoAlergeno(e.target.value)}
+                  placeholder="Añadir alérgeno personalizado..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addAlergenoPersonalizado();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={addAlergenoPersonalizado}
+                  disabled={!nuevoAlergeno.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Lista de alérgenos personalizados */}
+              {alergenosPersonalizados.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {alergenosPersonalizados.map((alergeno) => (
+                    <Badge
+                      key={alergeno}
+                      variant="secondary"
+                      className="gap-1 pr-1"
+                    >
+                      {alergeno}
+                      <button
+                        type="button"
+                        onClick={() => removeAlergenoPersonalizado(alergeno)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <FormField
+              control={form.control}
+              name="alergenos_notas"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas adicionales</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ej: puede contener trazas de..."
+                      className="resize-none"
+                      rows={2}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={crearCoctel.isPending || isUploading}
               >
                 {(crearCoctel.isPending || isUploading) && (

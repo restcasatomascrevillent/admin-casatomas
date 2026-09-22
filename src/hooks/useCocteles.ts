@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
 
 export interface Coctel {
   id: string;
@@ -39,6 +40,16 @@ export interface NuevoCoctel {
   descripcion?: string;
   ingredientes?: string;
   preparacion?: string;
+  alergenos_oficiales?: any;
+  alergenos_notas?: string;
+}
+
+/**
+ * Deja la lista de alérgenos en el vocabulario canónico (ver
+ * `src/lib/alergenos.ts`), igual que `usePlatos.ts`/`useVinos.ts`.
+ */
+function normalizarAlergenos(alergenos_oficiales: unknown): string[] {
+  return combinarAlergenos(parseAlergenos(alergenos_oficiales));
 }
 
 /** Llama a traducir-contenido; nunca lanza. Si falla, devuelve null y el
@@ -74,6 +85,24 @@ function avisar(mensajeBase: string) {
   notificarGuardadoYPublicacion("coctel", mensajeBase);
 }
 
+/** Deriva la ruta del objeto dentro del bucket "cocteles" a partir de la
+ * imagen_url pública (formato de Supabase Storage: `.../object/public/<bucket>/<ruta>`).
+ * Devuelve null si no hay imagen o si la URL no encaja con ese patrón, para
+ * no intentar borrar nada por error (ver informe, TAREA 2). */
+function rutaStorageDesdeUrl(imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  try {
+    const sinQuery = imagenUrl.split("?")[0].split("#")[0];
+    const marcador = "/object/public/cocteles/";
+    const indice = sinQuery.indexOf(marcador);
+    if (indice === -1) return null;
+    const ruta = sinQuery.slice(indice + marcador.length);
+    return ruta ? decodeURIComponent(ruta) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useCocteles() {
   const queryClient = useQueryClient();
 
@@ -92,6 +121,17 @@ export function useCocteles() {
 
   const crearCoctel = useMutation({
     mutationFn: async (nuevoCoctel: NuevoCoctel) => {
+      // Alérgenos en el propio INSERT (antes solo crearPlato/crearVino los
+      // aceptaban aquí; Cocteles dependía de un segundo actualizarCoctel
+      // desde el formulario, dejando una ventana en la que un cóctel podía
+      // quedar guardado sin alérgenos declarados si ese segundo paso fallaba
+      // -obligatorio por Reglamento UE 1169/2011-). Mismo criterio de
+      // normalización que usePlatos.ts/useVinos.ts.
+      const alergenosArray = normalizarAlergenos(nuevoCoctel.alergenos_oficiales);
+
+      // Cocteles no traduce alérgenos (no tiene columnas alergenos_en/fr ni
+      // el prompt COCTEL_SYSTEM las pide, ver traducir-contenido/prompts.ts),
+      // así que no se envían a traducirCoctel.
       const traducciones = await traducirCoctel({
         nombre: nuevoCoctel.nombre,
         descripcion: nuevoCoctel.descripcion || "",
@@ -110,6 +150,8 @@ export function useCocteles() {
             descripcion: nuevoCoctel.descripcion || null,
             ingredientes: nuevoCoctel.ingredientes || null,
             preparacion: nuevoCoctel.preparacion || null,
+            alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
+            alergenos_notas: nuevoCoctel.alergenos_notas || null,
             activado: true,
             orden: 0,
             created_at: new Date().toISOString(),
@@ -140,14 +182,71 @@ export function useCocteles() {
 
   const actualizarCoctel = useMutation({
     mutationFn: async ({ id, ...cambios }: Partial<Coctel> & { id: string }) => {
+      // Si la edición toca alérgenos, se guarda en vocabulario canónico
+      // (mismo criterio que `usePlatos.ts`/`useVinos.ts`). Sin esto, el
+      // EditarCoctelModal.tsx de otro agente guardaba alérgenos con un
+      // vocabulario distinto al resto de la carta, y el emparejamiento por
+      // sinónimos de las webs públicas (`src/lib/alergenos.ts`) podía no
+      // reconocerlos.
+      if ("alergenos_oficiales" in cambios) {
+        const normalizados = normalizarAlergenos(cambios.alergenos_oficiales);
+        cambios.alergenos_oficiales = normalizados.length > 0 ? normalizados : null;
+      }
+
+      // Retraducir SOLO si cambia nombre, descripcion, ingredientes o
+      // categoria: son las únicas columnas con *_en/*_fr en Cocteles.
+      // Comparamos contra el valor anterior en caché, no solo "está presente
+      // en cambios", para que un guardado de precio o de imagen_url (que
+      // reenvían solo esa clave) nunca llame a la función de traducción.
+      const anterior = queryClient.getQueryData<Coctel[]>(["cocteles"])?.find((c) => c.id === id);
+
+      // GUARDA: si no hay `anterior` (caché fría, invalidada, o el id aún no
+      // se cargó), NO se puede rellenar con seguridad lo que falte en
+      // `cambios` -quedaría en "" al traducir- ni comparar "¿cambió de
+      // verdad?". Traducir con huecos machacaría nombre_en/categoria_en/
+      // descripcion_en/ingredientes_en BUENOS con la traducción de un payload
+      // vacío (mismo patrón de corrupción silenciosa que el motor de OCR).
+      // Mejor una traducción desactualizada que una corrompida: se guarda
+      // igual con `cambios`, solo se salta la retraducción.
+      const tocaCampoTraducible =
+        "nombre" in cambios || "descripcion" in cambios || "ingredientes" in cambios || "categoria" in cambios;
+      if (tocaCampoTraducible && !anterior) {
+        console.warn(`useCocteles.actualizarCoctel: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      const cambiaTraducible = Boolean(
+        anterior &&
+          (("nombre" in cambios && cambios.nombre !== anterior.nombre) ||
+            ("descripcion" in cambios && cambios.descripcion !== anterior.descripcion) ||
+            ("ingredientes" in cambios && cambios.ingredientes !== anterior.ingredientes) ||
+            ("categoria" in cambios && cambios.categoria !== anterior.categoria)),
+      );
+
+      // Traducir primero (no escribe nada), igual que en la creación. Si
+      // falla, `traducciones` queda null y el guardado sigue igual (TAREA 2).
+      let traducciones: Record<string, unknown> | null = null;
+      if (cambiaTraducible) {
+        traducciones = await traducirCoctel({
+          nombre: (cambios.nombre ?? anterior?.nombre) || "",
+          descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
+          ingredientes: (cambios.ingredientes ?? anterior?.ingredientes) || "",
+          categoria: (cambios.categoria ?? anterior?.categoria) || "",
+        });
+      }
+
       const { data, error } = await supabase
         .from("Cocteles")
-        .update(cambios)
+        .update({ ...cambios, ...(traducciones || {}) } as any)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
+
+      if (cambiaTraducible && !traducciones) {
+        toast.warning("Cóctel actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -162,6 +261,22 @@ export function useCocteles() {
 
   const eliminarCoctel = useMutation({
     mutationFn: async (id: string) => {
+      // Best-effort: borramos la foto de Storage ANTES de borrar la fila
+      // (después ya no hay dónde consultar imagen_url). Si algo falla aquí
+      // -no se puede derivar la ruta, o el propio borrado del objeto falla-
+      // NO debe impedir que se borre el registro; solo dejamos constancia
+      // por consola (ver informe, TAREA 2).
+      const anterior = queryClient.getQueryData<Coctel[]>(["cocteles"])?.find((c) => c.id === id);
+      const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
+      if (ruta) {
+        const { error: storageError } = await supabase.storage.from("cocteles").remove([ruta]);
+        if (storageError) {
+          console.error("No se pudo borrar la imagen del cóctel en Storage:", storageError);
+        }
+      } else if (anterior?.imagen_url) {
+        console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
+      }
+
       const { error } = await supabase
         .from("Cocteles")
         .delete()

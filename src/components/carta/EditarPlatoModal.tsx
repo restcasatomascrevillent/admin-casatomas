@@ -49,6 +49,21 @@ const formSchema = z.object({
   alergenos_notas: z.string().optional(),
 });
 
+/**
+ * Deriva el nombre de fichero en Storage a partir de la URL pública guardada.
+ * Todas las subidas de esta carpeta usan `${id}.${extensión}` como nombre
+ * (ver más abajo, y BebidaForm/CoctelForm/PlatoForm/VinoForm), así que basta
+ * con recuperar la extensión de la URL vieja (sin el `?t=...` que se añade
+ * como cache-buster al subir) para reconstruir el path a borrar.
+ */
+function nombreArchivoStorage(id: string, imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  const sinQuery = imagenUrl.split("?")[0];
+  const ext = sinQuery.split(".").pop();
+  if (!ext) return null;
+  return `${id}.${ext}`;
+}
+
 interface EditarPlatoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -187,6 +202,20 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
         imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
       } else if (removeImage) {
         imageUrlUpdate = null;
+
+        // Borrado defensivo: si falla (fichero ya no existe, red, permisos...)
+        // no debe impedir que se guarde el resto de cambios del registro.
+        const nombreArchivo = nombreArchivoStorage(plato.id, plato.imagen_url);
+        if (nombreArchivo) {
+          try {
+            const { error: removeError } = await supabase.storage.from("platos").remove([nombreArchivo]);
+            if (removeError) {
+              console.error("No se pudo borrar la imagen antigua de Storage (platos):", removeError);
+            }
+          } catch (removeErr) {
+            console.error("Error borrando imagen antigua de Storage (platos):", removeErr);
+          }
+        }
       }
 
       await actualizarPlato.mutateAsync({

@@ -58,6 +58,24 @@ function avisar(mensajeBase: string) {
   notificarGuardadoYPublicacion("bebida", mensajeBase);
 }
 
+/** Deriva la ruta del objeto dentro del bucket "bebidas" a partir de la
+ * imagen_url pública (formato de Supabase Storage: `.../object/public/<bucket>/<ruta>`).
+ * Devuelve null si no hay imagen o si la URL no encaja con ese patrón, para
+ * no intentar borrar nada por error (ver informe, TAREA 2). */
+function rutaStorageDesdeUrl(imagenUrl: string | null | undefined): string | null {
+  if (!imagenUrl) return null;
+  try {
+    const sinQuery = imagenUrl.split("?")[0].split("#")[0];
+    const marcador = "/object/public/bebidas/";
+    const indice = sinQuery.indexOf(marcador);
+    if (indice === -1) return null;
+    const ruta = sinQuery.slice(indice + marcador.length);
+    return ruta ? decodeURIComponent(ruta) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useBebidas() {
   const queryClient = useQueryClient();
 
@@ -124,14 +142,57 @@ export function useBebidas() {
 
   const actualizarBebida = useMutation({
     mutationFn: async ({ id, ...cambios }: Partial<Bebida> & { id: string }) => {
+      // Retraducir SOLO si cambia nombre, descripcion o categoria: son las
+      // únicas columnas con *_en/*_fr en Bebidas. Comparamos contra el valor
+      // anterior en caché, no solo "está presente en cambios", para que un
+      // guardado de precio o de imagen_url (que reenvían solo esa clave)
+      // nunca llame a la función de traducción.
+      const anterior = queryClient.getQueryData<Bebida[]>(["bebidas"])?.find((b) => b.id === id);
+
+      // GUARDA: si no hay `anterior` (caché fría, invalidada, o el id aún no
+      // se cargó), NO se puede rellenar con seguridad lo que falte en
+      // `cambios` -quedaría en "" al traducir- ni comparar "¿cambió de
+      // verdad?". Traducir con huecos machacaría nombre_en/categoria_en/
+      // descripcion_en BUENOS con la traducción de un payload vacío (mismo
+      // patrón de corrupción silenciosa que el motor de OCR). Mejor una
+      // traducción desactualizada que una corrompida: se guarda igual con
+      // `cambios`, solo se salta la retraducción.
+      const tocaCampoTraducible = "nombre" in cambios || "descripcion" in cambios || "categoria" in cambios;
+      if (tocaCampoTraducible && !anterior) {
+        console.warn(`useBebidas.actualizarBebida: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      const cambiaTraducible = Boolean(
+        anterior &&
+          (("nombre" in cambios && cambios.nombre !== anterior.nombre) ||
+            ("descripcion" in cambios && cambios.descripcion !== anterior.descripcion) ||
+            ("categoria" in cambios && cambios.categoria !== anterior.categoria)),
+      );
+
+      // Traducir primero (no escribe nada), igual que en la creación. Si
+      // falla, `traducciones` queda null y el guardado sigue igual (TAREA 2).
+      let traducciones: Record<string, unknown> | null = null;
+      if (cambiaTraducible) {
+        traducciones = await traducirBebida({
+          nombre: (cambios.nombre ?? anterior?.nombre) || "",
+          descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
+          categoria: (cambios.categoria ?? anterior?.categoria) || "",
+        });
+      }
+
       const { data, error } = await supabase
         .from("Bebidas")
-        .update(cambios)
+        .update({ ...cambios, ...(traducciones || {}) } as any)
         .eq("id", id)
         .select()
         .single();
 
       if (error) throw error;
+
+      if (cambiaTraducible && !traducciones) {
+        toast.warning("Bebida actualizada sin volver a traducir. Revísala más tarde en inglés/francés.");
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -146,6 +207,22 @@ export function useBebidas() {
 
   const eliminarBebida = useMutation({
     mutationFn: async (id: string) => {
+      // Best-effort: borramos la foto de Storage ANTES de borrar la fila
+      // (después ya no hay dónde consultar imagen_url). Si algo falla aquí
+      // -no se puede derivar la ruta, o el propio borrado del objeto falla-
+      // NO debe impedir que se borre el registro; solo dejamos constancia
+      // por consola (ver informe, TAREA 2).
+      const anterior = queryClient.getQueryData<Bebida[]>(["bebidas"])?.find((b) => b.id === id);
+      const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
+      if (ruta) {
+        const { error: storageError } = await supabase.storage.from("bebidas").remove([ruta]);
+        if (storageError) {
+          console.error("No se pudo borrar la imagen de la bebida en Storage:", storageError);
+        }
+      } else if (anterior?.imagen_url) {
+        console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
+      }
+
       const { error } = await supabase
         .from("Bebidas")
         .delete()

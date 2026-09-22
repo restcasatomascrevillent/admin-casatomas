@@ -5,8 +5,10 @@ import { Wine, Trash2, Pencil, Eye, EyeOff, Move } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -221,6 +223,16 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                   <span className="text-lg font-medium text-primary">€</span>
                 </div>
               </div>
+
+              {parseAlergenos(vino.alergenos_oficiales).length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-2 border-t">
+                  {parseAlergenos(vino.alergenos_oficiales).map((alergeno) => (
+                    <Badge key={alergeno} variant="outline" className="text-xs py-0 px-1.5">
+                      {etiquetaAlergeno(alergeno)}
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
               {vino.alergenos_notas && (
                 <p className="text-xs text-muted-foreground italic pt-2 border-t">
