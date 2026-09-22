@@ -28,3 +28,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Estado local de la CLI de Supabase (project-ref, pooler-url, versiones)
+# No debe versionarse: es cache de la maquina, no del proyecto
+supabase/.temp/

@@ -180,6 +180,5 @@ export function useEliminarConfiguracionTurno() {
 // regla del umbral, distinta de la de `useDisponibilidad.ts` y de la del
 // motor compartido). Se confirmó sin uso — ningún import en el repo la
 // referenciaba, solo `useDisponibilidad.ts` exporta una función con ese
-// mismo nombre y es la que consume `SelectorHorasDisponibles.tsx` — y se
-// eliminó. La única fuente de esta regla es
+// mismo nombre — y se eliminó. La única fuente de esta regla es
 // `supabase/functions/_shared/disponibilidad.ts`.

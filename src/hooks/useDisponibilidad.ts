@@ -77,7 +77,7 @@ export interface DisponibilidadHora {
     comensales_actuales: number;
     capacidad_disponible: number;
     porcentaje_ocupacion: number;
-    /** Alias que ya leía `CalendarioDisponibilidad.tsx` y que no existía. */
+    /** Alias de `porcentaje_ocupacion`; antes no existía en el objeto devuelto. */
     porcentaje_ocupacion_sala: number;
   }[];
   capacidad_total_disponible: number;
@@ -232,8 +232,7 @@ export const useDisponibilidadPorFecha = (fecha: string) => {
  *     con reservas seguía existiendo y antes se perdía).
  *   - Añade `fecha`, `capacidad_disponible`, `capacidad_maxima`,
  *     `total_comensales`, `total_reservas` y `porcentaje_ocupacion_sala`,
- *     que `CalendarioDisponibilidad.tsx` y `CalendarioReservaPublica.tsx`
- *     YA leían y que no existían en el objeto (salían siempre 0 / vacío).
+ *     que antes no existían en el objeto y salían siempre a 0 / vacío.
  */
 export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
   return useQuery({
@@ -447,8 +446,7 @@ export const verificarDisponibilidadSala = async (
 /**
  * Genera los turnos ofrecidos de un día.
  *
- * Firma intacta para no tocar `SelectorHorasDisponibles.tsx`, pero por
- * dentro ya no hay lógica: la pone el motor compartido.
+ * Por dentro ya no hay lógica propia: la pone el motor compartido.
  *
  * `diaSemana` se ignora a propósito: se recalcula a partir de `fecha` con
  * aritmética UTC. El valor que llegaba venía de `fechaObj.getDay()`, que
