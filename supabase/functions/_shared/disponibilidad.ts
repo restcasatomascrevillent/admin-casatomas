@@ -66,6 +66,97 @@ const MAX_HUECOS_POR_PERIODO = 400;
 const MINUTOS_DIA = 1440;
 
 // ------------------------------------------------------------
+// AFORO POR NEGOCIO (marca) — bug de 2026-09-22
+// ------------------------------------------------------------
+// El grupo Casa Tomás tiene dos negocios (`reservas.marca`, migración
+// `20260922180000_marca_negocio_en_reservas.sql`: "casa_tomas" | "touza").
+// `espacios_reserva` los mezcla en UNA sola tabla — hoy Comedor/Salón/
+// Terraza (casa_tomas, 50 cada uno) y "El Reservado" (touza, 20), ver
+// migración `20260922150000_espacio_el_reservado_touza.sql`, que etiqueta
+// cada fila con `caracteristicas->>'marca'`.
+//
+// Hasta la migración `20260922190000_aforo_por_marca.sql` (trigger) y este
+// cambio (motor), TANTO el trigger `validar_capacidad_reserva` COMO este
+// fichero sumaban `capacidad_maxima` de TODOS los espacios activos sin
+// mirar la marca: al dar de alta "El Reservado" el aforo del restaurante
+// pasó de 150 a 170 (150 + 20 de un espacio que no es suyo), y una
+// solicitud de El Reservado se validaba contra 170 en vez de sus 20 reales.
+//
+// `filtrarEspaciosPorMarca`/`sumarCapacidadPorMarca` son las ÚNICAS
+// funciones que filtran/suman espacios por marca — las usan
+// `reservas-web/index.ts` y `useDisponibilidad.ts` (antes cada uno tenía
+// su propio `.reduce()` sin filtrar, ahora es un solo sitio, testeado
+// aquí). El criterio tiene que ser IDÉNTICO al del trigger o el cliente
+// vería un hueco que el servidor luego rechaza (o al revés): por eso
+// ambos lados usan el mismo `COALESCE(marca, 'casa_tomas')` — ver el
+// propio SQL de la migración del trigger para la prueba de que coinciden.
+//
+// La ocupación (`reservas.numero_comensales`) NO necesita un helper
+// equivalente aquí: `reservas.marca` es `NOT NULL DEFAULT 'casa_tomas'`
+// (misma migración), así que quien llama filtra con `.eq("marca", marca)`
+// directamente en la consulta — no hace falta emular un COALESCE en JS
+// para una columna que la base de datos ya garantiza que no es NULL.
+// ------------------------------------------------------------
+
+/**
+ * Valor que asume la marca de un espacio o de una reserva cuando no hay
+ * dato: el negocio mayoritario e histórico, Casa Tomás. Es el mismo valor
+ * que `NEGOCIO_POR_DEFECTO` en `reservas-web/plantillas.ts` y que el
+ * `DEFAULT 'casa_tomas'` de la columna `reservas.marca` — repetido aquí
+ * como literal, NO importado, porque este fichero no importa nada (regla
+ * de oro de la cabecera). Si cambia, cambia en los tres sitios a la vez:
+ * aquí, `NEGOCIO_POR_DEFECTO` y el `COALESCE` de
+ * `20260922190000_aforo_por_marca.sql`.
+ */
+export const MARCA_POR_DEFECTO = "casa_tomas";
+
+/** Lo mínimo de una fila de `espacios_reserva` para sumar aforo por marca. */
+export interface EspacioParaAforo {
+  capacidad_maxima: number;
+  /** `caracteristicas->>'marca'`, tal cual llega (sin validar, puede faltar). */
+  marca?: string | null;
+}
+
+/**
+ * Filtra espacios a los de la marca indicada. Mismo criterio que el
+ * trigger `validar_capacidad_reserva` (versión
+ * `20260922190000_aforo_por_marca.sql`): se compara
+ * `COALESCE(espacio.marca, 'casa_tomas')` con `COALESCE(marca, 'casa_tomas')`
+ * — un espacio sin etiquetar cuenta como Casa Tomás (nunca desaparece del
+ * aforo en silencio) y una marca vacía/null también cae en Casa Tomás
+ * (nunca deja el aforo en cero por accidente). Un negocio nuevo el día de
+ * mañana no toca esta función: solo hace falta que sus espacios traigan
+ * `caracteristicas.marca` con el valor nuevo — no hay ningún `IN`/`switch`
+ * con la lista de marcas cerrada a "casa_tomas" | "touza".
+ *
+ * Genérica (`T extends EspacioParaAforo`) para que quien llama pueda pasar
+ * la fila completa de `espacios_reserva` (con `id`, `nombre`...) y recuperar
+ * esos mismos campos ya filtrados, sin tener que reconstruir los objetos.
+ */
+export function filtrarEspaciosPorMarca<T extends EspacioParaAforo>(
+  espacios: T[],
+  marca: string | null | undefined,
+): T[] {
+  const marcaObjetivo = marca || MARCA_POR_DEFECTO;
+  return espacios.filter((e) => (e.marca || MARCA_POR_DEFECTO) === marcaObjetivo);
+}
+
+/**
+ * Suma `capacidad_maxima` SOLO de los espacios de la marca indicada.
+ * Ver `filtrarEspaciosPorMarca` (mismo criterio, aquí solo se reduce el
+ * resultado a un número).
+ */
+export function sumarCapacidadPorMarca(
+  espacios: EspacioParaAforo[],
+  marca: string | null | undefined,
+): number {
+  return filtrarEspaciosPorMarca(espacios, marca).reduce(
+    (suma, e) => suma + (Number.isFinite(Number(e.capacidad_maxima)) ? Number(e.capacidad_maxima) : 0),
+    0,
+  );
+}
+
+// ------------------------------------------------------------
 // AVISOS (diagnóstico de configuración incoherente)
 // ------------------------------------------------------------
 export const AVISO_DESAJUSTE_TURNO = "desajuste_corte_turno_16_17";
@@ -156,7 +247,13 @@ export interface EntradaDisponibilidad {
   configuraciones: ConfiguracionTurnoInput[];
   /** Reservas del día en estado que ocupa. */
   reservas: ReservaOcupante[];
-  /** Suma de `capacidad_maxima` de los espacios activos. Igual que el trigger. */
+  /**
+   * Suma de `capacidad_maxima` de los espacios activos DE LA MISMA MARCA
+   * que la reserva/consulta. Igual que el trigger — calcúlese con
+   * `sumarCapacidadPorMarca` (arriba en este mismo fichero), nunca sumando
+   * todos los espacios activos sin filtrar (ese fue el bug del aforo
+   * 150->170 al dar de alta "El Reservado", ver esa función).
+   */
   capacidadTotal: number;
   /** `null` = no aplicar corte horario ni reglas de "hoy". */
   ahora?: AhoraMadrid | null;

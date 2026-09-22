@@ -46,6 +46,8 @@ import {
   ahoraEnMadrid,
   ESTADOS_QUE_OCUPAN,
   HORA_CORTE_TURNO,
+  sumarCapacidadPorMarca,
+  filtrarEspaciosPorMarca,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
 } from "../_shared/disponibilidad.ts";
@@ -256,16 +258,43 @@ interface OcupacionResultado {
   capacidadTotal: number;
   ocupacionTotal: number;
 }
-async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | null): Promise<OcupacionResultado> {
-  const { data: espacios } = await supabase
+// `marca` es OBLIGATORIO (no opcional con default aquí dentro): las dos
+// llamadas a Supabase de esta función ya necesitan saberla para filtrar
+// (espacios por `caracteristicas->>'marca'`, reservas por la columna
+// `marca`), así que quien llama la resuelve primero con `resolverMarca`
+// (ver plantillas.ts) y no hay un valor "neutro" razonable que adivinar
+// aquí dentro si se olvidara pasarla.
+async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | null, marca: Marca): Promise<OcupacionResultado> {
+  const { data: espaciosRaw } = await supabase
     .from("espacios_reserva")
-    .select("id, nombre, capacidad_maxima")
+    .select("id, nombre, capacidad_maxima, caracteristicas")
     .eq("activa", true);
+
+  // Filtra a la marca pedida ANTES de construir nada: ni el desglose por
+  // espacio (`espacios`, que decide `espaciosLibres` en `handleCrear`) ni
+  // `capacidadTotal` deben ver espacios de otro negocio. Bug corregido
+  // 2026-09-22: antes sumaba TODOS los espacios activos sin mirar la marca
+  // (150 -> 170 al dar de alta "El Reservado", de Touza). Mismo criterio
+  // que el trigger `validar_capacidad_reserva`, ver `20260922190000_
+  // aforo_por_marca.sql` y `sumarCapacidadPorMarca`/`filtrarEspaciosPorMarca`
+  // en `_shared/disponibilidad.ts`.
+  const espaciosDeLaMarca = filtrarEspaciosPorMarca(
+    ((espaciosRaw || []) as Array<{ id: string; nombre: string; capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }>).map((e) => ({
+      ...e,
+      marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+    })),
+    marca,
+  );
 
   const { data: reservas } = await supabase
     .from("reservas")
     .select("espacio_id, numero_comensales, hora")
     .eq("fecha", fecha)
+    // Misma marca que se está comprobando: `reservas.marca` es `NOT NULL
+    // DEFAULT 'casa_tomas'` (migración 20260922180000), así que un `.eq()`
+    // normal ya es exactamente el `COALESCE(marca, 'casa_tomas') = v_marca`
+    // del trigger, sin tener que emularlo aquí.
+    .eq("marca", marca)
     .in("estado", ["pendiente", "verificada", "confirmada"]);
 
   // El "17:00" ya no está escrito a mano aquí: sale de `HORA_CORTE_TURNO`,
@@ -282,7 +311,7 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     if (r.espacio_id) ocupacionPorEspacio[r.espacio_id] = (ocupacionPorEspacio[r.espacio_id] || 0) + r.numero_comensales;
   }
 
-  const resultado: EspacioOcupacion[] = (espacios || []).map((e: { id: string; nombre: string; capacidad_maxima: number }) => ({
+  const resultado: EspacioOcupacion[] = espaciosDeLaMarca.map((e) => ({
     id: e.id,
     nombre: e.nombre,
     capacidad_maxima: e.capacidad_maxima,
@@ -290,7 +319,7 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     disponible: e.capacidad_maxima - (ocupacionPorEspacio[e.id] || 0),
   }));
 
-  const capacidadTotal = resultado.reduce((s, e) => s + e.capacidad_maxima, 0);
+  const capacidadTotal = sumarCapacidadPorMarca(espaciosDeLaMarca, marca);
   const ocupacionTotal = (reservasMismoTurno as Array<{ numero_comensales: number }>).reduce((s, r) => s + (r.numero_comensales || 0), 0);
 
   return { espacios: resultado, capacidadTotal, ocupacionTotal };
@@ -673,22 +702,51 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     return json({ ok: false, error: "error_configuracion" }, 500);
   }
 
+  // `caracteristicas` (no solo `capacidad_maxima`): hace falta para saber
+  // la marca de CADA espacio (`caracteristicas->>'marca'`) y, si viene
+  // `espacio_id`, para resolver la marca de la consulta sin una segunda
+  // consulta — ver `resolverMarca` más abajo.
   const { data: espaciosRaw, error: errEspacios } = await supabase
     .from("espacios_reserva")
-    .select("id, capacidad_maxima")
+    .select("id, capacidad_maxima, caracteristicas")
     .eq("activa", true);
   if (errEspacios) {
     console.error("[DISPONIBILIDAD] espacios_reserva:", errEspacios.message);
     return json({ ok: false, error: "error_configuracion" }, 500);
   }
 
+  // Marca (Casa Tomás / Touza) de ESTA consulta de disponibilidad — misma
+  // prioridad que `resolverMarca` usa en `handleCrear` (ver plantillas.ts):
+  // 1) `body.marca` explícita (ningún frontend la manda hoy, pero ya se
+  //    acepta); 2) la marca del espacio pedido, si se manda `espacio_id`;
+  // 3) por defecto `NEGOCIO_POR_DEFECTO` ('casa_tomas') — el único caso
+  // real hoy, porque ni Reservado.tsx ni ReservationForm.tsx mandan
+  // `espacio_id` ni `marca` todavía. Sin este paso, el aforo devuelto
+  // seguiría sumando TODOS los espacios activos sin distinguir negocio
+  // (el bug 150->170 que motiva este cambio).
+  const espacioConsultado = espacioId
+    ? (espaciosRaw || []).find((e: { id: string; caracteristicas: Record<string, unknown> | null }) => e.id === espacioId)
+    : null;
+  const marca: Marca = resolverMarca({
+    marcaExplicita: body?.marca,
+    marcaEspacio: espacioConsultado?.caracteristicas?.marca,
+    notasCliente: null,
+  });
+
   // Ocupación SIEMPRE desde `reservas`, nunca desde `vista_ocupacion`:
   // en producción 724 de sus 784 filas son huérfanas. Mismo criterio que
   // el webhook telefónico y que el trigger `trg_validar_capacidad`.
+  // `.eq("marca", marca)`: `reservas.marca` es `NOT NULL DEFAULT
+  // 'casa_tomas'` (migración 20260922180000), así que esto ya equivale al
+  // `COALESCE(marca, 'casa_tomas') = v_marca` del trigger sin tener que
+  // repetirlo aquí — una reserva de la otra marca no debe contar en ESTE
+  // aforo (por eso, no solo por el espacio, ver el porqué en
+  // `_shared/disponibilidad.ts`, sección "AFORO POR NEGOCIO").
   const { data: reservasDia, error: errReservas } = await supabase
     .from("reservas")
     .select("hora, numero_comensales, espacio_id")
     .eq("fecha", fecha)
+    .eq("marca", marca)
     .in("estado", ESTADOS_QUE_OCUPAN as unknown as string[]);
   if (errReservas) {
     console.error("[DISPONIBILIDAD] reservas:", errReservas.message);
@@ -696,9 +754,12 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }
 
   const config = await getReservationConfig();
-  const capacidadTotal = (espaciosRaw || []).reduce(
-    (suma: number, e: { capacidad_maxima: number }) => suma + (Number(e.capacidad_maxima) || 0),
-    0,
+  const capacidadTotal = sumarCapacidadPorMarca(
+    (espaciosRaw || []).map((e: { capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }) => ({
+      capacidad_maxima: e.capacidad_maxima,
+      marca: e.caracteristicas?.marca as string | undefined,
+    })),
+    marca,
   );
 
   const resultado = calcularDisponibilidad({
@@ -771,6 +832,13 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   const meta = {
     kind: "meta" as const,
     fecha,
+    // NUEVO: la marca (negocio) contra la que se ha calculado ESTE aforo
+    // — ver resolución arriba. Puramente informativo (nadie lo consumía
+    // antes de este campo), pero deja visible en la propia respuesta con
+    // qué capacidad se ha comparado, para poder detectar en caliente un
+    // desacuerdo entre lo que ve el cliente y lo que luego valida el
+    // trigger (el mismo caso que motiva este cambio).
+    marca,
     // `cerrado` conserva EXACTAMENTE su significado: el restaurante no abre
     // ese día (cero periodos). Un turno lleno NO es un día cerrado.
     cerrado: resultado.cerrado,
@@ -993,11 +1061,19 @@ async function handleCrear(req: Request): Promise<Response> {
   try {
     const [{ data: turnosCrear }, { data: espaciosCrear }, { data: reservasCrear }] = await Promise.all([
       supabase.from("configuracion_turnos").select("*").eq("activo", true),
-      supabase.from("espacios_reserva").select("capacidad_maxima").eq("activa", true),
+      // `caracteristicas` para poder filtrar por marca — ver `capacidadTotal`
+      // más abajo. `marcaTemprana` (resuelta arriba, sin tocar la BD) es la
+      // mejor señal disponible en este punto: el espacio (si lo hubiera)
+      // todavía no se ha resuelto, eso pasa más abajo, justo antes del
+      // INSERT. Hoy da igual: ni Reservado.tsx ni ReservationForm.tsx
+      // mandan `espacio_id`, así que `marcaTemprana` y la `marca` final
+      // siempre coinciden en producción.
+      supabase.from("espacios_reserva").select("capacidad_maxima, caracteristicas").eq("activa", true),
       supabase
         .from("reservas")
         .select("hora, numero_comensales, espacio_id")
         .eq("fecha", fecha)
+        .eq("marca", marcaTemprana)
         .in("estado", ESTADOS_QUE_OCUPAN as unknown as string[]),
     ]);
 
@@ -1007,9 +1083,12 @@ async function handleCrear(req: Request): Promise<Response> {
       espacioId: espacioIdInput,
       configuraciones: (turnosCrear || []) as unknown as ConfiguracionTurnoInput[],
       reservas: (reservasCrear || []) as unknown as ReservaOcupante[],
-      capacidadTotal: (espaciosCrear || []).reduce(
-        (suma: number, e: { capacidad_maxima: number }) => suma + (Number(e.capacidad_maxima) || 0),
-        0,
+      capacidadTotal: sumarCapacidadPorMarca(
+        (espaciosCrear || []).map((e: { capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }) => ({
+          capacidad_maxima: e.capacidad_maxima,
+          marca: e.caracteristicas?.marca as string | undefined,
+        })),
+        marcaTemprana,
       ),
       ahora: null,
     });
@@ -1033,8 +1112,9 @@ async function handleCrear(req: Request): Promise<Response> {
   }
 
   // Aforo (mismo criterio que el trigger `trg_validar_capacidad`; se
-  // anticipa aquí para dar una respuesta clara, no sustituye al trigger)
-  const { espacios, capacidadTotal, ocupacionTotal } = await getEspaciosConOcupacion(fecha, hora);
+  // anticipa aquí para dar una respuesta clara, no sustituye al trigger).
+  // `marcaTemprana`: mismo razonamiento que en el bloque de arriba.
+  const { espacios, capacidadTotal, ocupacionTotal } = await getEspaciosConOcupacion(fecha, hora, marcaTemprana);
   const disponibleGlobal = ocupacionTotal + partySize <= capacidadTotal;
   const espaciosLibres = espacios.filter((e) => e.disponible >= partySize);
   if (!disponibleGlobal || espaciosLibres.length === 0) {

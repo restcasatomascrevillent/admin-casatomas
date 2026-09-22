@@ -35,11 +35,15 @@ import {
   AVISO_SIN_CAPACIDAD,
   AVISO_TOPE_HUECOS,
   AVISO_UMBRAL_FUERA_DE_RANGO,
+  sumarCapacidadPorMarca,
+  filtrarEspaciosPorMarca,
+  MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type EntradaDisponibilidad,
   type NivelEscalera,
   type ReservaOcupante,
   type ResultadoDisponibilidad,
+  type EspacioParaAforo,
 } from "../disponibilidad";
 
 // ------------------------------------------------------------
@@ -1314,5 +1318,142 @@ describe("validarHoraOfrecida", () => {
     const v = validarHoraOfrecida(sinConfig, "13:00");
     expect(v.ok).toBe(true);
     expect(v.indeterminado).toBe(true);
+  });
+});
+
+// ============================================================
+// 18. AFORO POR NEGOCIO (marca) — bug de 2026-09-22
+// ============================================================
+// `espacios_reserva` mezcla espacios de los dos negocios del grupo. Antes
+// de esta sesión, tanto el trigger `validar_capacidad_reserva` como este
+// motor sumaban `capacidad_maxima` de TODOS los espacios activos sin
+// mirar de qué negocio eran: al dar de alta "El Reservado" (20, touza) el
+// aforo del restaurante pasó de 150 a 170. `filtrarEspaciosPorMarca` y
+// `sumarCapacidadPorMarca` son el arreglo — deben usar EXACTAMENTE el
+// mismo criterio que el trigger corregido en
+// `supabase/migrations/20260922190000_aforo_por_marca.sql`:
+// `COALESCE(marca_del_espacio, 'casa_tomas') = COALESCE(marca_pedida, 'casa_tomas')`.
+describe("aforo por negocio (marca)", () => {
+  // Estado real de `espacios_reserva` en producción el 2026-09-22 (ver
+  // tabla en la cabecera de la migración) — así estos tests son, a la
+  // vez, la prueba de regresión del bug 150 -> 170.
+  const ESPACIOS_PRODUCCION: EspacioParaAforo[] = [
+    { capacidad_maxima: 50, marca: "casa_tomas" }, // Comedor
+    { capacidad_maxima: 50, marca: "casa_tomas" }, // Salón
+    { capacidad_maxima: 50, marca: "casa_tomas" }, // Terraza
+    { capacidad_maxima: 20, marca: "touza" }, // El Reservado
+  ];
+
+  describe("sumarCapacidadPorMarca", () => {
+    it("REGRESIÓN: casa_tomas da 150, no 170 (el bug real de producción)", () => {
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "casa_tomas")).toBe(150);
+    });
+
+    it("touza da sus 20, no 170", () => {
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "touza")).toBe(20);
+    });
+
+    it("contraste explícito: sumar TODOS sin filtrar (el bug) da 170", () => {
+      // No se llama a la función a propósito: esto documenta el número
+      // que el bug producía antes de existir `sumarCapacidadPorMarca`,
+      // para que quede claro qué se está evitando.
+      const sinFiltrar = ESPACIOS_PRODUCCION.reduce((s, e) => s + e.capacidad_maxima, 0);
+      expect(sinFiltrar).toBe(170);
+      expect(sinFiltrar).not.toBe(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "casa_tomas"));
+    });
+
+    it("un espacio SIN marca etiquetada cuenta como casa_tomas (no desaparece del aforo)", () => {
+      const espacios: EspacioParaAforo[] = [
+        { capacidad_maxima: 50 }, // sin `marca` en absoluto
+        { capacidad_maxima: 50, marca: null },
+        { capacidad_maxima: 50, marca: "" }, // jsonb con clave vacía
+      ];
+      expect(sumarCapacidadPorMarca(espacios, "casa_tomas")).toBe(150);
+      expect(sumarCapacidadPorMarca(espacios, "touza")).toBe(0);
+    });
+
+    it("marca objetivo null/undefined/vacía cae a MARCA_POR_DEFECTO (casa_tomas)", () => {
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, null)).toBe(150);
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, undefined)).toBe(150);
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "")).toBe(150);
+      expect(MARCA_POR_DEFECTO).toBe("casa_tomas");
+    });
+
+    it("capacidad_maxima no numérica cuenta como 0, no rompe la suma", () => {
+      const espacios = [
+        { capacidad_maxima: 50, marca: "casa_tomas" },
+        { capacidad_maxima: NaN as unknown as number, marca: "casa_tomas" },
+        { capacidad_maxima: "cuarenta" as unknown as number, marca: "casa_tomas" },
+      ];
+      expect(sumarCapacidadPorMarca(espacios, "casa_tomas")).toBe(50);
+    });
+
+    it("lista vacía da 0 (no lanza)", () => {
+      expect(sumarCapacidadPorMarca([], "casa_tomas")).toBe(0);
+    });
+
+    it("un tercer negocio funciona sin tocar la función: basta con etiquetar sus espacios", () => {
+      const conTercerNegocio: EspacioParaAforo[] = [
+        ...ESPACIOS_PRODUCCION,
+        { capacidad_maxima: 35, marca: "bodega" },
+      ];
+      expect(sumarCapacidadPorMarca(conTercerNegocio, "bodega")).toBe(35);
+      // Y no contamina a los otros dos negocios:
+      expect(sumarCapacidadPorMarca(conTercerNegocio, "casa_tomas")).toBe(150);
+      expect(sumarCapacidadPorMarca(conTercerNegocio, "touza")).toBe(20);
+    });
+  });
+
+  describe("filtrarEspaciosPorMarca", () => {
+    it("devuelve solo los espacios de la marca pedida, en el mismo orden", () => {
+      const filtrados = filtrarEspaciosPorMarca(ESPACIOS_PRODUCCION, "casa_tomas");
+      expect(filtrados).toHaveLength(3);
+      expect(filtrados.every((e) => e.marca === "casa_tomas")).toBe(true);
+    });
+
+    it("es genérica: conserva campos extra (id, nombre...) del objeto original", () => {
+      const espacios = [
+        { id: "esp-1", nombre: "Comedor", capacidad_maxima: 50, marca: "casa_tomas" },
+        { id: "esp-4", nombre: "El Reservado", capacidad_maxima: 20, marca: "touza" },
+      ];
+      const filtrados = filtrarEspaciosPorMarca(espacios, "touza");
+      expect(filtrados).toEqual([{ id: "esp-4", nombre: "El Reservado", capacidad_maxima: 20, marca: "touza" }]);
+    });
+
+    it("no muta el array ni los objetos originales", () => {
+      const original: EspacioParaAforo[] = [{ capacidad_maxima: 50, marca: "casa_tomas" }];
+      const copia = JSON.parse(JSON.stringify(original));
+      filtrarEspaciosPorMarca(original, "touza");
+      expect(original).toEqual(copia);
+    });
+
+    it("marca objetivo desconocida (que no existe en ningún espacio) da lista vacía, no un error", () => {
+      expect(filtrarEspaciosPorMarca(ESPACIOS_PRODUCCION, "un_negocio_que_no_existe")).toEqual([]);
+    });
+  });
+
+  describe("mismo criterio que el trigger `validar_capacidad_reserva` (20260922190000_aforo_por_marca.sql)", () => {
+    // Estos tests reimplementan a mano, en SQL comentado junto a cada
+    // aserción, exactamente lo que hace el trigger, para dejar constancia
+    // de que motor y trigger están mirando la misma regla. La migración
+    // en sí no se ejecuta aquí (estos tests corren sin base de datos).
+    it("COALESCE(caracteristicas->>'marca', 'casa_tomas') = COALESCE(NEW.marca, 'casa_tomas')", () => {
+      // SQL del trigger:
+      //   WHERE activa = true
+      //     AND COALESCE(caracteristicas->>'marca', 'casa_tomas') = v_marca
+      //   con v_marca := COALESCE(NEW.marca, 'casa_tomas')
+      // Aquí: espacio sin marca (=> 'casa_tomas' por COALESCE) y una
+      // reserva sin marca explícita (=> también 'casa_tomas') deben
+      // encontrarse.
+      const espacios: EspacioParaAforo[] = [{ capacidad_maxima: 150 }]; // sin marca, como en el SQL
+      const marcaDeLaReserva: string | null = null; // como NEW.marca sin resolver
+      expect(sumarCapacidadPorMarca(espacios, marcaDeLaReserva)).toBe(150);
+    });
+
+    it("una reserva de touza NUNCA ve la capacidad de casa_tomas, ni al revés", () => {
+      expect(sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "touza")).not.toBe(
+        sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "casa_tomas"),
+      );
+    });
   });
 });

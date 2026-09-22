@@ -21,6 +21,8 @@ import {
   turnoDeHora,
   horaAMinutos,
   minutosAHora,
+  filtrarEspaciosPorMarca,
+  MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
   type ResultadoDisponibilidad,
@@ -31,9 +33,27 @@ export {
   calcularDisponibilidad,
   ahoraEnMadrid,
   turnoDeHora,
+  MARCA_POR_DEFECTO,
   type ResultadoDisponibilidad,
   type HuecoCalculado,
 };
+
+/**
+ * Aforo por negocio (marca) — bug de 2026-09-22.
+ * ------------------------------------------------------------
+ * `espacios_reserva` mezcla espacios de los dos negocios del grupo
+ * (Comedor/Salón/Terraza = casa_tomas, "El Reservado" = touza, ver
+ * `caracteristicas->>'marca'`). Todas las consultas de este fichero que
+ * suman `capacidad_maxima` o cuentan ocupación de `reservas` para decidir
+ * aforo filtran ahora por marca (por defecto `MARCA_POR_DEFECTO`, que es
+ * lo único que necesita HOY el panel: sus pantallas de reservas son del
+ * restaurante). Antes sumaban/contaban TODOS los espacios/reservas activos
+ * sin mirar el negocio — el mismo bug que el trigger `trg_validar_capacidad`
+ * (150 -> 170 al dar de alta "El Reservado"), solo que aquí afectaba a lo
+ * que el panel MUESTRA, no a lo que la base de datos VALIDA. Ver
+ * `_shared/disponibilidad.ts` (sección "AFORO POR NEGOCIO") y
+ * `supabase/migrations/20260922190000_aforo_por_marca.sql`.
+ */
 
 /**
  * Hora que separa el turno de comida del de cena.
@@ -123,15 +143,21 @@ interface DatosDelDia {
  * Antes `generarTurnosDinamicos` hacía UNA consulta POR HUECO (N+1: con
  * comida + cena eran ~24 round-trips por render, y el doble porque hacía
  * dos pasadas). Ahora son 3 consultas fijas.
+ *
+ * `marca` (por defecto `MARCA_POR_DEFECTO`, "casa_tomas"): filtra tanto
+ * `espacios_reserva` (por `caracteristicas->>'marca'`) como `reservas`
+ * (columna `marca`, `NOT NULL DEFAULT 'casa_tomas'`) al negocio pedido —
+ * ver la nota "Aforo por negocio" de la cabecera de este fichero.
  */
-async function leerDatosDelDia(fecha: string): Promise<DatosDelDia> {
+async function leerDatosDelDia(fecha: string, marca: string = MARCA_POR_DEFECTO): Promise<DatosDelDia> {
   const [turnosRes, espaciosRes, reservasRes] = await Promise.all([
     supabase.from("configuracion_turnos").select("*").eq("activo", true),
-    supabase.from("espacios_reserva" as any).select("id, nombre, capacidad_maxima").eq("activa", true),
+    supabase.from("espacios_reserva" as any).select("id, nombre, capacidad_maxima, caracteristicas").eq("activa", true),
     supabase
       .from("reservas" as any)
       .select("hora, numero_comensales, espacio_id")
       .eq("fecha", fecha)
+      .eq("marca", marca)
       .in("estado", ESTADOS_QUE_OCUPAN),
   ]);
 
@@ -139,10 +165,20 @@ async function leerDatosDelDia(fecha: string): Promise<DatosDelDia> {
   if (espaciosRes.error) throw espaciosRes.error;
   if (reservasRes.error) throw reservasRes.error;
 
-  const espacios = ((espaciosRes.data ?? []) as any[]).map((e) => ({
+  const espaciosCrudos = ((espaciosRes.data ?? []) as any[]).map((e) => ({
     id: e.id as string,
     nombre: e.nombre as string,
     capacidad_maxima: Number(e.capacidad_maxima) || 0,
+    marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+  }));
+  // Bug corregido 2026-09-22: antes esta lista (y por tanto `capacidadTotal`
+  // más abajo) incluía TODOS los espacios activos sin mirar la marca — un
+  // espacio de otro negocio ("El Reservado", touza) inflaba el aforo que
+  // ve el panel del restaurante. Ver cabecera del fichero.
+  const espacios = filtrarEspaciosPorMarca(espaciosCrudos, marca).map(({ id, nombre, capacidad_maxima }) => ({
+    id,
+    nombre,
+    capacidad_maxima,
   }));
 
   return {
@@ -161,15 +197,16 @@ async function leerDatosDelDia(fecha: string): Promise<DatosDelDia> {
  */
 export const useDisponibilidadCalculada = (
   fecha: string,
-  opciones?: { comensales?: number; espacioId?: string | null },
+  opciones?: { comensales?: number; espacioId?: string | null; marca?: string },
 ) => {
   const comensales = opciones?.comensales ?? 1;
   const espacioId = opciones?.espacioId ?? null;
+  const marca = opciones?.marca ?? MARCA_POR_DEFECTO;
 
   return useQuery({
-    queryKey: ["disponibilidad-calculada", fecha, comensales, espacioId],
+    queryKey: ["disponibilidad-calculada", fecha, comensales, espacioId, marca],
     queryFn: async (): Promise<ResultadoDisponibilidad> => {
-      const datos = await leerDatosDelDia(fecha);
+      const datos = await leerDatosDelDia(fecha, marca);
       return calcularDisponibilidad({
         fecha,
         comensales,
@@ -194,11 +231,11 @@ export const useDisponibilidadCalculada = (
  * las 17:00 que aplica el trigger de aforo. Se mantiene la misma forma de
  * salida para no tocar los componentes que la consumen.
  */
-export const useDisponibilidadPorFecha = (fecha: string) => {
+export const useDisponibilidadPorFecha = (fecha: string, marca: string = MARCA_POR_DEFECTO) => {
   return useQuery({
-    queryKey: ["disponibilidad", fecha],
+    queryKey: ["disponibilidad", fecha, marca],
     queryFn: async () => {
-      const datos = await leerDatosDelDia(fecha);
+      const datos = await leerDatosDelDia(fecha, marca);
       const resultado = calcularDisponibilidad({
         fecha,
         configuraciones: datos.configuraciones,
@@ -234,11 +271,11 @@ export const useDisponibilidadPorFecha = (fecha: string) => {
  *     `total_comensales`, `total_reservas` y `porcentaje_ocupacion_sala`,
  *     que antes no existían en el objeto y salían siempre a 0 / vacío.
  */
-export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
+export const useDisponibilidadDetalladaPorFecha = (fecha: string, marca: string = MARCA_POR_DEFECTO) => {
   return useQuery({
-    queryKey: ["disponibilidad-detallada", fecha],
+    queryKey: ["disponibilidad-detallada", fecha, marca],
     queryFn: async (): Promise<DisponibilidadHora[]> => {
-      const datos = await leerDatosDelDia(fecha);
+      const datos = await leerDatosDelDia(fecha, marca);
       const resultado = calcularDisponibilidad({
         fecha,
         configuraciones: datos.configuraciones,
@@ -308,26 +345,37 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string) => {
  *
  * También sale de `reservas` en vez de `vista_ocupacion`, por lo mismo.
  */
-export const useDisponibilidadRango = (fechaInicio: string, fechaFin: string) => {
+export const useDisponibilidadRango = (
+  fechaInicio: string,
+  fechaFin: string,
+  marca: string = MARCA_POR_DEFECTO,
+) => {
   return useQuery({
-    queryKey: ["disponibilidad-rango", fechaInicio, fechaFin],
+    queryKey: ["disponibilidad-rango", fechaInicio, fechaFin, marca],
     queryFn: async () => {
       const [espaciosRes, reservasRes] = await Promise.all([
-        supabase.from("espacios_reserva" as any).select("capacidad_maxima").eq("activa", true),
+        supabase.from("espacios_reserva" as any).select("capacidad_maxima, caracteristicas").eq("activa", true),
         supabase
           .from("reservas" as any)
           .select("fecha, hora, numero_comensales")
           .gte("fecha", fechaInicio)
           .lte("fecha", fechaFin)
+          .eq("marca", marca)
           .in("estado", ESTADOS_QUE_OCUPAN),
       ]);
       if (espaciosRes.error) throw espaciosRes.error;
       if (reservasRes.error) throw reservasRes.error;
 
-      const capacidadTotal = ((espaciosRes.data ?? []) as any[]).reduce(
-        (s, e) => s + (Number(e.capacidad_maxima) || 0),
-        0,
+      // Bug corregido 2026-09-22 (ver cabecera del fichero): antes sumaba
+      // TODOS los espacios activos sin filtrar por marca.
+      const espaciosDeLaMarca = filtrarEspaciosPorMarca(
+        ((espaciosRes.data ?? []) as any[]).map((e) => ({
+          capacidad_maxima: Number(e.capacidad_maxima) || 0,
+          marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+        })),
+        marca,
       );
+      const capacidadTotal = espaciosDeLaMarca.reduce((s, e) => s + e.capacidad_maxima, 0);
 
       const acumulado = new Map<
         string,
@@ -382,9 +430,10 @@ export interface AforoTurno {
 export const verificarAforoTurno = async (
   fecha: string,
   hora: string,
-  comensales: number
+  comensales: number,
+  marca: string = MARCA_POR_DEFECTO,
 ): Promise<AforoTurno> => {
-  const datos = await leerDatosDelDia(fecha);
+  const datos = await leerDatosDelDia(fecha, marca);
   const resultado = calcularDisponibilidad({
     fecha,
     comensales,
@@ -419,7 +468,7 @@ export const verificarDisponibilidadSala = async (
 ) => {
   const { data: sala } = await supabase
     .from("espacios_reserva" as any)
-    .select("capacidad_maxima")
+    .select("capacidad_maxima, caracteristicas")
     .eq("id", salaId)
     .single() as any;
 
@@ -429,8 +478,12 @@ export const verificarDisponibilidadSala = async (
 
   // El aforo real lo decide el TURNO completo (es lo que valida el trigger),
   // no la ocupación de esa hora suelta en `ocupacion_diaria` — que además
-  // está desincronizada. Se responde con el aforo del turno.
-  const aforo = await verificarAforoTurno(fecha, hora, 1);
+  // está desincronizada. Se responde con el aforo del turno DEL NEGOCIO AL
+  // QUE PERTENECE ESTA SALA (bug corregido 2026-09-22: antes se comprobaba
+  // siempre contra el aforo global sin distinguir marca — una sala de otro
+  // negocio habría comparado con un aforo que no era el suyo).
+  const marcaSala = (sala.caracteristicas?.marca as string | undefined) ?? MARCA_POR_DEFECTO;
+  const aforo = await verificarAforoTurno(fecha, hora, 1, marcaSala);
   return {
     disponible: aforo.capacidadDisponible > 0,
     capacidadDisponible: aforo.capacidadDisponible,
@@ -457,8 +510,9 @@ export const generarTurnosDinamicos = async (
   salaId: string | null,
   _diaSemana?: number,
   comensales = 1,
+  marca: string = MARCA_POR_DEFECTO,
 ): Promise<TurnoDinamico[]> => {
-  const datos = await leerDatosDelDia(fecha);
+  const datos = await leerDatosDelDia(fecha, marca);
   const resultado = calcularDisponibilidad({
     fecha,
     comensales,
@@ -492,8 +546,9 @@ export const obtenerHorasDisponibles = async (
   fecha: string,
   salaId: string | null,
   comensales = 1,
+  marca: string = MARCA_POR_DEFECTO,
 ): Promise<string[]> => {
-  const turnos = await generarTurnosDinamicos(fecha, salaId, undefined, comensales);
+  const turnos = await generarTurnosDinamicos(fecha, salaId, undefined, comensales, marca);
   return turnos.filter((t) => t.disponible).map((t) => t.hora);
 };
 
