@@ -1,5 +1,4 @@
 'use strict';
-const crypto = require('crypto');
 const fs = require('fs');
 
 // ---------- Config ----------
@@ -38,7 +37,6 @@ function esc(s) {
   if (s === null || s === undefined) return 'NULL';
   return "'" + String(s).replace(/'/g, "''") + "'";
 }
-function uuid() { return crypto.randomUUID(); }
 function stripAccents(s) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ñ/g, 'n').replace(/Ñ/g, 'N');
 }
@@ -208,75 +206,6 @@ for (const entry of activeSum.entries()) {
   if (sum > cap) throw new Error('AFORO SUPERADO en ' + k + ': ' + sum + ' > ' + cap);
 }
 
-// ---------- Trabajadores demo ----------
-const TRABAJADORES_BASE = [
-  { nombre: 'Lucia',   apellidos: 'Ortega Vega',      puesto: 'cocinero' },
-  { nombre: 'Marcos',  apellidos: 'Delgado Rubio',    puesto: 'ayudante_cocina' },
-  { nombre: 'Elena',   apellidos: 'Prieto Santos',    puesto: 'camarero' },
-  { nombre: 'Sergio',  apellidos: 'Cabrera Reyes',    puesto: 'camarero' },
-  { nombre: 'Paula',   apellidos: 'Iglesias Nunez',   puesto: 'ayudante_camarero' },
-  { nombre: 'Raul',    apellidos: 'Serrano Marin',    puesto: 'gerente' },
-  { nombre: 'Nuria',   apellidos: 'Crespo Vidal',     puesto: 'limpieza' },
-];
-const TRABAJADORES = TRABAJADORES_BASE.map(function(t) {
-  const id = uuid();
-  const tel = '600000' + String(int(0, 999)).padStart(3, '0');
-  const email = stripAccents(t.nombre).toLowerCase() + '.' + stripAccents(t.apellidos.split(' ')[0]).toLowerCase() + '.demo@example.com';
-  const salario = (int(950, 1400) / 100).toFixed(2);
-  const notas = MARKER + ' Personal ficticio para poblar el panel de demostracion.';
-  return { nombre: t.nombre, apellidos: t.apellidos, puesto: t.puesto, id: id, telefono: tel, email: email, salario_hora: salario, notas: notas };
-});
-
-// ---------- Turnos (2 semanas: hoy-7 .. hoy+6) ----------
-function shiftsFor(puesto, d) { // d = dia de la semana 0..6
-  if (puesto === 'gerente') {
-    if (d === 1) return []; // libra lunes
-    return [['12:00','16:00'], ['19:30','23:30']];
-  }
-  if (puesto === 'cocinero' || puesto === 'ayudante_cocina') {
-    if (d === 1 || d === 2) return []; // libra lunes y martes
-    return [['12:00','16:00'], ['19:30','23:30']];
-  }
-  if (puesto === 'camarero' || puesto === 'ayudante_camarero') {
-    if (d === 2 || d === 3) return []; // libra martes y miercoles
-    return [['12:30','16:00'], ['20:00','23:45']];
-  }
-  if (puesto === 'limpieza') {
-    if (d === 0) return []; // libra domingo
-    return [['09:00','13:00']];
-  }
-  if (puesto === 'recepcionista') {
-    if (d === 1) return [];
-    return [['18:00','23:00']];
-  }
-  return [['12:00','16:00']];
-}
-
-const turnos = [];
-for (const t of TRABAJADORES) {
-  for (let i = -7; i <= 6; i++) {
-    const fecha = addDays(TODAY, i);
-    const d = dow(fecha);
-    const estadoTurno = fecha < TODAY ? 'completado' : (fecha === TODAY ? 'activo' : 'programado');
-    const turnosDelDia = shiftsFor(t.puesto, d);
-    for (const par of turnosDelDia) {
-      turnos.push({ trabajador_id: t.id, fecha: fecha, hora_inicio: par[0], hora_fin: par[1], estado: estadoTurno, notas: MARKER });
-    }
-  }
-}
-
-// ---------- registro_horas: fichados ahora mismo (hoy, sin hora_salida) ----------
-const registroHoras = TRABAJADORES.map(function(t) {
-  const turnosHoy = shiftsFor(t.puesto, dow(TODAY));
-  const horaEntrada = turnosHoy.length > 0 ? turnosHoy[0][0] : '12:00';
-  return {
-    trabajador_id: t.id,
-    fecha: TODAY,
-    hora_entrada: TODAY + ' ' + horaEntrada + ':00+02',
-    notas: MARKER + ' Fichaje de demostracion (sin hora de salida = personal activo ahora).',
-  };
-});
-
 // ---------- SQL ----------
 let sql = '-- =====================================================================\n' +
 '-- Casa Tomas / Touza - datos de DEMOSTRACION para el panel admin\n' +
@@ -285,31 +214,6 @@ let sql = '-- ==================================================================
 '-- =====================================================================\n\n' +
 'BEGIN;\n\n' +
 '-- ---------------------------------------------------------------------\n' +
-'-- trabajadores (personal ficticio)\n' +
-'-- ---------------------------------------------------------------------\n' +
-'INSERT INTO public.trabajadores (id, nombre, apellidos, telefono, email, puesto, activo, salario_hora, notas) VALUES\n';
-
-sql += TRABAJADORES.map(function(t) {
-  return '  (' + esc(t.id) + ', ' + esc(t.nombre) + ', ' + esc(t.apellidos) + ', ' + esc(t.telefono) + ', ' + esc(t.email) + ', ' + esc(t.puesto) + ', true, ' + t.salario_hora + ', ' + esc(t.notas) + ')';
-}).join(',\n') + ';\n\n';
-
-sql += '-- ---------------------------------------------------------------------\n' +
-'-- turnos (planificacion: 7 dias atras .. 6 dias adelante)\n' +
-'-- ---------------------------------------------------------------------\n' +
-'INSERT INTO public.turnos (trabajador_id, fecha, hora_inicio, hora_fin, estado, notas) VALUES\n';
-sql += turnos.map(function(s) {
-  return '  (' + esc(s.trabajador_id) + ', ' + esc(s.fecha) + ', ' + esc(s.hora_inicio) + ', ' + esc(s.hora_fin) + ', ' + esc(s.estado) + ', ' + esc(s.notas) + ')';
-}).join(',\n') + ';\n\n';
-
-sql += '-- ---------------------------------------------------------------------\n' +
-'-- registro_horas (fichajes de hoy, sin hora_salida => "trabajando ahora")\n' +
-'-- ---------------------------------------------------------------------\n' +
-'INSERT INTO public.registro_horas (trabajador_id, fecha, hora_entrada, hora_salida, notas) VALUES\n';
-sql += registroHoras.map(function(r) {
-  return '  (' + esc(r.trabajador_id) + ', ' + esc(r.fecha) + ', ' + esc(r.hora_entrada) + '::timestamptz, NULL, ' + esc(r.notas) + ')';
-}).join(',\n') + ';\n\n';
-
-sql += '-- ---------------------------------------------------------------------\n' +
 '-- reservas (ultimo mes + proximas dos semanas; se excluye ' + Array.from(BLACKOUT_DATES).join(', ') + ' por el cron de recordatorios de las 08:00)\n' +
 '-- ---------------------------------------------------------------------\n' +
 'INSERT INTO public.reservas (fecha, hora, numero_comensales, estado, nombre, telefono, email, canal, marca, espacio_id, importante, notas_cliente) VALUES\n';
@@ -325,9 +229,6 @@ fs.writeFileSync(OUT, sql, 'utf8');
 // ---------- Resumen ----------
 function count(arr, fn) { const m = new Map(); for (const x of arr) { const k = fn(x); m.set(k, (m.get(k) || 0) + 1); } return Object.fromEntries(m); }
 const resumen = {
-  trabajadores: TRABAJADORES.length,
-  turnos: turnos.length,
-  registro_horas: registroHoras.length,
   reservas_total: reservas.length,
   reservas_por_estado: count(reservas, function(r){ return r.estado; }),
   reservas_por_marca: count(reservas, function(r){ return r.marca; }),

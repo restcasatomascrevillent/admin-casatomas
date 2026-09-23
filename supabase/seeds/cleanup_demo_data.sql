@@ -2,17 +2,16 @@
 -- Casa Tomas / Touza - borrado de los datos de DEMOSTRACION del panel admin
 --
 -- Borra EXCLUSIVAMENTE las filas creadas por seed_demo_data.sql, identificadas
--- por el marcador '[DEMO-SEED]' al principio de un campo de texto libre en
--- cada tabla (notas_cliente en reservas, notas en trabajadores/turnos/registro_horas).
+-- por el marcador '[DEMO-SEED]' al principio de reservas.notas_cliente.
 -- Ese marcador no puede aparecer nunca en un dato real: no es un valor que un
--- cliente o un empleado real escribirian ni que la aplicacion genere por si sola.
+-- cliente real escribiria ni que la aplicacion genere por si sola.
 --
--- Orden de borrado: primero las tablas "hijas" de trabajadores (registro_horas,
--- turnos) y despues trabajadores. En realidad hay FKs ON DELETE CASCADE desde
--- turnos.trabajador_id y registro_horas.trabajador_id hacia trabajadores.id, asi
--- que borrar trabajadores ya arrastraria sus turnos/registro_horas -- pero aqui
--- se hace explicito, fila a fila por marcador, para que este script sea
--- autocontenido y no dependa silenciosamente de esa cascada si el esquema cambia.
+-- Este script YA NO toca trabajadores, turnos (los de personal) ni
+-- registro_horas: la seccion Personal se retiro del panel (commit a24b5b5) y
+-- seed_demo_data.sql dejo de crear personal ficticio para alimentarla. Ver
+-- README.md de esta carpeta, seccion "Que ya no crea (y por que)". Esto NO
+-- afecta a configuracion_turnos (la escalera comida/cena de las reservas):
+-- ese sistema es independiente y este script nunca lo ha tocado.
 --
 -- OJO - ocupacion_diaria SI necesita limpieza aparte (bug real, descubierto al
 -- probar este script, no provocado por nosotros):
@@ -36,14 +35,11 @@
 -- rango.
 --
 -- NUNCA ejecutar este script (ni seed_demo_data.sql) contra una base con datos
--- reales de clientes o personal. Ver README.md de esta carpeta.
+-- reales de clientes. Ver README.md de esta carpeta.
 -- =====================================================================
 
 BEGIN;
 
-DELETE FROM public.registro_horas WHERE notas LIKE '[DEMO-SEED]%';
-DELETE FROM public.turnos          WHERE notas LIKE '[DEMO-SEED]%';
-DELETE FROM public.trabajadores    WHERE notas LIKE '[DEMO-SEED]%';
 DELETE FROM public.reservas        WHERE notas_cliente LIKE '[DEMO-SEED]%';
 
 -- Parche del bug de autolimpieza descrito arriba: borra las filas de
@@ -58,11 +54,8 @@ WHERE od.fecha BETWEEN '2026-08-24' AND '2026-10-07'
 
 COMMIT;
 
--- Verificacion rapida (deberia devolver 0 filas en las cinco):
+-- Verificacion rapida (deberia devolver 0 filas en las dos):
 -- SELECT 'reservas' t, count(*) FROM public.reservas WHERE notas_cliente LIKE '[DEMO-SEED]%'
--- UNION ALL SELECT 'trabajadores', count(*) FROM public.trabajadores WHERE notas LIKE '[DEMO-SEED]%'
--- UNION ALL SELECT 'turnos', count(*) FROM public.turnos WHERE notas LIKE '[DEMO-SEED]%'
--- UNION ALL SELECT 'registro_horas', count(*) FROM public.registro_horas WHERE notas LIKE '[DEMO-SEED]%'
 -- UNION ALL SELECT 'ocupacion_diaria_huerfana', count(*) FROM public.ocupacion_diaria od
 --   WHERE od.fecha BETWEEN '2026-08-24' AND '2026-10-07'
 --   AND NOT EXISTS (SELECT 1 FROM public.reservas r WHERE r.fecha=od.fecha AND r.hora=od.hora);

@@ -1,21 +1,25 @@
 # Datos de demostración — panel admin Casa Tomás / Touza
 
 Esta carpeta contiene datos de **demostración** para que el panel admin deje de
-verse vacío (reservas, personal activo, gráficas) mientras no hay datos reales.
+verse vacío (reservas, gráficas) mientras no hay datos reales.
 
-> **NUNCA ejecutes estos scripts contra una base con clientes o personal reales.**
+> **NUNCA ejecutes estos scripts contra una base con clientes reales.**
 > `seed_demo_data.sql` inserta filas ficticias directamente por SQL. Si lo lanzas
 > sobre una base en producción con reservas reales, se mezclarán datos falsos con
 > datos reales de clientes. Antes de usarlo, confirma en qué proyecto de Supabase
 > estás conectado.
+>
+> Desde septiembre de 2026 este seed **ya no crea personal ficticio** — solo
+> reservas. Ver "Qué ya no crea, y por qué" más abajo.
 
 ## Archivos
 
 | Archivo | Qué hace |
 |---|---|
-| `seed_demo_data.sql` | Inserta los datos de demostración (trabajadores, turnos, registro_horas, reservas). Generado con `gen_seed.js` (ver más abajo), con semilla fija — reproducible. |
+| `seed_demo_data.sql` | Inserta los datos de demostración (reservas). Generado con `gen_seed.js` (ver más abajo), con semilla fija — reproducible. |
 | `cleanup_demo_data.sql` | Borra **exclusivamente** las filas creadas por `seed_demo_data.sql`, en cualquier base donde se ejecute. |
 | `gen_seed.js` | Generador Node.js (sin dependencias) que produce `seed_demo_data.sql`. Solo hace falta para regenerar el seed con otros parámetros (otra fecha "hoy", otros volúmenes, etc.) — no hace falta para crear ni para borrar. |
+| `package.json` | `{ "type": "commonjs" }` — ámbito local para que `node gen_seed.js` (escrito en CommonJS) funcione aunque el `package.json` raíz del proyecto sea `"type": "module"`. No afecta a ningún otro paquete del repo. |
 | `README.md` | Este documento. |
 
 ### Regenerar el seed (opcional)
@@ -34,18 +38,18 @@ cron de recordatorios se recalcule como `TODAY + 2`.
 ## El marcador de demo
 
 Todas las filas creadas llevan el prefijo literal **`[DEMO-SEED]`** al principio
-de un campo de texto libre:
+del único campo de texto libre que usa este seed:
 
 - `reservas.notas_cliente`
-- `trabajadores.notas`
-- `turnos.notas`
-- `registro_horas.notas`
 
-Es un marcador que no podría aparecer nunca en un dato real: ni un cliente ni un
-empleado real escriben `[DEMO-SEED]`, y la aplicación tampoco lo genera. El
-borrado se basa siempre en `WHERE campo LIKE '[DEMO-SEED]%'` (en Postgres los
+Es un marcador que no podría aparecer nunca en un dato real: ningún cliente
+escribe `[DEMO-SEED]`, y la aplicación tampoco lo genera. El borrado se basa
+siempre en `WHERE notas_cliente LIKE '[DEMO-SEED]%'` (en Postgres los
 corchetes no son caracteres especiales de `LIKE`, así que no hace falta escapar
 nada).
+
+Hasta septiembre de 2026 también se usaba en `trabajadores.notas`,
+`turnos.notas` y `registro_horas.notas` — ver "Qué ya no crea, y por qué".
 
 Como señales adicionales (no son el marcador oficial, pero refuerzan que nada de
 esto es real):
@@ -61,21 +65,14 @@ abajo.
 
 | Tabla | Filas | Detalle |
 |---|---|---|
-| `trabajadores` | 7 | 2 cocina (cocinero, ayudante_cocina), 3 sala (camarero ×2, ayudante_camarero), 2 otros (gerente, limpieza). Nombres y apellidos ficticios, distintos de los 10 trabajadores reales ya existentes en la tabla. |
-| `turnos` | 136 | Turnos de los 7 trabajadores demo, de hoy−7 días a hoy+6 días, con patrones semanales realistas (turno partido comida/cena, días libres). |
-| `registro_horas` | 7 | Un fichaje de hoy por cada trabajador demo, con `hora_salida = NULL` ("todavía trabajando"). Es la vía que consulta el widget **Personal Activo** en primer lugar, así que el contador no depende de a qué hora del día se mire el panel. |
 | `reservas` | 266 | 255 marca `casa_tomas`, 11 marca `touza`. Estados mezclados (confirmada, verificada, pendiente, cancelada, completada, no_show), canales mezclados (web/teléfono/manual), tamaños de grupo de 2 a 12, horas repartidas en comida y cena, más volumen viernes/sábado y comida de domingo. |
 
 Los números exactos pueden variar ligeramente si se regenera `seed_demo_data.sql`
 con `gen_seed.js` (usa aleatoriedad, aunque con semilla fija para que sea
 reproducible tal cual está committeado).
 
-### Por qué estas tablas y no otras
+### Por qué esta tabla y no otras
 
-- El widget **Personal Activo** (Cocina / Sala / Otros) sale de
-  `src/hooks/useDashboardStats.ts` → `useActiveStaff()`: primero mira
-  `registro_horas` de hoy con `hora_salida IS NULL`; si no hay nada, cae a
-  `turnos` de hoy cuya franja cubre la hora actual. Por eso se rellenan las dos.
 - El widget **Reservas por Día** (`GraficoReservasPorDia.tsx`) solo cuenta
   reservas con `estado = 'confirmada'` — por eso la mayoría de las reservas
   generadas (tanto pasadas como futuras) quedan en ese estado, no solo las
@@ -88,6 +85,43 @@ reproducible tal cual está committeado).
 
 No se ha tocado `resenas`, `solicitudes_pendientes`, `notificaciones_dashboard`
 ni `blacklist` — no forman parte de este encargo.
+
+## Qué ya no crea, y por qué
+
+Hasta septiembre de 2026 este seed también creaba **7 `trabajadores`, 136
+`turnos`** (planificación de esos 7 trabajadores, de hoy−7 días a hoy+6 días)
+**y 7 `registro_horas`** (un fichaje de hoy por trabajador, sin `hora_salida`).
+Alimentaban el widget **Personal Activo** (Cocina / Sala / Otros) del
+dashboard, que salía de `src/hooks/useDashboardStats.ts` → `useActiveStaff()`:
+primero miraba `registro_horas` de hoy con `hora_salida IS NULL`; si no había
+nada, caía a `turnos` de hoy cuya franja cubre la hora actual.
+
+El dueño decidió **retirar la sección Personal** del panel. El commit
+`a24b5b5` ("feat(panel): retirar la seccion Personal") quitó la página de
+Trabajadores, sus componentes, el hook `useTrabajadores` y el widget
+`PersonasActivas` del dashboard — con lo que ese seed de personal pasó a
+alimentar un widget que ya no existe. Este cambio quita de `gen_seed.js`,
+`seed_demo_data.sql` y `cleanup_demo_data.sql` todo lo que creaba o borraba
+`trabajadores`, `turnos` (los de personal) y `registro_horas`. Las reservas,
+que es lo único que el panel sigue mostrando, no se han tocado.
+
+> **Aviso para quien lea esto después — no confundir los dos "turnos":** en
+> este proyecto la palabra aparece con dos significados completamente
+> distintos. Los `turnos` de esta sección eran el horario del personal (tabla
+> `turnos`, junto a `trabajadores` y `registro_horas`) — eso es lo que se ha
+> quitado de aquí. **`configuracion_turnos`** (comida/cena, la escalera de
+> horarios de disponibilidad de las reservas — `ConfiguracionTurnos.tsx`,
+> `useConfiguracionTurnos.ts`) es un sistema completamente distinto y es el
+> corazón de la disponibilidad de reservas: este seed **nunca** lo ha creado,
+> tocado ni referenciado, ni antes ni después de este cambio — se comprobó
+> explícitamente que ninguno de los tres ficheros (`gen_seed.js`,
+> `seed_demo_data.sql`, `cleanup_demo_data.sql`) menciona
+> `configuracion_turnos`.
+>
+> Las tablas `trabajadores`, `turnos` (personal) y `registro_horas` en sí no
+> se eliminan desde esta carpeta: este seed simplemente dejó de sembrarlas y
+> de limpiarlas. Su eliminación de la base de datos, si procede, es una
+> migración de esquema aparte (fuera del territorio de `supabase/seeds/`).
 
 ## Cómo se borra
 
@@ -102,8 +136,8 @@ curl -s -X POST "https://api.supabase.com/v1/projects/jeamoczmbfsnwkfjxcyo/datab
 O pega el contenido de `cleanup_demo_data.sql` en el editor SQL del dashboard de
 Supabase y ejecútalo.
 
-Borra, en este orden: `registro_horas` → `turnos` → `trabajadores` → `reservas`,
-todo filtrado por el marcador `[DEMO-SEED]`.
+Borra `reservas` filtradas por el marcador `[DEMO-SEED]`, más el parche de
+`ocupacion_diaria` explicado abajo.
 
 ### Aviso sobre `ocupacion_diaria` (bug preexistente, no de este seed)
 
@@ -134,21 +168,43 @@ hacer nada (no encontrará huérfanos) y se puede quitar sin riesgo.
 
 ## Prueba real de que el borrado funciona
 
-Ejecutado el 2026-09-23 contra el proyecto de Supabase de este repo
-(`jeamoczmbfsnwkfjxcyo`):
+Re-ejecutado el 2026-09-23 contra el proyecto de Supabase de este repo
+(`jeamoczmbfsnwkfjxcyo`), tras quitar trabajadores/turnos/registro_horas de
+los tres ficheros (esta es la prueba de esa versión reducida; la prueba
+anterior, con las 4 tablas, queda obsoleta y se sustituye por esta):
 
-1. **Crear**: `seed_demo_data.sql` → 266 reservas + 7 trabajadores + 136 turnos +
-   7 registro_horas marcados con `[DEMO-SEED]`.
-2. **Borrar**: `cleanup_demo_data.sql` → las 4 tablas a 0 filas marcadas, y
-   `ocupacion_diaria` a 0 filas huérfanas en el rango. Los totales absolutos de
-   `reservas` (110), `trabajadores` (10) y `turnos` (727) volvieron exactamente
-   a los valores que había antes de crear nada — ninguna fila ajena se tocó.
-3. **Cero confirmado** con `count(*)` en las 5 tablas/condiciones.
-4. **Crear de nuevo**: mismos números exactos (266/7/136/7) — la generación es
-   determinista (semilla fija en `gen_seed.js`).
+0. **Comprobación previa** (antes de tocar nada): `trabajadores`, `turnos` y
+   `registro_horas` ya **no existían** (`to_regclass` devolvía `NULL` en las
+   tres) — el dueño había aplicado por su cuenta la migración
+   `20260923_retirar_personal.sql` que las elimina, con copia de seguridad
+   propia de sus filas. No se intentó recrearlas: no forma parte de este
+   encargo y las 5 tablas de la prueba anterior ya no aplican. `reservas`
+   marcaba 266 filas `[DEMO-SEED]` (las que el panel estaba usando en ese
+   momento) y `configuracion_turnos` tenía sus 2 filas de siempre, sin tocar.
+1. **Borrar**: `cleanup_demo_data.sql` (versión nueva, solo `reservas`) →
+   `reservas` marcadas a 0, `ocupacion_diaria` a 0 filas huérfanas en el
+   rango. El total absoluto de `reservas` volvió a 110 — exactamente el valor
+   que había antes de crear nada — ninguna fila ajena se tocó.
+2. **Cero confirmado** con `count(*)`: `reservas` marcadas = 0, huérfanas de
+   `ocupacion_diaria` en rango = 0.
+3. **Crear**: `seed_demo_data.sql` (regenerado con `gen_seed.js`, sin tocarlo
+   a mano) → 266 reservas marcadas `[DEMO-SEED]` (255 `casa_tomas` / 11
+   `touza`), total `reservas` = 376 — mismos números exactos que antes de
+   quitar el personal, porque la generación de reservas no se tocó (semilla
+   fija).
+4. **Borrar de nuevo** → 0 marcadas, 110 total, 0 huérfanas otra vez.
+5. **Crear de nuevo** (estado final, para dejar el panel funcionando con las
+   mismas 266 reservas demo que tenía el dueño antes de la prueba): 266
+   marcadas, 376 total.
+6. **`configuracion_turnos` no se tocó en ningún momento** de la prueba: ni
+   `gen_seed.js`, ni `seed_demo_data.sql`, ni `cleanup_demo_data.sql`
+   contienen la cadena `configuracion_turnos` (comprobado con grep antes y
+   después de editar), y sus 2 filas siguen iguales al final.
 
-El estado final dejado en la base es el del paso 4 (datos de demo presentes),
-para que el panel se pueda ver funcionando.
+El estado final dejado en la base es el del paso 5: 266 reservas de demo
+presentes (igual que al empezar la prueba), sin trabajadores/turnos/
+registro_horas (ya no los crea nadie), para que el panel se siga viendo
+funcionando tal y como lo estaba usando el dueño.
 
 ## Reglas del sistema respetadas
 
@@ -187,19 +243,16 @@ el esquema encontramos:
   2026-09-23), así que el panel las sigue mostrando vacías para "hoy" aunque la
   tabla no esté a 0 filas. No se han tocado ni borrado — no las creamos
   nosotros y no estaba en el encargo limpiarlas.
-- 10 `trabajadores` **reales** ya dados de alta (nombres y emails `@restaurante.com`
-  que parecen personal de verdad), pero sin ningún `turno` ni `registro_horas`
-  para el rango de fechas de hoy — por eso el widget de personal marcaba 0
-  igualmente. El seed no reutiliza esas 10 personas ni les asigna turnos
-  ficticios (sería fabricar un historial de asistencia falso a nombre de
-  alguien real); en su lugar crea 7 trabajadores nuevos, igual de ficticios y
-  marcados que las reservas.
+- (Histórico, ya no aplica desde que se retiró la sección Personal) Hasta
+  septiembre de 2026 había además 10 `trabajadores` **reales** ya dados de
+  alta, y el seed creaba 7 trabajadores ficticios nuevos en vez de reutilizarlos
+  o asignarles turnos falsos (habría sido fabricar un historial de asistencia
+  falso a nombre de alguien real). Ver "Qué ya no crea, y por qué".
 - `resenas` ya tenía 11 filas (las mismas 11 reseñas falsas que, según el
   encargo, se ocultaron hoy) — no se ha añadido ni tocado ninguna.
 
 ## Qué widgets del panel deberían dejar de estar vacíos
 
-- **Personal Activo** (Cocina / Sala / Otros): 2 / 3 / 2 ahora mismo, 7 en total.
 - **Reservas por Día**: barras en prácticamente todos los días del rango
   (más altas viernes/sábado/domingo-comida), contando solo las `confirmada`.
 - **Curva de Reservas por Hora** (solo hoy): dos picos, uno de comida
@@ -208,3 +261,6 @@ el esquema encontramos:
   debería mostrar actividad variada en canal, estado y tamaño de grupo.
 - `ocupacion_diaria` / `vista_ocupacion` quedan con datos coherentes para el
   mismo rango de fechas (se generan solos a partir de `reservas`).
+- ~~**Personal Activo** (Cocina / Sala / Otros)~~ — el widget se retiró del
+  panel junto con toda la sección Personal (commit `a24b5b5`); este seed ya
+  no lo alimenta ni falta que lo haga.
