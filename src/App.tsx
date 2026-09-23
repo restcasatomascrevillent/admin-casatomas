@@ -11,9 +11,6 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
 import PlantillasEmail from "./pages/PlantillasEmail";
-// TEMP-QA: arnés de verificación visual, se retira antes de entregar.
-import QaPreviewPlantillas from "./pages/_QaPreviewPlantillas";
-
 import Espacios from "./pages/Espacios";
 import Trabajadores from "./pages/Trabajadores";
 import Ecommerce from "./pages/Ecommerce";
@@ -56,8 +53,6 @@ const App = () => (
         >
           <Routes>
             <Route path="/auth" element={<Auth />} />
-            {/* TEMP-QA: sin ProtectedRoute a propósito, se retira antes de entregar. */}
-            <Route path="/_qa_preview_plantillas" element={<QaPreviewPlantillas />} />
             <Route path="/" element={pagina(<Dashboard />)} />
             <Route path="/dashboard" element={pagina(<Dashboard />)} />
             <Route path="/reservas" element={pagina(<Reservas />)} />
