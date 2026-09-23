@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, CalendarIcon, CheckCircle, ShieldBan } from "lucide-react";
+import { AlertTriangle, CalendarIcon, CheckCircle, Info, ShieldBan } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +28,15 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
-import { useConfiguracionTurnos, ConfiguracionTurno } from "@/hooks/useConfiguracionTurnos";
+import { useOcupacionSalasDia, CLAVE_OCUPACION_SALAS_DIA } from "@/hooks/useOcupacionSalasDia";
+import {
+  calcularOcupacionSalas,
+  construirFranjas,
+  ETIQUETA_TURNO,
+  evaluarUbicacion,
+  horaCorta,
+} from "@/lib/reservas/ocupacionSalas";
+import { OcupacionSalas } from "./OcupacionSalas";
 
 const formSchema = z.object({
   nombre: z.string().min(2, "El nombre es requerido"),
@@ -38,50 +46,30 @@ const formSchema = z.object({
   hora: z.string().min(1, "Selecciona una hora"),
   numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
+  /** Sala asignada (null = sin asignar). */
+  espacio_id: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Horarios de respaldo si `configuracion_turnos` no devuelve nada para ese día.
-const HORARIOS_POR_DEFECTO = [
-  "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
-  "20:00", "20:30", "21:00", "21:30", "22:00", "22:30",
-];
+// Las horas del desplegable salen del motor compartido de disponibilidad
+// (`calcularDisponibilidad` sobre `configuracion_turnos`, vía
+// useOcupacionSalasDia): la MISMA fuente que la web y el bot. Antes había
+// aquí una copia propia (`generarHorarios`) con una lista fija de respaldo.
+// El personal puede además escribir una hora fuera de franja ("Otra hora...").
+const SIN_ASIGNAR = "__sin_asignar__";
+const OTRA_HORA = "__otra__";
 
-// Genera los huecos de un día a partir de los periodos configurados en `configuracion_turnos`.
-const generarHorarios = (turnos: ConfiguracionTurno[] | undefined, fecha: Date | undefined): string[] => {
-  if (!fecha) return [];
-
-  const diaSemana = fecha.getDay();
-  const periodos = (turnos ?? []).filter(
-    (turno) => turno.activo && turno.espacio_id === null && turno.dias_semana?.includes(diaSemana)
-  );
-
-  if (periodos.length === 0) return HORARIOS_POR_DEFECTO;
-
-  const horas = new Set<string>();
-
-  for (const periodo of periodos) {
-    const [inicioH, inicioM] = periodo.hora_inicio.split(":").map(Number);
-    const [finH, finM] = periodo.hora_fin.split(":").map(Number);
-    const paso = periodo.intervalo_base_minutos || 30;
-
-    let minutos = inicioH * 60 + inicioM;
-    const fin = finH * 60 + finM;
-
-    while (minutos < fin) {
-      const h = Math.floor(minutos / 60);
-      const m = minutos % 60;
-      horas.add(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-      minutos += paso;
-    }
-  }
-
-  return Array.from(horas).sort();
-};
+/** Lo que se acaba de crear, para quien abrió el formulario (p. ej. cerrar una solicitud). */
+export interface ReservaCreadaDesdeFormulario {
+  fecha: string;
+  hora: string;
+  numero_comensales: number;
+  espacio_id: string | null;
+}
 
 interface FormularioReservaProps {
-  onSuccess?: () => void;
+  onSuccess?: (reserva?: ReservaCreadaDesdeFormulario) => void;
   isPublic?: boolean;
   datosPreseleccionados?: {
     fecha?: Date;
@@ -93,6 +81,8 @@ interface FormularioReservaProps {
     email?: string;
     numero_comensales?: number;
     notas_cliente?: string;
+    /** Sala propuesta (diálogo de solicitudes del bot). */
+    espacio_id?: string | null;
   } | null;
 }
 
@@ -108,7 +98,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const [limiteAlcanzado, setLimiteAlcanzado] = useState<string | null>(null);
   const verificarBlacklist = useVerificarBlacklist();
   const { data: configReservas } = useConfiguracionReservas();
-  const { data: configTurnos } = useConfiguracionTurnos();
+  const [modoOtraHora, setModoOtraHora] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -116,6 +106,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       numero_comensales: 2,
       fecha: datosPreseleccionados?.fecha,
       hora: datosPreseleccionados?.hora ?? "",
+      espacio_id: datosPreseleccionados?.espacio_id ?? null,
     },
   });
 
@@ -136,6 +127,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     if (datosPreseleccionados?.notas_cliente) {
       form.setValue("notas_cliente", datosPreseleccionados.notas_cliente);
     }
+    if (datosPreseleccionados?.espacio_id !== undefined) {
+      form.setValue("espacio_id", datosPreseleccionados.espacio_id);
+    }
   }, [datosPreseleccionados, form]);
 
   const watchedFecha = form.watch("fecha");
@@ -143,18 +137,37 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const watchedComensales = form.watch("numero_comensales");
   const watchedEmail = form.watch("email");
   const watchedTelefono = form.watch("telefono");
+  const watchedEspacio = form.watch("espacio_id") ?? null;
+  const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
 
-  const horariosDisponibles = useMemo(
-    () => generarHorarios(configTurnos, watchedFecha),
-    [configTurnos, watchedFecha]
-  );
+  // Franjas + reservas + salas del día (una sola consulta, compartida con la
+  // rejilla "Ocupación de salas" por la clave de React Query).
+  const { data: datosDia, horasBase } = useOcupacionSalasDia(fechaStr);
+  const horariosDisponibles = useMemo(() => {
+    const f = construirFranjas(horasBase);
+    return [...f.comida, ...f.cena];
+  }, [horasBase]);
+  // Una hora fuera de las franjas (p. ej. propuesta a mano desde una
+  // solicitud) ya NO se borra al cambiar de día: el personal puede reservar
+  // a cualquier hora; el aforo lo sigue validando el trigger.
+  const horaFueraDeFranja = !!datosDia && !!watchedHora && !horariosDisponibles.includes(watchedHora);
+  const mostrarInputHora = modoOtraHora || horaFueraDeFranja;
 
-  // Si la hora elegida deja de existir al cambiar de día, se limpia para no enviar un hueco inválido.
-  useEffect(() => {
-    if (watchedHora && horariosDisponibles.length > 0 && !horariosDisponibles.includes(watchedHora)) {
-      form.setValue("hora", "");
-    }
-  }, [horariosDisponibles, watchedHora, form]);
+  // Aviso (no bloqueo) si la sala elegida se pasa de su capacidad en el
+  // turno: mismo criterio que el Kanban al mover de espacio.
+  const evaluacionSala = useMemo(() => {
+    if (!datosDia || !watchedHora) return null;
+    const ocupacion = calcularOcupacionSalas({
+      espacios: datosDia.espacios,
+      reservas: datosDia.reservas,
+      horasBase: datosDia.horasBase,
+      comensales: Number(watchedComensales) || 0,
+    });
+    return evaluarUbicacion(ocupacion, watchedEspacio, watchedHora);
+  }, [datosDia, watchedHora, watchedComensales, watchedEspacio]);
+
+  const superaMaximoAutomatico =
+    !!configReservas && Number(watchedComensales) > configReservas.max_comensales_por_reserva;
 
   // Verificar el aforo del turno cuando hay fecha, hora y comensales.
   // Es solo una comprobación previa: la validación real la hace el trigger
@@ -281,7 +294,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           toast.error(`Mínimo ${configReservas.min_comensales_por_reserva} comensal(es)`);
           return;
         }
-        if (values.numero_comensales > configReservas.max_comensales_por_reserva) {
+        // El máximo por reserva es el límite de los canales AUTOMÁTICOS (bot,
+        // web): un grupo grande es justo lo que el bot deriva al personal
+        // (motivo "grupo_grande"). En el panel solo se avisa; en la web se bloquea.
+        if (isPublic && values.numero_comensales > configReservas.max_comensales_por_reserva) {
           form.setError("numero_comensales", {
             message: `Máximo ${configReservas.max_comensales_por_reserva} comensales por reserva`,
           });
@@ -323,6 +339,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         hora: values.hora,
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente || null,
+        espacio_id: values.espacio_id || null,
         estado: estadoInicial,
         canal: isPublic ? "web" : "manual",
         en_blacklist: !!blacklisted,
@@ -348,6 +365,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         "disponibilidad-detallada",
         "disponibilidad-rango",
         "resumen-ocupacion-hoy-completo",
+        CLAVE_OCUPACION_SALAS_DIA,
       ].forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
       if (blacklisted) {
@@ -356,7 +374,14 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         toast.success("¡Reserva creada exitosamente!");
       }
 
-      form.reset({ numero_comensales: 2, hora: "" });
+      const creada: ReservaCreadaDesdeFormulario = {
+        fecha: fechaStr,
+        hora: values.hora,
+        numero_comensales: values.numero_comensales,
+        espacio_id: values.espacio_id || null,
+      };
+      form.reset({ numero_comensales: 2, hora: "", espacio_id: null });
+      setModoOtraHora(false);
       setLimiteAlcanzado(null);
       setDisponibilidadInfo(null);
 
@@ -364,7 +389,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         // No existe ninguna página de confirmación en el panel; se vuelve al listado.
         navigate("/reservas");
       } else if (onSuccess) {
-        onSuccess();
+        onSuccess(creada);
       }
     } catch (error: any) {
       console.error("Error creando reserva:", error);
@@ -483,51 +508,143 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             render={({ field }) => (
               <FormItem className="flex flex-col">
                 <FormLabel>Hora</FormLabel>
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  disabled={!watchedFecha}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={watchedFecha ? "Seleccionar hora" : "Elige antes una fecha"}
+                {mostrarInputHora ? (
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        type="time"
+                        step={300}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(horaCorta(e.target.value) ?? "")}
                       />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {horariosDisponibles.map((hora) => (
-                      <SelectItem key={hora} value={hora}>
-                        {hora}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    </FormControl>
+                    {horariosDisponibles.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-10 shrink-0 text-xs"
+                        onClick={() => {
+                          setModoOtraHora(false);
+                          if (horaFueraDeFranja) field.onChange("");
+                        }}
+                      >
+                        Turnos
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Select
+                    value={field.value || undefined}
+                    onValueChange={(v) => (v === OTRA_HORA ? setModoOtraHora(true) : field.onChange(v))}
+                    disabled={!watchedFecha}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={watchedFecha ? "Seleccionar hora" : "Elige antes una fecha"}
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {horariosDisponibles.map((hora) => (
+                        <SelectItem key={hora} value={hora}>
+                          {hora}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value={OTRA_HORA}>Otra hora…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {horaFueraDeFranja && (
+                  <p className="text-[11px] text-muted-foreground">Hora fuera de las franjas del día.</p>
+                )}
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="numero_comensales"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Número de comensales</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min={configReservas?.min_comensales_por_reserva || 1}
-                  max={configReservas?.max_comensales_por_reserva || 100}
-                  {...field}
-                  onChange={(e) => field.onChange(parseInt(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="numero_comensales"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Número de comensales</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min={configReservas?.min_comensales_por_reserva || 1}
+                    // Solo la web pública se limita al máximo automático; el
+                    // personal puede dar de alta grupos grandes (ver onSubmit).
+                    max={isPublic ? configReservas?.max_comensales_por_reserva || 100 : undefined}
+                    {...field}
+                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {!isPublic && (
+            <FormField
+              control={form.control}
+              name="espacio_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sala</FormLabel>
+                  <Select
+                    value={field.value ?? SIN_ASIGNAR}
+                    onValueChange={(v) => field.onChange(v === SIN_ASIGNAR ? null : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
+                      {(datosDia?.espacios ?? []).map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nombre} ({e.capacidad_maxima} plazas)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           )}
-        />
+        </div>
+
+        {!isPublic && superaMaximoAutomatico && configReservas && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Grupo de {watchedComensales} personas: supera el máximo automático ({configReservas.max_comensales_por_reserva}).
+              Como alta manual se permite.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isPublic && (
+          <div className="rounded-lg border p-3">
+            <OcupacionSalas
+              fecha={fechaStr}
+              comensales={Number(watchedComensales) || 0}
+              hora={watchedHora || null}
+              espacioId={watchedEspacio}
+              onSeleccionar={(espacioId, hora) => {
+                setModoOtraHora(false);
+                form.setValue("espacio_id", espacioId);
+                form.setValue("hora", hora, { shouldValidate: true });
+              }}
+            />
+          </div>
+        )}
 
         <FormField
           control={form.control}
@@ -577,6 +694,17 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           </Alert>
         )}
 
+        {evaluacionSala && evaluacionSala.cabeAforo && !evaluacionSala.cabeSala && evaluacionSala.sala && evaluacionSala.celda && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {evaluacionSala.sala.nombre} quedaría en {evaluacionSala.celda.tras}/{evaluacionSala.celda.capacidad} en
+              el turno de {ETIQUETA_TURNO[evaluacionSala.turno].toLowerCase()} (supera su capacidad). Puedes crearla
+              igualmente o elegir otra sala.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {disponibilidadInfo && (
           <Alert variant={disponibilidadInfo.disponible ? "default" : "destructive"}>
             {disponibilidadInfo.disponible ? (
@@ -586,6 +714,18 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             )}
             <AlertDescription>{disponibilidadInfo.mensaje}</AlertDescription>
           </Alert>
+        )}
+
+        {!isPublic && (
+          // Comportamiento real (sin cambios): el alta hace solo un INSERT en
+          // `reservas`; no invoca `notify-reservation-change` ni hay trigger
+          // que mande correo al crear. Los correos salen al CAMBIAR el estado
+          // desde la lista (notify-reservation-change -> emails-reserva).
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            Al crear la reserva no se envía ningún correo al cliente. Avísale tú; el correo sale cuando cambies su
+            estado (verificar / confirmar) desde la lista.
+          </p>
         )}
 
         <Button

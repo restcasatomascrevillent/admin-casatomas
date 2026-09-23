@@ -72,6 +72,30 @@ export function useSolicitudesPendientes() {
     return true;
   };
 
+  /**
+   * Guarda la propuesta del personal (día/hora/comensales + la línea de
+   * "Petición original" en notas internas). Los cambios los calcula
+   * `actualizacionPropuesta` en src/lib/reservas/solicitudPropuesta.ts.
+   */
+  const updatePropuesta = async (
+    id: string,
+    cambios: Pick<SolicitudPendiente, "fecha_solicitada" | "hora_solicitada" | "numero_comensales" | "notas_internas">,
+    opciones?: { silencioso?: boolean },
+  ) => {
+    const { error } = await supabase
+      .from("solicitudes_pendientes")
+      .update({ ...cambios, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Error al guardar los cambios de la solicitud");
+      return false;
+    }
+    if (!opciones?.silencioso) toast.success("Cambios de la solicitud guardados");
+    await fetchSolicitudes();
+    return true;
+  };
+
   useEffect(() => {
     fetchSolicitudes();
 
@@ -106,5 +130,6 @@ export function useSolicitudesPendientes() {
     fetchSolicitudes,
     updateEstado,
     updateNotasInternas,
+    updatePropuesta,
   };
 }

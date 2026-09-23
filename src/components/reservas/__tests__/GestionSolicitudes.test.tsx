@@ -46,6 +46,7 @@ const defaultHookReturn = {
   fetchSolicitudes: vi.fn(),
   updateEstado: vi.fn().mockResolvedValue(true),
   updateNotasInternas: vi.fn().mockResolvedValue(true),
+  updatePropuesta: vi.fn().mockResolvedValue(true),
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

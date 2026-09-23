@@ -42,6 +42,9 @@ const CLAVES_DERIVADAS = [
   "today-confirmed-reservations",
   "dashboard-stats",
   "reservas_mes",
+  // Rejilla "Ocupación de salas" (useOcupacionSalasDia): mover de sala o
+  // marcar llegada cambia la ocupación por sala.
+  "ocupacion-salas-dia",
 ];
 
 // null = aún no se sabe; se descubre en el primer UPDATE que la incluya.

@@ -45,7 +45,9 @@ import {
 } from "@/hooks/useVerificacionReservas";
 import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
-import { FormularioReserva } from "./FormularioReserva";
+import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
+import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
+import { actualizacionPropuesta, type PropuestaSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import {
   OPCIONES_FILTRO_ESTADO,
   esSolicitudAbierta,
@@ -108,6 +110,13 @@ export function ListaReservasAvanzada({
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
+  // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
+  // `null` = convertir tal cual está guardada la solicitud.
+  const [propuestaConversion, setPropuestaConversion] = useState<PropuestaSolicitud | null>(null);
+  const abrirConversion = (s: SolicitudPendiente, propuesta: PropuestaSolicitud | null = null) => {
+    setPropuestaConversion(propuesta);
+    setSolicitudAConvertir(s);
+  };
   const [solicitudGestionId, setSolicitudGestionId] = useState<string | null>(null);
 
   // `select("*")` a propósito, no una lista de columnas: `hora_solicitada`/
@@ -164,21 +173,33 @@ export function ListaReservasAvanzada({
   const datosConversion = useMemo(() => {
     const s = solicitudAConvertir;
     if (!s) return null;
+    const p = propuestaConversion;
+    const fecha = p ? p.fecha : s.fecha_solicitada;
+    const hora = p ? p.hora : s.hora_solicitada;
     return {
-      fecha: s.fecha_solicitada ? new Date(`${s.fecha_solicitada}T12:00:00`) : undefined,
-      hora: s.hora_solicitada ? String(s.hora_solicitada).substring(0, 5) : undefined,
+      fecha: fecha ? new Date(`${fecha}T12:00:00`) : undefined,
+      hora: hora ? String(hora).substring(0, 5) : undefined,
       nombre: s.nombre ?? undefined,
       telefono: s.telefono ?? undefined,
       email: s.email ?? undefined,
-      numero_comensales: s.numero_comensales ?? undefined,
+      numero_comensales: (p ? p.comensales : s.numero_comensales) ?? undefined,
       notas_cliente: s.notas_cliente ?? undefined,
+      espacio_id: p?.espacioId ?? null,
     };
-  }, [solicitudAConvertir]);
+  }, [solicitudAConvertir, propuestaConversion]);
 
-  const handleReservaDesdeSolicitudCreada = async () => {
+  const handleReservaDesdeSolicitudCreada = async (creada?: ReservaCreadaDesdeFormulario) => {
     const s = solicitudAConvertir;
     setSolicitudAConvertir(null);
+    setPropuestaConversion(null);
     if (s && solicitudesState) {
+      // Si la reserva final difiere de lo guardado en la solicitud, se deja
+      // constancia en la propia solicitud (día/hora/pax + "Petición original"
+      // en notas) antes de cerrarla. Sin toast: el de "resuelta" basta.
+      const cambios = creada
+        ? actualizacionPropuesta(s, { fecha: creada.fecha, hora: creada.hora, comensales: creada.numero_comensales })
+        : null;
+      if (cambios) await solicitudesState.updatePropuesta(s.id, cambios, { silencioso: true });
       await solicitudesState.updateEstado(s.id, "resuelta");
     }
   };
@@ -516,7 +537,7 @@ export function ListaReservasAvanzada({
                 solicitud={fila.solicitud}
                 onUpdateEstado={solicitudesState.updateEstado}
                 onUpdateNotas={solicitudesState.updateNotasInternas}
-                onConvertir={canEdit ? setSolicitudAConvertir : undefined}
+                onConvertir={canEdit ? (s) => abrirConversion(s) : undefined}
               />
             )
           ) : (() => { const reservation = fila.reserva; return (
@@ -622,7 +643,7 @@ export function ListaReservasAvanzada({
                     key={fila.id}
                     solicitud={fila.solicitud}
                     canEdit={canEdit}
-                    onConvertir={() => setSolicitudAConvertir(fila.solicitud)}
+                    onConvertir={() => abrirConversion(fila.solicitud)}
                     onGestionar={() => setSolicitudGestionId(fila.solicitud.id)}
                   />
                 ) : (() => { const reservation = fila.reserva; return (
@@ -712,12 +733,14 @@ export function ListaReservasAvanzada({
 
       {/* Convertir una solicitud del bot en reserva: alta manual prerrellenada;
           al crearla, la solicitud pasa a "resuelta". */}
-      <Dialog open={!!solicitudAConvertir} onOpenChange={(open) => { if (!open) setSolicitudAConvertir(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!solicitudAConvertir} onOpenChange={(open) => { if (!open) { setSolicitudAConvertir(null); setPropuestaConversion(null); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Convertir solicitud en reserva</DialogTitle>
             <DialogDescription>
-              Datos tomados de la solicitud que dejó el cliente por teléfono. Revísalos: al crear la reserva, la solicitud se marcará como resuelta.
+              {propuestaConversion
+                ? "Datos de la solicitud con los cambios que has propuesto (día, hora, comensales y sala). Revísalos: al crear la reserva, la solicitud se marcará como resuelta."
+                : "Datos tomados de la solicitud que dejó el cliente por teléfono. Revísalos: al crear la reserva, la solicitud se marcará como resuelta."}
             </DialogDescription>
           </DialogHeader>
           {solicitudAConvertir && (
@@ -732,18 +755,21 @@ export function ListaReservasAvanzada({
       {/* Gestión completa de una solicitud (notas internas, contactado,
           resuelta, descartar…) desde la tabla de escritorio. */}
       <Dialog open={!!solicitudGestion} onOpenChange={(open) => { if (!open) setSolicitudGestionId(null); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Solicitud pendiente del bot</DialogTitle>
-            <DialogDescription>El asistente telefónico no pudo cerrar esta reserva. Gestiona aquí el seguimiento.</DialogDescription>
+            <DialogDescription>
+              El asistente telefónico no pudo cerrar esta reserva. Ajusta día, hora, comensales y sala mirando la ocupación, y conviértela en reserva.
+            </DialogDescription>
           </DialogHeader>
           {solicitudGestion && solicitudesState && (
-            <SolicitudCard
+            <SolicitudGestionPanel
+              key={solicitudGestion.id}
               solicitud={solicitudGestion}
               onUpdateEstado={solicitudesState.updateEstado}
               onUpdateNotas={solicitudesState.updateNotasInternas}
-              onConvertir={canEdit ? (s) => { setSolicitudGestionId(null); setSolicitudAConvertir(s); } : undefined}
-              defaultExpanded
+              onGuardarPropuesta={(id, cambios) => solicitudesState.updatePropuesta(id, cambios)}
+              onConvertir={canEdit ? (s, propuesta) => { setSolicitudGestionId(null); abrirConversion(s, propuesta); } : undefined}
             />
           )}
         </DialogContent>
