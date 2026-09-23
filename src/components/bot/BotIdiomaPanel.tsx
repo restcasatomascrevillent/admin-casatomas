@@ -132,7 +132,7 @@ export function BotIdiomaPanel({
         }`}
         ejemplo={
           <>
-            es solo una prioridad DENTRO de lo que sigue activo en Gestor Carta: si marcas un plato aquí pero lo
+            es solo una prioridad DENTRO de lo que sigue activo en la pestaña Carta: si marcas un plato aquí pero lo
             desactivas allí, el bot deja de poder mencionarlo — nunca inventa platos que no existan en la carta
             real.
           </>
@@ -208,7 +208,7 @@ export function BotIdiomaPanel({
         explicacion={`Los vinos que el bot priorizará cuando un cliente pida sugerencias.${
           draft.vinos.length ? ` (${draft.vinos.length} seleccionados)` : ""
         }`}
-        ejemplo={<>igual que con los platos: es prioridad dentro de los vinos activos en Gestor Carta, nunca una lista cerrada ni inventada.</>}
+        ejemplo={<>igual que con los platos: es prioridad dentro de los vinos activos en la pestaña Carta, nunca una lista cerrada ni inventada.</>}
       >
         {draft.vinos.length > 0 && (
           <div className="flex flex-wrap gap-2 pb-2 border-b">

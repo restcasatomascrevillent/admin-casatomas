@@ -6,7 +6,8 @@ import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredSection?: SectionKey;
+  /** Sección necesaria; con una lista basta con poder ver CUALQUIERA de ellas. */
+  requiredSection?: SectionKey | SectionKey[];
 }
 
 // Mapeo de rutas a secciones
@@ -16,10 +17,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/reservas": "reservas",
   "/espacios": "espacios",
   "/trabajadores": "trabajadores",
-  "/gestor-carta": "gestor_carta",
   "/ecommerce": "ecommerce",
-  "/gestion-web": "gestion_web",
-  "/gestion-bot": "gestion_bot",
   "/asistente-telefonico": "asistente_telefonico",
   "/resenas": "resenas",
   "/marketing": "marketing",
@@ -46,22 +44,27 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   useEffect(() => {
     if (loading || !user) return;
 
-    const sectionKey = requiredSection || ROUTE_TO_SECTION[location.pathname];
-    
-    if (!sectionKey) return; // Ruta no mapeada, permitir acceso
+    const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
+    const sectionKeys = Array.isArray(required) ? required : required ? [required] : [];
+
+    if (sectionKeys.length === 0) return; // Ruta no mapeada, permitir acceso
 
     // Los admins tienen acceso a todo
     if (isAdmin) return;
 
     // La sección de usuarios es solo para admins
-    if (sectionKey === "usuarios") {
+    if (sectionKeys.includes("usuarios")) {
       navigate("/dashboard");
       return;
     }
 
-    // Verificar permiso de visualización
-    const permission = permissions.find((p) => p.section_key === sectionKey);
-    if (!permission?.can_view) {
+    // Verificar permiso de visualización (basta con una de las secciones:
+    // p. ej. el Gestor Web agrupa carta, contenido web y bot, y cada pestaña
+    // vuelve a comprobar la suya).
+    const puedeVer = sectionKeys.some(
+      (key) => permissions.find((p) => p.section_key === key)?.can_view,
+    );
+    if (!puedeVer) {
       navigate("/dashboard");
     }
   }, [user, loading, isAdmin, permissions, location.pathname, requiredSection, navigate]);

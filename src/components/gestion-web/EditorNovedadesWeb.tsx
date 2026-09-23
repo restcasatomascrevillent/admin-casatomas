@@ -1,197 +1,138 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useNovedades } from "@/hooks/useNovedades";
+import { useNovedades, type Novedad } from "@/hooks/useNovedades";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Plus, Edit2, Trash2, Eye, Save, X, Image as ImageIcon, Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Loader2, Globe, Move } from "lucide-react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  X,
+  Image as ImageIcon,
+  Wine,
+  UtensilsCrossed,
+  Gift,
+  Calendar,
+  Star,
+  Sparkles,
+  Loader2,
+  Languages,
+  Move,
+  ArrowUp,
+  ArrowDown,
+  ChevronDown,
+  AlertCircle,
+  RefreshCw,
+  Eraser,
+  Newspaper,
+  Upload,
+  Coffee,
+  Cake,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { NovedadPreview } from "./MobilePreview";
+import { MobilePreview, type NovedadPreview } from "./MobilePreview";
 import { ImagePositionSelector } from "./ImagePositionSelector";
-const TIPOS_NOVEDAD = [{
-  value: "plato_nuevo",
-  label: "Plato Nuevo"
-}, {
-  value: "promocion",
-  label: "Promoción"
-}, {
-  value: "evento",
-  label: "Evento"
-}, {
-  value: "festivo",
-  label: "Festivo"
-}, {
-  value: "anuncio",
-  label: "Anuncio General"
-}];
-const ICONOS = [{
-  value: "utensils",
-  label: "Cubiertos",
-  icon: UtensilsCrossed
-}, {
-  value: "wine",
-  label: "Vino",
-  icon: Wine
-}, {
-  value: "gift",
-  label: "Regalo",
-  icon: Gift
-}, {
-  value: "calendar",
-  label: "Calendario",
-  icon: Calendar
-}, {
-  value: "star",
-  label: "Estrella",
-  icon: Star
-}, {
-  value: "sparkles",
-  label: "Destacado",
-  icon: Sparkles
-}];
-const TONOS = [{
-  value: "cercano",
-  label: "Cercano",
-  description: "Tono amigable y familiar"
-}, {
-  value: "formal",
-  label: "Formal",
-  description: "Tono profesional y elegante"
-}, {
-  value: "divertido",
-  label: "Divertido",
-  description: "Tono alegre y desenfadado"
-}, {
-  value: "exclusivo",
-  label: "Exclusivo",
-  description: "Tono premium y sofisticado"
-}];
-const LOADING_MESSAGES = ["Generando magia ✨", "Cocinando las palabras perfectas 🍳", "Creando tu descripción...", "Puliendo cada detalle 💎", "Dándole el toque final 🎨", "Inspirándose en tu idea 💡", "Casi listo... ⏳"];
-type GestionWebSeccion = "novedades" | "menus_diarios" | "tapas";
+import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
+import { CabeceraPestana } from "./CabeceraPestana";
 
-const SECCION_CONFIG: Record<
-  GestionWebSeccion,
-  { dbValue: string; singular: string; plural: string; canalWebhook: string }
-> = {
-  novedades: {
-    dbValue: "gestion_web_novedades",
-    singular: "Novedad",
-    plural: "Novedades",
-    canalWebhook: "novedades",
-  },
-  menus_diarios: {
-    dbValue: "gestion_web_menus_diarios",
-    singular: "Menú diario",
-    plural: "Menús diarios",
-    canalWebhook: "menus_diarios",
-  },
-  tapas: {
-    dbValue: "gestion_web_tapas",
-    singular: "Tapa",
-    plural: "Tapas",
-    canalWebhook: "tapas",
-  },
+// ---------------------------------------------------------------------------
+// Novedades de la web (tabla `novedades`)
+//
+// La web pública (casa-tomas-story, NovedadesSection) lee la tabla en vivo,
+// sin rebuild: lo que se guarda aquí se ve en la web al recargarla. Qué filas
+// ve el público lo decide la RLS «Público puede ver novedades activas
+// vigentes»: activo = true AND fecha_inicio <= hoy AND (fecha_fin IS NULL OR
+// fecha_fin >= hoy). El orden es destacado DESC, orden ASC.
+// ---------------------------------------------------------------------------
+
+/** Solo orienta al generador de texto (format-novedad); no se guarda. */
+const TIPOS_NOVEDAD = [
+  { value: "plato_nuevo", label: "Plato nuevo" },
+  { value: "promocion", label: "Promoción" },
+  { value: "evento", label: "Evento" },
+  { value: "festivo", label: "Festivo" },
+  { value: "anuncio", label: "Anuncio general" },
+];
+
+// Los mismos iconos que sabe pintar la web pública.
+const ICONOS = [
+  { value: "star", label: "Estrella", icon: Star },
+  { value: "utensils", label: "Cubiertos", icon: UtensilsCrossed },
+  { value: "wine", label: "Vino", icon: Wine },
+  { value: "gift", label: "Regalo", icon: Gift },
+  { value: "calendar", label: "Calendario", icon: Calendar },
+  { value: "sparkles", label: "Destellos", icon: Sparkles },
+  { value: "coffee", label: "Café", icon: Coffee },
+  { value: "cake", label: "Tarta", icon: Cake },
+];
+
+const TONOS = [
+  { value: "cercano", label: "Cercano", description: "Amigable y familiar" },
+  { value: "formal", label: "Formal", description: "Profesional y elegante" },
+  { value: "divertido", label: "Divertido", description: "Alegre y desenfadado" },
+  { value: "exclusivo", label: "Exclusivo", description: "Premium y sofisticado" },
+];
+
+const LOADING_MESSAGES = [
+  "Redactando la descripción...",
+  "Buscando las palabras justas...",
+  "Puliendo los detalles...",
+  "Casi listo...",
+];
+
+const SECCION_NOVEDADES = "gestion_web_novedades";
+const BUCKET = "novedades";
+const MAX_IMAGEN_MB = 5;
+const MAX_TITULO = 120;
+
+// Campos opcionales que enriquecen el texto que se manda a la IA.
+const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
+  plato_nuevo: [
+    { key: "nombre_plato", label: "Nombre del plato", placeholder: "Ej: Risotto de setas" },
+    { key: "precio", label: "Precio (€)", placeholder: "12.50", type: "number" },
+    { key: "ingredientes", label: "Ingredientes principales", placeholder: "Tomate, mozzarella..." },
+    { key: "alergenos", label: "Alérgenos", placeholder: "Gluten, lácteos..." },
+  ],
+  promocion: [
+    { key: "precio_original", label: "Precio original (€)", placeholder: "20.00", type: "number" },
+    { key: "precio_oferta", label: "Precio oferta (€)", placeholder: "15.00", type: "number" },
+    { key: "condiciones", label: "Condiciones", placeholder: "Válido solo fines de semana..." },
+  ],
+  evento: [
+    { key: "fecha_evento", label: "Fecha del evento", placeholder: "", type: "date" },
+    { key: "hora_evento", label: "Hora", placeholder: "20:00", type: "time" },
+    { key: "precio_entrada", label: "Precio entrada (€)", placeholder: "25.00", type: "number" },
+    { key: "aforo", label: "Aforo máximo", placeholder: "50", type: "number" },
+  ],
+  festivo: [
+    { key: "fecha_festivo", label: "Fecha", placeholder: "", type: "date" },
+    { key: "horario_especial", label: "Horario especial", placeholder: "12:00 - 16:00" },
+    { key: "menu_especial", label: "Menú especial", placeholder: "Menú de Navidad..." },
+  ],
+  anuncio: [],
 };
 
-const perteneceASeccion = (seccionActiva: GestionWebSeccion, seccion: string | null): boolean => {
-  if (seccionActiva === "novedades") {
-    // Compatibilidad con contenido previo sin sección asignada.
-    return !seccion || seccion === SECCION_CONFIG.novedades.dbValue;
-  }
-
-  return seccion === SECCION_CONFIG[seccionActiva].dbValue;
-};
-
-interface EditorNovedadesWebProps {
-  seccionActiva: GestionWebSeccion;
-  onPreview: (novedad: NovedadPreview | null) => void;
-  onPreviewListChange?: (ids: string[]) => void;
-}
-// Campos específicos por tipo de novedad
-const CAMPOS_POR_TIPO: Record<string, {
-  key: string;
-  label: string;
-  placeholder: string;
-  type?: string;
-}[]> = {
-  plato_nuevo: [{
-    key: "nombre_plato",
-    label: "Nombre del plato",
-    placeholder: "Ej: Risotto de setas..."
-  }, {
-    key: "precio",
-    label: "Precio (€)",
-    placeholder: "12.50",
-    type: "number"
-  }, {
-    key: "ingredientes",
-    label: "Ingredientes principales",
-    placeholder: "Tomate, mozzarella, albahaca..."
-  }, {
-    key: "alergenos",
-    label: "Alérgenos",
-    placeholder: "Gluten, lácteos, frutos secos..."
-  }],
-  promocion: [{
-    key: "precio_original",
-    label: "Precio original (€)",
-    placeholder: "20.00",
-    type: "number"
-  }, {
-    key: "precio_oferta",
-    label: "Precio oferta (€)",
-    placeholder: "15.00",
-    type: "number"
-  }, {
-    key: "condiciones",
-    label: "Condiciones",
-    placeholder: "Válido solo fines de semana..."
-  }],
-  evento: [{
-    key: "fecha_evento",
-    label: "Fecha del evento",
-    placeholder: "",
-    type: "date"
-  }, {
-    key: "hora_evento",
-    label: "Hora",
-    placeholder: "20:00",
-    type: "time"
-  }, {
-    key: "precio_entrada",
-    label: "Precio entrada (€)",
-    placeholder: "25.00",
-    type: "number"
-  }, {
-    key: "aforo",
-    label: "Aforo máximo",
-    placeholder: "50",
-    type: "number"
-  }],
-  festivo: [{
-    key: "fecha_festivo",
-    label: "Fecha",
-    placeholder: "",
-    type: "date"
-  }, {
-    key: "horario_especial",
-    label: "Horario especial",
-    placeholder: "12:00 - 16:00"
-  }, {
-    key: "menu_especial",
-    label: "Menú especial",
-    placeholder: "Menú de Navidad..."
-  }],
-  anuncio: []
-};
 interface FormData {
   tipo: string;
   titulo: string;
@@ -213,16 +154,29 @@ interface FormData {
   bullets: string[];
   bullets_en: string[];
   bullets_fr: string[];
-  cta_text: string;
-  cta_url: string;
-  subtitle: string;
   tags: string[];
   tags_en: string[];
   tags_fr: string[];
-  // Campos dinámicos por tipo
   campos_tipo: Record<string, string>;
 }
-const initialFormData: FormData = {
+
+interface ResultadoIA {
+  title?: string | null;
+  body?: string | null;
+  bullets?: string[];
+  tags?: string[];
+  meta?: { source?: string; missing?: string[] };
+}
+
+/** Fecha local YYYY-MM-DD (toISOString daría la de UTC y de madrugada cambia de día). */
+const hoyLocal = () => new Date().toLocaleDateString("sv-SE");
+
+const formatearFecha = (iso: string) => {
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+};
+
+const nuevoFormulario = (): FormData => ({
   tipo: "anuncio",
   titulo: "",
   descripcion: "",
@@ -233,907 +187,1486 @@ const initialFormData: FormData = {
   badge_text: "",
   badge_text_en: "",
   badge_text_fr: "",
-  icono: "utensils",
+  icono: "star",
   imagen_url: "",
   imagen_posicion_y: 50,
-  fecha_inicio: new Date().toISOString().split("T")[0],
+  fecha_inicio: hoyLocal(),
   fecha_fin: "",
   activo: true,
   destacado: false,
   bullets: [],
   bullets_en: [],
   bullets_fr: [],
-  cta_text: "",
-  cta_url: "",
-  subtitle: "",
   tags: [],
   tags_en: [],
   tags_fr: [],
-  campos_tipo: {}
+  campos_tipo: {},
+});
+
+const formularioDesdeNovedad = (n: Novedad): FormData => ({
+  tipo: "anuncio",
+  titulo: n.titulo || "",
+  descripcion: n.descripcion || "",
+  titulo_en: n.titulo_en || "",
+  descripcion_en: n.descripcion_en || "",
+  titulo_fr: n.titulo_fr || "",
+  descripcion_fr: n.descripcion_fr || "",
+  badge_text: n.badge_text || "",
+  badge_text_en: n.badge_text_en || "",
+  badge_text_fr: n.badge_text_fr || "",
+  icono: n.icono || "star",
+  imagen_url: n.imagen_url || "",
+  imagen_posicion_y: n.imagen_posicion_y ?? 50,
+  fecha_inicio: n.fecha_inicio?.split("T")[0] || hoyLocal(),
+  fecha_fin: n.fecha_fin?.split("T")[0] || "",
+  activo: n.activo ?? true,
+  destacado: n.destacado ?? false,
+  bullets: n.bullets || [],
+  bullets_en: n.bullets_en || [],
+  bullets_fr: n.bullets_fr || [],
+  tags: n.tags || [],
+  tags_en: n.tags_en || [],
+  tags_fr: n.tags_fr || [],
+  campos_tipo: {},
+});
+
+/** Lo que se traduce: si cambia, las traducciones guardadas quedan viejas. */
+const huellaEspanol = (f: Pick<FormData, "titulo" | "descripcion" | "badge_text" | "bullets" | "tags">) =>
+  JSON.stringify([f.titulo.trim(), f.descripcion.trim(), f.badge_text.trim(), f.bullets, f.tags]);
+
+/** Lo que se guarda (para saber si hay cambios sin guardar). */
+const huellaFormulario = (f: FormData) => {
+  // campos_tipo y tipo solo alimentan a la IA, no se guardan.
+  const { campos_tipo: _c, tipo: _t, ...resto } = f;
+  return JSON.stringify(resto);
 };
-export function EditorNovedadesWeb({
-  seccionActiva,
-  onPreview,
-  onPreviewListChange
-}: EditorNovedadesWebProps) {
+
+type EstadoWeb = { clave: "visible" | "oculta" | "programada" | "caducada"; texto: string };
+
+const estadoEnWeb = (n: { activo: boolean | null; fecha_inicio: string; fecha_fin: string | null }): EstadoWeb => {
+  const hoy = hoyLocal();
+  const inicio = n.fecha_inicio?.split("T")[0] || "";
+  const fin = n.fecha_fin?.split("T")[0] || "";
+  if (!n.activo) return { clave: "oculta", texto: "Oculta" };
+  if (inicio && inicio > hoy) return { clave: "programada", texto: `Desde el ${formatearFecha(inicio)}` };
+  if (fin && fin < hoy) return { clave: "caducada", texto: "Caducada" };
+  return { clave: "visible", texto: "En la web" };
+};
+
+const ESTILO_ESTADO: Record<EstadoWeb["clave"], string> = {
+  visible: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
+  oculta: "bg-muted text-muted-foreground",
+  programada: "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-900",
+  caducada: "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
+};
+
+/** Ruta dentro del bucket `novedades` a partir de la URL pública, o null si no es de ese bucket. */
+const rutaEnBucket = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  const marca = `/storage/v1/object/public/${BUCKET}/`;
+  const i = url.indexOf(marca);
+  if (i === -1) return null;
+  return decodeURIComponent(url.slice(i + marca.length).split("?")[0]);
+};
+
+const aPreview = (f: FormData | Novedad, id: string): NovedadPreview => ({
+  id,
+  titulo: f.titulo || "",
+  descripcion: f.descripcion || "",
+  titulo_en: f.titulo_en,
+  descripcion_en: f.descripcion_en,
+  titulo_fr: f.titulo_fr,
+  descripcion_fr: f.descripcion_fr,
+  imagen_url: f.imagen_url,
+  imagen_posicion_y: f.imagen_posicion_y,
+  badge_text: f.badge_text,
+  badge_text_en: f.badge_text_en,
+  badge_text_fr: f.badge_text_fr,
+  icono: f.icono,
+  destacado: !!f.destacado,
+  bullets: f.bullets || [],
+  bullets_en: f.bullets_en,
+  bullets_fr: f.bullets_fr,
+  tags: f.tags || [],
+  tags_en: f.tags_en,
+  tags_fr: f.tags_fr,
+});
+
+const ID_NUEVA = "__nueva__";
+
+const CLAVES_IDIOMA = {
+  en: {
+    nombre: "Inglés",
+    titulo: "titulo_en",
+    badge: "badge_text_en",
+    descripcion: "descripcion_en",
+    bullets: "bullets_en",
+    tags: "tags_en",
+  },
+  fr: {
+    nombre: "Francés",
+    titulo: "titulo_fr",
+    badge: "badge_text_fr",
+    descripcion: "descripcion_fr",
+    bullets: "bullets_fr",
+    tags: "tags_fr",
+  },
+} as const;
+
+export function EditorNovedadesWeb() {
   const {
     novedades,
     isLoading,
+    isError,
+    error,
+    refetch,
     crearNovedad,
     actualizarNovedad,
     eliminarNovedad,
-    toggleActivo
+    toggleActivo,
+    reordenar,
   } = useNovedades();
-  const [editingId, setEditingId] = useState<string | null>("new");
-  const [formData, setFormData] = useState<FormData>(initialFormData);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // --- Formulario -----------------------------------------------------------
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FormData>(nuevoFormulario);
+  const [huellaGuardada, setHuellaGuardada] = useState(() => huellaFormulario(nuevoFormulario()));
+  /** Huella del español con la que se corresponden las traducciones actuales. */
+  const [huellaTraducida, setHuellaTraducida] = useState(() => huellaEspanol(nuevoFormulario()));
+  /** El usuario ha escrito a mano en EN/FR: no se sobrescriben al guardar. */
+  const [traduccionManual, setTraduccionManual] = useState(false);
+  const [imagenOriginal, setImagenOriginal] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [traduccionesAbiertas, setTraduccionesAbiertas] = useState(false);
+  const [nuevaEtiqueta, setNuevaEtiqueta] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const tituloRef = useRef<HTMLInputElement>(null);
+
+  // --- Diálogos -------------------------------------------------------------
+  const [deleteTarget, setDeleteTarget] = useState<Novedad | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [accionPendiente, setAccionPendiente] = useState<(() => void) | null>(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [previewMovilAbierta, setPreviewMovilAbierta] = useState(false);
+
+  // --- IA -------------------------------------------------------------------
   const [generandoDescripcion, setGenerandoDescripcion] = useState(false);
   const [tonoModalOpen, setTonoModalOpen] = useState(false);
   const [tonoSeleccionado, setTonoSeleccionado] = useState("cercano");
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0]);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-  const [resultadoModalOpen, setResultadoModalOpen] = useState(false);
-  const [resultadoWebhook, setResultadoWebhook] = useState<{
-    title?: string;
-    subtitle?: string;
-    body?: string;
-    bullets?: string[];
-    cta?: {
-      text?: string;
-      url?: string;
+  const [resultadoIA, setResultadoIA] = useState<ResultadoIA | null>(null);
+
+  const editando = editingId !== null;
+  const hayCambios = huellaFormulario(formData) !== huellaGuardada;
+  const espanolCambiado = huellaEspanol(formData) !== huellaTraducida;
+  const tieneTraducciones = !!(formData.titulo_en || formData.titulo_fr);
+  const estadoBorrador = estadoEnWeb({
+    activo: formData.activo,
+    fecha_inicio: formData.fecha_inicio,
+    fecha_fin: formData.fecha_fin || null,
+  });
+  const novedadEditada = editando ? novedades.find((n) => n.id === editingId) : undefined;
+
+  // Aviso del navegador si se cierra/recarga con cambios sin guardar.
+  useEffect(() => {
+    if (!hayCambios) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
     };
-    tags?: string[];
-  } | null>(null);
-  const [previewIds, setPreviewIds] = useState<Set<string>>(new Set());
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewInicializadoRef = useRef(false);
-  const configSeccion = SECCION_CONFIG[seccionActiva];
-  const novedadesSeccion = useMemo(() => {
-    return (novedades || []).filter(
-      (novedad) => novedad.tipo === "anuncio" && perteneceASeccion(seccionActiva, novedad.seccion)
-    );
-  }, [novedades, seccionActiva]);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hayCambios]);
 
-  // Inicializar previewIds una sola vez para no sobrescribir cambios manuales.
+  // Si alguien borra desde otro sitio la novedad que estoy editando.
   useEffect(() => {
-    if (!previewInicializadoRef.current && !isLoading) {
-      const activeIds = novedadesSeccion.filter(n => n.activo).map(n => n.id);
-      setPreviewIds(new Set(activeIds));
-      previewInicializadoRef.current = true;
+    if (editingId && !isLoading && !novedades.some((n) => n.id === editingId)) {
+      toast.warning("La novedad que estabas editando ya no existe.");
+      cargarEnFormulario(null);
     }
-  }, [novedadesSeccion, isLoading]);
+  }, [novedades, isLoading, editingId]);
 
-  // Limpiar IDs que ya no existen en la sección actual.
-  useEffect(() => {
-    const idsVigentes = new Set(novedadesSeccion.map((n) => n.id));
-    setPreviewIds((prev) => {
-      const filtrados = new Set(Array.from(prev).filter((id) => idsVigentes.has(id)));
-      return filtrados.size === prev.size ? prev : filtrados;
-    });
-  }, [novedadesSeccion]);
-
-  // Notificar cambios en preview list
-  useEffect(() => {
-    onPreviewListChange?.(Array.from(previewIds));
-  }, [previewIds, onPreviewListChange]);
-  const handleTogglePreview = (id: string, checked: boolean) => {
-    setPreviewIds(prev => {
-      const newSet = new Set(prev);
-      if (checked) newSet.add(id);
-      else newSet.delete(id);
-      return newSet;
-    });
-  };
-  const handleToggleActivo = async (id: string, checked: boolean) => {
-    await toggleActivo.mutateAsync({
-      id,
-      activo: checked
-    });
-
-    // Si se desactiva, también se oculta de preview.
-    if (!checked) {
-      setPreviewIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  };
-  const handleCampoTipoChange = (key: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      campos_tipo: {
-        ...prev.campos_tipo,
-        [key]: value
-      }
-    }));
-  };
-  const camposActuales = CAMPOS_POR_TIPO[formData.tipo] || [];
-  const handleAbrirModalTono = () => {
-    if (!formData.descripcion.trim()) {
-      toast.error("Escribe primero alguna idea o texto en la descripción");
-      return;
-    }
-    setTonoModalOpen(true);
-  };
-
-  // Efecto para rotar mensajes de carga
   useEffect(() => {
     if (!generandoDescripcion) return;
     const interval = setInterval(() => {
-      setLoadingMessageIndex(prev => {
-        const next = (prev + 1) % LOADING_MESSAGES.length;
-        setLoadingMessage(LOADING_MESSAGES[next]);
-        return next;
-      });
+      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
     }, 2000);
     return () => clearInterval(interval);
   }, [generandoDescripcion]);
-  const handleGenerarDescripcion = async () => {
-    setTonoModalOpen(false);
-    setLoadingMessageIndex(0);
-    setLoadingMessage(LOADING_MESSAGES[0]);
-    setResultadoWebhook(null);
 
-    // Campos opcionales - no validamos como obligatorios
-    const campos = formData.campos_tipo ?? {};
+  // --- Utilidades -----------------------------------------------------------
+  const setCampo = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-    // Construir texto enriquecido con los campos del tipo
-    let textoEnriquecido = formData.descripcion;
-    if (Object.keys(campos).length > 0) {
-      const detalles = camposActuales.filter(campo => campos[campo.key]).map(campo => `${campo.label}: ${campos[campo.key]}`).join(". ");
-      if (detalles) {
-        textoEnriquecido += `. Detalles: ${detalles}`;
-      }
-    }
-    setGenerandoDescripcion(true);
+  const setTraduccion = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+    setTraduccionManual(true);
+    setCampo(field, value);
+  };
+
+  /** Borra de Storage una imagen del bucket si ninguna novedad la usa. Nunca bloquea. */
+  const borrarImagenSiHuerfana = async (url: string | null | undefined, excluirId?: string) => {
+    const ruta = rutaEnBucket(url);
+    if (!ruta) return;
+    const enUso = novedades.some((n) => n.id !== excluirId && n.imagen_url === url);
+    if (enUso) return;
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke("format-novedad", {
-        body: {
-          tipo: formData.tipo === "plato_nuevo" ? "plato" : formData.tipo === "promocion" ? "promo" : formData.tipo === "anuncio" ? "anuncio" : formData.tipo,
-          // evento, festivo se envían tal cual
-          idioma: "es",
-          tono: tonoSeleccionado,
-          texto: textoEnriquecido,
-          canal: configSeccion.canalWebhook,
-          campos_extra: formData.campos_tipo
-        }
-      });
-      if (error) {
-        console.error("Error al llamar webhook:", error);
-        toast.error("Error al generar la descripción");
-        setGenerandoDescripcion(false);
-        return;
-      }
-      console.log("Respuesta del webhook:", data);
+      const { error: removeError } = await supabase.storage.from(BUCKET).remove([ruta]);
+      if (removeError) console.error("No se pudo borrar la imagen de Storage (novedades):", removeError);
+    } catch (err) {
+      console.error("Error borrando imagen de Storage (novedades):", err);
+    }
+  };
 
-      // Guardar resultado y mostrar modal de resultados
-      setResultadoWebhook(data);
-      setGenerandoDescripcion(false);
-      setResultadoModalOpen(true);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al conectar con el servicio");
-      setGenerandoDescripcion(false);
+  /** Una imagen subida en este formulario que no llegó a guardarse. */
+  const descartarSubidaSinGuardar = () => {
+    if (formData.imagen_url && formData.imagen_url !== imagenOriginal) {
+      void borrarImagenSiHuerfana(formData.imagen_url);
     }
   };
-  const handleAplicarResultado = () => {
-    if (!resultadoWebhook) return;
 
-    // Aplicar los datos devueltos por el webhook
-    if (resultadoWebhook.title) {
-      handleInputChange("titulo", resultadoWebhook.title);
-    }
-    if (resultadoWebhook.subtitle) {
-      handleInputChange("subtitle", resultadoWebhook.subtitle);
-    }
-    if (resultadoWebhook.body) {
-      handleInputChange("descripcion", resultadoWebhook.body);
-    }
-    if (resultadoWebhook.bullets && Array.isArray(resultadoWebhook.bullets)) {
-      setFormData(prev => ({
-        ...prev,
-        bullets: resultadoWebhook.bullets || []
-      }));
-    }
-    if (resultadoWebhook.cta) {
-      if (resultadoWebhook.cta.text) handleInputChange("badge_text", resultadoWebhook.cta.text);
-      if (resultadoWebhook.cta.url) handleInputChange("cta_url", resultadoWebhook.cta.url);
-    }
-    if (resultadoWebhook.tags && Array.isArray(resultadoWebhook.tags)) {
-      setFormData(prev => ({
-        ...prev,
-        tags: resultadoWebhook.tags || []
-      }));
-    }
-    toast.success("Contenido aplicado correctamente");
-    setResultadoModalOpen(false);
-    setResultadoWebhook(null);
+  const cargarEnFormulario = (novedad: Novedad | null) => {
+    const datos = novedad ? formularioDesdeNovedad(novedad) : nuevoFormulario();
+    setEditingId(novedad?.id ?? null);
+    setFormData(datos);
+    setHuellaGuardada(huellaFormulario(datos));
+    // Se asume que las traducciones guardadas corresponden al español guardado.
+    setHuellaTraducida(huellaEspanol(datos));
+    setTraduccionManual(false);
+    setImagenOriginal(datos.imagen_url);
+    setNuevaEtiqueta("");
   };
-  const handleReenviar = () => {
-    setResultadoModalOpen(false);
-    handleGenerarDescripcion();
+
+  /** Ejecuta `accion` y, si hay cambios sin guardar, pregunta antes. */
+  const conConfirmacion = (accion: () => void) => {
+    if (hayCambios) {
+      setAccionPendiente(() => accion);
+      return;
+    }
+    accion();
   };
-  const handleCambiarTono = () => {
-    setResultadoModalOpen(false);
-    setTonoModalOpen(true);
-  };
-  const handleInputChange = (field: keyof FormData, value: string | boolean | string[] | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-  const handlePreview = () => {
-    onPreview({
-      titulo: formData.titulo,
-      descripcion: formData.descripcion,
-      titulo_en: formData.titulo_en,
-      descripcion_en: formData.descripcion_en,
-      titulo_fr: formData.titulo_fr,
-      descripcion_fr: formData.descripcion_fr,
-      imagen_url: formData.imagen_url,
-      imagen_posicion_y: formData.imagen_posicion_y,
-      badge_text: formData.badge_text,
-      badge_text_en: formData.badge_text_en,
-      badge_text_fr: formData.badge_text_fr,
-      icono: formData.icono,
-      destacado: formData.destacado,
-      bullets: formData.bullets,
-      bullets_en: formData.bullets_en,
-      bullets_fr: formData.bullets_fr,
-      tags: formData.tags,
-      tags_en: formData.tags_en,
-      tags_fr: formData.tags_fr,
+
+  const empezarEdicion = (novedad: Novedad) => {
+    if (novedad.id === editingId) return;
+    conConfirmacion(() => {
+      descartarSubidaSinGuardar();
+      cargarEnFormulario(novedad);
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
 
-  const handleTranslate = async () => {
-    if (!formData.titulo.trim()) {
-      toast.error("Escribe primero un título para traducir");
-      return;
-    }
-    
-    setIsTranslating(true);
+  const empezarNueva = () => {
+    conConfirmacion(() => {
+      descartarSubidaSinGuardar();
+      cargarEnFormulario(null);
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => tituloRef.current?.focus(), 300);
+    });
+  };
+
+  // --- Lista y orden --------------------------------------------------------
+  // Se muestran TODAS las filas de la tabla: la web pública no filtra por
+  // sección ni por tipo, así que cualquier fila activa y vigente sale en la
+  // web y tiene que poder gestionarse desde aquí.
+  const lista = novedades;
+
+  const moverNovedad = async (index: number, direccion: -1 | 1) => {
+    const destino = index + direccion;
+    if (destino < 0 || destino >= lista.length) return;
+    const ids = lista.map((n) => n.id);
+    [ids[index], ids[destino]] = [ids[destino], ids[index]];
     try {
-      // Antes: 'traducir-novedad', proxy al webhook de n8n, que devolvía las
-      // claves planas (data.titulo_en, ...). Ahora: 'traducir-contenido' con
-      // tipo 'novedad', que las devuelve anidadas en {ok, translations}.
-      // Mismas claves dentro de translations, así que solo cambia el nivel.
-      const { data, error } = await supabase.functions.invoke("traducir-contenido", {
-        body: {
-          tipo: "novedad",
-          datos: {
-            titulo: formData.titulo,
-            descripcion: formData.descripcion,
-            badge_text: formData.badge_text,
-            bullets: formData.bullets,
-            tags: formData.tags,
-          },
-        }
-      });
-
-      if (error) {
-        console.error("Error al traducir:", error);
-        toast.error("Error al traducir la novedad");
-        return;
-      }
-
-      // traducir-contenido responde 200 con {ok:false, error} cuando falla
-      // OpenAI, a propósito, para no romper el flujo de guardado.
-      if (!data?.ok) {
-        console.error("Error al traducir:", data?.error);
-        toast.error("Error al traducir la novedad");
-        return;
-      }
-
-      const t = data.translations || {};
-
-      // Actualizar formData con las traducciones
-      setFormData(prev => ({
-        ...prev,
-        titulo_en: t.titulo_en || prev.titulo_en,
-        titulo_fr: t.titulo_fr || prev.titulo_fr,
-        descripcion_en: t.descripcion_en || prev.descripcion_en,
-        descripcion_fr: t.descripcion_fr || prev.descripcion_fr,
-        badge_text_en: t.badge_text_en || prev.badge_text_en,
-        badge_text_fr: t.badge_text_fr || prev.badge_text_fr,
-        bullets_en: t.bullets_en || prev.bullets_en,
-        bullets_fr: t.bullets_fr || prev.bullets_fr,
-        tags_en: t.tags_en || prev.tags_en,
-        tags_fr: t.tags_fr || prev.tags_fr,
-      }));
-
-      toast.success("¡Traducción completada! 🌍");
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al conectar con el servicio de traducción");
-    } finally {
-      setIsTranslating(false);
+      await reordenar.mutateAsync(ids);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo cambiar el orden. Inténtalo de nuevo.");
     }
   };
-  const handleClearPreview = () => {
-    onPreview(null);
+
+  const handleToggleActivo = async (novedad: Novedad, checked: boolean) => {
+    setTogglingId(novedad.id);
+    try {
+      await toggleActivo.mutateAsync({ id: novedad.id, activo: checked });
+      toast.success(checked ? `«${novedad.titulo}» vuelve a mostrarse en la web` : `«${novedad.titulo}» ya no se muestra en la web`);
+      if (novedad.id === editingId) {
+        // Mantener el formulario coherente con lo guardado sin perder otros cambios.
+        setFormData((prev) => ({ ...prev, activo: checked }));
+        setHuellaGuardada((prev) => {
+          const base = JSON.parse(prev) as Record<string, unknown>;
+          return JSON.stringify({ ...base, activo: checked });
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo cambiar la visibilidad. Inténtalo de nuevo.");
+    } finally {
+      setTogglingId(null);
+    }
   };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await eliminarNovedad.mutateAsync(deleteTarget.id);
+      await borrarImagenSiHuerfana(deleteTarget.imagen_url, deleteTarget.id);
+      toast.success(`«${deleteTarget.titulo}» eliminada`);
+      if (deleteTarget.id === editingId) cargarEnFormulario(null);
+      setDeleteTarget(null);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo eliminar la novedad.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // --- Imagen ---------------------------------------------------------------
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Permite volver a elegir el mismo fichero después de quitarlo.
+    e.target.value = "";
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("El archivo tiene que ser una imagen (JPG, PNG o WebP).");
+      return;
+    }
+    if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
+      toast.error(`La imagen pesa demasiado (máximo ${MAX_IMAGEN_MB} MB).`);
+      return;
+    }
     setUploading(true);
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `novedades/${fileName}`;
-      const {
-        error: uploadError
-      } = await supabase.storage.from("novedades").upload(filePath, file);
+      const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const filePath = `novedades/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
+        contentType: file.type,
+      });
       if (uploadError) throw uploadError;
-      const {
-        data
-      } = supabase.storage.from("novedades").getPublicUrl(filePath);
-      handleInputChange("imagen_url", data.publicUrl);
-      toast.success("Imagen subida correctamente");
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
+      // Si ya había una subida sin guardar en este formulario, se descarta.
+      descartarSubidaSinGuardar();
+      setFormData((prev) => ({ ...prev, imagen_url: data.publicUrl, imagen_posicion_y: 50 }));
+      toast.success("Imagen subida. Ajusta el encuadre si hace falta.");
     } catch (error) {
       console.error("Error uploading image:", error);
-      toast.error("Error al subir la imagen");
+      toast.error("No se pudo subir la imagen.");
     } finally {
       setUploading(false);
     }
   };
-  const handleEdit = (novedad: any) => {
-    setEditingId(novedad.id);
-    setFormData({
-      tipo: novedad.tipo || "anuncio",
-      titulo: novedad.titulo || "",
-      descripcion: novedad.descripcion || "",
-      titulo_en: novedad.titulo_en || "",
-      descripcion_en: novedad.descripcion_en || "",
-      titulo_fr: novedad.titulo_fr || "",
-      descripcion_fr: novedad.descripcion_fr || "",
-      badge_text: novedad.badge_text || "",
-      badge_text_en: novedad.badge_text_en || "",
-      badge_text_fr: novedad.badge_text_fr || "",
-      icono: novedad.icono || "utensils",
-      imagen_url: novedad.imagen_url || "",
-      imagen_posicion_y: novedad.imagen_posicion_y ?? 50,
-      fecha_inicio: novedad.fecha_inicio?.split("T")[0] || new Date().toISOString().split("T")[0],
-      fecha_fin: novedad.fecha_fin?.split("T")[0] || "",
-      activo: novedad.activo ?? true,
-      destacado: novedad.destacado ?? false,
-      bullets: novedad.bullets || [],
-      bullets_en: novedad.bullets_en || [],
-      bullets_fr: novedad.bullets_fr || [],
-      cta_text: "",
-      cta_url: "",
-      subtitle: "",
-      tags: novedad.tags || [],
-      tags_en: novedad.tags_en || [],
-      tags_fr: novedad.tags_fr || [],
-      campos_tipo: {}
-    });
+
+  const quitarImagen = () => {
+    descartarSubidaSinGuardar();
+    setFormData((prev) => ({ ...prev, imagen_url: "", imagen_posicion_y: 50 }));
   };
-  const handleCancel = () => {
-    setEditingId(null);
-    setFormData(initialFormData);
-    handleClearPreview();
+
+  // --- Traducción -----------------------------------------------------------
+  const traducir = async (datos: FormData): Promise<Partial<FormData> | null> => {
+    try {
+      const { data, error } = await supabase.functions.invoke("traducir-contenido", {
+        body: {
+          tipo: "novedad",
+          datos: {
+            titulo: datos.titulo,
+            descripcion: datos.descripcion,
+            badge_text: datos.badge_text,
+            bullets: datos.bullets,
+            tags: datos.tags,
+          },
+        },
+      });
+      // traducir-contenido responde 200 con {ok:false, error} si falla OpenAI.
+      if (error || !data?.ok) {
+        console.error("Error al traducir:", error ?? data?.error);
+        return null;
+      }
+      const t = data.translations || {};
+      return {
+        titulo_en: t.titulo_en || "",
+        titulo_fr: t.titulo_fr || "",
+        descripcion_en: t.descripcion_en || "",
+        descripcion_fr: t.descripcion_fr || "",
+        badge_text_en: t.badge_text_en || "",
+        badge_text_fr: t.badge_text_fr || "",
+        bullets_en: t.bullets_en || [],
+        bullets_fr: t.bullets_fr || [],
+        tags_en: t.tags_en || [],
+        tags_fr: t.tags_fr || [],
+      };
+    } catch (e) {
+      console.error("Error al traducir:", e);
+      return null;
+    }
   };
-  const handleSubmit = async () => {
+
+  const handleTranslate = async () => {
     if (!formData.titulo.trim()) {
-      toast.error("El título es obligatorio");
+      toast.error("Escribe primero el título en español.");
       return;
     }
-    const data = {
+    setIsTranslating(true);
+    const t = await traducir(formData);
+    setIsTranslating(false);
+    if (!t) {
+      toast.error("El traductor automático no está disponible ahora mismo. Puedes escribir las traducciones a mano.");
+      return;
+    }
+    setFormData((prev) => ({ ...prev, ...t }));
+    setHuellaTraducida(huellaEspanol(formData));
+    setTraduccionManual(false);
+    setTraduccionesAbiertas(true);
+    toast.success("Traducciones actualizadas. Revísalas antes de guardar.");
+  };
+
+  // --- Guardar --------------------------------------------------------------
+  const handleSubmit = async () => {
+    const titulo = formData.titulo.trim();
+    if (!titulo) {
+      toast.error("El título es obligatorio.");
+      tituloRef.current?.focus();
+      return;
+    }
+    if (formData.fecha_fin && formData.fecha_inicio && formData.fecha_fin < formData.fecha_inicio) {
+      toast.error("La fecha «hasta» no puede ser anterior a la fecha «desde».");
+      return;
+    }
+
+    setIsSaving(true);
+    let datos = formData;
+    let avisoTraduccion: string | null = null;
+
+    // Traducción automática al guardar si el español ha cambiado desde la
+    // última traducción y nadie ha tocado las traducciones a mano. Antes solo
+    // se traducía al CREAR: al editar una novedad las versiones EN/FR se
+    // quedaban con el texto viejo para siempre.
+    if (espanolCambiado && !traduccionManual) {
+      const t = await traducir(formData);
+      if (t) {
+        datos = { ...formData, ...t };
+      } else {
+        avisoTraduccion = tieneTraducciones
+          ? "No se pudo actualizar la traducción: en inglés y francés sigue el texto anterior."
+          : "No se pudo traducir: en inglés y francés se mostrará el texto en español.";
+      }
+    }
+
+    const nullSiVacio = (v: string) => (v.trim() ? v.trim() : null);
+    const arrayONull = (v: string[]) => {
+      const limpio = v.map((x) => x.trim()).filter(Boolean);
+      return limpio.length > 0 ? limpio : null;
+    };
+
+    const payload = {
       tipo: "anuncio" as const,
       tipo_asociacion: "seccion" as const,
-      seccion: configSeccion.dbValue,
-      titulo: formData.titulo,
-      descripcion: formData.descripcion,
-      titulo_en: formData.titulo_en || null,
-      descripcion_en: formData.descripcion_en || null,
-      titulo_fr: formData.titulo_fr || null,
-      descripcion_fr: formData.descripcion_fr || null,
-      badge_text: formData.badge_text || null,
-      badge_text_en: formData.badge_text_en || null,
-      badge_text_fr: formData.badge_text_fr || null,
-      icono: formData.icono,
-      imagen_url: formData.imagen_url || null,
-      imagen_posicion_y: Math.round(formData.imagen_posicion_y),
-      fecha_inicio: formData.fecha_inicio,
-      fecha_fin: formData.fecha_fin || null,
-      activo: formData.activo,
-      destacado: formData.destacado,
-      bullets: formData.bullets.length > 0 ? formData.bullets : null,
-      bullets_en: formData.bullets_en.length > 0 ? formData.bullets_en : null,
-      bullets_fr: formData.bullets_fr.length > 0 ? formData.bullets_fr : null,
-      tags: formData.tags.length > 0 ? formData.tags : null,
-      tags_en: formData.tags_en.length > 0 ? formData.tags_en : null,
-      tags_fr: formData.tags_fr.length > 0 ? formData.tags_fr : null,
+      seccion: SECCION_NOVEDADES,
+      titulo,
+      descripcion: datos.descripcion.trim(),
+      titulo_en: nullSiVacio(datos.titulo_en),
+      descripcion_en: nullSiVacio(datos.descripcion_en),
+      titulo_fr: nullSiVacio(datos.titulo_fr),
+      descripcion_fr: nullSiVacio(datos.descripcion_fr),
+      badge_text: nullSiVacio(datos.badge_text),
+      badge_text_en: nullSiVacio(datos.badge_text_en),
+      badge_text_fr: nullSiVacio(datos.badge_text_fr),
+      icono: datos.icono,
+      imagen_url: datos.imagen_url || null,
+      imagen_posicion_y: Math.round(datos.imagen_posicion_y),
+      fecha_inicio: datos.fecha_inicio || hoyLocal(),
+      fecha_fin: datos.fecha_fin || null,
+      activo: datos.activo,
+      destacado: datos.destacado,
+      bullets: arrayONull(datos.bullets),
+      bullets_en: arrayONull(datos.bullets_en),
+      bullets_fr: arrayONull(datos.bullets_fr),
+      tags: arrayONull(datos.tags),
+      tags_en: arrayONull(datos.tags_en),
+      tags_fr: arrayONull(datos.tags_fr),
     };
-    setIsSaving(true);
+
     try {
-      if (editingId && editingId !== "new") {
-        // Actualizar: no llama al webhook
-        await actualizarNovedad.mutateAsync({
-          id: editingId,
-          ...data
-        });
-        toast.success("Novedad actualizada");
+      if (editingId) {
+        await actualizarNovedad.mutateAsync({ id: editingId, ...payload });
+        if (imagenOriginal && imagenOriginal !== payload.imagen_url) {
+          await borrarImagenSiHuerfana(imagenOriginal, editingId);
+        }
       } else {
-        // Crear: llama al webhook automáticamente desde el hook
-        await crearNovedad.mutateAsync(data);
-        toast.success("Novedad creada");
+        // Las nuevas salen las primeras (orden menor que el de todas las demás).
+        const ordenMinimo = novedades.reduce((min, n) => Math.min(min, n.orden ?? 0), 0);
+        await crearNovedad.mutateAsync({ ...payload, orden: ordenMinimo - 1 });
       }
-      handleCancel();
-    } catch (error) {
-      toast.error("Error al guardar la novedad");
+
+      const estado = estadoEnWeb(payload);
+      const accion = editingId ? "Cambios guardados" : "Novedad creada";
+      if (estado.clave === "visible") {
+        toast.success(`${accion}. Ya se ve en la web (recarga la página para verla).`);
+      } else {
+        toast.success(`${accion}. No se muestra en la web: ${estado.texto.toLowerCase()}.`);
+      }
+      if (avisoTraduccion) toast.warning(avisoTraduccion, { duration: 10000 });
+
+      cargarEnFormulario(null);
+    } catch (e) {
+      console.error(e);
+      const mensaje = e instanceof Error ? e.message : "Error desconocido";
+      toast.error(`No se pudo guardar la novedad: ${mensaje}`);
     } finally {
       setIsSaving(false);
     }
   };
-  const handleDelete = async () => {
-    if (!deleteId) return;
+
+  // --- IA: "Hacer descripción" ----------------------------------------------
+  const camposActuales = CAMPOS_POR_TIPO[formData.tipo] || [];
+
+  const handleAbrirModalTono = () => {
+    if (!formData.descripcion.trim()) {
+      toast.error("Escribe primero alguna idea en la descripción.");
+      return;
+    }
+    setTonoModalOpen(true);
+  };
+
+  const handleGenerarDescripcion = async () => {
+    setTonoModalOpen(false);
+    setLoadingMessageIndex(0);
+    setResultadoIA(null);
+
+    const campos = formData.campos_tipo ?? {};
+    let textoEnriquecido = formData.descripcion;
+    const detalles = camposActuales
+      .filter((campo) => campos[campo.key])
+      .map((campo) => `${campo.label}: ${campos[campo.key]}`)
+      .join(". ");
+    if (detalles) textoEnriquecido += `. Detalles: ${detalles}`;
+
+    setGenerandoDescripcion(true);
     try {
-      await eliminarNovedad.mutateAsync(deleteId);
-      toast.success("Novedad eliminada");
-      setDeleteId(null);
+      const { data, error } = await supabase.functions.invoke("format-novedad", {
+        body: {
+          tipo:
+            formData.tipo === "plato_nuevo" ? "plato" : formData.tipo === "promocion" ? "promo" : formData.tipo,
+          idioma: "es",
+          tono: tonoSeleccionado,
+          texto: textoEnriquecido,
+          canal: "novedades",
+          campos_extra: formData.campos_tipo,
+        },
+      });
+      if (error) {
+        console.error("Error al llamar a format-novedad:", error);
+        toast.error("No se pudo generar la descripción. Inténtalo de nuevo.");
+        return;
+      }
+      const resultado = data as ResultadoIA;
+      // format-novedad NUNCA devuelve error: si falla OpenAI responde 200 con
+      // meta.source = "fallback" y el texto original. Antes eso se mostraba
+      // como si fuera un resultado y parecía que la IA "no hacía nada".
+      if (resultado?.meta?.source === "fallback") {
+        toast.error(resultado.meta.missing?.[0] || "El generador de textos no está disponible ahora mismo.");
+        return;
+      }
+      setResultadoIA(resultado);
     } catch (error) {
-      toast.error("Error al eliminar");
+      console.error("Error:", error);
+      toast.error("No se pudo conectar con el generador de textos.");
+    } finally {
+      setGenerandoDescripcion(false);
     }
   };
-  const getEstadoBadge = (novedad: any) => {
-    const hoy = new Date();
-    const inicio = new Date(novedad.fecha_inicio);
-    const fin = novedad.fecha_fin ? new Date(novedad.fecha_fin) : null;
-    if (!novedad.activo) return <Badge variant="secondary">Inactivo</Badge>;
-    if (inicio > hoy) return <Badge variant="outline">Programado</Badge>;
-    if (fin && fin < hoy) return <Badge variant="destructive">Expirado</Badge>;
-    return <Badge variant="default">Activo</Badge>;
+
+  const handleAplicarResultado = () => {
+    if (!resultadoIA) return;
+    setFormData((prev) => ({
+      ...prev,
+      titulo: resultadoIA.title || prev.titulo,
+      descripcion: resultadoIA.body || prev.descripcion,
+      bullets: Array.isArray(resultadoIA.bullets) && resultadoIA.bullets.length > 0 ? resultadoIA.bullets : prev.bullets,
+      tags: Array.isArray(resultadoIA.tags) && resultadoIA.tags.length > 0 ? resultadoIA.tags : prev.tags,
+    }));
+    toast.success("Texto aplicado. Revísalo y pulsa «Guardar».");
+    setResultadoIA(null);
   };
-  return <div className="space-y-6">
-      {/* Lista de novedades existentes */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">
-            {configSeccion.plural} ({novedadesSeccion.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 max-h-48 overflow-y-auto">
-          {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : novedadesSeccion.length === 0 ? <p className="text-sm text-muted-foreground">No hay {configSeccion.plural.toLowerCase()}</p> : novedadesSeccion.map(novedad => <div key={novedad.id} className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors gap-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-sm font-medium truncate">{novedad.titulo}</span>
+
+  // --- Vista previa ---------------------------------------------------------
+  // Lo que vería el público: filas visibles hoy, en el orden de la web, con la
+  // que se está editando sustituida por el borrador (en vivo, sin botón).
+  const idBorrador = editingId ?? ID_NUEVA;
+  const novedadesPreview = useMemo(() => {
+    type Item = NovedadPreview & { _orden: number; _pos: number };
+    const items: Item[] = [];
+    lista.forEach((n, pos) => {
+      if (n.id === editingId) return;
+      if (estadoEnWeb(n).clave !== "visible") return;
+      items.push({ ...aPreview(n, n.id), _orden: n.orden ?? 0, _pos: pos });
+    });
+    const ordenBorrador = editingId
+      ? novedadEditada?.orden ?? 0
+      : lista.reduce((min, n) => Math.min(min, n.orden ?? 0), 0) - 1;
+    const posBorrador = editingId ? lista.findIndex((n) => n.id === editingId) : -1;
+    const tieneContenido = formData.titulo.trim() || formData.descripcion.trim() || formData.imagen_url;
+    if (editingId || tieneContenido) {
+      items.push({
+        ...aPreview(formData, idBorrador),
+        avisoVisibilidad: estadoBorrador.clave === "visible" ? null : `No se verá en la web: ${estadoBorrador.texto.toLowerCase()}`,
+        _orden: ordenBorrador,
+        _pos: posBorrador,
+      });
+    }
+    items.sort(
+      (a, b) => Number(!!b.destacado) - Number(!!a.destacado) || a._orden - b._orden || a._pos - b._pos,
+    );
+    return items.map(({ _orden: _o, _pos: _p, ...rest }) => rest);
+  }, [lista, editingId, novedadEditada, formData, idBorrador, estadoBorrador.clave, estadoBorrador.texto]);
+
+  const visiblesEnWeb = lista.filter((n) => estadoEnWeb(n).clave === "visible").length;
+
+  const vistaPrevia = <MobilePreview novedades={novedadesPreview} idResaltado={idBorrador} />;
+
+  // --- Render ---------------------------------------------------------------
+  return (
+    <div className="space-y-6">
+      <CabeceraPestana
+        titulo="Novedades"
+        descripcion="Tarjetas de la sección «Novedades» de la web de Casa Tomás. Los cambios se ven en la web al momento."
+        acciones={
+          <Button onClick={empezarNueva}>
+            <Plus className="w-4 h-4 mr-1.5" />
+            Nueva novedad
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        <div className="space-y-6 min-w-0">
+          {/* ------------------------------------------------ Lista */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                Publicadas y guardadas
+                <Badge variant="secondary">{lista.length}</Badge>
+              </CardTitle>
+              <CardDescription>
+                {visiblesEnWeb === 1 ? "1 se ve" : `${visiblesEnWeb} se ven`} ahora mismo en la web. El orden de esta
+                lista es el de la web: usa las flechas para cambiarlo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[0, 1, 2].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  {/* Toggle Activo */}
-                  <div className="flex items-center gap-1">
-                    <Switch
-                      checked={!!novedad.activo}
-                      onCheckedChange={(checked) => handleToggleActivo(novedad.id, checked)}
-                      className="scale-75"
-                    />
-                    <span className={`text-[10px] w-12 ${novedad.activo ? 'text-green-600' : 'text-muted-foreground'}`}>
-                      {novedad.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
-                  {/* Toggle Preview */}
-                  <div className="gap-[4px] items-center justify-start flex flex-row my-0 px-[7px]">
-                    <Switch
-                      checked={previewIds.has(novedad.id)}
-                      onCheckedChange={(checked) => handleTogglePreview(novedad.id, checked)}
-                      className="scale-75"
-                    />
-                    <Eye className={`w-3.5 h-3.5 ${previewIds.has(novedad.id) ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </div>
-                  {/* Acciones */}
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(novedad)}>
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(novedad.id)}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+              ) : isError ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>No se pudieron cargar las novedades</AlertTitle>
+                  <AlertDescription className="space-y-2">
+                    <p>{error instanceof Error ? error.message : "Error desconocido"}</p>
+                    <Button size="sm" variant="outline" className="bg-background" onClick={() => refetch()}>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Reintentar
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : lista.length === 0 ? (
+                <div className="flex flex-col items-center text-center gap-2 py-8">
+                  <Newspaper className="w-8 h-8 text-muted-foreground/60" />
+                  <p className="text-sm font-medium">Todavía no hay novedades</p>
+                  <p className="text-xs text-muted-foreground max-w-xs">
+                    Crea la primera con el formulario de abajo: un plato nuevo, una promoción o un evento.
+                  </p>
                 </div>
-              </div>)}
-        </CardContent>
-      </Card>
+              ) : (
+                <ul className="space-y-2" aria-label="Novedades">
+                  {lista.map((novedad, index) => {
+                    const estado = estadoEnWeb(novedad);
+                    const esEditada = novedad.id === editingId;
+                    const mismoGrupoArriba = index > 0 && !!lista[index - 1].destacado === !!novedad.destacado;
+                    const mismoGrupoAbajo =
+                      index < lista.length - 1 && !!lista[index + 1].destacado === !!novedad.destacado;
+                    return (
+                      <li
+                        key={novedad.id}
+                        className={`flex items-center gap-3 p-2 pr-1 rounded-lg border transition-colors ${
+                          esEditada ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/50"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => empezarEdicion(novedad)}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label={`Editar «${novedad.titulo}»`}
+                        >
+                          <div className="h-10 w-14 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                            {novedad.imagen_url ? (
+                              <img
+                                src={novedad.imagen_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                                style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <ImageIcon className="w-4 h-4 text-muted-foreground/60" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{novedad.titulo || "Sin título"}</p>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${ESTILO_ESTADO[estado.clave]}`}>
+                                {estado.texto}
+                              </Badge>
+                              {novedad.destacado && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                  <Star className="w-2.5 h-2.5 mr-0.5" />
+                                  Destacada
+                                </Badge>
+                              )}
+                              {esEditada && <span className="text-[10px] text-primary font-medium">Editando</span>}
+                            </div>
+                          </div>
+                        </button>
 
-      {/* Formulario de edición - Siempre visible */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">
-            {editingId && editingId !== "new"
-              ? `Editar ${configSeccion.singular}`
-              : `Nueva ${configSeccion.singular}`}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {/* Tipo e Icono */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Tipo</Label>
-              <Select value={formData.tipo} onValueChange={v => handleInputChange("tipo", v)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIPOS_NOVEDAD.map(t => <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Icono</Label>
-              <Select value={formData.icono} onValueChange={v => handleInputChange("icono", v)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ICONOS.map(i => {
-                  const Icon = i.icon;
-                  return <SelectItem key={i.value} value={i.value}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="w-4 h-4" />
-                          {i.label}
-                        </div>
-                      </SelectItem>;
-                })}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Título y Badge */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 space-y-1.5">
-              <Label className="text-xs">Título *</Label>
-              <Input value={formData.titulo} onChange={e => handleInputChange("titulo", e.target.value)} placeholder="Título de la novedad" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Badge</Label>
-              <Input value={formData.badge_text} onChange={e => handleInputChange("badge_text", e.target.value)} placeholder="Nuevo" className="h-9" />
-            </div>
-          </div>
-
-          {/* Campos específicos según tipo */}
-          {camposActuales.length > 0 && <div className="space-y-2 p-3 rounded-lg bg-accent/30 border">
-              <p className="text-xs font-medium text-muted-foreground">
-                📋 Datos para {TIPOS_NOVEDAD.find(t => t.value === formData.tipo)?.label}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {camposActuales.map(campo => <div key={campo.key} className="space-y-1">
-                    <Label className="text-xs">{campo.label}</Label>
-                    <Input type={campo.type || "text"} value={(formData.campos_tipo ?? {})[campo.key] || ""} onChange={e => handleCampoTipoChange(campo.key, e.target.value)} placeholder={campo.placeholder} className="h-8 text-sm" step={campo.type === "number" ? "0.01" : undefined} />
-                  </div>)}
-              </div>
-            </div>}
-
-          {/* Descripción */}
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Descripción / Ideas</Label>
-              <Textarea value={formData.descripcion} onChange={e => handleInputChange("descripcion", e.target.value)} placeholder="Escribe ideas o un borrador de la descripción..." className="min-h-16 resize-none" />
-              <Button type="button" variant="outline" size="sm" className="mt-1" onClick={handleAbrirModalTono} disabled={generandoDescripcion}>
-                {generandoDescripcion ? <>
-                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1" />
-                    Generando...
-                  </> : <>
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Hacer descripción
-                  </>}
-              </Button>
-            </div>
-
-            {/* Campos generados por el webhook - solo visibles si tienen contenido */}
-            {(formData.subtitle || (formData.bullets?.length ?? 0) > 0 || formData.cta_text || (formData.tags?.length ?? 0) > 0) && <div className="space-y-3 p-3 rounded-lg bg-muted/50 border border-dashed">
-                <p className="text-xs text-muted-foreground font-medium">✨ Contenido generado</p>
-
-                {/* Subtítulo */}
-                {formData.subtitle && <div className="space-y-1">
-                    <Label className="text-xs">Subtítulo</Label>
-                    <Input value={formData.subtitle} onChange={e => handleInputChange("subtitle", e.target.value)} className="h-8 text-sm" />
-                  </div>}
-
-                {/* Bullets */}
-                {(formData.bullets?.length ?? 0) > 0 && <div className="space-y-1.5">
-                    <Label className="text-xs">Puntos destacados</Label>
-                    <div className="space-y-1">
-                      {formData.bullets?.map((bullet, index) => <div key={index} className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <Input value={bullet} onChange={e => {
-                    const newBullets = [...(formData.bullets ?? [])];
-                    newBullets[index] = e.target.value;
-                    handleInputChange("bullets", newBullets);
-                  }} className="h-7 text-sm flex-1" />
-                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                    const newBullets = (formData.bullets ?? []).filter((_, i) => i !== index);
-                    handleInputChange("bullets", newBullets);
-                  }}>
-                            <X className="w-3 h-3" />
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <label className="flex items-center gap-1.5 px-1.5 cursor-pointer" title="Mostrar u ocultar en la web">
+                            <Switch
+                              checked={!!novedad.activo}
+                              disabled={togglingId === novedad.id}
+                              onCheckedChange={(checked) => handleToggleActivo(novedad, checked)}
+                              aria-label={`Visible en la web: «${novedad.titulo}»`}
+                            />
+                            <span className="hidden sm:inline text-xs text-muted-foreground w-12">
+                              {novedad.activo ? "Visible" : "Oculta"}
+                            </span>
+                          </label>
+                          <div className="flex flex-col">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-5 w-7"
+                              disabled={!mismoGrupoArriba || reordenar.isPending}
+                              onClick={() => moverNovedad(index, -1)}
+                              aria-label="Subir"
+                              title="Subir"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-5 w-7"
+                              disabled={!mismoGrupoAbajo || reordenar.isPending}
+                              onClick={() => moverNovedad(index, 1)}
+                              aria-label="Bajar"
+                              title="Bajar"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => empezarEdicion(novedad)}
+                            aria-label="Editar"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
                           </Button>
-                        </div>)}
-                    </div>
-                  </div>}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(novedad)}
+                            aria-label="Eliminar"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
 
-                {/* CTA */}
-                {formData.cta_text}
-
-                {/* Tags */}
-                {(formData.tags?.length ?? 0) > 0 && <div className="space-y-1">
-                    <Label className="text-xs">Etiquetas</Label>
-                    <div className="flex flex-wrap gap-1">
-                      {formData.tags?.map((tag, index) => <Badge key={index} variant="secondary" className="text-xs gap-1">
-                          {tag}
-                          <button type="button" onClick={() => {
-                    const newTags = (formData.tags ?? []).filter((_, i) => i !== index);
-                    handleInputChange("tags", newTags);
-                  }} className="ml-1 hover:text-destructive">
-                            <X className="w-2.5 h-2.5" />
-                          </button>
-                        </Badge>)}
-                    </div>
-                  </div>}
-              </div>}
-          </div>
-
-          {/* Imagen */}
-          <div className="space-y-2">
-            <Label className="text-xs">Imagen</Label>
-
-            {/* Previsualización grande si hay imagen */}
-            {formData.imagen_url ? (
-              <div className="relative w-full h-32 rounded-lg overflow-hidden border bg-muted">
-                <img 
-                  src={formData.imagen_url} 
-                  alt="Preview" 
-                  className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
-                  style={{ objectPosition: `center ${formData.imagen_posicion_y}%` }}
-                  onClick={() => setImageModalOpen(true)} 
-                />
-                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-                  <Move className="w-3 h-3" />
-                  Clic para posicionar
+          {/* ------------------------------------------------ Formulario */}
+          <Card ref={formRef} className={`scroll-mt-20 ${editando ? "border-primary" : ""}`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                    {editando ? "Editar novedad" : "Nueva novedad"}
+                    {editando && (
+                      <Badge variant="outline" className="border-primary text-primary font-normal truncate max-w-[16rem]">
+                        {novedadEditada?.titulo || formData.titulo}
+                      </Badge>
+                    )}
+                    {hayCambios && (
+                      <span className="flex items-center gap-1 text-xs font-normal text-amber-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        Sin guardar
+                      </span>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    La vista previa se actualiza mientras escribes. Nada se publica hasta que pulses «Guardar».
+                  </CardDescription>
                 </div>
-                <Button 
-                  type="button" 
-                  variant="destructive" 
-                  size="icon" 
-                  className="absolute top-2 right-2 h-7 w-7" 
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleInputChange("imagen_url", "");
-                    handleInputChange("imagen_posicion_y", 50);
-                  }}
+                {!editando && hayCambios && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground shrink-0"
+                    onClick={() => conConfirmacion(() => {
+                      descartarSubidaSinGuardar();
+                      cargarEnFormulario(null);
+                    })}
+                  >
+                    <Eraser className="w-4 h-4 mr-1" />
+                    Vaciar
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              {/* Título y badge */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2 space-y-1.5">
+                  <Label htmlFor="nov-titulo">
+                    Título <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="nov-titulo"
+                    ref={tituloRef}
+                    value={formData.titulo}
+                    maxLength={MAX_TITULO}
+                    onChange={(e) => setCampo("titulo", e.target.value)}
+                    placeholder="Ej: Llega el cocido gallego"
+                    aria-required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="nov-badge">Etiqueta de la tarjeta</Label>
+                  <Input
+                    id="nov-badge"
+                    value={formData.badge_text}
+                    maxLength={24}
+                    onChange={(e) => setCampo("badge_text", e.target.value)}
+                    placeholder="Ej: Nuevo, -20%"
+                  />
+                </div>
+              </div>
+
+              {/* Descripción + IA */}
+              <div className="space-y-2">
+                <div className="flex items-end justify-between gap-2">
+                  <Label htmlFor="nov-descripcion">Descripción</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAbrirModalTono}
+                    disabled={generandoDescripcion}
+                  >
+                    {generandoDescripcion ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                    )}
+                    Redactar con IA
+                  </Button>
+                </div>
+                <Textarea
+                  id="nov-descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setCampo("descripcion", e.target.value)}
+                  placeholder="Escribe el texto o unas ideas sueltas y pulsa «Redactar con IA» para que lo pula."
+                  className="min-h-24"
+                />
+
+                <Collapsible>
+                  <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                    <ChevronDown className="w-3.5 h-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                    Datos extra para la IA (opcional)
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-3 space-y-3">
+                    <div className="space-y-1.5 max-w-xs">
+                      <Label className="text-xs">Tipo de novedad</Label>
+                      <Select value={formData.tipo} onValueChange={(v) => setCampo("tipo", v)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIPOS_NOVEDAD.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>
+                              {t.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {camposActuales.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-lg bg-muted/40 border">
+                        {camposActuales.map((campo) => (
+                          <div key={campo.key} className="space-y-1">
+                            <Label className="text-xs">{campo.label}</Label>
+                            <Input
+                              type={campo.type || "text"}
+                              value={formData.campos_tipo[campo.key] || ""}
+                              onChange={(e) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  campos_tipo: { ...prev.campos_tipo, [campo.key]: e.target.value },
+                                }))
+                              }
+                              placeholder={campo.placeholder}
+                              className="h-8 text-sm"
+                              step={campo.type === "number" ? "0.01" : undefined}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Solo sirven para que la IA redacte mejor; no se guardan ni se muestran en la web.
+                    </p>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+
+              {/* Puntos destacados */}
+              <div className="space-y-2">
+                <Label>Puntos destacados</Label>
+                {formData.bullets.length > 0 && (
+                  <div className="space-y-1.5">
+                    {formData.bullets.map((bullet, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <span className="text-primary text-sm">•</span>
+                        <Input
+                          value={bullet}
+                          onChange={(e) => {
+                            const nuevos = [...formData.bullets];
+                            nuevos[index] = e.target.value;
+                            setCampo("bullets", nuevos);
+                          }}
+                          className="h-8 text-sm flex-1"
+                          aria-label={`Punto destacado ${index + 1}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setCampo("bullets", formData.bullets.filter((_, i) => i !== index))}
+                          aria-label="Quitar punto"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-muted-foreground"
+                  onClick={() => setCampo("bullets", [...formData.bullets, ""])}
                 >
-                  <X className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Añadir punto
                 </Button>
               </div>
-            ) : (
-              <label 
-                className="w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors"
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept="image/*" 
-                  onChange={handleImageUpload} 
-                  className="hidden" 
+
+              {/* Etiquetas */}
+              <div className="space-y-2">
+                <Label htmlFor="nov-etiqueta">Etiquetas</Label>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {formData.tags.map((tag, index) => (
+                    <Badge key={`${tag}-${index}`} variant="secondary" className="gap-1 pr-1">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setCampo("tags", formData.tags.filter((_, i) => i !== index))}
+                        className="rounded-sm hover:text-destructive"
+                        aria-label={`Quitar etiqueta ${tag}`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <Input
+                    id="nov-etiqueta"
+                    value={nuevaEtiqueta}
+                    onChange={(e) => setNuevaEtiqueta(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.key === "Enter" || e.key === ",") && nuevaEtiqueta.trim()) {
+                        e.preventDefault();
+                        setCampo("tags", [...formData.tags, nuevaEtiqueta.trim()]);
+                        setNuevaEtiqueta("");
+                      }
+                    }}
+                    placeholder="Escribe y pulsa Intro"
+                    className="h-8 text-sm w-44"
+                  />
+                </div>
+              </div>
+
+              {/* Imagen */}
+              <div className="space-y-2">
+                <Label>Imagen</Label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageUpload}
+                  className="hidden"
                 />
-                {uploading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs text-muted-foreground">Subiendo...</span>
+                {formData.imagen_url ? (
+                  <div className="space-y-2">
+                    <div className="relative w-full max-w-md rounded-lg overflow-hidden border bg-muted" style={{ aspectRatio: NOVEDAD_CARD_IMAGE_ASPECT_RATIO }}>
+                      <img
+                        src={formData.imagen_url}
+                        alt="Imagen de la novedad"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={{ objectPosition: `center ${formData.imagen_posicion_y}%` }}
+                      />
+                      {uploading && (
+                        <div className="absolute inset-0 bg-background/70 flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => setImageModalOpen(true)}>
+                        <Move className="w-3.5 h-3.5 mr-1.5" />
+                        Ajustar encuadre
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploading}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5 mr-1.5" />
+                        Cambiar
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={quitarImagen}>
+                        <X className="w-3.5 h-3.5 mr-1.5" />
+                        Quitar
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
-                    <span className="text-xs text-muted-foreground">Haz clic para subir imagen</span>
-                  </>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full max-w-md h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-muted/50 transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        <span className="text-xs text-muted-foreground">Subiendo...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-7 h-7 text-muted-foreground/50" />
+                        <span className="text-sm text-muted-foreground">Subir imagen</span>
+                        <span className="text-xs text-muted-foreground/80">
+                          JPG, PNG o WebP · máx. {MAX_IMAGEN_MB} MB · sin foto la web pone una genérica
+                        </span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </label>
-            )}
-          </div>
+              </div>
 
+              {/* Icono */}
+              <div className="space-y-1.5 max-w-xs">
+                <Label>Icono</Label>
+                <Select value={formData.icono} onValueChange={(v) => setCampo("icono", v)}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ICONOS.map((i) => {
+                      const Icon = i.icon;
+                      return (
+                        <SelectItem key={i.value} value={i.value}>
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4" />
+                            {i.label}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Fechas */}
+              {/* Publicación */}
+              <div className="rounded-lg border p-4 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Publicación</p>
+                  <Badge variant="outline" className={`text-[11px] ${ESTILO_ESTADO[estadoBorrador.clave]}`}>
+                    {estadoBorrador.texto}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className="flex items-start justify-between gap-3 cursor-pointer">
+                    <span>
+                      <span className="text-sm block">Visible en la web</span>
+                      <span className="text-xs text-muted-foreground">Desactívalo para guardarla sin mostrarla.</span>
+                    </span>
+                    <Switch checked={formData.activo} onCheckedChange={(v) => setCampo("activo", v)} />
+                  </label>
+                  <label className="flex items-start justify-between gap-3 cursor-pointer">
+                    <span>
+                      <span className="text-sm block">Destacada</span>
+                      <span className="text-xs text-muted-foreground">Aparece antes que las demás.</span>
+                    </span>
+                    <Switch checked={formData.destacado} onCheckedChange={(v) => setCampo("destacado", v)} />
+                  </label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nov-desde" className="text-xs">Mostrar desde</Label>
+                    <Input
+                      id="nov-desde"
+                      type="date"
+                      value={formData.fecha_inicio}
+                      onChange={(e) => setCampo("fecha_inicio", e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="nov-hasta" className="text-xs">Hasta (opcional)</Label>
+                    <div className="flex gap-1">
+                      <Input
+                        id="nov-hasta"
+                        type="date"
+                        value={formData.fecha_fin}
+                        min={formData.fecha_inicio || undefined}
+                        onChange={(e) => setCampo("fecha_fin", e.target.value)}
+                        className="h-9"
+                      />
+                      {formData.fecha_fin && (
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCampo("fecha_fin", "")} aria-label="Quitar fecha de fin">
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          {/* Switches */}
+              {/* Traducciones */}
+              <Collapsible open={traduccionesAbiertas} onOpenChange={setTraduccionesAbiertas} className="rounded-lg border">
+                <div className="flex items-center justify-between gap-2 p-3">
+                  <CollapsibleTrigger className="group flex items-center gap-2 text-sm font-medium min-w-0">
+                    <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                    <Languages className="w-4 h-4 shrink-0" />
+                    Inglés y francés
+                    {espanolCambiado && !traduccionManual ? (
+                      <Badge variant="outline" className="text-[10px] font-normal">Se traducirá al guardar</Badge>
+                    ) : espanolCambiado && traduccionManual ? (
+                      <Badge variant="outline" className="text-[10px] font-normal border-amber-300 text-amber-700">Revisar: el español ha cambiado</Badge>
+                    ) : tieneTraducciones ? (
+                      <Badge variant="outline" className="text-[10px] font-normal">Al día</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] font-normal">Sin traducir</Badge>
+                    )}
+                  </CollapsibleTrigger>
+                  <Button type="button" variant="outline" size="sm" onClick={handleTranslate} disabled={isTranslating || !formData.titulo.trim()}>
+                    {isTranslating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Languages className="w-3.5 h-3.5 mr-1.5" />}
+                    Traducir ahora
+                  </Button>
+                </div>
+                <CollapsibleContent className="px-3 pb-3 space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Al guardar se traduce automáticamente todo lo que haya cambiado en español. Si corriges algo aquí a mano,
+                    se respeta tu versión. Si falta una traducción, la web muestra el texto en español.
+                  </p>
+                  {(["en", "fr"] as const).map((lang) => {
+                    const k = CLAVES_IDIOMA[lang];
+                    const extras = [...formData[k.bullets], ...formData[k.tags]];
+                    return (
+                      <div key={lang} className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{k.nombre}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <Input
+                            className="sm:col-span-2 h-9"
+                            value={formData[k.titulo]}
+                            onChange={(e) => setTraduccion(k.titulo, e.target.value)}
+                            placeholder={formData.titulo || "Título"}
+                            aria-label={`Título (${k.nombre.toLowerCase()})`}
+                          />
+                          <Input
+                            className="h-9"
+                            value={formData[k.badge]}
+                            onChange={(e) => setTraduccion(k.badge, e.target.value)}
+                            placeholder={formData.badge_text || "Etiqueta"}
+                            aria-label={`Etiqueta (${k.nombre.toLowerCase()})`}
+                          />
+                        </div>
+                        <Textarea
+                          value={formData[k.descripcion]}
+                          onChange={(e) => setTraduccion(k.descripcion, e.target.value)}
+                          placeholder={formData.descripcion || "Descripción"}
+                          className="min-h-16 text-sm"
+                          aria-label={`Descripción (${k.nombre.toLowerCase()})`}
+                        />
+                        {extras.length > 0 && <p className="text-xs text-muted-foreground">{extras.join(" · ")}</p>}
+                      </div>
+                    );
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
 
-          {/* Botones de acción */}
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" size="sm" onClick={handlePreview} className="flex-1">
-              <Eye className="w-4 h-4 mr-1" />
-              Vista previa
-            </Button>
-            <Button size="sm" onClick={handleSubmit} disabled={isSaving} className="flex-1">
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  {editingId && editingId !== "new" ? "Actualizando..." : "Guardando..."}
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-1" />
-                  {editingId && editingId !== "new" ? "Actualizar" : "Guardar"}
-                </>
-              )}
-            </Button>
-          </div>
-          {/* Botón Borrar todo */}
-          <div className="pt-2 border-t">
-            <Button variant="destructive" size="sm" className="w-full" onClick={() => {
-            setFormData(initialFormData);
-            setEditingId("new");
-            handleClearPreview();
-          }}>
-              <Trash2 className="w-4 h-4 mr-1" />
-              Borrar todo
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              {/* Acciones */}
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2 border-t">
+                {editando && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => conConfirmacion(() => {
+                      descartarSubidaSinGuardar();
+                      cargarEnFormulario(null);
+                    })}
+                    disabled={isSaving}
+                  >
+                    Cancelar edición
+                  </Button>
+                )}
+                <Button onClick={handleSubmit} disabled={isSaving || uploading || (editando && !hayCambios)} className="sm:min-w-40">
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      {espanolCambiado && !traduccionManual ? "Traduciendo y guardando..." : "Guardando..."}
+                    </>
+                  ) : editando ? (
+                    "Guardar cambios"
+                  ) : (
+                    "Guardar novedad"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Dialog de confirmación de eliminación */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        {/* ------------------------------------------------ Vista previa */}
+        <aside className="hidden xl:block sticky top-20">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 text-center">Así se ve en el móvil</h3>
+          {vistaPrevia}
+        </aside>
+        <Collapsible open={previewMovilAbierta} onOpenChange={setPreviewMovilAbierta} className="xl:hidden rounded-lg border">
+          <CollapsibleTrigger className="group w-full flex items-center justify-between p-3 text-sm font-medium">
+            Vista previa en el móvil
+            <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pb-4 px-2">{previewMovilAbierta && vistaPrevia}</CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      {/* Eliminar */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && !isDeleting && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar novedad?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar «{deleteTarget?.titulo}»?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. La novedad será eliminada permanentemente.
+              Desaparecerá de la web en los tres idiomas y no se puede deshacer. Si solo quieres quitarla un tiempo,
+              usa el interruptor «Visible» en su lugar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Modal para posicionar imagen */}
+      {/* Descartar cambios */}
+      <AlertDialog open={!!accionPendiente} onOpenChange={(open) => !open && setAccionPendiente(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar los cambios sin guardar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Has modificado {editando ? `«${novedadEditada?.titulo ?? formData.titulo}»` : "la nueva novedad"} y no lo
+              has guardado. Si continúas, se perderán esos cambios.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const accion = accionPendiente;
+                setAccionPendiente(null);
+                accion?.();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ImagePositionSelector
         open={imageModalOpen}
         onOpenChange={setImageModalOpen}
         imageUrl={formData.imagen_url}
         currentPosition={formData.imagen_posicion_y}
-        onPositionChange={(pos) => handleInputChange("imagen_posicion_y", pos)}
+        onPositionChange={(pos) => setCampo("imagen_posicion_y", pos)}
+        aspectRatio={NOVEDAD_CARD_IMAGE_ASPECT_RATIO}
       />
 
-      {/* Modal para seleccionar tono */}
+      {/* IA: tono */}
       <Dialog open={tonoModalOpen} onOpenChange={setTonoModalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Selecciona el tono</DialogTitle>
+            <DialogTitle>¿Con qué tono?</DialogTitle>
+            <DialogDescription>La IA reescribirá tu texto; podrás revisarlo antes de usarlo.</DialogDescription>
           </DialogHeader>
-          <RadioGroup value={tonoSeleccionado} onValueChange={setTonoSeleccionado} className="space-y-3 py-4">
-            {TONOS.map(tono => <div key={tono.value} className="flex items-start space-x-3">
-                <RadioGroupItem value={tono.value} id={tono.value} className="mt-0.5" />
-                <Label htmlFor={tono.value} className="flex flex-col cursor-pointer">
+          <RadioGroup value={tonoSeleccionado} onValueChange={setTonoSeleccionado} className="space-y-3 py-2">
+            {TONOS.map((tono) => (
+              <div key={tono.value} className="flex items-start space-x-3">
+                <RadioGroupItem value={tono.value} id={`tono-${tono.value}`} className="mt-0.5" />
+                <Label htmlFor={`tono-${tono.value}`} className="flex flex-col cursor-pointer">
                   <span className="font-medium">{tono.label}</span>
-                  <span className="text-xs text-muted-foreground">{tono.description}</span>
+                  <span className="text-xs text-muted-foreground font-normal">{tono.description}</span>
                 </Label>
-              </div>)}
+              </div>
+            ))}
           </RadioGroup>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTonoModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleGenerarDescripcion}>Enviar</Button>
+            <Button onClick={handleGenerarDescripcion}>
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Redactar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de carga mientras se genera */}
-      <Dialog open={generandoDescripcion} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md" onPointerDownOutside={e => e.preventDefault()} onEscapeKeyDown={e => e.preventDefault()}>
-          <div className="flex flex-col items-center justify-center py-16 space-y-8">
-            <div className="relative flex items-center justify-center">
-              <div className="absolute w-20 h-20 rounded-full border-4 border-primary/20"></div>
-              <Loader2 className="w-20 h-20 text-primary animate-spin" />
-            </div>
-            <div className="text-center space-y-3">
-              <p className="text-2xl font-bold text-foreground">{loadingMessage}</p>
-              <p className="text-sm text-muted-foreground">Esto puede tardar unos segundos...</p>
+      {/* IA: cargando */}
+      <Dialog open={generandoDescripcion}>
+        <DialogContent
+          className="max-w-sm [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Redactando</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-10 space-y-5" role="status" aria-live="polite">
+            <Loader2 className="w-12 h-12 text-primary animate-spin" />
+            <div className="text-center space-y-1">
+              <p className="text-lg font-semibold">{LOADING_MESSAGES[loadingMessageIndex]}</p>
+              <p className="text-sm text-muted-foreground">Puede tardar unos segundos.</p>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de resultados del webhook */}
-      <Dialog open={resultadoModalOpen} onOpenChange={setResultadoModalOpen}>
+      {/* IA: resultado */}
+      <Dialog open={!!resultadoIA} onOpenChange={(open) => !open && setResultadoIA(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              Contenido generado
+              Propuesta de la IA
             </DialogTitle>
+            <DialogDescription>
+              «Usar este texto» sustituye el título, la descripción, los puntos y las etiquetas del formulario.
+            </DialogDescription>
           </DialogHeader>
 
-          {resultadoWebhook && <div className="space-y-4 py-4">
-              {/* Título */}
-              {resultadoWebhook.title && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título</Label>
+          {resultadoIA && (
+            <div className="space-y-4 py-2">
+              {resultadoIA.title && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Título</Label>
                   <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="font-semibold text-lg">{resultadoWebhook.title}</p>
+                    <p className="font-semibold text-lg">{resultadoIA.title}</p>
                   </div>
-                </div>}
-
-              {/* Subtítulo */}
-              {resultadoWebhook.subtitle && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Subtítulo</Label>
+                </div>
+              )}
+              {resultadoIA.body && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Descripción</Label>
                   <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-muted-foreground">{resultadoWebhook.subtitle}</p>
+                    <p className="text-sm leading-relaxed">{resultadoIA.body}</p>
                   </div>
-                </div>}
-
-              {/* Descripción */}
-              {resultadoWebhook.body && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Descripción
-                  </Label>
-                  <div className="p-3 bg-muted/50 rounded-lg border">
-                    <p className="text-sm leading-relaxed">{resultadoWebhook.body}</p>
-                  </div>
-                </div>}
-
-              {/* Bullets */}
-              {resultadoWebhook.bullets && resultadoWebhook.bullets.length > 0 && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Puntos destacados
-                  </Label>
+                </div>
+              )}
+              {resultadoIA.bullets && resultadoIA.bullets.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Puntos destacados</Label>
                   <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
-                    {resultadoWebhook.bullets.map((bullet, i) => <div key={i} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary mt-0.5">•</span>
+                    {resultadoIA.bullets.map((bullet, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <span className="text-primary">•</span>
                         <span>{bullet}</span>
-                      </div>)}
+                      </div>
+                    ))}
                   </div>
-                </div>}
-
-              {/* Tags */}
-              {resultadoWebhook.tags && resultadoWebhook.tags.length > 0 && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Etiquetas</Label>
+                </div>
+              )}
+              {resultadoIA.tags && resultadoIA.tags.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Etiquetas</Label>
                   <div className="flex flex-wrap gap-1.5">
-                    {resultadoWebhook.tags.map((tag, i) => <Badge key={i} variant="outline" className="text-xs capitalize">
+                    {resultadoIA.tags.map((tag, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
                         {tag}
-                      </Badge>)}
+                      </Badge>
+                    ))}
                   </div>
-                </div>}
-
-              {/* CTA */}
-              {resultadoWebhook.cta && (resultadoWebhook.cta.text || resultadoWebhook.cta.url) && <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Llamada a la acción (CTA)
-                  </Label>
-                  <div className="p-3 bg-muted/50 rounded-lg border space-y-1">
-                    {resultadoWebhook.cta.text && <p className="text-sm font-medium">{resultadoWebhook.cta.text}</p>}
-                    {resultadoWebhook.cta.url && <p className="text-xs text-muted-foreground break-all">{resultadoWebhook.cta.url}</p>}
-                  </div>
-                </div>}
-            </div>}
-
-          <DialogFooter className="flex-col sm:flex-row gap-2 pt-4 border-t">
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" size="sm" onClick={handleReenviar} className="flex-1 sm:flex-none">
-                <Loader2 className="w-4 h-4 mr-1.5" />
-                Regenerar
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleCambiarTono} className="flex-1 sm:flex-none">
-                <Edit2 className="w-4 h-4 mr-1.5" />
-                Otro tono
-              </Button>
+                </div>
+              )}
             </div>
-            <Button size="sm" onClick={handleAplicarResultado} className="flex-1 sm:flex-none">
-              <Save className="w-4 h-4 mr-1.5" />
-              Usar
+          )}
+
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleGenerarDescripcion}>
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Otra versión
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setResultadoIA(null);
+                setTonoModalOpen(true);
+              }}
+            >
+              Cambiar tono
+            </Button>
+            <Button onClick={handleAplicarResultado}>Usar este texto</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>;
+    </div>
+  );
 }

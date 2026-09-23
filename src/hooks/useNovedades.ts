@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 export interface Novedad {
   id: string;
@@ -41,7 +40,7 @@ export interface Novedad {
 export interface NuevaNovedad {
   titulo?: string;
   descripcion?: string;
-  imagen_url?: string;
+  imagen_url?: string | null;
   imagen_posicion_y?: number;
   tipo: "item_carta" | "anuncio";
   tipo_asociacion?: "plato" | "vino" | "bebida" | "seccion" | null;
@@ -73,7 +72,9 @@ export interface NuevaNovedad {
 export function useNovedades() {
   const queryClient = useQueryClient();
 
-  const { data: novedades = [], isLoading } = useQuery({
+  // Los avisos (toast) los muestra quien llama: antes el hook y el editor
+  // mostraban cada uno el suyo y cada guardado salía dos veces.
+  const { data: novedades = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["novedades"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -111,71 +112,67 @@ export function useNovedades() {
 
       if (error) throw error;
 
-      // Traducción automática al crear.
+      // Traducción automática al crear — SOLO como red de seguridad.
       //
-      // Antes: 'traducir-novedad-auto', que era un proxy al webhook
-      // /webhook/traducciones de n8n. Era n8n quien ESCRIBÍA las traducciones
-      // en la fila (por eso aquí se descartaba la respuesta).
-      // Ahora: 'traducir-contenido' (tipo 'novedad'), que SOLO traduce y
-      // devuelve {ok, translations}. Como ya no hay nadie detrás que escriba,
-      // la escritura en la tabla la hace este hook — si no, la traducción se
-      // calcularía y se tiraría.
+      // El editor (EditorNovedadesWeb) ya traduce antes de guardar y manda
+      // las columnas *_en/*_fr rellenas. Antes este hook traducía SIEMPRE
+      // tras el insert y machacaba cualquier traducción que viniera del
+      // editor (incluidas las corregidas a mano). Ahora solo actúa si la
+      // fila llega sin traducción, p. ej. si el traductor falló en el editor.
       //
-      // Se mantiene el carácter no bloqueante del original: si la traducción
-      // falla, la novedad queda creada en español y no se rompe el flujo.
-      try {
-        const { data: tradRes, error: tradError } = await supabase.functions.invoke(
-          'traducir-contenido',
-          {
-            body: {
-              tipo: 'novedad',
-              datos: {
-                titulo: data.titulo,
-                descripcion: data.descripcion,
-                badge_text: data.badge_text,
-                bullets: data.bullets,
-                tags: data.tags,
+      // 'traducir-contenido' (tipo 'novedad') SOLO traduce y devuelve
+      // {ok, translations}; la escritura en la tabla la hace este hook.
+      // No bloqueante: si falla, la novedad queda creada en español.
+      if (!data.titulo_en && !data.titulo_fr) {
+        try {
+          const { data: tradRes, error: tradError } = await supabase.functions.invoke(
+            'traducir-contenido',
+            {
+              body: {
+                tipo: 'novedad',
+                datos: {
+                  titulo: data.titulo,
+                  descripcion: data.descripcion,
+                  badge_text: data.badge_text,
+                  bullets: data.bullets,
+                  tags: data.tags,
+                },
               },
-            },
-          }
-        );
+            }
+          );
 
-        const t = !tradError && tradRes?.ok ? tradRes.translations : null;
-        if (t) {
-          const { error: updateError } = await supabase
-            .from("novedades")
-            .update({
-              titulo_en: t.titulo_en,
-              titulo_fr: t.titulo_fr,
-              descripcion_en: t.descripcion_en,
-              descripcion_fr: t.descripcion_fr,
-              badge_text_en: t.badge_text_en,
-              badge_text_fr: t.badge_text_fr,
-              bullets_en: t.bullets_en,
-              bullets_fr: t.bullets_fr,
-              tags_en: t.tags_en,
-              tags_fr: t.tags_fr,
-            })
-            .eq("id", data.id);
-          if (updateError) {
-            console.error("Error al guardar las traducciones de la novedad:", updateError);
+          const t = !tradError && tradRes?.ok ? tradRes.translations : null;
+          if (t) {
+            const { error: updateError } = await supabase
+              .from("novedades")
+              .update({
+                titulo_en: t.titulo_en,
+                titulo_fr: t.titulo_fr,
+                descripcion_en: t.descripcion_en,
+                descripcion_fr: t.descripcion_fr,
+                badge_text_en: t.badge_text_en,
+                badge_text_fr: t.badge_text_fr,
+                bullets_en: t.bullets_en,
+                bullets_fr: t.bullets_fr,
+                tags_en: t.tags_en,
+                tags_fr: t.tags_fr,
+              })
+              .eq("id", data.id);
+            if (updateError) {
+              console.error("Error al guardar las traducciones de la novedad:", updateError);
+            }
+          } else if (tradError) {
+            console.error("Error al traducir la novedad:", tradError);
           }
-        } else if (tradError) {
-          console.error("Error al traducir la novedad:", tradError);
+        } catch (tradException) {
+          console.error("Error al traducir la novedad:", tradException);
         }
-      } catch (tradException) {
-        console.error("Error al traducir la novedad:", tradException);
-        // No bloqueamos el flujo si la traducción falla
       }
 
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novedades"] });
-      toast.success("Novedad creada correctamente");
-    },
-    onError: (error) => {
-      toast.error("Error al crear la novedad: " + error.message);
     },
   });
 
@@ -193,10 +190,6 @@ export function useNovedades() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novedades"] });
-      toast.success("Novedad actualizada correctamente");
-    },
-    onError: (error) => {
-      toast.error("Error al actualizar la novedad: " + error.message);
     },
   });
 
@@ -207,10 +200,6 @@ export function useNovedades() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["novedades"] });
-      toast.success("Novedad eliminada correctamente");
-    },
-    onError: (error) => {
-      toast.error("Error al eliminar la novedad: " + error.message);
     },
   });
 
@@ -224,6 +213,25 @@ export function useNovedades() {
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["novedades"] });
+    },
+  });
+
+  /**
+   * Guarda un nuevo orden. Recibe los ids en el orden deseado y escribe
+   * `orden` = posición. La web pública ordena por destacado DESC, orden ASC.
+   */
+  const reordenar = useMutation({
+    mutationFn: async (idsOrdenados: string[]) => {
+      const resultados = await Promise.all(
+        idsOrdenados.map((id, index) =>
+          supabase.from("novedades").update({ orden: index }).eq("id", id)
+        )
+      );
+      const fallo = resultados.find((r) => r.error);
+      if (fallo?.error) throw fallo.error;
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["novedades"] });
     },
   });
@@ -246,10 +254,14 @@ export function useNovedades() {
     novedades,
     novedadesActivas,
     isLoading,
+    isError,
+    error,
+    refetch,
     crearNovedad,
     actualizarNovedad,
     eliminarNovedad,
     toggleActivo,
     toggleDestacado,
+    reordenar,
   };
 }

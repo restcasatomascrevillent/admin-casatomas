@@ -1,6 +1,6 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                          APLICADA el 23/09/2026 (verificado: las columnas origen y prioridad existen)                                  ##
 -- ##                                                                       ##
 -- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.       ##
 -- ##   Queda preparado para que el dueño lo revise y decida. Verificado    ##

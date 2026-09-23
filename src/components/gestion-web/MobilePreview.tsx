@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles } from "lucide-react";
+import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Coffee, Cake, ImageIcon, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { MOBILE_PREVIEW_IMAGE_ASPECT_RATIO } from "./previewConstants";
+import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
 
 export interface NovedadPreview {
   id?: string;
@@ -27,226 +27,202 @@ export interface NovedadPreview {
   tags?: string[];
   tags_en?: string[] | null;
   tags_fr?: string[] | null;
+  /** Solo para el borrador: motivo por el que NO se vería en la web todavía. */
+  avisoVisibilidad?: string | null;
 }
 
 interface MobilePreviewProps {
+  /** Tarjetas en el orden en que las mostraría la web pública. */
   novedades: NovedadPreview[];
-  previewNovedad?: NovedadPreview | null;
-  seccionActiva?: "novedades" | "menus_diarios" | "tapas";
+  /** id de la tarjeta que se está editando (se resalta). */
+  idResaltado?: string | null;
 }
 
 type Idioma = "es" | "en" | "fr";
 
+const IDIOMAS: { value: Idioma; label: string; nombre: string }[] = [
+  { value: "es", label: "ES", nombre: "Español" },
+  { value: "en", label: "EN", nombre: "Inglés" },
+  { value: "fr", label: "FR", nombre: "Francés" },
+];
+
+// Mismo criterio que getLocalizedContent() de casa-tomas-story
+// (NovedadesSection.tsx): si falta la traducción se cae al español.
 const getTextoIdioma = (novedad: NovedadPreview, idioma: Idioma) => {
-  switch (idioma) {
-    case "en":
-      return {
-        titulo: novedad.titulo_en || novedad.titulo,
-        descripcion: novedad.descripcion_en || novedad.descripcion,
-        badge_text: novedad.badge_text_en || novedad.badge_text,
-        bullets: novedad.bullets_en || novedad.bullets || [],
-        tags: novedad.tags_en || novedad.tags || [],
-      };
-    case "fr":
-      return {
-        titulo: novedad.titulo_fr || novedad.titulo,
-        descripcion: novedad.descripcion_fr || novedad.descripcion,
-        badge_text: novedad.badge_text_fr || novedad.badge_text,
-        bullets: novedad.bullets_fr || novedad.bullets || [],
-        tags: novedad.tags_fr || novedad.tags || [],
-      };
-    default:
-      return {
-        titulo: novedad.titulo,
-        descripcion: novedad.descripcion,
-        badge_text: novedad.badge_text,
-        bullets: novedad.bullets || [],
-        tags: novedad.tags || [],
-      };
-  }
+  const sufijo = idioma === "es" ? null : idioma;
+  const pick = <T,>(es: T, en: T | null | undefined, fr: T | null | undefined): T =>
+    (sufijo === "en" ? en || es : sufijo === "fr" ? fr || es : es) as T;
+  return {
+    titulo: pick(novedad.titulo, novedad.titulo_en, novedad.titulo_fr),
+    descripcion: pick(novedad.descripcion, novedad.descripcion_en, novedad.descripcion_fr),
+    badge: pick(novedad.badge_text || "", novedad.badge_text_en, novedad.badge_text_fr),
+    bullets: pick(novedad.bullets || [], novedad.bullets_en?.length ? novedad.bullets_en : null, novedad.bullets_fr?.length ? novedad.bullets_fr : null),
+    tags: pick(novedad.tags || [], novedad.tags_en?.length ? novedad.tags_en : null, novedad.tags_fr?.length ? novedad.tags_fr : null),
+  };
 };
-const ICONOS_MAP: Record<string, React.ComponentType<{
-  className?: string;
-}>> = {
+
+// Mismos iconos (y mismo icono por defecto: estrella) que la web pública.
+const ICONOS_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   utensils: UtensilsCrossed,
   wine: Wine,
   gift: Gift,
   calendar: Calendar,
   star: Star,
-  sparkles: Sparkles
+  sparkles: Sparkles,
+  coffee: Coffee,
+  cake: Cake,
 };
-const TITULO_SECCION: Record<NonNullable<MobilePreviewProps["seccionActiva"]>, Record<Idioma, string>> = {
-  novedades: {
-    es: "Novedades",
-    en: "What's New",
-    fr: "Nouveautés",
+
+// Textos reales de la sección en casa-tomas-story/src/i18n/languages/*.ts
+const TEXTOS_SECCION: Record<Idioma, { titulo: string; subtitulo: string; vacio: string }> = {
+  es: {
+    titulo: "Novedades",
+    subtitulo: "Nuevas incorporaciones y experiencias que queremos compartir",
+    vacio: "No hay novedades en este momento",
   },
-  menus_diarios: {
-    es: "Menús diarios",
-    en: "Daily Menus",
-    fr: "Menus du jour",
+  en: {
+    titulo: "What's New",
+    subtitulo: "Fresh additions and experiences we're excited to share",
+    vacio: "No highlights at the moment",
   },
-  tapas: {
-    es: "Tapas",
-    en: "Tapas",
-    fr: "Tapas",
+  fr: {
+    titulo: "Nouveautés",
+    subtitulo: "Nos dernières créations et expériences à découvrir",
+    vacio: "Aucune nouveauté pour le moment",
   },
 };
 
-const DESCRIPCION_SECCION: Record<NonNullable<MobilePreviewProps["seccionActiva"]>, Record<Idioma, string>> = {
-  novedades: {
-    es: "Nuevas incorporaciones y experiencias que queremos compartir",
-    en: "New additions and experiences we want to share",
-    fr: "Nouvelles incorporations et expériences à partager",
-  },
-  menus_diarios: {
-    es: "Descubre el menú del día disponible en el restaurante",
-    en: "Discover today's menu available at the restaurant",
-    fr: "Découvrez le menu du jour disponible au restaurant",
-  },
-  tapas: {
-    es: "Tapas destacadas que puedes pedir hoy",
-    en: "Featured tapas you can order today",
-    fr: "Tapas à la une que vous pouvez commander aujourd'hui",
-  },
-};
-export function MobilePreview({
-  novedades,
-  previewNovedad,
-  seccionActiva = "novedades"
-}: MobilePreviewProps) {
+/**
+ * Réplica en miniatura de la sección «Novedades» de la web de Casa Tomás
+ * (casa-tomas-story/src/components/NovedadesSection.tsx) tal y como se ve en
+ * un móvil: una tarjeta por fila, foto de 176px de alto, badge solo si hay
+ * texto, puntos destacados como lista y etiquetas como chips.
+ */
+export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
   const [idioma, setIdioma] = useState<Idioma>("es");
-  
-  // Si hay una novedad en preview, mostrarla primero
-  const todasNovedades = previewNovedad ? [{
-    ...previewNovedad,
-    id: 'preview'
-  }, ...novedades.filter(n => n.id !== previewNovedad.id)] : novedades;
-  
-  return <div className="flex flex-col items-center gap-3">
-      {/* Selector de idioma */}
-      <ToggleGroup 
-        type="single" 
-        value={idioma} 
+  const textos = TEXTOS_SECCION[idioma];
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <ToggleGroup
+        type="single"
+        value={idioma}
         onValueChange={(v) => v && setIdioma(v as Idioma)}
         className="bg-muted rounded-lg p-1"
+        aria-label="Idioma de la vista previa"
       >
-        <ToggleGroupItem value="es" className="text-base px-2 py-1 data-[state=on]:bg-background">
-          🇪🇸
-        </ToggleGroupItem>
-        <ToggleGroupItem value="en" className="text-base px-2 py-1 data-[state=on]:bg-background">
-          🇬🇧
-        </ToggleGroupItem>
-        <ToggleGroupItem value="fr" className="text-base px-2 py-1 data-[state=on]:bg-background">
-          🇫🇷
-        </ToggleGroupItem>
+        {IDIOMAS.map((i) => (
+          <ToggleGroupItem
+            key={i.value}
+            value={i.value}
+            aria-label={i.nombre}
+            title={i.nombre}
+            className="h-7 px-3 text-xs font-semibold text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+          >
+            {i.label}
+          </ToggleGroupItem>
+        ))}
       </ToggleGroup>
-      
+
       {/* Marco del teléfono */}
-      <div className="relative w-[320px] h-[640px] bg-zinc-900 rounded-[3rem] p-2 shadow-2xl">
-        {/* Notch */}
+      <div className="relative w-[320px] h-[640px] max-w-full bg-zinc-900 rounded-[3rem] p-2 shadow-2xl">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-900 rounded-b-2xl z-10" />
-        
-        {/* Pantalla */}
+
         <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden relative">
-          {/* Barra de estado */}
           <div className="h-8 bg-zinc-900 flex items-center justify-center">
             <div className="w-20 h-5 bg-zinc-800 rounded-full" />
           </div>
-          
-          {/* Contenido scrolleable */}
-          <div className="h-[calc(100%-2rem)] overflow-y-auto px-3 py-4 space-y-4">
-            {/* Header */}
-            <div className="text-center space-y-1 mb-4">
-              <h2 className="text-lg font-bold text-foreground">
-                {TITULO_SECCION[seccionActiva][idioma]}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {DESCRIPCION_SECCION[seccionActiva][idioma]}
-              </p>
+
+          <div className="h-[calc(100%-2rem)] overflow-y-auto px-4 py-5 space-y-4">
+            <div className="text-center space-y-1 mb-5">
+              <h2 className="text-2xl font-bold text-primary">{textos.titulo}</h2>
+              <p className="text-xs text-muted-foreground">{textos.subtitulo}</p>
             </div>
 
-            {/* Cards de novedades */}
-            {todasNovedades.length === 0 ? <div className="text-center py-8 text-muted-foreground text-sm">
-                {idioma === "en" ? "No news to show" : idioma === "fr" ? "Aucune nouveauté à afficher" : "No hay novedades para mostrar"}
-              </div> : <div className="space-y-3">
-                {todasNovedades.map((novedad, index) => {
-              const IconComponent = ICONOS_MAP[novedad.icono || 'utensils'] || UtensilsCrossed;
-              const isPreview = novedad.id === 'preview';
-              const textos = getTextoIdioma(novedad, idioma);
-              return <Card key={novedad.id || index} className={`overflow-hidden transition-all duration-300 ${isPreview ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
-                      {novedad.imagen_url && (
-                        <div className="overflow-hidden">
-                          <AspectRatio ratio={MOBILE_PREVIEW_IMAGE_ASPECT_RATIO} className="relative overflow-hidden">
-                            <img
-                              src={novedad.imagen_url}
-                              alt={textos.titulo}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }}
-                            />
-                            {isPreview && (
-                              <div className="absolute top-1 right-1">
-                                <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                                  Preview
-                                </Badge>
-                              </div>
-                            )}
-                          </AspectRatio>
-                        </div>
-                      )}
-                      <CardHeader className="p-2 pb-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <div className="p-1 rounded-full bg-accent/20">
-                            <IconComponent className="w-3 h-3 text-accent" />
-                          </div>
-                          <Badge className="text-[10px] px-1.5 py-0 bg-accent text-primary-foreground hover:bg-accent/90 border-0">
-                              {textos.badge_text || (idioma === "en" ? "New" : idioma === "fr" ? "Nouveau" : "Nuevo")}
-                            </Badge>
-                        </div>
-                        <CardTitle className="text-sm font-semibold leading-tight">
-                          {textos.titulo || (idioma === "en" ? "No title" : idioma === "fr" ? "Sans titre" : "Sin título")}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-2 pt-0 space-y-2">
-                        <p className="text-xs text-muted-foreground">
-                          {textos.descripcion || (idioma === "en" ? "No description" : idioma === "fr" ? "Sans description" : "Sin descripción")}
-                        </p>
-                        
-                        {/* Puntos destacados (bullets) */}
-                        {textos.bullets && textos.bullets.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {textos.bullets.map((bullet, i) => (
-                              <Badge 
-                                key={i} 
-                                variant="secondary" 
-                                className="text-[8px] px-1.5 py-0.5 h-auto font-normal"
-                              >
-                                {bullet}
-                              </Badge>
-                            ))}
+            {novedades.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">{textos.vacio}</div>
+            ) : (
+              <div className="space-y-4">
+                {novedades.map((novedad, index) => {
+                  const IconComponent = ICONOS_MAP[novedad.icono || "star"] || Star;
+                  const resaltado = !!idResaltado && novedad.id === idResaltado;
+                  const t = getTextoIdioma(novedad, idioma);
+                  return (
+                    <Card
+                      key={novedad.id || index}
+                      className={`overflow-hidden border border-border/70 bg-gradient-to-br from-background via-muted/40 to-background transition-shadow ${
+                        resaltado ? "ring-2 ring-primary ring-offset-2" : ""
+                      }`}
+                    >
+                      <AspectRatio ratio={NOVEDAD_CARD_IMAGE_ASPECT_RATIO} className="relative overflow-hidden bg-muted/40">
+                        {novedad.imagen_url ? (
+                          <img
+                            src={novedad.imagen_url}
+                            alt={t.titulo}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            style={{ objectPosition: `center ${novedad.imagen_posicion_y || 50}%` }}
+                          />
+                        ) : (
+                          // La web pública rellena el hueco con una foto genérica
+                          // del restaurante (pulpo / carne / champán) si no hay imagen.
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                            <ImageIcon className="w-5 h-5" />
+                            <span className="text-[10px]">Sin foto: la web pondrá una genérica</span>
                           </div>
                         )}
-                        
-                        {/* Etiquetas (tags) */}
-                        {textos.tags && textos.tags.length > 0 && (
+                        {resaltado && (
+                          <Badge className="absolute top-2 left-2 text-[10px] px-1.5 py-0">Editando</Badge>
+                        )}
+                      </AspectRatio>
+                      {resaltado && novedad.avisoVisibilidad && (
+                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] px-3 py-1">
+                          <EyeOff className="w-3 h-3 shrink-0" />
+                          {novedad.avisoVisibilidad}
+                        </div>
+                      )}
+                      <CardHeader className="p-4 pb-2">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="p-2 bg-accent/10 rounded-lg">
+                            <IconComponent className="w-5 h-5 text-accent" />
+                          </div>
+                          {t.badge && <Badge className="bg-accent hover:bg-accent/90 text-[10px]">{t.badge}</Badge>}
+                        </div>
+                        <CardTitle className="text-base leading-snug">
+                          {t.titulo || <span className="text-muted-foreground italic">Sin título</span>}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0 space-y-2">
+                        {t.descripcion && (
+                          <p className="text-muted-foreground text-xs leading-relaxed">{t.descripcion}</p>
+                        )}
+                        {t.bullets.length > 0 && (
+                          <ul className="space-y-0.5 text-xs text-muted-foreground">
+                            {t.bullets.map((item, i) => (
+                              <li key={i} className="flex gap-1.5 items-start">
+                                <span className="text-primary">•</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {t.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {textos.tags.map((tag, i) => (
-                              <Badge 
-                                key={i} 
-                                variant="outline" 
-                                className="text-[8px] px-1 py-0 h-4 bg-muted/50"
-                              >
+                            {t.tags.map((tag, i) => (
+                              <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
                                 {tag}
                               </Badge>
                             ))}
                           </div>
                         )}
                       </CardContent>
-                    </Card>;
-            })}
-              </div>}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 }

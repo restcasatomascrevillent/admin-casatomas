@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Send, Info } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Loader2, Save, Send, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import {
   useVersionesPlantilla,
@@ -31,7 +32,7 @@ import {
   type CamposEditablesPlantilla,
   type PlantillaEmailVersion,
 } from "@/hooks/usePlantillasEmail";
-import { DESCRIPCION_TIPO, ETIQUETA_TIPO, TOKENS_DISPONIBLES, BLOQUES_DISPONIBLES, leerBloque } from "./catalogoTokens";
+import { DESCRIPCION_TIPO, ETIQUETA_TIPO, BLOQUES_DISPONIBLES, leerBloque } from "./catalogoTokens";
 import { VistaPreviaEmail } from "./VistaPreviaEmail";
 import { SelectorVariable } from "./SelectorVariable";
 import { HistorialVersionesPlantilla } from "./HistorialVersionesPlantilla";
@@ -133,6 +134,9 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
   const [guardado, setGuardado] = useState<CamposEditablesPlantilla>(CAMPOS_VACIOS);
   const [notaVersion, setNotaVersion] = useState("");
   const [destinatario, setDestinatario] = useState(emailUsuario);
+  // Cerrada por defecto: la marca (colores + logo) se configura una vez y
+  // no debería competir por espacio con el contenido, que se edita a diario.
+  const [marcaAbierta, setMarcaAbierta] = useState(false);
 
   // Se re-sincroniza SOLO cuando cambia de verdad la versión actual cargada
   // (carga inicial, guardado nuevo o restauración) — nunca en cada tecla que
@@ -205,9 +209,28 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
         <HistorialVersionesPlantilla tipo={tipo} versiones={versiones ?? []} puedeRestaurar={puedeEditar} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Columna izquierda: formulario */}
-        <div className="space-y-4">
+      {/*
+        El contenedor de abajo es SU PROPIO scroll interno (max-h + overflow-y-auto)
+        a propósito, no solo estética: DashboardLayout pone `overflow-x-hidden` en
+        <main> (y en el div que lo envuelve) sin fijar `overflow-y`, así que el
+        navegador le calcula `overflow-y: auto` implícito (comprobado en vivo con
+        getBoundingClientRect antes/después de hacer scroll). Eso convierte a
+        <main> — no el viewport — en el "contenedor de scroll" que CSS usa como
+        referencia para cualquier `position: sticky` de dentro, y como <main> en
+        sí nunca desborda (su contenido crece con la página en vez de recortarse),
+        un sticky anclado a él no se queda pegado nunca: se comporta como si fuera
+        estático. Afecta a cualquier sticky dentro de <main> en todo el panel —
+        p.ej. el mismo patrón "Vista previa móvil" con sticky top-6 en
+        GestorWeb.tsx probablemente tampoco se quede pegado — pero arreglarlo iría
+        en DashboardLayout.tsx, un layout compartido por toda la app, y esa no es
+        esta tarea. Aquí basta con crear un contenedor de scroll MÁS CERCANO que
+        <main> para que el sticky de la vista previa tenga una referencia que sí
+        se desplaza.
+      */}
+      <div className="lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+      <div className="grid gap-6 lg:grid-cols-5 lg:items-start">
+        {/* Columna izquierda: formulario — más ancha, es lo que se edita a diario */}
+        <div className="space-y-4 lg:col-span-3">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Contenido</CardTitle>
@@ -266,40 +289,48 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Marca</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <CampoColorMarca
-                  id={`color-acento-${tipo}`}
-                  etiqueta="Color de acento"
-                  valor={campos.color_acento}
-                  onChange={(v) => actualizarCampo("color_acento", v)}
-                  disabled={!puedeEditar}
-                />
-                <CampoColorMarca
-                  id={`color-oscuro-${tipo}`}
-                  etiqueta="Color oscuro (pie)"
-                  valor={campos.color_oscuro}
-                  onChange={(v) => actualizarCampo("color_oscuro", v)}
-                  disabled={!puedeEditar}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor={`logo-${tipo}`}>URL del logo (opcional)</Label>
-                <Input
-                  id={`logo-${tipo}`}
-                  value={campos.logo_url ?? ""}
-                  onChange={(e) => actualizarCampo("logo_url", e.target.value || null)}
-                  readOnly={!puedeEditar}
-                  placeholder="https://.../logo.png"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Si se deja vacío, se muestra el nombre "Casa Tomás" en su lugar.
-                </p>
-              </div>
-            </CardContent>
+            <Collapsible open={marcaAbierta} onOpenChange={setMarcaAbierta}>
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-6 pb-3 text-left">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">Marca</CardTitle>
+                  <CardDescription>Colores y logo del correo — se configuran una vez y casi nunca cambian.</CardDescription>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-4 pt-3">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <CampoColorMarca
+                      id={`color-acento-${tipo}`}
+                      etiqueta="Color de acento"
+                      valor={campos.color_acento}
+                      onChange={(v) => actualizarCampo("color_acento", v)}
+                      disabled={!puedeEditar}
+                    />
+                    <CampoColorMarca
+                      id={`color-oscuro-${tipo}`}
+                      etiqueta="Color oscuro (pie)"
+                      valor={campos.color_oscuro}
+                      onChange={(v) => actualizarCampo("color_oscuro", v)}
+                      disabled={!puedeEditar}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`logo-${tipo}`}>URL del logo (opcional)</Label>
+                    <Input
+                      id={`logo-${tipo}`}
+                      value={campos.logo_url ?? ""}
+                      onChange={(e) => actualizarCampo("logo_url", e.target.value || null)}
+                      readOnly={!puedeEditar}
+                      placeholder="https://.../logo.png"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Si se deja vacío, se muestra el nombre "Casa Tomás" en su lugar.
+                    </p>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           <Card>
@@ -395,29 +426,16 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
           )}
         </div>
 
-        {/* Columna derecha: vista previa + ayuda de tokens */}
-        <div className="space-y-4">
-          <VistaPreviaEmail tipo={tipo} campos={campos} />
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Info className="h-4 w-4" />
-                Variables disponibles
-              </CardTitle>
-              <CardDescription>Se insertan con el botón "Variable" de cada campo, o escribiéndolas a mano.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {TOKENS_DISPONIBLES.map((token) => (
-                  <div key={token.clave} className="rounded-md border p-2">
-                    <span className="font-mono text-xs font-semibold text-primary">{`{{${token.clave}}}`}</span>
-                    <p className="text-xs text-muted-foreground">{token.descripcion}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Columna derecha: vista previa — pegada arriba (sticky) para que se
+            vea sin desplazarse mientras se edita el formulario, más largo, de
+            la izquierda. Las variables ya no viven aquí como lista aparte:
+            cada campo tiene su propio botón "{ } Variable" justo al lado. */}
+        <div className="lg:col-span-2">
+          <div className="lg:sticky lg:top-0">
+            <VistaPreviaEmail tipo={tipo} campos={campos} />
+          </div>
         </div>
+      </div>
       </div>
     </div>
   );

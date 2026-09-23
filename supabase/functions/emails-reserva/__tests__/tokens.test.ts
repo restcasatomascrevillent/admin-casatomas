@@ -87,4 +87,35 @@ describe("firmarToken / verificarToken", () => {
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     expect(await verificarToken("", token, "aceptar")).toBeNull();
   });
+
+  /**
+   * Guarda de regresión para el bug de emails-reserva/index.ts corregido en
+   * esta entrega (punto 3 del encargo "cierre del círculo resend-webhook"):
+   * construirCorreoParaTipo llamaba a firmarToken SIN pasar
+   * `ahoraEpochSegundos`, así que usaba el valor por defecto (`Date.now()`
+   * EN EL MOMENTO DE CADA LLAMADA) — el token (y por tanto el HTML) salía
+   * distinto entre el envío original y cada reintento de la MISMA fila,
+   * rompiendo la idempotencia de Resend (mismo Idempotency-Key, payload
+   * distinto -> 409 -> se clasificaba como fallo permanente sobre una
+   * propuesta que en realidad sí se había entregado). El arreglo fue en
+   * index.ts (pasar el `creado_at` de la fila en vez de dejar el default),
+   * no en `firmarToken` — esta función ya soportaba un timestamp explícito
+   * (se usa más abajo para el test de caducidad); lo que faltaba era que
+   * quien la llama lo aprovechara con un valor ESTABLE. Este test fija esa
+   * propiedad para que no se rompa por accidente en el futuro.
+   */
+  it("dos llamadas con el MISMO ahoraEpochSegundos producen el MISMO token (estabilidad entre reintentos)", async () => {
+    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const epochFijo = Math.floor(new Date("2026-09-20T10:00:00Z").getTime() / 1000);
+    const token1 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, epochFijo);
+    const token2 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, epochFijo);
+    expect(token1).toBe(token2);
+  });
+
+  it("dos llamadas SIN ahoraEpochSegundos explícito (el bug original) pueden producir tokens distintos", async () => {
+    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const token1 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, 1_000_000_000);
+    const token2 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, 1_000_000_001);
+    expect(token1).not.toBe(token2);
+  });
 });

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
@@ -11,13 +11,15 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
 import PlantillasEmail from "./pages/PlantillasEmail";
+// TEMP-QA: arnés de verificación visual, se retira antes de entregar.
+import QaPreviewPlantillas from "./pages/_QaPreviewPlantillas";
 
 import Espacios from "./pages/Espacios";
 import Trabajadores from "./pages/Trabajadores";
-import GestorCarta from "./pages/GestorCarta";
 import Ecommerce from "./pages/Ecommerce";
-import GestionWeb from "./pages/GestionWeb";
-import GestionBot from "./pages/GestionBot";
+// Gestor Web unifica Carta, Novedades, Menús, Tapas y Bot web en pestañas
+// (?tab=...). Las rutas antiguas /gestor-carta y /gestion-bot redirigen aquí.
+import GestionWeb from "./pages/GestorWeb";
 import AsistenteTelefonico from "./pages/AsistenteTelefonico";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
@@ -33,7 +35,7 @@ const queryClient = new QueryClient();
  * de modo que un fallo en Facturas no se lleva por delante Reservas y al navegar
  * a otra sección la barrera se resetea sola.
  */
-const pagina = (contenido: ReactNode, requiredSection?: SectionKey) => (
+const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[]) => (
   <RouteErrorBoundary>
     <ProtectedRoute requiredSection={requiredSection}>{contenido}</ProtectedRoute>
   </RouteErrorBoundary>
@@ -54,16 +56,18 @@ const App = () => (
         >
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            {/* TEMP-QA: sin ProtectedRoute a propósito, se retira antes de entregar. */}
+            <Route path="/_qa_preview_plantillas" element={<QaPreviewPlantillas />} />
             <Route path="/" element={pagina(<Dashboard />)} />
             <Route path="/dashboard" element={pagina(<Dashboard />)} />
             <Route path="/reservas" element={pagina(<Reservas />)} />
             <Route path="/plantillas-email" element={pagina(<PlantillasEmail />, "reservas")} />
             <Route path="/espacios" element={pagina(<Espacios />)} />
             <Route path="/trabajadores" element={pagina(<Trabajadores />)} />
-            <Route path="/gestor-carta" element={pagina(<GestorCarta />)} />
             <Route path="/ecommerce" element={pagina(<Ecommerce />)} />
             <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
-            <Route path="/gestion-bot" element={pagina(<GestionBot />)} />
+            <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
+            <Route path="/gestion-bot" element={<Navigate to="/gestion-web?tab=bot" replace />} />
             <Route path="/asistente-telefonico" element={pagina(<AsistenteTelefonico />)} />
             <Route path="/marketing" element={pagina(<Marketing />)} />
             <Route path="/facturas" element={pagina(<Facturas />)} />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { CabeceraPestana } from "@/components/gestion-web/CabeceraPestana";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 
 type FiltroWeb = "todos" | "restaurante" | "touza" | "ninguno";
 
-export default function GestorCarta() {
+export default function TabCarta() {
   const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos, expandirTodos, contraerTodos } = usePlatos();
   const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas } = useBebidas();
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos } = useVinos();
@@ -171,37 +171,30 @@ export default function GestorCarta() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="space-y-6">
-        
-        
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Gestor de Carta</h2>
-            <p className="text-muted-foreground">
-              Gestiona el menú, bebidas, vinos y cócteles de tu restaurante y Touza
-            </p>
-          </div>
-          <div className="flex gap-3 items-center flex-wrap">
-            <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
-              <Percent className="mr-2 h-4 w-4" />
-              Ajustar Precios
-            </Button>
-            <Button onClick={handleAñadir}>
-              <Plus className="mr-2 h-4 w-4" />
-              Añadir
-            </Button>
-          </div>
-        </div>
+        <CabeceraPestana
+          titulo="Carta"
+          descripcion="Platos, bebidas, vinos y cócteles de Casa Tomás y Touza"
+          acciones={
+            <>
+              <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
+                <Percent className="mr-2 h-4 w-4" />
+                Ajustar precios
+              </Button>
+              <Button onClick={handleAñadir}>
+                <Plus className="mr-2 h-4 w-4" />
+                Añadir
+              </Button>
+            </>
+          }
+        />
 
         {/* Filtros de visibilidad (auto: botones o select según ancho real) */}
         <div ref={filtroEstadoWrapperRef} className="relative w-full">
@@ -518,6 +511,5 @@ export default function GestorCarta() {
           onOpenChange={setDialogAjustePreciosOpen}
         />
       </div>
-    </DashboardLayout>
   );
 }

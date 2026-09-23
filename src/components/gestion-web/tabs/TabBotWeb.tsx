@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { CabeceraPestana } from "@/components/gestion-web/CabeceraPestana";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,7 @@ import { BotIdiomaPanel } from "@/components/bot/BotIdiomaPanel";
 
 type DraftsPorIdioma = Record<IdiomaBotWeb, DraftBotWeb>;
 
-export default function GestionBot() {
+export default function TabBotWeb() {
   const { canAccess: canEdit } = useCanAccessSection("gestion_bot", "edit");
   const { configs, isLoading, isError, error, refetch, updateConfig } = useConfigBotWeb();
   const { platos, isLoading: loadingPlatos } = usePlatos();
@@ -147,18 +147,15 @@ export default function GestionBot() {
 
   if (isLoading || !drafts) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   if (isError) {
     return (
-      <DashboardLayout>
-        <Alert variant="destructive">
+      <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>No se pudo cargar la configuración del bot</AlertTitle>
           <AlertDescription className="space-y-3">
@@ -169,27 +166,22 @@ export default function GestionBot() {
             </Button>
           </AlertDescription>
         </Alert>
-      </DashboardLayout>
     );
   }
 
   const idiomaActivo = IDIOMAS.find((i) => i.value === activeIdioma)!;
 
   return (
-    <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Gestor Bot Web</h2>
-            <p className="text-muted-foreground">
-              Configura cómo se comporta el chatbot de la web — estás editando la versión en{" "}
-              <span className="font-medium text-foreground">
-                {idiomaActivo.flag} {idiomaActivo.label}
-              </span>
-              .
-            </p>
-          </div>
-        </div>
+        <CabeceraPestana
+          titulo="Bot web"
+          descripcion={
+            <>
+              Cómo se comporta el chatbot de la web — estás editando la versión en{" "}
+              <span className="font-medium text-foreground">{idiomaActivo.label}</span>.
+            </>
+          }
+        />
 
         {!canEdit && (
           <Alert>
@@ -249,6 +241,5 @@ export default function GestionBot() {
           ))}
         </Tabs>
       </div>
-    </DashboardLayout>
   );
 }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Users, MapPin, BookOpen, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Bot, Wallet, Star, Phone, Mail } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Users, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -18,17 +18,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 
-const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey }[] = [
+// `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
+// cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
+const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey | SectionKey[] }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas" },
   { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas" },
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
   { title: "Personal", url: "/trabajadores", icon: Users, sectionKey: "trabajadores" },
-  { title: "Gestor Carta", url: "/gestor-carta", icon: BookOpen, sectionKey: "gestor_carta" },
   { title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" },
-  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: "gestion_web" },
-  { title: "Gestor Bot Web", url: "/gestion-bot", icon: Bot, sectionKey: "gestion_bot" },
+  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB },
   { title: "Asistente Tel.", url: "/asistente-telefonico", icon: Phone, sectionKey: "asistente_telefonico" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
@@ -51,9 +52,9 @@ export function AppSidebar() {
   const visibleItems = menuItems.filter((item) => {
     if (loading) return false;
     if (isAdmin) return true;
-    if (item.sectionKey === "usuarios") return false; // Solo admins
-    const permission = permissions.find((p) => p.section_key === item.sectionKey);
-    return permission?.can_view ?? false;
+    const keys = Array.isArray(item.sectionKey) ? item.sectionKey : [item.sectionKey];
+    if (keys.includes("usuarios")) return false; // Solo admins
+    return keys.some((key) => permissions.find((p) => p.section_key === key)?.can_view);
   });
 
   return (

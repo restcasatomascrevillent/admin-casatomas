@@ -127,12 +127,12 @@ export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
           </p>
           <p>
             <span className="text-muted-foreground">Priorizará estos platos </span>
-            <span className="text-muted-foreground">(si siguen activos en Gestor Carta): </span>
+            <span className="text-muted-foreground">(si siguen activos en la pestaña Carta): </span>
             {draft.platos.length ? draft.platos.join(", ") : "ninguno — recomendará libremente entre los platos activos"}
           </p>
           <p>
             <span className="text-muted-foreground">Priorizará estos vinos </span>
-            <span className="text-muted-foreground">(si siguen activos en Gestor Carta): </span>
+            <span className="text-muted-foreground">(si siguen activos en la pestaña Carta): </span>
             {draft.vinos.length ? draft.vinos.join(", ") : "ninguno — recomendará libremente entre los vinos activos"}
           </p>
           <p>

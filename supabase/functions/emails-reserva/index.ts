@@ -228,6 +228,35 @@ async function obtenerPlantillaActual(tipo: TipoPlantilla): Promise<FilaPlantill
   return data as FilaPlantilla;
 }
 
+/**
+ * NUEVO (punto 1 del encargo, la parte "valora si conviene no volver a
+ * escribir a esa dirección" del caso 'complained'): `direcciones_email_
+ * suprimidas` la puebla resend-webhook al recibir bounced/complained/
+ * suppressed (ver su migración e index.ts) — aquí solo se consulta, antes
+ * de intentar un envío, para no seguir escribiendo a quien ya rebotó,
+ * se quejó, o que Resend ya tiene suprimida. Fail-open a propósito
+ * (mismo criterio que comprobarLimitePrueba más abajo en este fichero):
+ * un fallo LEYENDO la tabla de supresión no debe bloquear un envío real
+ * — no es una comprobación de seguridad, es una optimización de
+ * reputación/deliverability, así que el peor caso de un fallo aquí es
+ * mandar un correo de más, nunca dejar de mandar uno que sí tocaba.
+ */
+async function estaDireccionSuprimida(email: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("direcciones_email_suprimidas")
+    .select("email")
+    .eq("email", email.toLowerCase().trim())
+    .maybeSingle();
+  if (error) {
+    // "column/relation does not exist" es el caso esperable si la
+    // migración de resend-webhook todavía no se ha aplicado — se deja
+    // pasar igual que cualquier otro error de lectura (ver docstring).
+    console.error("[emails-reserva] Error comprobando direcciones_email_suprimidas (se deja pasar):", error.message);
+    return false;
+  }
+  return !!data;
+}
+
 async function construirDatosReserva(
   reserva: ReservaRow,
   urlsBotones?: { principal?: string; secundario?: string },
@@ -274,13 +303,16 @@ async function reclamarEnvio(
   tipoEmail: TipoPlantilla,
   destinatario: string,
   plantillaId: string,
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; creado_at: string } | null> {
   await liberarPendientesAbandonados({ reserva_id: reservaId, tipo_email: tipoEmail });
 
+  // `creado_at` en el select — lo necesita construirCorreoParaTipo para el
+  // token estable de 'propuesta' (punto 3 del encargo, ver su llamada en
+  // enviarCorreoParaReserva más abajo).
   const { data, error } = await supabase
     .from("envios_email_reserva")
     .insert({ reserva_id: reservaId, tipo_email: tipoEmail, destinatario, plantilla_id: plantillaId, resultado: "pendiente" })
-    .select("id")
+    .select("id, creado_at")
     .single();
 
   if (error) {
@@ -291,13 +323,20 @@ async function reclamarEnvio(
     }
     return null;
   }
-  return { id: data.id as string };
+  return { id: data.id as string, creado_at: data.creado_at as string };
 }
 
 async function marcarEnviado(id: string, resendId: string | null): Promise<void> {
+  // `error: null` — BUG PRE-EXISTENTE ENCONTRADO Y CORREGIDO AQUÍ (fuera del
+  // encargo original, pero dentro de mi territorio, punto 4): sin esto, una
+  // fila que fallaba y luego se reintentaba con éxito quedaba 'enviado' pero
+  // conservando el `error` del intento anterior — el panel podía mostrar un
+  // motivo de fallo sobre un envío que sí se entregó. `enviado`/`fallido`/
+  // `fallido_definitivo` son estados mutuamente excluyentes; solo estos dos
+  // últimos deben dejar `error` relleno.
   const { error } = await supabase
     .from("envios_email_reserva")
-    .update({ resultado: "enviado", resend_id: resendId, enviado_at: ahoraIso(), ultimo_intento_at: ahoraIso() })
+    .update({ resultado: "enviado", resend_id: resendId, error: null, enviado_at: ahoraIso(), ultimo_intento_at: ahoraIso() })
     .eq("id", id);
   if (error) console.error(`[emails-reserva] Error marcando enviado ${id}:`, error.message);
 }
@@ -412,17 +451,39 @@ async function enviarPorResendConIdempotencia(payload: PayloadCorreo, idempotenc
  * botones firmados de 'propuesta'. Extraído de enviarCorreoParaReserva para
  * que /reintentar-fallidos pueda reconstruir el mismo contenido (recalculado
  * con los datos VIGENTES de la reserva, no los del intento original — ver
- * comentario sobre tipoDeEmailSigueVigente en reintentos.ts). */
+ * comentario sobre tipoDeEmailSigueVigente en reintentos.ts).
+ *
+ * `tokenBasadoEnIso` — BUG PRE-EXISTENTE ENCONTRADO Y CORREGIDO AQUÍ (punto 3
+ * del encargo): antes, `firmarToken` se llamaba SIEMPRE con su valor por
+ * defecto (`Date.now()` en el momento de la llamada), así que `exp` — y por
+ * tanto el token entero, y por tanto el HTML — cambiaba entre el intento
+ * original y cada reintento de la MISMA fila. Si el original SÍ había
+ * llegado a Resend, el reintento mandaba un cuerpo distinto con la MISMA
+ * clave de idempotencia (claveIdempotenciaEnvio(envioId), estable por fila
+ * — ver cabecera de intentarEnviarYRegistrar) → Resend respondía 409
+ * `invalid_idempotent_request` (payload distinto, misma clave) →
+ * clasificarErrorEnvio lo marca PERMANENTE → fallido_definitivo + aviso
+ * "llama al cliente" sobre una propuesta que en realidad SÍ se había
+ * entregado. Ahora `firmarToken` recibe el `creado_at` de la propia fila de
+ * envios_email_reserva (estable durante todo su ciclo de vida: el reintento
+ * hace UPDATE de la misma fila, nunca INSERT de una nueva — ver
+ * reclamarReintento) en vez de "ahora", así que el token —y el HTML
+ * completo— es IDÉNTICO en el intento original y en cada reintento de esa
+ * fila. Solo afecta a 'propuesta' (el único tipo con token); una fila NUEVA
+ * (nueva propuesta tras una anterior ya concluida) sigue obteniendo un
+ * `creado_at` — y por tanto un `exp` — nuevo y correcto. */
 async function construirCorreoParaTipo(
   reserva: ReservaRow,
   tipo: TipoPlantilla,
   plantilla: FilaPlantilla,
+  tokenBasadoEnIso?: string,
 ): Promise<{ asunto: string; html: string }> {
   let urlsBotones: { principal?: string; secundario?: string } | undefined;
   if (tipo === "propuesta") {
     const huella = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-    const tokenAceptar = await firmarToken(TOKEN_SECRET, reserva.id, "aceptar", huella);
-    const tokenRechazar = await firmarToken(TOKEN_SECRET, reserva.id, "rechazar", huella);
+    const basadoEnEpoch = tokenBasadoEnIso ? Math.floor(new Date(tokenBasadoEnIso).getTime() / 1000) : undefined;
+    const tokenAceptar = await firmarToken(TOKEN_SECRET, reserva.id, "aceptar", huella, basadoEnEpoch);
+    const tokenRechazar = await firmarToken(TOKEN_SECRET, reserva.id, "rechazar", huella, basadoEnEpoch);
     urlsBotones = {
       principal: `${PUBLIC_BASE_URL}/aceptar?token=${encodeURIComponent(tokenAceptar)}`,
       secundario: `${PUBLIC_BASE_URL}/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
@@ -599,8 +660,15 @@ async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlan
   const plantilla = await obtenerPlantillaActual(tipo);
   if (!plantilla) return { enviado: false, motivo: `plantilla_no_configurada_${tipo}` };
 
-  const { asunto, html: cuerpoHtml } = await construirCorreoParaTipo(reserva, tipo, plantilla);
-
+  // ORDEN CAMBIADO A PROPÓSITO (punto 3 del encargo): se reclama la fila
+  // ANTES de construir el correo, no después — al revés de como estaba.
+  // Así se conoce `claim.creado_at` (estable durante todo el ciclo de vida
+  // de esta fila) ANTES de firmar el token de 'propuesta', y
+  // construirCorreoParaTipo puede usarlo en vez de "ahora" (ver su
+  // docstring para el bug completo que esto corrige). Es además el MISMO
+  // orden que ya usaba el camino de reintento (procesarReintentoDeFila:
+  // reclama -> lee reserva -> construye correo) — esto solo lo hace
+  // consistente entre el primer intento y los reintentos.
   const claim = await reclamarEnvio(reserva.id, tipo, reserva.email, plantilla.id);
   if (!claim) return { enviado: false, motivo: "ya_enviado_o_en_curso" };
 
@@ -613,6 +681,19 @@ async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlan
     await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, tipo, "resend_no_configurado")]);
     return { enviado: false, motivo: "resend_no_configurado" };
   }
+
+  // NUEVO (punto 1 del encargo): no intentar siquiera un envío a una
+  // dirección que resend-webhook ya marcó como rebotada/quejada/suprimida.
+  // Se comprueba aquí (tras reclamar, antes de construir el HTML) para no
+  // malgastar la construcción del correo —con su token firmado— en un
+  // envío que no va a intentarse.
+  if (await estaDireccionSuprimida(reserva.email)) {
+    await marcarFallidoDefinitivo(claim.id, "destinatario_suprimido");
+    await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, tipo, "destinatario_suprimido")]);
+    return { enviado: false, motivo: "destinatario_suprimido" };
+  }
+
+  const { asunto, html: cuerpoHtml } = await construirCorreoParaTipo(reserva, tipo, plantilla, claim.creado_at);
 
   const resultado = await intentarEnviarYRegistrar(claim.id, reserva.email, asunto, cuerpoHtml, 1);
   if (resultado.enviado) return { enviado: true };
@@ -635,6 +716,11 @@ interface FilaEnvioFallido {
   intentos: number;
   resultado: string;
   proximo_reintento_en: string | null;
+  /** Estable durante todo el ciclo de vida de la fila (el reintento hace
+   * UPDATE, nunca INSERT) — se pasa a construirCorreoParaTipo para que el
+   * token de 'propuesta' sea idéntico en cada reintento (punto 3 del
+   * encargo, ver docstring de construirCorreoParaTipo). */
+  creado_at: string;
 }
 
 async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnvioFallido[]> {
@@ -652,7 +738,7 @@ async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnv
   // el orden haya dejado dentro del límite sin tocarles aún.
   const { data, error } = await supabase
     .from("envios_email_reserva")
-    .select("id, reserva_id, tipo_email, plantilla_id, intentos, resultado, proximo_reintento_en")
+    .select("id, reserva_id, tipo_email, plantilla_id, intentos, resultado, proximo_reintento_en, creado_at")
     .eq("resultado", "fallido")
     .lt("intentos", MAX_INTENTOS_POR_DEFECTO)
     .order("proximo_reintento_en", { ascending: true, nullsFirst: true })
@@ -727,6 +813,14 @@ async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string
     return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "reserva_sin_email") };
   }
 
+  // NUEVO (punto 1 del encargo): mismo motivo que en enviarCorreoParaReserva
+  // — no reintentar hacia una dirección que resend-webhook ya marcó
+  // rebotada/quejada/suprimida mientras esta fila esperaba su reintento.
+  if (await estaDireccionSuprimida(reserva.email)) {
+    await marcarFallidoDefinitivo(claim.id, "destinatario_suprimido");
+    return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "destinatario_suprimido") };
+  }
+
   if (!fila.plantilla_id) {
     await marcarFallidoDefinitivo(claim.id, "plantilla_no_encontrada");
     return { estado: "definitivo", perdido: resumenPerdido(reserva, fila.tipo_email as TipoPlantilla, "plantilla_no_encontrada") };
@@ -750,6 +844,7 @@ async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string
     reserva,
     fila.tipo_email as TipoPlantilla,
     plantillaData as FilaPlantilla,
+    fila.creado_at,
   );
 
   const resultado = await intentarEnviarYRegistrar(claim.id, reserva.email, asunto, cuerpoHtml, claim.intentos);
