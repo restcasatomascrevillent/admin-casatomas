@@ -24,7 +24,7 @@ project_id = "jeamoczmbfsnwkfjxcyo"
 
 
 # ----------------------------------------------------------------------------
-# verify_jwt = false — las tres que TIENEN que responder sin cabeceras
+# verify_jwt = false — las funciones que TIENEN que responder sin cabeceras
 # ----------------------------------------------------------------------------
 
 # Rutas GET dentro de un correo electrónico: el cliente pulsa "Confirmar" o
@@ -61,6 +61,16 @@ verify_jwt = false
 # si esa env var falta — a diferencia de checkSharedSecret en reservas-web,
 # que falla abierto (ver docs/REVISION-PUERTOS-N8N.md A-3).
 [functions.emails-reserva]
+verify_jwt = false
+
+# La llama pg_cron (net.http_post, 03:30 UTC) sin usuario ni JWT: con
+# verify_jwt = true la pasarela la cortaría con 401. La autenticación real es
+# la cabecera x-webhook-secret == TRAFICO_WEB_CRON_SECRET (comparación en
+# tiempo constante, FALLA CERRADO si la env var falta -> 500). El valor sale
+# del secreto de Vault 'trafico_web_cron_secret'. Ver
+# supabase/functions/sync-trafico-web/{index.ts,DEPLOY.md} y la migración
+# 20260923200000_trafico_web.sql.
+[functions.sync-trafico-web]
 verify_jwt = false
 
 
