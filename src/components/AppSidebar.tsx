@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Users, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -27,7 +27,8 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas" },
   { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas" },
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
-  { title: "Personal", url: "/trabajadores", icon: Users, sectionKey: "trabajadores" },
+  // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
+  // docs/funcionalidades/10-retirada-seccion-personal.md.
   { title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" },
   { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB },
   { title: "Asistente Tel.", url: "/asistente-telefonico", icon: Phone, sectionKey: "asistente_telefonico" },

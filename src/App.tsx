@@ -12,7 +12,6 @@ import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
 import PlantillasEmail from "./pages/PlantillasEmail";
 import Espacios from "./pages/Espacios";
-import Trabajadores from "./pages/Trabajadores";
 import Ecommerce from "./pages/Ecommerce";
 // Gestor Web unifica Carta, Novedades, Menús, Tapas y Bot web en pestañas
 // (?tab=...). Las rutas antiguas /gestor-carta y /gestion-bot redirigen aquí.
@@ -58,7 +57,9 @@ const App = () => (
             <Route path="/reservas" element={pagina(<Reservas />)} />
             <Route path="/plantillas-email" element={pagina(<PlantillasEmail />, "reservas")} />
             <Route path="/espacios" element={pagina(<Espacios />)} />
-            <Route path="/trabajadores" element={pagina(<Trabajadores />)} />
+            {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se
+                conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
+            <Route path="/trabajadores" element={<Navigate to="/" replace />} />
             <Route path="/ecommerce" element={pagina(<Ecommerce />)} />
             <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
             <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />

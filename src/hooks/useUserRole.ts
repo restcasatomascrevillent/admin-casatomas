@@ -22,7 +22,9 @@ export const SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "reservas", label: "Reservas" },
   { key: "espacios", label: "Espacios" },
-  { key: "trabajadores", label: "Personal" },
+  // "trabajadores" (Personal) retirada el 2026-09-23 (decisión del dueño).
+  // Filas de user_permissions con section_key="trabajadores" que puedan
+  // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "ecommerce", label: "Ecommerce" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },

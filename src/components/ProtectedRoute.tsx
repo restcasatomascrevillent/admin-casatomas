@@ -16,7 +16,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/": "dashboard",
   "/reservas": "reservas",
   "/espacios": "espacios",
-  "/trabajadores": "trabajadores",
+  // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/ecommerce": "ecommerce",
   "/asistente-telefonico": "asistente_telefonico",
   "/resenas": "resenas",
