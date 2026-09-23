@@ -12,39 +12,69 @@ import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanza
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
-import { GestionSolicitudes } from "@/components/reservas/GestionSolicitudes";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
+import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
-  const [activeTab, setActiveTab] = useState("hoy");
+  const [activeTab, setActiveTab] = useState<string>("reservas");
   const [tabsOverflow, setTabsOverflow] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
   const isAdmin = role === "admin";
-  const { countPendientes } = useSolicitudesPendientes();
+  // ÚNICA instancia en la página: el tab la usa para el contador y la lista
+  // unificada para pintar las solicitudes (ver aviso de realtime en el hook).
+  const solicitudesState = useSolicitudesPendientes();
+  const { countPendientes } = solicitudesState;
+  const listaRef = useRef<HTMLElement | null>(null);
 
   // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,
   // el formulario reescribiría la fecha continuamente.
   const datosNuevaReserva = useMemo(() => ({ fecha: new Date() }), [openDialog]);
 
-  // Leer parámetros de URL para controlar tab activo
+  // Leer parámetros de URL para controlar tab activo. Las pestañas antiguas
+  // (hoy, lista, solicitudes) se unificaron en "reservas" (2026-09-23);
+  // `resolverDeepLinkReservas` traduce los enlaces viejos — `?tab=solicitudes`
+  // abre "reservas" con el filtro "Solicitudes sin resolver".
   const tabFromUrl = searchParams.get("tab");
-  const statusFromUrl = searchParams.get("status");
-  const dateFromUrl = searchParams.get("date");
+  const destino = resolverDeepLinkReservas({
+    tab: tabFromUrl,
+    status: searchParams.get("status"),
+    date: searchParams.get("date"),
+  });
+  const statusFromUrl = destino.status;
+  const dateFromUrl = destino.date;
+  const hayPresetLista = !!(statusFromUrl || dateFromUrl);
 
   useEffect(() => {
-    if (tabFromUrl) {
-      setActiveTab(tabFromUrl);
+    if (!tabFromUrl) return;
+    setActiveTab(destino.tab);
+    // Normalizar la URL de una pestaña antigua sin perder los filtros.
+    if (!(TABS_RESERVAS as readonly string[]).includes(tabFromUrl)) {
+      const params: Record<string, string> = { tab: destino.tab };
+      if (destino.status) params.status = destino.status;
+      if (destino.date) params.date = destino.date;
+      setSearchParams(params, { replace: true });
     }
-  }, [tabFromUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabFromUrl, destino.tab, destino.status, destino.date]);
+
+  // Si se llega con un filtro preestablecido (campana, widget del dashboard),
+  // lo que interesa es la lista, que está debajo de "Reservas de hoy".
+  useEffect(() => {
+    if (activeTab !== "reservas" || !hayPresetLista) return;
+    const t = window.setTimeout(() => {
+      listaRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [activeTab, hayPresetLista, statusFromUrl, dateFromUrl]);
 
   useEffect(() => {
     const el = tabsContainerRef.current;
@@ -138,12 +168,10 @@ export default function Reservas() {
                 <SelectValue placeholder="Selecciona vista" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hoy">Hoy</SelectItem>
-                <SelectItem value="lista">Lista</SelectItem>
-                <SelectItem value="calendario">Calendario</SelectItem>
-                <SelectItem value="solicitudes">
-                  Solicitudes{countPendientes > 0 ? ` (${countPendientes})` : ""}
+                <SelectItem value="reservas">
+                  Reservas{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                 </SelectItem>
+                <SelectItem value="calendario">Calendario</SelectItem>
                 <SelectItem value="blacklist">Blacklist</SelectItem>
                 {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
               </SelectContent>
@@ -158,17 +186,19 @@ export default function Reservas() {
             }`}
           >
             <TabsList className="w-max min-w-max justify-start gap-1 p-1">
-              <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
-              <TabsTrigger value="lista" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Lista</TabsTrigger>
-              <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
-              <TabsTrigger value="solicitudes" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
-                Solicitudes
+              <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
+                Reservas
                 {countPendientes > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full">
+                  <span
+                    className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
+                    aria-label={`${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`}
+                    title="Solicitudes del bot sin resolver"
+                  >
                     {countPendientes}
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
               <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
               {isAdmin && (
                 <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
@@ -180,24 +210,33 @@ export default function Reservas() {
             </TabsList>
           </div>
 
-          <TabsContent value="hoy" className="space-y-6 mt-6">
+          {/* Pestaña unificada (antes Hoy + Lista + Solicitudes): arriba
+              "Reservas de hoy", debajo la lista completa con las solicitudes
+              del bot mezcladas como filas "Solicitud". */}
+          <TabsContent value="reservas" className="space-y-8 mt-6">
             <VistaHoy onEspacioClick={handleEspacioClick} />
-          </TabsContent>
 
-          <TabsContent value="lista" className="space-y-6 mt-6">
-            <ListaReservasAvanzada 
-              onEspacioClick={handleEspacioClick}
-              initialStatusFilter={statusFromUrl || undefined}
-              initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
-            />
+            <section ref={listaRef} aria-labelledby="titulo-todas-reservas" className="space-y-3 scroll-mt-4">
+              <div>
+                <h3 id="titulo-todas-reservas" className="text-lg sm:text-xl font-semibold">Todas las reservas y solicitudes</h3>
+                <p className="text-muted-foreground text-xs sm:text-sm">
+                  Historial completo. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
+                </p>
+              </div>
+              <ListaReservasAvanzada
+                // `key`: si llega otro filtro por URL estando ya en la página
+                // (p. ej. desde la campana), la lista se reinicia con él.
+                key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
+                onEspacioClick={handleEspacioClick}
+                initialStatusFilter={statusFromUrl || undefined}
+                initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
+                solicitudesState={solicitudesState}
+              />
+            </section>
           </TabsContent>
 
           <TabsContent value="calendario" className="space-y-6 mt-6">
             <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
-          </TabsContent>
-
-          <TabsContent value="solicitudes" className="space-y-6 mt-6">
-            <GestionSolicitudes />
           </TabsContent>
 
           <TabsContent value="blacklist" className="space-y-6 mt-6">

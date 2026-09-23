@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +22,13 @@ import {
   Star,
   Phone,
   Globe,
-  Pencil
+  Pencil,
+  UserX,
+  Inbox,
+  CalendarPlus,
+  Settings2,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -37,6 +43,15 @@ import {
   aceptarComoSolicitado,
   aceptarVariasComoSolicitado,
 } from "@/hooks/useVerificacionReservas";
+import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
+import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
+import { FormularioReserva } from "./FormularioReserva";
+import {
+  OPCIONES_FILTRO_ESTADO,
+  esSolicitudAbierta,
+  filtrarFilasUnificadas,
+  unificarReservasYSolicitudes,
+} from "@/lib/reservas/vistaUnificada";
 
 // Mismo tipo que consume ModalVerificacionReserva.tsx — fuente única del
 // contrato con `reservas` (incluye espacio_id y, si la migración
@@ -49,19 +64,21 @@ interface ListaReservasAvanzadaProps {
   onEspacioClick?: (espacioId: string) => void;
   initialStatusFilter?: string;
   initialDateFilter?: Date;
+  /**
+   * Solicitudes que el bot no pudo resolver, mezcladas en la lista como
+   * filas "Solicitud". Lo instancia `Reservas.tsx` (una sola vez: ver el
+   * aviso de realtime en useSolicitudesPendientes.ts) y lo pasa aquí.
+   */
+  solicitudesState?: ReturnType<typeof useSolicitudesPendientes>;
 }
 
 export function ListaReservasAvanzada({
   onEditReserva,
   onEspacioClick,
   initialStatusFilter,
-  initialDateFilter
+  initialDateFilter,
+  solicitudesState,
 }: ListaReservasAvanzadaProps) {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
-  // Sin este estado, un fallo de carga se pintaba como
-  // "No se encontraron reservas con los filtros aplicados".
-  const [loadError, setLoadError] = useState<unknown>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [verificacionModalOpen, setVerificacionModalOpen] = useState(false);
   const [selectedReservaForVerification, setSelectedReservaForVerification] = useState<Reservation | null>(null);
@@ -89,12 +106,9 @@ export function ListaReservasAvanzada({
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
-
-
-
-  useEffect(() => {
-    fetchReservations();
-  }, []);
+  // Solicitud del bot que se está convirtiendo en reserva / gestionando.
+  const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
+  const [solicitudGestionId, setSolicitudGestionId] = useState<string | null>(null);
 
   // `select("*")` a propósito, no una lista de columnas: `hora_solicitada`/
   // `espacio_solicitado_id` (migración 20260920010000) todavía no están en
@@ -109,23 +123,64 @@ export function ListaReservasAvanzada({
   // opcionales y el resto del código (objetivoAceptarComoSolicitado,
   // difiereSolicitudDeOferta) ya trata su ausencia como "sin contraoferta
   // todavía", no como un error.
-  const fetchReservations = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("reservas")
-      .select("*")
-      .order("fecha", { ascending: false })
-      .order("hora", { ascending: true });
+  //
+  // React Query (antes useState + fetch manual) con clave "reservas-lista":
+  // así las acciones de otras partes de la pestaña — "Ha llegado" en
+  // "Reservas de hoy", mover de espacio en el Gestor, alta nueva — refrescan
+  // también esta lista (useAccionesServicioReserva / FormularioReserva
+  // invalidan por prefijo), y un fallo de carga sigue sin pintarse como
+  // "No se encontraron reservas".
+  const {
+    data: reservasData,
+    isLoading: loading,
+    error: loadError,
+    refetch,
+  } = useQuery({
+    queryKey: ["reservas-lista"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("reservas")
+        .select("*")
+        .order("fecha", { ascending: false })
+        .order("hora", { ascending: true });
+      if (error) {
+        toast.error("Error al cargar reservas");
+        console.error(error);
+        throw error;
+      }
+      return (data as unknown as Reservation[]) || [];
+    },
+  });
+  const reservations = useMemo(() => reservasData ?? [], [reservasData]);
+  const fetchReservations = () => {
+    void refetch();
+  };
 
-    if (error) {
-      toast.error("Error al cargar reservas");
-      console.error(error);
-      setLoadError(error);
-    } else {
-      setLoadError(null);
-      setReservations((data as any) || []);
+  const solicitudes = useMemo(() => solicitudesState?.solicitudes ?? [], [solicitudesState?.solicitudes]);
+  const solicitudGestion = solicitudGestionId ? solicitudes.find((s) => s.id === solicitudGestionId) ?? null : null;
+
+  // Datos para prerrellenar el alta a partir de la solicitud. Memo: el
+  // formulario reescribe sus campos cada vez que cambia la identidad.
+  const datosConversion = useMemo(() => {
+    const s = solicitudAConvertir;
+    if (!s) return null;
+    return {
+      fecha: s.fecha_solicitada ? new Date(`${s.fecha_solicitada}T12:00:00`) : undefined,
+      hora: s.hora_solicitada ? String(s.hora_solicitada).substring(0, 5) : undefined,
+      nombre: s.nombre ?? undefined,
+      telefono: s.telefono ?? undefined,
+      email: s.email ?? undefined,
+      numero_comensales: s.numero_comensales ?? undefined,
+      notas_cliente: s.notas_cliente ?? undefined,
+    };
+  }, [solicitudAConvertir]);
+
+  const handleReservaDesdeSolicitudCreada = async () => {
+    const s = solicitudAConvertir;
+    setSolicitudAConvertir(null);
+    if (s && solicitudesState) {
+      await solicitudesState.updateEstado(s.id, "resuelta");
     }
-    setLoading(false);
   };
 
   const updateReservationStatus = async (id: string, newStatus: string) => {
@@ -268,42 +323,42 @@ export function ListaReservasAvanzada({
             Cancelada
           </Badge>
         );
+      // 'completada' = el cliente llegó (ver src/lib/reservas/servicioSala.ts).
+      case "completada":
+        return (
+          <Badge className="bg-emerald-600 text-white">
+            <CheckCheck className="mr-1 h-3 w-3" />
+            Llegó
+          </Badge>
+        );
+      case "no_show":
+        return (
+          <Badge variant="secondary">
+            <UserX className="mr-1 h-3 w-3" />
+            No vino
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  // Aplicar filtros
-  const filteredReservations = reservations.filter((r) => {
-    // Filtro de búsqueda por nombre
-    if (searchQuery && !r.nombre?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-
-    // Filtro de estado
-    if (statusFilter !== "all" && r.estado !== statusFilter) {
-      return false;
-    }
-
-    // Filtro de canal
-    if (canalFilter !== "all") {
-      const canalReserva = r.canal || 'web';
-      if (canalReserva !== canalFilter) return false;
-    }
-
-    // Filtro de fecha
-    if (dateFilter) {
-      const reservaDate = new Date(r.fecha);
-      const filterDate = new Date(dateFilter);
-      reservaDate.setHours(0, 0, 0, 0);
-      filterDate.setHours(0, 0, 0, 0);
-      if (reservaDate.getTime() !== filterDate.getTime()) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  // Aplicar filtros — a reservas Y solicitudes a la vez (lógica pura en
+  // src/lib/reservas/vistaUnificada.ts). La fecha se compara como texto
+  // "yyyy-MM-dd": antes se hacía `new Date(r.fecha)` (medianoche UTC) contra
+  // una fecha local, lo que en husos negativos casaba con el día anterior.
+  const filas = useMemo(
+    () =>
+      filtrarFilasUnificadas(unificarReservasYSolicitudes(reservations, solicitudes), {
+        busqueda: searchQuery,
+        estado: statusFilter,
+        canal: canalFilter,
+        fecha: dateFilter ? format(dateFilter, "yyyy-MM-dd") : null,
+      }),
+    [reservations, solicitudes, searchQuery, statusFilter, canalFilter, dateFilter],
+  );
+  const filteredReservations = filas.flatMap((f) => (f.tipo === "reserva" ? [f.reserva] : []));
+  const numSolicitudesVisibles = filas.length - filteredReservations.length;
 
   if (loading) {
     return (
@@ -337,7 +392,8 @@ export function ListaReservasAvanzada({
             <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre..."
+                placeholder="Buscar nombre, teléfono o email…"
+                aria-label="Buscar reservas y solicitudes"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -390,15 +446,13 @@ export function ListaReservasAvanzada({
 
               {/* Filtro de estado */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[130px] sm:w-[160px]">
+                <SelectTrigger className="w-[170px] sm:w-[200px]" aria-label="Filtrar por estado">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="pendiente">Pendiente</SelectItem>
-                  <SelectItem value="verificada">Verificada</SelectItem>
-                  <SelectItem value="confirmada">Confirmada</SelectItem>
-                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                  {OPCIONES_FILTRO_ESTADO.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -419,6 +473,7 @@ export function ListaReservasAvanzada({
             {/* Contador de resultados */}
             <Badge variant="secondary" className="self-center sm:ml-auto">
               {filteredReservations.length} reservas
+              {numSolicitudesVisibles > 0 && ` · ${numSolicitudesVisibles} solicitud${numSolicitudesVisibles === 1 ? "" : "es"}`}
             </Badge>
           </div>
         </CardContent>
@@ -447,14 +502,24 @@ export function ListaReservasAvanzada({
 
       {/* Mobile card view */}
       <div className="sm:hidden space-y-3">
-        {filteredReservations.length === 0 ? (
+        {filas.length === 0 ? (
           <Card>
             <CardContent className="text-center py-8 text-muted-foreground">
               No se encontraron reservas con los filtros aplicados
             </CardContent>
           </Card>
         ) : (
-          filteredReservations.map((reservation) => (
+          filas.map((fila) => fila.tipo === "solicitud" ? (
+            solicitudesState && (
+              <SolicitudCard
+                key={fila.id}
+                solicitud={fila.solicitud}
+                onUpdateEstado={solicitudesState.updateEstado}
+                onUpdateNotas={solicitudesState.updateNotasInternas}
+                onConvertir={canEdit ? setSolicitudAConvertir : undefined}
+              />
+            )
+          ) : (() => { const reservation = fila.reserva; return (
             <Card key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
@@ -508,13 +573,13 @@ export function ListaReservasAvanzada({
                       {updatingId === reservation.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Cancelar"}
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={() => setBlacklistReserva(reservation)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto" onClick={() => setBlacklistReserva(reservation)} aria-label={`Añadir a ${reservation.nombre || "este cliente"} a la lista negra`}>
                     <ShieldBan className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          ))
+          ); })())
         )}
       </div>
 
@@ -545,14 +610,22 @@ export function ListaReservasAvanzada({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredReservations.length === 0 ? (
+              {filas.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-8 text-muted-foreground">
                     No se encontraron reservas con los filtros aplicados
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredReservations.map((reservation) => (
+                filas.map((fila) => fila.tipo === "solicitud" ? (
+                  <FilaSolicitud
+                    key={fila.id}
+                    solicitud={fila.solicitud}
+                    canEdit={canEdit}
+                    onConvertir={() => setSolicitudAConvertir(fila.solicitud)}
+                    onGestionar={() => setSolicitudGestionId(fila.solicitud.id)}
+                  />
+                ) : (() => { const reservation = fila.reserva; return (
                   <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
                     {canEdit && (
                       <TableCell>
@@ -612,12 +685,12 @@ export function ListaReservasAvanzada({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reservation)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reservation)} aria-label={`Añadir a ${reservation.nombre || "este cliente"} a la lista negra`}>
                         <ShieldBan className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                ); })())
               )}
             </TableBody>
           </Table>
@@ -636,6 +709,123 @@ export function ListaReservasAvanzada({
         open={!!blacklistReserva}
         onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
       />
+
+      {/* Convertir una solicitud del bot en reserva: alta manual prerrellenada;
+          al crearla, la solicitud pasa a "resuelta". */}
+      <Dialog open={!!solicitudAConvertir} onOpenChange={(open) => { if (!open) setSolicitudAConvertir(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Convertir solicitud en reserva</DialogTitle>
+            <DialogDescription>
+              Datos tomados de la solicitud que dejó el cliente por teléfono. Revísalos: al crear la reserva, la solicitud se marcará como resuelta.
+            </DialogDescription>
+          </DialogHeader>
+          {solicitudAConvertir && (
+            <FormularioReserva
+              datosPreseleccionados={datosConversion}
+              onSuccess={handleReservaDesdeSolicitudCreada}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Gestión completa de una solicitud (notas internas, contactado,
+          resuelta, descartar…) desde la tabla de escritorio. */}
+      <Dialog open={!!solicitudGestion} onOpenChange={(open) => { if (!open) setSolicitudGestionId(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Solicitud pendiente del bot</DialogTitle>
+            <DialogDescription>El asistente telefónico no pudo cerrar esta reserva. Gestiona aquí el seguimiento.</DialogDescription>
+          </DialogHeader>
+          {solicitudGestion && solicitudesState && (
+            <SolicitudCard
+              solicitud={solicitudGestion}
+              onUpdateEstado={solicitudesState.updateEstado}
+              onUpdateNotas={solicitudesState.updateNotasInternas}
+              onConvertir={canEdit ? (s) => { setSolicitudGestionId(null); setSolicitudAConvertir(s); } : undefined}
+              defaultExpanded
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+/** Fila de la tabla (escritorio) para una solicitud pendiente del bot. */
+function FilaSolicitud({
+  solicitud,
+  canEdit,
+  onConvertir,
+  onGestionar,
+}: {
+  solicitud: SolicitudPendiente;
+  canEdit: boolean;
+  onConvertir: () => void;
+  onGestionar: () => void;
+}) {
+  const motivo = MOTIVO_LABELS[solicitud.motivo_rechazo] || MOTIVO_LABELS.otro;
+  const abierta = esSolicitudAbierta(solicitud.estado);
+  const estadoLabel = ESTADO_LABELS[solicitud.estado]?.label || solicitud.estado;
+  return (
+    <TableRow className={cn("bg-amber-50/50 dark:bg-amber-950/10", !abierta && "opacity-70")}>
+      {canEdit && <TableCell />}
+      <TableCell>
+        {solicitud.fecha_solicitada
+          ? new Date(`${solicitud.fecha_solicitada}T12:00:00`).toLocaleDateString("es-ES")
+          : <span className="text-muted-foreground">Sin fecha</span>}
+      </TableCell>
+      <TableCell>{solicitud.hora_solicitada ? String(solicitud.hora_solicitada).substring(0, 5) : "—"}</TableCell>
+      <TableCell>
+        <div>
+          <p className="font-medium">{solicitud.nombre || "Sin nombre"}</p>
+          {solicitud.telefono && (
+            <a href={`tel:${solicitud.telefono}`} className="text-xs text-muted-foreground hover:underline">
+              {solicitud.telefono}
+            </a>
+          )}
+          {solicitud.descripcion_rechazo && (
+            <p className="text-xs text-muted-foreground mt-0.5 max-w-[260px] truncate" title={solicitud.descripcion_rechazo}>
+              {solicitud.descripcion_rechazo}
+            </p>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        {solicitud.numero_comensales ? (
+          <div className="flex items-center gap-1"><Users className="h-4 w-4 text-muted-foreground" />{solicitud.numero_comensales}</div>
+        ) : "—"}
+      </TableCell>
+      <TableCell>
+        <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 gap-1">
+          <Phone className="h-3 w-3" />
+          Bot
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col items-start gap-1">
+          <Badge className="bg-amber-500 text-white gap-1">
+            <Inbox className="h-3 w-3" />
+            Solicitud · {estadoLabel}
+          </Badge>
+          <Badge className={cn("text-[10px]", motivo.color)}>{motivo.label}</Badge>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex gap-2 flex-wrap">
+          {canEdit && abierta && (
+            <Button size="sm" onClick={onConvertir}>
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              Convertir en reserva
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onGestionar}>
+            <Settings2 className="h-4 w-4 mr-1" />
+            Gestionar
+          </Button>
+        </div>
+      </TableCell>
+      <TableCell />
+    </TableRow>
   );
 }

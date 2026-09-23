@@ -86,6 +86,13 @@ interface FormularioReservaProps {
   datosPreseleccionados?: {
     fecha?: Date;
     hora?: string;
+    // Datos del cliente: los usa "Convertir en reserva" desde una solicitud
+    // pendiente del bot (ListaReservasAvanzada.tsx) para no reteclearlos.
+    nombre?: string;
+    telefono?: string;
+    email?: string;
+    numero_comensales?: number;
+    notas_cliente?: string;
   } | null;
 }
 
@@ -119,6 +126,15 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     }
     if (datosPreseleccionados?.hora) {
       form.setValue("hora", datosPreseleccionados.hora);
+    }
+    if (datosPreseleccionados?.nombre) form.setValue("nombre", datosPreseleccionados.nombre);
+    if (datosPreseleccionados?.telefono) form.setValue("telefono", datosPreseleccionados.telefono);
+    if (datosPreseleccionados?.email) form.setValue("email", datosPreseleccionados.email);
+    if (datosPreseleccionados?.numero_comensales) {
+      form.setValue("numero_comensales", datosPreseleccionados.numero_comensales);
+    }
+    if (datosPreseleccionados?.notas_cliente) {
+      form.setValue("notas_cliente", datosPreseleccionados.notas_cliente);
     }
   }, [datosPreseleccionados, form]);
 
@@ -320,6 +336,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       [
         "reservas-hoy",
         "reservas-kanban",
+        "reservas-lista",
         "reservas_mes",
         "reservas_hoy_todas",
         "ocupacion_hoy",

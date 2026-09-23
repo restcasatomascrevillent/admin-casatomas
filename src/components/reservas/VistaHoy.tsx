@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { BlacklistModal } from "./BlacklistModal";
 import { GestorReservasKanban } from "./GestorReservasKanban";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { ControlLlegada } from "./ControlLlegada";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
@@ -32,8 +34,9 @@ const ESTADOS_RESERVA = {
   verificada: { label: "Verificada", color: "bg-blue-500" },
   confirmada: { label: "Confirmada", color: "bg-green-500" },
   cancelada: { label: "Cancelada", color: "bg-red-500" },
-  completada: { label: "Completada", color: "bg-primary" },
-  no_show: { label: "No Show", color: "bg-gray-500" },
+  // 'completada' = el cliente llegó (ver src/lib/reservas/servicioSala.ts).
+  completada: { label: "Llegó", color: "bg-emerald-600" },
+  no_show: { label: "No vino", color: "bg-gray-500" },
 };
 
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
@@ -50,6 +53,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const [busqueda, setBusqueda] = useState("");
   const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
   const [kanbanOpen, setKanbanOpen] = useState(false);
+  const acciones = useAccionesServicioReserva();
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const toggleImportante = async (reserva: any) => {
@@ -135,14 +139,16 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
             <p className="text-muted-foreground text-xs sm:text-sm">Resumen de ocupación del día</p>
           </div>
         </div>
+        {/* Antes: variant="outline" + clases de `destructive` (rojo de "peligro"
+            para una acción normal, y borde/hover de outline mezclados). */}
         <Button
-          variant="outline"
           size="sm"
-          className="gap-2 shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
+          className="gap-2 shrink-0 w-full sm:w-auto"
           onClick={() => setKanbanOpen(true)}
+          aria-haspopup="dialog"
         >
-          <LayoutGrid className="h-4 w-4" />
-          Gestor Reservas
+          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+          Gestor de reservas
         </Button>
       </div>
 
@@ -313,7 +319,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                               </Badge>
                             </div>
                             <div className="flex items-center gap-2 mb-1">
-                              <button onClick={() => toggleImportante(reserva)} className="shrink-0">
+                              <button onClick={() => toggleImportante(reserva)} className="shrink-0" aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"} aria-pressed={!!reserva.importante}>
                                 <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
                               </button>
                               <span className="font-medium text-sm">{reserva.nombre || "Sin nombre"}</span>
@@ -324,10 +330,11 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                                 <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reserva.numero_comensales}</span>
                                 {reserva.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{reserva.telefono}</span>}
                               </div>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBlacklistReserva(reserva)}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBlacklistReserva(reserva)} aria-label={`Añadir a ${reserva.nombre || "este cliente"} a la lista negra`}>
                                 <ShieldBan className="h-3 w-3 text-destructive" />
                               </Button>
                             </div>
+                            <ControlLlegada reserva={reserva as any} acciones={acciones} className="mt-2" />
                           </div>
                         );
                       })}
@@ -343,7 +350,8 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                             <TableHead>Contacto</TableHead>
                             <TableHead>Comensales</TableHead>
                             <TableHead>Estado</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>Llegada</TableHead>
+                            <TableHead className="w-[50px]"><span className="sr-only">Lista negra</span></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -361,7 +369,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-2">
-                                    <button onClick={() => toggleImportante(reserva)} className="shrink-0 hover:scale-110 transition-transform">
+                                    <button onClick={() => toggleImportante(reserva)} className="shrink-0 hover:scale-110 transition-transform" aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"} aria-pressed={!!reserva.importante}>
                                       <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
                                     </button>
                                     <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
@@ -381,7 +389,10 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                                   <Badge className={cn("text-white", estadoInfo.color)}>{estadoInfo.label}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reserva)}>
+                                  <ControlLlegada reserva={reserva as any} acciones={acciones} />
+                                </TableCell>
+                                <TableCell>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reserva)} aria-label={`Añadir a ${reserva.nombre || "este cliente"} a la lista negra`}>
                                     <ShieldBan className="h-3.5 w-3.5 text-destructive" />
                                   </Button>
                                 </TableCell>
@@ -411,11 +422,14 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         <DialogContent className="max-w-[98vw] sm:max-w-[95vw] w-full h-[95vh] sm:h-[90vh] max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col p-3 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <LayoutGrid className="h-5 w-5" />
-              Gestor de Reservas por Espacio
+              <LayoutGrid className="h-5 w-5" aria-hidden="true" />
+              Gestor de reservas por espacio
             </DialogTitle>
+            <DialogDescription>
+              Reservas de hoy por espacio. Mueve una reserva de sala y marca quién ha llegado; nada de esto envía correos al cliente.
+            </DialogDescription>
           </DialogHeader>
-          <div className="overflow-hidden flex-1">
+          <div className="overflow-hidden flex-1 min-h-0">
             <GestorReservasKanban />
           </div>
         </DialogContent>

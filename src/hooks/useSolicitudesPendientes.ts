@@ -75,12 +75,19 @@ export function useSolicitudesPendientes() {
   useEffect(() => {
     fetchSolicitudes();
 
-    // Suscripción en tiempo real para nuevas solicitudes
+    // Suscripción en tiempo real. "*" y no solo INSERT (sesión 2026-09-23):
+    // las solicitudes viven ahora dentro de la lista de reservas y, si un
+    // compañero la marca resuelta/descartada en otro dispositivo, tiene que
+    // desaparecer también aquí sin recargar.
+    // Ojo: montar este hook DOS veces a la vez rompe el realtime (realtime-js
+    // devuelve el MISMO canal para el mismo nombre y el primer desmontaje lo
+    // cierra para ambos). En /reservas lo instancia solo `Reservas.tsx` y lo
+    // pasa hacia abajo.
     const channel = supabase
       .channel("solicitudes_realtime")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "solicitudes_pendientes" },
+        { event: "*", schema: "public", table: "solicitudes_pendientes" },
         () => {
           fetchSolicitudes();
         }

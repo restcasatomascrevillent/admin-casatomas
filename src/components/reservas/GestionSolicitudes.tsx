@@ -18,10 +18,11 @@ import {
   ChevronDown,
   ChevronUp,
   StickyNote,
+  CalendarPlus,
 } from "lucide-react";
 import { useSolicitudesPendientes, type SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 
-const MOTIVO_LABELS: Record<string, { label: string; color: string }> = {
+export const MOTIVO_LABELS: Record<string, { label: string; color: string }> = {
   grupo_grande: { label: "Grupo grande", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
   sin_disponibilidad: { label: "Sin disponibilidad", color: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
   reserva_hoy: { label: "Reserva para hoy", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
@@ -32,23 +33,30 @@ const MOTIVO_LABELS: Record<string, { label: string; color: string }> = {
   otro: { label: "Otro", color: "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300" },
 };
 
-const ESTADO_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
+export const ESTADO_LABELS: Record<string, { label: string; icon: typeof Clock }> = {
   pendiente: { label: "Pendiente", icon: Clock },
   contactado: { label: "Contactado", icon: PhoneOutgoing },
   resuelta: { label: "Resuelta", icon: CheckCircle },
   descartada: { label: "Descartada", icon: XCircle },
 };
 
-function SolicitudCard({
+// Exportada: la lista unificada de reservas (ListaReservasAvanzada.tsx) la
+// reutiliza para las solicitudes que se muestran mezcladas con las reservas.
+export function SolicitudCard({
   solicitud,
   onUpdateEstado,
   onUpdateNotas,
+  onConvertir,
+  defaultExpanded = false,
 }: {
   solicitud: SolicitudPendiente;
   onUpdateEstado: (id: string, estado: string) => Promise<boolean>;
   onUpdateNotas: (id: string, notas: string) => Promise<boolean>;
+  /** Si se pasa, aparece "Convertir en reserva" (abre el alta prerrellenada). */
+  onConvertir?: (solicitud: SolicitudPendiente) => void;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(solicitud.notas_internas || "");
   const [saving, setSaving] = useState(false);
@@ -207,6 +215,17 @@ function SolicitudCard({
 
             {/* Acciones de estado */}
             <div className="flex flex-wrap gap-2">
+              {onConvertir && (solicitud.estado === "pendiente" || solicitud.estado === "contactado") && (
+                <Button
+                  size="sm"
+                  className="text-xs"
+                  disabled={saving}
+                  onClick={() => onConvertir(solicitud)}
+                >
+                  <CalendarPlus className="h-3 w-3 mr-1" />
+                  Convertir en reserva
+                </Button>
+              )}
               {solicitud.estado !== "contactado" && (
                 <Button
                   size="sm"

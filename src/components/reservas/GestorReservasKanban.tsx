@@ -7,107 +7,220 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  closestCenter,
+  pointerWithin,
+  rectIntersection,
   MeasuringStrategy,
   useDroppable,
   useDraggable,
 } from "@dnd-kit/core";
-import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
+import type { DragStartEvent, DragEndEvent, CollisionDetection, Announcements } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { filtrarEspaciosPorMarca, MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
+import { filtrarEspaciosPorMarca, MARCA_POR_DEFECTO, turnoDeHora } from "@/hooks/useDisponibilidad";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import {
+  comensalesEnEspacioTurno,
+  evaluarMovimiento,
+  puedeMoverReserva,
+  type ReservaServicio,
+} from "@/lib/reservas/servicioSala";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight, MoveRight, MoreVertical, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { ControlLlegada } from "./ControlLlegada";
 
+// Estados del CHECK `reservas_estado_check`. Antes este mapa usaba "no-show"
+// (con guion, nunca casaba) y "rechazada" (no existe en la BD).
 const ESTADOS_RESERVA: Record<string, { label: string; color: string }> = {
   pendiente: { label: "Pendiente", color: "bg-yellow-500" },
   verificada: { label: "Verificada", color: "bg-blue-500" },
   confirmada: { label: "Confirmada", color: "bg-green-500" },
   cancelada: { label: "Cancelada", color: "bg-red-500" },
-  rechazada: { label: "Rechazada", color: "bg-destructive" },
-  completada: { label: "Completada", color: "bg-primary" },
-  "no-show": { label: "No Show", color: "bg-gray-500" },
+  completada: { label: "Llegó", color: "bg-emerald-600" },
+  no_show: { label: "No vino", color: "bg-gray-500" },
 };
 
-interface Reserva {
+const SIN_ASIGNAR = "sin-asignar";
+type FiltroTurno = "todo" | "comida" | "cena";
+
+interface Columna {
   id: string;
-  nombre: string | null;
-  hora: string;
-  numero_comensales: number;
-  estado: string;
-  importante: boolean;
-  espacio_id: string | null;
-  email: string | null;
-  telefono: string | null;
+  title: string;
+  capacidadMax?: number;
 }
 
+type Acciones = ReturnType<typeof useAccionesServicioReserva>;
+
 // Draggable reservation card
-function ReservaCard({ reserva, isDragOverlay }: { reserva: Reserva; isDragOverlay?: boolean }) {
+function ReservaCard({
+  reserva,
+  columnas,
+  acciones,
+  onMover,
+  isDragOverlay,
+}: {
+  reserva: ReservaServicio;
+  columnas: Columna[];
+  acciones: Acciones;
+  onMover: (reserva: ReservaServicio, destinoColumnaId: string) => void;
+  isDragOverlay?: boolean;
+}) {
+  const movible = puedeMoverReserva(reserva.estado);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
+    disabled: !movible || isDragOverlay,
   });
-
-  const style: React.CSSProperties = isDragOverlay
-    ? { boxShadow: "0 15px 35px -5px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)", transform: "scale(1.03) rotate(1deg)", pointerEvents: "none", cursor: "grabbing" }
-    : {};
 
   const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
 
   if (isDragOverlay) {
     return (
       <div
-        className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] animate-in zoom-in-95 duration-150"
-        style={style}
+        className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] shadow-2xl rotate-1 scale-[1.03] cursor-grabbing pointer-events-none"
       >
-        <CardContent reserva={reserva} estadoInfo={estadoInfo} />
+        <ContenidoTarjeta reserva={reserva} estadoInfo={estadoInfo} />
       </div>
     );
   }
 
+  const columnaActual = reserva.espacio_id || SIN_ASIGNAR;
+  const destinos = columnas.filter((c) => c.id !== columnaActual);
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
       className={cn(
-        "p-2.5 sm:p-3 rounded-lg border bg-card transition-all duration-200 cursor-grab active:cursor-grabbing group outline-none focus:outline-none focus-visible:outline-none",
-        "hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5",
-        isDragging && "opacity-20 scale-95 border-dashed border-primary/40",
-        reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20"
+        "p-2.5 sm:p-3 rounded-lg border bg-card transition-shadow duration-200 group outline-none",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        movible ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30" : "cursor-default opacity-60",
+        isDragging && "opacity-30 border-dashed border-primary/40",
+        reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
       )}
-      {...listeners}
+      aria-roledescription={movible ? "reserva arrastrable" : "reserva"}
+      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${estadoInfo.label}`}
+      {...(movible ? listeners : {})}
       {...attributes}
     >
-      <CardContent reserva={reserva} estadoInfo={estadoInfo} />
+      <div className="flex items-start justify-between gap-1 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {reserva.importante && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" aria-label="Importante" />}
+          <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
+        </div>
+        <div
+          className="flex items-center shrink-0"
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
+              >
+                {acciones.estaEnCurso(reserva.id) ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <MoreVertical className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
+                <MoveRight className="h-3.5 w-3.5" />
+                Mover a…
+              </DropdownMenuLabel>
+              {movible ? (
+                destinos.map((c) => (
+                  <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
+                    {c.title}
+                    {c.capacidadMax ? (
+                      <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                <DropdownMenuItem disabled>No se puede mover en este estado</DropdownMenuItem>
+              )}
+              {reserva.telefono && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <a href={`tel:${reserva.telefono}`}>
+                      <Phone className="h-3.5 w-3.5 mr-2" />
+                      Llamar
+                    </a>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {movible && (
+            <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
+          )}
+        </div>
+      </div>
+      <ContenidoTarjeta reserva={reserva} estadoInfo={estadoInfo} sinCabecera />
+      <ControlLlegada reserva={reserva} acciones={acciones} compacto className="mt-2" />
     </div>
   );
 }
 
-function CardContent({ reserva, estadoInfo }: { reserva: Reserva; estadoInfo: { label: string; color: string } }) {
+function ContenidoTarjeta({
+  reserva,
+  estadoInfo,
+  sinCabecera,
+}: {
+  reserva: ReservaServicio;
+  estadoInfo: { label: string; color: string };
+  sinCabecera?: boolean;
+}) {
   return (
     <>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
+      {!sinCabecera && (
+        <div className="flex items-center gap-1.5 min-w-0 mb-2">
           {reserva.importante && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />}
           <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
         </div>
-        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
-      </div>
+      )}
       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5">
-          <Clock className="h-3 w-3" />
+        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5 tabular-nums">
+          <Clock className="h-3 w-3" aria-hidden="true" />
           {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
         </span>
-        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5">
-          <Users className="h-3 w-3" />
+        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5 tabular-nums">
+          <Users className="h-3 w-3" aria-hidden="true" />
           {reserva.numero_comensales}
         </span>
         <Badge className={cn("text-[10px] px-1.5 py-0 text-white h-4", estadoInfo.color)}>
@@ -115,12 +228,32 @@ function CardContent({ reserva, estadoInfo }: { reserva: Reserva; estadoInfo: { 
         </Badge>
       </div>
       {reserva.telefono && (
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60 mt-1.5">
-          <Phone className="h-2.5 w-2.5" />
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-1.5">
+          <Phone className="h-2.5 w-2.5" aria-hidden="true" />
           {reserva.telefono}
         </div>
       )}
     </>
+  );
+}
+
+function BarraTurno({ etiqueta, pax, capacidad }: { etiqueta: string; pax: number; capacidad: number }) {
+  const porcentaje = capacidad ? Math.min(100, Math.round((pax / capacidad) * 100)) : 0;
+  const excedido = pax > capacidad;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>{etiqueta}</span>
+        <span className={cn("tabular-nums", excedido && "text-destructive font-medium")}>
+          {pax}/{capacidad} pax
+        </span>
+      </div>
+      <Progress
+        value={porcentaje}
+        className={cn("h-1.5", excedido && "[&>div]:bg-destructive")}
+        aria-label={`${etiqueta}: ${pax} de ${capacidad} plazas`}
+      />
+    </div>
   );
 }
 
@@ -129,7 +262,9 @@ function KanbanColumn({
   id,
   title,
   capacidadMax,
-  comensalesActuales,
+  paxComida,
+  paxCena,
+  filtroTurno,
   children,
   count,
   isActive,
@@ -139,7 +274,9 @@ function KanbanColumn({
   id: string;
   title: string;
   capacidadMax?: number;
-  comensalesActuales: number;
+  paxComida: number;
+  paxCena: number;
+  filtroTurno: FiltroTurno;
   children: React.ReactNode;
   count: number;
   isActive: boolean;
@@ -147,51 +284,49 @@ function KanbanColumn({
   onToggleMinimize: () => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
-  const porcentaje = capacidadMax ? Math.min(100, Math.round((comensalesActuales / capacidadMax) * 100)) : 0;
-  const excedido = capacidadMax ? comensalesActuales > capacidadMax : false;
 
   if (minimized) {
     return (
-      <div
+      <button
+        type="button"
         ref={setNodeRef}
         className={cn(
-          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[42px] sm:w-[52px] shrink-0 transition-all duration-200 cursor-pointer outline-none focus:outline-none focus-visible:outline-none",
+          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[42px] sm:w-[52px] shrink-0 transition-colors duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
           !isOver && "border-transparent hover:border-muted-foreground/20",
         )}
         onClick={onToggleMinimize}
+        aria-label={`Expandir columna ${title} (${count} reservas)`}
       >
         <div className="p-2 flex flex-col items-center gap-2">
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold [writing-mode:vertical-lr] rotate-180 whitespace-nowrap">
-            {title}
-          </span>
+          <span className="text-xs font-semibold [writing-mode:vertical-lr] rotate-180 whitespace-nowrap">{title}</span>
           <Badge variant="secondary" className="text-[10px] px-1.5 tabular-nums">{count}</Badge>
         </div>
-      </div>
+      </button>
     );
   }
 
   return (
-    <div
+    <section
       ref={setNodeRef}
+      aria-label={`Columna ${title}`}
       className={cn(
-        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[200px] w-[220px] sm:min-w-[250px] sm:w-[270px] shrink-0 transition-all duration-200 outline-none focus:outline-none focus-visible:outline-none",
+        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[210px] w-[230px] sm:min-w-[250px] sm:w-[270px] shrink-0 transition-colors duration-200",
         isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
         !isOver && "border-transparent",
-        isActive && !isOver && "border-muted-foreground/10"
+        isActive && !isOver && "border-muted-foreground/10",
       )}
     >
-      {/* Header */}
-      <div className={cn(
-        "p-3 border-b space-y-2 transition-colors duration-200",
-        isOver && "bg-primary/5"
-      )}>
+      <div className={cn("p-3 border-b space-y-2 transition-colors duration-200", isOver && "bg-primary/5")}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <button
+              type="button"
               onClick={onToggleMinimize}
-              className="p-0.5 rounded hover:bg-muted transition-colors outline-none focus:outline-none focus-visible:outline-none"
+              className="p-0.5 rounded hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Minimizar columna ${title}`}
               title="Minimizar columna"
             >
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -200,51 +335,66 @@ function KanbanColumn({
           </div>
           <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
-        {capacidadMax != null && (
-          <>
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="tabular-nums">{comensalesActuales}/{capacidadMax} pax</span>
-              <span className={cn("tabular-nums", excedido && "text-destructive font-medium")}>{porcentaje}%</span>
-            </div>
-            <Progress value={porcentaje} className={cn("h-1.5", excedido && "[&>div]:bg-destructive")} />
-          </>
+        {capacidadMax != null && capacidadMax > 0 && (
+          <div className="space-y-1.5">
+            {filtroTurno !== "cena" && <BarraTurno etiqueta="Comida" pax={paxComida} capacidad={capacidadMax} />}
+            {filtroTurno !== "comida" && <BarraTurno etiqueta="Cena" pax={paxCena} capacidad={capacidadMax} />}
+          </div>
         )}
       </div>
-      {/* Cards */}
-      <ScrollArea className="flex-1 max-h-[70vh]">
-        <div className={cn(
-          "p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl",
-          isOver && "bg-primary/[0.02]"
-        )}>
+      <ScrollArea className="flex-1 max-h-[65vh]">
+        <div className={cn("p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl", isOver && "bg-primary/[0.02]")}>
           {children}
           {count === 0 && (
-            <div className={cn(
-              "flex flex-col items-center justify-center py-8 text-muted-foreground/50 transition-all duration-200",
-              isOver && "text-primary/60 scale-105"
-            )}>
-              <div className={cn(
-                "w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center mb-2 transition-colors",
-                isOver ? "border-primary/40 bg-primary/5" : "border-muted-foreground/20"
-              )}>
-                <Users className="h-5 w-5" />
+            <div
+              className={cn(
+                "flex flex-col items-center justify-center py-8 text-muted-foreground/60 transition-all duration-200",
+                isOver && "text-primary/70 scale-105",
+              )}
+            >
+              <div
+                className={cn(
+                  "w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center mb-2 transition-colors",
+                  isOver ? "border-primary/40 bg-primary/5" : "border-muted-foreground/20",
+                )}
+              >
+                <Users className="h-5 w-5" aria-hidden="true" />
               </div>
-              <p className="text-xs font-medium">
-                {isOver ? "Soltar aquí" : "Arrastra reservas aquí"}
-              </p>
+              <p className="text-xs font-medium">{isOver ? "Soltar aquí" : "Arrastra reservas aquí"}</p>
             </div>
           )}
         </div>
       </ScrollArea>
-    </div>
+    </section>
   );
 }
 
+// Primero lo que está bajo el puntero (preciso con columnas estrechas o
+// minimizadas); si no hay nada — teclado, o el puntero entre columnas — el
+// rectángulo con más intersección. `closestCenter`, lo que había, elegía a
+// veces la columna vecina al soltar sobre el borde.
+const deteccionColisiones: CollisionDetection = (args) => {
+  const bajoPuntero = pointerWithin(args);
+  return bajoPuntero.length > 0 ? bajoPuntero : rectIntersection(args);
+};
+
+interface MovimientoPendiente {
+  reserva: ReservaServicio;
+  destinoId: string | null;
+  destinoNombre: string;
+  ocupacionTras: number;
+  capacidad: number;
+  turno: "comida" | "cena";
+}
+
 export function GestorReservasKanban() {
-  const queryClient = useQueryClient();
   const { data: espacios } = useEspaciosReserva();
-  const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
+  const acciones = useAccionesServicioReserva();
+  const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
+  const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
+  const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   const toggleMinimize = (colId: string) => {
@@ -257,42 +407,48 @@ export function GestorReservasKanban() {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-    useSensor(KeyboardSensor)
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(KeyboardSensor),
   );
 
   // Aforo por negocio (marca) — bug de 2026-09-22, ver "Aforo por negocio"
-  // en `useDisponibilidad.ts`. Este Kanban organiza el servicio de HOY por
-  // espacio físico del restaurante (columnas Comedor/Salón/Terraza); sin
-  // filtrar por marca, la consulta traía también reservas de otros negocios
-  // (touza) mezcladas en "Sin asignar" o contando ocupación de una columna
-  // que no es la suya. Por defecto `MARCA_POR_DEFECTO`, igual que el resto
-  // del panel.
-  const { data: reservas, isLoading } = useQuery({
+  // en `useDisponibilidad.ts`. Sin filtrar por marca, la consulta traía
+  // también reservas de otros negocios (touza).
+  //
+  // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
+  // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría).
+  // `as any`: `.eq("marca", ...)` dispara "Type instantiation is excessively
+  // deep" (`marca` no está en los tipos generados). Mismo recurso que
+  // `useDisponibilidad.ts`.
+  //
+  // La clave empieza por "reservas-kanban": useAccionesServicioReserva hace el
+  // update optimista por prefijo. (Antes el optimista escribía en
+  // ["reservas-kanban", hoy] — sin la marca — es decir, en una entrada de
+  // caché que nadie leía: la tarjeta no se movía hasta el refetch.)
+  const {
+    data: reservas,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["reservas-kanban", hoy, MARCA_POR_DEFECTO],
     queryFn: async () => {
-      // `as any` en `.from(...)`: `.eq("marca", ...)` hace que TypeScript
-      // falle con "Type instantiation is excessively deep" al inferir el
-      // tipo del query builder de Supabase (`marca` no está en los tipos
-      // generados para `reservas`). Mismo recurso que `useDisponibilidad.ts`.
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("id, nombre, hora, numero_comensales, estado, importante, espacio_id, email, telefono")
+        .select("*")
         .eq("fecha", hoy)
-        .not("estado", "in", "(cancelada,rechazada)")
+        .neq("estado", "cancelada")
         .eq("marca", MARCA_POR_DEFECTO)
         .order("hora", { ascending: true });
       if (error) throw error;
-      return data as unknown as Reserva[];
+      return data as unknown as ReservaServicio[];
     },
   });
 
   // Mismo motivo: sin filtrar por marca, "El Reservado" (touza) aparecía
-  // como columna de este Kanban del restaurante, con su propia capacidad
-  // (20) pero fuera de lugar en una pantalla pensada para Comedor/Salón/
-  // Terraza — y habría podido recibir por error una reserva de Casa Tomás
-  // arrastrada por el personal.
+  // como columna de este Kanban del restaurante.
   const espaciosActivos = useMemo(
     () =>
       filtrarEspaciosPorMarca(
@@ -301,156 +457,232 @@ export function GestorReservasKanban() {
           .map((e: any) => ({ ...e, marca: e.caracteristicas?.marca })),
         MARCA_POR_DEFECTO,
       ),
-    [espacios]
+    [espacios],
   );
 
-  const columnas = useMemo(() => {
-    const cols: { id: string; title: string; capacidadMax?: number }[] = [
-      { id: "sin-asignar", title: "Sin asignar" },
-      ...espaciosActivos.map((e: any) => ({
-        id: e.id,
-        title: e.nombre,
-        capacidadMax: e.capacidad_maxima,
-      })),
-    ];
-    return cols;
-  }, [espaciosActivos]);
+  const columnas = useMemo<Columna[]>(
+    () => [
+      { id: SIN_ASIGNAR, title: "Sin asignar" },
+      ...espaciosActivos.map((e: any) => ({ id: e.id, title: e.nombre, capacidadMax: e.capacidad_maxima })),
+    ],
+    [espaciosActivos],
+  );
 
   const reservasFiltradas = useMemo(() => {
-    if (!busqueda.trim()) return reservas || [];
     const q = busqueda.toLowerCase().trim();
-    return (reservas || []).filter((r) =>
-      (r.nombre || "").toLowerCase().includes(q) ||
-      (r.email || "").toLowerCase().includes(q) ||
-      (r.telefono || "").includes(q)
-    );
-  }, [reservas, busqueda]);
+    return (reservas || []).filter((r) => {
+      if (filtroTurno !== "todo" && turnoDeHora(r.hora) !== filtroTurno) return false;
+      if (!q) return true;
+      return (
+        (r.nombre || "").toLowerCase().includes(q) ||
+        (r.email || "").toLowerCase().includes(q) ||
+        (r.telefono || "").includes(q)
+      );
+    });
+  }, [reservas, busqueda, filtroTurno]);
 
   const reservasPorColumna = useMemo(() => {
-    const map: Record<string, Reserva[]> = {};
+    const map: Record<string, ReservaServicio[]> = {};
     columnas.forEach((c) => (map[c.id] = []));
     reservasFiltradas.forEach((r) => {
-      const key = r.espacio_id || "sin-asignar";
-      if (map[key]) map[key].push(r);
-      else map["sin-asignar"].push(r);
+      const key = r.espacio_id && map[r.espacio_id] ? r.espacio_id : SIN_ASIGNAR;
+      map[key].push(r);
     });
     return map;
   }, [reservasFiltradas, columnas]);
 
-  const comensalesPorColumna = useMemo(() => {
-    const map: Record<string, number> = {};
-    Object.entries(reservasPorColumna).forEach(([key, list]) => {
-      map[key] = list.reduce((sum, r) => sum + r.numero_comensales, 0);
+  // Ocupación por espacio y TURNO sobre todas las reservas del día (no solo
+  // las visibles por la búsqueda): la capacidad no depende de lo que se filtre.
+  const paxPorColumna = useMemo(() => {
+    const todas = reservas || [];
+    const map: Record<string, { comida: number; cena: number }> = {};
+    columnas.forEach((c) => {
+      const espacioId = c.id === SIN_ASIGNAR ? null : c.id;
+      map[c.id] = {
+        comida: comensalesEnEspacioTurno(todas, espacioId, "comida"),
+        cena: comensalesEnEspacioTurno(todas, espacioId, "cena"),
+      };
     });
     return map;
-  }, [reservasPorColumna]);
+  }, [reservas, columnas]);
+
+  const nombreColumna = (id: string | number | undefined | null) =>
+    columnas.find((c) => c.id === id)?.title ?? "Sin asignar";
+
+  const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
+    const destinoId = columnaId === SIN_ASIGNAR ? null : columnaId;
+    const col = columnas.find((c) => c.id === columnaId);
+    const evaluacion = evaluarMovimiento(reserva, destinoId, reservas || [], col?.capacidadMax);
+
+    switch (evaluacion.tipo) {
+      case "sin_cambio":
+        return;
+      case "bloqueado":
+        toast.error(evaluacion.motivo);
+        return;
+      case "excede_capacidad":
+        setMovimientoPendiente({
+          reserva,
+          destinoId,
+          destinoNombre: col?.title ?? "Sin asignar",
+          ocupacionTras: evaluacion.ocupacionTras,
+          capacidad: evaluacion.capacidad ?? 0,
+          turno: evaluacion.turno,
+        });
+        return;
+      case "ok":
+        void acciones.moverEspacio(reserva, destinoId, col?.title ?? "Sin asignar");
+    }
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     const r = (reservas || []).find((res) => res.id === event.active.id);
     setActiveReserva(r || null);
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     setActiveReserva(null);
     const { active, over } = event;
     if (!over) return;
-
-    const reservaId = active.id as string;
-    const targetColumnId = over.id as string;
-    const newEspacioId = targetColumnId === "sin-asignar" ? null : targetColumnId;
-
-    const reserva = (reservas || []).find((r) => r.id === reservaId);
+    const reserva = (reservas || []).find((r) => r.id === active.id);
     if (!reserva) return;
-    if (reserva.espacio_id === newEspacioId) return;
+    solicitarMovimiento(reserva, String(over.id));
+  };
 
-    // Check capacity
-    if (newEspacioId) {
-      const col = columnas.find((c) => c.id === newEspacioId);
-      if (col?.capacidadMax) {
-        const currentPax = comensalesPorColumna[newEspacioId] || 0;
-        if (currentPax + reserva.numero_comensales > col.capacidadMax) {
-          toast.warning(`Se excede la capacidad máxima de ${col.title} (${col.capacidadMax} pax)`);
-        }
-      }
-    }
-
-    // Optimistic update
-    queryClient.setQueryData(["reservas-kanban", hoy], (old: Reserva[] | undefined) =>
-      (old || []).map((r) => (r.id === reservaId ? { ...r, espacio_id: newEspacioId } : r))
-    );
-
-    const { error } = await supabase
-      .from("reservas")
-      .update({ espacio_id: newEspacioId })
-      .eq("id", reservaId);
-
-    if (error) {
-      toast.error("Error al mover la reserva");
-      queryClient.invalidateQueries({ queryKey: ["reservas-kanban", hoy] });
-    } else {
-      const destino = newEspacioId
-        ? columnas.find((c) => c.id === newEspacioId)?.title
-        : "Sin asignar";
-      toast.success(`Reserva movida a ${destino}`);
-    }
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => {
+      const r = (reservas || []).find((x) => x.id === active.id);
+      return `Has cogido la reserva de ${r?.nombre || "sin nombre"}. Usa las flechas para cambiar de columna, Espacio o Intro para soltar, Escape para cancelar.`;
+    },
+    onDragOver: ({ over }) => (over ? `Sobre la columna ${nombreColumna(over.id)}.` : "Fuera de cualquier columna."),
+    onDragEnd: ({ over }) => (over ? `Reserva soltada en ${nombreColumna(over.id)}.` : "Reserva soltada fuera de las columnas; no se mueve."),
+    onDragCancel: () => "Movimiento cancelado.",
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        Cargando reservas...
+      <div className="flex items-center justify-center py-12 text-muted-foreground gap-2" role="status">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Cargando reservas…
       </div>
     );
   }
 
+  if (isError) {
+    return <EstadoErrorCarga titulo="las reservas de hoy" error={error} onReintentar={() => refetch()} />;
+  }
+
   return (
-    <div className="space-y-4 sm:space-y-8 h-full flex flex-col">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre, email o teléfono..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="pl-9 focus-visible:ring-0 focus-visible:ring-offset-0"
-        />
+    <div className="space-y-3 sm:space-y-4 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Input
+            placeholder="Buscar por nombre, email o teléfono…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9"
+            aria-label="Buscar reservas"
+          />
+        </div>
+        <ToggleGroup
+          type="single"
+          value={filtroTurno}
+          onValueChange={(v) => v && setFiltroTurno(v as FiltroTurno)}
+          variant="outline"
+          size="sm"
+          aria-label="Filtrar por turno"
+        >
+          <ToggleGroupItem value="todo">Todo el día</ToggleGroupItem>
+          <ToggleGroupItem value="comida">Comida</ToggleGroupItem>
+          <ToggleGroupItem value="cena">Cena</ToggleGroupItem>
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground sm:ml-auto">
+          Arrastra una tarjeta a otro espacio o usa <MoreVertical className="inline h-3 w-3" aria-hidden="true" /> → «Mover a…».
+        </p>
       </div>
+
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        collisionDetection={closestCenter}
+        onDragCancel={() => setActiveReserva(null)}
+        collisionDetection={deteccionColisiones}
         measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-      >
-        <div className="flex gap-2 sm:gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
-        {columnas.map((col) => (
-          <KanbanColumn
-            key={col.id}
-            id={col.id}
-            title={col.title}
-            capacidadMax={col.capacidadMax}
-            comensalesActuales={comensalesPorColumna[col.id] || 0}
-            count={reservasPorColumna[col.id]?.length || 0}
-            isActive={!!activeReserva}
-            minimized={minimizedCols.has(col.id)}
-            onToggleMinimize={() => toggleMinimize(col.id)}
-          >
-            {(reservasPorColumna[col.id] || []).map((reserva) => (
-              <ReservaCard key={reserva.id} reserva={reserva} />
-            ))}
-          </KanbanColumn>
-        ))}
-      </div>
-
-      <DragOverlay
-        modifiers={[snapCenterToCursor]}
-        dropAnimation={{
-          duration: 200,
-          easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable:
+              "Para mover una reserva con el teclado, pulsa Espacio o Intro, usa las flechas para ir a otra columna y vuelve a pulsar Espacio o Intro. También puedes usar el menú de acciones de la tarjeta: «Mover a…».",
+          },
         }}
       >
-        {activeReserva ? <ReservaCard reserva={activeReserva} isDragOverlay /> : null}
-      </DragOverlay>
+        <div className="flex gap-2 sm:gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
+          {columnas.map((col) => (
+            <KanbanColumn
+              key={col.id}
+              id={col.id}
+              title={col.title}
+              capacidadMax={col.capacidadMax}
+              paxComida={paxPorColumna[col.id]?.comida ?? 0}
+              paxCena={paxPorColumna[col.id]?.cena ?? 0}
+              filtroTurno={filtroTurno}
+              count={reservasPorColumna[col.id]?.length || 0}
+              isActive={!!activeReserva}
+              minimized={minimizedCols.has(col.id)}
+              onToggleMinimize={() => toggleMinimize(col.id)}
+            >
+              {(reservasPorColumna[col.id] || []).map((reserva) => (
+                <ReservaCard
+                  key={reserva.id}
+                  reserva={reserva}
+                  columnas={columnas}
+                  acciones={acciones}
+                  onMover={solicitarMovimiento}
+                />
+              ))}
+            </KanbanColumn>
+          ))}
+        </div>
+
+        <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
+          {activeReserva ? (
+            <ReservaCard
+              reserva={activeReserva}
+              columnas={columnas}
+              acciones={acciones}
+              onMover={solicitarMovimiento}
+              isDragOverlay
+            />
+          ) : null}
+        </DragOverlay>
       </DndContext>
+
+      <AlertDialog open={!!movimientoPendiente} onOpenChange={(open) => !open && setMovimientoPendiente(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Superar la capacidad de {movimientoPendiente?.destinoNombre}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Con la reserva de {movimientoPendiente?.reserva.nombre || "este cliente"} (
+              {movimientoPendiente?.reserva.numero_comensales} pax), el turno de{" "}
+              {movimientoPendiente?.turno === "comida" ? "comida" : "cena"} de {movimientoPendiente?.destinoNombre} quedaría
+              en {movimientoPendiente?.ocupacionTras} de {movimientoPendiente?.capacidad} plazas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No mover</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const m = movimientoPendiente;
+                setMovimientoPendiente(null);
+                if (m) void acciones.moverEspacio(m.reserva, m.destinoId, m.destinoNombre);
+              }}
+            >
+              Mover igualmente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -125,8 +125,14 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
   // verificada y confirmada ocupan plaza; canceladas y no_show no cuentan
   // como "van a venir" (antes se usaban los totales SIN filtrar por estado,
   // y el panel prometía más comensales de los que iban a venir).
+  // + 'completada' (sesión 2026-09-23): desde que el panel registra la
+  // llegada ("Ha llegado" → 'completada', ver src/lib/reservas/servicioSala.ts)
+  // los que ya están sentados tienen que seguir contando en "Reservas hoy" /
+  // "Comensales" / "Ocupación del día"; si no, las cifras bajaban a medida
+  // que llegaba la gente. OJO: el trigger de aforo NO cuenta 'completada'
+  // (decisión pendiente del dueño, ver docs/funcionalidades/01-reservas.md).
   const activas = (reservas ?? []).filter((r) =>
-    ["pendiente", "verificada", "confirmada"].includes(r.estado),
+    ["pendiente", "verificada", "confirmada", "completada"].includes(r.estado),
   );
   const totalReservas = activas.length;
   const totalComensales = activas.reduce((acc, r) => acc + (Number(r.numero_comensales) || 0), 0);

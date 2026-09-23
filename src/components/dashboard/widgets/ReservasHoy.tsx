@@ -251,7 +251,7 @@ export function ReservasHoy() {
           </div>
           <div
             className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors"
-            onClick={() => navigate('/reservas?tab=lista&status=pendiente&date=today')}
+            onClick={() => navigate('/reservas?tab=reservas&status=pendiente&date=today')}
           >
             <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
             <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Pendientes</p>

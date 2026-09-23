@@ -34,9 +34,10 @@ export function CentroNotificaciones() {
 
   const handleClick = (notif: (typeof notificaciones)[0]) => {
     marcarLeida(notif.id);
-    // Navegar a la pestaña de solicitudes si es una solicitud pendiente
+    // Las solicitudes viven ahora dentro de la pestaña unificada "Reservas",
+    // filtradas por "Solicitudes sin resolver" (antes: ?tab=solicitudes).
     if (notif.referencia_tipo === "solicitud") {
-      navigate("/reservas?tab=solicitudes");
+      navigate("/reservas?tab=reservas&status=solicitudes");
     }
   };
 
