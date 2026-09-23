@@ -35,6 +35,7 @@ export const SECTIONS = [
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
   { key: "gestor_gasto", label: "Gestor Gasto" },
+  { key: "trafico_web", label: "Tráfico web" },
 ] as const;
 
 export type SectionKey = typeof SECTIONS[number]["key"];

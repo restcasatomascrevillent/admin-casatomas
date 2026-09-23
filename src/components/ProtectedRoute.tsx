@@ -24,6 +24,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/facturas": "facturas",
   "/usuarios": "usuarios",
   "/gestor-gasto": "gestor_gasto",
+  "/trafico-web": "trafico_web",
 };
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {

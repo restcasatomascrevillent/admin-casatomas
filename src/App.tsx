@@ -23,6 +23,7 @@ import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
 import GestorGasto from "./pages/GestorGasto";
 import GestionResenas from "./pages/GestionResenas";
+import TraficoWeb from "./pages/TraficoWeb";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
             <Route path="/gestor-gasto" element={pagina(<GestorGasto />)} />
             <Route path="/resenas" element={pagina(<GestionResenas />)} />
+            <Route path="/trafico-web" element={pagina(<TraficoWeb />, "trafico_web")} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </RouteErrorBoundary>

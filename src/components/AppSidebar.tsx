@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail, Activity } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -37,6 +37,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
   { title: "Gestor Gasto", url: "/gestor-gasto", icon: Wallet, sectionKey: "gestor_gasto" },
   { title: "Reseñas Google", url: "/resenas", icon: Star, sectionKey: "resenas" },
+  { title: "Tráfico web", url: "/trafico-web", icon: Activity, sectionKey: "trafico_web" },
 ];
 
 export function AppSidebar() {
