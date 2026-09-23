@@ -32,6 +32,8 @@ import { leerNivelesCrudos, NIVELES_POR_DEFECTO, etiquetaNivelLocal } from "./es
 // y para pintar el resumen de cada tarjeta) — nunca se reimplementa la regla.
 import {
   resolverEscalera,
+  sumarCapacidadPorMarca,
+  MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type NivelEscalera,
   type BaseUmbral,
@@ -96,15 +98,6 @@ export function ConfiguracionTurnos() {
   const actualizarMutation = useActualizarConfiguracionTurno();
   const eliminarMutation = useEliminarConfiguracionTurno();
 
-  // Aforo total del restaurante (espacios ACTIVOS), igual que calcula
-  // `leerDatosDelDia` en `useDisponibilidad.ts`: es la cifra que el motor
-  // usa siempre para el aforo y para repartir el umbral, sin importar si la
-  // escalera que se edita es global o de una zona concreta.
-  const capacidadTotalActiva = useMemo(
-    () => (espacios ?? []).filter((e: any) => e.activa).reduce((s: number, e: any) => s + (Number(e.capacidad_maxima) || 0), 0),
-    [espacios],
-  );
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -123,6 +116,35 @@ export function ConfiguracionTurnos() {
       base_umbral: "reparto_nivel_base",
     },
   });
+
+  // Aforo por negocio (marca) — bug de 2026-09-22, ver "Aforo por negocio"
+  // en `useDisponibilidad.ts`. Antes sumaba `capacidad_maxima` de TODOS los
+  // espacios activos sin mirar `caracteristicas->>'marca'` (mismo patrón
+  // que el trigger `trg_validar_capacidad` antes del fix: con "El
+  // Reservado", touza, dado de alta, esta previsualización pasaba de 150 a
+  // 170). Igual que calcula `leerDatosDelDia` en `useDisponibilidad.ts`: es
+  // la cifra que el motor usa siempre para el aforo y para repartir el
+  // umbral.
+  //
+  // La marca no se fija a `MARCA_POR_DEFECTO` a ciegas: el selector
+  // "Aplicar a" de este formulario ya deja elegir CUALQUIER espacio activo
+  // (incluido uno de otro negocio, si algún día lo hay), así que la
+  // previsualización usa la marca DEL ESPACIO elegido — mismo criterio que
+  // `verificarDisponibilidadSala` en `useDisponibilidad.ts`. Un periodo
+  // global (`espacio_id = null`) sigue usando `MARCA_POR_DEFECTO`: hoy es
+  // lo único que tiene sentido, porque el panel no ofrece ningún turno
+  // global para touza.
+  const espacioIdSeleccionado = form.watch("espacio_id");
+  const capacidadTotalActiva = useMemo(() => {
+    const espacioElegido = espacios?.find((e: any) => e.id === espacioIdSeleccionado);
+    const marcaObjetivo = (espacioElegido as any)?.caracteristicas?.marca || MARCA_POR_DEFECTO;
+    return sumarCapacidadPorMarca(
+      (espacios ?? [])
+        .filter((e: any) => e.activa)
+        .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
+      marcaObjetivo,
+    );
+  }, [espacios, espacioIdSeleccionado]);
 
   const openCreateDialog = () => {
     setEditingConfig(null);

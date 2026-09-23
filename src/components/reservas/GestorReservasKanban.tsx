@@ -17,6 +17,7 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { filtrarEspaciosPorMarca, MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -261,22 +262,45 @@ export function GestorReservasKanban() {
     useSensor(KeyboardSensor)
   );
 
+  // Aforo por negocio (marca) — bug de 2026-09-22, ver "Aforo por negocio"
+  // en `useDisponibilidad.ts`. Este Kanban organiza el servicio de HOY por
+  // espacio físico del restaurante (columnas Comedor/Salón/Terraza); sin
+  // filtrar por marca, la consulta traía también reservas de otros negocios
+  // (touza) mezcladas en "Sin asignar" o contando ocupación de una columna
+  // que no es la suya. Por defecto `MARCA_POR_DEFECTO`, igual que el resto
+  // del panel.
   const { data: reservas, isLoading } = useQuery({
-    queryKey: ["reservas-kanban", hoy],
+    queryKey: ["reservas-kanban", hoy, MARCA_POR_DEFECTO],
     queryFn: async () => {
+      // `as any` en `.from(...)`: `.eq("marca", ...)` hace que TypeScript
+      // falle con "Type instantiation is excessively deep" al inferir el
+      // tipo del query builder de Supabase (`marca` no está en los tipos
+      // generados para `reservas`). Mismo recurso que `useDisponibilidad.ts`.
       const { data, error } = await supabase
-        .from("reservas")
+        .from("reservas" as any)
         .select("id, nombre, hora, numero_comensales, estado, importante, espacio_id, email, telefono")
         .eq("fecha", hoy)
         .not("estado", "in", "(cancelada,rechazada)")
+        .eq("marca", MARCA_POR_DEFECTO)
         .order("hora", { ascending: true });
       if (error) throw error;
-      return data as Reserva[];
+      return data as unknown as Reserva[];
     },
   });
 
+  // Mismo motivo: sin filtrar por marca, "El Reservado" (touza) aparecía
+  // como columna de este Kanban del restaurante, con su propia capacidad
+  // (20) pero fuera de lugar en una pantalla pensada para Comedor/Salón/
+  // Terraza — y habría podido recibir por error una reserva de Casa Tomás
+  // arrastrada por el personal.
   const espaciosActivos = useMemo(
-    () => (espacios || []).filter((e: any) => e.activa !== false),
+    () =>
+      filtrarEspaciosPorMarca(
+        (espacios || [])
+          .filter((e: any) => e.activa !== false)
+          .map((e: any) => ({ ...e, marca: e.caracteristicas?.marca })),
+        MARCA_POR_DEFECTO,
+      ),
     [espacios]
   );
 

@@ -22,6 +22,7 @@ import {
   horaAMinutos,
   minutosAHora,
   filtrarEspaciosPorMarca,
+  sumarCapacidadPorMarca,
   MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
@@ -29,10 +30,19 @@ import {
   type HuecoCalculado,
 } from "../../supabase/functions/_shared/disponibilidad";
 
+// Reexportados para que el resto de `src/` (widgets del dashboard, Kanban,
+// configuración de turnos...) filtre espacios/capacidad por negocio SIN
+// tener que importar el módulo compartido con una ruta relativa distinta
+// por cada profundidad de carpeta, y sin escribir una copia propia del
+// criterio (bug de 2026-09-22 en `_shared/disponibilidad.ts`, sección
+// "AFORO POR NEGOCIO"). Sesión 2026-09-23: se detectaron más sitios en el
+// panel con el mismo patrón sin filtrar (ver comentario de arriba).
 export {
   calcularDisponibilidad,
   ahoraEnMadrid,
   turnoDeHora,
+  filtrarEspaciosPorMarca,
+  sumarCapacidadPorMarca,
   MARCA_POR_DEFECTO,
   type ResultadoDisponibilidad,
   type HuecoCalculado,

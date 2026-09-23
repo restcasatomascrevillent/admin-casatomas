@@ -9,18 +9,34 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { sumarCapacidadPorMarca, MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
 
-function useOcupacionData() {
+/**
+ * Aforo por negocio (marca) — bug de 2026-09-22 (ver `useDisponibilidad.ts`).
+ * Antes sumaba `capacidad_maxima` de TODOS los espacios activos sin mirar
+ * `caracteristicas->>'marca'`: con "El Reservado" (touza, 20 plazas) dado de
+ * alta, esta tarjeta pasó a mostrar "170" en vez de los 150 del
+ * restaurante — es la captura que enseñó el dueño ("0/170 pax"). Se pide
+ * también `caracteristicas` para poder filtrar, igual que hace
+ * `leerDatosDelDia` en `useDisponibilidad.ts`.
+ */
+function useOcupacionData(marca: string = MARCA_POR_DEFECTO) {
   return useQuery({
-    queryKey: ["ocupacion-reservas-hoy"],
+    queryKey: ["ocupacion-reservas-hoy", marca],
     queryFn: async () => {
       const { data: espacios, error } = await supabase
         .from("espacios_reserva")
-        .select("capacidad_maxima")
+        .select("capacidad_maxima, caracteristicas")
         .eq("activa", true);
 
       if (error) throw error;
-      return (espacios ?? []).reduce((s, e) => s + (e.capacidad_maxima || 0), 0);
+      return sumarCapacidadPorMarca(
+        ((espacios ?? []) as any[]).map((e) => ({
+          capacidad_maxima: Number(e.capacidad_maxima) || 0,
+          marca: (e.caracteristicas as any)?.marca as string | undefined,
+        })),
+        marca,
+      );
     },
     refetchInterval: 60000,
   });
