@@ -37,21 +37,33 @@ import {
   horaCorta,
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
-import { formatearTelefonoReserva, telefonoValido, variantesTelefono } from "@/lib/reservas/telefono";
+import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
+import {
+  debeNotificarAltaPanel,
+  errorEmail,
+  errorTelefono,
+  estadoInicialAltaPanel,
+  RE_EMAIL,
+} from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
+import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
 
-const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+// Teléfono Y email obligatorios (decisión del dueño, 2026-09-23): el cliente
+// recibe un correo para confirmar la reserva. Reglas en src/lib/reservas/altaPanel.ts.
 const formSchema = z.object({
-  nombre: z.string().trim().min(2, "El nombre es requerido"),
+  nombre: z.string({ required_error: "El nombre es obligatorio" }).trim().min(2, "El nombre es obligatorio"),
   telefono: z
-    .string()
-    .optional()
-    .refine((v) => !v || !v.trim() || telefonoValido(v), "Teléfono no válido (mínimo 9 cifras)"),
+    .string({ required_error: "El teléfono es obligatorio" })
+    .superRefine((v, ctx) => {
+      const mensaje = errorTelefono(v);
+      if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
+    }),
   email: z
-    .string()
-    .optional()
-    .refine((v) => !v || !v.trim() || RE_EMAIL.test(v.trim()), "Email no válido"),
+    .string({ required_error: "El email es obligatorio" })
+    .superRefine((v, ctx) => {
+      const mensaje = errorEmail(v);
+      if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
+    }),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
   numero_comensales: z
@@ -375,17 +387,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
   const onSubmit = async (values: FormValues) => {
     try {
-      // Validate required fields based on config
-      if (configReservas?.telefono_obligatorio && (!values.telefono || values.telefono.length < 9)) {
-        form.setError("telefono", { message: "El teléfono es obligatorio" });
-        toast.error("El teléfono es obligatorio");
-        return;
-      }
-      if (configReservas?.email_obligatorio && (!values.email || !values.email.includes("@"))) {
-        form.setError("email", { message: "El email es obligatorio" });
-        toast.error("El email es obligatorio");
-        return;
-      }
+      // Teléfono y email ya los exige el esquema (siempre obligatorios en el
+      // panel; los flags telefono_obligatorio/email_obligatorio de
+      // configuracion_reservas solo aplican a los canales automáticos).
 
       // Validate comensales limits
       if (configReservas) {
@@ -421,10 +425,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       // Mismo formato que el bot ("+34XXXXXXXXX") para que la búsqueda, los
       // límites y la lista negra casen entre canales.
       const telefonoGuardar = formatearTelefonoReserva(values.telefono);
-      const emailGuardar = values.email?.trim() || null;
+      const emailGuardar = values.email.trim();
 
       // Check limits per phone/email
-      const limiteMsg = await verificarLimites(values.telefono, emailGuardar ?? undefined, fechaStr);
+      const limiteMsg = await verificarLimites(values.telefono, emailGuardar, fechaStr);
       if (limiteMsg) {
         setLimiteAlcanzado(limiteMsg);
         toast.error(limiteMsg);
@@ -433,8 +437,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       // Verificar blacklist antes de crear
       const blacklisted = await verificarBlacklist.mutateAsync({
-        email: emailGuardar || "",
-        telefono: values.telefono || "",
+        email: emailGuardar,
+        telefono: values.telefono,
       });
 
       // Los estados válidos los fija el CHECK `reservas_estado_check`:
@@ -442,9 +446,14 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       // Un cliente en blacklist entra como `pendiente` con `en_blacklist = true`
       // para que el equipo la revise a mano (antes se usaba "rechazada", que no existe
       // en el CHECK y hacía fallar el INSERT con el error 23514).
-      const estadoInicial = blacklisted
-        ? "pendiente"
-        : (configReservas?.auto_confirmar ? "confirmada" : "pendiente");
+      //
+      // Decisión del dueño (2026-09-23): un alta del panel NUNCA nace
+      // 'confirmada' en silencio (se ignora configuracion_reservas.auto_confirmar).
+      // Nace 'verificada' y se dispara notify-reservation-change, igual que al
+      // pasar una reserva a 'verificada' desde la lista: emails-reserva manda
+      // la plantilla 'propuesta' ("Confirma tu reserva") y el cliente la
+      // confirma desde el enlace (-> 'confirmada' + correo de confirmación).
+      const estadoInicial = estadoInicialAltaPanel(!!blacklisted);
 
       const fila: Record<string, unknown> = {
         nombre: values.nombre.trim(),
@@ -474,6 +483,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       if (error) throw error;
 
+      const idCreada = (insertada as { id?: string } | null)?.id ?? null;
+      // Correo "Confirma tu reserva" (mismo camino que un cambio de estado en
+      // la lista). En lista negra no se escribe al cliente: queda pendiente
+      // de revisión.
+      if (idCreada && debeNotificarAltaPanel(estadoInicial)) notificarCambioReserva(idCreada, { estado: estadoInicial });
+
       // Refrescar todo lo que muestra reservas del día, ocupación y disponibilidad:
       // sin esto la reserva se crea pero no aparece en ninguna pantalla y el hueco
       // recién ocupado se sigue ofreciendo como libre.
@@ -482,11 +497,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       if (blacklisted) {
         toast.info("Reserva registrada como pendiente de revisión (cliente en lista negra)");
       } else {
-        toast.success("¡Reserva creada exitosamente!");
+        toast.success("Reserva creada. Se ha enviado al cliente un correo para que la confirme.");
       }
 
       const creada: ReservaCreadaDesdeFormulario = {
-        id: (insertada as { id?: string } | null)?.id ?? null,
+        id: idCreada,
         fecha: fechaStr,
         hora: values.hora,
         numero_comensales: values.numero_comensales,
@@ -855,17 +870,13 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         )}
 
         {!isPublic && (
-          // Comportamiento real (sin cambios): el alta hace solo un INSERT en
-          // `reservas`; no invoca `notify-reservation-change` ni hay trigger
-          // que mande correo al crear. Los correos salen al CAMBIAR el estado
-          // desde la lista (notify-reservation-change -> emails-reserva).
+          // La reserva nace 'verificada' y se invoca notify-reservation-change
+          // (ver onSubmit): el cliente recibe "Confirma tu reserva".
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>
-              {configReservas?.auto_confirmar
-                ? "La reserva se crea directamente como confirmada y no se envía ningún correo. Avisa tú al cliente."
-                : "La reserva se crea como pendiente y no se envía ningún correo al crearla: sale cuando la verificas o confirmas desde la lista."}
-              {!watchedEmail?.trim() && " Sin email, el cliente no recibirá ningún correo (tampoco el recordatorio)."}
+              Se enviará al cliente un correo para que confirme su reserva. Queda como verificada hasta que la
+              confirme desde el enlace.
             </span>
           </p>
         )}

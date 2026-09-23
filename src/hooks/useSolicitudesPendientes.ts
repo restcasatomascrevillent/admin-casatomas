@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ActualizacionSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import { esErrorEsquemaPendiente, mensajeErrorPropuesta } from "@/lib/reservas/propuestaCliente";
+import type { ContactoReserva } from "@/lib/reservas/altaPanel";
 
 export interface SolicitudPendiente {
   id: string;
@@ -166,11 +167,26 @@ export function useSolicitudesPendientes() {
 
   /**
    * El cliente aceptó por teléfono: crea la reserva con lo guardado en la
-   * solicitud (misma función que usa el enlace del correo) y, como la reserva
-   * nace confirmada, dispara el correo de confirmación si tiene email (regla:
-   * el correo sale al verificar/confirmar).
+   * solicitud (misma función que usa el enlace del correo) y dispara
+   * notify-reservation-change. Decisión del dueño (2026-09-23): igual que un
+   * alta manual, la reserva nace 'verificada' (migración 20260923220000) y el
+   * cliente recibe "Confirma tu reserva"; sin esa migración nace 'confirmada'
+   * y le llega la confirmación. El correo lo elige emails-reserva por estado.
+   *
+   * `contacto` (teléfono + email ya validados, obligatorios): se guarda antes
+   * en la solicitud, que es de donde la RPC copia los datos a la reserva.
    */
-  const aceptarPropuestaTelefono = async (id: string): Promise<ResultadoPropuesta> => {
+  const aceptarPropuestaTelefono = async (id: string, contacto?: ContactoReserva): Promise<ResultadoPropuesta> => {
+    if (contacto) {
+      const { error } = await supabase
+        .from("solicitudes_pendientes")
+        .update({ telefono: contacto.telefono, email: contacto.email, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) {
+        toast.error(`No se pudo guardar el teléfono/email del cliente: ${error.message}`);
+        return { ok: false, error: "error_contacto", mensaje: error.message };
+      }
+    }
     const res = await llamarRpcPropuesta("fn_aceptar_propuesta_solicitud", id);
     if (!res.ok) {
       toast.error(res.error === "sin_migracion" || res.error === "error_rpc" ? res.mensaje ?? "Error" : mensajeErrorPropuesta(res.error, res.mensaje));
@@ -184,6 +200,8 @@ export function useSolicitudesPendientes() {
     }
     if (res.ya_aceptada) toast.info("Ya estaba aceptada: la reserva existía.");
     else if (res.estado === "pendiente") toast.info("Reserva creada como pendiente de revisión (cliente en lista negra).");
+    else if (res.estado === "verificada")
+      toast.success("Reserva creada. Se ha enviado al cliente un correo para que la confirme. Solicitud resuelta.");
     else toast.success("Reserva creada y confirmada. Solicitud resuelta.");
     await fetchSolicitudes();
     return res;

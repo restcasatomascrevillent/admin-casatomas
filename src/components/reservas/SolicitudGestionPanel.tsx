@@ -57,6 +57,7 @@ import {
   type PropuestaSolicitud,
 } from "@/lib/reservas/solicitudPropuesta";
 import { esSolicitudAbierta } from "@/lib/reservas/vistaUnificada";
+import { validarContactoReserva, type ContactoReserva } from "@/lib/reservas/altaPanel";
 import { SolicitudCard } from "./GestionSolicitudes";
 import { OcupacionSalas } from "./OcupacionSalas";
 
@@ -87,8 +88,10 @@ export interface SolicitudGestionPanelProps {
   onConvertir?: (solicitud: SolicitudPendiente, propuesta: PropuestaSolicitud) => void;
   /** Envía el correo de propuesta (lo guardado en la solicitud). */
   onEnviarPropuesta?: (id: string) => Promise<boolean>;
-  /** El cliente aceptó por teléfono: crea la reserva con lo guardado. */
-  onAceptarTelefono?: (id: string) => Promise<ResultadoPropuesta>;
+  /** El cliente aceptó por teléfono: guarda teléfono + email (obligatorios)
+   * en la solicitud y crea la reserva con lo guardado; el cliente recibe un
+   * correo para confirmarla. */
+  onAceptarTelefono?: (id: string, contacto: ContactoReserva) => Promise<ResultadoPropuesta>;
   /** El cliente rechazó por teléfono. */
   onRechazarTelefono?: (id: string) => Promise<ResultadoPropuesta>;
 }
@@ -114,6 +117,14 @@ export function SolicitudGestionPanel({
   const [guardando, setGuardando] = useState(false);
   const [confirmar, setConfirmar] = useState<AccionConfirmar>(null);
   const [ejecutando, setEjecutando] = useState(false);
+  // Teléfono y email del paso "aceptó por teléfono" (obligatorios; se
+  // prerrellenan con lo que dejó el cliente al bot).
+  const [contactoTelefono, setContactoTelefono] = useState(solicitud.telefono ?? "");
+  const [contactoEmail, setContactoEmail] = useState(solicitud.email ?? "");
+  const [erroresContacto, setErroresContacto] = useState<{ telefono: string | null; email: string | null }>({
+    telefono: null,
+    email: null,
+  });
 
   const { data, horasBase } = useOcupacionSalasDia(propuesta.fecha);
   const espacios = data?.espacios ?? [];
@@ -192,15 +203,28 @@ export function SolicitudGestionPanel({
   const ejecutarConfirmado = async () => {
     const accion = confirmar;
     if (!accion) return;
+    // Antes de nada: teléfono y email válidos. Si faltan, el diálogo sigue
+    // abierto con el error en cada campo.
+    let contacto: ContactoReserva | null = null;
+    if (accion === "aceptar") {
+      const validacion = validarContactoReserva({ telefono: contactoTelefono, email: contactoEmail });
+      setErroresContacto(validacion.errores);
+      if (!validacion.contacto) return;
+      contacto = validacion.contacto;
+    }
     setEjecutando(true);
     try {
       if (accion === "rechazar") {
         await onRechazarTelefono?.(solicitud.id);
         return;
       }
+      if (accion === "aceptar") {
+        if (!(await guardarSiHaceFalta())) return;
+        await onAceptarTelefono?.(solicitud.id, contacto as ContactoReserva);
+        return;
+      }
       if (!(await guardarSiHaceFalta())) return;
-      if (accion === "enviar") await onEnviarPropuesta?.(solicitud.id);
-      else await onAceptarTelefono?.(solicitud.id);
+      await onEnviarPropuesta?.(solicitud.id);
     } finally {
       setEjecutando(false);
       setConfirmar(null);
@@ -486,7 +510,12 @@ export function SolicitudGestionPanel({
                     type="button"
                     size="sm"
                     variant={tieneEmail ? "outline" : "default"}
-                    onClick={() => setConfirmar("aceptar")}
+                    onClick={() => {
+                      setContactoTelefono(solicitud.telefono ?? "");
+                      setContactoEmail(solicitud.email ?? "");
+                      setErroresContacto({ telefono: null, email: null });
+                      setConfirmar("aceptar");
+                    }}
                     disabled={!propuestaCompleta || sinAforo || ejecutando}
                   >
                     <PhoneCall className="mr-1 h-4 w-4" aria-hidden />
@@ -535,13 +564,55 @@ export function SolicitudGestionPanel({
                     solicitud.propuesta_estado === "enviada" ? " El enlace del correo anterior dejará de funcionar." : ""
                   }`}
                 {confirmar === "aceptar" &&
-                  `Se creará una reserva confirmada para ${solicitud.nombre || "el cliente"}: ${resumenPropuesta}. La solicitud quedará resuelta${
-                    tieneEmail ? " y el cliente recibirá el correo de confirmación" : ""
-                  }.`}
+                  `Se creará la reserva de ${solicitud.nombre || "el cliente"}: ${resumenPropuesta}. La solicitud quedará resuelta y se enviará al cliente un correo para que confirme su reserva.`}
                 {confirmar === "rechazar" &&
                   "La propuesta quedará como rechazada y la solicitud seguirá abierta para proponer otra cosa o descartarla."}
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {confirmar === "aceptar" && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="aceptar-telefono">Teléfono</Label>
+                  <Input
+                    id="aceptar-telefono"
+                    type="tel"
+                    autoComplete="off"
+                    value={contactoTelefono}
+                    onChange={(e) => setContactoTelefono(e.target.value)}
+                    aria-invalid={!!erroresContacto.telefono}
+                    aria-describedby={erroresContacto.telefono ? "aceptar-telefono-error" : undefined}
+                    disabled={ejecutando}
+                  />
+                  {erroresContacto.telefono && (
+                    <p id="aceptar-telefono-error" role="alert" className="text-xs text-destructive">
+                      {erroresContacto.telefono}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aceptar-email">Email</Label>
+                  <Input
+                    id="aceptar-email"
+                    type="email"
+                    autoComplete="off"
+                    placeholder="cliente@email.com"
+                    value={contactoEmail}
+                    onChange={(e) => setContactoEmail(e.target.value)}
+                    aria-invalid={!!erroresContacto.email}
+                    aria-describedby={erroresContacto.email ? "aceptar-email-error" : undefined}
+                    disabled={ejecutando}
+                  />
+                  {erroresContacto.email && (
+                    <p id="aceptar-email-error" role="alert" className="text-xs text-destructive">
+                      {erroresContacto.email}
+                    </p>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                  Los dos son obligatorios y se guardan en la solicitud y en la reserva.
+                </p>
+              </div>
+            )}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={ejecutando}>Cancelar</AlertDialogCancel>
               <AlertDialogAction

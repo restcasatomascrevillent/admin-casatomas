@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
 import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star, LayoutGrid } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -84,14 +85,16 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   } = useQuery({
     queryKey: ["reservas-hoy", hoy],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reservas")
+      // Solo Casa Tomás (Touza no tiene reservas, decisión del dueño
+      // 2026-09-23). `as any`: ver ListaReservasAvanzada.
+      const { data, error } = await (supabase.from("reservas" as any) as any)
         .select("*")
         .eq("fecha", hoy)
+        .eq("marca", MARCA_POR_DEFECTO)
         .order("hora", { ascending: true });
 
       if (error) throw error;
-      return data;
+      return data as any[];
     },
   });
 

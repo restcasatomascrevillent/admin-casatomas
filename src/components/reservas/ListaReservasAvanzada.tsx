@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
+import { MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
 import { toast } from "sonner";
 import {
   CheckCircle,
@@ -152,9 +153,13 @@ export function ListaReservasAvanzada({
   } = useQuery({
     queryKey: ["reservas-lista"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reservas")
+      // Solo Casa Tomás (Touza no tiene reservas, decisión del dueño
+      // 2026-09-23). `as any`: `marca` no está en los tipos generados y
+      // `.eq("marca", ...)` dispara "Type instantiation is excessively deep"
+      // (mismo recurso que GestorReservasKanban / useDisponibilidad).
+      const { data, error } = await (supabase.from("reservas" as any) as any)
         .select("*")
+        .eq("marca", MARCA_POR_DEFECTO)
         .order("fecha", { ascending: false })
         .order("hora", { ascending: true });
       if (error) {
@@ -787,8 +792,8 @@ export function ListaReservasAvanzada({
               onEnviarPropuesta={canEdit ? solicitudesState.enviarPropuesta : undefined}
               onAceptarTelefono={
                 canEdit
-                  ? async (id) => {
-                      const res = await solicitudesState.aceptarPropuestaTelefono(id);
+                  ? async (id, contacto) => {
+                      const res = await solicitudesState.aceptarPropuestaTelefono(id, contacto);
                       if (res.ok) refrescarReservas();
                       return res;
                     }

@@ -18,7 +18,7 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { filtrarEspaciosPorMarca, MARCA_POR_DEFECTO, turnoDeHora } from "@/hooks/useDisponibilidad";
+import { MARCA_POR_DEFECTO, turnoDeHora } from "@/hooks/useDisponibilidad";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import {
   comensalesEnEspacioTurno,
@@ -412,9 +412,9 @@ export function GestorReservasKanban() {
     useSensor(KeyboardSensor),
   );
 
-  // Aforo por negocio (marca) — bug de 2026-09-22, ver "Aforo por negocio"
-  // en `useDisponibilidad.ts`. Sin filtrar por marca, la consulta traía
-  // también reservas de otros negocios (touza).
+  // Solo Casa Tomás: Touza no tiene reservas (decisión del dueño,
+  // 2026-09-23). El filtro por marca se mantiene para que una reserva
+  // perdida de otro negocio no aparezca aquí.
   //
   // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
   // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría).
@@ -447,16 +447,9 @@ export function GestorReservasKanban() {
     },
   });
 
-  // Mismo motivo: sin filtrar por marca, "El Reservado" (touza) aparecía
-  // como columna de este Kanban del restaurante.
+  // useEspaciosReserva ya devuelve solo los espacios de Casa Tomás.
   const espaciosActivos = useMemo(
-    () =>
-      filtrarEspaciosPorMarca(
-        (espacios || [])
-          .filter((e: any) => e.activa !== false)
-          .map((e: any) => ({ ...e, marca: e.caracteristicas?.marca })),
-        MARCA_POR_DEFECTO,
-      ),
+    () => (espacios || []).filter((e: any) => e.activa !== false),
     [espacios],
   );
 

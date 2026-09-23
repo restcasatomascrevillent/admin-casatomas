@@ -47,7 +47,6 @@ export interface OcupacionSalasProps {
   /** Si se pasa, cada celda es un botón que fija sala + hora. */
   onSeleccionar?: (espacioId: string | null, hora: string) => void;
   excluirReservaId?: string | null;
-  marca?: string;
   className?: string;
 }
 
@@ -58,10 +57,9 @@ export function OcupacionSalas({
   espacioId,
   onSeleccionar,
   excluirReservaId,
-  marca,
   className,
 }: OcupacionSalasProps) {
-  const { data, isLoading, error, refetch, isFetching } = useOcupacionSalasDia(fecha, { marca });
+  const { data, isLoading, error, refetch, isFetching } = useOcupacionSalasDia(fecha);
 
   const ocupacion = useMemo<OcupacionSalasDia | null>(() => {
     if (!data) return null;
@@ -118,7 +116,7 @@ export function OcupacionSalas({
           </Button>
         </div>
       ) : !ocupacion || ocupacion.salas.length === 0 ? (
-        <EstadoVacio>No hay salas activas configuradas para este negocio.</EstadoVacio>
+        <EstadoVacio>No hay salas activas configuradas.</EstadoVacio>
       ) : ocupacion.franjas.comida.length + ocupacion.franjas.cena.length === 0 ? (
         <EstadoVacio>
           {data?.cerrado

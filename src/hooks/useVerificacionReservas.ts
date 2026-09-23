@@ -103,8 +103,8 @@ export function objetivoAceptarComoSolicitado(reserva: ReservaParaVerificar): { 
   };
 }
 
-/** Notifica el cambio de estado (dispara el correo que toque). Fire-and-forget, best-effort — igual que ya hacían ModalVerificacionReserva.tsx y ListaReservasAvanzada.tsx. */
-function notificarCambioReserva<T extends object>(reservaId: string, cambios: T): void {
+/** Notifica el cambio de estado (dispara el correo que toque). Fire-and-forget, best-effort — igual que ya hacían ModalVerificacionReserva.tsx y ListaReservasAvanzada.tsx. También lo usa el alta del panel (FormularioReserva) para mandar "Confirma tu reserva". */
+export function notificarCambioReserva<T extends object>(reservaId: string, cambios: T): void {
   supabase.functions
     .invoke("notify-reservation-change", { body: { id: reservaId, ...cambios } })
     .catch((err) => console.error("Error notificando cambio de reserva:", err));

@@ -129,8 +129,9 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
   // llegada ("Ha llegado" → 'completada', ver src/lib/reservas/servicioSala.ts)
   // los que ya están sentados tienen que seguir contando en "Reservas hoy" /
   // "Comensales" / "Ocupación del día"; si no, las cifras bajaban a medida
-  // que llegaba la gente. OJO: el trigger de aforo NO cuenta 'completada'
-  // (decisión pendiente del dueño, ver docs/funcionalidades/01-reservas.md).
+  // que llegaba la gente. El trigger de aforo NO cuenta 'completada' y así se
+  // queda (decisión del dueño 2026-09-23: todo se reserva con antelación y
+  // el día se bloquea la víspera, así que no se revende el hueco).
   const activas = (reservas ?? []).filter((r) =>
     ["pendiente", "verificada", "confirmada", "completada"].includes(r.estado),
   );

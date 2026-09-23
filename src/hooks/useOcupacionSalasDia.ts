@@ -39,9 +39,10 @@ export interface DatosOcupacionSalasDia {
 
 export function useOcupacionSalasDia(
   fecha: string | null | undefined,
-  opciones?: { marca?: string; enabled?: boolean },
+  opciones?: { enabled?: boolean },
 ) {
-  const marca = opciones?.marca ?? MARCA_POR_DEFECTO;
+  // Solo Casa Tomás: Touza no tiene reservas (decisión del dueño, 2026-09-23).
+  const marca = MARCA_POR_DEFECTO;
   const queryClient = useQueryClient();
   const idCanal = useId();
 

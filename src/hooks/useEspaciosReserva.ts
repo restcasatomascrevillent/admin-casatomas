@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { filtrarEspaciosPorMarca, MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
 
 export interface EspacioReserva {
   id: string;
@@ -11,6 +12,14 @@ export interface EspacioReserva {
   activa: boolean;
 }
 
+/**
+ * Espacios de reserva de Casa Tomás. Touza no tiene reservas (decisión del
+ * dueño, 2026-09-23): un espacio etiquetado con otra marca en
+ * `caracteristicas->>'marca'` (p. ej. "El Reservado") no se enseña en
+ * ninguna pantalla de reservas (Kanban, turnos, verificación, Espacios). Un
+ * espacio sin etiqueta cuenta como Casa Tomás (mismo criterio que el
+ * trigger de aforo, ver `filtrarEspaciosPorMarca`). No se tocan los datos.
+ */
 export const useEspaciosReserva = () => {
   return useQuery({
     queryKey: ["espacios_reserva"],
@@ -19,9 +28,13 @@ export const useEspaciosReserva = () => {
         .from("espacios_reserva" as any)
         .select("*")
         .order("nombre");
-      
+
       if (error) throw error;
-      return data as any;
+      const filas = (data ?? []) as unknown as EspacioReserva[];
+      return filtrarEspaciosPorMarca(
+        filas.map((fila) => ({ fila, capacidad_maxima: fila.capacidad_maxima, marca: fila.caracteristicas?.marca ?? null })),
+        MARCA_POR_DEFECTO,
+      ).map(({ fila }) => fila) as any;
     },
   });
 };

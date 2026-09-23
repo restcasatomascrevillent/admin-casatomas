@@ -278,7 +278,7 @@ export function ConfiguracionGeneralReservas() {
                       <div className="space-y-0.5">
                         <FormLabel>Teléfono obligatorio</FormLabel>
                         <FormDescription>
-                          Requerir teléfono en el formulario de reserva
+                          Requerir teléfono en la web de reservas (en el panel siempre es obligatorio)
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -295,7 +295,7 @@ export function ConfiguracionGeneralReservas() {
                       <div className="space-y-0.5">
                         <FormLabel>Email obligatorio</FormLabel>
                         <FormDescription>
-                          Requerir email en el formulario de reserva
+                          Requerir email en la web de reservas (en el panel siempre es obligatorio)
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -312,7 +312,7 @@ export function ConfiguracionGeneralReservas() {
                       <div className="space-y-0.5">
                         <FormLabel>Auto-confirmar reservas</FormLabel>
                         <FormDescription>
-                          Las reservas se confirman automáticamente sin pasar por "pendiente"
+                          No afecta a las reservas creadas desde el panel: el cliente siempre recibe un correo para confirmarlas
                         </FormDescription>
                       </div>
                       <FormControl>

@@ -105,7 +105,7 @@ export const TEXTO_MOTIVO_NO_ENVIAR: Record<MotivoNoEnviar, string> = {
   sin_migracion: "Para enviar propuestas hay que aplicar antes la migración 20260923210000 en Supabase.",
   cerrada: "La solicitud ya está resuelta o descartada.",
   aceptada: "El cliente ya aceptó: la reserva existe.",
-  sin_email: "El cliente no dejó email: llámale y, si acepta, registra la aceptación aquí.",
+  sin_email: "El cliente no dejó email: llámale, pídeselo y, si acepta, registra la aceptación aquí (el email es obligatorio).",
   incompleta: "Elige día, hora y comensales.",
   fecha_pasada: "El día propuesto ya ha pasado.",
 };
@@ -130,6 +130,8 @@ export function mensajeErrorPropuesta(error: string | null | undefined, detalle?
       return "El día propuesto ya ha pasado. Cambia la fecha.";
     case "propuesta_incompleta":
       return "Faltan día, hora o comensales en la propuesta.";
+    case "falta_contacto":
+      return "Faltan el teléfono o el email del cliente: los dos son obligatorios.";
     case "solicitud_cerrada":
       return "La solicitud ya está resuelta o descartada.";
     case "ya_aceptada":

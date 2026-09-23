@@ -36,11 +36,11 @@
 -- (20260918120000_rls_por_permisos_de_seccion.sql): quien puede actualizar
 -- una reserva puede escribir esta columna, y nadie más.
 --
--- DECISIÓN PENDIENTE DEL DUEÑO (no incluida aquí a propósito)
+-- AFORO Y 'completada' (decidido por el dueño, 2026-09-23: sin cambios)
 --   El trigger de aforo `validar_capacidad_reserva` solo cuenta pendiente/
---   verificada/confirmada: una mesa que ya llegó ('completada') deja de
---   ocupar aforo de SU turno y el hueco se podría volver a vender en ese
---   mismo turno. Ver docs/funcionalidades/01-reservas.md §4.
+--   verificada/confirmada; una mesa que ya llegó ('completada') deja de
+--   contar en SU turno. No importa: todo se reserva con antelación y el día
+--   se bloquea la víspera. Ver docs/funcionalidades/01-reservas.md §4.
 --
 -- Idempotente: se puede re-ejecutar.
 -- ============================================================================

@@ -126,25 +126,19 @@ export function ConfiguracionTurnos() {
   // la cifra que el motor usa siempre para el aforo y para repartir el
   // umbral.
   //
-  // La marca no se fija a `MARCA_POR_DEFECTO` a ciegas: el selector
-  // "Aplicar a" de este formulario ya deja elegir CUALQUIER espacio activo
-  // (incluido uno de otro negocio, si algún día lo hay), así que la
-  // previsualización usa la marca DEL ESPACIO elegido — mismo criterio que
-  // `verificarDisponibilidadSala` en `useDisponibilidad.ts`. Un periodo
-  // global (`espacio_id = null`) sigue usando `MARCA_POR_DEFECTO`: hoy es
-  // lo único que tiene sentido, porque el panel no ofrece ningún turno
-  // global para touza.
-  const espacioIdSeleccionado = form.watch("espacio_id");
-  const capacidadTotalActiva = useMemo(() => {
-    const espacioElegido = espacios?.find((e: any) => e.id === espacioIdSeleccionado);
-    const marcaObjetivo = (espacioElegido as any)?.caracteristicas?.marca || MARCA_POR_DEFECTO;
-    return sumarCapacidadPorMarca(
-      (espacios ?? [])
-        .filter((e: any) => e.activa)
-        .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
-      marcaObjetivo,
-    );
-  }, [espacios, espacioIdSeleccionado]);
+  // Siempre Casa Tomás: Touza no tiene reservas (decisión del dueño,
+  // 2026-09-23) y useEspaciosReserva ya no devuelve espacios de otro
+  // negocio, así que el selector "Aplicar a" solo ofrece salas de Casa Tomás.
+  const capacidadTotalActiva = useMemo(
+    () =>
+      sumarCapacidadPorMarca(
+        (espacios ?? [])
+          .filter((e: any) => e.activa)
+          .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
+        MARCA_POR_DEFECTO,
+      ),
+    [espacios],
+  );
 
   const openCreateDialog = () => {
     setEditingConfig(null);

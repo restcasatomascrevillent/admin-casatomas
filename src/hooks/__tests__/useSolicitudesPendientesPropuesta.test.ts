@@ -101,6 +101,52 @@ describe("useSolicitudesPendientes · propuesta al cliente", () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it("aceptarPropuestaTelefono con contacto: lo guarda en la solicitud antes de la RPC y avisa del correo de confirmación", async () => {
+    const builder = builderSecuencia([{ data: [], error: null }]);
+    rpc.mockResolvedValue({ data: { ok: true, reserva_id: "res-7", estado: "verificada" }, error: null });
+    const { result } = await montar();
+
+    let res: { ok: boolean } = { ok: false };
+    await act(async () => {
+      res = await result.current.aceptarPropuestaTelefono("sol-1", {
+        telefono: "+34612345678",
+        email: "ana@example.com",
+      });
+    });
+
+    expect(res.ok).toBe(true);
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ telefono: "+34612345678", email: "ana@example.com" }),
+    );
+    expect(builder.eq).toHaveBeenCalledWith("id", "sol-1");
+    const ordenUpdate = (builder.update as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(ordenUpdate).toBeLessThan(rpc.mock.invocationCallOrder[0]);
+    expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", { body: { reserva_id: "res-7" } });
+    expect(vi.mocked(toast.success).mock.calls.at(-1)?.[0]).toMatch(/correo para que la confirme/);
+  });
+
+  it("aceptarPropuestaTelefono: si no se puede guardar el contacto, no crea la reserva", async () => {
+    // 1ª resolución: carga de la lista; 2ª: el update del contacto falla.
+    builderSecuencia([
+      { data: [], error: null },
+      { data: null, error: { code: "42501", message: "permiso denegado" } },
+    ]);
+    const { result } = await montar();
+
+    let res: { ok: boolean; error?: string } = { ok: true };
+    await act(async () => {
+      res = await result.current.aceptarPropuestaTelefono("sol-1", {
+        telefono: "+34612345678",
+        email: "ana@example.com",
+      });
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe("error_contacto");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
   it("aceptarPropuestaTelefono sin aforo: no notifica y explica el motivo", async () => {
     builderSecuencia([{ data: [], error: null }]);
     rpc.mockResolvedValue({ data: { ok: false, error: "sin_aforo" }, error: null });

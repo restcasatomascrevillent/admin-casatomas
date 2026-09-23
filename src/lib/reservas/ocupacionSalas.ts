@@ -324,7 +324,7 @@ export function recomendarUbicacion(
   const turnoPedido: Turno | null = hora ? turnoDeHora(hora) : null;
 
   if (ocupacion.salas.length === 0) {
-    return { tipo: "sin_hueco", texto: "No hay salas activas configuradas para este negocio." };
+    return { tipo: "sin_hueco", texto: "No hay salas activas configuradas." };
   }
 
   if (hora && turnoPedido) {
