@@ -22,6 +22,8 @@ import {
   claveIdempotenciaEnvio,
   debeCrearAvisoLote,
   construirAvisoLote,
+  prioridadEmailFallido,
+  ORIGEN_EMAILS_RESERVA,
   MAX_INTENTOS_POR_DEFECTO,
   BACKOFF_BASE_MS_POR_DEFECTO,
   BACKOFF_MAX_MS_POR_DEFECTO,
@@ -235,6 +237,36 @@ describe("debeCrearAvisoLote", () => {
 
   it("verdadero bastante después del cooldown", () => {
     expect(debeCrearAvisoLote("2026-03-15T00:00:00.000Z", ahora, 30)).toBe(true);
+  });
+});
+
+describe("ORIGEN_EMAILS_RESERVA", () => {
+  it("es el valor de carril distinto del de reservas-web (reservas-web/plantillas.ts::ORIGEN_RESERVAS_WEB)", () => {
+    expect(ORIGEN_EMAILS_RESERVA).toBe("emails_reserva");
+  });
+});
+
+describe("prioridadEmailFallido — margen anti-aluvión: por qué 'alta' nunca queda tapado por 'normal'", () => {
+  it("'propuesta' y 'confirmada' son 'alta' (acción pendiente del cliente)", () => {
+    expect(prioridadEmailFallido("propuesta", "error_servidor_500")).toBe("alta");
+    expect(prioridadEmailFallido("confirmada", "permanente_validation_error")).toBe("alta");
+  });
+
+  it("'solicitud_recibida', 'rechazada' y 'recordatorio' son 'normal' (informativo)", () => {
+    expect(prioridadEmailFallido("solicitud_recibida", "error_servidor_500")).toBe("normal");
+    expect(prioridadEmailFallido("rechazada", "sin_respuesta_http")).toBe("normal");
+    expect(prioridadEmailFallido("recordatorio", "limite_429")).toBe("normal");
+  });
+
+  it("'resend_no_configurado' es SIEMPRE 'alta', sin importar el tipo de correo (bloquea TODOS los envíos)", () => {
+    expect(prioridadEmailFallido("solicitud_recibida", "resend_no_configurado")).toBe("alta");
+    expect(prioridadEmailFallido("recordatorio", "resend_no_configurado")).toBe("alta");
+  });
+
+  it("caso exacto de la prueba de QA: solicitud_recibida (normal) y confirmada/propuesta (alta) caen en carriles distintos", () => {
+    const prioridadBaja = prioridadEmailFallido("solicitud_recibida", "error_servidor_500");
+    const prioridadAlta = prioridadEmailFallido("propuesta", "error_servidor_500");
+    expect(prioridadBaja).not.toBe(prioridadAlta);
   });
 });
 

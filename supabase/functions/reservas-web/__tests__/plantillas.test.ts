@@ -22,6 +22,10 @@ import {
   resolverMarcaPorNotas,
   resolverMarca,
   construirAvisoEmailFallido,
+  mensajeDeError,
+  prioridadAvisoEmailFallido,
+  debeCrearAvisoEmailFallido,
+  ORIGEN_RESERVAS_WEB,
   escapeHtml,
   tplSolicitudRecibida,
   tplSolicitudNoProcesada,
@@ -307,6 +311,104 @@ describe("construirAvisoEmailFallido", () => {
     const fila = construirAvisoEmailFallido({ ...base, error: undefined });
     expect(fila.mensaje).toContain(base.nombre);
     expect(fila.mensaje).not.toContain("undefined");
+  });
+
+  it("origen siempre 'reservas_web' — carril propio del margen anti-aluvión", () => {
+    expect(construirAvisoEmailFallido(base).origen).toBe(ORIGEN_RESERVAS_WEB);
+  });
+
+  it("prioridad 'normal' para 'solicitud recibida'/'solicitud no procesada', 'alta' para 'confirma asistencia'", () => {
+    expect(construirAvisoEmailFallido(base).prioridad).toBe("normal");
+    expect(construirAvisoEmailFallido({ ...base, contexto: "solicitud no procesada" }).prioridad).toBe("normal");
+    expect(construirAvisoEmailFallido({ ...base, contexto: "confirma asistencia" }).prioridad).toBe("alta");
+  });
+});
+
+describe("mensajeDeError — nunca '[object Object]' ni cadena vacía (bug de QA: dos filas reales en produccion con ese texto)", () => {
+  it("Error real: usa .message", () => {
+    expect(mensajeDeError(new Error("fallo de red"))).toBe("fallo de red");
+  });
+
+  it("objeto plano {name, message} del SDK de Resend (forma real verificada — el bug original)", () => {
+    // Repro exacto del bug: `String({name: "validation_error", message: "..."})`
+    // da "[object Object]" porque un objeto plano no define `toString`.
+    const errorResend = { name: "validation_error", message: "You can only send testing emails to your own email address" };
+    expect(String(errorResend)).toBe("[object Object]"); // documenta el bug que se corrige
+    expect(mensajeDeError(errorResend)).toBe("validation_error: You can only send testing emails to your own email address");
+  });
+
+  it("objeto plano solo con message (sin name)", () => {
+    expect(mensajeDeError({ message: "missing_required_field" })).toBe("missing_required_field");
+  });
+
+  it("objeto plano solo con name (sin message reconocible)", () => {
+    expect(mensajeDeError({ name: "rate_limit_exceeded" })).toBe("rate_limit_exceeded");
+  });
+
+  it("cadena suelta", () => {
+    expect(mensajeDeError("timeout")).toBe("timeout");
+  });
+
+  it("cadena vacía o solo espacios: cae al valor por defecto, nunca ''", () => {
+    expect(mensajeDeError("")).toBe("Error desconocido");
+    expect(mensajeDeError("   ")).toBe("Error desconocido");
+  });
+
+  it("null/undefined: cae al valor por defecto", () => {
+    expect(mensajeDeError(null)).toBe("Error desconocido");
+    expect(mensajeDeError(undefined)).toBe("Error desconocido");
+  });
+
+  it("algo inesperado (número, objeto sin name/message): nunca '[object Object]' ni ''", () => {
+    expect(mensajeDeError(42)).toBe("Error desconocido");
+    const resultado = mensajeDeError({ codigo: 500, detalle: "oops" });
+    expect(resultado).not.toBe("[object Object]");
+    expect(resultado).not.toBe("");
+    expect(resultado).toContain("500");
+  });
+
+  it("admite un valor por defecto propio", () => {
+    expect(mensajeDeError(null, "excepcion_desconocida")).toBe("excepcion_desconocida");
+  });
+});
+
+describe("prioridadAvisoEmailFallido", () => {
+  it("'confirma asistencia' es 'alta' (lleva los enlaces de confirmar/cancelar)", () => {
+    expect(prioridadAvisoEmailFallido("confirma asistencia")).toBe("alta");
+  });
+
+  it("el resto de contextos conocidos son 'normal'", () => {
+    expect(prioridadAvisoEmailFallido("solicitud recibida")).toBe("normal");
+    expect(prioridadAvisoEmailFallido("solicitud no procesada")).toBe("normal");
+  });
+});
+
+describe("debeCrearAvisoEmailFallido — margen anti-aluvión propio de reservas-web", () => {
+  const AHORA = "2026-03-16T12:00:00.000Z";
+
+  it("sin aviso previo: siempre toca crear uno", () => {
+    expect(debeCrearAvisoEmailFallido(null, AHORA)).toBe(true);
+  });
+
+  it("aviso reciente (dentro del cooldown de 30 min por defecto): no toca crear otro", () => {
+    const hace10min = "2026-03-16T11:50:00.000Z";
+    expect(debeCrearAvisoEmailFallido(hace10min, AHORA)).toBe(false);
+  });
+
+  it("aviso justo en el borde del cooldown (>=): toca crear otro", () => {
+    const hace30minExactos = "2026-03-16T11:30:00.000Z";
+    expect(debeCrearAvisoEmailFallido(hace30minExactos, AHORA)).toBe(true);
+  });
+
+  it("aviso más antiguo que el cooldown: toca crear otro", () => {
+    const hace1hora = "2026-03-16T11:00:00.000Z";
+    expect(debeCrearAvisoEmailFallido(hace1hora, AHORA)).toBe(true);
+  });
+
+  it("acepta un cooldown propio distinto del de 30 min por defecto", () => {
+    const hace5min = "2026-03-16T11:55:00.000Z";
+    expect(debeCrearAvisoEmailFallido(hace5min, AHORA, 10)).toBe(false);
+    expect(debeCrearAvisoEmailFallido(hace5min, AHORA, 2)).toBe(true);
   });
 });
 

@@ -1,0 +1,252 @@
+-- ===========================================================================
+-- ##                                                                       ##
+-- ##                            APLICADA                                   ##
+-- ##                                                                       ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (confirmado contra            ##
+-- ##   supabase_migrations.schema_migrations, API de Supabase, solo         ##
+-- ##   lectura).                                                           ##
+-- ##                                                                       ##
+-- ===========================================================================
+--
+-- Lectura pública segura de `resenas` (sin exponer `email`)
+-- (auditoría de seguridad, sesión 2026-09-23, proyecto jeamoczmbfsnwkfjxcyo)
+-- ---------------------------------------------------------------------------
+--
+-- EL PROBLEMA (verificado contra producción, no de oídas)
+--   La sección de reseñas de casa-tomas-story
+--   (`casa-tomas-story/src/components/ReviewsSection.tsx:40-44`, repo ajeno,
+--   solo lectura) hace, sin sesión:
+--
+--     .from("resenas")
+--     .select("id, nombre_cliente, comentario, valoracion, google_rating, fecha")
+--     .eq("estado", "publicada")
+--     .order("fecha", { ascending: false }).limit(12)
+--
+--   Hoy esa consulta devuelve `[]` con HTTP 200 a cualquier visitante: sin
+--   error, sin fila. El propio componente ya lo documenta en su código
+--   (comentario junto al botón "dejar reseña", líneas ~148-151): "`resenas`
+--   no tiene política de lectura anónima, así que en la web pública el
+--   carrusel sale vacío". El carrusel de 11 reseñas reales nunca se ve.
+--
+--   Esto NO es nuevo ni pasó desapercibido: las dos migraciones de
+--   endurecimiento de RLS de esta misma semana ya identificaron `resenas`
+--   como contenido que casa-tomas-story necesita leer sin sesión, igual que
+--   Platos/Vinos/Bebidas/Cocteles/menus_diarios/tapas/novedades/configBotWeb
+--   (`20260918084909_cerrar_fuga_rls_anonima.sql`, cabecera, bloque
+--   "SE CONSERVA"; `20260918120000_rls_por_permisos_de_seccion.sql`, cabecera,
+--   bloque "QUE NO TOCA"). Ninguna de las dos migraciones tocó una sola línea
+--   de `resenas`: se limitaron a no romper lo que ya conservaba, y lo que
+--   "conservaba" para `resenas` ya estaba roto desde su creación
+--   (`20251124064529_ca1e9826-73ba-4617-a26e-21f142d5a803.sql`, política
+--   "Usuarios autenticados pueden ver reseñas", `USING (auth.uid() IS NOT
+--   NULL)`, sin excepción para `anon`). Este fichero es el que por fin cierra
+--   ese pendiente.
+--
+-- QUÉ HAY HOY EN `resenas` (leído de producción con la Management API,
+-- solo SELECT, justo antes de escribir este fichero)
+--   RLS activa (relrowsecurity = true, relforcerowsecurity = false).
+--   Columnas: id uuid, nombre_cliente text not null, email text,
+--     valoracion integer not null, comentario text, fuente text, fecha date
+--     not null, estado text (default 'publicada', CHECK IN
+--     ('publicada','pendiente','oculta'), pero SIN NOT NULL), created_at,
+--     updated_at, google_review_id, google_rating numeric, respuesta,
+--     fecha_respuesta.
+--   11 filas en total; las 11 con estado = 'publicada'. No existe hoy
+--     ninguna fila 'pendiente' ni 'oculta' (comprobado con
+--     `select estado, count(*) from resenas group by estado`), pero el
+--     filtro de la política se escribe iguelmente por `estado` y no como
+--     "true": el día que exista una reseña 'pendiente' u 'oculta' no debe
+--     hacerse pública solo por tener un `INSERT`.
+--   CINCO políticas viven hoy sobre `resenas` (una más de las que el
+--     encargo original mencionaba -- comprobado, no asumido):
+--       1. "Auth can manage resenas"                    ALL    {authenticated} USING (true)                  -- 20260208164243, no documentada en el encargo
+--       2. "Usuarios autenticados pueden ver reseñas"    SELECT {public}        USING (auth.uid() IS NOT NULL) -- la que cita el encargo
+--       3. "Usuarios autenticados pueden crear reseñas"  INSERT {public}        WITH CHECK (auth.uid() IS NOT NULL)
+--       4. "Usuarios autenticados pueden actualizar..."  UPDATE {public}        USING (auth.uid() IS NOT NULL)
+--       5. "Usuarios autenticados pueden eliminar..."    DELETE {public}        USING (auth.uid() IS NOT NULL)
+--     La política 1 (FOR ALL, `USING (true)`) ya cubre TODO para
+--     `authenticated` por sí sola; las políticas 2-5 son historia previa que
+--     quedó como redundancia inofensiva. Ninguna de las 5 aplica a `anon`
+--     (la 1 está acotada a `{authenticated}`; las 2-5 son `{public}` pero su
+--     `USING`/`WITH CHECK` exige `auth.uid() IS NOT NULL`, que para `anon`
+--     es siempre NULL => siempre falso). Verificado en vivo:
+--     `begin; set local role anon; select count(*) from resenas; rollback;`
+--     -> 0 filas.
+--   GRANT de tabla: `anon` tiene hoy SELECT (+ REFERENCES/TRIGGER, inertes
+--     sin DDL) sobre `resenas` -- NUNCA se le revocó, a diferencia de las
+--     tablas internas que sí se limpiaron en el bloque 5 de
+--     `20260918084909`. Es el típico privilegio "grant all" que Supabase
+--     concede al crear el proyecto. Consecuencia comprobada:
+--     `has_column_privilege('anon','public.resenas','email','SELECT')` ->
+--     true HOY MISMO. anon ya puede pedir `email` a nivel de permisos; lo
+--     único que hoy lo bloquea es la política de fila (0 filas visibles). Si
+--     este fichero se limitara a añadir una política de fila para `anon`
+--     -- sin tocar el GRANT -- el mismo `select email from resenas` pasaría
+--     de "0 filas" a "11 filas con el correo real de cada cliente" en
+--     cuanto la política empezara a dejar pasar filas. Cambiaríamos un
+--     fallo silencioso por una fuga de datos personales, que es exactamente
+--     lo que había que evitar.
+--
+-- MECANISMO ELEGIDO Y POR QUÉ
+--   GRANT/REVOKE a nivel de COLUMNA (no de fila) + una política de fila
+--   nueva acotada a `anon`. RLS filtra FILAS; que `anon` nunca pueda pedir
+--   la columna `email` (ni `fuente`, `created_at`, `updated_at`,
+--   `google_review_id`, `respuesta`, `fecha_respuesta`) es un privilegio de
+--   columna, así que hace falta el mecanismo de columna aparte del de fila.
+--
+--   Se descarta una vista `security_invoker`: con `security_invoker = on`
+--   Postgres comprueba los privilegios de la tabla base contra quien
+--   consulta -- es decir, `anon` necesitaría exactamente el mismo GRANT de
+--   columna sobre `resenas` que este fichero ya concede, más una vista
+--   adicional que no quita ni añade seguridad, solo una capa de más que
+--   mantener. Y se descarta también una vista SIN `security_invoker` (la
+--   vista "de toda la vida", que se ejecuta con los permisos de su dueño):
+--   sería el mismo patrón -- vista que ignora la RLS de la tabla base y se
+--   salta el GRANT de `anon` -- que el bloque 1 de
+--   `20260918084909_cerrar_fuga_rls_anonima.sql` trató como un problema de
+--   seguridad en 13 vistas de este mismo proyecto y cerró sistemáticamente
+--   (`alter view ... set (security_invoker = on)`) y que el linter de
+--   Supabase señala como `security_definer_view`. Crear una vista nueva con
+--   ese mismo patrón iría en contra de lo que ese fichero ya estableció
+--   como norma aquí. El GRANT/REVOKE de columna es además el mecanismo
+--   nativo de Postgres para "misma fila, menos columnas": no crea ningún
+--   objeto nuevo, y la web ya pide exactamente el subconjunto de columnas
+--   que este fichero concede -- no una aproximación seguida de un filtro de
+--   aplicación, sino el permiso de base de datos calcado a la consulta
+--   real.
+--
+-- QUÉ EXPONE ESTO A `anon` Y QUÉ NO
+--   SÍ (7 columnas, SOLO en filas con estado = 'publicada'):
+--     id, nombre_cliente, comentario, valoracion, fecha, google_rating,
+--     estado.
+--   `estado` se concede aunque `ReviewsSection.tsx` no la devuelve en el
+--     `.select()`: su propio `.eq("estado", "publicada")` hace que
+--     PostgREST monte un `WHERE estado = 'publicada'`, y Postgres exige
+--     privilegio SELECT sobre cualquier columna referenciada en el WHERE,
+--     no solo en el SELECT list -- sin este GRANT, la consulta real de la
+--     web fallaría con "permission denied for column estado" en vez de
+--     arreglarse. No es un dato sensible (es un enum de 3 valores de flujo
+--     interno) y la política de fila de abajo garantiza que `anon` JAMÁS
+--     puede ver una fila con otro valor: por mucho que alguien pida
+--     `?estado=eq.oculta` a mano, la política sigue exigiendo
+--     `estado = 'publicada'` y esa fila no aparece.
+--   NO: `email` (dato personal -- el motivo de este fichero), `fuente`,
+--     `created_at`, `updated_at`, `google_review_id`, `respuesta`,
+--     `fecha_respuesta` -- ni las filas con estado 'pendiente' u 'oculta'
+--     (hoy no existe ninguna, pero la política las cubre si aparecen).
+--     `anon` tampoco gana ningún privilegio de escritura: INSERT/UPDATE/
+--     DELETE/TRUNCATE ya estaban fuera del GRANT de `anon` antes de este
+--     fichero (comprobado) y este fichero no los toca.
+--
+-- NO ROMPE EL PANEL (comprobado contra las políticas y GRANT reales de hoy,
+-- no supuesto)
+--   Este fichero solo toca privilegios de `anon` y crea UNA política nueva
+--   `TO anon`. No se modifica ni se borra ninguna de las 5 políticas
+--   existentes (todas `{authenticated}` o inertes para `anon`), ni el GRANT
+--   de tabla de `authenticated` (que ya tiene SELECT/INSERT/UPDATE/DELETE
+--   completos, sin restricción de columna, y así se queda). El panel
+--   (`GestionResenas` y similares, autenticado) sigue viendo las 5
+--   políticas de siempre y las 14 columnas completas, `email` y las filas
+--   'pendiente'/'oculta' incluidas.
+--
+-- OTRAS TABLAS QUE LA WEB PÚBLICA LEE SIN SESIÓN -- REVISADAS, NINGUNA TIENE
+-- ESTE PROBLEMA (grep exhaustivo de `.from(`, `.rpc(`, `/rest/v1/` y
+-- `.storage.` en casa-tomas-story/src y touza-restaurant-website/src; es el
+-- inventario COMPLETO de lo que ambas webs leen sin sesión, no una
+-- muestra). Para cada una se comprobó en producción, con
+-- `set local role anon`, que devuelve filas de verdad:
+--   Platos (128 filas), Vinos (185), Bebidas (75), Cocteles (13): cada una
+--     tiene su propia política "Público puede ver X activos/activas"
+--     `TO public USING (activado = true)`. Bien.
+--   novedades (1 fila): "Público puede ver novedades activas vigentes"
+--     `TO public USING (activo = true AND fecha_inicio <= current_date AND
+--     (fecha_fin IS NULL OR fecha_fin >= current_date))`. Bien.
+--   configBotWeb (3 filas, leída por fetch directo en AIChatbot.tsx):
+--     "configBotWeb lectura publica" `TO anon, authenticated USING (true)`.
+--     Bien.
+--   menus_diarios (3 filas), tapas (3 filas): ya resueltas en
+--     `20260918084909_cerrar_fuga_rls_anonima.sql` bloque 3
+--     ("Lectura publica de ..." `TO anon, authenticated USING (true)`).
+--     Bien.
+--   `resenas` es la ÚNICA de las 9 con el patrón "política de solo
+--   `auth.uid() IS NOT NULL`, sin ninguna alternativa para `anon`". No se
+--   ha encontrado ninguna otra tabla que corregir.
+-- ===========================================================================
+
+begin;
+
+-- Retira el SELECT de tabla completa que `anon` conserva desde el
+-- aprovisionamiento inicial del proyecto (nunca se revocó para esta tabla).
+-- Sin este paso, el GRANT de columna de abajo se sumaría al de tabla en vez
+-- de sustituirlo, y `anon` seguiría pudiendo pedir `email`.
+revoke select on public.resenas from anon;
+
+-- Vuelve a conceder SELECT, pero solo en las columnas que la consulta real
+-- de ReviewsSection.tsx necesita (las 6 que devuelve + `estado`, exigida
+-- por su propio `.eq("estado", "publicada")`; ver "QUÉ EXPONE" arriba).
+-- `email` queda fuera a propósito.
+grant select (id, nombre_cliente, comentario, valoracion, fecha, estado, google_rating)
+  on public.resenas to anon;
+
+-- Política de fila: `anon` solo ve reseñas publicadas. Acotada a `anon`
+-- (no `public`) para no interferir con ninguna de las 5 políticas de
+-- `authenticated` ya existentes, que no se tocan.
+drop policy if exists "Público puede ver reseñas publicadas" on public.resenas;
+create policy "Público puede ver reseñas publicadas" on public.resenas
+  for select
+  to anon
+  using (estado = 'publicada');
+
+commit;
+
+-- ---------------------------------------------------------------------------
+-- CONSULTA DE VERIFICACIÓN -- ejecutar ANTES y DESPUÉS de aplicar esta
+-- migración. Todo lo de aquí abajo es de solo lectura (el bloque 3 abre su
+-- propia transacción y termina en ROLLBACK).
+-- ---------------------------------------------------------------------------
+--
+-- -- 1) Políticas de SELECT sobre resenas y a qué rol aplican:
+-- select policyname, roles, cmd, qual
+-- from pg_policies
+-- where schemaname = 'public' and tablename = 'resenas' and cmd = 'SELECT'
+-- order by policyname;
+--
+-- -- 2) Si el rol anon puede leer la columna email frente a las columnas seguras:
+-- select
+--   has_column_privilege('anon', 'public.resenas', 'email', 'SELECT')          as anon_puede_leer_email,
+--   has_column_privilege('anon', 'public.resenas', 'estado', 'SELECT')         as anon_puede_leer_estado,
+--   has_column_privilege('anon', 'public.resenas', 'nombre_cliente', 'SELECT') as anon_puede_leer_nombre,
+--   has_column_privilege('anon', 'public.resenas', 'comentario', 'SELECT')     as anon_puede_leer_comentario;
+--
+-- -- 3) Extremo a extremo como anon de verdad, calcando la consulta real de
+-- --    ReviewsSection.tsx (solo lectura; termina en rollback):
+-- begin;
+-- set local role anon;
+-- select count(*) as filas_que_ve_anon from public.resenas;
+-- select id, nombre_cliente, comentario, valoracion, google_rating, fecha
+-- from public.resenas
+-- where estado = 'publicada'
+-- order by fecha desc
+-- limit 12;                                    -- debe funcionar (o fallar, ver ANTES/DESPUÉS)
+-- select email from public.resenas limit 1;     -- ver ANTES/DESPUÉS
+-- rollback;
+--
+-- ANTES de esta migración debe devolver:
+--   (1) 1 fila -- "Usuarios autenticados pueden ver reseñas", {public}, SELECT, (auth.uid() IS NOT NULL)
+--   (2) anon_puede_leer_email = true, anon_puede_leer_estado = true,
+--       anon_puede_leer_nombre = true, anon_puede_leer_comentario = true
+--       (el GRANT ya lo permite hoy; solo la política de fila bloquea)
+--   (3) filas_que_ve_anon = 0; el segundo select devuelve 0 filas (no error,
+--       vacío); el tercero (select email) NO falla -- el privilegio ya
+--       existe hoy -- pero también devuelve 0 filas (bloqueado por RLS, no
+--       por GRANT)
+--
+-- DESPUÉS de esta migración debe devolver:
+--   (1) 2 filas -- la anterior + "Público puede ver reseñas publicadas", {anon}, SELECT, (estado = 'publicada')
+--   (2) anon_puede_leer_email = false, anon_puede_leer_estado = true,
+--       anon_puede_leer_nombre = true, anon_puede_leer_comentario = true
+--   (3) filas_que_ve_anon = 11; el segundo select devuelve las 11 reseñas
+--       publicadas (la consulta real de la web empieza a funcionar); el
+--       tercero (select email) FALLA con 42501 "permission denied for
+--       column email"
+-- ---------------------------------------------------------------------------

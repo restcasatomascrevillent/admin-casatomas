@@ -254,6 +254,11 @@ export function claveIdempotenciaEnvio(envioId: string): string {
 
 export const AVISO_COOLDOWN_MINUTOS_POR_DEFECTO = 30;
 
+/** Valor de `notificaciones_dashboard.origen` para avisos de ESTA función —
+ * ver "MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS: por qué origen Y
+ * prioridad" más abajo, junto a `prioridadEmailFallido`. */
+export const ORIGEN_EMAILS_RESERVA = "emails_reserva";
+
 /**
  * Verdadero si toca crear un aviso nuevo en `notificaciones_dashboard`.
  * `ultimoAvisoCreadoAt` es el `created_at` del aviso más reciente de tipo
@@ -265,6 +270,17 @@ export const AVISO_COOLDOWN_MINUTOS_POR_DEFECTO = 30;
  * doscientos avisos en diez minutos, que es el escenario que el encargo pide
  * evitar explícitamente) — no es un contador exacto por reserva, igual que
  * comprobarLimitePrueba en index.ts tampoco lo es para su propio caso.
+ *
+ * BUG ENCONTRADO Y CORREGIDO AQUÍ (verificado en la prueba de QA: un fallo
+ * de "solicitud recibida" tapó 30 minutos el aviso de una "propuesta"/
+ * "confirmación" de OTRA reserva): `ultimoAvisoCreadoAt` DEBE venir ya
+ * filtrado por `origen='emails_reserva'` Y por la MISMA `prioridad` que el
+ * aviso que se quiere crear (ver `avisarEnviosDefinitivamentePerdidos` en
+ * index.ts, que hace ese filtro) — antes de este cambio, el filtro era solo
+ * `tipo='email_fallido'`, así que un aviso de baja prioridad de CUALQUIER
+ * tubería (incluida `reservas-web`, otro origen por completo) podía tapar
+ * uno de alta prioridad durante todo el cooldown. Ver `prioridadEmailFallido`
+ * más abajo para el porqué de los DOS ejes (origen Y prioridad, no solo uno).
  */
 export function debeCrearAvisoLote(
   ultimoAvisoCreadoAt: string | null,
@@ -304,6 +320,44 @@ function etiquetaTipoEmail(tipo: string): string {
 
 function esProblemaDeConfiguracion(motivo: string): boolean {
   return motivo === "resend_no_configurado";
+}
+
+export type PrioridadAvisoEmailFallido = "alta" | "normal";
+
+/**
+ * MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS: por qué origen Y prioridad
+ * -----------------------------------------------------------------------
+ * "Por origen" (ORIGEN_EMAILS_RESERVA arriba) ya arregla el caso exacto de
+ * la prueba de QA (solicitud_recibida es de reservas-web; propuesta/
+ * confirmada son de emails-reserva — orígenes distintos, cooldowns ya
+ * independientes con solo ese filtro). Pero ESTA MISMA tubería manda tanto
+ * tipos de baja prioridad (solicitud_recibida, rechazada, recordatorio)
+ * como de alta (propuesta, confirmada) — así que "por origen" solo deja un
+ * riesgo residual: un solicitud_recibida fallido podría tapar, DENTRO de
+ * emails-reserva, un propuesta/confirmada fallido posterior. De ahí el
+ * segundo eje: la prioridad se calcula por tipo de correo (y por motivo,
+ * para "resend_no_configurado" — ver abajo) y el cooldown se comprueba solo
+ * contra avisos de la MISMA prioridad (ver `avisarEnviosDefinitivamentePerdidos`
+ * en index.ts). Combinados dan 4 carriles independientes: (emails_reserva,
+ * alta) / (emails_reserva,normal), más los 2 equivalentes de reservas-web
+ * (ver `prioridadAvisoEmailFallido`/`ORIGEN_RESERVAS_WEB` en
+ * `reservas-web/plantillas.ts` — mismo criterio, duplicado porque las dos
+ * Edge Functions no comparten módulos entre sí; `_shared/` queda fuera del
+ * territorio de esta sesión).
+ *
+ * CLASIFICACIÓN:
+ *   'alta': 'propuesta'/'confirmada' — el cliente se queda sin el correo
+ *     que lleva la acción pendiente (aceptar/rechazar una propuesta, o la
+ *     confirmación ya cerrada). También 'alta' si el motivo es
+ *     "resend_no_configurado": ese problema bloquea TODOS los envíos, no
+ *     solo el que se está avisando, y merece atención inmediata sin
+ *     importar qué plantilla lo disparó primero.
+ *   'normal': el resto (solicitud_recibida, rechazada, recordatorio) —
+ *     informativo, sin acción pendiente que dependa del correo en sí.
+ */
+export function prioridadEmailFallido(tipoEmail: string, motivo: string): PrioridadAvisoEmailFallido {
+  if (esProblemaDeConfiguracion(motivo)) return "alta";
+  return tipoEmail === "propuesta" || tipoEmail === "confirmada" ? "alta" : "normal";
 }
 
 function contactoDe(p: EnvioPerdido): string {

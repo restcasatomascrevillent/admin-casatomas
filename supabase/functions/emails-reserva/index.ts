@@ -104,8 +104,11 @@ import {
   claveIdempotenciaEnvio,
   debeCrearAvisoLote,
   construirAvisoLote,
+  prioridadEmailFallido,
+  ORIGEN_EMAILS_RESERVA,
   MAX_INTENTOS_POR_DEFECTO,
   type EnvioPerdido,
+  type PrioridadAvisoEmailFallido,
 } from "./reintentos.ts";
 
 // ------------------------------------------------------------
@@ -504,11 +507,29 @@ async function avisarEnviosDefinitivamentePerdidos(perdidos: EnvioPerdido[]): Pr
   const aviso = construirAvisoLote(perdidos);
   if (!aviso) return false;
 
+  // MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS — BUG ENCONTRADO Y
+  // CORREGIDO AQUÍ (verificado en la prueba de QA: un fallo de "solicitud
+  // recibida" tapó 30 minutos el aviso de una "propuesta"/"confirmación" de
+  // OTRA reserva). Un lote puede mezclar prioridades (p.ej. un recordatorio
+  // Y una propuesta fallando en la misma pasada del cron); si CUALQUIERA de
+  // las filas es 'alta', el aviso agrupado entero se trata como 'alta' — no
+  // tiene sentido que una urgencia real quede en el carril 'normal' solo
+  // porque venía acompañada. Ver prioridadEmailFallido/ORIGEN_EMAILS_RESERVA
+  // (reintentos.ts) para el porqué completo de los dos ejes (origen Y
+  // prioridad).
+  const prioridad: PrioridadAvisoEmailFallido = perdidos.some(
+    (p) => prioridadEmailFallido(p.tipoEmail, p.motivo) === "alta",
+  )
+    ? "alta"
+    : "normal";
+
   const ahora = ahoraIso();
   const { data: ultimo, error: errUltimo } = await supabase
     .from("notificaciones_dashboard")
     .select("created_at")
     .eq("tipo", "email_fallido")
+    .eq("origen", ORIGEN_EMAILS_RESERVA)
+    .eq("prioridad", prioridad)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -517,7 +538,7 @@ async function avisarEnviosDefinitivamentePerdidos(perdidos: EnvioPerdido[]): Pr
     console.error("[emails-reserva] Error comprobando el ultimo aviso de email_fallido (se avisa igualmente):", errUltimo.message);
   } else if (!debeCrearAvisoLote((ultimo?.created_at as string | undefined) ?? null, ahora)) {
     console.log(
-      `[emails-reserva] Aviso de correos perdidos omitido por cooldown (${perdidos.length} fila(s) afectada(s) en esta pasada, ya hay un aviso reciente).`,
+      `[emails-reserva] Aviso de correos perdidos omitido por cooldown (${perdidos.length} fila(s) afectada(s) en esta pasada, prioridad=${prioridad}, ya hay un aviso reciente del mismo origen y prioridad).`,
     );
     return false;
   }
@@ -525,6 +546,8 @@ async function avisarEnviosDefinitivamentePerdidos(perdidos: EnvioPerdido[]): Pr
   const referenciaUnica = perdidos.length === 1 ? perdidos[0] : null;
   const { error: errInsert } = await supabase.from("notificaciones_dashboard").insert({
     tipo: "email_fallido",
+    origen: ORIGEN_EMAILS_RESERVA,
+    prioridad,
     titulo: aviso.titulo,
     mensaje: aviso.mensaje,
     referencia_id: referenciaUnica?.reservaId ?? null,

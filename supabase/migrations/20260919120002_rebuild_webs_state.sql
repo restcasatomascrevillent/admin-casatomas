@@ -2,8 +2,9 @@
 -- Estado de redespliegue de las webs publicas (antirrebote de rebuild-webs)
 -- Proyecto Supabase: jeamoczmbfsnwkfjxcyo
 -- Generada: 2026-09-19
--- NO APLICADA -- el dueno decide cuando aplicarla (ver informe de la tarea
--- de traduccion; esto se anadio a mitad de esa tarea como encargo aparte).
+-- APLICADA -- verificado 2026-09-23 contra supabase_migrations.schema_migrations
+-- (API de Supabase, solo lectura). La cabecera decia "NO APLICADA"; ya no es
+-- cierto (ver informe de la tarea de traduccion). SQL sin tocar.
 --
 -- PROBLEMA QUE RESUELVE
 --   casa-tomas-story y touza-restaurant-website prerenderizan la carta en

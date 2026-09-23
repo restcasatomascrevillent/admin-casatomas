@@ -1,9 +1,10 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
--- ##   Queda preparado para que el dueño lo revise y decida.                ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (confirmado contra            ##
+-- ##   supabase_migrations.schema_migrations, API de Supabase, solo         ##
+-- ##   lectura).                                                           ##
 -- ##   Es aditiva: añade una columna con DEFAULT seguro (todas las filas    ##
 -- ##   existentes son de Casa Tomás) y no borra ni renombra nada.           ##
 -- ##                                                                       ##

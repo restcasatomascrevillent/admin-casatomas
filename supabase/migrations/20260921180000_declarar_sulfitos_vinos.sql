@@ -1,9 +1,9 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
--- ##   Queda preparado para que el dueño lo revise y decida.                ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (supabase_migrations.         ##
+-- ##   schema_migrations lo confirma; API de Supabase, solo lectura).       ##
 -- ##   Se ha ensayado dentro de BEGIN/ROLLBACK contra los datos reales      ##
 -- ##   (solo lectura persistida); ver el informe de la sesión para las      ##
 -- ##   cifras exactas.                                                      ##
@@ -99,7 +99,7 @@
 -- reales o NULL) — es específico de Vinos.
 --
 -- RELACIÓN CON supabase/migrations/20260921120000_normalizar_vocabulario_alergenos.sql
--- Esa migración (sin aplicar, de otra sesión) limpia sinónimos sucios
+-- Esa migración (aplicada, de otra sesión — corregido 2026-09-23) limpia sinónimos sucios
 -- (`sulfito`, `so2`, ...) dentro de arrays JA EXISTENTES; nunca añade
 -- "sulfitos" a una fila que no lo tenga, y su guarda
 -- `jsonb_typeof(columna) = 'array'` hace que, TAL COMO ESTÁ HOY, no toque

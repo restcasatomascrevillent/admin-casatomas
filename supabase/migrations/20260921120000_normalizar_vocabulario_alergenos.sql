@@ -1,11 +1,11 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
--- ##   Queda preparado para que el dueño lo revise y decida.                ##
--- ##   Antes de aplicarlo: haz copia de seguridad y ejecuta primero la      ##
--- ##   CONSULTA DE ENSAYO del final (solo lee, no escribe).                 ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (confirmado contra            ##
+-- ##   supabase_migrations.schema_migrations, API de Supabase, solo         ##
+-- ##   lectura). Para comprobar el resultado, usa la CONSULTA DE ENSAYO     ##
+-- ##   del final (solo lee, no escribe).                                   ##
 -- ##                                                                       ##
 -- ===========================================================================
 --

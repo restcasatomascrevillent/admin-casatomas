@@ -1,9 +1,10 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
--- ##   Queda preparado para que el dueño lo revise y decida.                ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (confirmado contra            ##
+-- ##   supabase_migrations.schema_migrations, API de Supabase, solo         ##
+-- ##   lectura).                                                           ##
 -- ##   Es un CREATE OR REPLACE FUNCTION sobre una función YA EXISTENTE      ##
 -- ##   (`validar_capacidad_reserva`, el trigger `trg_validar_capacidad`     ##
 -- ##   sigue apuntando a la misma función con el mismo nombre — no hace     ##

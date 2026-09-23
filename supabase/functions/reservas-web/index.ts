@@ -61,6 +61,8 @@ import {
   esMarcaValida,
   resolverMarca,
   construirAvisoEmailFallido,
+  mensajeDeError,
+  debeCrearAvisoEmailFallido,
   escapeHtml,
   tplSolicitudRecibida,
   tplSolicitudNoProcesada,
@@ -453,12 +455,19 @@ async function sendEmail(to: string, subject: string, htmlBody: string): Promise
     const { error } = await resend.emails.send({ from: RESEND_FROM_EMAIL, to: [to], subject, html: htmlBody });
     if (error) {
       console.error("[EMAIL] Resend error:", error);
-      return { ok: false, error: String(error) };
+      // BUG ENCONTRADO Y CORREGIDO AQUÍ (QA contra producción, verificado
+      // con datos reales): `error` aquí es el objeto PLANO {name, message}
+      // del SDK de Resend, no una `Error` — `String(error)` daba literalmente
+      // "[object Object]", que `construirAvisoEmailFallido` (plantillas.ts)
+      // interpolaba tal cual en notificaciones_dashboard.mensaje. Ver el
+      // razonamiento completo (por qué emails-reserva no tiene este fallo,
+      // qué formas de entrada cubre) en `mensajeDeError`, plantillas.ts.
+      return { ok: false, error: mensajeDeError(error, "error_resend_desconocido") };
     }
     return { ok: true };
   } catch (err) {
     console.error("[EMAIL] Excepción enviando email:", (err as Error)?.message || err);
-    return { ok: false, error: (err as Error)?.message || "unknown" };
+    return { ok: false, error: mensajeDeError(err, "excepcion_desconocida") };
   }
 }
 
@@ -466,12 +475,48 @@ async function sendEmail(to: string, subject: string, htmlBody: string): Promise
 // en plantillas.ts para el porqué y el contrato. Este wrapper es el único
 // que hace I/O (Supabase); el contenido del aviso ya viene armado y
 // probado por separado.
-async function avisarEmailFallido(params: AvisoEmailFallidoInput): Promise<void> {
+//
+// MARGEN ANTI-ALUVIÓN PROPIO — BUG ENCONTRADO Y CORREGIDO AQUÍ (verificado
+// en la prueba de QA): antes de este cambio, esta función insertaba SIN
+// NINGÚN cooldown propio — una caída de Resend habría generado un aviso por
+// cada email fallido, sin límite. Ahora comprueba, por `origen` Y por
+// `prioridad` (ver el bloque "MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE
+// TUBERÍAS" en plantillas.ts para el porqué de los dos ejes), si el último
+// aviso de ESTE carril es lo bastante reciente antes de insertar uno nuevo.
+// Devuelve `boolean` (¿se creó el aviso?) — mismo contrato que
+// `emails-reserva/index.ts::avisarEnviosDefinitivamentePerdidos`, aunque
+// ningún llamador de aquí mira todavía el valor de retorno.
+async function avisarEmailFallido(params: AvisoEmailFallidoInput): Promise<boolean> {
+  const fila = construirAvisoEmailFallido(params);
   try {
-    const { error } = await supabase.from("notificaciones_dashboard").insert(construirAvisoEmailFallido(params));
+    const ahora = new Date().toISOString();
+    const { data: ultimo, error: errUltimo } = await supabase
+      .from("notificaciones_dashboard")
+      .select("created_at")
+      .eq("tipo", "email_fallido")
+      .eq("origen", fila.origen)
+      .eq("prioridad", fila.prioridad)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (errUltimo) {
+      // Fail-open, igual que emails-reserva: un error comprobando el
+      // cooldown nunca debe silenciar un aviso real.
+      console.error("[EMAIL_FALLIDO] Error comprobando el ultimo aviso (se avisa igualmente):", errUltimo.message);
+    } else if (!debeCrearAvisoEmailFallido((ultimo?.created_at as string | undefined) ?? null, ahora)) {
+      console.log(
+        `[EMAIL_FALLIDO] Aviso omitido por cooldown (origen=${fila.origen}, prioridad=${fila.prioridad}, ya hay uno reciente del mismo carril).`,
+      );
+      return false;
+    }
+
+    const { error } = await supabase.from("notificaciones_dashboard").insert(fila);
     if (error) console.error("[EMAIL_FALLIDO] Error al registrar aviso:", error.message);
+    return !error;
   } catch (err) {
     console.error("[EMAIL_FALLIDO] Excepción registrando aviso:", (err as Error)?.message || err);
+    return false;
   }
 }
 

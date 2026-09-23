@@ -1,10 +1,10 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.        ##
--- ##   Queda preparado para que el dueño lo revise y decida.                ##
--- ##   NO aplicar sin completar antes el ORDEN DE DESPLIEGUE de más abajo.  ##
+-- ##   Corregido 2026-09-23: SI esta aplicado (confirmado contra            ##
+-- ##   supabase_migrations.schema_migrations, API de Supabase, solo         ##
+-- ##   lectura). El ORDEN DE DESPLIEGUE de mas abajo documenta el proceso.  ##
 -- ##                                                                       ##
 -- ===========================================================================
 --

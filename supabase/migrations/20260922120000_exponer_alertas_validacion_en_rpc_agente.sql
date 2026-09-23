@@ -50,10 +50,10 @@
 --  queda fuera del permiso de escritura de esta revision.
 --
 --  Idempotente. NO toca ningun dato de negocio, solo el SELECT de las RPC.
---  NO APLICADA: escrita para revision. No se ha podido ejecutar ni probar
---  contra la base de datos real -- el acceso a Supabase (MCP) devuelve
---  Unauthorized en el momento de escribir esto. Revisar con cuidado antes de
---  aplicarla (`supabase db push` o pegarla en el SQL editor).
+--  APLICADA: corregido 2026-09-23. Al escribir esto (2026-09-22) el acceso a
+--  Supabase (MCP) devolvia Unauthorized y no se pudo confirmar entonces;
+--  verificado despues contra supabase_migrations.schema_migrations (API de
+--  Supabase, solo lectura) -- la version SI aparece aplicada. SQL sin tocar.
 -- ============================================================================
 
 

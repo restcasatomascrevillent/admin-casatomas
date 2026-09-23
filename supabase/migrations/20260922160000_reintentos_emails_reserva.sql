@@ -1,10 +1,10 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##                            APLICADA                                   ##
 -- ##                                                                       ##
--- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.       ##
--- ##   Queda preparado para que el dueño lo revise y decida cuándo         ##
--- ##   aplicarlo. Nadie ha corrido `supabase db push` con esto.            ##
+-- ##   Corregido 2026-09-23: SI esta aplicado -- su version aparece en      ##
+-- ##   supabase_migrations.schema_migrations (API de Supabase, solo         ##
+-- ##   lectura). SQL sin tocar.                                            ##
 -- ##                                                                       ##
 -- ===========================================================================
 --

@@ -1,7 +1,9 @@
 -- ============================================================
 -- ESCALERA DE NIVELES DE TURNO  (configuracion_turnos)
 -- ============================================================
--- NO APLICADA. Escrita para que el dueño la revise antes de ejecutarla.
+-- APLICADA — verificado 2026-09-23 contra supabase_migrations.schema_migrations
+-- (API de Supabase, solo lectura). La cabecera decía "NO APLICADA"; ya no es
+-- cierto. SQL sin tocar.
 --
 -- QUÉ RESUELVE
 -- ------------

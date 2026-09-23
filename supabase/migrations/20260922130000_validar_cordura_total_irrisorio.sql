@@ -1,10 +1,10 @@
 -- ============================================================================
---  ⚠️⚠️⚠️  MIGRACIÓN NO APLICADA — ESCRITA PARA REVISIÓN  ⚠️⚠️⚠️
+--  ✅  MIGRACIÓN APLICADA — CORREGIDO 2026-09-23  ✅
 -- ----------------------------------------------------------------------------
---  NO se ha ejecutado ni probado contra la base de datos real: el acceso a
---  Supabase (MCP) devuelve Unauthorized en el momento de escribir esto, así
---  que no hay forma de comprobarla aquí. Revisar con cuidado antes de
---  aplicarla (`supabase db push` o pegarla en el SQL editor). No se toca
+--  Verificado contra supabase_migrations.schema_migrations (API de Supabase,
+--  solo lectura): la version SI aparece aplicada. Al escribir esto
+--  originalmente (2026-09-22) el acceso a Supabase (MCP) devolvia
+--  Unauthorized y no se pudo confirmar entonces. No se toca
 --  ningún dato ni ninguna tabla: es un único `CREATE OR REPLACE FUNCTION`.
 -- ============================================================================
 --
@@ -281,6 +281,6 @@ revoke all on function public.validar_cordura_factura(bigint) from public, anon;
 grant execute on function public.validar_cordura_factura(bigint) to authenticated, service_role;
 
 -- ============================================================================
---  Recordatorio: esta migracion NO se ha aplicado. Revisarla y aplicarla a
---  mano (`supabase db push` o pegarla en el SQL editor) cuando se decida.
+--  Recordatorio (corregido 2026-09-23): esta migracion SI esta aplicada --
+--  confirmado contra supabase_migrations.schema_migrations. Aviso obsoleto.
 -- ============================================================================

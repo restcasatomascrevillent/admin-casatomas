@@ -212,6 +212,63 @@ export function escapeHtml(value: unknown): string {
 }
 
 // ----------------------------------------------------------------------------
+// EXTRACCIÓN DE MENSAJE DE ERROR — Resend (y cualquier catch a su alrededor)
+// ----------------------------------------------------------------------------
+// BUG ENCONTRADO EN QA CONTRA PRODUCCIÓN, verificado con datos reales (dos
+// filas en `notificaciones_dashboard` con "... Motivo: [object Object]"):
+// `resend.emails.send()` (SDK `resend@2.0.0`, misma versión que usa
+// `emails-reserva`) NO lanza una `Error` cuando Resend rechaza el envío — el
+// `{ error }` que devuelve es un objeto PLANO `{name, message}` (mismo shape
+// que `ErrorComoResend` en `emails-reserva/envio-prueba.ts`, que ya lo usa
+// contra el MISMO SDK para `esErrorSandboxResend`/`handleEnviarPrueba`).
+// `String(objetoPlano)` da literalmente "[object Object]" porque ese objeto
+// no define `toString` propio — `index.ts` (`sendEmail`, antes de este
+// cambio) hacía justo eso, y `construirAvisoEmailFallido` de más abajo
+// interpola ese texto corrupto tal cual en `notificaciones_dashboard.mensaje`
+// — el personal lo ve en la campana del panel sin ninguna pista real.
+//
+// `emails-reserva` NO tiene este fallo porque su envío real usa `fetch`
+// directo a la API HTTP de Resend, no el SDK (ver el razonamiento completo
+// en `emails-reserva/reintentos.ts`, cabecera), y extrae `message` a mano
+// del cuerpo JSON de la respuesta (`enviarPorResendConIdempotencia` en
+// `emails-reserva/index.ts`). Su envío de PRUEBA sí usa el SDK (igual que
+// aquí) y extrae con `error.message || "..."` (`handleEnviarPrueba`) — este
+// helper generaliza ese mismo criterio porque aquí `error` puede llegar no
+// solo del SDK sino también de un `catch` (ver los dos usos en `sendEmail`):
+// una `Error` de verdad, un objeto plano con `message`, uno con `name` pero
+// sin `message` reconocible, una cadena suelta, o cualquier otra cosa
+// inesperada. Nunca deja pasar `""` ni "[object Object]": `defecto` es la
+// red de seguridad final.
+// ----------------------------------------------------------------------------
+export function mensajeDeError(error: unknown, defecto = "Error desconocido"): string {
+  if (error instanceof Error) {
+    return error.message.trim() || defecto;
+  }
+  if (typeof error === "string") {
+    return error.trim() || defecto;
+  }
+  if (error && typeof error === "object") {
+    const objeto = error as { message?: unknown; name?: unknown };
+    const mensaje = typeof objeto.message === "string" ? objeto.message.trim() : "";
+    const nombre = typeof objeto.name === "string" ? objeto.name.trim() : "";
+    if (mensaje && nombre) return `${nombre}: ${mensaje}`;
+    if (mensaje) return mensaje;
+    if (nombre) return nombre;
+    // Objeto plano sin `message`/`name` reconocibles: `JSON.stringify` da
+    // algo legible ("[object Object]" NUNCA es el resultado); si hasta eso
+    // falla (referencias circulares...) cae al valor por defecto.
+    try {
+      const json = JSON.stringify(objeto);
+      if (json && json !== "{}") return json;
+    } catch {
+      // sigue abajo — cae al valor por defecto.
+    }
+    return defecto;
+  }
+  return defecto;
+}
+
+// ----------------------------------------------------------------------------
 // Aviso interno cuando un email de reserva falla al enviarse
 // ----------------------------------------------------------------------------
 // `sendEmail` (index.ts) puede fallar (Resend sin configurar, error de
@@ -225,13 +282,104 @@ export function escapeHtml(value: unknown): string {
 // aquí). Solo se construye el CONTENIDO aquí (puro, testable); quien hace el
 // INSERT de verdad es `avisarEmailFallido` en index.ts, el único con acceso
 // al cliente de Supabase.
+//
+// MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS — BUG ENCONTRADO Y
+// CORREGIDO AQUÍ (verificado en la prueba de QA: un fallo de "solicitud
+// recibida" tapó 30 minutos el aviso de una "propuesta"/"confirmación" de
+// OTRA reserva). Antes de este cambio, `avisarEmailFallido` (index.ts)
+// insertaba sin NINGÚN margen propio, y el único margen que existía
+// (`debeCrearAvisoLote` en `emails-reserva/reintentos.ts`) miraba la última
+// fila de `tipo='email_fallido'` SIN distinguir de qué tubería venía ni de
+// qué prioridad era — así que un aviso de esta función (reservas-web) podía
+// tapar, o ser tapado por, uno de emails-reserva sin relación alguna.
+//
+// MECANISMO ELEGIDO: dos ejes independientes, NO solo uno:
+//   - POR ORIGEN (`origen`: 'reservas_web' | 'emails_reserva'): cada
+//     tubería solo mira SUS PROPIOS avisos anteriores. Ya arregla el caso
+//     exacto de la prueba (solicitud_recibida es de reservas-web; propuesta/
+//     confirmada son de emails-reserva — orígenes distintos).
+//   - POR PRIORIDAD (`prioridad`: 'alta' | 'normal', ver
+//     `prioridadAvisoEmailFallido` más abajo): dentro de LA MISMA tubería,
+//     un aviso 'normal' (p.ej. solicitud_recibida) tampoco debe tapar uno
+//     'alta' (p.ej. confirma_asistencia) — y `emails-reserva` puede fallar
+//     al mandar AMBOS tipos por su propio camino, así que "por origen" solo
+//     no basta ahí.
+// Combinados dan 4 "carriles" de cooldown totalmente independientes:
+// (reservas_web,alta) / (reservas_web,normal) / (emails_reserva,alta) /
+// (emails_reserva,normal). Cada carril sigue teniendo su propio margen de
+// `AVISO_COOLDOWN_MINUTOS` minutos (la caída de Resend no puede generar
+// doscientos avisos DENTRO de un carril), pero ningún carril puede tapar a
+// otro — es la forma más simple de garantizar "un aviso importante nunca
+// queda tapado por uno menor" sin tener que razonar sobre un orden parcial
+// entre avisos. Mismo criterio, espejado, en
+// `emails-reserva/reintentos.ts::prioridadEmailFallido` — no se comparte
+// código entre las dos funciones porque son dos Edge Functions
+// independientes sin módulo común en el territorio de esta sesión (`_shared/`
+// queda fuera); si algún día se tocan las dos a la vez, hoistear esto a
+// `_shared/` evita la duplicación.
+//
+// Columnas nuevas (`origen`, `prioridad`) en migración SIN APLICAR — ver
+// `supabase/migrations/20260923120000_origen_prioridad_notificaciones.sql`.
+// Hasta que se aplique, desplegar este fichero tal cual rompería el INSERT
+// (columna inexistente): desplegar migración + función juntas.
+
+export type PrioridadAvisoEmailFallido = "alta" | "normal";
+
+/** Valor de `notificaciones_dashboard.origen` para avisos de ESTA función —
+ * ver el bloque "MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS" arriba. */
+export const ORIGEN_RESERVAS_WEB = "reservas_web";
+
+/** 'alta': el correo lleva una acción pendiente que depende de que el
+ * cliente lo reciba (hoy solo "confirma asistencia" — el email con los
+ * enlaces de confirmar/cancelar; ver `tplConfirmaAsistencia`). 'normal':
+ * el resto — recibo o rechazo informativo, sin acción pendiente que
+ * dependa del correo en sí (el cliente ya sabe su situación por la propia
+ * respuesta HTTP de `/crear`, aunque no le llegue el email).
+ *
+ * NOTA: `handleNotificarEstado` (index.ts) todavía NO llama a
+ * `avisarEmailFallido` cuando falla el envío de "confirma asistencia" — ese
+ * fallo hoy no genera ningún aviso interno (gap real, pero fuera de los dos
+ * fallos verificados en la prueba de QA que motivan esta sesión; no se
+ * amplía el alcance para corregirlo aquí). Esta función queda lista para
+ * cuando se conecte: clasifica 'alta' aunque ese punto no la use todavía. */
+export function prioridadAvisoEmailFallido(contexto: string): PrioridadAvisoEmailFallido {
+  return contexto === "confirma asistencia" ? "alta" : "normal";
+}
+
+/** Mismo valor por defecto que `emails-reserva/reintentos.ts::
+ * AVISO_COOLDOWN_MINUTOS_POR_DEFECTO` — no hay ninguna razón para que las
+ * dos tuberías avisen con cadencias distintas de cara al personal. */
+export const AVISO_COOLDOWN_MINUTOS = 30;
+
+/**
+ * Verdadero si toca crear un aviso nuevo. Pura: recibe "ahora" en vez de
+ * leerlo (mismo criterio que el resto de funciones puras de este proyecto).
+ * `ultimoAvisoCreadoAt` DEBE venir ya filtrado por `origen='reservas_web'` Y
+ * por la MISMA `prioridad` que el aviso que se quiere crear (ver
+ * `avisarEmailFallido` en index.ts) — si se filtrara solo por
+ * `tipo='email_fallido'`, esto reproduciría el bug verificado en la prueba
+ * de QA (ver el bloque "MARGEN ANTI-ALUVIÓN COMPARTIDO ENTRE TUBERÍAS" más
+ * arriba). Mismo algoritmo que `emails-reserva/reintentos.ts::
+ * debeCrearAvisoLote` — duplicado por la misma razón de territorio que
+ * `prioridadAvisoEmailFallido`.
+ */
+export function debeCrearAvisoEmailFallido(
+  ultimoAvisoCreadoAt: string | null,
+  ahoraIso: string,
+  cooldownMinutos = AVISO_COOLDOWN_MINUTOS,
+): boolean {
+  if (!ultimoAvisoCreadoAt) return true;
+  const transcurridoMs = new Date(ahoraIso).getTime() - new Date(ultimoAvisoCreadoAt).getTime();
+  return transcurridoMs >= cooldownMinutos * 60 * 1000;
+}
 
 /** Qué se sabe en el momento de un fallo de envío. `reservaId` es `null`
  * cuando el fallo ocurre en un rechazo (`avisar()` en `handleCrear`): en ese
  * punto todavía no existe fila en `reservas` a la que apuntar. */
 export interface AvisoEmailFallidoInput {
   /** Qué correo falló, en texto libre para el título ("solicitud recibida",
-   * "solicitud no procesada"...). */
+   * "solicitud no procesada"...) Y para clasificar la prioridad — ver
+   * `prioridadAvisoEmailFallido`. */
   contexto: string;
   negocio: DatosNegocio;
   nombre: string;
@@ -244,9 +392,14 @@ export interface AvisoEmailFallidoInput {
 
 /** Fila lista para insertar en `notificaciones_dashboard`
  * (`20260313000000_solicitudes_y_notificaciones.sql`: `tipo`/`titulo`
- * NOT NULL, `mensaje`/`referencia_id`/`referencia_tipo` nullable). */
+ * NOT NULL, `mensaje`/`referencia_id`/`referencia_tipo` nullable;
+ * `origen`/`prioridad`: ver `20260923120000_origen_prioridad_notificaciones.sql`,
+ * SIN APLICAR — NOT NULL con DEFAULT, así que un INSERT que no los mande no
+ * rompe, pero `avisarEmailFallido` siempre los manda explícitos). */
 export interface FilaNotificacionDashboard {
   tipo: "email_fallido";
+  origen: string;
+  prioridad: PrioridadAvisoEmailFallido;
   titulo: string;
   mensaje: string;
   referencia_id: string | null;
@@ -257,6 +410,8 @@ export interface FilaNotificacionDashboard {
 export function construirAvisoEmailFallido(input: AvisoEmailFallidoInput): FilaNotificacionDashboard {
   return {
     tipo: "email_fallido",
+    origen: ORIGEN_RESERVAS_WEB,
+    prioridad: prioridadAvisoEmailFallido(input.contexto),
     titulo: `Correo de ${input.contexto} no enviado (${input.negocio.nombre})`,
     mensaje: `${input.nombre} — ${input.fecha} ${input.hora}.${input.error ? ` Motivo: ${input.error}` : ""}`,
     referencia_id: input.reservaId,
