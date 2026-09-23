@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,8 +45,10 @@ import {
 } from "@/hooks/useVerificacionReservas";
 import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
-import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
+import { CLAVES_REFRESCO_RESERVAS, FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
+import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
+import { estadoPropuestaVista } from "@/lib/reservas/propuestaCliente";
 import { actualizacionPropuesta, type PropuestaSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import {
   OPCIONES_FILTRO_ESTADO,
@@ -90,6 +92,9 @@ export function ListaReservasAvanzada({
   const [aceptandoBloque, setAceptandoBloque] = useState(false);
 
   const { canAccess: canEdit } = useCanAccessSection("reservas", "edit");
+  const queryClient = useQueryClient();
+  const refrescarReservas = () =>
+    CLAVES_REFRESCO_RESERVAS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
   const toggleImportante = async (reservation: Reservation) => {
     const nuevoValor = !(reservation as any).importante;
@@ -184,7 +189,11 @@ export function ListaReservasAvanzada({
       email: s.email ?? undefined,
       numero_comensales: (p ? p.comensales : s.numero_comensales) ?? undefined,
       notas_cliente: s.notas_cliente ?? undefined,
-      espacio_id: p?.espacioId ?? null,
+      espacio_id: p ? p.espacioId : s.espacio_propuesto_id ?? null,
+      // El cliente llamó al bot: la reserva es de canal teléfono y queda
+      // enlazada a su solicitud (reservas.solicitud_id).
+      canal: "telefono" as const,
+      solicitud_id: s.id,
     };
   }, [solicitudAConvertir, propuestaConversion]);
 
@@ -194,13 +203,17 @@ export function ListaReservasAvanzada({
     setPropuestaConversion(null);
     if (s && solicitudesState) {
       // Si la reserva final difiere de lo guardado en la solicitud, se deja
-      // constancia en la propia solicitud (día/hora/pax + "Petición original"
-      // en notas) antes de cerrarla. Sin toast: el de "resuelta" basta.
+      // constancia en la propia solicitud (día/hora/pax/sala + "Petición
+      // original" en notas) antes de cerrarla. Sin toast: el de "resuelta" basta.
       const cambios = creada
-        ? actualizacionPropuesta(s, { fecha: creada.fecha, hora: creada.hora, comensales: creada.numero_comensales })
+        ? actualizacionPropuesta(
+            s,
+            { fecha: creada.fecha, hora: creada.hora, comensales: creada.numero_comensales, espacioId: creada.espacio_id },
+            { persistirSala: "espacio_propuesto_id" in s },
+          )
         : null;
       if (cambios) await solicitudesState.updatePropuesta(s.id, cambios, { silencioso: true });
-      await solicitudesState.updateEstado(s.id, "resuelta");
+      await solicitudesState.marcarConvertida(s.id, creada?.id ?? null);
     }
   };
 
@@ -538,6 +551,7 @@ export function ListaReservasAvanzada({
                 onUpdateEstado={solicitudesState.updateEstado}
                 onUpdateNotas={solicitudesState.updateNotasInternas}
                 onConvertir={canEdit ? (s) => abrirConversion(s) : undefined}
+                onGestionarPropuesta={(s) => setSolicitudGestionId(s.id)}
               />
             )
           ) : (() => { const reservation = fila.reserva; return (
@@ -759,7 +773,7 @@ export function ListaReservasAvanzada({
           <DialogHeader>
             <DialogTitle>Solicitud pendiente del bot</DialogTitle>
             <DialogDescription>
-              El asistente telefónico no pudo cerrar esta reserva. Ajusta día, hora, comensales y sala mirando la ocupación, y conviértela en reserva.
+              El asistente telefónico no pudo cerrar esta reserva. Ajusta día, hora, comensales y sala mirando la ocupación y envía la propuesta al cliente; cuando la acepte, se crea la reserva.
             </DialogDescription>
           </DialogHeader>
           {solicitudGestion && solicitudesState && (
@@ -768,8 +782,19 @@ export function ListaReservasAvanzada({
               solicitud={solicitudGestion}
               onUpdateEstado={solicitudesState.updateEstado}
               onUpdateNotas={solicitudesState.updateNotasInternas}
-              onGuardarPropuesta={(id, cambios) => solicitudesState.updatePropuesta(id, cambios)}
+              onGuardarPropuesta={(id, cambios, opciones) => solicitudesState.updatePropuesta(id, cambios, opciones)}
               onConvertir={canEdit ? (s, propuesta) => { setSolicitudGestionId(null); abrirConversion(s, propuesta); } : undefined}
+              onEnviarPropuesta={canEdit ? solicitudesState.enviarPropuesta : undefined}
+              onAceptarTelefono={
+                canEdit
+                  ? async (id) => {
+                      const res = await solicitudesState.aceptarPropuestaTelefono(id);
+                      if (res.ok) refrescarReservas();
+                      return res;
+                    }
+                  : undefined
+              }
+              onRechazarTelefono={canEdit ? solicitudesState.rechazarPropuestaTelefono : undefined}
             />
           )}
         </DialogContent>
@@ -793,6 +818,7 @@ function FilaSolicitud({
   const motivo = MOTIVO_LABELS[solicitud.motivo_rechazo] || MOTIVO_LABELS.otro;
   const abierta = esSolicitudAbierta(solicitud.estado);
   const estadoLabel = ESTADO_LABELS[solicitud.estado]?.label || solicitud.estado;
+  const vistaPropuesta = estadoPropuestaVista(solicitud, format(new Date(), "yyyy-MM-dd"));
   return (
     <TableRow className={cn("bg-amber-50/50 dark:bg-amber-950/10", !abierta && "opacity-70")}>
       {canEdit && <TableCell />}
@@ -835,6 +861,7 @@ function FilaSolicitud({
             Solicitud · {estadoLabel}
           </Badge>
           <Badge className={cn("text-[10px]", motivo.color)}>{motivo.label}</Badge>
+          {vistaPropuesta && vistaPropuesta.clave !== "borrador" && <EstadoPropuestaBadge vista={vistaPropuesta} />}
         </div>
       </TableCell>
       <TableCell>

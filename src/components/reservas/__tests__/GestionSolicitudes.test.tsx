@@ -47,6 +47,10 @@ const defaultHookReturn = {
   updateEstado: vi.fn().mockResolvedValue(true),
   updateNotasInternas: vi.fn().mockResolvedValue(true),
   updatePropuesta: vi.fn().mockResolvedValue(true),
+  enviarPropuesta: vi.fn().mockResolvedValue(true),
+  aceptarPropuestaTelefono: vi.fn().mockResolvedValue({ ok: true }),
+  rechazarPropuestaTelefono: vi.fn().mockResolvedValue({ ok: true }),
+  marcarConvertida: vi.fn().mockResolvedValue(true),
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

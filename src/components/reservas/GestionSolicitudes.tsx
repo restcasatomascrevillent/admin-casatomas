@@ -19,8 +19,12 @@ import {
   ChevronUp,
   StickyNote,
   CalendarPlus,
+  Settings2,
 } from "lucide-react";
+import { format } from "date-fns";
 import { useSolicitudesPendientes, type SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import { estadoPropuestaVista } from "@/lib/reservas/propuestaCliente";
+import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
 
 export const MOTIVO_LABELS: Record<string, { label: string; color: string }> = {
   grupo_grande: { label: "Grupo grande", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
@@ -47,6 +51,7 @@ export function SolicitudCard({
   onUpdateEstado,
   onUpdateNotas,
   onConvertir,
+  onGestionarPropuesta,
   defaultExpanded = false,
 }: {
   solicitud: SolicitudPendiente;
@@ -54,8 +59,11 @@ export function SolicitudCard({
   onUpdateNotas: (id: string, notas: string) => Promise<boolean>;
   /** Si se pasa, aparece "Convertir en reserva" (abre el alta prerrellenada). */
   onConvertir?: (solicitud: SolicitudPendiente) => void;
+  /** Si se pasa, aparece "Propuesta y salas" (abre el diálogo de gestión completo). */
+  onGestionarPropuesta?: (solicitud: SolicitudPendiente) => void;
   defaultExpanded?: boolean;
 }) {
+  const vistaPropuesta = estadoPropuestaVista(solicitud, format(new Date(), "yyyy-MM-dd"));
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [editingNotas, setEditingNotas] = useState(false);
   const [notasDraft, setNotasDraft] = useState(solicitud.notas_internas || "");
@@ -98,6 +106,7 @@ export function SolicitudCard({
               })()}
               {ESTADO_LABELS[solicitud.estado]?.label || solicitud.estado}
             </Badge>
+            {vistaPropuesta && vistaPropuesta.clave !== "borrador" && <EstadoPropuestaBadge vista={vistaPropuesta} />}
           </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">{createdAt}</span>
         </div>
@@ -215,6 +224,18 @@ export function SolicitudCard({
 
             {/* Acciones de estado */}
             <div className="flex flex-wrap gap-2">
+              {onGestionarPropuesta && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  disabled={saving}
+                  onClick={() => onGestionarPropuesta(solicitud)}
+                >
+                  <Settings2 className="h-3 w-3 mr-1" />
+                  Propuesta y salas
+                </Button>
+              )}
               {onConvertir && (solicitud.estado === "pendiente" || solicitud.estado === "contactado") && (
                 <Button
                   size="sm"

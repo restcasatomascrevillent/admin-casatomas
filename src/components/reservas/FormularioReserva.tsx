@@ -37,14 +37,27 @@ import {
   horaCorta,
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
+import { formatearTelefonoReserva, telefonoValido, variantesTelefono } from "@/lib/reservas/telefono";
+import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
+
+const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const formSchema = z.object({
-  nombre: z.string().min(2, "El nombre es requerido"),
-  telefono: z.string().optional(),
-  email: z.string().optional(),
+  nombre: z.string().trim().min(2, "El nombre es requerido"),
+  telefono: z
+    .string()
+    .optional()
+    .refine((v) => !v || !v.trim() || telefonoValido(v), "Teléfono no válido (mínimo 9 cifras)"),
+  email: z
+    .string()
+    .optional()
+    .refine((v) => !v || !v.trim() || RE_EMAIL.test(v.trim()), "Email no válido"),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
   hora: z.string().min(1, "Selecciona una hora"),
-  numero_comensales: z.number().min(1, "Mínimo 1 comensal"),
+  numero_comensales: z
+    .number({ invalid_type_error: "Indica el número de comensales" })
+    .int("El número de comensales debe ser entero")
+    .min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
   /** Sala asignada (null = sin asignar). */
   espacio_id: z.string().nullable().optional(),
@@ -60,8 +73,63 @@ type FormValues = z.infer<typeof formSchema>;
 const SIN_ASIGNAR = "__sin_asignar__";
 const OTRA_HORA = "__otra__";
 
+/** Claves de React Query a invalidar tras crear una reserva (desde aquí o
+ * aceptando la propuesta de una solicitud). */
+export const CLAVES_REFRESCO_RESERVAS = [
+  "reservas-hoy",
+  "reservas-kanban",
+  "reservas-lista",
+  "reservas_mes",
+  "reservas_hoy_todas",
+  "ocupacion_hoy",
+  "ocupacion-reservas-hoy",
+  "today-reservations",
+  "today-confirmed-reservations",
+  "dashboard-stats",
+  "disponibilidad",
+  "disponibilidad-detallada",
+  "disponibilidad-rango",
+  "resumen-ocupacion-hoy-completo",
+  CLAVE_OCUPACION_SALAS_DIA,
+];
+
+interface ReservaMismoDia {
+  hora: string;
+  estado: string;
+  nombre: string | null;
+}
+
+/** Reservas vivas ese día con el mismo teléfono (en cualquier formato) o email. */
+async function buscarReservasMismoDia(
+  telefono: string | undefined,
+  email: string | undefined,
+  fecha: string,
+): Promise<ReservaMismoDia[]> {
+  const filtros: string[] = [];
+  const variantes = variantesTelefono(telefono);
+  // Valores entre comillas dobles para el `.or()` de PostgREST (el "+" y los
+  // espacios de las variantes no rompen el filtro).
+  const lista = (vals: string[]) => vals.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
+  if (variantes.length > 0) filtros.push(`telefono.in.(${lista(variantes)})`);
+  const emailLimpio = email?.trim();
+  if (emailLimpio && RE_EMAIL.test(emailLimpio)) {
+    filtros.push(`email.in.(${lista(Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])))})`);
+  }
+  if (filtros.length === 0) return [];
+  const { data, error } = await (supabase.from("reservas" as any) as any)
+    .select("hora, estado, nombre")
+    .eq("fecha", fecha)
+    .not("estado", "in", "(cancelada,no_show)")
+    .or(filtros.join(","))
+    .order("hora");
+  if (error) throw error;
+  return ((data ?? []) as ReservaMismoDia[]).map((r) => ({ ...r, hora: String(r.hora) }));
+}
+
 /** Lo que se acaba de crear, para quien abrió el formulario (p. ej. cerrar una solicitud). */
 export interface ReservaCreadaDesdeFormulario {
+  /** null solo si la BD no devolvió la fila (no debería pasar). */
+  id: string | null;
   fecha: string;
   hora: string;
   numero_comensales: number;
@@ -83,6 +151,10 @@ interface FormularioReservaProps {
     notas_cliente?: string;
     /** Sala propuesta (diálogo de solicitudes del bot). */
     espacio_id?: string | null;
+    /** Canal de la reserva: 'telefono' si viene de una solicitud del bot. */
+    canal?: "telefono" | "manual";
+    /** Solicitud del bot de la que sale (reservas.solicitud_id). */
+    solicitud_id?: string | null;
   } | null;
 }
 
@@ -96,6 +168,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const [verificando, setVerificando] = useState(false);
   const [blacklistEntry, setBlacklistEntry] = useState<BlacklistEntry | null>(null);
   const [limiteAlcanzado, setLimiteAlcanzado] = useState<string | null>(null);
+  // Reservas vivas del mismo teléfono/email ese día (aviso, no bloqueo).
+  const [duplicadas, setDuplicadas] = useState<ReservaMismoDia[]>([]);
   const verificarBlacklist = useVerificarBlacklist();
   const { data: configReservas } = useConfiguracionReservas();
   const [modoOtraHora, setModoOtraHora] = useState(false);
@@ -234,15 +308,42 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     return () => clearTimeout(timeout);
   }, [watchedEmail, watchedTelefono]);
 
-  // Verificar límites de reservas por teléfono/email
+  // Posible duplicado: otra reserva viva del mismo cliente ese día. Solo
+  // avisa (puede ser legítimo: comida y cena); el límite configurado por
+  // teléfono/email sí bloquea al enviar.
+  useEffect(() => {
+    if (isPublic || !fechaStr || (!watchedTelefono?.trim() && !watchedEmail?.trim())) {
+      setDuplicadas([]);
+      return;
+    }
+    let cancelado = false;
+    const timeout = setTimeout(async () => {
+      try {
+        const encontradas = await buscarReservasMismoDia(watchedTelefono, watchedEmail, fechaStr);
+        if (!cancelado) setDuplicadas(encontradas);
+      } catch (error) {
+        console.error("Error buscando reservas duplicadas:", error);
+        if (!cancelado) setDuplicadas([]);
+      }
+    }, 600);
+    return () => {
+      cancelado = true;
+      clearTimeout(timeout);
+    };
+  }, [isPublic, fechaStr, watchedTelefono, watchedEmail]);
+
+  // Verificar límites de reservas por teléfono/email. El teléfono se busca
+  // en todas sus formas (+34..., 0034..., con espacios): las reservas del bot
+  // se guardan como "+34XXXXXXXXX" y las antiguas del panel tal cual.
   const verificarLimites = async (telefono: string | undefined, email: string | undefined, fecha: string) => {
     if (!configReservas) return null;
 
-    if (telefono && configReservas.max_reservas_por_telefono_dia > 0) {
+    const variantes = variantesTelefono(telefono);
+    if (variantes.length > 0 && configReservas.max_reservas_por_telefono_dia > 0) {
       const { count, error } = await supabase
         .from("reservas" as any)
         .select("id", { count: "exact", head: true })
-        .eq("telefono", telefono)
+        .in("telefono", variantes)
         .eq("fecha", fecha)
         .not("estado", "in", "(cancelada,no_show)");
 
@@ -253,11 +354,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       }
     }
 
-    if (email && configReservas.max_reservas_por_email_dia > 0) {
+    const emailLimpio = email?.trim();
+    if (emailLimpio && configReservas.max_reservas_por_email_dia > 0) {
       const { count, error } = await supabase
         .from("reservas" as any)
         .select("id", { count: "exact", head: true })
-        .eq("email", email)
+        .in("email", Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])))
         .eq("fecha", fecha)
         .not("estado", "in", "(cancelada,no_show)");
 
@@ -308,8 +410,21 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       const fechaStr = format(values.fecha, "yyyy-MM-dd");
 
+      // El calendario no deja elegir un día pasado, pero una fecha
+      // prerrellenada (p. ej. una solicitud antigua del bot) sí se colaba.
+      if (fechaStr < format(new Date(), "yyyy-MM-dd")) {
+        form.setError("fecha", { message: "La fecha ya ha pasado" });
+        toast.error("La fecha de la reserva ya ha pasado");
+        return;
+      }
+
+      // Mismo formato que el bot ("+34XXXXXXXXX") para que la búsqueda, los
+      // límites y la lista negra casen entre canales.
+      const telefonoGuardar = formatearTelefonoReserva(values.telefono);
+      const emailGuardar = values.email?.trim() || null;
+
       // Check limits per phone/email
-      const limiteMsg = await verificarLimites(values.telefono, values.email, fechaStr);
+      const limiteMsg = await verificarLimites(values.telefono, emailGuardar ?? undefined, fechaStr);
       if (limiteMsg) {
         setLimiteAlcanzado(limiteMsg);
         toast.error(limiteMsg);
@@ -318,7 +433,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       // Verificar blacklist antes de crear
       const blacklisted = await verificarBlacklist.mutateAsync({
-        email: values.email || "",
+        email: emailGuardar || "",
         telefono: values.telefono || "",
       });
 
@@ -331,42 +446,38 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         ? "pendiente"
         : (configReservas?.auto_confirmar ? "confirmada" : "pendiente");
 
-      const { error } = await supabase.from("reservas" as any).insert({
-        nombre: values.nombre,
-        telefono: values.telefono || null,
-        email: values.email || null,
+      const fila: Record<string, unknown> = {
+        nombre: values.nombre.trim(),
+        telefono: telefonoGuardar,
+        email: emailGuardar,
         fecha: fechaStr,
         hora: values.hora,
         numero_comensales: values.numero_comensales,
-        notas_cliente: values.notas_cliente || null,
+        notas_cliente: values.notas_cliente?.trim() || null,
         espacio_id: values.espacio_id || null,
         estado: estadoInicial,
-        canal: isPublic ? "web" : "manual",
+        // 'telefono' al convertir una solicitud del bot (el cliente llamó);
+        // 'manual' para un alta del personal.
+        canal: isPublic ? "web" : datosPreseleccionados?.canal ?? "manual",
         en_blacklist: !!blacklisted,
-      });
+      };
+      if (datosPreseleccionados?.solicitud_id) fila.solicitud_id = datosPreseleccionados.solicitud_id;
+
+      const insertar = (valores: Record<string, unknown>) =>
+        (supabase.from("reservas" as any) as any).insert(valores).select("id").single();
+      let { data: insertada, error } = await insertar(fila);
+      // Sin la migración 20260923210000 no existe reservas.solicitud_id.
+      if (error && "solicitud_id" in fila && esErrorEsquemaPendiente(error)) {
+        const { solicitud_id: _omitida, ...sinSolicitud } = fila;
+        ({ data: insertada, error } = await insertar(sinSolicitud));
+      }
 
       if (error) throw error;
 
       // Refrescar todo lo que muestra reservas del día, ocupación y disponibilidad:
       // sin esto la reserva se crea pero no aparece en ninguna pantalla y el hueco
       // recién ocupado se sigue ofreciendo como libre.
-      [
-        "reservas-hoy",
-        "reservas-kanban",
-        "reservas-lista",
-        "reservas_mes",
-        "reservas_hoy_todas",
-        "ocupacion_hoy",
-        "ocupacion-reservas-hoy",
-        "today-reservations",
-        "today-confirmed-reservations",
-        "dashboard-stats",
-        "disponibilidad",
-        "disponibilidad-detallada",
-        "disponibilidad-rango",
-        "resumen-ocupacion-hoy-completo",
-        CLAVE_OCUPACION_SALAS_DIA,
-      ].forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+      CLAVES_REFRESCO_RESERVAS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
       if (blacklisted) {
         toast.info("Reserva registrada como pendiente de revisión (cliente en lista negra)");
@@ -375,6 +486,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       }
 
       const creada: ReservaCreadaDesdeFormulario = {
+        id: (insertada as { id?: string } | null)?.id ?? null,
         fecha: fechaStr,
         hora: values.hora,
         numero_comensales: values.numero_comensales,
@@ -384,6 +496,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       setModoOtraHora(false);
       setLimiteAlcanzado(null);
       setDisponibilidadInfo(null);
+      setDuplicadas([]);
 
       if (isPublic) {
         // No existe ninguna página de confirmación en el panel; se vuelve al listado.
@@ -397,7 +510,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       // se supera el aforo del turno, y también los CHECK de la tabla.
       const mensaje = error?.code === "23514" && String(error?.message || "").includes("Aforo")
         ? "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales."
-        : `Error al crear la reserva: ${error?.message ?? "error desconocido"}`;
+        : error?.code === "23505" && String(error?.message || "").includes("solicitud")
+          ? "Esta solicitud ya se había convertido en una reserva."
+          : error?.code === "42501"
+            ? "No tienes permiso para crear reservas."
+            : `Error al crear la reserva: ${error?.message ?? "error desconocido"}`;
       toast.error(mensaje);
     }
   };
@@ -677,6 +794,27 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           </Alert>
         )}
 
+        {!isPublic && datosDia?.cerrado && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Ese día no tiene turnos configurados (el restaurante cierra). Se puede crear con "Otra hora…", pero
+              revisa que sea correcto.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isPublic && duplicadas.length > 0 && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Este cliente ya tiene {duplicadas.length === 1 ? "una reserva" : `${duplicadas.length} reservas`} ese día:{" "}
+              {duplicadas.map((d) => `${d.hora.slice(0, 5)} (${d.estado})`).join(", ")}. Comprueba que no sea un
+              duplicado.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {limiteAlcanzado && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
@@ -723,8 +861,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           // desde la lista (notify-reservation-change -> emails-reserva).
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-            Al crear la reserva no se envía ningún correo al cliente. Avísale tú; el correo sale cuando cambies su
-            estado (verificar / confirmar) desde la lista.
+            <span>
+              {configReservas?.auto_confirmar
+                ? "La reserva se crea directamente como confirmada y no se envía ningún correo. Avisa tú al cliente."
+                : "La reserva se crea como pendiente y no se envía ningún correo al crearla: sale cuando la verificas o confirmas desde la lista."}
+              {!watchedEmail?.trim() && " Sin email, el cliente no recibirá ningún correo (tampoco el recordatorio)."}
+            </span>
           </p>
         )}
 

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { variantesTelefono } from "@/lib/reservas/telefono";
 
 export interface BlacklistEntry {
   id: string;
@@ -41,28 +42,34 @@ export function useBlacklist() {
 export function useVerificarBlacklist() {
   return useMutation({
     mutationFn: async ({ email, telefono }: { email?: string; telefono?: string }) => {
-      const conditions = [];
-      
-      if (email) {
-        conditions.push({ tipo: "email", valor: email });
+      // Antes se comparaba el valor EXACTO: "612345678" no casaba con una
+      // entrada guardada como "+34612345678" (formato del bot), y un email con
+      // mayúsculas o espacios tampoco. Ahora se buscan todas las variantes.
+      const conditions: Array<{ tipo: "email" | "telefono"; valores: string[] }> = [];
+      const emailLimpio = email?.trim();
+      if (emailLimpio) {
+        conditions.push({ tipo: "email", valores: Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])) });
       }
-      if (telefono) {
-        conditions.push({ tipo: "telefono", valor: telefono });
+      const variantes = variantesTelefono(telefono);
+      if (variantes.length > 0) {
+        conditions.push({ tipo: "telefono", valores: variantes });
       }
 
       if (conditions.length === 0) return null;
 
-      // Check each condition separately
+      const hoy = new Date().toISOString().slice(0, 10);
       for (const condition of conditions) {
         const { data, error } = await supabase
           .from("blacklist")
           .select("*")
           .eq("tipo", condition.tipo)
-          .eq("valor", condition.valor)
-          .maybeSingle();
+          .in("valor", condition.valores);
 
         if (error) throw error;
-        if (data) return data as BlacklistEntry;
+        // Una entrada con caducidad ya vencida (sugerencias aprobadas con
+        // `caduca_el`) deja de aplicar.
+        const vigente = ((data ?? []) as BlacklistEntry[]).find((e) => !e.caduca_el || e.caduca_el >= hoy);
+        if (vigente) return vigente;
       }
 
       return null;

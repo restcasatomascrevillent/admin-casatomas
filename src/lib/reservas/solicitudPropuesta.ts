@@ -14,9 +14,12 @@
 //     Sirve a la vez de rastro para los compañeros (se ve en la tarjeta) y de
 //     fuente para el bloque "Pidió → Propuesta" (`extraerPeticionOriginal`).
 //     Si alguien borra esa línea a mano, lo "original" pasa a ser lo guardado.
-//   · La SALA no tiene columna en `solicitudes_pendientes`: es una elección
-//     local del diálogo que viaja a "Convertir en reserva" (`espacio_id` de la
-//     reserva). Ver el informe de la sesión para la migración opcional.
+//   · La SALA se guarda en `espacio_propuesto_id` (migración
+//     20260923210000_solicitud_propuesta_espacio.sql). Mientras la migración
+//     no esté aplicada, la fila no trae esa columna y la sala sigue siendo una
+//     elección local que viaja a "Convertir en reserva" (`persistirSala`).
+//   · Si la propuesta ya se había ENVIADO al cliente y se cambia algo, vuelve
+//     a 'borrador': el enlace del correo firma los datos y deja de valer.
 // ============================================================================
 
 import { horaCorta } from "./ocupacionSalas";
@@ -30,7 +33,7 @@ export interface PeticionSolicitud {
 }
 
 export interface PropuestaSolicitud extends PeticionSolicitud {
-  /** Sala elegida (null = sin asignar). No se persiste en la solicitud. */
+  /** Sala elegida (null = sin asignar). Se guarda en espacio_propuesto_id. */
   espacioId: string | null;
 }
 
@@ -39,6 +42,8 @@ interface SolicitudConPeticion {
   hora_solicitada: string | null;
   numero_comensales: number | null;
   notas_internas: string | null;
+  espacio_propuesto_id?: string | null;
+  propuesta_estado?: string | null;
 }
 
 export const PREFIJO_PETICION_ORIGINAL = "Petición original del cliente:";
@@ -113,15 +118,27 @@ export interface ActualizacionSolicitud {
   hora_solicitada: string | null;
   numero_comensales: number | null;
   notas_internas: string;
+  /** Solo si `persistirSala` y la sala cambia. */
+  espacio_propuesto_id?: string | null;
+  /** 'borrador' si ya se había enviado y la propuesta cambia. */
+  propuesta_estado?: string;
+}
+
+/** La fila trae la columna de sala (migración 20260923210000 aplicada). */
+export function puedePersistirSala(solicitud: object): boolean {
+  return "espacio_propuesto_id" in solicitud;
 }
 
 /**
  * Cambios a escribir en `solicitudes_pendientes` para guardar la propuesta.
  * `null` si no hay nada que cambiar respecto a lo guardado.
+ * `persistirSala`: incluir la sala (`propuesta.espacioId`) en la comparación
+ * y en el UPDATE — solo si la columna existe (ver `puedePersistirSala`).
  */
 export function actualizacionPropuesta(
   solicitud: SolicitudConPeticion,
-  propuesta: PeticionSolicitud,
+  propuesta: PeticionSolicitud & { espacioId?: string | null },
+  opciones?: { persistirSala?: boolean },
 ): ActualizacionSolicitud | null {
   const guardada = peticionGuardada(solicitud);
   const destino: PeticionSolicitud = {
@@ -129,15 +146,25 @@ export function actualizacionPropuesta(
     hora: horaCorta(propuesta.hora),
     comensales: comensalesValidos(propuesta.comensales),
   };
-  if (!diferenciasPeticion(guardada, destino).alguna) return null;
-  return {
+  const cambiaPeticion = diferenciasPeticion(guardada, destino).alguna;
+  const salaDestino = propuesta.espacioId ?? null;
+  const cambiaSala =
+    !!opciones?.persistirSala && propuesta.espacioId !== undefined && salaDestino !== (solicitud.espacio_propuesto_id ?? null);
+  if (!cambiaPeticion && !cambiaSala) return null;
+  const upd: ActualizacionSolicitud = {
     fecha_solicitada: destino.fecha,
     hora_solicitada: destino.hora,
     numero_comensales: destino.comensales,
     // La original es la que había ANTES del primer cambio: si ya hay marca se
-    // respeta; si no, lo guardado ahora ES lo que pidió el cliente.
-    notas_internas: anotarPeticionOriginal(solicitud.notas_internas, peticionOriginal(solicitud)),
+    // respeta; si no, lo guardado ahora ES lo que pidió el cliente. Solo se
+    // anota si cambia día/hora/pax (la sala nunca la pidió el cliente).
+    notas_internas: cambiaPeticion
+      ? anotarPeticionOriginal(solicitud.notas_internas, peticionOriginal(solicitud))
+      : solicitud.notas_internas ?? "",
   };
+  if (cambiaSala) upd.espacio_propuesto_id = salaDestino;
+  if (solicitud.propuesta_estado === "enviada") upd.propuesta_estado = "borrador";
+  return upd;
 }
 
 /** "6/10/2026" a partir de "2026-10-06" (sin pasar por zonas horarias). */

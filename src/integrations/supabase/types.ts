@@ -2755,6 +2755,7 @@ export type Database = {
           numero_comensales: number
           telefono: string | null
           updated_at: string | null
+          solicitud_id: string | null
         }
         Insert: {
           canal?: string | null
@@ -2772,6 +2773,7 @@ export type Database = {
           numero_comensales: number
           telefono?: string | null
           updated_at?: string | null
+          solicitud_id?: string | null
         }
         Update: {
           canal?: string | null
@@ -2789,6 +2791,7 @@ export type Database = {
           numero_comensales?: number
           telefono?: string | null
           updated_at?: string | null
+          solicitud_id?: string | null
         }
         Relationships: [
           {
@@ -2909,6 +2912,13 @@ export type Database = {
           numero_comensales: number | null
           telefono: string | null
           updated_at: string | null
+          espacio_propuesto_id: string | null
+          propuesta_enviada_at: string | null
+          propuesta_error: string | null
+          propuesta_estado: string
+          propuesta_respondida_at: string | null
+          propuesta_respuesta_via: string | null
+          reserva_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -2925,6 +2935,13 @@ export type Database = {
           numero_comensales?: number | null
           telefono?: string | null
           updated_at?: string | null
+          espacio_propuesto_id?: string | null
+          propuesta_enviada_at?: string | null
+          propuesta_error?: string | null
+          propuesta_estado?: string
+          propuesta_respondida_at?: string | null
+          propuesta_respuesta_via?: string | null
+          reserva_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -2941,6 +2958,13 @@ export type Database = {
           numero_comensales?: number | null
           telefono?: string | null
           updated_at?: string | null
+          espacio_propuesto_id?: string | null
+          propuesta_enviada_at?: string | null
+          propuesta_error?: string | null
+          propuesta_estado?: string
+          propuesta_respondida_at?: string | null
+          propuesta_respuesta_via?: string | null
+          reserva_id?: string | null
         }
         Relationships: []
       }
@@ -3844,6 +3868,15 @@ export type Database = {
       cleanup_old_security_logs: { Args: never; Returns: undefined }
       cleanup_rate_limit_log: { Args: never; Returns: undefined }
       ejecutar_consulta_chatbot: { Args: { query_sql: string }; Returns: Json }
+      fn_aceptar_propuesta_solicitud: {
+        Args: { p_solicitud_id: string; p_via?: string }
+        Returns: Json
+      }
+      fn_normalizar_telefono: { Args: { p_telefono: string }; Returns: string }
+      fn_rechazar_propuesta_solicitud: {
+        Args: { p_solicitud_id: string; p_via?: string }
+        Returns: Json
+      }
       ejecutar_limpieza_gdpr: {
         Args: never
         Returns: {

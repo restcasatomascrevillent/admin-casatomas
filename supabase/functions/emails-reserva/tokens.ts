@@ -27,7 +27,12 @@
 
 const TOKEN_TTL_SEGUNDOS = 60 * 60 * 24 * 14; // 14 días, igual que reservas-web
 
-export type AccionToken = "aceptar" | "rechazar";
+// 'aceptar'/'rechazar'  -> contraoferta sobre una RESERVA (id = reservas.id).
+// '*_solicitud'         -> propuesta sobre una SOLICITUD del bot (id =
+//                          solicitudes_pendientes.id, ver propuesta-solicitud.ts).
+// Acciones distintas a propósito: verificarToken exige la acción esperada,
+// así que un token de un flujo nunca se acepta en las rutas del otro.
+export type AccionToken = "aceptar" | "rechazar" | "aceptar_solicitud" | "rechazar_solicitud";
 
 export interface CargaToken {
   id: string;
