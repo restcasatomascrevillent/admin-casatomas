@@ -210,7 +210,8 @@ export function useCocteles() {
       // igual con `cambios`, solo se salta la retraducción.
       const tocaCampoTraducible =
         "nombre" in cambios || "descripcion" in cambios || "ingredientes" in cambios || "categoria" in cambios;
-      if (tocaCampoTraducible && !anterior) {
+      const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
+      if (saltaRetraduccionSinAnterior) {
         console.warn(`useCocteles.actualizarCoctel: se salta la retraducción de "${id}" — sin estado previo en caché.`);
       }
 
@@ -243,7 +244,11 @@ export function useCocteles() {
 
       if (error) throw error;
 
-      if (cambiaTraducible && !traducciones) {
+      if (saltaRetraduccionSinAnterior) {
+        toast.warning(
+          "Cóctel actualizado, pero no se pudo comprobar si había que retraducirlo (la lista de cócteles no estaba cargada). Vuelve a editarlo con la lista cargada para revisar el inglés/francés.",
+        );
+      } else if (cambiaTraducible && !traducciones) {
         toast.warning("Cóctel actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
       }
 

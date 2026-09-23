@@ -158,7 +158,8 @@ export function useBebidas() {
       // traducción desactualizada que una corrompida: se guarda igual con
       // `cambios`, solo se salta la retraducción.
       const tocaCampoTraducible = "nombre" in cambios || "descripcion" in cambios || "categoria" in cambios;
-      if (tocaCampoTraducible && !anterior) {
+      const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
+      if (saltaRetraduccionSinAnterior) {
         console.warn(`useBebidas.actualizarBebida: se salta la retraducción de "${id}" — sin estado previo en caché.`);
       }
 
@@ -189,7 +190,11 @@ export function useBebidas() {
 
       if (error) throw error;
 
-      if (cambiaTraducible && !traducciones) {
+      if (saltaRetraduccionSinAnterior) {
+        toast.warning(
+          "Bebida actualizada, pero no se pudo comprobar si había que retraducirla (la lista de bebidas no estaba cargada). Vuelve a editarla con la lista cargada para revisar el inglés/francés.",
+        );
+      } else if (cambiaTraducible && !traducciones) {
         toast.warning("Bebida actualizada sin volver a traducir. Revísala más tarde en inglés/francés.");
       }
 

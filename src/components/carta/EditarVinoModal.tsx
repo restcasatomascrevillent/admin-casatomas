@@ -196,6 +196,25 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
         const { data: urlData } = supabase.storage.from("vinos").getPublicUrl(fileName);
         imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+
+        // Borrado defensivo de la imagen anterior cuando el nuevo fichero
+        // cambia de nombre (p.ej. extensión distinta: .jpg -> .png). El
+        // upsert solo sobrescribe cuando el nombre coincide EXACTO, y
+        // ".JPG"/".jpg" son objetos distintos en Storage, así que sin esto
+        // el objeto viejo queda huérfano. Si el borrado falla (fichero ya
+        // no existe, red, permisos...) no debe impedir que se guarde el
+        // resto de cambios del registro.
+        const nombreArchivoAnterior = nombreArchivoStorage(vino.id, vino.imagen_url);
+        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) {
+          try {
+            const { error: removeError } = await supabase.storage.from("vinos").remove([nombreArchivoAnterior]);
+            if (removeError) {
+              console.error("No se pudo borrar la imagen antigua de Storage (vinos):", removeError);
+            }
+          } catch (removeErr) {
+            console.error("Error borrando imagen antigua de Storage (vinos):", removeErr);
+          }
+        }
       } else if (removeImage) {
         imageUrlUpdate = null;
 

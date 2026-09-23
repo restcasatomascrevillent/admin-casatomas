@@ -209,7 +209,8 @@ export function usePlatos() {
       // igual con `cambios`, solo se salta la retraducción.
       const tocaCampoTraducible =
         "nombre" in cambios || "descripcion" in cambios || "categoria" in cambios || "alergenos_oficiales" in cambios;
-      if (tocaCampoTraducible && !anterior) {
+      const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
+      if (saltaRetraduccionSinAnterior) {
         console.warn(`usePlatos.actualizarPlato: se salta la retraducción de "${id}" — sin estado previo en caché.`);
       }
 
@@ -244,7 +245,11 @@ export function usePlatos() {
 
       if (error) throw error;
 
-      if (cambiaTraducible && !traducciones) {
+      if (saltaRetraduccionSinAnterior) {
+        toast.warning(
+          "Plato actualizado, pero no se pudo comprobar si había que retraducirlo (la lista de platos no estaba cargada). Vuelve a editarlo con la lista cargada para revisar el inglés/francés.",
+        );
+      } else if (cambiaTraducible && !traducciones) {
         toast.warning("Plato actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
       }
 

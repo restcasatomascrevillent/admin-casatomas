@@ -232,7 +232,8 @@ export function useVinos() {
         "ubicacion_pais" in cambios ||
         "ubicacion_region" in cambios ||
         "alergenos_notas" in cambios;
-      if (tocaCampoTraducible && !anterior) {
+      const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
+      if (saltaRetraduccionSinAnterior) {
         console.warn(`useVinos.actualizarVino: se salta la retraducción de "${id}" — sin estado previo en caché.`);
       }
 
@@ -269,7 +270,11 @@ export function useVinos() {
 
       if (error) throw error;
 
-      if (cambiaTraducible && !traducciones) {
+      if (saltaRetraduccionSinAnterior) {
+        toast.warning(
+          "Vino actualizado, pero no se pudo comprobar si había que retraducirlo (la lista de vinos no estaba cargada). Vuelve a editarlo con la lista cargada para revisar el inglés/francés.",
+        );
+      } else if (cambiaTraducible && !traducciones) {
         toast.warning("Vino actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
       }
 
