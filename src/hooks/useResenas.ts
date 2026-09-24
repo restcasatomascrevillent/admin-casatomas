@@ -14,7 +14,6 @@ export function useResenas() {
         { event: "*", schema: "public", table: "resenas" },
         () => {
           queryClient.invalidateQueries({ queryKey: ["resenas"] });
-          queryClient.invalidateQueries({ queryKey: ["resenas-recientes"] });
         }
       )
       .subscribe();
@@ -32,41 +31,6 @@ export function useResenas() {
         .select("*")
         .eq("estado", "publicada")
         .order("fecha", { ascending: false });
-      return data || [];
-    },
-  });
-}
-
-export function useResenasRecientes(limit = 5) {
-  const queryClient = useQueryClient();
-
-  // Suscripción en tiempo real — el widget del dashboard se actualiza solo
-  useEffect(() => {
-    const channel = supabase
-      .channel(`resenas-recientes-${limit}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "resenas" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["resenas-recientes", limit] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, limit]);
-
-  return useQuery({
-    queryKey: ["resenas-recientes", limit],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("resenas")
-        .select("*")
-        .eq("estado", "publicada")
-        .order("fecha", { ascending: false })
-        .limit(limit);
       return data || [];
     },
   });

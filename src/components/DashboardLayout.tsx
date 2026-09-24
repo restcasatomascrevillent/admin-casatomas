@@ -6,15 +6,27 @@ import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  /** Cuando es true, la página ocupa exactamente el alto de la pantalla y no
+   * hace scroll (ni vertical ni horizontal). Úsalo solo en vistas cuyo
+   * contenido está diseñado para caber sin desbordarse. */
+  fixedHeight?: boolean;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, fixedHeight = false }: DashboardLayoutProps) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
+      <div
+        className={`flex w-full bg-background overflow-x-hidden ${
+          fixedHeight ? "h-screen overflow-hidden" : "min-h-screen"
+        }`}
+      >
         <AppSidebar />
-        <div className="flex-1 flex flex-col overflow-x-hidden">
-          <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full">
+        <div
+          className={`flex-1 flex flex-col overflow-x-hidden ${
+            fixedHeight ? "h-screen overflow-hidden" : ""
+          }`}
+        >
+          <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full shrink-0">
             <SidebarTrigger className="mr-2 sm:mr-4 shrink-0" />
             <div className="flex items-center justify-between w-full min-w-0">
               <div className="min-w-0">
@@ -33,7 +45,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">
+          <main
+            className={`flex-1 p-3 sm:p-6 overflow-x-hidden ${
+              fixedHeight ? "overflow-y-hidden min-h-0" : ""
+            }`}
+          >
             {/* El sidebar y la cabecera sobreviven a un fallo del contenido: el usuario puede navegar a otra sección. */}
             <RouteErrorBoundary>{children}</RouteErrorBoundary>
           </main>
