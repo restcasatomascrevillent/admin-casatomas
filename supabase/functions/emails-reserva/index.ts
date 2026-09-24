@@ -31,9 +31,15 @@
 //                                           no es un envío real, no debe
 //                                           consumir su idempotencia ni
 //                                           contaminar el historial.
-//   GET  /aceptar?token=...       HTML  -> acepta la contraoferta (1 uso)
-//   GET  /rechazar?token=...      HTML  -> pantalla "¿seguro?" (no muta)
-//   GET  /rechazar/ejecutar?token=...  HTML -> rechaza de verdad
+//   ENLACES DE LOS CORREOS (2026-09-24, ver enlaces-web.ts): Supabase sirve
+//   el HTML de *.supabase.co como text/plain, así que las páginas que ve el
+//   cliente viven en las webs públicas
+//   (https://<web del negocio>/reserva/respuesta?token=...) y llaman aquí:
+//   POST /enlace/consultar {token} JSON -> estado + datos (NO muta)
+//   POST /enlace/ejecutar  {token} JSON -> acepta/rechaza (clic del cliente)
+//   GET  /aceptar, /rechazar, /rechazar/ejecutar,
+//        /propuesta/aceptar[/ejecutar], /propuesta/rechazar[/ejecutar]
+//        -> 302 a la web con el mismo token (correos ya enviados). NUNCA mutan.
 //
 //   PROPUESTA DESDE UNA SOLICITUD DEL BOT (2026-09-23, ver
 //   propuesta-solicitud.ts y la migración 20260923210000):
@@ -42,14 +48,10 @@
 //                                           igual que /enviar-prueba); manda
 //                                           la plantilla 'propuesta' con los
 //                                           datos guardados en la solicitud
-//   GET  /propuesta/aceptar?token=...           HTML -> "¿confirmas?" (no muta)
-//   GET  /propuesta/aceptar/ejecutar?token=...  HTML -> crea la reserva
-//                                           (fn_aceptar_propuesta_solicitud)
-//   GET  /propuesta/rechazar?token=...          HTML -> "¿seguro?" (no muta)
-//   GET  /propuesta/rechazar/ejecutar?token=... HTML -> marca rechazada
-//   Aceptar va en DOS pasos (a diferencia de /aceptar de la contraoferta)
-//   porque aquí crea una reserva nueva: un escáner de correo que precargue
-//   el enlace no debe poder crearla.
+//   Sus enlaces van a la misma página de la web (/enlace/* de arriba); al
+//   aceptar se llama a fn_aceptar_propuesta_solicitud (crea la reserva), al
+//   rechazar a fn_rechazar_propuesta_solicitud. Todo en DOS pasos (ver
+//   /enlace/*): un escáner de correo que precargue el enlace no crea nada.
 //
 // verify_jwt = false (ver config.toml) PARA TODA LA FUNCIÓN — no puede ser
 // true a nivel de función porque las rutas GET las pulsa el cliente desde su
@@ -80,7 +82,12 @@
 //   EMAILS_RESERVA_TOKEN_SECRET               (NUEVO — firma HMAC de aceptar/rechazar)
 // Opcionales:
 //   RESEND_FROM_EMAIL           (por defecto: sandbox de Resend, ver informe)
-//   EMAILS_RESERVA_PUBLIC_URL   (base de los enlaces de los correos)
+//   WEB_CASA_TOMAS_URL          (web de los enlaces de Casa Tomás; por defecto
+//                                https://restaurantecasatomascrevillente.es)
+//   WEB_TOUZA_URL               (web de los enlaces de Touza; por defecto
+//                                https://touza-restaurant-website.vercel.app)
+//   EMAILS_RESERVA_ORIGENES_EXTRA (CORS extra de /enlace/*, separados por comas)
+//   (EMAILS_RESERVA_PUBLIC_URL ya no se usa: los enlaces van a las webs)
 //   EMAILS_RESERVA_LOTE_TAMANO, EMAILS_RESERVA_LOTE_PAUSA_MS  (ver resend-lote.ts)
 // ============================================================================
 
@@ -90,9 +97,7 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
 
 import {
   renderPlantilla,
-  escapeHtml,
   negocioParaMarca,
-  adaptarPaginaANegocio,
   TIPOS_PLANTILLA,
   type TipoPlantilla,
   type FilaPlantilla,
@@ -106,7 +111,28 @@ import {
   type ReservaParaRecordatorio,
 } from "./recordatorios.ts";
 import { esAusenciaSinAvisar, resumirHistorialCliente, type ReservaHistorialCliente } from "./ausencias.ts";
-import { firmarToken, verificarToken, calcularHuella } from "./tokens.ts";
+import { firmarToken, calcularHuella, type CargaToken } from "./tokens.ts";
+import {
+  basesWeb,
+  origenesPermitidos,
+  enlaceRespuestaWeb,
+  cabecerasCorsEnlace,
+  verificarTokenCualquierAccion,
+  describirAccion,
+  marcaSegura,
+  negocioEnlace,
+  respuestaInvalida,
+  estadoContraoferta,
+  estadoPropuesta,
+  estadoTrasAceptarPropuesta,
+  estadoErrorConfirmarContraoferta,
+  tokenDelCuerpo,
+  type AccionWeb,
+  type EstadoEnlace,
+  type DetallesEnlace,
+  type RespuestaEnlace,
+} from "./enlaces-web.ts";
+import type { Marca } from "../reservas-web/plantillas.ts";
 import {
   TAMANO_LOTE_POR_DEFECTO,
   PAUSA_ENTRE_LOTES_MS_POR_DEFECTO,
@@ -143,7 +169,6 @@ import {
   marcaDeSolicitudParaCorreo,
   claveIdempotenciaPropuestaSolicitud,
   epochSegundos,
-  paginaTrasAceptar,
   horaCorta,
   MENSAJE_ERROR_ENVIO,
   type SolicitudParaPropuesta,
@@ -163,7 +188,10 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "Casa Tomás <onboarding@resend.dev>";
 const SHARED_SECRET = Deno.env.get("EMAILS_RESERVA_SHARED_SECRET") ?? "";
 const TOKEN_SECRET = Deno.env.get("EMAILS_RESERVA_TOKEN_SECRET") ?? "";
-const PUBLIC_BASE_URL = Deno.env.get("EMAILS_RESERVA_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/emails-reserva`;
+// Webs públicas donde viven las páginas de los enlaces de los correos (ver
+// enlaces-web.ts: Supabase sirve el HTML de *.supabase.co como text/plain).
+const BASES_WEB = basesWeb({ casaTomas: Deno.env.get("WEB_CASA_TOMAS_URL"), touza: Deno.env.get("WEB_TOUZA_URL") });
+const ORIGENES_WEB = origenesPermitidos(BASES_WEB, Deno.env.get("EMAILS_RESERVA_ORIGENES_EXTRA"));
 const TAMANO_LOTE = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_LOTE_TAMANO"), TAMANO_LOTE_POR_DEFECTO);
 const PAUSA_LOTE_MS = leerEnteroEnv(Deno.env.get("EMAILS_RESERVA_LOTE_PAUSA_MS"), PAUSA_ENTRE_LOTES_MS_POR_DEFECTO);
 // Cuántas filas 'fallido' se evalúan como máximo en una sola ejecución de
@@ -182,14 +210,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-const RESTAURANTE_TEL_TEXTO = "966 10 78 87";
-const RESTAURANTE_TEL_HREF = "966107887";
-
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-}
-function html(body: string, status = 200): Response {
-  return new Response(body, { status, headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" } });
 }
 
 // FALLA CERRADO a propósito: checkSharedSecret de reservas-web falla ABIERTO
@@ -242,9 +264,9 @@ async function obtenerMapaEspacios(): Promise<Map<string, string>> {
   return new Map(((data ?? []) as Array<{ id: string; nombre: string }>).map((e) => [e.id, e.nombre]));
 }
 
-/** Negocio de una solicitud (sin columna marca): sala propuesta > marcador
+/** Marca de una solicitud (sin columna marca): sala propuesta > marcador
  * de El Reservado en las notas > Casa Tomás. Ver marcaDeSolicitudParaCorreo. */
-async function negocioDeSolicitud(s: SolicitudParaPropuesta): Promise<DatosNegocio> {
+async function marcaDeSolicitud(s: SolicitudParaPropuesta): Promise<Marca> {
   let marcaEspacio: unknown = null;
   if (s.espacio_propuesto_id) {
     const { data } = await supabase
@@ -254,13 +276,13 @@ async function negocioDeSolicitud(s: SolicitudParaPropuesta): Promise<DatosNegoc
       .maybeSingle();
     marcaEspacio = (data as { caracteristicas?: { marca?: unknown } | null } | null)?.caracteristicas?.marca ?? null;
   }
-  return negocioParaMarca(marcaDeSolicitudParaCorreo(s, marcaEspacio));
+  return marcaDeSolicitudParaCorreo(s, marcaEspacio);
 }
 
-/** Página HTML con el nombre/teléfono del negocio de la reserva (Touza para El Reservado). */
-function htmlNegocio(body: string, negocio: DatosNegocio, status = 200): Response {
-  return html(adaptarPaginaANegocio(body, negocio), status);
+async function negocioDeSolicitud(s: SolicitudParaPropuesta): Promise<DatosNegocio> {
+  return negocioParaMarca(await marcaDeSolicitud(s));
 }
+
 
 function tipoEmailParaEstado(estado: string): TipoPlantilla | null {
   switch (estado) {
@@ -547,8 +569,8 @@ async function construirCorreoParaTipo(
     const tokenAceptar = await firmarToken(TOKEN_SECRET, reserva.id, "aceptar", huella, basadoEnEpoch);
     const tokenRechazar = await firmarToken(TOKEN_SECRET, reserva.id, "rechazar", huella, basadoEnEpoch);
     urlsBotones = {
-      principal: `${PUBLIC_BASE_URL}/aceptar?token=${encodeURIComponent(tokenAceptar)}`,
-      secundario: `${PUBLIC_BASE_URL}/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
+      principal: enlaceRespuestaWeb(BASES_WEB, reserva.marca, tokenAceptar),
+      secundario: enlaceRespuestaWeb(BASES_WEB, reserva.marca, tokenRechazar),
     };
   }
   const datos = await construirDatosReserva(reserva, urlsBotones);
@@ -818,7 +840,7 @@ async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnv
  * otra ejecución ya la reclamó (o ya cambió de estado) entre la consulta y
  * este UPDATE, la condición no casa con ninguna fila y se devuelve null —
  * mismo patrón de "UPDATE condicional + comprobar si afectó algo" que ya
- * usan handleAceptar/handleRechazarEjecutar en este mismo fichero, en vez de
+ * usan ejecutarContraoferta y los antiguos handleAceptar/handleRechazarEjecutar en este mismo fichero, en vez de
  * una función de base de datos nueva para esto. */
 async function reclamarReintento(fila: FilaEnvioFallido, ahoraIso_: string): Promise<{ id: string; intentos: number } | null> {
   const nuevosIntentos = fila.intentos + 1;
@@ -986,137 +1008,6 @@ async function reintentarEnviosFallidos(maxFilas: number): Promise<ResultadoRein
     omitidos_estado_cambiado: omitidosEstadoCambiado,
     aviso_creado: avisoCreado,
   };
-}
-
-// ------------------------------------------------------------
-// PÁGINAS HTML (enlaces de aceptar/rechazar)
-// ------------------------------------------------------------
-function pageEnlaceInvalido(): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Enlace no válido - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e0e0e0);display:flex;align-items:center;justify-content:center;min-height:100vh; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:32px 28px;text-align:center;border-top:6px solid #9B948E; }
-  .icon { width:60px;height:60px;border-radius:50%;background:#F0EDEA;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:30px;color:#6B6560; }
-  h1 { margin:12px 0 8px;font-size:22px;color:#333; }
-  p { margin:6px 0;color:#555;line-height:1.6;font-size:14px; }
-</style></head>
-<body>
-  <div class="card">
-    <div class="icon">i</div>
-    <h1>Este enlace ya no es válido</h1>
-    <p>Puede que ya se haya usado, que haya caducado o que la reserva haya cambiado.</p>
-    <p>Si necesitas ayuda, llámanos al <a href="tel:${RESTAURANTE_TEL_HREF}">${RESTAURANTE_TEL_TEXTO}</a>.</p>
-  </div>
-</body></html>`;
-}
-
-function pageAceptada(nombre: string, fecha: string, hora: string, comensales: number, espacio: string | null): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Reserva confirmada - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { margin:0;padding:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e8efe4);display:flex;align-items:center;justify-content:center;min-height:100vh; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:32px 28px;text-align:center; }
-  .check { width:60px;height:60px;border-radius:50%;border:3px solid #2c7a33;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:#2c7a33; }
-  h1 { margin:12px 0 8px;font-size:24px;color:#333; }
-  p { margin:6px 0;color:#555;line-height:1.5;font-size:14px; }
-  .details { margin-top:18px;padding:14px 16px;background:#f7faf7;border-radius:8px;text-align:left;font-size:14px;color:#333; }
-  .details b { color:#2c7a33; }
-</style></head>
-<body>
-  <div class="card">
-    <div class="check">&#10003;</div>
-    <h1>¡Reserva confirmada!</h1>
-    <p>Gracias, <b>${escapeHtml(nombre)}</b>. Hemos confirmado tu reserva en Casa Tomás con estos datos:</p>
-    <div class="details">
-      <p><b>Fecha:</b> ${escapeHtml(fecha)}</p>
-      <p><b>Hora:</b> ${escapeHtml(hora.slice(0, 5))}</p>
-      <p><b>Comensales:</b> ${comensales}</p>
-      ${espacio ? `<p><b>Espacio:</b> ${escapeHtml(espacio)}</p>` : ""}
-    </div>
-    <p>¡Te esperamos!</p>
-  </div>
-</body></html>`;
-}
-
-function pageRechazarPreview(nombre: string, fecha: string, hora: string, comensales: number, ejecutarUrl: string): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Rechazar propuesta - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e0e0e0);display:flex;align-items:center;justify-content:center;min-height:100vh; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:32px 28px;text-align:center;border-top:6px solid #e04f5f; }
-  .icon { width:60px;height:60px;border-radius:50%;background:#fff5f5;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:#e04f5f;font-weight:bold; }
-  h1 { margin:12px 0 8px;font-size:24px;color:#333; }
-  p { margin:6px 0;color:#555;line-height:1.5;font-size:14px; }
-  .details { margin-top:20px;padding:16px;background:#f9f9f9;border-left:4px solid #e04f5f;border-radius:4px;text-align:left;font-size:14px;color:#333; }
-  .btns { margin-top:30px;display:flex;flex-direction:column;gap:10px; }
-  .btn-delete { display:block;width:100%;padding:14px 0;background:#e04f5f;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;font-size:16px;box-sizing:border-box; }
-  .btn-keep { display:block;width:100%;padding:14px 0;background:transparent;color:#777;text-decoration:none;border-radius:4px;font-size:14px;border:1px solid #ddd;box-sizing:border-box; }
-</style></head>
-<body>
-  <div class="card">
-    <div class="icon">!</div>
-    <h1>¿No puedes venir a estas condiciones?</h1>
-    <p>Vas a rechazar la propuesta de reserva de <b>${escapeHtml(nombre)}</b> en Casa Tomás. La reserva quedará cancelada.</p>
-    <div class="details">
-      <p><b>Fecha:</b> ${escapeHtml(fecha)}</p>
-      <p><b>Hora:</b> ${escapeHtml(hora.slice(0, 5))}</p>
-      <p><b>Comensales:</b> ${comensales}</p>
-    </div>
-    <div class="btns">
-      <a href="${ejecutarUrl}" class="btn-delete">Sí, cancelar la reserva</a>
-      <a href="javascript:window.close()" class="btn-keep">No, esperar</a>
-    </div>
-    <p>Si tienes dudas, llámanos al ${RESTAURANTE_TEL_TEXTO}.</p>
-  </div>
-</body></html>`;
-}
-
-function pageRechazada(): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Reserva cancelada - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e0e0e0);display:flex;align-items:center;justify-content:center;min-height:100vh; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:40px 28px;text-align:center;border-top:6px solid #394247; }
-  .icon { width:70px;height:70px;border-radius:50%;border:3px solid #394247;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:36px;color:#394247;font-weight:bold; }
-  h1 { margin:12px 0 15px;font-size:26px;color:#333; }
-  p { margin:10px 0;color:#555;line-height:1.6;font-size:16px; }
-</style></head>
-<body>
-  <div class="card">
-    <div class="icon">&#10003;</div>
-    <h1>Reserva cancelada</h1>
-    <p>La reserva ha quedado cancelada. Gracias por avisarnos.</p>
-    <p>Esperamos verte en otra ocasión en Casa Tomás.</p>
-  </div>
-</body></html>`;
-}
-
-function pageYaRechazada(): string {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Reserva ya cancelada - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  body { margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e0e0e0);display:flex;align-items:center;justify-content:center;min-height:100vh; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:32px 28px;text-align:center;border-top:6px solid #394247; }
-  h1 { margin:12px 0 8px;font-size:22px;color:#333; }
-  p { margin:6px 0;color:#555;line-height:1.6;font-size:14px; }
-</style></head>
-<body>
-  <div class="card">
-    <h1>Esta reserva ya estaba cancelada</h1>
-    <p>No hace falta que hagas nada más.</p>
-  </div>
-</body></html>`;
 }
 
 // ------------------------------------------------------------
@@ -1339,184 +1230,14 @@ async function handleEnviarPrueba(req: Request): Promise<Response> {
 }
 
 // ------------------------------------------------------------
-// ACCIÓN: aceptar la contraoferta (1 uso)
-// ------------------------------------------------------------
-async function handleAceptar(req: Request): Promise<Response> {
-  const token = new URL(req.url).searchParams.get("token") || "";
-  const payload = await verificarToken(TOKEN_SECRET, token, "aceptar");
-  if (!payload) return html(pageEnlaceInvalido());
-
-  const reserva = await fetchReserva(payload.id);
-  if (!reserva) return html(pageEnlaceInvalido());
-  const negocio = negocioParaMarca(reserva.marca);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-
-  const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) {
-    return responder(pageEnlaceInvalido());
-  }
-
-  const { data: actualizada, error } = await supabase
-    .from("reservas")
-    .update({ estado: "confirmada" })
-    .eq("id", reserva.id)
-    .eq("estado", "verificada")
-    .select("id")
-    .maybeSingle();
-  if (error || !actualizada) {
-    console.error("[emails-reserva] No se pudo aceptar (condicion de carrera o error):", error?.message);
-    return responder(pageEnlaceInvalido());
-  }
-
-  // Correo de confirmación, best-effort: la reserva YA quedó confirmada
-  // aunque este envío falle, así que no se condiciona la página de éxito a él.
-  try {
-    await enviarCorreoParaReserva(reserva.id);
-  } catch (err) {
-    console.error("[emails-reserva] Error mandando confirmacion tras aceptar:", err);
-  }
-
-  const mapa = await obtenerMapaEspacios();
-  const espacioNombre = reserva.espacio_id ? mapa.get(reserva.espacio_id) ?? null : null;
-  return responder(pageAceptada(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, espacioNombre));
-}
-
-// ------------------------------------------------------------
-// ACCIÓN: rechazar — paso 1, pantalla "¿seguro?", NO muta nada
-// ------------------------------------------------------------
-// Dos pasos a propósito, igual que reservas-web/cancelar: los clientes de
-// correo pre-cargan enlaces al escanear el mensaje; un solo paso cancelaría
-// reservas que nadie pulsó de verdad.
-async function handleRechazarPreview(req: Request): Promise<Response> {
-  const token = new URL(req.url).searchParams.get("token") || "";
-  const payload = await verificarToken(TOKEN_SECRET, token, "rechazar");
-  if (!payload) return html(pageEnlaceInvalido());
-
-  const reserva = await fetchReserva(payload.id);
-  if (!reserva) return html(pageEnlaceInvalido());
-  const negocio = negocioParaMarca(reserva.marca);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-
-  // Chequeo de "ya cancelada" ANTES de comprobar la huella: si se
-  // comprobara después, una reserva ya cancelada (huella con
-  // estado=cancelada) nunca pasaría el chequeo de huella y el cliente vería
-  // "enlace no válido" en vez del mensaje correcto. Ver
-  // docs/REVISION-PUERTOS-N8N.md X-2, mismo fallo en reservas-web/cancelar.
-  if (reserva.estado === "cancelada") return responder(pageYaRechazada());
-
-  const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return responder(pageEnlaceInvalido());
-
-  const ejecutarUrl = `${PUBLIC_BASE_URL}/rechazar/ejecutar?token=${encodeURIComponent(token)}`;
-  return responder(pageRechazarPreview(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, ejecutarUrl));
-}
-
-// ------------------------------------------------------------
-// ACCIÓN: rechazar — paso 2, ejecuta el rechazo
-// ------------------------------------------------------------
-async function handleRechazarEjecutar(req: Request): Promise<Response> {
-  const token = new URL(req.url).searchParams.get("token") || "";
-  const payload = await verificarToken(TOKEN_SECRET, token, "rechazar");
-  if (!payload) return html(pageEnlaceInvalido());
-
-  const reserva = await fetchReserva(payload.id);
-  if (!reserva) return html(pageEnlaceInvalido());
-  const negocio = negocioParaMarca(reserva.marca);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-  if (reserva.estado === "cancelada") return responder(pageYaRechazada());
-
-  const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return responder(pageEnlaceInvalido());
-
-  const { data: actualizada, error } = await supabase
-    .from("reservas")
-    .update({ estado: "cancelada" })
-    .eq("id", reserva.id)
-    .eq("estado", "verificada")
-    .select("id")
-    .maybeSingle();
-  if (error || !actualizada) {
-    console.error("[emails-reserva] No se pudo rechazar (condicion de carrera o error):", error?.message);
-    return responder(pageEnlaceInvalido());
-  }
-
-  try {
-    await enviarCorreoParaReserva(reserva.id);
-  } catch (err) {
-    console.error("[emails-reserva] Error mandando aviso de rechazo:", err);
-  }
-
-  return responder(pageRechazada());
-}
-
-// ------------------------------------------------------------
 // PROPUESTA DESDE UNA SOLICITUD DEL BOT (ver propuesta-solicitud.ts)
 // ------------------------------------------------------------
-function pageMensaje(opciones: {
-  titulo: string;
-  parrafos: string[];
-  detalles?: Array<[string, string]>;
-  boton?: { texto: string; url: string };
-  color?: string;
-}): string {
-  const color = opciones.color ?? "#394247";
-  const detalles = opciones.detalles?.length
-    ? `<div class="details">${opciones.detalles
-        .map(([k, v]) => `<p><b>${escapeHtml(k)}:</b> ${escapeHtml(v)}</p>`)
-        .join("")}</div>`
-    : "";
-  const boton = opciones.boton
-    ? `<a class="btn" href="${escapeHtml(opciones.boton.url)}">${escapeHtml(opciones.boton.texto)}</a>`
-    : "";
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>${escapeHtml(opciones.titulo)} - Casa Tomás</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex">
-<style>
-  body { margin:0;padding:16px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:linear-gradient(135deg,#f5f5f5,#e0e0e0);display:flex;align-items:center;justify-content:center;min-height:100vh;box-sizing:border-box; }
-  .card { background:#fff;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);max-width:480px;width:100%;padding:32px 28px;text-align:center;border-top:6px solid ${color}; }
-  h1 { margin:12px 0 8px;font-size:22px;color:#333; }
-  p { margin:6px 0;color:#555;line-height:1.6;font-size:15px; }
-  .details { margin-top:18px;padding:14px 16px;background:#f7f7f7;border-radius:8px;text-align:left;font-size:14px;color:#333; }
-  .btn { display:block;margin-top:24px;padding:14px 0;background:${color};color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;font-size:16px; }
-  a { color:${color}; }
-</style></head>
-<body>
-  <div class="card">
-    <h1>${escapeHtml(opciones.titulo)}</h1>
-    ${opciones.parrafos.map((p) => `<p>${p}</p>`).join("")}
-    ${detalles}
-    ${boton}
-  </div>
-</body></html>`;
-}
-
-const TEXTO_LLAMANOS = `Si necesitas ayuda, llámanos al <a href="tel:${RESTAURANTE_TEL_HREF}">${RESTAURANTE_TEL_TEXTO}</a>.`;
-
 async function fetchSolicitud(id: string): Promise<SolicitudParaPropuesta | null> {
   // select("*"): si la migración no está aplicada, las columnas de propuesta
   // simplemente no vienen (validarSolicitudParaEnvio lo detecta).
   const { data, error } = await supabase.from("solicitudes_pendientes").select("*").eq("id", id).maybeSingle();
   if (error || !data) return null;
   return data as SolicitudParaPropuesta;
-}
-
-async function detallesPropuesta(s: SolicitudParaPropuesta): Promise<Array<[string, string]>> {
-  const mapa = await obtenerMapaEspacios();
-  const filas: Array<[string, string]> = [
-    ["Fecha", formatearFechaLarga(s.fecha_solicitada)],
-    ["Hora", horaCorta(s.hora_solicitada) ?? ""],
-    ["Comensales", String(s.numero_comensales ?? "")],
-  ];
-  const sala = s.espacio_propuesto_id ? mapa.get(s.espacio_propuesto_id) : null;
-  if (sala) filas.push(["Espacio", sala]);
-  return filas;
-}
-
-function formatearFechaLarga(fecha: string | null): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha ?? "");
-  return m ? `${Number(m[3])}/${Number(m[2])}/${m[1]}` : "";
 }
 
 /** La propuesta del enlace sigue siendo la vigente (mismos datos, mismo envío). */
@@ -1583,12 +1304,13 @@ async function handleEnviarPropuestaSolicitud(req: Request): Promise<Response> {
 
   const mapa = await obtenerMapaEspacios();
   const nombreEspacio = s.espacio_propuesto_id ? mapa.get(s.espacio_propuesto_id) ?? null : null;
+  const marca = await marcaDeSolicitud(s);
   const datos: DatosReservaParaCorreo = {
     ...datosCorreoPropuestaSolicitud(s, nombreEspacio, {
-      aceptar: `${PUBLIC_BASE_URL}/propuesta/aceptar?token=${encodeURIComponent(tokenAceptar)}`,
-      rechazar: `${PUBLIC_BASE_URL}/propuesta/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
+      aceptar: enlaceRespuestaWeb(BASES_WEB, marca, tokenAceptar),
+      rechazar: enlaceRespuestaWeb(BASES_WEB, marca, tokenRechazar),
     }),
-    negocio: await negocioDeSolicitud(s),
+    negocio: negocioParaMarca(marca),
   };
   const { asunto, html: cuerpoHtml } = renderPlantilla(plantilla, datos);
 
@@ -1633,48 +1355,156 @@ async function handleEnviarPropuestaSolicitud(req: Request): Promise<Response> {
   return json({ ok: true, enviada_at: enviadaIso, destinatario: email });
 }
 
-async function leerSolicitudDeToken(
-  req: Request,
-  accion: "aceptar_solicitud" | "rechazar_solicitud",
-): Promise<{ token: string; fp: string; s: SolicitudParaPropuesta } | null> {
-  const token = new URL(req.url).searchParams.get("token") || "";
-  const payload = await verificarToken(TOKEN_SECRET, token, accion);
-  if (!payload) return null;
-  const s = await fetchSolicitud(payload.id);
-  if (!s) return null;
-  return { token, fp: payload.fp, s };
+// ------------------------------------------------------------
+// ENLACES DE LOS CORREOS (aceptar/rechazar) — API JSON para las webs
+// ------------------------------------------------------------
+// Las páginas que ve el cliente las sirven las webs públicas (ver cabecera de
+// enlaces-web.ts: Supabase fuerza text/plain en el HTML de *.supabase.co).
+// Aquí solo quedan:
+//   POST /enlace/consultar  -> estado + datos (NO muta nada)
+//   POST /enlace/ejecutar   -> ejecuta la acción (clic del cliente)
+//   GET  rutas antiguas     -> 302 a la web del negocio con el mismo token
+// La autenticación sigue siendo el token HMAC (tokens.ts): mismo secreto,
+// mismas huellas, mismas acciones — un token de un correo ya enviado vale
+// igual en la web nueva.
+
+/** Detalles para la web a partir de una solicitud (fecha ISO, hora HH:MM). */
+async function detallesDeSolicitud(s: SolicitudParaPropuesta): Promise<DetallesEnlace> {
+  const mapa = await obtenerMapaEspacios();
+  return {
+    nombre: s.nombre || "",
+    fecha: (s.fecha_solicitada ?? "").slice(0, 10),
+    hora: horaCorta(s.hora_solicitada) ?? "",
+    comensales: Number(s.numero_comensales) || 0,
+    espacio: s.espacio_propuesto_id ? mapa.get(s.espacio_propuesto_id) ?? null : null,
+  };
 }
 
-async function handlePropuestaAceptarPreview(req: Request): Promise<Response> {
-  const leido = await leerSolicitudDeToken(req, "aceptar_solicitud");
-  if (!leido) return html(pageEnlaceInvalido());
-  const { s, fp, token } = leido;
-  const negocio = await negocioDeSolicitud(s);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-  if (s.propuesta_estado === "aceptada") {
-    return responder(pageMensaje({ titulo: "Tu reserva ya está confirmada", parrafos: ["No hace falta que hagas nada más. ¡Te esperamos!"], color: "#2c7a33" }));
+async function detallesDeReserva(r: ReservaRow): Promise<DetallesEnlace> {
+  const mapa = await obtenerMapaEspacios();
+  return {
+    nombre: r.nombre || "",
+    fecha: (r.fecha ?? "").slice(0, 10),
+    hora: (r.hora ?? "").slice(0, 5),
+    comensales: r.numero_comensales,
+    espacio: r.espacio_id ? mapa.get(r.espacio_id) ?? null : null,
+  };
+}
+
+/** Contexto común de un token ya verificado: la fila, su marca y su flujo. */
+type ContextoEnlace =
+  | { tipo: "contraoferta"; accion: AccionWeb; carga: CargaToken; reserva: ReservaRow; marca: Marca }
+  | { tipo: "propuesta"; accion: AccionWeb; carga: CargaToken; solicitud: SolicitudParaPropuesta; marca: Marca };
+
+async function cargarContextoEnlace(token: string): Promise<ContextoEnlace | null> {
+  const carga = await verificarTokenCualquierAccion(TOKEN_SECRET, token);
+  if (!carga) return null;
+  const { tipo, accion } = describirAccion(carga.accion);
+  if (tipo === "contraoferta") {
+    const reserva = await fetchReserva(carga.id);
+    if (!reserva) return null;
+    return { tipo, accion, carga, reserva, marca: marcaSegura(reserva.marca) };
   }
-  if (!propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
-  return responder(
-    pageMensaje({
-      titulo: "Confirma tu reserva",
-      parrafos: [`Hola, <b>${escapeHtml(s.nombre || "")}</b>. Esta es la propuesta de Casa Tomás:`],
-      detalles: await detallesPropuesta(s),
-      boton: { texto: "Sí, confirmo la reserva", url: `${PUBLIC_BASE_URL}/propuesta/aceptar/ejecutar?token=${encodeURIComponent(token)}` },
-      color: "#2c7a33",
-    }),
-  );
+  const solicitud = await fetchSolicitud(carga.id);
+  if (!solicitud) return null;
+  return { tipo, accion, carga, solicitud, marca: await marcaDeSolicitud(solicitud) };
 }
 
-async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
-  const leido = await leerSolicitudDeToken(req, "aceptar_solicitud");
-  if (!leido) return html(pageEnlaceInvalido());
-  const { s, fp } = leido;
-  const negocio = await negocioDeSolicitud(s);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-  if (s.propuesta_estado !== "aceptada" && !propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
+function respuestaEnlace(
+  ctx: ContextoEnlace,
+  estado: EstadoEnlace,
+  detalles: DetallesEnlace | null,
+): RespuestaEnlace {
+  const ok = estado === "pendiente" || estado === "hecho" || estado === "recibida" || estado === "ya_hecho";
+  return {
+    ok,
+    estado,
+    tipo: ctx.tipo,
+    accion: ctx.accion,
+    negocio: negocioEnlace(ctx.marca, BASES_WEB),
+    // Un enlace inválido no enseña datos de nadie.
+    detalles: estado === "invalido" ? null : detalles,
+  };
+}
 
-  const detalles = await detallesPropuesta(s);
+async function consultarEnlace(token: string): Promise<RespuestaEnlace> {
+  const ctx = await cargarContextoEnlace(token);
+  if (!ctx) return respuestaInvalida(BASES_WEB);
+  if (ctx.tipo === "contraoferta") {
+    const estado = estadoContraoferta(ctx.accion, ctx.reserva, ctx.carga.fp);
+    return respuestaEnlace(ctx, estado, await detallesDeReserva(ctx.reserva));
+  }
+  const estado = estadoPropuesta(ctx.accion, ctx.solicitud.propuesta_estado, propuestaVigente(ctx.solicitud, ctx.carga.fp));
+  return respuestaEnlace(ctx, estado, await detallesDeSolicitud(ctx.solicitud));
+}
+
+/** Contraoferta: aceptar = verificada -> confirmada; rechazar = verificada -> cancelada. */
+async function ejecutarContraoferta(ctx: Extract<ContextoEnlace, { tipo: "contraoferta" }>): Promise<RespuestaEnlace> {
+  const { reserva, accion } = ctx;
+  const detalles = await detallesDeReserva(reserva);
+  const previo = estadoContraoferta(accion, reserva, ctx.carga.fp);
+  if (previo !== "pendiente") return respuestaEnlace(ctx, previo, detalles);
+
+  const nuevoEstado = accion === "aceptar" ? "confirmada" : "cancelada";
+  const { data: actualizada, error } = await supabase
+    .from("reservas")
+    .update({ estado: nuevoEstado })
+    .eq("id", reserva.id)
+    .eq("estado", "verificada")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error(`[emails-reserva] No se pudo ${accion} la contraoferta ${reserva.id}:`, error.code, error.message);
+    const estado = estadoErrorConfirmarContraoferta(error.code, error.message);
+    await avisoPanelReservaBestEffort(reserva, accion, error.message);
+    return respuestaEnlace(ctx, estado, detalles);
+  }
+  if (!actualizada) {
+    // Carrera: otra pestaña/otra persona cambió el estado entre medias.
+    const actual = await fetchReserva(reserva.id);
+    const estado = actual ? estadoContraoferta(accion, actual, ctx.carga.fp) : "invalido";
+    return respuestaEnlace(ctx, estado === "pendiente" ? "error" : estado, detalles);
+  }
+
+  // Correo de confirmación / aviso de rechazo, best-effort: el cambio de
+  // estado ya está hecho aunque el envío falle (entra en los reintentos).
+  try {
+    await enviarCorreoParaReserva(reserva.id);
+  } catch (err) {
+    console.error(`[emails-reserva] Error mandando correo tras ${accion} contraoferta:`, err);
+  }
+  return respuestaEnlace(ctx, "hecho", detalles);
+}
+
+async function avisoPanelReservaBestEffort(reserva: ReservaRow, accion: AccionWeb, motivo: string): Promise<void> {
+  const { error } = await supabase.from("notificaciones_dashboard").insert({
+    tipo: "propuesta_fallida",
+    titulo: accion === "aceptar" ? "Un cliente aceptó la propuesta pero no se pudo confirmar" : "Un cliente rechazó la propuesta pero no se pudo registrar",
+    mensaje: `${reserva.nombre || "Cliente"} (${reserva.telefono || "sin teléfono"}), ${reserva.fecha} ${(reserva.hora || "").slice(0, 5)}: ${motivo}. Llámale.`,
+    referencia_id: reserva.id,
+    referencia_tipo: "reserva",
+    prioridad: "alta",
+  });
+  if (error) console.error("[emails-reserva] No se pudo crear el aviso del panel:", error.message);
+}
+
+/** Propuesta de una solicitud del bot: aceptar crea la reserva; rechazar la marca rechazada. */
+async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta" }>): Promise<RespuestaEnlace> {
+  const { solicitud: s, accion } = ctx;
+  const detalles = await detallesDeSolicitud(s);
+  const previo = estadoPropuesta(accion, s.propuesta_estado, propuestaVigente(s, ctx.carga.fp));
+  if (previo !== "pendiente") return respuestaEnlace(ctx, previo, detalles);
+
+  if (accion === "rechazar") {
+    const { data, error } = await supabase.rpc("fn_rechazar_propuesta_solicitud", { p_solicitud_id: s.id, p_via: "email" });
+    const res = data as { ok?: boolean } | null;
+    if (error || !res?.ok) {
+      console.error(`[emails-reserva] fn_rechazar_propuesta_solicitud(${s.id}) falló:`, error?.message ?? JSON.stringify(data));
+      return respuestaEnlace(ctx, error ? "error" : "invalido", detalles);
+    }
+    return respuestaEnlace(ctx, "hecho", detalles);
+  }
+
   const { data, error } = await supabase.rpc("fn_aceptar_propuesta_solicitud", { p_solicitud_id: s.id, p_via: "email" });
   if (error) {
     console.error(`[emails-reserva] fn_aceptar_propuesta_solicitud(${s.id}) falló:`, error.message);
@@ -1685,7 +1515,7 @@ async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
     );
   }
   const res = (error ? null : data) as { ok?: boolean; error?: string; estado?: string; reserva_id?: string; ya_aceptada?: boolean } | null;
-  const pagina = paginaTrasAceptar(res);
+  const estado = estadoTrasAceptarPropuesta(res);
 
   // Correo de la reserva recién creada (confirmada -> 'confirmada';
   // pendiente por lista negra -> 'solicitud_recibida'). Best-effort: la
@@ -1697,77 +1527,71 @@ async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
       console.error("[emails-reserva] Error mandando correo tras aceptar propuesta de solicitud:", err);
     }
   }
-
-  switch (pagina) {
-    case "confirmada":
-      return responder(pageMensaje({ titulo: "¡Reserva confirmada!", parrafos: [`Gracias, <b>${escapeHtml(s.nombre || "")}</b>. Te esperamos en Casa Tomás.`], detalles, color: "#2c7a33" }));
-    case "recibida":
-      return responder(pageMensaje({ titulo: "Hemos recibido tu respuesta", parrafos: ["El restaurante revisará la reserva y te la confirmará en breve.", TEXTO_LLAMANOS], detalles }));
-    case "sin_aforo":
-      return responder(pageMensaje({
-        titulo: "No hemos podido confirmar la reserva",
-        parrafos: ["Lo sentimos: mientras respondías se ha completado el aforo de ese turno. El restaurante ya está avisado y te llamará para buscar otra opción.", TEXTO_LLAMANOS],
-        detalles,
-        color: "#b45309",
-      }));
-    case "fecha_pasada":
-      return responder(pageMensaje({ titulo: "Esta propuesta ha caducado", parrafos: ["El día propuesto ya ha pasado. El restaurante está avisado.", TEXTO_LLAMANOS], color: "#b45309" }));
-    case "no_vigente":
-      return responder(pageEnlaceInvalido());
-    default:
-      if (!error) {
-        await avisoPanelBestEffort(
-          "Un cliente aceptó la propuesta pero no se creó la reserva",
-          `${s.nombre || "Cliente"} (${s.telefono || "sin teléfono"}): ${res?.error ?? "error desconocido"}. Llámale.`,
-          s.id,
-        );
-      }
-      return responder(pageMensaje({
-        titulo: "No hemos podido confirmar la reserva",
-        parrafos: ["Ha ocurrido un problema al registrar tu respuesta. El restaurante está avisado y te llamará.", TEXTO_LLAMANOS],
-        color: "#b45309",
-      }));
+  if (estado === "error" && !error) {
+    await avisoPanelBestEffort(
+      "Un cliente aceptó la propuesta pero no se creó la reserva",
+      `${s.nombre || "Cliente"} (${s.telefono || "sin teléfono"}): ${res?.error ?? "error desconocido"}. Llámale.`,
+      s.id,
+    );
   }
+  return respuestaEnlace(ctx, estado, detalles);
 }
 
-async function handlePropuestaRechazarPreview(req: Request): Promise<Response> {
-  const leido = await leerSolicitudDeToken(req, "rechazar_solicitud");
-  if (!leido) return html(pageEnlaceInvalido());
-  const { s, fp, token } = leido;
-  const negocio = await negocioDeSolicitud(s);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-  if (s.propuesta_estado === "rechazada") {
-    return responder(pageMensaje({ titulo: "Ya nos lo habías dicho", parrafos: ["Tenemos registrado que no te viene bien esta propuesta. " + TEXTO_LLAMANOS] }));
-  }
-  if (!propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
-  return responder(
-    pageMensaje({
-      titulo: "¿No te viene bien esta propuesta?",
-      parrafos: ["Si la rechazas, no se creará la reserva. El restaurante verá tu respuesta."],
-      detalles: await detallesPropuesta(s),
-      boton: { texto: "Sí, rechazar la propuesta", url: `${PUBLIC_BASE_URL}/propuesta/rechazar/ejecutar?token=${encodeURIComponent(token)}` },
-      color: "#e04f5f",
-    }),
-  );
+async function ejecutarEnlace(token: string): Promise<RespuestaEnlace> {
+  const ctx = await cargarContextoEnlace(token);
+  if (!ctx) return respuestaInvalida(BASES_WEB);
+  return ctx.tipo === "contraoferta" ? await ejecutarContraoferta(ctx) : await ejecutarPropuesta(ctx);
 }
 
-async function handlePropuestaRechazarEjecutar(req: Request): Promise<Response> {
-  const leido = await leerSolicitudDeToken(req, "rechazar_solicitud");
-  if (!leido) return html(pageEnlaceInvalido());
-  const { s, fp } = leido;
-  const negocio = await negocioDeSolicitud(s);
-  const responder = (body: string) => htmlNegocio(body, negocio);
-  if (s.propuesta_estado !== "rechazada" && !propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
-
-  const { data, error } = await supabase.rpc("fn_rechazar_propuesta_solicitud", { p_solicitud_id: s.id, p_via: "email" });
-  const res = data as { ok?: boolean } | null;
-  if (error || !res?.ok) {
-    console.error(`[emails-reserva] fn_rechazar_propuesta_solicitud(${s.id}) falló:`, error?.message ?? JSON.stringify(data));
-    return responder(pageEnlaceInvalido());
-  }
-  return responder(pageMensaje({ titulo: "Gracias por avisarnos", parrafos: ["Hemos registrado que no te viene bien la propuesta.", "Esperamos verte en otra ocasión en Casa Tomás."] }));
+function jsonEnlace(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...cabecerasCorsEnlace(req.headers.get("Origin"), ORIGENES_WEB),
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
+async function handleEnlace(req: Request, modo: "consultar" | "ejecutar"): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return jsonEnlace(req, { ok: false, error: "invalid_json" }, 400);
+  }
+  const token = tokenDelCuerpo(body);
+  if (!token) return jsonEnlace(req, respuestaInvalida(BASES_WEB));
+  const respuesta = modo === "consultar" ? await consultarEnlace(token) : await ejecutarEnlace(token);
+  return jsonEnlace(req, respuesta);
+}
+
+/**
+ * Rutas GET antiguas (enlaces de correos ya enviados, y los "ejecutar" que
+ * enlazaban las páginas HTML): 302 a la página de la web del negocio con el
+ * MISMO token. No muta nada nunca — la acción solo ocurre con el POST de la
+ * web tras el clic. Token malo o fila borrada -> web de Casa Tomás, que
+ * enseña "enlace no válido".
+ */
+async function handleRedirigirAWeb(req: Request): Promise<Response> {
+  const token = new URL(req.url).searchParams.get("token") || "";
+  let marca: Marca = marcaSegura(null);
+  try {
+    const ctx = token ? await cargarContextoEnlace(token) : null;
+    if (ctx) marca = ctx.marca;
+  } catch (err) {
+    console.error("[emails-reserva] Error resolviendo la marca para redirigir (se usa Casa Tomás):", err);
+  }
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: enlaceRespuestaWeb(BASES_WEB, marca, token),
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+}
 // ------------------------------------------------------------
 // ACCIÓN: recordatorios T-2 (cron, vía pg_net — ver migración)
 // ------------------------------------------------------------
@@ -1928,13 +1752,31 @@ async function handleReintentarFallidos(req: Request): Promise<Response> {
 // ------------------------------------------------------------
 // ROUTER
 // ------------------------------------------------------------
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+/** Rutas GET de las antiguas páginas HTML: hoy solo redirigen a la web. */
+const RUTAS_GET_ANTIGUAS = new Set([
+  "aceptar",
+  "rechazar",
+  "rechazar/ejecutar",
+  "propuesta/aceptar",
+  "propuesta/aceptar/ejecutar",
+  "propuesta/rechazar",
+  "propuesta/rechazar/ejecutar",
+]);
 
+serve(async (req: Request) => {
   const url = new URL(req.url);
   const segments = url.pathname.split("/").filter(Boolean);
   const idx = segments.indexOf("emails-reserva");
   const route = (idx === -1 ? segments : segments.slice(idx + 1)).join("/");
+
+  if (req.method === "OPTIONS") {
+    // Las rutas /enlace/* solo aceptan las webs públicas (ver enlaces-web.ts);
+    // el resto conserva el CORS abierto de siempre (panel, crons).
+    const cabeceras = route.startsWith("enlace/")
+      ? cabecerasCorsEnlace(req.headers.get("Origin"), ORIGENES_WEB)
+      : corsHeaders;
+    return new Response(null, { headers: cabeceras });
+  }
 
   try {
     if (req.method === "POST" && route === "notificar") return await handleNotificar(req);
@@ -1942,14 +1784,11 @@ serve(async (req: Request) => {
     if (req.method === "POST" && route === "detectar-ausencias") return await handleDetectarAusencias(req);
     if (req.method === "POST" && route === "reintentar-fallidos") return await handleReintentarFallidos(req);
     if (req.method === "POST" && route === "enviar-prueba") return await handleEnviarPrueba(req);
-    if (req.method === "GET" && route === "aceptar") return await handleAceptar(req);
-    if (req.method === "GET" && route === "rechazar") return await handleRechazarPreview(req);
-    if (req.method === "GET" && route === "rechazar/ejecutar") return await handleRechazarEjecutar(req);
     if (req.method === "POST" && route === "enviar-propuesta-solicitud") return await handleEnviarPropuestaSolicitud(req);
-    if (req.method === "GET" && route === "propuesta/aceptar") return await handlePropuestaAceptarPreview(req);
-    if (req.method === "GET" && route === "propuesta/aceptar/ejecutar") return await handlePropuestaAceptarEjecutar(req);
-    if (req.method === "GET" && route === "propuesta/rechazar") return await handlePropuestaRechazarPreview(req);
-    if (req.method === "GET" && route === "propuesta/rechazar/ejecutar") return await handlePropuestaRechazarEjecutar(req);
+    // Páginas de los enlaces: las sirve la web; aquí solo JSON + redirección.
+    if (req.method === "POST" && route === "enlace/consultar") return await handleEnlace(req, "consultar");
+    if (req.method === "POST" && route === "enlace/ejecutar") return await handleEnlace(req, "ejecutar");
+    if (req.method === "GET" && RUTAS_GET_ANTIGUAS.has(route)) return await handleRedirigirAWeb(req);
     return json({ ok: false, error: "not_found", route }, 404);
   } catch (err) {
     console.error("[emails-reserva] Error no controlado:", (err as Error)?.message, (err as Error)?.stack);

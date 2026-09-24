@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { baseBajaWeb, urlBajaWeb } from "../newsletter-baja/enlace-web.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -242,6 +243,9 @@ serve(async (req) => {
     // expone al cliente y ya se trata como secreto en este mismo proyecto.
     const unsubSecret = Deno.env.get('NEWSLETTER_UNSUB_SECRET') || supabaseKey;
     const newsletterBajaUrl = `${supabaseUrl}/functions/v1/newsletter-baja`;
+    // Página de baja en la web de Casa Tomás: Supabase sirve el HTML de
+    // *.supabase.co como text/plain (ver newsletter-baja/enlace-web.ts).
+    const bajaWebUrl = baseBajaWeb(Deno.env.get('NEWSLETTER_BAJA_WEB_URL'));
 
     // Determinar asunto según tipo
     let subject = payload.titulo;
@@ -258,10 +262,11 @@ serve(async (req) => {
       try {
         // Enlace de baja para el pie del email (clic humano -> página de confirmación)
         const sigBody = await hmacSign(`${suscriptor.id}:body`, unsubSecret);
-        const unsubscribeLink = `${newsletterBajaUrl}?sid=${suscriptor.id}&via=body&sig=${sigBody}`;
+        const unsubscribeLink = urlBajaWeb(bajaWebUrl, suscriptor.id, 'body', sigBody);
 
         // Enlace para la cabecera List-Unsubscribe (RFC 8058, "one-click": Gmail y
-        // Outlook hacen POST directo a esta URL sin pasar por la página de confirmación)
+        // Outlook hacen POST directo a esta URL sin pasar por la página de confirmación).
+        // Se queda en la función: un GET a ella redirige a la web.
         const sigHeader = await hmacSign(`${suscriptor.id}:header`, unsubSecret);
         const listUnsubscribeUrl = `${newsletterBajaUrl}?sid=${suscriptor.id}&via=header&sig=${sigHeader}`;
 

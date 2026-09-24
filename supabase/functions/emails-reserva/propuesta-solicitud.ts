@@ -3,10 +3,11 @@
 // ============================================================================
 // Flujo (ver migración 20260923210000_solicitud_propuesta_espacio.sql):
 //   panel "Enviar propuesta"  -> POST /enviar-propuesta-solicitud
-//   correo con 2 botones      -> GET  /propuesta/aceptar   (pantalla "¿confirmas?")
-//                                GET  /propuesta/aceptar/ejecutar -> fn_aceptar_propuesta_solicitud
-//                                GET  /propuesta/rechazar  (pantalla "¿seguro?")
-//                                GET  /propuesta/rechazar/ejecutar -> fn_rechazar_propuesta_solicitud
+//   correo con 2 botones      -> web del negocio /reserva/respuesta?token=... (pantalla "¿confirmas?")
+//                                POST /enlace/consultar (no muta) y, tras el clic,
+//                                POST /enlace/ejecutar -> fn_aceptar_propuesta_solicitud
+//                                                      o fn_rechazar_propuesta_solicitud
+//                                (ver enlaces-web.ts; los GET /propuesta/... antiguos redirigen a la web)
 //
 // Reutiliza de la contraoferta: plantilla 'propuesta', firma HMAC (tokens.ts)
 // y envío con Idempotency-Key. Diferencias:

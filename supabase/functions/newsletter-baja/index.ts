@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { baseBajaWeb, urlBajaWeb, quiereJson, respuestaBaja, type EstadoBaja } from "./enlace-web.ts";
 
 // ============================================================================
 // newsletter-baja
@@ -31,6 +32,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // configura, con SUPABASE_SERVICE_ROLE_KEY como fallback). Sin el secreto no
 // se puede forjar una firma válida: no vale con adivinar o iterar ids.
 //
+// PÁGINA EN LA WEB (2026-09-24, ver enlace-web.ts): Supabase sirve el HTML de
+// *.supabase.co como text/plain, así que la página de baja la sirve ahora
+// casa-tomas-story (/newsletter/baja) y llama aquí con `formato=json`. Un GET
+// sin `formato=json` (enlaces ya enviados) redirige 302 a esa página. El POST
+// "one-click" de Gmail/Outlook sigue igual.
+//
 // enviar-newsletter/index.ts es quien genera estos enlaces al enviar cada
 // newsletter (mismo HMAC, duplicado ahí a propósito: este proyecto no usa un
 // directorio _shared/ entre funciones, así que se sigue esa misma convención).
@@ -43,6 +50,7 @@ const corsHeaders = {
 };
 
 const SITE_URL = "https://restaurantecasatomascrevillente.es";
+const BAJA_WEB_URL = baseBajaWeb(Deno.env.get("NEWSLETTER_BAJA_WEB_URL"));
 
 // ---------------------------------------------------------------------------
 // Firma HMAC
@@ -254,6 +262,29 @@ serve(async (req) => {
   const viaParam = url.searchParams.get("via");
   const via = viaParam === "header" ? "header" : "body";
   const sig = url.searchParams.get("sig");
+  const modoJson = quiereJson(url);
+
+  // Navegador abriendo un enlace ya enviado: a la página de la web (no muta).
+  if (req.method === "GET" && !modoJson) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: urlBajaWeb(BAJA_WEB_URL, sid ?? "", via, sig ?? ""),
+        "Cache-Control": "no-store",
+        "Referrer-Policy": "no-referrer",
+      },
+    });
+  }
+
+  // Respuesta según el modo: JSON para la web, HTML para el one-click.
+  const responder = (estado: EstadoBaja, html: string, status: number, email?: string, fechaBaja?: string) =>
+    modoJson
+      ? new Response(JSON.stringify(respuestaBaja(estado, email ?? null, fechaBaja ?? null)), {
+          // 200 también en inválido: la web lee el estado del cuerpo.
+          status: status >= 500 ? status : 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+        })
+      : htmlResponse(html, status);
 
   const secret = Deno.env.get("NEWSLETTER_UNSUB_SECRET") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -261,11 +292,11 @@ serve(async (req) => {
 
   if (!secret || !supabaseUrl || !serviceKey) {
     console.error("newsletter-baja: faltan variables de entorno (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
-    return htmlResponse(renderErrorPage(), 500);
+    return responder("error", renderErrorPage(), 500);
   }
 
   if (!sid || !sig || !UUID_RE.test(sid) || !(await verifySignature(sid, via, sig, secret))) {
-    return htmlResponse(renderInvalidPage(), 400);
+    return responder("invalido", renderInvalidPage(), 400);
   }
 
   const supabase = createClient(supabaseUrl, serviceKey);
@@ -278,24 +309,27 @@ serve(async (req) => {
 
   if (fetchError) {
     console.error("newsletter-baja: error consultando suscriptor:", fetchError);
-    return htmlResponse(renderErrorPage(), 500);
+    return responder("error", renderErrorPage(), 500);
   }
 
   if (!suscriptor) {
     // Firma válida pero el suscriptor ya no existe (borrado manual, etc.)
-    return htmlResponse(renderInvalidPage(), 404);
+    return responder("invalido", renderInvalidPage(), 404);
   }
 
   if (req.method === "GET") {
+    // Solo llega aquí en modo JSON (el GET de navegador ya se redirigió).
     if (!suscriptor.activo) {
-      return htmlResponse(renderDonePage(suscriptor.email, suscriptor.fecha_baja ?? new Date().toISOString(), true));
+      const fecha = suscriptor.fecha_baja ?? new Date().toISOString();
+      return responder("ya_estaba", renderDonePage(suscriptor.email, fecha, true), 200, suscriptor.email, fecha);
     }
-    return htmlResponse(renderConfirmPage(suscriptor.email, sid, via, sig));
+    return responder("confirmar", renderConfirmPage(suscriptor.email, sid, via, sig), 200, suscriptor.email);
   }
 
   // POST: acción real de baja (idempotente si ya estaba dado de baja)
   if (!suscriptor.activo) {
-    return htmlResponse(renderDonePage(suscriptor.email, suscriptor.fecha_baja ?? new Date().toISOString(), true));
+    const fecha = suscriptor.fecha_baja ?? new Date().toISOString();
+    return responder("ya_estaba", renderDonePage(suscriptor.email, fecha, true), 200, suscriptor.email, fecha);
   }
 
   const origen = via === "header" ? "cabecera_one_click" : "enlace_email";
@@ -307,9 +341,9 @@ serve(async (req) => {
 
   if (updateError) {
     console.error("newsletter-baja: error al dar de baja:", updateError);
-    return htmlResponse(renderErrorPage(), 500);
+    return responder("error", renderErrorPage(), 500);
   }
 
   console.log(`newsletter-baja: suscriptor ${sid} dado de baja (origen=${origen})`);
-  return htmlResponse(renderDonePage(suscriptor.email, nowIso, false));
+  return responder("baja_hecha", renderDonePage(suscriptor.email, nowIso, false), 200, suscriptor.email, nowIso);
 });
