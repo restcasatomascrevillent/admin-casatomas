@@ -21,17 +21,26 @@
 //     criterio del Gestor de reservas (Kanban) al mover de espacio, así que el
 //     aviso "excede la capacidad de la sala" dice lo mismo en los dos sitios.
 //     Para días futuros ambas cuentas coinciden (aún no hay 'completada').
-//   · Los espacios deben llegar YA filtrados por negocio (marca): el hook usa
-//     `filtrarEspaciosPorMarca`, igual que el motor de disponibilidad.
+//   · AFORO POR NEGOCIO: `calcularOcupacionSalas` mide UN negocio; los
+//     espacios y reservas deben llegar ya repartidos por negocio (marca).
+//     `repartirPorNegocio` hace ese reparto (espacio: `caracteristicas.marca`;
+//     reserva: columna `reservas.marca`, la que usa el trigger) y
+//     `calcularOcupacionPorNegocio` calcula un bloque por negocio, de modo que
+//     los comensales de Touza (El Reservado) nunca cuentan contra el aforo de
+//     Casa Tomás ni al revés. Decisión del dueño 2026-09-24: la rejilla
+//     enseña los dos negocios, agrupados.
 // ============================================================================
 
 import {
+  calcularDisponibilidad,
   ESTADOS_QUE_OCUPAN,
   horaAMinutos,
   minutosAHora,
   turnoDeHora,
+  type ConfiguracionTurnoInput,
 } from "../../../supabase/functions/_shared/disponibilidad";
 import { ocupaEspacio } from "./servicioSala";
+import { MARCA_POR_DEFECTO, normalizarMarca, agruparPorNegocio } from "./negocios";
 
 export type Turno = "comida" | "cena";
 export const TURNOS: Turno[] = ["comida", "cena"];
@@ -50,6 +59,8 @@ export interface EspacioSala {
   id: string;
   nombre: string;
   capacidad_maxima: number;
+  /** Negocio (`caracteristicas.marca`); sin valor = Casa Tomás. */
+  marca?: string | null;
 }
 
 export interface ReservaOcupacionSala {
@@ -58,6 +69,8 @@ export interface ReservaOcupacionSala {
   numero_comensales: number;
   estado: string;
   espacio_id: string | null;
+  /** Negocio (`reservas.marca`); sin valor = Casa Tomás. */
+  marca?: string | null;
 }
 
 export interface FranjasDia {
@@ -191,7 +204,7 @@ function construirFila(
 }
 
 export interface EntradaOcupacionSalas {
-  /** Espacios YA filtrados por negocio (marca). */
+  /** Espacios de UN negocio (ver `repartirPorNegocio`). */
   espacios: EspacioSala[];
   /** Reservas del día (cualquier estado: aquí se filtran). */
   reservas: ReservaOcupacionSala[];
@@ -246,6 +259,107 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
   }
 
   return { comensales, franjas, salas, sinAsignar: haySinAsignar ? filaSinAsignar : null, aforo };
+}
+
+// ----------------------------------------------------------------------------
+// VARIOS NEGOCIOS (Casa Tomás + Touza · El Reservado)
+// ----------------------------------------------------------------------------
+
+export interface BloqueNegocioSalas {
+  marca: string;
+  espacios: EspacioSala[];
+  /** Reservas del día de ESTE negocio (columna `reservas.marca`). */
+  reservas: ReservaOcupacionSala[];
+}
+
+/**
+ * Reparte espacios y reservas por negocio. Una reserva va al negocio de SU
+ * columna `marca` (aunque su `espacio_id` apunte a una sala de otro negocio:
+ * así lo cuenta el trigger; en la rejilla saldrá en "Sin asignar" de su
+ * negocio). Casa Tomás siempre tiene bloque; los demás, si tienen espacios o
+ * reservas ese día.
+ */
+export function repartirPorNegocio(
+  espacios: readonly EspacioSala[],
+  reservas: readonly ReservaOcupacionSala[],
+): BloqueNegocioSalas[] {
+  const porEspacio = agruparPorNegocio(espacios, (e) => normalizarMarca(e.marca), [MARCA_POR_DEFECTO]);
+  const porReserva = agruparPorNegocio(reservas, (r) => normalizarMarca(r.marca));
+  const marcas = agruparPorNegocio(
+    [...porEspacio.map((g) => g.negocio.marca), ...porReserva.map((g) => g.negocio.marca)],
+    (m) => m,
+  ).map((g) => g.negocio.marca);
+  return marcas.map((marca) => ({
+    marca,
+    espacios: porEspacio.find((g) => g.negocio.marca === marca)?.items ?? [],
+    reservas: porReserva.find((g) => g.negocio.marca === marca)?.items ?? [],
+  }));
+}
+
+/**
+ * Horas (franjas) que ofrece el motor para un negocio ese día. Casa Tomás:
+ * turnos generales (`espacio_id` null), como siempre. Otro negocio: la unión
+ * de las horas de cada uno de sus espacios — el motor usa los turnos propios
+ * del espacio si los tiene y, si no, los generales (`seleccionarConfiguraciones`).
+ */
+export function horasBaseDeNegocio(
+  fecha: string,
+  bloque: BloqueNegocioSalas,
+  configuraciones: readonly ConfiguracionTurnoInput[],
+): { horasBase: string[]; cerrado: boolean } {
+  const capacidadTotal = bloque.espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0);
+  const reservasQueOcupan = bloque.reservas.filter((r) => ocupaAforo(r.estado));
+  const ids: (string | null)[] =
+    normalizarMarca(bloque.marca) === MARCA_POR_DEFECTO || bloque.espacios.length === 0
+      ? [null]
+      : bloque.espacios.map((e) => e.id);
+  const horas = new Set<string>();
+  let cerrado = true;
+  for (const espacioId of ids) {
+    const resultado = calcularDisponibilidad({
+      fecha,
+      espacioId,
+      configuraciones: configuraciones as ConfiguracionTurnoInput[],
+      reservas: reservasQueOcupan,
+      capacidadTotal,
+      ahora: null,
+    });
+    if (!resultado.cerrado) cerrado = false;
+    for (const h of resultado.huecos) horas.add(h.hora);
+  }
+  return { horasBase: Array.from(horas), cerrado };
+}
+
+export interface OcupacionNegocio {
+  marca: string;
+  ocupacion: OcupacionSalasDia;
+  cerrado: boolean;
+}
+
+/** Un `calcularOcupacionSalas` por negocio: aforo por turno SEPARADO. */
+export function calcularOcupacionPorNegocio(entrada: {
+  bloques: readonly (BloqueNegocioSalas & { horasBase: readonly string[]; cerrado?: boolean })[];
+  horasExtra?: readonly (string | null | undefined)[];
+  /** Tamaño del grupo: solo se prueba en el negocio en juego. */
+  comensales: number;
+  /** Negocio de la sala elegida (por defecto Casa Tomás). Los demás bloques
+   * se calculan con 0 comensales: solo enseñan su ocupación. */
+  marcaEnJuego?: string | null;
+  excluirReservaId?: string | null;
+}): OcupacionNegocio[] {
+  const enJuego = normalizarMarca(entrada.marcaEnJuego);
+  return entrada.bloques.map((b) => ({
+    marca: b.marca,
+    cerrado: !!b.cerrado,
+    ocupacion: calcularOcupacionSalas({
+      espacios: b.espacios,
+      reservas: b.reservas,
+      horasBase: b.horasBase,
+      horasExtra: normalizarMarca(b.marca) === enJuego ? entrada.horasExtra : [],
+      comensales: normalizarMarca(b.marca) === enJuego ? entrada.comensales : 0,
+      excluirReservaId: entrada.excluirReservaId,
+    }),
+  }));
 }
 
 // ----------------------------------------------------------------------------

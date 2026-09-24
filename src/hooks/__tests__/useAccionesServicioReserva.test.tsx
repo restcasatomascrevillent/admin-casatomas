@@ -51,7 +51,7 @@ function mockUpdates(respuestas: { error: unknown }[]) {
 
 function setup() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(["reservas-kanban", "2026-09-23", "casa_tomas"], [reserva]);
+  queryClient.setQueryData(["reservas-kanban", "2026-09-23"], [reserva]);
   queryClient.setQueryData(["reservas-hoy", "2026-09-23"], [reserva]);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -61,7 +61,7 @@ function setup() {
 }
 
 const kanban = (qc: QueryClient) =>
-  qc.getQueryData<ReservaServicio[]>(["reservas-kanban", "2026-09-23", "casa_tomas"])!;
+  qc.getQueryData<ReservaServicio[]>(["reservas-kanban", "2026-09-23"])!;
 
 describe("useAccionesServicioReserva", () => {
   beforeEach(() => {

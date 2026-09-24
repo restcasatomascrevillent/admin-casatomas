@@ -29,6 +29,7 @@
 //      {{espacio}}             — espacio VIGENTE, o "" si no hay asignado
 //      {{hora_solicitada}}     — solo relevante en tipo 'propuesta'
 //      {{espacio_solicitado}}  — solo relevante en tipo 'propuesta'
+//      {{negocio}}             — siempre, "Casa Tomás" | "Touza"
 //    Disponibles en TODOS los tipos aunque solo tengan sentido en algunos —
 //    usarlos fuera de 'propuesta' es válido pero probablemente no lo que se
 //    quiere (mostraría la hora vigente dos veces).
@@ -55,6 +56,20 @@
 //    `{ asunto, html }`. Quien la llama (index.ts) es responsable de leer
 //    la plantilla vigente de la BD y de resolver nombres de espacio.
 // ============================================================================
+
+// Negocio del correo (2026-09-24): las reservas de "El Reservado" son de
+// Touza (`reservas.marca = 'touza'`) y se gestionan igual que las de Casa
+// Tomás, así que su correo lleva el nombre, la dirección y el teléfono de
+// Touza. Única fuente de esos datos: `NEGOCIOS` de reservas-web (módulo puro,
+// sin imports). Sin marca o marca desconocida => Casa Tomás.
+import { NEGOCIOS, NEGOCIO_POR_DEFECTO, esMarcaValida, type DatosNegocio } from "../reservas-web/plantillas.ts";
+
+export type { DatosNegocio };
+
+/** Datos de contacto del negocio de una marca (desconocida/null => Casa Tomás). */
+export function negocioParaMarca(marca: unknown): DatosNegocio {
+  return NEGOCIOS[esMarcaValida(marca) ? marca : NEGOCIO_POR_DEFECTO];
+}
 
 export type TipoPlantilla =
   | "solicitud_recibida"
@@ -101,6 +116,8 @@ export interface DatosReservaParaCorreo {
   espacioSolicitado?: string | null;
   botonPrincipalUrl?: string | null;
   botonSecundarioUrl?: string | null;
+  /** Negocio de la reserva (ver `negocioParaMarca`). Sin él, Casa Tomás. */
+  negocio?: DatosNegocio | null;
 }
 
 interface FilaTabla {
@@ -180,6 +197,7 @@ export function construirTokens(datos: DatosReservaParaCorreo): Record<string, s
     espacio: datos.espacio || "",
     hora_solicitada: formatearHora(datos.horaSolicitada || datos.hora),
     espacio_solicitado: datos.espacioSolicitado || "",
+    negocio: (datos.negocio ?? NEGOCIOS[NEGOCIO_POR_DEFECTO]).nombre,
   };
 }
 
@@ -266,12 +284,13 @@ interface EsqueletoParams {
   colorAcento: string;
   colorOscuro: string;
   logoUrl: string | null;
+  negocio: DatosNegocio;
 }
 
 function envolverEsqueleto(p: EsqueletoParams): string {
   const marca = p.logoUrl
-    ? `<img src="${escapeHtml(p.logoUrl)}" alt="Casa Tomás" style="max-height:48px;display:inline-block;">`
-    : `<div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:${escapeHtml(p.colorOscuro)};text-transform:uppercase;font-weight:normal;">Casa Tomás</div>`;
+    ? `<img src="${escapeHtml(p.logoUrl)}" alt="${escapeHtml(p.negocio.nombre)}" style="max-height:48px;display:inline-block;">`
+    : `<div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:${escapeHtml(p.colorOscuro)};text-transform:uppercase;font-weight:normal;">${escapeHtml(p.negocio.nombre)}</div>`;
 
   const bloqueComparacion = p.comparacion
     ? `
@@ -319,7 +338,7 @@ function envolverEsqueleto(p: EsqueletoParams): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Casa Tomás</title>
+  <title>${escapeHtml(p.negocio.nombre)}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
@@ -330,7 +349,7 @@ function envolverEsqueleto(p: EsqueletoParams): string {
             <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
               ${marca}
               <div style="width:40px;height:1px;background:${escapeHtml(p.colorAcento)};margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:${escapeHtml(p.colorAcento)};text-transform:uppercase;">Crevillente</div>
+              <div style="font-size:10px;letter-spacing:3px;color:${escapeHtml(p.colorAcento)};text-transform:uppercase;">${escapeHtml(p.negocio.localidad)}</div>
             </td>
           </tr>
           <tr>
@@ -346,7 +365,7 @@ function envolverEsqueleto(p: EsqueletoParams): string {
           </tr>${bloqueComparacion}${bloqueTabla}${bloqueBotones}
           <tr>
             <td style="padding:0 48px 24px;">
-              <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">Casa Tomás · C/ Santa María de la Cabeza, 2, Crevillente · <a href="tel:966107887" style="color:#9B948E;">966 10 78 87</a></p>
+              <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">${escapeHtml(p.negocio.nombre)} · ${escapeHtml(p.negocio.direccion)}, ${escapeHtml(p.negocio.localidad)} · <a href="tel:${escapeHtml(p.negocio.telefonoDigits)}" style="color:#9B948E;">${escapeHtml(p.negocio.telefonoTexto)}</a></p>
             </td>
           </tr>${bloquePie}
         </table>
@@ -361,16 +380,44 @@ function envolverEsqueleto(p: EsqueletoParams): string {
 // Render principal
 // ----------------------------------------------------------------------------
 
+/**
+ * Las plantillas de `plantillas_email_reserva` son UNA por tipo (no por
+ * negocio) y su texto se escribió para Casa Tomás ("Gracias por reservar en
+ * Casa Tomás"). En un correo de otro negocio, cada mención literal de "Casa
+ * Tomás" se cambia por el nombre de ese negocio; para textos nuevos, mejor
+ * usar el token {{negocio}}. En un correo de Casa Tomás no cambia nada.
+ */
+export function adaptarTextoANegocio(textoPlano: string, negocio: DatosNegocio): string {
+  if (!textoPlano || negocio.nombre === NEGOCIOS[NEGOCIO_POR_DEFECTO].nombre) return textoPlano;
+  return textoPlano.replace(/Casa Tom[aá]s/gi, negocio.nombre);
+}
+
+/**
+ * Páginas HTML que ve el cliente al pulsar un enlace del correo (index.ts):
+ * se escribieron con el nombre y el teléfono de Casa Tomás. Para una reserva
+ * de otro negocio se cambian por los suyos. En Casa Tomás no cambia nada.
+ */
+export function adaptarPaginaANegocio(html: string, negocio: DatosNegocio): string {
+  const ct = NEGOCIOS[NEGOCIO_POR_DEFECTO];
+  if (!html || negocio.nombre === ct.nombre) return html;
+  return html
+    .split(ct.nombre).join(negocio.nombre)
+    .split(ct.telefonoTexto).join(negocio.telefonoTexto)
+    .split(`tel:${ct.telefonoDigits}`).join(`tel:${negocio.telefonoDigits}`);
+}
+
 export function renderPlantilla(
   plantilla: FilaPlantilla,
   datos: DatosReservaParaCorreo,
 ): ResultadoRenderizado {
   const tokens = construirTokens(datos);
+  const negocio = datos.negocio ?? NEGOCIOS[NEGOCIO_POR_DEFECTO];
+  const texto = (t: string) => adaptarTextoANegocio(t, negocio);
 
-  const asunto = sustituirTexto(plantilla.asunto, tokens);
-  const saludoHtml = sustituirTexto(plantilla.saludo, tokens);
-  const cuerpoHtml = parrafosHtml(sustituirTexto(plantilla.cuerpo, tokens));
-  const pieTexto = plantilla.pie ? sustituirTexto(plantilla.pie, tokens) : null;
+  const asunto = sustituirTexto(texto(plantilla.asunto), tokens);
+  const saludoHtml = sustituirTexto(texto(plantilla.saludo), tokens);
+  const cuerpoHtml = parrafosHtml(sustituirTexto(texto(plantilla.cuerpo), tokens));
+  const pieTexto = plantilla.pie ? sustituirTexto(texto(plantilla.pie), tokens) : null;
 
   const mostrarTabla = leerBloque(plantilla.bloques, "mostrar_tabla_detalles", true);
   const mostrarBotonSecundario = leerBloque(plantilla.bloques, "mostrar_boton_secundario", true);
@@ -424,7 +471,10 @@ export function renderPlantilla(
     pieHtml: mostrarPie ? pieTexto : null,
     colorAcento: plantilla.color_acento || "#B8936A",
     colorOscuro: plantilla.color_oscuro || "#1C1F22",
-    logoUrl: plantilla.logo_url,
+    // El logo guardado en la plantilla es el de Casa Tomás: en un correo de
+    // otro negocio se pinta su nombre en texto.
+    logoUrl: negocio === NEGOCIOS[NEGOCIO_POR_DEFECTO] ? plantilla.logo_url : null,
+    negocio,
   });
 
   return { asunto, html };

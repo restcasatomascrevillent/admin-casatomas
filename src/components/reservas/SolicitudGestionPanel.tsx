@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -29,7 +29,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ResultadoPropuesta, SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import {
@@ -39,7 +47,9 @@ import {
   tieneColumnasPropuesta,
 } from "@/lib/reservas/propuestaCliente";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
-import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
+import { datosDeNegocio, useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
+import { agruparPorNegocio, marcaDeSolicitud, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
+import { NegocioBadge } from "./NegocioBadge";
 import {
   calcularOcupacionSalas,
   construirFranjas,
@@ -126,8 +136,27 @@ export function SolicitudGestionPanel({
     email: null,
   });
 
-  const { data, horasBase } = useOcupacionSalasDia(propuesta.fecha);
-  const espacios = data?.espacios ?? [];
+  const { data } = useOcupacionSalasDia(propuesta.fecha);
+  const espacios = useMemo(() => (data?.negocios ?? []).flatMap((n) => n.espacios), [data]);
+  // Negocio de la solicitud: el de la sala propuesta; sin sala, el marcador
+  // del formulario de El Reservado en las notas; si no, Casa Tomás. La
+  // reserva que salga de aquí (propuesta por correo, "aceptó por teléfono" o
+  // "Convertir en reserva") será de ese negocio, con sus turnos y su aforo.
+  const marcaSolicitud = marcaDeSolicitud(
+    { espacio_propuesto_id: propuesta.espacioId, notas_cliente: solicitud.notas_cliente },
+    espacios,
+  );
+  const datosNegocio = useMemo(() => datosDeNegocio(data, marcaSolicitud), [data, marcaSolicitud]);
+  const horasBase = useMemo(() => datosNegocio?.horasBase ?? [], [datosNegocio]);
+
+  // Solicitud de un negocio con UNA sola sala (Touza: El Reservado) sin sala
+  // elegida: se preselecciona esa sala para que la reserva no acabe como
+  // "Casa Tomás · Sin asignar". Queda como cambio pendiente de guardar.
+  useEffect(() => {
+    if (propuesta.espacioId || marcaSolicitud === MARCA_POR_DEFECTO) return;
+    const propios = datosNegocio?.espacios ?? [];
+    if (propios.length === 1) setPropuesta((p) => (p.espacioId ? p : { ...p, espacioId: propios[0].id }));
+  }, [propuesta.espacioId, marcaSolicitud, datosNegocio]);
 
   const opcionesHora = useMemo(() => {
     const f = construirFranjas(horasBase);
@@ -138,15 +167,15 @@ export function SolicitudGestionPanel({
   const mostrarInputHora = modoOtraHora || horaPersonalizada;
 
   const evaluacion = useMemo(() => {
-    if (!data) return null;
+    if (!datosNegocio) return null;
     const ocupacion = calcularOcupacionSalas({
-      espacios: data.espacios,
-      reservas: data.reservas,
-      horasBase: data.horasBase,
+      espacios: datosNegocio.espacios,
+      reservas: datosNegocio.reservas,
+      horasBase: datosNegocio.horasBase,
       comensales: propuesta.comensales ?? 0,
     });
     return evaluarUbicacion(ocupacion, propuesta.espacioId, propuesta.hora);
-  }, [data, propuesta.comensales, propuesta.espacioId, propuesta.hora]);
+  }, [datosNegocio, propuesta.comensales, propuesta.espacioId, propuesta.hora]);
 
   const cambiosVsOriginal = diferenciasPeticion(original, propuesta);
   const pendienteDeGuardar = actualizacionPropuesta(solicitud, propuesta, { persistirSala });
@@ -353,7 +382,10 @@ export function SolicitudGestionPanel({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="propuesta-sala">Sala</Label>
+              <Label htmlFor="propuesta-sala" className="flex items-center gap-2">
+                Sala
+                <NegocioBadge marca={marcaSolicitud} />
+              </Label>
               <Select
                 value={propuesta.espacioId ?? SIN_ASIGNAR}
                 onValueChange={(v) => set({ espacioId: v === SIN_ASIGNAR ? null : v })}
@@ -363,10 +395,15 @@ export function SolicitudGestionPanel({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
-                  {espacios.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.nombre} ({e.capacidad_maxima} plazas)
-                    </SelectItem>
+                  {agruparPorNegocio(espacios, (e) => e.marca ?? MARCA_POR_DEFECTO).map(({ negocio, items }) => (
+                    <SelectGroup key={negocio.marca}>
+                      <SelectLabel>{negocio.etiqueta}</SelectLabel>
+                      {items.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nombre} ({e.capacidad_maxima} plazas)
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
@@ -637,6 +674,7 @@ export function SolicitudGestionPanel({
           comensales={propuesta.comensales ?? 0}
           hora={propuesta.hora}
           espacioId={propuesta.espacioId}
+          marca={marcaSolicitud}
           onSeleccionar={(espacioId, hora) => {
             setModoOtraHora(false);
             set({ espacioId, hora });

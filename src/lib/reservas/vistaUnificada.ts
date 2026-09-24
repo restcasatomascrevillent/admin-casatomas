@@ -11,6 +11,7 @@
 // ============================================================================
 
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import { coincideNegocio, marcaDeReserva, marcaDeSolicitud } from "./negocios";
 
 /** Mínimo de `reservas` que necesita la lista unificada. */
 export interface ReservaListable {
@@ -24,6 +25,8 @@ export interface ReservaListable {
   canal?: string | null;
   numero_comensales: number;
   notas_cliente?: string | null;
+  /** Negocio (`reservas.marca`): casa_tomas | touza. */
+  marca?: string | null;
 }
 
 export type FilaUnificada<R extends ReservaListable = ReservaListable> =
@@ -62,6 +65,11 @@ export interface FiltrosListaUnificada {
   canal?: string;
   /** "yyyy-MM-dd" */
   fecha?: string | null;
+  /** "all" | casa_tomas | touza (ver src/lib/reservas/negocios.ts). */
+  negocio?: string;
+  /** Negocio de una solicitud (no tiene columna marca). Por defecto:
+   * marcador de El Reservado en las notas, si no Casa Tomás. */
+  marcaDeSolicitud?: (s: SolicitudPendiente) => string;
 }
 
 const normalizarHora = (hora: string | null | undefined) =>
@@ -123,9 +131,17 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
   const estado = filtros.estado ?? "all";
   const canal = filtros.canal ?? "all";
   const fecha = filtros.fecha ?? null;
+  const negocio = filtros.negocio ?? "all";
+  const marcaSolicitud = filtros.marcaDeSolicitud ?? ((s: SolicitudPendiente) => marcaDeSolicitud(s, []));
 
   return filas.filter((f) => {
     if (fecha && f.fecha !== fecha) return false;
+    if (
+      negocio !== "all" &&
+      !coincideNegocio(f.tipo === "reserva" ? marcaDeReserva(f.reserva) : marcaSolicitud(f.solicitud), negocio)
+    ) {
+      return false;
+    }
 
     if (f.tipo === "solicitud") {
       const s = f.solicitud;

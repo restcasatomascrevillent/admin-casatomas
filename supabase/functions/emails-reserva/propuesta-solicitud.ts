@@ -22,6 +22,7 @@
 // ============================================================================
 
 import type { DatosReservaParaCorreo } from "./plantillas.ts";
+import { resolverMarcaPorNotas, NEGOCIO_POR_DEFECTO, esMarcaValida, type Marca } from "../reservas-web/plantillas.ts";
 
 export interface SolicitudParaPropuesta {
   id: string;
@@ -36,6 +37,24 @@ export interface SolicitudParaPropuesta {
   espacio_propuesto_id?: string | null;
   propuesta_estado?: string | null;
   propuesta_enviada_at?: string | null;
+  /** Texto del cliente; el formulario de El Reservado (web de Touza) lo
+   * empieza con "Solicitud de El Reservado". */
+  notas_cliente?: string | null;
+}
+
+/**
+ * Negocio de una solicitud (la tabla no tiene columna `marca`): el de la sala
+ * propuesta si la hay (`marcaEspacioPropuesto` = su `caracteristicas.marca`);
+ * si no, el marcador de El Reservado en las notas; si no, Casa Tomás. Mismo
+ * orden que `fn_aceptar_propuesta_solicitud` (migración 20260924090000) y
+ * que el panel (`src/lib/reservas/negocios.ts`, `marcaDeSolicitud`).
+ */
+export function marcaDeSolicitudParaCorreo(
+  s: Pick<SolicitudParaPropuesta, "espacio_propuesto_id" | "notas_cliente">,
+  marcaEspacioPropuesto: unknown,
+): Marca {
+  if (s.espacio_propuesto_id) return esMarcaValida(marcaEspacioPropuesto) ? marcaEspacioPropuesto : NEGOCIO_POR_DEFECTO;
+  return resolverMarcaPorNotas(s.notas_cliente ?? null) ?? NEGOCIO_POR_DEFECTO;
 }
 
 export type ErrorEnvioPropuesta =

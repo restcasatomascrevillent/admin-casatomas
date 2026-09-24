@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import {
-  calcularOcupacionSalas,
+  calcularOcupacionPorNegocio,
   ETIQUETA_NIVEL,
   ETIQUETA_TURNO,
   horaCorta,
@@ -14,16 +14,25 @@ import {
   type CeldaTurno,
   type FilaSala,
   type NivelOcupacion,
+  type OcupacionNegocio,
   type OcupacionSalasDia,
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
+import { etiquetaNegocio, normalizarMarca } from "@/lib/reservas/negocios";
+import { NegocioBadge } from "./NegocioBadge";
 
 // ============================================================================
 // "Ocupación de salas": rejilla salas × franjas de un día para decidir dónde
 // y a qué hora cabe un grupo. La lógica está en `lib/reservas/ocupacionSalas`
 // (ver su cabecera: cómo se cuenta y por qué coincide con el trigger).
 // Se usa en el diálogo de solicitudes del bot y en FormularioReserva.
+//
+// Un bloque por negocio (Casa Tomás y Touza · El Reservado), cada uno con SU
+// aforo por turno, igual que el trigger. El grupo que se quiere colocar solo
+// se prueba en el negocio "en juego" (el de la sala elegida); la
+// recomendación también se limita a ese negocio: no se propone mover a un
+// cliente del restaurante al Reservado de Touza ni al revés.
 // ============================================================================
 
 const CLASES_NIVEL: Record<NivelOcupacion, string> = {
@@ -47,6 +56,8 @@ export interface OcupacionSalasProps {
   /** Si se pasa, cada celda es un botón que fija sala + hora. */
   onSeleccionar?: (espacioId: string | null, hora: string) => void;
   excluirReservaId?: string | null;
+  /** Negocio en juego si no hay sala elegida (por defecto, el de `espacioId`). */
+  marca?: string | null;
   className?: string;
 }
 
@@ -57,21 +68,34 @@ export function OcupacionSalas({
   espacioId,
   onSeleccionar,
   excluirReservaId,
+  marca,
   className,
 }: OcupacionSalasProps) {
   const { data, isLoading, error, refetch, isFetching } = useOcupacionSalasDia(fecha);
 
-  const ocupacion = useMemo<OcupacionSalasDia | null>(() => {
+  // Negocio en juego: el de la sala elegida; si no hay, el que diga quien
+  // llama; si no, Casa Tomás.
+  const marcaEnJuego = useMemo(() => {
+    const deSala = espacioId
+      ? data?.negocios.find((n) => n.espacios.some((e) => e.id === espacioId))?.marca
+      : undefined;
+    return normalizarMarca(deSala ?? marca);
+  }, [data, espacioId, marca]);
+
+  const bloques = useMemo<OcupacionNegocio[] | null>(() => {
     if (!data) return null;
-    return calcularOcupacionSalas({
-      espacios: data.espacios,
-      reservas: data.reservas,
-      horasBase: data.horasBase,
+    return calcularOcupacionPorNegocio({
+      bloques: data.negocios,
       horasExtra: [hora],
       comensales,
+      marcaEnJuego,
       excluirReservaId,
     });
-  }, [data, hora, comensales, excluirReservaId]);
+  }, [data, hora, comensales, marcaEnJuego, excluirReservaId]);
+
+  const bloqueEnJuego = bloques?.find((b) => b.marca === marcaEnJuego) ?? null;
+  const ocupacion = bloqueEnJuego?.ocupacion ?? null;
+  const variosNegocios = (bloques?.length ?? 0) > 1;
 
   const recomendacion = useMemo(
     () => (ocupacion ? recomendarUbicacion(ocupacion, { espacioId, hora }) : null),
@@ -115,14 +139,8 @@ export function OcupacionSalas({
             Reintentar
           </Button>
         </div>
-      ) : !ocupacion || ocupacion.salas.length === 0 ? (
+      ) : !bloques || bloques.every((b) => b.ocupacion.salas.length === 0 && !b.ocupacion.sinAsignar) ? (
         <EstadoVacio>No hay salas activas configuradas.</EstadoVacio>
-      ) : ocupacion.franjas.comida.length + ocupacion.franjas.cena.length === 0 ? (
-        <EstadoVacio>
-          {data?.cerrado
-            ? "Ese día no hay turnos configurados (cerrado). Puedes indicar una hora personalizada."
-            : "No hay franjas horarias para ese día."}
-        </EstadoVacio>
       ) : (
         <>
           {recomendacion && (
@@ -142,6 +160,7 @@ export function OcupacionSalas({
               ) : (
                 <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
               )}
+              {variosNegocios && <NegocioBadge marca={marcaEnJuego} className="bg-background" />}
               <span className="min-w-0 flex-1">{recomendacion.texto}</span>
               {recomendacion.tipo === "sugerencia" && onSeleccionar && (
                 <Button
@@ -157,69 +176,132 @@ export function OcupacionSalas({
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full border-collapse text-xs tabular-nums">
-              <caption className="sr-only">
-                Comensales por sala y franja horaria. Cada turno muestra ocupadas sobre capacidad; cada hora, los
-                comensales ya reservados a esa hora y si caben {comensales} más.
-              </caption>
-              <thead>
-                <tr className="bg-muted/50">
-                  <th scope="col" rowSpan={2} className="sticky left-0 z-10 bg-muted px-2 py-1.5 text-left font-medium">
-                    Sala
-                  </th>
-                  {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => (
-                    <th
-                      key={t}
-                      scope="colgroup"
-                      colSpan={ocupacion.franjas[t].length + 1}
-                      className="border-l px-2 py-1.5 text-left font-medium"
-                    >
-                      <span>{ETIQUETA_TURNO[t]}</span>
-                      <AforoTurno ocupacion={ocupacion} turno={t} />
-                    </th>
-                  ))}
-                </tr>
-                <tr className="bg-muted/30 text-muted-foreground">
-                  {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => [
-                    <th key={`${t}-turno`} scope="col" className="border-l px-2 py-1 text-left font-normal">
-                      Turno
-                    </th>,
-                    ...ocupacion.franjas[t].map((h) => (
-                      <th
-                        key={`${t}-${h}`}
-                        scope="col"
-                        className={cn("px-1 py-1 text-center font-normal", h === horaSel && "font-semibold text-foreground")}
-                      >
-                        {h}
-                      </th>
-                    )),
-                  ])}
-                </tr>
-              </thead>
-              <tbody>
-                {[...ocupacion.salas, ...(ocupacion.sinAsignar ? [ocupacion.sinAsignar] : [])].map((sala) => (
-                  <FilaRejilla
-                    key={sala.espacioId ?? "sin-asignar"}
-                    sala={sala}
-                    ocupacion={ocupacion}
-                    horaSel={horaSel}
-                    espacioSel={espacioId}
-                    onSeleccionar={onSeleccionar}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {bloques.map((bloque) => (
+            <BloqueNegocio
+              key={bloque.marca}
+              bloque={bloque}
+              mostrarCabecera={variosNegocios}
+              enJuego={bloque.marca === marcaEnJuego}
+              horaSel={horaSel}
+              espacioSel={espacioId}
+              onSeleccionar={onSeleccionar}
+            />
+          ))}
           {onSeleccionar && (
             <p className="text-[11px] text-muted-foreground">
-              Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00), igual que
-              la base de datos.
+              Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00) y por
+              negocio, igual que la base de datos.
             </p>
           )}
         </>
       )}
     </section>
+  );
+}
+
+function BloqueNegocio({
+  bloque,
+  mostrarCabecera,
+  enJuego,
+  horaSel,
+  espacioSel,
+  onSeleccionar,
+}: {
+  bloque: OcupacionNegocio;
+  mostrarCabecera: boolean;
+  enJuego: boolean;
+  horaSel: string | null;
+  espacioSel: string | null;
+  onSeleccionar?: (espacioId: string | null, hora: string) => void;
+}) {
+  const ocupacion = bloque.ocupacion;
+  const idCabecera = useId();
+  const sinFranjas = ocupacion.franjas.comida.length + ocupacion.franjas.cena.length === 0;
+  const vacio = ocupacion.salas.length === 0 && !ocupacion.sinAsignar;
+
+  return (
+    <div
+      className="space-y-1.5"
+      role={mostrarCabecera ? "group" : undefined}
+      aria-labelledby={mostrarCabecera ? idCabecera : undefined}
+    >
+      {mostrarCabecera && (
+        <h4 id={idCabecera} className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          {etiquetaNegocio(bloque.marca)}
+          {!enJuego && (
+            <span className="font-normal text-muted-foreground">· solo ocupación (aforo independiente)</span>
+          )}
+        </h4>
+      )}
+      {vacio ? (
+        <EstadoVacio>No hay salas activas configuradas para este negocio.</EstadoVacio>
+      ) : sinFranjas ? (
+        <EstadoVacio>
+          {bloque.cerrado
+            ? "Ese día no hay turnos configurados (cerrado). Puedes indicar una hora personalizada."
+            : "No hay franjas horarias para ese día."}
+        </EstadoVacio>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full border-collapse text-xs tabular-nums">
+            <caption className="sr-only">
+              {etiquetaNegocio(bloque.marca)}: comensales por sala y franja horaria. Cada turno muestra ocupadas sobre
+              capacidad; cada hora, los comensales ya reservados a esa hora
+              {ocupacion.comensales > 0 ? ` y si caben ${ocupacion.comensales} más` : ""}.
+            </caption>
+            <thead>
+              <tr className="bg-muted/50">
+                <th scope="col" rowSpan={2} className="sticky left-0 z-10 bg-muted px-2 py-1.5 text-left font-medium">
+                  Sala
+                </th>
+                {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => (
+                  <th
+                    key={t}
+                    scope="colgroup"
+                    colSpan={ocupacion.franjas[t].length + 1}
+                    className="border-l px-2 py-1.5 text-left font-medium"
+                  >
+                    <span>{ETIQUETA_TURNO[t]}</span>
+                    <AforoTurno ocupacion={ocupacion} turno={t} />
+                  </th>
+                ))}
+              </tr>
+              <tr className="bg-muted/30 text-muted-foreground">
+                {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => [
+                  <th key={`${t}-turno`} scope="col" className="border-l px-2 py-1 text-left font-normal">
+                    Turno
+                  </th>,
+                  ...ocupacion.franjas[t].map((h) => (
+                    <th
+                      key={`${t}-${h}`}
+                      scope="col"
+                      className={cn(
+                        "px-1 py-1 text-center font-normal",
+                        enJuego && h === horaSel && "font-semibold text-foreground",
+                      )}
+                    >
+                      {h}
+                    </th>
+                  )),
+                ])}
+              </tr>
+            </thead>
+            <tbody>
+              {[...ocupacion.salas, ...(ocupacion.sinAsignar ? [ocupacion.sinAsignar] : [])].map((sala) => (
+                <FilaRejilla
+                  key={sala.espacioId ?? "sin-asignar"}
+                  sala={sala}
+                  ocupacion={ocupacion}
+                  horaSel={enJuego ? horaSel : null}
+                  espacioSel={espacioSel}
+                  onSeleccionar={onSeleccionar}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -10,7 +10,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
+import {
+  coincideNegocio,
+  FILTRO_NEGOCIO_TODOS,
+  marcaDeReserva,
+  NEGOCIOS_PANEL,
+} from "@/lib/reservas/negocios";
+import type { CifrasNegocio } from "@/lib/reservas/resumenNegocios";
+import { NegocioBadge } from "./NegocioBadge";
 import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star, LayoutGrid } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -52,6 +59,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   } = useResumenOcupacionHoy();
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
   const [busqueda, setBusqueda] = useState("");
+  const [filtroNegocio, setFiltroNegocio] = useState<string>(FILTRO_NEGOCIO_TODOS);
   const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
   const [kanbanOpen, setKanbanOpen] = useState(false);
   const acciones = useAccionesServicioReserva();
@@ -85,12 +93,12 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   } = useQuery({
     queryKey: ["reservas-hoy", hoy],
     queryFn: async () => {
-      // Solo Casa Tomás (Touza no tiene reservas, decisión del dueño
-      // 2026-09-23). `as any`: ver ListaReservasAvanzada.
-      const { data, error } = await (supabase.from("reservas" as any) as any)
+      // Reservas de hoy de TODOS los negocios (Casa Tomás y Touza · El
+      // Reservado, decisión del dueño 2026-09-24); cada fila lleva su insignia.
+      const { data, error } = await supabase
+        .from("reservas")
         .select("*")
         .eq("fecha", hoy)
-        .eq("marca", MARCA_POR_DEFECTO)
         .order("hora", { ascending: true });
 
       if (error) throw error;
@@ -126,6 +134,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
 
   const today = new Date();
   const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
+  const porNegocio = resumen?.porNegocio ?? [];
 
   return (
     <div className="space-y-6">
@@ -169,6 +178,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                   activas{reservasCanceladas > 0 ? ` · ${reservasCanceladas} cancelada(s)` : ""}
                 </p>
+                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.totalReservas}`} />
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-primary/10">
                 <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
@@ -188,6 +198,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                   sin canceladas
                 </p>
+                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.totalComensales}`} />
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-accent/10">
                 <Users className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
@@ -201,9 +212,10 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Capacidad Total
+                  Capacidad por turno
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold">{resumen?.capacidadTotal || 0}</p>
+                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.capacidadTotal}`} />
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-secondary/10">
                 <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />
@@ -223,6 +235,11 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                 <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                   {resumen?.totalComensales || 0}/{resumen?.capacidadTotal || 0} plazas
                 </p>
+                {/* Cada negocio contra SU aforo: Touza nunca ocupa plazas del restaurante. */}
+                <DesgloseNegocios
+                  porNegocio={porNegocio}
+                  valor={(n) => `${n.porcentajeTotal}% (${n.totalComensales}/${n.capacidadTotal})`}
+                />
               </div>
               <div className="p-2 sm:p-3 rounded-full bg-green-500/10">
                 <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
@@ -250,6 +267,19 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                   className="pl-9 w-full sm:w-[250px]"
                 />
               </div>
+              <Select value={filtroNegocio} onValueChange={setFiltroNegocio}>
+                <SelectTrigger className="w-[150px]" aria-label="Filtrar por negocio">
+                  <SelectValue placeholder="Negocio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTRO_NEGOCIO_TODOS}>Todos los negocios</SelectItem>
+                  {NEGOCIOS_PANEL.map((n) => (
+                    <SelectItem key={n.marca} value={n.marca}>
+                      {n.etiqueta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filtroEstado} onValueChange={setFiltroEstado}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Estado" />
@@ -288,7 +318,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                     (r.email || "").toLowerCase().includes(term) ||
                     (r.telefono || "").toLowerCase().includes(term) ||
                     (r.notas_cliente || "").toLowerCase().includes(term);
-                  return matchBusqueda;
+                  return matchBusqueda && coincideNegocio(marcaDeReserva(r), filtroNegocio);
                 });
                 const reservasFiltradas = filtroEstado === "todos" 
                   ? reservasBuscadas 
@@ -327,6 +357,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                               </button>
                               <span className="font-medium text-sm">{reserva.nombre || "Sin nombre"}</span>
                               {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
+                              <NegocioBadge marca={marcaDeReserva(reserva)} corta className="ml-auto" />
                             </div>
                             <div className="flex items-center justify-between text-xs text-muted-foreground">
                               <div className="flex items-center gap-3">
@@ -377,6 +408,7 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
                                     </button>
                                     <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
                                     {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
+                                    <NegocioBadge marca={marcaDeReserva(reserva)} corta />
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -444,5 +476,25 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
         onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
       />
     </div>
+  );
+}
+
+/** Desglose de una cifra por negocio (solo si hay más de uno ese día). */
+function DesgloseNegocios({
+  porNegocio,
+  valor,
+}: {
+  porNegocio: CifrasNegocio[];
+  valor: (n: CifrasNegocio) => string;
+}) {
+  if (porNegocio.length < 2) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-[10px] sm:text-xs text-muted-foreground" aria-label="Desglose por negocio">
+      {porNegocio.map((n) => (
+        <li key={n.negocio.marca} className="tabular-nums">
+          {n.negocio.nombre}: <span className="font-medium text-foreground">{valor(n)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

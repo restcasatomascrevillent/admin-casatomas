@@ -9,7 +9,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
+import { NegocioBadge } from "./NegocioBadge";
 
 interface CalendarioOcupacionProps {
   onDayClick?: (date: Date, reservas: any[]) => void;
@@ -24,21 +24,19 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
 
   // Obtener reservas del mes
   //
-  // Aforo por negocio (marca) — bug de 2026-09-22, ver "Aforo por negocio"
-  // en `useDisponibilidad.ts`. Sin filtrar por marca, el calendario mensual
-  // del restaurante sumaba también reservas de otros negocios (touza) en el
-  // conteo de comensales/reservas de cada día. Por defecto
-  // `MARCA_POR_DEFECTO`, igual que el resto del panel.
+  // De TODOS los negocios (Casa Tomás + Touza · El Reservado, decisión del
+  // dueño 2026-09-24): el calendario solo cuenta reservas y comensales por
+  // día (no calcula aforo), y cada reserva del día lleva su insignia de
+  // negocio. Quien calcule aforo debe hacerlo por negocio (trigger
+  // `validar_capacidad_reserva`).
   const { data: reservasMes, isLoading } = useQuery({
-    queryKey: ["reservas_mes", format(currentMonth, "yyyy-MM"), MARCA_POR_DEFECTO],
+    queryKey: ["reservas_mes", format(currentMonth, "yyyy-MM")],
     queryFn: async () => {
       const inicio = format(startOfMonth(currentMonth), "yyyy-MM-dd");
       const fin = format(endOfMonth(currentMonth), "yyyy-MM-dd");
 
-      // `as any` + cast final: `.eq("marca", ...)` hace que TypeScript
-      // falle con "Type instantiation is excessively deep" al inferir el
-      // tipo del query builder de Supabase (`marca` no está en los tipos
-      // generados para `reservas`). Mismo recurso que `useDisponibilidad.ts`.
+      // `as any` + cast final: `marca` no está en los tipos generados para
+      // `reservas`. Mismo recurso que `useDisponibilidad.ts`.
       const { data, error } = await supabase
         .from("reservas" as any)
         .select(`
@@ -47,12 +45,12 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
           hora,
           numero_comensales,
           estado,
-          nombre
+          nombre,
+          marca
         `)
         .gte("fecha", inicio)
         .lte("fecha", fin)
         .neq("estado", "cancelada")
-        .eq("marca", MARCA_POR_DEFECTO)
         .order("fecha")
         .order("hora");
 
@@ -238,9 +236,12 @@ export function CalendarioOcupacion({ onDayClick, onEspacioClick }: CalendarioOc
                             {r.hora} · {r.numero_comensales} personas
                           </p>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {r.estado}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="outline" className="text-xs">
+                            {r.estado}
+                          </Badge>
+                          <NegocioBadge corta marca={r.marca} />
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -29,6 +29,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useDisponibilidadCalculada } from "@/hooks/useDisponibilidad";
+import { marcaDeEspacio, marcaDeReserva } from "@/lib/reservas/negocios";
+import { NegocioBadge } from "./NegocioBadge";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   type ReservaParaVerificar,
@@ -93,13 +95,16 @@ export function ModalVerificacionReserva({
 
   const fecha = reserva?.fecha || "";
   const comensales = reserva?.numero_comensales || 1;
+  // Negocio de la reserva (Casa Tomás / Touza · El Reservado): las horas, el
+  // aforo y las zonas que se pueden ofrecer son solo las de ese negocio.
+  const marca = marcaDeReserva(reserva);
 
   // Motor de disponibilidad (supabase/functions/_shared/disponibilidad.ts vía
   // useDisponibilidad.ts) recalculado para la ZONA que se esté ofreciendo
   // ahora mismo en el formulario: cambiar de zona recalcula qué horas caben.
   const { data: disponibilidad, isLoading: cargandoHoras, isError: errorHoras } = useDisponibilidadCalculada(
     fecha,
-    { comensales, espacioId: espacioOferta },
+    { comensales, espacioId: espacioOferta, marca },
   );
 
   const opcionesHora = useMemo(() => {
@@ -114,13 +119,13 @@ export function ModalVerificacionReserva({
   }, [disponibilidad, horaOferta]);
 
   const opcionesEspacio = useMemo(() => {
-    const activos = (espacios ?? []).filter((e: any) => e.activa);
+    const activos = (espacios ?? []).filter((e: any) => e.activa && marcaDeEspacio(e) === marca);
     if (espacioOferta && !activos.some((e: any) => e.id === espacioOferta)) {
       const actual = (espacios ?? []).find((e: any) => e.id === espacioOferta);
       if (actual) return [...activos, actual];
     }
     return activos;
-  }, [espacios, espacioOferta]);
+  }, [espacios, espacioOferta, marca]);
 
   if (!reserva) return null;
 
@@ -162,7 +167,10 @@ export function ModalVerificacionReserva({
     <Dialog open={open} onOpenChange={cerrar}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Verificar solicitud</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Verificar solicitud
+            <NegocioBadge marca={marca} />
+          </DialogTitle>
           <DialogDescription>
             {reserva.nombre || "Cliente sin nombre"} ·{" "}
             {fecha ? format(new Date(`${fecha}T00:00:00`), "d MMM yyyy", { locale: es }) : "sin fecha"}

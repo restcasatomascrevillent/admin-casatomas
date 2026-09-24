@@ -12,6 +12,8 @@ import { useMesas, useCrearMesa, useActualizarMesa, useActualizarMesasSilent, us
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import { useAsignacionesMesa, useCrearAsignacion, useEliminarAsignacion, AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
 import { useReservasHoyPorEspacio } from "@/hooks/useOcupacionHoy";
+import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { marcaDeEspacio } from "@/lib/reservas/negocios";
 import { 
   DndContext, 
   DragEndEvent, 
@@ -521,7 +523,10 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
   const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(fechaActual, espacioId);
-  const { data: reservasHoy } = useReservasHoyPorEspacio();
+  // Reservas de hoy del negocio de ESTE espacio (El Reservado => Touza).
+  const { data: espaciosPlano } = useEspaciosReserva();
+  const marcaPlano = marcaDeEspacio(((espaciosPlano ?? []) as any[]).find((e) => e.id === espacioId));
+  const { data: reservasHoy } = useReservasHoyPorEspacio(marcaPlano);
 
   const crearMesa = useCrearMesa();
   const actualizarMesasSilent = useActualizarMesasSilent();

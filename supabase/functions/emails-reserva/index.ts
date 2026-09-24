@@ -88,7 +88,17 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
-import { renderPlantilla, escapeHtml, TIPOS_PLANTILLA, type TipoPlantilla, type FilaPlantilla, type DatosReservaParaCorreo } from "./plantillas.ts";
+import {
+  renderPlantilla,
+  escapeHtml,
+  negocioParaMarca,
+  adaptarPaginaANegocio,
+  TIPOS_PLANTILLA,
+  type TipoPlantilla,
+  type FilaPlantilla,
+  type DatosReservaParaCorreo,
+  type DatosNegocio,
+} from "./plantillas.ts";
 import {
   seleccionarReservasParaRecordatorio,
   fechaObjetivoRecordatorio,
@@ -130,6 +140,7 @@ import {
   validarSolicitudParaEnvio,
   huellaPropuestaSolicitud,
   datosCorreoPropuestaSolicitud,
+  marcaDeSolicitudParaCorreo,
   claveIdempotenciaPropuestaSolicitud,
   epochSegundos,
   paginaTrasAceptar,
@@ -208,12 +219,15 @@ interface ReservaRow {
   espacio_id: string | null;
   hora_solicitada: string | null;
   espacio_solicitado_id: string | null;
+  /** Negocio (columna NOT NULL DEFAULT 'casa_tomas', migración
+   * 20260922180000): 'touza' = El Reservado. Decide la marca del correo. */
+  marca?: string | null;
 }
 
 async function fetchReserva(id: string): Promise<ReservaRow | null> {
   const { data, error } = await supabase
     .from("reservas")
-    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id")
+    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id, marca")
     .eq("id", id)
     .maybeSingle();
   if (error || !data) return null;
@@ -226,6 +240,26 @@ async function fetchReserva(id: string): Promise<ReservaRow | null> {
 async function obtenerMapaEspacios(): Promise<Map<string, string>> {
   const { data } = await supabase.from("espacios_reserva").select("id, nombre");
   return new Map(((data ?? []) as Array<{ id: string; nombre: string }>).map((e) => [e.id, e.nombre]));
+}
+
+/** Negocio de una solicitud (sin columna marca): sala propuesta > marcador
+ * de El Reservado en las notas > Casa Tomás. Ver marcaDeSolicitudParaCorreo. */
+async function negocioDeSolicitud(s: SolicitudParaPropuesta): Promise<DatosNegocio> {
+  let marcaEspacio: unknown = null;
+  if (s.espacio_propuesto_id) {
+    const { data } = await supabase
+      .from("espacios_reserva")
+      .select("caracteristicas")
+      .eq("id", s.espacio_propuesto_id)
+      .maybeSingle();
+    marcaEspacio = (data as { caracteristicas?: { marca?: unknown } | null } | null)?.caracteristicas?.marca ?? null;
+  }
+  return negocioParaMarca(marcaDeSolicitudParaCorreo(s, marcaEspacio));
+}
+
+/** Página HTML con el nombre/teléfono del negocio de la reserva (Touza para El Reservado). */
+function htmlNegocio(body: string, negocio: DatosNegocio, status = 200): Response {
+  return html(adaptarPaginaANegocio(body, negocio), status);
 }
 
 function tipoEmailParaEstado(estado: string): TipoPlantilla | null {
@@ -299,6 +333,7 @@ async function construirDatosReserva(
     espacioSolicitado: reserva.espacio_solicitado_id ? mapa.get(reserva.espacio_solicitado_id) ?? null : null,
     botonPrincipalUrl: urlsBotones?.principal ?? null,
     botonSecundarioUrl: urlsBotones?.secundario ?? null,
+    negocio: negocioParaMarca(reserva.marca),
   };
 }
 
@@ -1313,10 +1348,12 @@ async function handleAceptar(req: Request): Promise<Response> {
 
   const reserva = await fetchReserva(payload.id);
   if (!reserva) return html(pageEnlaceInvalido());
+  const negocio = negocioParaMarca(reserva.marca);
+  const responder = (body: string) => htmlNegocio(body, negocio);
 
   const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
   if (reserva.estado !== "verificada" || huellaActual !== payload.fp) {
-    return html(pageEnlaceInvalido());
+    return responder(pageEnlaceInvalido());
   }
 
   const { data: actualizada, error } = await supabase
@@ -1328,7 +1365,7 @@ async function handleAceptar(req: Request): Promise<Response> {
     .maybeSingle();
   if (error || !actualizada) {
     console.error("[emails-reserva] No se pudo aceptar (condicion de carrera o error):", error?.message);
-    return html(pageEnlaceInvalido());
+    return responder(pageEnlaceInvalido());
   }
 
   // Correo de confirmación, best-effort: la reserva YA quedó confirmada
@@ -1341,7 +1378,7 @@ async function handleAceptar(req: Request): Promise<Response> {
 
   const mapa = await obtenerMapaEspacios();
   const espacioNombre = reserva.espacio_id ? mapa.get(reserva.espacio_id) ?? null : null;
-  return html(pageAceptada(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, espacioNombre));
+  return responder(pageAceptada(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, espacioNombre));
 }
 
 // ------------------------------------------------------------
@@ -1357,19 +1394,21 @@ async function handleRechazarPreview(req: Request): Promise<Response> {
 
   const reserva = await fetchReserva(payload.id);
   if (!reserva) return html(pageEnlaceInvalido());
+  const negocio = negocioParaMarca(reserva.marca);
+  const responder = (body: string) => htmlNegocio(body, negocio);
 
   // Chequeo de "ya cancelada" ANTES de comprobar la huella: si se
   // comprobara después, una reserva ya cancelada (huella con
   // estado=cancelada) nunca pasaría el chequeo de huella y el cliente vería
   // "enlace no válido" en vez del mensaje correcto. Ver
   // docs/REVISION-PUERTOS-N8N.md X-2, mismo fallo en reservas-web/cancelar.
-  if (reserva.estado === "cancelada") return html(pageYaRechazada());
+  if (reserva.estado === "cancelada") return responder(pageYaRechazada());
 
   const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return html(pageEnlaceInvalido());
+  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return responder(pageEnlaceInvalido());
 
   const ejecutarUrl = `${PUBLIC_BASE_URL}/rechazar/ejecutar?token=${encodeURIComponent(token)}`;
-  return html(pageRechazarPreview(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, ejecutarUrl));
+  return responder(pageRechazarPreview(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, ejecutarUrl));
 }
 
 // ------------------------------------------------------------
@@ -1382,10 +1421,12 @@ async function handleRechazarEjecutar(req: Request): Promise<Response> {
 
   const reserva = await fetchReserva(payload.id);
   if (!reserva) return html(pageEnlaceInvalido());
-  if (reserva.estado === "cancelada") return html(pageYaRechazada());
+  const negocio = negocioParaMarca(reserva.marca);
+  const responder = (body: string) => htmlNegocio(body, negocio);
+  if (reserva.estado === "cancelada") return responder(pageYaRechazada());
 
   const huellaActual = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return html(pageEnlaceInvalido());
+  if (reserva.estado !== "verificada" || huellaActual !== payload.fp) return responder(pageEnlaceInvalido());
 
   const { data: actualizada, error } = await supabase
     .from("reservas")
@@ -1396,7 +1437,7 @@ async function handleRechazarEjecutar(req: Request): Promise<Response> {
     .maybeSingle();
   if (error || !actualizada) {
     console.error("[emails-reserva] No se pudo rechazar (condicion de carrera o error):", error?.message);
-    return html(pageEnlaceInvalido());
+    return responder(pageEnlaceInvalido());
   }
 
   try {
@@ -1405,7 +1446,7 @@ async function handleRechazarEjecutar(req: Request): Promise<Response> {
     console.error("[emails-reserva] Error mandando aviso de rechazo:", err);
   }
 
-  return html(pageRechazada());
+  return responder(pageRechazada());
 }
 
 // ------------------------------------------------------------
@@ -1542,10 +1583,13 @@ async function handleEnviarPropuestaSolicitud(req: Request): Promise<Response> {
 
   const mapa = await obtenerMapaEspacios();
   const nombreEspacio = s.espacio_propuesto_id ? mapa.get(s.espacio_propuesto_id) ?? null : null;
-  const datos = datosCorreoPropuestaSolicitud(s, nombreEspacio, {
-    aceptar: `${PUBLIC_BASE_URL}/propuesta/aceptar?token=${encodeURIComponent(tokenAceptar)}`,
-    rechazar: `${PUBLIC_BASE_URL}/propuesta/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
-  });
+  const datos: DatosReservaParaCorreo = {
+    ...datosCorreoPropuestaSolicitud(s, nombreEspacio, {
+      aceptar: `${PUBLIC_BASE_URL}/propuesta/aceptar?token=${encodeURIComponent(tokenAceptar)}`,
+      rechazar: `${PUBLIC_BASE_URL}/propuesta/rechazar?token=${encodeURIComponent(tokenRechazar)}`,
+    }),
+    negocio: await negocioDeSolicitud(s),
+  };
   const { asunto, html: cuerpoHtml } = renderPlantilla(plantilla, datos);
 
   // Primero se envía y DESPUÉS se registra: si el envío falla, la solicitud
@@ -1605,11 +1649,13 @@ async function handlePropuestaAceptarPreview(req: Request): Promise<Response> {
   const leido = await leerSolicitudDeToken(req, "aceptar_solicitud");
   if (!leido) return html(pageEnlaceInvalido());
   const { s, fp, token } = leido;
+  const negocio = await negocioDeSolicitud(s);
+  const responder = (body: string) => htmlNegocio(body, negocio);
   if (s.propuesta_estado === "aceptada") {
-    return html(pageMensaje({ titulo: "Tu reserva ya está confirmada", parrafos: ["No hace falta que hagas nada más. ¡Te esperamos!"], color: "#2c7a33" }));
+    return responder(pageMensaje({ titulo: "Tu reserva ya está confirmada", parrafos: ["No hace falta que hagas nada más. ¡Te esperamos!"], color: "#2c7a33" }));
   }
-  if (!propuestaVigente(s, fp)) return html(pageEnlaceInvalido());
-  return html(
+  if (!propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
+  return responder(
     pageMensaje({
       titulo: "Confirma tu reserva",
       parrafos: [`Hola, <b>${escapeHtml(s.nombre || "")}</b>. Esta es la propuesta de Casa Tomás:`],
@@ -1624,7 +1670,9 @@ async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
   const leido = await leerSolicitudDeToken(req, "aceptar_solicitud");
   if (!leido) return html(pageEnlaceInvalido());
   const { s, fp } = leido;
-  if (s.propuesta_estado !== "aceptada" && !propuestaVigente(s, fp)) return html(pageEnlaceInvalido());
+  const negocio = await negocioDeSolicitud(s);
+  const responder = (body: string) => htmlNegocio(body, negocio);
+  if (s.propuesta_estado !== "aceptada" && !propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
 
   const detalles = await detallesPropuesta(s);
   const { data, error } = await supabase.rpc("fn_aceptar_propuesta_solicitud", { p_solicitud_id: s.id, p_via: "email" });
@@ -1652,20 +1700,20 @@ async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
 
   switch (pagina) {
     case "confirmada":
-      return html(pageMensaje({ titulo: "¡Reserva confirmada!", parrafos: [`Gracias, <b>${escapeHtml(s.nombre || "")}</b>. Te esperamos en Casa Tomás.`], detalles, color: "#2c7a33" }));
+      return responder(pageMensaje({ titulo: "¡Reserva confirmada!", parrafos: [`Gracias, <b>${escapeHtml(s.nombre || "")}</b>. Te esperamos en Casa Tomás.`], detalles, color: "#2c7a33" }));
     case "recibida":
-      return html(pageMensaje({ titulo: "Hemos recibido tu respuesta", parrafos: ["El restaurante revisará la reserva y te la confirmará en breve.", TEXTO_LLAMANOS], detalles }));
+      return responder(pageMensaje({ titulo: "Hemos recibido tu respuesta", parrafos: ["El restaurante revisará la reserva y te la confirmará en breve.", TEXTO_LLAMANOS], detalles }));
     case "sin_aforo":
-      return html(pageMensaje({
+      return responder(pageMensaje({
         titulo: "No hemos podido confirmar la reserva",
         parrafos: ["Lo sentimos: mientras respondías se ha completado el aforo de ese turno. El restaurante ya está avisado y te llamará para buscar otra opción.", TEXTO_LLAMANOS],
         detalles,
         color: "#b45309",
       }));
     case "fecha_pasada":
-      return html(pageMensaje({ titulo: "Esta propuesta ha caducado", parrafos: ["El día propuesto ya ha pasado. El restaurante está avisado.", TEXTO_LLAMANOS], color: "#b45309" }));
+      return responder(pageMensaje({ titulo: "Esta propuesta ha caducado", parrafos: ["El día propuesto ya ha pasado. El restaurante está avisado.", TEXTO_LLAMANOS], color: "#b45309" }));
     case "no_vigente":
-      return html(pageEnlaceInvalido());
+      return responder(pageEnlaceInvalido());
     default:
       if (!error) {
         await avisoPanelBestEffort(
@@ -1674,7 +1722,7 @@ async function handlePropuestaAceptarEjecutar(req: Request): Promise<Response> {
           s.id,
         );
       }
-      return html(pageMensaje({
+      return responder(pageMensaje({
         titulo: "No hemos podido confirmar la reserva",
         parrafos: ["Ha ocurrido un problema al registrar tu respuesta. El restaurante está avisado y te llamará.", TEXTO_LLAMANOS],
         color: "#b45309",
@@ -1686,11 +1734,13 @@ async function handlePropuestaRechazarPreview(req: Request): Promise<Response> {
   const leido = await leerSolicitudDeToken(req, "rechazar_solicitud");
   if (!leido) return html(pageEnlaceInvalido());
   const { s, fp, token } = leido;
+  const negocio = await negocioDeSolicitud(s);
+  const responder = (body: string) => htmlNegocio(body, negocio);
   if (s.propuesta_estado === "rechazada") {
-    return html(pageMensaje({ titulo: "Ya nos lo habías dicho", parrafos: ["Tenemos registrado que no te viene bien esta propuesta. " + TEXTO_LLAMANOS] }));
+    return responder(pageMensaje({ titulo: "Ya nos lo habías dicho", parrafos: ["Tenemos registrado que no te viene bien esta propuesta. " + TEXTO_LLAMANOS] }));
   }
-  if (!propuestaVigente(s, fp)) return html(pageEnlaceInvalido());
-  return html(
+  if (!propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
+  return responder(
     pageMensaje({
       titulo: "¿No te viene bien esta propuesta?",
       parrafos: ["Si la rechazas, no se creará la reserva. El restaurante verá tu respuesta."],
@@ -1705,15 +1755,17 @@ async function handlePropuestaRechazarEjecutar(req: Request): Promise<Response> 
   const leido = await leerSolicitudDeToken(req, "rechazar_solicitud");
   if (!leido) return html(pageEnlaceInvalido());
   const { s, fp } = leido;
-  if (s.propuesta_estado !== "rechazada" && !propuestaVigente(s, fp)) return html(pageEnlaceInvalido());
+  const negocio = await negocioDeSolicitud(s);
+  const responder = (body: string) => htmlNegocio(body, negocio);
+  if (s.propuesta_estado !== "rechazada" && !propuestaVigente(s, fp)) return responder(pageEnlaceInvalido());
 
   const { data, error } = await supabase.rpc("fn_rechazar_propuesta_solicitud", { p_solicitud_id: s.id, p_via: "email" });
   const res = data as { ok?: boolean } | null;
   if (error || !res?.ok) {
     console.error(`[emails-reserva] fn_rechazar_propuesta_solicitud(${s.id}) falló:`, error?.message ?? JSON.stringify(data));
-    return html(pageEnlaceInvalido());
+    return responder(pageEnlaceInvalido());
   }
-  return html(pageMensaje({ titulo: "Gracias por avisarnos", parrafos: ["Hemos registrado que no te viene bien la propuesta.", "Esperamos verte en otra ocasión en Casa Tomás."] }));
+  return responder(pageMensaje({ titulo: "Gracias por avisarnos", parrafos: ["Hemos registrado que no te viene bien la propuesta.", "Esperamos verte en otra ocasión en Casa Tomás."] }));
 }
 
 // ------------------------------------------------------------

@@ -20,7 +20,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { verificarAforoTurno } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,7 +36,15 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
-import { useOcupacionSalasDia, CLAVE_OCUPACION_SALAS_DIA } from "@/hooks/useOcupacionSalasDia";
+import { useOcupacionSalasDia, CLAVE_OCUPACION_SALAS_DIA, datosDeNegocio } from "@/hooks/useOcupacionSalasDia";
+import {
+  agruparPorNegocio,
+  etiquetaNegocio,
+  marcaParaAlta,
+  MARCA_POR_DEFECTO,
+  normalizarMarca,
+} from "@/lib/reservas/negocios";
+import { NegocioBadge } from "./NegocioBadge";
 import {
   calcularOcupacionSalas,
   construirFranjas,
@@ -167,6 +183,9 @@ interface FormularioReservaProps {
     canal?: "telefono" | "manual";
     /** Solicitud del bot de la que sale (reservas.solicitud_id). */
     solicitud_id?: string | null;
+    /** Negocio si no hay sala elegida (p. ej. solicitud de El Reservado sin
+     * sala). Con sala, manda siempre la marca de la sala. */
+    marca?: string | null;
   } | null;
 }
 
@@ -227,8 +246,18 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
 
   // Franjas + reservas + salas del día (una sola consulta, compartida con la
-  // rejilla "Ocupación de salas" por la clave de React Query).
-  const { data: datosDia, horasBase } = useOcupacionSalasDia(fechaStr);
+  // rejilla "Ocupación de salas" por la clave de React Query), de TODOS los
+  // negocios. El negocio de la reserva lo decide la sala elegida: "El
+  // Reservado" => Touza; cualquier otra o sin sala => Casa Tomás. Las horas
+  // del desplegable, el aforo del turno y la evaluación de la sala son las de
+  // ESE negocio (turnos propios del espacio si los tiene, si no los generales).
+  const { data: datosDia } = useOcupacionSalasDia(fechaStr);
+  const todosLosEspacios = useMemo(() => (datosDia?.negocios ?? []).flatMap((n) => n.espacios), [datosDia]);
+  const marcaDeAlta = (espacioId: string | null | undefined) =>
+    espacioId ? marcaParaAlta(espacioId, todosLosEspacios) : normalizarMarca(datosPreseleccionados?.marca);
+  const marcaAlta = marcaDeAlta(watchedEspacio);
+  const datosNegocio = useMemo(() => datosDeNegocio(datosDia, marcaAlta), [datosDia, marcaAlta]);
+  const horasBase = useMemo(() => datosNegocio?.horasBase ?? [], [datosNegocio]);
   const horariosDisponibles = useMemo(() => {
     const f = construirFranjas(horasBase);
     return [...f.comida, ...f.cena];
@@ -242,15 +271,15 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   // Aviso (no bloqueo) si la sala elegida se pasa de su capacidad en el
   // turno: mismo criterio que el Kanban al mover de espacio.
   const evaluacionSala = useMemo(() => {
-    if (!datosDia || !watchedHora) return null;
+    if (!datosNegocio || !watchedHora) return null;
     const ocupacion = calcularOcupacionSalas({
-      espacios: datosDia.espacios,
-      reservas: datosDia.reservas,
-      horasBase: datosDia.horasBase,
+      espacios: datosNegocio.espacios,
+      reservas: datosNegocio.reservas,
+      horasBase: datosNegocio.horasBase,
       comensales: Number(watchedComensales) || 0,
     });
     return evaluarUbicacion(ocupacion, watchedEspacio, watchedHora);
-  }, [datosDia, watchedHora, watchedComensales, watchedEspacio]);
+  }, [datosNegocio, watchedHora, watchedComensales, watchedEspacio]);
 
   const superaMaximoAutomatico =
     !!configReservas && Number(watchedComensales) > configReservas.max_comensales_por_reserva;
@@ -268,10 +297,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     const comprobar = async () => {
       setVerificando(true);
       try {
+        // Aforo del turno DEL NEGOCIO de la reserva (igual que el trigger).
         const resultado = await verificarAforoTurno(
           format(watchedFecha, "yyyy-MM-dd"),
           watchedHora,
-          watchedComensales
+          watchedComensales,
+          marcaAlta,
         );
         if (!cancelado) {
           setDisponibilidadInfo({ disponible: resultado.disponible, mensaje: resultado.mensaje });
@@ -295,7 +326,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       cancelado = true;
       clearTimeout(timeout);
     };
-  }, [watchedFecha, watchedHora, watchedComensales]);
+  }, [watchedFecha, watchedHora, watchedComensales, marcaAlta]);
 
   useEffect(() => {
     const checkBlacklist = async () => {
@@ -464,6 +495,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente?.trim() || null,
         espacio_id: values.espacio_id || null,
+        // Negocio: el de la sala elegida (El Reservado => 'touza'). Sin sala,
+        // el que traiga la solicitud de origen o, si no, Casa Tomás (mismo
+        // valor que el DEFAULT de la columna).
+        marca: marcaDeAlta(values.espacio_id),
         estado: estadoInicial,
         // 'telefono' al convertir una solicitud del bot (el cliente llamó);
         // 'manual' para un alta del personal.
@@ -726,7 +761,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
               name="espacio_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Sala</FormLabel>
+                  <FormLabel className="flex items-center gap-2">
+                    Sala
+                    <NegocioBadge marca={marcaAlta} />
+                  </FormLabel>
                   <Select
                     value={field.value ?? SIN_ASIGNAR}
                     onValueChange={(v) => field.onChange(v === SIN_ASIGNAR ? null : v)}
@@ -737,14 +775,24 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
-                      {(datosDia?.espacios ?? []).map((e) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.nombre} ({e.capacidad_maxima} plazas)
-                        </SelectItem>
-                      ))}
+                      <SelectItem value={SIN_ASIGNAR}>Sin asignar ({etiquetaNegocio(marcaDeAlta(null))})</SelectItem>
+                      {agruparPorNegocio(todosLosEspacios, (e) => e.marca ?? MARCA_POR_DEFECTO).map(
+                        ({ negocio, items }) => (
+                          <SelectGroup key={negocio.marca}>
+                            <SelectLabel>{negocio.etiqueta}</SelectLabel>
+                            {items.map((e) => (
+                              <SelectItem key={e.id} value={e.id}>
+                                {e.nombre} ({e.capacidad_maxima} plazas)
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    El negocio lo marca la sala: «El Reservado» es de Touza y tiene su propio aforo.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -769,6 +817,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
               comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
               espacioId={watchedEspacio}
+              marca={marcaAlta}
               onSeleccionar={(espacioId, hora) => {
                 setModoOtraHora(false);
                 form.setValue("espacio_id", espacioId);
@@ -809,11 +858,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           </Alert>
         )}
 
-        {!isPublic && datosDia?.cerrado && (
+        {!isPublic && datosNegocio?.cerrado && (
           <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Ese día no tiene turnos configurados (el restaurante cierra). Se puede crear con "Otra hora…", pero
+              Ese día no tiene turnos configurados ({etiquetaNegocio(marcaAlta)} cierra). Se puede crear con "Otra hora…", pero
               revisa que sea correcto.
             </AlertDescription>
           </Alert>

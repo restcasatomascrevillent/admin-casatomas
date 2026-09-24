@@ -18,7 +18,16 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { MARCA_POR_DEFECTO, turnoDeHora } from "@/hooks/useDisponibilidad";
+import { turnoDeHora } from "@/hooks/useDisponibilidad";
+import { ESTADOS_QUE_OCUPAN } from "../../../supabase/functions/_shared/disponibilidad";
+import {
+  agruparPorNegocio,
+  etiquetaNegocio,
+  marcaDeEspacio,
+  marcaDeReserva,
+  MARCA_POR_DEFECTO,
+  normalizarMarca,
+} from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import {
   comensalesEnEspacioTurno,
@@ -68,13 +77,28 @@ const ESTADOS_RESERVA: Record<string, { label: string; color: string }> = {
   no_show: { label: "No vino", color: "bg-gray-500" },
 };
 
+// Columna "Sin asignar" POR NEGOCIO: "sin-asignar" es la de Casa Tomás (id
+// histórico) y "sin-asignar:<marca>" la de otro negocio (solo aparece si
+// tiene reservas sin sala, p. ej. una de El Reservado llegada desde la web).
 const SIN_ASIGNAR = "sin-asignar";
+const idSinAsignar = (marca: string) =>
+  normalizarMarca(marca) === MARCA_POR_DEFECTO ? SIN_ASIGNAR : `${SIN_ASIGNAR}:${normalizarMarca(marca)}`;
+const esSinAsignar = (id: string) => id === SIN_ASIGNAR || id.startsWith(`${SIN_ASIGNAR}:`);
 type FiltroTurno = "todo" | "comida" | "cena";
 
 interface Columna {
   id: string;
   title: string;
   capacidadMax?: number;
+  /** Negocio de la columna (casa_tomas | touza). */
+  marca: string;
+}
+
+/** Columna en la que se pinta una reserva: su sala si es de su negocio; si no, "Sin asignar" de su negocio. */
+function columnaDeReserva(reserva: ReservaServicio, columnas: Columna[]): string {
+  const marca = marcaDeReserva(reserva as { marca?: string | null });
+  const propia = reserva.espacio_id ? columnas.find((c) => c.id === reserva.espacio_id) : undefined;
+  return propia && propia.marca === marca ? propia.id : idSinAsignar(marca);
 }
 
 type Acciones = ReturnType<typeof useAccionesServicioReserva>;
@@ -112,8 +136,12 @@ function ReservaCard({
     );
   }
 
-  const columnaActual = reserva.espacio_id || SIN_ASIGNAR;
-  const destinos = columnas.filter((c) => c.id !== columnaActual);
+  // Solo se puede mover dentro de su negocio: una reserva de Casa Tomás no
+  // pasa a El Reservado (Touza) ni al revés (cambiaría de aforo sin cambiar
+  // de negocio). Para eso, cancelar y crear otra.
+  const columnaActual = columnaDeReserva(reserva, columnas);
+  const marcaReserva = marcaDeReserva(reserva as { marca?: string | null });
+  const destinos = columnas.filter((c) => c.id !== columnaActual && c.marca === marcaReserva);
 
   return (
     <div
@@ -412,20 +440,16 @@ export function GestorReservasKanban() {
     useSensor(KeyboardSensor),
   );
 
-  // Solo Casa Tomás: Touza no tiene reservas (decisión del dueño,
-  // 2026-09-23). El filtro por marca se mantiene para que una reserva
-  // perdida de otro negocio no aparezca aquí.
+  // Reservas de hoy de TODOS los negocios (decisión del dueño 2026-09-24):
+  // Casa Tomás con sus salas y Touza con "El Reservado", agrupados por
+  // negocio y con el aforo de cada uno por separado (como el trigger).
   //
   // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
-  // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría).
-  // `as any`: `.eq("marca", ...)` dispara "Type instantiation is excessively
-  // deep" (`marca` no está en los tipos generados). Mismo recurso que
-  // `useDisponibilidad.ts`.
+  // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría),
+  // y `marca`. `as any`: `marca` no está en los tipos generados.
   //
   // La clave empieza por "reservas-kanban": useAccionesServicioReserva hace el
-  // update optimista por prefijo. (Antes el optimista escribía en
-  // ["reservas-kanban", hoy] — sin la marca — es decir, en una entrada de
-  // caché que nadie leía: la tarjeta no se movía hasta el refetch.)
+  // update optimista por prefijo.
   const {
     data: reservas,
     isLoading,
@@ -433,33 +457,81 @@ export function GestorReservasKanban() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["reservas-kanban", hoy, MARCA_POR_DEFECTO],
+    queryKey: ["reservas-kanban", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
         .select("*")
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
-        .eq("marca", MARCA_POR_DEFECTO)
         .order("hora", { ascending: true });
       if (error) throw error;
       return data as unknown as ReservaServicio[];
     },
   });
 
-  // useEspaciosReserva ya devuelve solo los espacios de Casa Tomás.
   const espaciosActivos = useMemo(
     () => (espacios || []).filter((e: any) => e.activa !== false),
     [espacios],
   );
 
-  const columnas = useMemo<Columna[]>(
-    () => [
-      { id: SIN_ASIGNAR, title: "Sin asignar" },
-      ...espaciosActivos.map((e: any) => ({ id: e.id, title: e.nombre, capacidadMax: e.capacidad_maxima })),
-    ],
-    [espaciosActivos],
-  );
+  // Grupos de columnas por negocio. Casa Tomás: "Sin asignar" + sus salas.
+  // Otro negocio (Touza): sus salas ("El Reservado") y, solo si hace falta,
+  // su propio "Sin asignar".
+  const grupos = useMemo(() => {
+    const todas = reservas || [];
+    return agruparPorNegocio(
+      [
+        ...espaciosActivos.map((e: any) => ({ tipo: "espacio" as const, marca: marcaDeEspacio(e), e })),
+        ...todas.map((r) => ({ tipo: "reserva" as const, marca: marcaDeReserva(r as { marca?: string | null }), e: null })),
+      ],
+      (x) => x.marca,
+      [MARCA_POR_DEFECTO],
+    ).map(({ negocio, items }) => {
+      const salas: Columna[] = items
+        .filter((x) => x.tipo === "espacio")
+        .map((x: any) => ({ id: x.e.id, title: x.e.nombre, capacidadMax: x.e.capacidad_maxima, marca: negocio.marca }));
+      const idsSalas = new Set(salas.map((c) => c.id));
+      const hayHuerfanas = todas.some(
+        (r) =>
+          marcaDeReserva(r as { marca?: string | null }) === negocio.marca &&
+          (!r.espacio_id || !idsSalas.has(r.espacio_id)),
+      );
+      const sinAsignar: Columna = {
+        id: idSinAsignar(negocio.marca),
+        title: negocio.marca === MARCA_POR_DEFECTO ? "Sin asignar" : `Sin asignar (${negocio.nombre})`,
+        marca: negocio.marca,
+      };
+      const columnasGrupo =
+        negocio.marca === MARCA_POR_DEFECTO || hayHuerfanas || salas.length === 0 ? [sinAsignar, ...salas] : salas;
+      return { negocio, columnas: columnasGrupo };
+    });
+  }, [espaciosActivos, reservas]);
+
+  const columnas = useMemo<Columna[]>(() => grupos.flatMap((g) => g.columnas), [grupos]);
+
+  // Aforo del turno POR NEGOCIO (lo que valida el trigger): reservas que
+  // ocupan (pendiente/verificada/confirmada) de ese negocio contra la suma
+  // de SUS salas. Las de Touza nunca cuentan contra Casa Tomás.
+  const aforoPorNegocio = useMemo(() => {
+    const todas = reservas || [];
+    const map: Record<string, { comida: number; cena: number; capacidad: number }> = {};
+    for (const g of grupos) {
+      const propias = todas.filter(
+        (r) =>
+          marcaDeReserva(r as { marca?: string | null }) === g.negocio.marca &&
+          (ESTADOS_QUE_OCUPAN as readonly string[]).includes(r.estado),
+      );
+      const pax = (turno: "comida" | "cena") =>
+        propias.filter((r) => turnoDeHora(r.hora) === turno).reduce((s, r) => s + (Number(r.numero_comensales) || 0), 0);
+      map[g.negocio.marca] = {
+        comida: pax("comida"),
+        cena: pax("cena"),
+        capacidad: g.columnas.reduce((s, c) => s + (c.capacidadMax || 0), 0),
+      };
+    }
+    return map;
+  }, [grupos, reservas]);
 
   const reservasFiltradas = useMemo(() => {
     const q = busqueda.toLowerCase().trim();
@@ -478,22 +550,24 @@ export function GestorReservasKanban() {
     const map: Record<string, ReservaServicio[]> = {};
     columnas.forEach((c) => (map[c.id] = []));
     reservasFiltradas.forEach((r) => {
-      const key = r.espacio_id && map[r.espacio_id] ? r.espacio_id : SIN_ASIGNAR;
-      map[key].push(r);
+      const key = columnaDeReserva(r, columnas);
+      (map[key] ??= []).push(r);
     });
     return map;
   }, [reservasFiltradas, columnas]);
 
   // Ocupación por espacio y TURNO sobre todas las reservas del día (no solo
-  // las visibles por la búsqueda): la capacidad no depende de lo que se filtre.
+  // las visibles por la búsqueda): la capacidad no depende de lo que se
+  // filtre. Cada columna cuenta solo reservas de SU negocio.
   const paxPorColumna = useMemo(() => {
     const todas = reservas || [];
     const map: Record<string, { comida: number; cena: number }> = {};
     columnas.forEach((c) => {
-      const espacioId = c.id === SIN_ASIGNAR ? null : c.id;
+      const delNegocio = todas.filter((r) => marcaDeReserva(r as { marca?: string | null }) === c.marca);
+      const espacioId = esSinAsignar(c.id) ? null : c.id;
       map[c.id] = {
-        comida: comensalesEnEspacioTurno(todas, espacioId, "comida"),
-        cena: comensalesEnEspacioTurno(todas, espacioId, "cena"),
+        comida: comensalesEnEspacioTurno(delNegocio, espacioId, "comida"),
+        cena: comensalesEnEspacioTurno(delNegocio, espacioId, "cena"),
       };
     });
     return map;
@@ -503,9 +577,18 @@ export function GestorReservasKanban() {
     columnas.find((c) => c.id === id)?.title ?? "Sin asignar";
 
   const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
-    const destinoId = columnaId === SIN_ASIGNAR ? null : columnaId;
+    const destinoId = esSinAsignar(columnaId) ? null : columnaId;
     const col = columnas.find((c) => c.id === columnaId);
-    const evaluacion = evaluarMovimiento(reserva, destinoId, reservas || [], col?.capacidadMax);
+    const marcaReserva = marcaDeReserva(reserva as { marca?: string | null });
+    if (col && col.marca !== marcaReserva) {
+      toast.error(
+        `Esta reserva es de ${etiquetaNegocio(marcaReserva)} y «${col.title}» es de ${etiquetaNegocio(col.marca)}. ` +
+          "No se puede mover entre negocios: cancélala y crea una nueva.",
+      );
+      return;
+    }
+    const delNegocio = (reservas || []).filter((r) => marcaDeReserva(r as { marca?: string | null }) === marcaReserva);
+    const evaluacion = evaluarMovimiento(reserva, destinoId, delNegocio, col?.capacidadMax);
 
     switch (evaluacion.tipo) {
       case "sin_cambio":
@@ -610,8 +693,27 @@ export function GestorReservasKanban() {
           },
         }}
       >
-        <div className="flex gap-2 sm:gap-4 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
-          {columnas.map((col) => (
+        <div className="flex gap-3 sm:gap-6 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
+          {grupos.map(({ negocio, columnas: columnasGrupo }) => (
+            <div
+              key={negocio.marca}
+              role="group"
+              aria-label={negocio.etiqueta}
+              className={cn("flex flex-col gap-2 shrink-0", grupos.length > 1 && "rounded-xl border border-dashed p-2")}
+            >
+              {grupos.length > 1 && (
+                <div className="flex flex-wrap items-baseline gap-x-2 px-1 text-xs">
+                  <span className="font-semibold">{negocio.etiqueta}</span>
+                  {aforoPorNegocio[negocio.marca]?.capacidad > 0 && (
+                    <span className="text-muted-foreground tabular-nums">
+                      aforo comida {aforoPorNegocio[negocio.marca].comida}/{aforoPorNegocio[negocio.marca].capacidad} · cena{" "}
+                      {aforoPorNegocio[negocio.marca].cena}/{aforoPorNegocio[negocio.marca].capacidad}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 sm:gap-4">
+          {columnasGrupo.map((col) => (
             <KanbanColumn
               key={col.id}
               id={col.id}
@@ -635,6 +737,9 @@ export function GestorReservasKanban() {
                 />
               ))}
             </KanbanColumn>
+          ))}
+              </div>
+            </div>
           ))}
         </div>
 

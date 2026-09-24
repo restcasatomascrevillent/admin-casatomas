@@ -10,6 +10,7 @@ import { format, addDays } from "date-fns";
 vi.mock("sonner");
 vi.mock("@/hooks/useOcupacionSalasDia", () => ({
   useOcupacionSalasDia: () => ({ data: undefined, horasBase: [] }),
+  datosDeNegocio: () => null,
   CLAVE_OCUPACION_SALAS_DIA: "ocupacion-salas-dia",
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({ SolicitudCard: () => null }));

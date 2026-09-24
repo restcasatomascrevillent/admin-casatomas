@@ -163,3 +163,57 @@ describe("renderPlantilla", () => {
     expect(html).not.toContain("Texto de pie exclusivo");
   });
 });
+
+// Decisión del dueño 2026-09-24: las reservas de El Reservado (Touza) se
+// gestionan igual que las de Casa Tomás, pero su correo lleva la marca Touza.
+import { negocioParaMarca, adaptarTextoANegocio, adaptarPaginaANegocio } from "../plantillas.ts";
+import { marcaDeSolicitudParaCorreo } from "../propuesta-solicitud.ts";
+
+describe("marca del negocio en el correo", () => {
+  it("sin negocio (o casa_tomas) se ve exactamente como siempre", () => {
+    const sin = renderPlantilla(plantillaBase(), datosBase());
+    const ct = renderPlantilla(plantillaBase(), datosBase({ negocio: negocioParaMarca("casa_tomas") }));
+    expect(ct).toEqual(sin);
+    expect(sin.html).toContain("Casa Tomás");
+    expect(sin.html).toContain("966 10 78 87");
+  });
+
+  it("una reserva de Touza no lleva el nombre, la dirección ni el teléfono de Casa Tomás", () => {
+    const { html, asunto } = renderPlantilla(
+      plantillaBase({ asunto: "Tu reserva en Casa Tomás", cuerpo: "Gracias por elegir Casa Tomás, {{negocio}}.", logo_url: "https://x/logo-ct.png" }),
+      datosBase({ negocio: negocioParaMarca("touza") }),
+    );
+    expect(asunto).toBe("Tu reserva en Touza");
+    expect(html).not.toContain("Casa Tomás");
+    expect(html).not.toContain("966 10 78 87");
+    expect(html).not.toContain("logo-ct.png");
+    expect(html).toContain("Touza");
+    expect(html).toContain("C/ San Vicente, 14");
+    expect(html).toContain("tel:966782000");
+  });
+
+  it("marca desconocida => Casa Tomás", () => {
+    expect(negocioParaMarca("otra").nombre).toBe("Casa Tomás");
+    expect(negocioParaMarca(null).nombre).toBe("Casa Tomás");
+  });
+
+  it("adapta textos y páginas solo para otro negocio", () => {
+    const touza = negocioParaMarca("touza");
+    expect(adaptarTextoANegocio("Bienvenido a Casa Tomás", negocioParaMarca("casa_tomas"))).toBe("Bienvenido a Casa Tomás");
+    expect(adaptarTextoANegocio("Bienvenido a Casa Tomás", touza)).toBe("Bienvenido a Touza");
+    expect(adaptarPaginaANegocio('<title>X - Casa Tomás</title><a href="tel:966107887">966 10 78 87</a>', touza)).toBe(
+      '<title>X - Touza</title><a href="tel:966782000">966 782 000</a>',
+    );
+  });
+
+  it("negocio de una solicitud: sala propuesta > marcador de El Reservado > Casa Tomás", () => {
+    expect(marcaDeSolicitudParaCorreo({ espacio_propuesto_id: "r", notas_cliente: null }, "touza")).toBe("touza");
+    expect(marcaDeSolicitudParaCorreo({ espacio_propuesto_id: "c", notas_cliente: "Solicitud de El Reservado" }, undefined)).toBe(
+      "casa_tomas",
+    );
+    expect(marcaDeSolicitudParaCorreo({ espacio_propuesto_id: null, notas_cliente: "Solicitud de El Reservado\nx" }, null)).toBe(
+      "touza",
+    );
+    expect(marcaDeSolicitudParaCorreo({ espacio_propuesto_id: null, notas_cliente: "hola" }, null)).toBe("casa_tomas");
+  });
+});

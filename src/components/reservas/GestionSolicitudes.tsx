@@ -25,6 +25,8 @@ import { format } from "date-fns";
 import { useSolicitudesPendientes, type SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { estadoPropuestaVista } from "@/lib/reservas/propuestaCliente";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
+import { NegocioBadge } from "./NegocioBadge";
+import { marcaDeSolicitud } from "@/lib/reservas/negocios";
 
 export const MOTIVO_LABELS: Record<string, { label: string; color: string }> = {
   grupo_grande: { label: "Grupo grande", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
@@ -53,6 +55,7 @@ export function SolicitudCard({
   onConvertir,
   onGestionarPropuesta,
   defaultExpanded = false,
+  marca,
 }: {
   solicitud: SolicitudPendiente;
   onUpdateEstado: (id: string, estado: string) => Promise<boolean>;
@@ -62,6 +65,9 @@ export function SolicitudCard({
   /** Si se pasa, aparece "Propuesta y salas" (abre el diálogo de gestión completo). */
   onGestionarPropuesta?: (solicitud: SolicitudPendiente) => void;
   defaultExpanded?: boolean;
+  /** Negocio (Casa Tomás / Touza · El Reservado). Si no se pasa, se deduce
+   * del marcador de El Reservado en las notas. */
+  marca?: string;
 }) {
   const vistaPropuesta = estadoPropuestaVista(solicitud, format(new Date(), "yyyy-MM-dd"));
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -107,6 +113,7 @@ export function SolicitudCard({
               {ESTADO_LABELS[solicitud.estado]?.label || solicitud.estado}
             </Badge>
             {vistaPropuesta && vistaPropuesta.clave !== "borrador" && <EstadoPropuestaBadge vista={vistaPropuesta} />}
+            <NegocioBadge marca={marca ?? marcaDeSolicitud(solicitud, [])} />
           </div>
           <span className="text-xs text-muted-foreground whitespace-nowrap">{createdAt}</span>
         </div>

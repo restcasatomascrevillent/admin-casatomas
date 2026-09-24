@@ -1,21 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { MARCA_POR_DEFECTO } from "./useDisponibilidad";
 
 /**
- * Aforo por negocio (marca) — bug de 2026-09-22, ver `useDisponibilidad.ts`.
- * ------------------------------------------------------------
- * Las consultas de este fichero leen `reservas` sin filtrar por
- * `espacio_id`, así que si no se filtra por `marca` cuentan también las
- * reservas de otros negocios (hoy, "El Reservado"/touza) en widgets que se
- * presentan como del restaurante. Por defecto `MARCA_POR_DEFECTO`
- * (casa_tomas): es lo único que necesita HOY el panel, igual que
- * `useDisponibilidad.ts`.
+ * Negocio (marca) — las consultas de este fichero leen `reservas` sin
+ * filtrar por `espacio_id`. Decisión del dueño 2026-09-24: el dashboard es
+ * del GRUPO (Casa Tomás + Touza · El Reservado), así que por defecto
+ * (`marca` null/undefined) cuentan los dos negocios; cada fila trae su
+ * `marca` para que el widget desglose por negocio. Pasar una marca filtra a
+ * ese negocio. El aforo (%) nunca se calcula sobre la suma de los dos: ver
+ * `ReservasHoy.tsx` y `src/lib/reservas/resumenNegocios.ts`.
  */
-export function useDashboardStats(startDate: Date, endDate: Date, marca: string = MARCA_POR_DEFECTO) {
+export function useDashboardStats(startDate: Date, endDate: Date, marca?: string | null) {
   return useQuery({
-    queryKey: ["dashboard-stats", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), marca],
+    queryKey: ["dashboard-stats", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), marca ?? "all"],
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
@@ -27,13 +25,14 @@ export function useDashboardStats(startDate: Date, endDate: Date, marca: string 
       // fallara con "Type instantiation is excessively deep" al inferir el
       // tipo del query builder de Supabase. Mismo recurso que ya usa
       // `useDisponibilidad.ts` para `reservas`/`espacios_reserva`.
-      const { data: reservasData, error: reservasError } = await supabase
+      let consulta = supabase
         .from("reservas" as any)
         .select("*")
         .gte("fecha", start)
         .lte("fecha", end)
-        .eq("estado", "confirmada")
-        .eq("marca", marca);
+        .eq("estado", "confirmada");
+      if (marca) consulta = consulta.eq("marca", marca);
+      const { data: reservasData, error: reservasError } = await consulta;
 
       if (reservasError) throw reservasError;
 
@@ -56,21 +55,22 @@ export function useDashboardStats(startDate: Date, endDate: Date, marca: string 
 }
 
 // Hook para todas las reservas de hoy (para mostrar en widgets informativos)
-export function useTodayReservations(marca: string = MARCA_POR_DEFECTO) {
+export function useTodayReservations(marca?: string | null) {
   return useQuery({
-    queryKey: ["today-reservations", marca],
+    queryKey: ["today-reservations", marca ?? "all"],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
 
       // `as any` + cast final: ver la nota de `useDashboardStats` más arriba
       // (mismo "Type instantiation is excessively deep" al añadir
       // `.eq("marca", marca)` sobre `select("*")`).
-      const { data, error } = await supabase
+      let consulta = supabase
         .from("reservas" as any)
         .select("*")
         .eq("fecha", today)
-        .neq("estado", "cancelada")
-        .eq("marca", marca);
+        .neq("estado", "cancelada");
+      if (marca) consulta = consulta.eq("marca", marca);
+      const { data, error } = await consulta;
 
       if (error) throw error;
       return (data ?? []) as any[];
@@ -79,18 +79,19 @@ export function useTodayReservations(marca: string = MARCA_POR_DEFECTO) {
 }
 
 // Hook para solo reservas confirmadas de hoy (para métricas de ocupación)
-export function useTodayConfirmedReservations(marca: string = MARCA_POR_DEFECTO) {
+export function useTodayConfirmedReservations(marca?: string | null) {
   return useQuery({
-    queryKey: ["today-confirmed-reservations", marca],
+    queryKey: ["today-confirmed-reservations", marca ?? "all"],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
 
-      const { data, error } = await supabase
+      let consulta = supabase
         .from("reservas" as any)
         .select("*")
         .eq("fecha", today)
-        .eq("estado", "confirmada")
-        .eq("marca", marca);
+        .eq("estado", "confirmada");
+      if (marca) consulta = consulta.eq("marca", marca);
+      const { data, error } = await consulta;
 
       if (error) throw error;
       return (data ?? []) as any[];

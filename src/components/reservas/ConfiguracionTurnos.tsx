@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,8 @@ import {
 } from "@/hooks/useConfiguracionTurnos";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { EscaleraTurnoEditor } from "./EscaleraTurnoEditor";
+import { NegocioBadge } from "./NegocioBadge";
+import { agruparPorNegocio, marcaDeEspacio } from "@/lib/reservas/negocios";
 import { leerNivelesCrudos, NIVELES_POR_DEFECTO, etiquetaNivelLocal } from "./escaleraTexto";
 // El mismo módulo puro que usan la web y el teléfono. Se usa aquí solo para
 // LEER (derivar la escalera equivalente de las columnas antiguas al migrar,
@@ -33,7 +35,6 @@ import { leerNivelesCrudos, NIVELES_POR_DEFECTO, etiquetaNivelLocal } from "./es
 import {
   resolverEscalera,
   sumarCapacidadPorMarca,
-  MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type NivelEscalera,
   type BaseUmbral,
@@ -126,19 +127,25 @@ export function ConfiguracionTurnos() {
   // la cifra que el motor usa siempre para el aforo y para repartir el
   // umbral.
   //
-  // Siempre Casa Tomás: Touza no tiene reservas (decisión del dueño,
-  // 2026-09-23) y useEspaciosReserva ya no devuelve espacios de otro
-  // negocio, así que el selector "Aplicar a" solo ofrece salas de Casa Tomás.
-  const capacidadTotalActiva = useMemo(
-    () =>
-      sumarCapacidadPorMarca(
-        (espacios ?? [])
-          .filter((e: any) => e.activa)
-          .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
-        MARCA_POR_DEFECTO,
-      ),
-    [espacios],
-  );
+  // Turnos POR NEGOCIO como los modela la BD: `configuracion_turnos` no
+  // tiene columna de negocio; un periodo con `espacio_id` de "El Reservado"
+  // (Touza) es un turno de Touza, y el motor usa los turnos propios del
+  // espacio si los tiene y, si no, los globales (`seleccionarConfiguraciones`).
+  // Por eso la previsualización usa la marca DEL ESPACIO elegido — mismo
+  // criterio que el trigger `validar_capacidad_reserva` —; un periodo global
+  // (`espacio_id = null`) es de Casa Tomás. Decisión del dueño 2026-09-24:
+  // El Reservado se gestiona igual que las demás salas.
+  const espacioIdSeleccionado = form.watch("espacio_id");
+  const capacidadTotalActiva = useMemo(() => {
+    const espacioElegido = espacios?.find((e: any) => e.id === espacioIdSeleccionado);
+    const marcaObjetivo = marcaDeEspacio(espacioElegido as any);
+    return sumarCapacidadPorMarca(
+      (espacios ?? [])
+        .filter((e: any) => e.activa)
+        .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
+      marcaObjetivo,
+    );
+  }, [espacios, espacioIdSeleccionado]);
 
   const openCreateDialog = () => {
     setEditingConfig(null);
@@ -432,14 +439,22 @@ export function ConfiguracionTurnos() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="all">Todos los espacios</SelectItem>
-                          {espacios?.map((espacio) => (
-                            <SelectItem key={espacio.id} value={espacio.id}>
-                              {espacio.nombre}
-                            </SelectItem>
+                          <SelectItem value="all">Todos los espacios (generales)</SelectItem>
+                          {agruparPorNegocio((espacios ?? []) as any[], (e) => marcaDeEspacio(e)).map(({ negocio, items }) => (
+                            <SelectGroup key={negocio.marca}>
+                              <SelectLabel>{negocio.etiqueta}</SelectLabel>
+                              {items.map((espacio) => (
+                                <SelectItem key={espacio.id} value={espacio.id}>
+                                  {espacio.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormDescription>
+                        Los generales son los de Casa Tomás. El Reservado (Touza) usa sus turnos propios si los tiene; si no, los generales. El aforo se cuenta por negocio.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -635,8 +650,12 @@ export function ConfiguracionTurnos() {
                   </Button>
                 </div>
               </div>
-              <CardDescription>
+              <CardDescription className="flex flex-wrap items-center gap-1.5">
                 {getEspacioNombre(config.espacio_id)}
+                <NegocioBadge
+                  corta
+                  marca={marcaDeEspacio(espacios?.find((e) => e.id === config.espacio_id) as any)}
+                />
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">

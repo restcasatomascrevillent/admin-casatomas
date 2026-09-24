@@ -9,20 +9,20 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
-import { sumarCapacidadPorMarca, MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
+import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
+import { agruparPorNegocio, marcaDeEspacio, marcaDeReserva, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
 
 /**
- * Aforo por negocio (marca) — bug de 2026-09-22 (ver `useDisponibilidad.ts`).
- * Antes sumaba `capacidad_maxima` de TODOS los espacios activos sin mirar
- * `caracteristicas->>'marca'`: con "El Reservado" (touza, 20 plazas) dado de
- * alta, esta tarjeta pasó a mostrar "170" en vez de los 150 del
- * restaurante — es la captura que enseñó el dueño ("0/170 pax"). Se pide
- * también `caracteristicas` para poder filtrar, igual que hace
- * `leerDatosDelDia` en `useDisponibilidad.ts`.
+ * Aforo por negocio (marca). El 2026-09-22 esta tarjeta sumaba las plazas de
+ * los dos negocios ("0/170 pax"). Desde el 2026-09-24 (decisión del dueño:
+ * El Reservado de Touza se gestiona igual que las demás salas) la tarjeta
+ * cuenta las reservas de los DOS negocios, pero la ocupación (%) se da POR
+ * NEGOCIO contra su propio aforo — igual que el trigger
+ * `validar_capacidad_reserva` —, nunca sobre la suma.
  */
-function useOcupacionData(marca: string = MARCA_POR_DEFECTO) {
+function useEspaciosCapacidad() {
   return useQuery({
-    queryKey: ["ocupacion-reservas-hoy", marca],
+    queryKey: ["ocupacion-reservas-hoy-espacios"],
     queryFn: async () => {
       const { data: espacios, error } = await supabase
         .from("espacios_reserva")
@@ -30,27 +30,30 @@ function useOcupacionData(marca: string = MARCA_POR_DEFECTO) {
         .eq("activa", true);
 
       if (error) throw error;
-      return sumarCapacidadPorMarca(
-        ((espacios ?? []) as any[]).map((e) => ({
-          capacidad_maxima: Number(e.capacidad_maxima) || 0,
-          marca: (e.caracteristicas as any)?.marca as string | undefined,
-        })),
-        marca,
-      );
+      return ((espacios ?? []) as any[]).map((e) => ({
+        capacidad_maxima: Number(e.capacidad_maxima) || 0,
+        marca: marcaDeEspacio(e),
+      }));
     },
     refetchInterval: 60000,
   });
 }
 
+const getStatusColor = (p: number) => {
+  if (p < 50) return { bg: "bg-green-500/10", text: "text-green-600", bar: "bg-green-500", label: "Baja" };
+  if (p < 80) return { bg: "bg-amber-500/10", text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
+  return { bg: "bg-red-500/10", text: "text-red-600", bar: "bg-red-500", label: "Alta" };
+};
+
 export function ReservasHoy() {
   const navigate = useNavigate();
   const todasQuery = useTodayReservations();
   const confirmadasQuery = useTodayConfirmedReservations();
-  const capacidadQuery = useOcupacionData();
+  const capacidadQuery = useEspaciosCapacidad();
 
   const { data: todasReservas } = todasQuery;
   const { data: reservasConfirmadas } = confirmadasQuery;
-  const capacidadTotal = capacidadQuery.data ?? 0;
+  const espaciosCapacidad = capacidadQuery.data ?? [];
 
   const hayError = todasQuery.isError || confirmadasQuery.isError || capacidadQuery.isError;
   const errorDetalle = todasQuery.error || confirmadasQuery.error || capacidadQuery.error;
@@ -73,14 +76,22 @@ export function ReservasHoy() {
   const comensalesCena = reservasCena.reduce((acc, r) => acc + r.numero_comensales, 0);
   const comensalesActivos = reservasActivas.reduce((acc, r) => acc + r.numero_comensales, 0);
 
-  // Ocupación
-  const porcentajeOcupacion = capacidadTotal > 0 ? Math.round((comensalesActivos / capacidadTotal) * 100) : 0;
-  const getStatusColor = (p: number) => {
-    if (p < 50) return { bg: "bg-green-500/10", text: "text-green-600", bar: "bg-green-500", label: "Baja" };
-    if (p < 80) return { bg: "bg-amber-500/10", text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
-    return { bg: "bg-red-500/10", text: "text-red-600", bar: "bg-red-500", label: "Alta" };
-  };
-  const colors = getStatusColor(porcentajeOcupacion);
+  // Ocupación POR NEGOCIO (aforo separado, como el trigger). Casa Tomás
+  // siempre sale; Touza si tiene sala activa o reservas hoy.
+  const ocupacionPorNegocio = agruparPorNegocio(
+    [
+      ...espaciosCapacidad.map((e) => e.marca),
+      ...reservasActivas.map((r) => marcaDeReserva(r)),
+    ],
+    (m) => m,
+    [MARCA_POR_DEFECTO],
+  ).map(({ negocio }) => {
+    const capacidad = sumarCapacidadPorMarca(espaciosCapacidad, negocio.marca);
+    const delNegocio = reservasActivas.filter((r) => marcaDeReserva(r) === negocio.marca);
+    const comensales = delNegocio.reduce((acc, r) => acc + r.numero_comensales, 0);
+    const porcentaje = capacidad > 0 ? Math.round((comensales / capacidad) * 100) : 0;
+    return { negocio, capacidad, comensales, reservas: delNegocio.length, porcentaje, colors: getStatusColor(porcentaje) };
+  });
 
   // Alertas
   const reservasBlacklist = todasReservas?.filter(r => r.en_blacklist) || [];
@@ -179,27 +190,32 @@ export function ReservasHoy() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Barra de ocupación */}
-        <div className={`p-3 rounded-lg ${colors.bg}`}>
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-2">
-              <span className={`text-2xl font-bold ${colors.text}`}>{porcentajeOcupacion}%</span>
-              <Badge variant="outline" className={`${colors.text} border-current text-[10px]`}>
-                {colors.label}
-              </Badge>
+        {/* Ocupación por negocio: cada uno contra SU aforo */}
+        <div className="space-y-2">
+          {ocupacionPorNegocio.map(({ negocio, capacidad, comensales, reservas, porcentaje, colors }) => (
+            <div key={negocio.marca} className={`p-3 rounded-lg ${colors.bg}`}>
+              <div className="flex items-center justify-between mb-1.5 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`text-2xl font-bold ${colors.text}`}>{porcentaje}%</span>
+                  <Badge variant="outline" className={`${colors.text} border-current text-[10px]`}>
+                    {colors.label}
+                  </Badge>
+                  <span className="text-xs font-medium truncate">{negocio.etiqueta}</span>
+                </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {comensales}/{capacidad} pax · {reservas} res.
+                </span>
+              </div>
+              <div className="h-2 bg-background/50 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${colors.bar} transition-all duration-500`}
+                  style={{ width: `${Math.min(100, porcentaje)}%` }}
+                />
+              </div>
             </div>
-            <span className="text-xs text-muted-foreground">
-              {comensalesActivos}/{capacidadTotal} pax sin canceladas
-            </span>
-          </div>
-          <div className="h-2 bg-background/50 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${colors.bar} transition-all duration-500`}
-              style={{ width: `${Math.min(100, porcentajeOcupacion)}%` }}
-            />
-          </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground">
-            {reservasActivas.length} reservas activas = {numConfirmadas} confirmadas
+          ))}
+          <p className="text-[10px] text-muted-foreground">
+            {reservasActivas.length} reservas activas ({comensalesActivos} pax, sin canceladas) = {numConfirmadas} confirmadas
             + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
           </p>
         </div>

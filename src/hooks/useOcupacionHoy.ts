@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { sumarCapacidadPorMarca, MARCA_POR_DEFECTO } from "./useDisponibilidad";
+import { resumirOcupacionPorNegocio } from "@/lib/reservas/resumenNegocios";
+import { normalizarMarca } from "@/lib/reservas/negocios";
 
 export interface OcupacionEspacio {
   espacio_id?: string;
@@ -35,6 +36,7 @@ interface EspacioCapacidad {
 interface ReservaParaResumen {
   estado: string;
   numero_comensales: number;
+  marca?: string | null;
 }
 
 /**
@@ -63,31 +65,23 @@ export function useOcupacionHoy() {
 }
 
 /**
- * Aforo por negocio (marca) — bug de 2026-09-22, ver la nota "Aforo por
- * negocio" en `useDisponibilidad.ts`.
+ * Resumen de las reservas de HOY: total del grupo + desglose por negocio
+ * (Casa Tomás / Touza · El Reservado, decisión del dueño 2026-09-24).
  * ------------------------------------------------------------
- * Antes este hook sacaba `totalReservas`/`totalComensales`/etc. de
- * `vista_ocupacion_hoy`, sumando (via `useOcupacionHoy`) sobre su única
- * fila sin filtrar por marca — la vista agrega TODAS las reservas de hoy,
- * de los dos negocios, en un solo total. La capacidad tampoco se filtraba:
- * sumaba `capacidad_maxima` de TODOS los espacios activos. Con "El
- * Reservado" (touza, 20 plazas) dado de alta, la pestaña "Hoy" de Reservas
- * mostraba "Capacidad Total: 170" y una "Ocupación del día" calculada sobre
- * comensales que podían incluir reservas de touza.
+ * No usa `vista_ocupacion_hoy` (no expone `marca`): lee `reservas` de hoy y
+ * `espacios_reserva` y agrega en JS con `resumirOcupacionPorNegocio`
+ * (src/lib/reservas/resumenNegocios.ts). La capacidad de cada negocio es la
+ * suma de SUS espacios activos (mismo criterio que el trigger de aforo): el
+ * aforo de El Reservado nunca se suma al del restaurante en el % de ocupación
+ * de un negocio.
  *
- * La vista no se puede filtrar por marca desde aquí (no expone `espacio_id`
- * ni `marca` por fila, y está definida en `supabase/**`, fuera del
- * territorio de esta sesión), así que este hook deja de depender de ella:
- * lee `reservas` de hoy filtradas por `marca` directamente (mismo criterio
- * que `leerDatosDelDia` en `useDisponibilidad.ts`) y agrega en JS. La
- * capacidad reutiliza `sumarCapacidadPorMarca` del motor compartido.
- *
- * Por defecto `MARCA_POR_DEFECTO` (casa_tomas): es lo único que necesita
- * HOY el panel — sus pantallas de reservas son del restaurante.
+ * `marca` opcional: si se pasa, solo ese negocio (las cifras de nivel
+ * superior son las suyas); sin ella, los dos.
  */
-export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
+export function useResumenOcupacionHoy(marca?: string | null) {
+  const marcaFiltro = marca ? normalizarMarca(marca) : null;
   const espaciosQuery = useQuery({
-    queryKey: ["espacios_capacidad_total", marca],
+    queryKey: ["espacios_capacidad_total"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("espacios_reserva" as any)
@@ -100,7 +94,7 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
   });
 
   const reservasQuery = useQuery({
-    queryKey: ["reservas_hoy_resumen", marca],
+    queryKey: ["reservas_hoy_resumen"],
     queryFn: async () => {
       // Fecha LOCAL: `toISOString()` devuelve la fecha UTC y en Madrid (UTC+1/+2)
       // desplazaba el día en el tramo final del servicio.
@@ -108,9 +102,8 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
 
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("estado, numero_comensales")
-        .eq("fecha", today)
-        .eq("marca", marca);
+        .select("estado, numero_comensales, marca")
+        .eq("fecha", today);
 
       if (error) throw error;
       return (data ?? []) as unknown as ReservaParaResumen[];
@@ -121,49 +114,19 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
   const reservas = reservasQuery.data;
   const espacios = espaciosQuery.data ?? [];
 
-  // Mismo criterio que el trigger `trg_validar_capacidad`: pendiente,
-  // verificada y confirmada ocupan plaza; canceladas y no_show no cuentan
-  // como "van a venir" (antes se usaban los totales SIN filtrar por estado,
-  // y el panel prometía más comensales de los que iban a venir).
-  // + 'completada' (sesión 2026-09-23): desde que el panel registra la
-  // llegada ("Ha llegado" → 'completada', ver src/lib/reservas/servicioSala.ts)
-  // los que ya están sentados tienen que seguir contando en "Reservas hoy" /
-  // "Comensales" / "Ocupación del día"; si no, las cifras bajaban a medida
-  // que llegaba la gente. El trigger de aforo NO cuenta 'completada' y así se
-  // queda (decisión del dueño 2026-09-23: todo se reserva con antelación y
+  // Mismo criterio que antes: pendiente, verificada, confirmada y
+  // 'completada' (ya sentados, ver src/lib/reservas/servicioSala.ts) cuentan;
+  // canceladas y no_show no. El trigger de aforo NO cuenta 'completada' y así
+  // se queda (decisión del dueño 2026-09-23: todo se reserva con antelación y
   // el día se bloquea la víspera, así que no se revende el hueco).
-  const activas = (reservas ?? []).filter((r) =>
-    ["pendiente", "verificada", "confirmada", "completada"].includes(r.estado),
-  );
-  const totalReservas = activas.length;
-  const totalComensales = activas.reduce((acc, r) => acc + (Number(r.numero_comensales) || 0), 0);
-  const reservasTodasEstados = reservas?.length ?? 0;
-  const reservasCanceladas = (reservas ?? []).filter((r) => r.estado === "cancelada").length;
-  const reservasConfirmadas = (reservas ?? []).filter((r) => r.estado === "confirmada").length;
-  const reservasPendientes = (reservas ?? []).filter((r) => r.estado === "pendiente").length;
-
-  const capacidadTotal = sumarCapacidadPorMarca(
-    espacios
-      .filter((espacio) => espacio.activa !== false)
-      .map((espacio) => ({
-        capacidad_maxima: Number(espacio.capacidad_maxima) || 0,
-        marca: espacio.caracteristicas?.marca ?? null,
-      })),
-    marca,
-  );
-
   const resumen = reservas
-    ? {
-        totalReservas,
-        totalComensales,
-        reservasTodasEstados,
-        reservasCanceladas,
-        reservasConfirmadas,
-        reservasPendientes,
-        capacidadTotal,
-        // Ocupación global del día: comensales que ocupan plaza / capacidad total.
-        porcentajeTotal: capacidadTotal > 0 ? Math.round((totalComensales / capacidadTotal) * 100) : 0,
-      }
+    ? (() => {
+        const todo = resumirOcupacionPorNegocio(reservas, espacios);
+        if (!marcaFiltro) return todo;
+        const propio = todo.porNegocio.find((n) => n.negocio.marca === marcaFiltro);
+        const { negocio: _negocio, ...cifras } = propio ?? { negocio: null, ...resumirOcupacionPorNegocio([], []) };
+        return { ...cifras, porNegocio: propio ? [propio] : [] };
+      })()
     : null;
 
   return {
@@ -180,18 +143,18 @@ export function useResumenOcupacionHoy(marca: string = MARCA_POR_DEFECTO) {
 /**
  * Todas las reservas de HOY (sin cancelar), para el plano 2D por espacio.
  *
- * Aforo por negocio (marca) — bug de 2026-09-22, ver `useDisponibilidad.ts`.
- * Antes no filtraba por marca: el plano de un espacio del restaurante (p.
- * ej. Comedor) podía ofrecer como "pendientes de asignar" o sumar en "Total
- * Comensales" reservas de otro negocio (touza). Por defecto
- * `MARCA_POR_DEFECTO`, igual que el resto del panel.
+ * Filtradas por negocio (marca): el plano de un espacio solo debe ofrecer
+ * como "pendientes de asignar" y sumar reservas de SU negocio. Quien lo usa
+ * pasa la marca del espacio que se está mirando (El Reservado => 'touza');
+ * por defecto Casa Tomás.
  *
  * El nombre es heredado: NO filtra por `espacio_id` (devuelve las de TODOS
  * los espacios del negocio, asignadas o no) — quien consume esto filtra
  * luego localmente. No se ha tocado ese comportamiento: es una pregunta
  * distinta a la de esta sesión (filtrar por marca).
  */
-export function useReservasHoyPorEspacio(marca: string = MARCA_POR_DEFECTO) {
+export function useReservasHoyPorEspacio(marcaEspacio?: string | null) {
+  const marca = normalizarMarca(marcaEspacio);
   return useQuery({
     queryKey: ["reservas_hoy_todas", marca],
     queryFn: async () => {

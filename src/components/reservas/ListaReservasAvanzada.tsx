@@ -8,7 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { MARCA_POR_DEFECTO } from "@/hooks/useDisponibilidad";
+import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import {
+  espacioUnicoDeNegocio,
+  FILTRO_NEGOCIO_TODOS,
+  marcaDeReserva,
+  marcaDeSolicitud,
+  NEGOCIOS_PANEL,
+} from "@/lib/reservas/negocios";
+import { NegocioBadge } from "./NegocioBadge";
 import { toast } from "sonner";
 import {
   CheckCircle,
@@ -114,6 +122,11 @@ export function ListaReservasAvanzada({
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [canalFilter, setCanalFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(initialDateFilter);
+  // Negocio: Casa Tomás / Touza · El Reservado (las dos se gestionan aquí).
+  const [negocioFilter, setNegocioFilter] = useState<string>(FILTRO_NEGOCIO_TODOS);
+  const { data: espaciosData } = useEspaciosReserva();
+  const espacios = useMemo(() => ((espaciosData ?? []) as any[]), [espaciosData]);
+  const marcaSolicitud = (s: SolicitudPendiente) => marcaDeSolicitud(s, espacios);
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -153,13 +166,12 @@ export function ListaReservasAvanzada({
   } = useQuery({
     queryKey: ["reservas-lista"],
     queryFn: async () => {
-      // Solo Casa Tomás (Touza no tiene reservas, decisión del dueño
-      // 2026-09-23). `as any`: `marca` no está en los tipos generados y
-      // `.eq("marca", ...)` dispara "Type instantiation is excessively deep"
-      // (mismo recurso que GestorReservasKanban / useDisponibilidad).
-      const { data, error } = await (supabase.from("reservas" as any) as any)
+      // Reservas de TODOS los negocios (Casa Tomás y Touza · El Reservado,
+      // decisión del dueño 2026-09-24): cada fila lleva su insignia de negocio
+      // y el filtro "Negocio" separa una de otra.
+      const { data, error } = await supabase
+        .from("reservas")
         .select("*")
-        .eq("marca", MARCA_POR_DEFECTO)
         .order("fecha", { ascending: false })
         .order("hora", { ascending: true });
       if (error) {
@@ -186,6 +198,11 @@ export function ListaReservasAvanzada({
     const p = propuestaConversion;
     const fecha = p ? p.fecha : s.fecha_solicitada;
     const hora = p ? p.hora : s.hora_solicitada;
+    // Negocio de la solicitud (sala propuesta o marcador de El Reservado en
+    // las notas). Si es de un negocio con una sola sala (Touza), esa sala
+    // queda preseleccionada: la reserva nace de Touza, con su aforo.
+    const espacioElegido = p ? p.espacioId : s.espacio_propuesto_id ?? null;
+    const marca = marcaDeSolicitud({ espacio_propuesto_id: espacioElegido, notas_cliente: s.notas_cliente }, espacios);
     return {
       fecha: fecha ? new Date(`${fecha}T12:00:00`) : undefined,
       hora: hora ? String(hora).substring(0, 5) : undefined,
@@ -194,13 +211,14 @@ export function ListaReservasAvanzada({
       email: s.email ?? undefined,
       numero_comensales: (p ? p.comensales : s.numero_comensales) ?? undefined,
       notas_cliente: s.notas_cliente ?? undefined,
-      espacio_id: p ? p.espacioId : s.espacio_propuesto_id ?? null,
+      espacio_id: espacioElegido ?? espacioUnicoDeNegocio(marca, espacios),
+      marca,
       // El cliente llamó al bot: la reserva es de canal teléfono y queda
       // enlazada a su solicitud (reservas.solicitud_id).
       canal: "telefono" as const,
       solicitud_id: s.id,
     };
-  }, [solicitudAConvertir, propuestaConversion]);
+  }, [solicitudAConvertir, propuestaConversion, espacios]);
 
   const handleReservaDesdeSolicitudCreada = async (creada?: ReservaCreadaDesdeFormulario) => {
     const s = solicitudAConvertir;
@@ -393,8 +411,10 @@ export function ListaReservasAvanzada({
         estado: statusFilter,
         canal: canalFilter,
         fecha: dateFilter ? format(dateFilter, "yyyy-MM-dd") : null,
+        negocio: negocioFilter,
+        marcaDeSolicitud: (s) => marcaDeSolicitud(s, espacios),
       }),
-    [reservations, solicitudes, searchQuery, statusFilter, canalFilter, dateFilter],
+    [reservations, solicitudes, searchQuery, statusFilter, canalFilter, dateFilter, negocioFilter, espacios],
   );
   const filteredReservations = filas.flatMap((f) => (f.tipo === "reserva" ? [f.reserva] : []));
   const numSolicitudesVisibles = filas.length - filteredReservations.length;
@@ -507,6 +527,21 @@ export function ListaReservasAvanzada({
                   <SelectItem value="manual">✏️ Manual</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Filtro de negocio */}
+              <Select value={negocioFilter} onValueChange={setNegocioFilter}>
+                <SelectTrigger className="w-[150px] sm:w-[190px]" aria-label="Filtrar por negocio">
+                  <SelectValue placeholder="Negocio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FILTRO_NEGOCIO_TODOS}>Todos los negocios</SelectItem>
+                  {NEGOCIOS_PANEL.map((n) => (
+                    <SelectItem key={n.marca} value={n.marca}>
+                      {n.etiqueta}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Contador de resultados */}
@@ -557,6 +592,7 @@ export function ListaReservasAvanzada({
                 onUpdateNotas={solicitudesState.updateNotasInternas}
                 onConvertir={canEdit ? (s) => abrirConversion(s) : undefined}
                 onGestionarPropuesta={(s) => setSolicitudGestionId(s.id)}
+                marca={marcaSolicitud(fila.solicitud)}
               />
             )
           ) : (() => { const reservation = fila.reserva; return (
@@ -584,6 +620,7 @@ export function ListaReservasAvanzada({
                   <span>{reservation.hora}</span>
                   <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reservation.numero_comensales}</span>
                   {getCanalBadge(reservation.canal)}
+                  <NegocioBadge marca={marcaDeReserva(reservation)} corta />
                 </div>
                 {reservation.telefono && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -664,6 +701,7 @@ export function ListaReservasAvanzada({
                     canEdit={canEdit}
                     onConvertir={() => abrirConversion(fila.solicitud)}
                     onGestionar={() => setSolicitudGestionId(fila.solicitud.id)}
+                    marca={marcaSolicitud(fila.solicitud)}
                   />
                 ) : (() => { const reservation = fila.reserva; return (
                   <TableRow key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
@@ -690,6 +728,7 @@ export function ListaReservasAvanzada({
                         <div>
                           <p className="font-medium">{reservation.nombre || "Sin nombre"}</p>
                           {reservation.telefono && <p className="text-xs text-muted-foreground">{reservation.telefono}</p>}
+                          <NegocioBadge marca={marcaDeReserva(reservation)} className="mt-0.5" />
                         </div>
                       </div>
                     </TableCell>
@@ -814,11 +853,13 @@ function FilaSolicitud({
   canEdit,
   onConvertir,
   onGestionar,
+  marca,
 }: {
   solicitud: SolicitudPendiente;
   canEdit: boolean;
   onConvertir: () => void;
   onGestionar: () => void;
+  marca: string;
 }) {
   const motivo = MOTIVO_LABELS[solicitud.motivo_rechazo] || MOTIVO_LABELS.otro;
   const abierta = esSolicitudAbierta(solicitud.estado);
@@ -841,6 +882,7 @@ function FilaSolicitud({
               {solicitud.telefono}
             </a>
           )}
+          <NegocioBadge marca={marca} className="mt-0.5 flex w-fit" />
           {solicitud.descripcion_rechazo && (
             <p className="text-xs text-muted-foreground mt-0.5 max-w-[260px] truncate" title={solicitud.descripcion_rechazo}>
               {solicitud.descripcion_rechazo}

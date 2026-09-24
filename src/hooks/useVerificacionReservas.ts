@@ -43,6 +43,8 @@ export interface ReservaParaVerificar {
   hora_solicitada?: string | null;
   /** NUEVO (migración 20260920010000, aún no aplicada). Puede faltar. */
   espacio_solicitado_id?: string | null;
+  /** Negocio (`reservas.marca`): casa_tomas | touza (El Reservado). */
+  marca?: string | null;
 }
 
 export interface CambiosVerificacion {
