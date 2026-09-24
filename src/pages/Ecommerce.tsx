@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, ShoppingCart, Boxes, Users, BarChart3, Receipt } from "lucide-react";
 import { TPVContainer } from "@/components/ecommerce/tpv/TPVContainer";
@@ -17,7 +17,7 @@ export default function Ecommerce() {
   const isTPV = useMemo(() => seccionActiva === "tpv", [seccionActiva]);
 
   return (
-    <DashboardLayout>
+    <SuperAdminLayout>
       <div className={cn(isTPV ? "h-full min-h-0 flex flex-col" : "space-y-6")}>
         <div className={cn(isTPV ? "shrink-0" : "")}>
           <h1 className="text-3xl font-bold">Ecommerce</h1>
@@ -101,6 +101,6 @@ export default function Ecommerce() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

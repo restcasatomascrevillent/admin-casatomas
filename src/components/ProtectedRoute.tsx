@@ -17,15 +17,13 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/reservas": "reservas",
   "/espacios": "espacios",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
-  "/ecommerce": "ecommerce",
-  "/asistente-telefonico": "asistente_telefonico",
-  "/resenas": "resenas",
   "/marketing": "marketing",
   "/facturas": "facturas",
   "/usuarios": "usuarios",
-  "/gestor-gasto": "gestor_gasto",
   "/trafico-web": "trafico_web",
 };
+// Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google ya no tienen ruta
+// aquí: viven bajo /super-admin/* protegidas por SuperAdminRoute.
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();

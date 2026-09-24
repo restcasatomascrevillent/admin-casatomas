@@ -1,9 +1,9 @@
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { GestorGasto as GestorGastoWidget } from "@/components/dashboard/widgets/GestorGasto";
 
 export default function GestorGasto() {
   return (
-    <DashboardLayout>
+    <SuperAdminLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Gestor de Gasto</h1>
@@ -11,6 +11,6 @@ export default function GestorGasto() {
         </div>
         <GestorGastoWidget />
       </div>
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

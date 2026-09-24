@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ export default function GestionResenas() {
     const isPlaceholderPlaceId = config?.place_id?.includes("_casa_") || !config?.place_id?.startsWith("ChIJ");
 
     return (
-        <DashboardLayout>
+        <SuperAdminLayout>
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -326,6 +326,6 @@ export default function GestionResenas() {
                     </CardContent>
                 </Card>
             </div>
-        </DashboardLayout>
+        </SuperAdminLayout>
     );
 }

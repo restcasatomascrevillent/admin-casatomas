@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -350,7 +350,7 @@ export default function AsistenteTelefonico() {
     }, [config, isLoadingConfig, updateModeMutation.isPending]);
 
     return (
-        <DashboardLayout>
+        <SuperAdminLayout>
             <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
@@ -632,6 +632,6 @@ export default function AsistenteTelefonico() {
 
                 <TelefoniaCallDetailDialog call={selectedCall} onClose={() => setSelectedCall(null)} />
             </div>
-        </DashboardLayout>
+        </SuperAdminLayout>
     );
 }

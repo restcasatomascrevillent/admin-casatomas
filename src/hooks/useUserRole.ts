@@ -26,17 +26,15 @@ export const SECTIONS = [
   // Filas de user_permissions con section_key="trabajadores" que puedan
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
   { key: "gestor_carta", label: "Gestor Web · Carta" },
-  { key: "ecommerce", label: "Ecommerce" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
-  { key: "resenas", label: "Reseñas Google" },
   { key: "gestion_bot", label: "Gestor Web · Bot web" },
-  { key: "asistente_telefonico", label: "Asistente Tel." },
   { key: "marketing", label: "Newsletter" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
-  { key: "gestor_gasto", label: "Gestor Gasto" },
   { key: "trafico_web", label: "Tráfico web" },
 ] as const;
+// Nota: Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google se gestionan
+// exclusivamente desde el Super Admin y ya no forman parte del Admin Panel normal.
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 

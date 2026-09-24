@@ -1,7 +1,7 @@
-import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, ShoppingCart, Wallet, Star, Phone, Mail, Activity } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, Mail, Activity, Settings } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -18,41 +18,48 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
-const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey | SectionKey[] }[] = [
+// `toggleKey` es la clave que usa el Super Admin para activar/desactivar el
+// item en el sidebar (independiente del permiso por sección): por defecto es
+// el propio sectionKey cuando es uno solo, o se declara aparte cuando el item
+// agrupa varias secciones o comparte permiso con otro item.
+const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey | SectionKey[]; toggleKey?: string }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
-  { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas" },
-  { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas" },
-  { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios" },
+  { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas", toggleKey: "reservas" },
+  { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas", toggleKey: "plantillas_email" },
+  { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios", toggleKey: "espacios" },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
   // docs/funcionalidades/10-retirada-seccion-personal.md.
-  { title: "Ecommerce", url: "/ecommerce", icon: ShoppingCart, sectionKey: "ecommerce" },
-  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB },
-  { title: "Asistente Tel.", url: "/asistente-telefonico", icon: Phone, sectionKey: "asistente_telefonico" },
-  { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing" },
-  { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas" },
-  { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios" },
-  { title: "Gestor Gasto", url: "/gestor-gasto", icon: Wallet, sectionKey: "gestor_gasto" },
-  { title: "Reseñas Google", url: "/resenas", icon: Star, sectionKey: "resenas" },
-  { title: "Tráfico web", url: "/trafico-web", icon: Activity, sectionKey: "trafico_web" },
+  // Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google se gestionan
+  // exclusivamente desde el Super Admin y ya no forman parte del Admin
+  // Panel normal (ver /super-admin).
+  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB, toggleKey: "gestion_web" },
+  { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing", toggleKey: "marketing" },
+  { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas", toggleKey: "facturas" },
+  { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios", toggleKey: "usuarios" },
+  { title: "Tráfico web", url: "/trafico-web", icon: Activity, sectionKey: "trafico_web", toggleKey: "trafico_web" },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const { signOut } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
   const { isAdmin, permissions, loading } = useUserRole();
+  const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
   const isActive = (path: string) => currentPath === path;
   const isCollapsed = state === "collapsed";
 
-  // Filtrar items según permisos
+  // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
-    if (loading) return false;
+    if (loading || togglesLoading) return false;
+    if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
     if (isAdmin) return true;
     const keys = Array.isArray(item.sectionKey) ? item.sectionKey : [item.sectionKey];
     if (keys.includes("usuarios")) return false; // Solo admins
@@ -98,14 +105,26 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <Button
-          variant="ghost"
-          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
-          onClick={() => signOut()}
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
-        </Button>
+        <div className={`flex gap-2 ${isCollapsed ? 'flex-col' : 'flex-row'}`}>
+          <Button
+            variant="ghost"
+            className={`text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'w-full justify-center px-2' : 'flex-1 justify-start'}`}
+            onClick={() => signOut()}
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-sidebar-foreground hover:bg-sidebar-accent shrink-0"
+            onClick={() => navigate("/super-admin/login")}
+            title="Super Admin"
+            aria-label="Super Admin"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
