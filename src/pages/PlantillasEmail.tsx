@@ -1,10 +1,10 @@
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Mail } from "lucide-react";
 import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 
 export default function PlantillasEmail() {
   return (
-    <DashboardLayout>
+    <SuperAdminLayout>
       <div className="space-y-6">
         <div>
           <h2 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
@@ -19,6 +19,6 @@ export default function PlantillasEmail() {
 
         <EditorPlantillasEmail />
       </div>
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, Mail, Activity, Settings } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, MapPin, Globe, Megaphone, Receipt, LogOut, Shield, Settings } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,18 +30,16 @@ import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb
 const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey | SectionKey[]; toggleKey?: string }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas", toggleKey: "reservas" },
-  { title: "Plantillas Email", url: "/plantillas-email", icon: Mail, sectionKey: "reservas", toggleKey: "plantillas_email" },
   { title: "Espacios", url: "/espacios", icon: MapPin, sectionKey: "espacios", toggleKey: "espacios" },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
   // docs/funcionalidades/10-retirada-seccion-personal.md.
-  // Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google se gestionan
-  // exclusivamente desde el Super Admin y ya no forman parte del Admin
-  // Panel normal (ver /super-admin).
+  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
+  // Email y Tráfico web se gestionan exclusivamente desde el Super Admin y
+  // ya no forman parte del Admin Panel normal (ver /super-admin).
   { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB, toggleKey: "gestion_web" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing", toggleKey: "marketing" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas", toggleKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios", toggleKey: "usuarios" },
-  { title: "Tráfico web", url: "/trafico-web", icon: Activity, sectionKey: "trafico_web", toggleKey: "trafico_web" },
 ];
 
 export function AppSidebar() {

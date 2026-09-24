@@ -1,11 +1,10 @@
 import { useMemo, useState } from "react";
 import { format, subDays } from "date-fns";
 import { Activity, BarChart3 } from "lucide-react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
-import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   useEstadoSyncTrafico,
   useFdtMes,
@@ -59,7 +58,6 @@ function CargandoPagina() {
 export default function TraficoWeb() {
   const [proyecto, setProyecto] = useState<FiltroProyecto>("ambos");
   const [dias, setDias] = useState<RangoDias>(30);
-  const { canAccess: puedeEditar } = useCanAccessSection("trafico_web", "edit");
 
   // Fechas en calendario local; la RPC trabaja con días cerrados (< hoy).
   const hoyStr = format(new Date(), ISO);
@@ -89,7 +87,7 @@ export default function TraficoWeb() {
   const sinDatos = serieQ.isSuccess && actual.diasConDato === 0 && anterior.diasConDato === 0;
 
   return (
-    <DashboardLayout>
+    <SuperAdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -101,7 +99,7 @@ export default function TraficoWeb() {
               Visitas de Casa Tomás y Touza (Vercel Web Analytics) y estimación de la transferencia de datos.
             </p>
           </div>
-          {puedeEditar && <EditorPesoPaginas />}
+          <EditorPesoPaginas />
         </div>
 
         <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
@@ -142,6 +140,6 @@ export default function TraficoWeb() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

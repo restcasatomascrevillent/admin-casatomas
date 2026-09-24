@@ -2,7 +2,7 @@ import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, ShieldAlert, ShoppingCart, Wallet, Star, Phone } from "lucide-react";
+import { Loader2, ShieldAlert, ShoppingCart, Wallet, Star, Phone, Mail, Activity } from "lucide-react";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ const MOVED_FEATURES = [
   { title: "Asistente Tel.", url: "/super-admin/asistente-telefonico", icon: Phone },
   { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },
   { title: "Reseñas Google", url: "/super-admin/resenas", icon: Star },
+  { title: "Plantillas Email", url: "/super-admin/plantillas-email", icon: Mail },
+  { title: "Tráfico web", url: "/super-admin/trafico-web", icon: Activity },
 ];
 
 export default function SuperAdminPanel() {

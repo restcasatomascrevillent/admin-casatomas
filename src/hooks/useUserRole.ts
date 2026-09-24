@@ -31,10 +31,10 @@ export const SECTIONS = [
   { key: "marketing", label: "Newsletter" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
-  { key: "trafico_web", label: "Tráfico web" },
 ] as const;
-// Nota: Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google se gestionan
-// exclusivamente desde el Super Admin y ya no forman parte del Admin Panel normal.
+// Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
+// Email y Tráfico web se gestionan exclusivamente desde el Super Admin y ya
+// no forman parte del Admin Panel normal.
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 

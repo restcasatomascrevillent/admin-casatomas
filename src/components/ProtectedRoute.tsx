@@ -20,10 +20,10 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/marketing": "marketing",
   "/facturas": "facturas",
   "/usuarios": "usuarios",
-  "/trafico-web": "trafico_web",
 };
-// Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google ya no tienen ruta
-// aquí: viven bajo /super-admin/* protegidas por SuperAdminRoute.
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email y
+// Tráfico web ya no tienen ruta aquí: viven bajo /super-admin/* protegidas
+// por SuperAdminRoute.
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();

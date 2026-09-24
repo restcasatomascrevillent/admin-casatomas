@@ -41,8 +41,9 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
   </RouteErrorBoundary>
 );
 
-// Ecommerce, Asistente Tel., Gestor Gasto y Reseñas Google viven exclusivamente
-// bajo /super-admin/* (ver botón de engranaje en AppSidebar).
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email y
+// Tráfico web viven exclusivamente bajo /super-admin/* (ver botón de
+// engranaje en AppSidebar).
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
     <SuperAdminRoute>{contenido}</SuperAdminRoute>
@@ -67,7 +68,6 @@ const App = () => (
             <Route path="/" element={pagina(<Dashboard />)} />
             <Route path="/dashboard" element={pagina(<Dashboard />)} />
             <Route path="/reservas" element={pagina(<Reservas />)} />
-            <Route path="/plantillas-email" element={pagina(<PlantillasEmail />, "reservas")} />
             <Route path="/espacios" element={pagina(<Espacios />)} />
             {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se
                 conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
@@ -78,13 +78,14 @@ const App = () => (
             <Route path="/marketing" element={pagina(<Marketing />)} />
             <Route path="/facturas" element={pagina(<Facturas />)} />
             <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
-            <Route path="/trafico-web" element={pagina(<TraficoWeb />, "trafico_web")} />
             <Route path="/super-admin/login" element={<SuperAdminLogin />} />
             <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
             <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
             <Route path="/super-admin/asistente-telefonico" element={paginaSuperAdmin(<AsistenteTelefonico />)} />
             <Route path="/super-admin/gestor-gasto" element={paginaSuperAdmin(<GestorGasto />)} />
             <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
+            <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
+            <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </RouteErrorBoundary>

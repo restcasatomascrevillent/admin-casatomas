@@ -107,13 +107,11 @@ USING (public.is_super_admin(auth.uid()));
 -- (dashboard queda fuera a propósito: nunca debe poder desactivarse)
 INSERT INTO public.admin_feature_toggles (section_key, label, enabled) VALUES
   ('reservas', 'Reservas', true),
-  ('plantillas_email', 'Plantillas Email', true),
   ('espacios', 'Espacios', true),
   ('gestion_web', 'Gestor Web', true),
   ('marketing', 'Newsletter', true),
   ('facturas', 'Facturas', true),
-  ('usuarios', 'Usuarios', true),
-  ('trafico_web', 'Tráfico web', true)
+  ('usuarios', 'Usuarios', true)
 ON CONFLICT (section_key) DO NOTHING;
 
 -- Otorga acceso de super admin al propietario existente del sistema
