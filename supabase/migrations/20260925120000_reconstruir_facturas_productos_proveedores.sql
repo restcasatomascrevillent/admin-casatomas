@@ -540,9 +540,11 @@ COMMIT;
 -- ===========================================================================
 -- ROLLBACK
 -- ===========================================================================
---   Ver 20260925120000_reconstruir_facturas_productos_proveedores_rollback.sql
---   (fichero separado, en comentarios -- no se ejecuta solo). Recuerda:
---   las tablas y la funcion siguen existiendo en produccion aunque se
---   "deshaga" esta reconstruccion en un entorno local; el rollback solo
---   tiene sentido contra una base creada a partir de este mismo fichero.
+--   Ver supabase/rollbacks/20260925120000_reconstruir_facturas_productos_proveedores_ROLLBACK.sql
+--   (fichero separado, fuera de supabase/migrations/ -- ver
+--   supabase/rollbacks/README.md -- no lo ejecuta `db push`/`db reset`,
+--   es solo para correrlo a mano si hace falta). Ese rollback hace DROP
+--   TABLE: NUNCA contra produccion, donde las tablas ya tienen datos
+--   reales; solo tiene sentido contra una base de pruebas creada a
+--   partir de este mismo fichero.
 -- ===========================================================================
