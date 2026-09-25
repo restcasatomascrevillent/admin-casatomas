@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -58,7 +58,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -66,6 +66,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { ControlLlegada } from "./ControlLlegada";
 import { BlacklistModal } from "./BlacklistModal";
+import {
+  ANCHO_COLUMNA_PLEGADA,
+  calcularDisposicion,
+  columnasAPlegarParaQueQuepan,
+  type DisposicionKanban,
+  type ItemColumna,
+} from "./kanbanLayout";
 
 // Estados del CHECK `reservas_estado_check`. Antes este mapa usaba "no-show"
 // (con guion, nunca casaba) y "rechazada" (no existe en la BD).
@@ -321,6 +328,10 @@ function KanbanColumn({
   isActive,
   minimized,
   onToggleMinimize,
+  ancho,
+  margenDerecho,
+  conIman,
+  alturaMaxima,
 }: {
   id: string;
   title: string;
@@ -333,16 +344,30 @@ function KanbanColumn({
   isActive: boolean;
   minimized: boolean;
   onToggleMinimize: () => void;
+  /** Ancho calculado por `kanbanLayout`; ya no es fijo (ver ese módulo). */
+  ancho: number;
+  /** Separación a la derecha: incluye el hueco de relleno de fin de página. */
+  margenDerecho: number;
+  /** Lleva imán de scroll: es donde el desplazamiento puede quedarse parado. */
+  conIman: boolean;
+  alturaMaxima: string;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
+  // El ancho va en `style` y no en clases porque lo decide la aritmética de
+  // `kanbanLayout` a partir del ancho real del contenedor.
+  const medidas: React.CSSProperties = {
+    marginRight: margenDerecho,
+    scrollSnapAlign: conIman ? "start" : undefined,
+  };
 
   if (minimized) {
     return (
       <button
         type="button"
         ref={setNodeRef}
+        style={{ ...medidas, width: ANCHO_COLUMNA_PLEGADA }}
         className={cn(
-          "flex flex-col items-center rounded-xl border-2 bg-muted/20 w-[42px] sm:w-[52px] shrink-0 transition-colors duration-200",
+          "flex flex-col items-center rounded-xl border-2 bg-muted/20 shrink-0 transition-colors duration-200",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
           !isOver && "border-transparent hover:border-muted-foreground/20",
@@ -363,8 +388,9 @@ function KanbanColumn({
     <section
       ref={setNodeRef}
       aria-label={`Columna ${title}`}
+      style={{ ...medidas, width: ancho }}
       className={cn(
-        "flex flex-col rounded-xl border-2 bg-muted/20 min-w-[210px] w-[230px] sm:min-w-[250px] sm:w-[270px] shrink-0 transition-colors duration-200",
+        "flex flex-col rounded-xl border-2 bg-muted/20 shrink-0 transition-colors duration-200",
         isOver && "border-primary bg-primary/5 shadow-lg shadow-primary/10",
         !isOver && "border-transparent",
         isActive && !isOver && "border-muted-foreground/10",
@@ -393,7 +419,7 @@ function KanbanColumn({
           </div>
         )}
       </div>
-      <ScrollArea className="flex-1 max-h-[65vh]">
+      <ScrollArea className="flex-1" style={{ maxHeight: alturaMaxima }}>
         <div className={cn("p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl", isOver && "bg-primary/[0.02]")}>
           {children}
           {count === 0 && (
@@ -416,6 +442,199 @@ function KanbanColumn({
           )}
         </div>
       </ScrollArea>
+    </section>
+  );
+}
+
+/**
+ * Fila de columnas de UN negocio. Es la que garantiza que nunca se vea una
+ * columna partida (encargo del dueño 2026-09-25).
+ *
+ * Por qué una fila por negocio y no todas en la misma: cuando Casa Tomás
+ * (4 columnas) y Touza convivían en la MISMA fila con scroll, el ancho pedido
+ * era siempre mayor que el disponible y la última columna quedaba cortada por
+ * el borde. Apilando los negocios, cada uno dispone del ancho completo, que es
+ * justo lo que hace que en escritorio no haga falta ni scroll.
+ *
+ * Dentro de la fila:
+ *   · Mide su propio ancho con ResizeObserver (no se adivina por breakpoints:
+ *     el ancho real depende del sidebar, que se pliega).
+ *   · `kanbanLayout` reparte ese ancho. Si no caben, primero pliega las
+ *     columnas VACÍAS (un carril de 52px en vez de 250) y, si aun así no
+ *     caben, pagina en páginas del ancho exacto del viewport.
+ *   · Paginado = scroll-snap por página + flechas + degradados en los bordes.
+ *     Al pararse el scroll siempre hay columnas enteras a la vista.
+ */
+function FilaNegocio({
+  etiqueta,
+  aforo,
+  mostrarCabecera,
+  items,
+  vacias,
+  arrastrando,
+  children,
+}: {
+  etiqueta: string;
+  aforo?: { comida: number; cena: number; capacidad: number };
+  mostrarCabecera: boolean;
+  items: ItemColumna[];
+  /** Columnas sin reservas: candidatas a plegarse solas si falta sitio. */
+  vacias: ReadonlySet<string>;
+  arrastrando: boolean;
+  children: (disposicion: DisposicionKanban, autoPlegadas: ReadonlySet<string>) => React.ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [ancho, setAncho] = useState(0);
+  const [parada, setParada] = useState(0);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAncho(el.clientWidth);
+    const observador = new ResizeObserver(() => setAncho(el.clientWidth));
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, []);
+
+  const autoPlegadas = useMemo(
+    () => columnasAPlegarParaQueQuepan(items, vacias, ancho),
+    [items, vacias, ancho],
+  );
+  const disposicion = useMemo(
+    () => calcularDisposicion(items.map((i) => ({ ...i, plegada: i.plegada || autoPlegadas.has(i.id) })), ancho),
+    [items, autoPlegadas, ancho],
+  );
+
+  const { paradas, visiblesPorParada } = disposicion;
+  const desplazable = disposicion.modo === "desplazable";
+  const totalParadas = paradas.length;
+  const paradaActual = Math.min(parada, Math.max(0, totalParadas - 1));
+
+  // Rango de espacios a la vista ("2–4 de 5"): se lee de la propia disposición,
+  // que es quien sabe cuántas columnas caben enteras.
+  const visibles = visiblesPorParada[paradaActual] ?? [];
+  const posicionDe = (id: string) => items.findIndex((i) => i.id === id) + 1;
+  const desde = visibles.length > 0 ? posicionDe(visibles[0]) : 0;
+  const hasta = visibles.length > 0 ? posicionDe(visibles[visibles.length - 1]) : 0;
+
+  // Al cambiar el ancho (redimensionar, plegar el sidebar) el desplazamiento
+  // anterior ya no cae en una parada: se recoloca en el sitio exacto para no
+  // dejar media columna a la vista.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollLeft = desplazable ? (paradas[Math.min(parada, paradas.length - 1)] ?? 0) : 0;
+    // `parada` a propósito fuera de las dependencias: este efecto recoloca al
+    // cambiar la disposición, no debe pelearse con el scroll del usuario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desplazable, totalParadas, disposicion.anchoColumna]);
+
+  const irAParada = (destino: number) => {
+    const el = scrollRef.current;
+    if (!el || totalParadas === 0) return;
+    const objetivo = Math.max(0, Math.min(destino, totalParadas - 1));
+    el.scrollTo({ left: paradas[objetivo], behavior: "smooth" });
+    setParada(objetivo);
+  };
+
+  const alDesplazar = () => {
+    const el = scrollRef.current;
+    if (!el || totalParadas === 0) return;
+    let masCercana = 0;
+    let minimaDistancia = Infinity;
+    paradas.forEach((posicion, i) => {
+      const distancia = Math.abs(posicion - el.scrollLeft);
+      if (distancia < minimaDistancia) {
+        minimaDistancia = distancia;
+        masCercana = i;
+      }
+    });
+    setParada(masCercana);
+  };
+
+  return (
+    <section
+      aria-label={etiqueta}
+      className={cn("flex flex-col gap-2 min-w-0", mostrarCabecera && "rounded-xl border border-dashed p-2")}
+    >
+      {(mostrarCabecera || desplazable) && (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-1 text-xs min-w-0">
+          {mostrarCabecera && (
+            <>
+              <span className="font-semibold">{etiqueta}</span>
+              {aforo && aforo.capacidad > 0 && (
+                <span className="text-muted-foreground tabular-nums">
+                  aforo comida {aforo.comida}/{aforo.capacidad} · cena {aforo.cena}/{aforo.capacidad}
+                </span>
+              )}
+            </>
+          )}
+          {desplazable && (
+            <div className="ml-auto flex items-center gap-1 self-center">
+              <span
+                role="status"
+                className="text-muted-foreground tabular-nums"
+                aria-label={`Viendo los espacios ${desde} a ${hasta} de ${items.length} de ${etiqueta}`}
+              >
+                {desde}–{hasta} de {items.length}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                disabled={paradaActual <= 0}
+                onClick={() => irAParada(paradaActual - 1)}
+                aria-label={`Ver los espacios anteriores de ${etiqueta}`}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-6 w-6"
+                disabled={paradaActual >= totalParadas - 1}
+                onClick={() => irAParada(paradaActual + 1)}
+                aria-label={`Ver los siguientes espacios de ${etiqueta}`}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="relative min-w-0">
+        <div
+          ref={scrollRef}
+          onScroll={alDesplazar}
+          className={cn(
+            // `min-w-0` + `overflow-x-auto` AQUÍ: el scroll horizontal se
+            // contiene en el kanban y nunca sube a los layouts (ya rompió
+            // `position: sticky` en toda la app una vez).
+            "flex min-w-0 overflow-x-auto overflow-y-hidden py-2",
+            desplazable ? "[scrollbar-width:thin]" : "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          )}
+          style={{
+            // Mientras se arrastra se desactiva el imán: si no, el autoscroll
+            // de dnd-kit y el snap se pelean y la tarjeta da saltos. Al soltar
+            // vuelve a activarse y el navegador recoloca en página entera.
+            scrollSnapType: desplazable && !arrastrando ? "x mandatory" : undefined,
+          }}
+        >
+          {children(disposicion, autoPlegadas)}
+          {disposicion.espacioFinal > 0 && (
+            <div aria-hidden="true" className="shrink-0" style={{ width: disposicion.espacioFinal }} />
+          )}
+        </div>
+        {desplazable && paradaActual > 0 && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent" />
+        )}
+        {desplazable && paradaActual < totalParadas - 1 && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent" />
+        )}
+      </div>
     </section>
   );
 }
@@ -445,7 +664,11 @@ export function GestorReservasKanban() {
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
+  // Plegado de columnas: el usuario manda sobre el automático. `minimizedCols`
+  // son las que plegó a mano; `expandidasCols` las que desplegó a mano y que,
+  // por tanto, el plegado automático de columnas vacías ya no puede tocar.
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
+  const [expandidasCols, setExpandidasCols] = useState<Set<string>>(new Set());
   const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
@@ -473,11 +696,22 @@ export function GestorReservasKanban() {
     toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
   };
 
-  const toggleMinimize = (colId: string) => {
+  /**
+   * `plegadaAhora` es lo que el usuario VE (puede estar plegada porque la
+   * plegó él o porque no cabía). Pulsar siempre hace lo contrario de lo que se
+   * ve, y deja constancia para que el automático no lo deshaga.
+   */
+  const togglePlegado = (colId: string, plegadaAhora: boolean) => {
     setMinimizedCols((prev) => {
       const next = new Set(prev);
-      if (next.has(colId)) next.delete(colId);
+      if (plegadaAhora) next.delete(colId);
       else next.add(colId);
+      return next;
+    });
+    setExpandidasCols((prev) => {
+      const next = new Set(prev);
+      if (plegadaAhora) next.add(colId);
+      else next.delete(colId);
       return next;
     });
   };
@@ -698,8 +932,11 @@ export function GestorReservasKanban() {
 
   return (
     <div className="space-y-3 sm:space-y-4 h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        <div className="relative w-full sm:max-w-sm">
+      {/* `flex-wrap`: por debajo de ~1100px el texto de ayuda se baja a su
+          propia línea en vez de estrujar el filtro de turno hasta partir
+          "Todo el día" en dos renglones. */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+        <div className="relative w-full min-w-0 sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Buscar por nombre, email o teléfono…"
@@ -715,13 +952,14 @@ export function GestorReservasKanban() {
           onValueChange={(v) => v && setFiltroTurno(v as FiltroTurno)}
           variant="outline"
           size="sm"
+          className="shrink-0"
           aria-label="Filtrar por turno"
         >
-          <ToggleGroupItem value="todo">Todo el día</ToggleGroupItem>
-          <ToggleGroupItem value="comida">Comida</ToggleGroupItem>
-          <ToggleGroupItem value="cena">Cena</ToggleGroupItem>
+          <ToggleGroupItem value="todo" className="whitespace-nowrap">Todo el día</ToggleGroupItem>
+          <ToggleGroupItem value="comida" className="whitespace-nowrap">Comida</ToggleGroupItem>
+          <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
         </ToggleGroup>
-        <p className="text-xs text-muted-foreground sm:ml-auto">
+        <p className="text-xs text-muted-foreground sm:basis-full lg:basis-auto lg:ml-auto">
           Arrastra una tarjeta a otro espacio o usa <MoreVertical className="inline h-3 w-3" aria-hidden="true" /> → «Mover a…».
         </p>
       </div>
@@ -741,56 +979,69 @@ export function GestorReservasKanban() {
           },
         }}
       >
-        <div className="flex gap-3 sm:gap-6 overflow-x-auto overflow-y-visible pb-4 px-1 pt-1 flex-1">
-          {grupos.map(({ negocio, columnas: columnasGrupo }) => (
-            <div
-              key={negocio.marca}
-              role="group"
-              aria-label={negocio.etiqueta}
-              className={cn("flex flex-col gap-2 shrink-0", grupos.length > 1 && "rounded-xl border border-dashed p-2")}
-            >
-              {grupos.length > 1 && (
-                <div className="flex flex-wrap items-baseline gap-x-2 px-1 text-xs">
-                  <span className="font-semibold">{negocio.etiqueta}</span>
-                  {aforoPorNegocio[negocio.marca]?.capacidad > 0 && (
-                    <span className="text-muted-foreground tabular-nums">
-                      aforo comida {aforoPorNegocio[negocio.marca].comida}/{aforoPorNegocio[negocio.marca].capacidad} · cena{" "}
-                      {aforoPorNegocio[negocio.marca].cena}/{aforoPorNegocio[negocio.marca].capacidad}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="flex gap-2 sm:gap-4">
-          {columnasGrupo.map((col) => (
-            <KanbanColumn
-              key={col.id}
-              id={col.id}
-              title={col.title}
-              capacidadMax={col.capacidadMax}
-              paxComida={paxPorColumna[col.id]?.comida ?? 0}
-              paxCena={paxPorColumna[col.id]?.cena ?? 0}
-              filtroTurno={filtroTurno}
-              count={reservasPorColumna[col.id]?.length || 0}
-              isActive={!!activeReserva}
-              minimized={minimizedCols.has(col.id)}
-              onToggleMinimize={() => toggleMinimize(col.id)}
-            >
-              {(reservasPorColumna[col.id] || []).map((reserva) => (
-                <ReservaCard
-                  key={reserva.id}
-                  reserva={reserva}
-                  columnas={columnas}
-                  acciones={acciones}
-                  onMover={solicitarMovimiento}
-                  onToggleImportante={toggleImportante}
-                  onBlacklist={setBlacklistReserva}
-                />
-              ))}
-            </KanbanColumn>
-          ))}
-              </div>
-            </div>
-          ))}
+        {/* Los negocios se APILAN (antes iban uno al lado del otro y entre los
+            dos nunca cabían): así cada uno dispone del ancho completo. */}
+        <div className="flex flex-col gap-3 min-w-0 flex-1">
+          {grupos.map(({ negocio, columnas: columnasGrupo }) => {
+            const cuenta = (id: string) => reservasPorColumna[id]?.length || 0;
+            const itemsFila: ItemColumna[] = columnasGrupo.map((col) => ({
+              id: col.id,
+              plegada: minimizedCols.has(col.id),
+            }));
+            // Vacías y no desplegadas a mano: las únicas que se pueden plegar
+            // solas para hacer sitio.
+            const vacias = new Set(
+              columnasGrupo.filter((col) => cuenta(col.id) === 0 && !expandidasCols.has(col.id)).map((col) => col.id),
+            );
+            return (
+              <FilaNegocio
+                key={negocio.marca}
+                etiqueta={negocio.etiqueta}
+                aforo={aforoPorNegocio[negocio.marca]}
+                mostrarCabecera={grupos.length > 1}
+                items={itemsFila}
+                vacias={vacias}
+                arrastrando={!!activeReserva}
+              >
+                {(disposicion, autoPlegadas) =>
+                  columnasGrupo.map((col) => {
+                    const plegada = minimizedCols.has(col.id) || autoPlegadas.has(col.id);
+                    return (
+                      <KanbanColumn
+                        key={col.id}
+                        id={col.id}
+                        title={col.title}
+                        capacidadMax={col.capacidadMax}
+                        paxComida={paxPorColumna[col.id]?.comida ?? 0}
+                        paxCena={paxPorColumna[col.id]?.cena ?? 0}
+                        filtroTurno={filtroTurno}
+                        count={cuenta(col.id)}
+                        isActive={!!activeReserva}
+                        minimized={plegada}
+                        onToggleMinimize={() => togglePlegado(col.id, plegada)}
+                        ancho={disposicion.anchoColumna}
+                        margenDerecho={disposicion.margenes[col.id] ?? 0}
+                        conIman={disposicion.idsConIman.includes(col.id)}
+                        alturaMaxima={grupos.length > 1 ? "42vh" : "65vh"}
+                      >
+                        {(reservasPorColumna[col.id] || []).map((reserva) => (
+                          <ReservaCard
+                            key={reserva.id}
+                            reserva={reserva}
+                            columnas={columnas}
+                            acciones={acciones}
+                            onMover={solicitarMovimiento}
+                            onToggleImportante={toggleImportante}
+                            onBlacklist={setBlacklistReserva}
+                          />
+                        ))}
+                      </KanbanColumn>
+                    );
+                  })
+                }
+              </FilaNegocio>
+            );
+          })}
         </div>
 
         <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
