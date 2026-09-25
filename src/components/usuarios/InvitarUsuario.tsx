@@ -35,7 +35,11 @@ const DEFAULT_STAFF_PERMISSIONS = EDITABLE_SECTIONS.map((section) => ({
   can_edit: false,
 }));
 
-export function InvitarUsuario() {
+interface InvitarUsuarioProps {
+  onSuccess?: () => void;
+}
+
+export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -199,6 +203,7 @@ export function InvitarUsuario() {
       setRole("staff");
       setSelectedAccessConfig(MANUAL_OPTION);
       setPermissions(DEFAULT_STAFF_PERMISSIONS);
+      onSuccess?.();
     } catch (error: unknown) {
       console.error("Error creating user:", error);
       const message = error instanceof Error ? error.message : "Error al crear el usuario";
