@@ -210,22 +210,19 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
       </div>
 
       {/*
-        El contenedor de abajo es SU PROPIO scroll interno (max-h + overflow-y-auto)
-        a propósito, no solo estética: DashboardLayout pone `overflow-x-hidden` en
-        <main> (y en el div que lo envuelve) sin fijar `overflow-y`, así que el
-        navegador le calcula `overflow-y: auto` implícito (comprobado en vivo con
-        getBoundingClientRect antes/después de hacer scroll). Eso convierte a
-        <main> — no el viewport — en el "contenedor de scroll" que CSS usa como
-        referencia para cualquier `position: sticky` de dentro, y como <main> en
-        sí nunca desborda (su contenido crece con la página en vez de recortarse),
-        un sticky anclado a él no se queda pegado nunca: se comporta como si fuera
-        estático. Afecta a cualquier sticky dentro de <main> en todo el panel —
-        p.ej. el mismo patrón "Vista previa móvil" con sticky top-6 en
-        GestorWeb.tsx probablemente tampoco se quede pegado — pero arreglarlo iría
-        en DashboardLayout.tsx, un layout compartido por toda la app, y esa no es
-        esta tarea. Aquí basta con crear un contenedor de scroll MÁS CERCANO que
-        <main> para que el sticky de la vista previa tenga una referencia que sí
-        se desplaza.
+        Corrección 2026-09-25: esta pantalla (Plantillas de Correo) cuelga de
+        SuperAdminLayout, no de DashboardLayout — ambos compartían el mismo
+        bug (overflow-x-hidden sin overflow-y explícito en <main>, que el
+        navegador traduce a overflow-y:auto implícito y rompe cualquier
+        `position: sticky` de dentro, porque <main> nunca desborda de verdad
+        y pasa a ser el "contenedor de scroll" de referencia en vez del
+        viewport). Ya está arreglado en la raíz (DashboardLayout.tsx y
+        SuperAdminLayout.tsx), así que el sticky de más abajo (columna de
+        vista previa) ya funcionaría solo contra el viewport.
+        El contenedor de abajo (max-h + overflow-y-auto) se mantiene de
+        todos modos, ahora como elección deliberada: dentro de un formulario
+        largo interesa que la vista previa quede pegada en una región propia
+        acotada en vez de perseguir todo el scroll de la página.
       */}
       <div className="lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
       <div className="grid gap-6 lg:grid-cols-5 lg:items-start">

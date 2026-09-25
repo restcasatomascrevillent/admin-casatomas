@@ -22,7 +22,6 @@ import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { BlacklistModal } from "./BlacklistModal";
 import { GestorReservasKanban } from "./GestorReservasKanban";
@@ -132,24 +131,20 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
     );
   }
 
-  const today = new Date();
   const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
   const porNegocio = resumen?.porNegocio ?? [];
 
   return (
     <div className="space-y-6">
-      {/* Header con fecha + Botón Gestor */}
+      {/* Header con título + botón Gestor. Sin fecha (2026-09-25): ya
+          aparece una única vez en la cabecera global (DashboardLayout.tsx);
+          repetirla aquí era la duplicación más visible de la página. */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 sm:p-3 rounded-xl bg-primary/10">
             <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
           </div>
-          <div>
-            <h3 className="text-lg sm:text-2xl font-bold">
-              {format(today, "EEEE, d 'de' MMMM", { locale: es })}
-            </h3>
-            <p className="text-muted-foreground text-xs sm:text-sm">Resumen de ocupación del día</p>
-          </div>
+          <h3 className="text-base sm:text-lg font-semibold">Resumen de ocupación del día</h3>
         </div>
         {/* Antes: variant="outline" + clases de `destructive` (rojo de "peligro"
             para una acción normal, y borde/hover de outline mezclados). */}

@@ -11,9 +11,18 @@ interface SuperAdminLayoutProps {
 export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
+      {/* Sin `overflow-x-hidden` aquí ni en el div de abajo (2026-09-25):
+          fijaba overflow-x sin fijar overflow-y, así que el navegador
+          calculaba `overflow-y: auto` implícito y convertía a este div (y a
+          <main>) en el "contenedor de scroll" de referencia para cualquier
+          `position: sticky` de dentro — que nunca desborda de verdad (crece
+          con la página), así que el sticky no llegaba a quedarse pegado
+          nunca. Mismo bug y mismo arreglo que en DashboardLayout.tsx: quitar
+          el overflow accidental y usar `min-w-0` (no `overflow-x-hidden`)
+          para que los hijos flex sigan sin forzar scroll horizontal. */}
+      <div className="min-h-screen flex w-full bg-background">
         <SuperAdminSidebar />
-        <div className="flex-1 flex flex-col overflow-x-hidden">
+        <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full">
             <SidebarTrigger className="mr-2 sm:mr-4 shrink-0" />
             <div className="flex items-center gap-2 min-w-0">
@@ -26,7 +35,7 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-3 sm:p-6 overflow-x-hidden">
+          <main className="flex-1 min-w-0 p-3 sm:p-6">
             <RouteErrorBoundary>{children}</RouteErrorBoundary>
           </main>
         </div>

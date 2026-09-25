@@ -136,11 +136,10 @@ export default function Reservas() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Reservas</h2>
-            <p className="text-muted-foreground text-sm sm:text-base">Gestiona las reservas del restaurante</p>
-          </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Reservas" activa en
+            el menú lateral ya dice dónde estás — repetirlo aquí solo restaba
+            espacio vertical. Se conserva el botón, que sí es una acción. */}
+        <div className="flex justify-end">
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger asChild>
               <Button>
