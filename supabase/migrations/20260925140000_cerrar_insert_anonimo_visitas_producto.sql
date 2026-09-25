@@ -1,0 +1,189 @@
+-- ===========================================================================
+-- ##                                                                       ##
+-- ##                          NO APLICADA                                  ##
+-- ##                                                                       ##
+-- ##   Este fichero NO se ha ejecutado contra ninguna base de datos.       ##
+-- ##   Verificado contra produccion (proyecto jeamoczmbfsnwkfjxcyo) el     ##
+-- ##   2026-09-25 via el endpoint de solo lectura database/query: la       ##
+-- ##   version '20260925140000' NO aparece en                             ##
+-- ##   supabase_migrations.schema_migrations. Queda preparado para que el  ##
+-- ##   dueno lo revise y decida.                                          ##
+-- ##                                                                       ##
+-- ===========================================================================
+--
+-- Cierra el INSERT anonimo en `visitas_producto`
+-- (seguimiento de 20260922170000, sesion 2026-09-25, proyecto jeamoczmbfsnwkfjxcyo)
+-- ---------------------------------------------------------------------------
+--
+-- POR QUE EXISTE ESTE FICHERO
+--   20260922170000_cerrar_insert_anonimo_reservas.sql ya encontro esta
+--   tabla al cerrar `reservas` (mismo bloque 6 de
+--   20260918084909_cerrar_fuga_rls_anonima.sql concedia INSERT anonimo a
+--   las dos): confirmo politica "Cualquiera puede registrar visitas" (TO
+--   anon, authenticated, WITH CHECK true) y GRANT INSERT a anon, y un grep
+--   de los 4 repos sin ningun consumidor. Pero decidio NO cerrarla en ese
+--   momento, citando textualmente dos motivos: (a) quedaba fuera del
+--   alcance pedido (cerrar `reservas`); (b) "sin acceso a los logs de
+--   Supabase no se puede descartar un consumidor fuera de estos 4 repos
+--   (script de terceros, GTM, un cliente no versionado aqui...)", y la dejo
+--   como "candidato para una revision aparte, con su propia migracion".
+--   Este fichero es esa revision aparte.
+--
+-- QUE HAY HOY (confirmado en vivo, 2026-09-25)
+--   Tabla creada en 20260202183521_61a4594b-7582-4110-b382-b127615b22a0.sql
+--   (hace ~8 meses) con columnas id, producto_id, producto_tipo, user_id,
+--   session_id, ip_address, user_agent, referer, pais, ciudad, created_at --
+--   forma clasica de "un evento por visita a una ficha de producto".
+--
+--   Politicas RLS vigentes (pg_policies):
+--     "Admins pueden ver visitas"          SELECT  {authenticated}  is_admin(auth.uid())
+--     "Cualquiera puede registrar visitas" INSERT  {anon,authenticated}  WITH CHECK true
+--   Privilegios de tabla vigentes (has_table_privilege):
+--     anon INSERT = true, anon SELECT = true, authenticated INSERT = true.
+--
+-- LA PREGUNTA QUE DEJO ABIERTA 20260922170000: "¿SIGUE LLENANDOSE?"
+--   Respuesta verificada hoy con select count(*)/min(created_at)/max(created_at):
+--
+--     total_filas = 0, primera = NULL, ultima = NULL
+--
+--   CERO filas. No "pocas" ni "viejas": cero, desde que se creo la tabla
+--   (2026-02-02) hasta hoy (2026-09-25) -- casi 8 meses en los que `anon`
+--   ha podido insertar sin interrupcion (la politica se creo ya con
+--   `TO anon` desde el primer dia; 20260918084909 solo la reafirmo dentro
+--   de un revoke-y-regrant general, no abrio una ventana nueva). Si
+--   cualquier cosa -- codigo propio, un script de terceros, GTM, un
+--   webhook, un cliente no versionado aqui -- hubiera llamado alguna vez a
+--   este INSERT con exito, existiria al menos una fila. No existe ninguna.
+--   Esto es una prueba directa sobre los datos, no una ausencia de
+--   evidencia por grep: responde exactamente al "si se sigue llenando,
+--   algo la usa aunque no lo encuentres por grep" que motivaba dejarlo
+--   abierto.
+--
+-- LA PREGUNTA QUE DEJO ABIERTA 20260922170000: "¿ALGO EXTERNO PODRIA ESCRIBIR AHI?"
+--   No hay acceso en esta sesion a los logs HTTP/API gateway de Supabase
+--   (Logflare) -- la misma limitacion que ya tenia 20260922170000; el
+--   acceso de esta tarea es unicamente el endpoint de solo lectura
+--   database/query (SQL directo). Dentro de lo que SI es comprobable por
+--   SQL y por codigo, se ha verificado explicitamente (no solo repetido lo
+--   ya escrito el 22):
+--     - Repetido el grep de "visitas_producto" en los 4 repos (excluidos
+--       node_modules/dist): las unicas coincidencias siguen siendo
+--       migraciones SQL y los `integrations/supabase/types.ts`
+--       autogenerados de adminpanelct y touza-restaurant-website (tipos
+--       TypeScript, no codigo que se ejecute). Cero componentes, hooks,
+--       paginas o Edge Functions.
+--     - Grep adicional (no hecho el 22) de patrones GENERICOS de tracking
+--       que no dependen de que el nombre de la tabla aparezca literal --
+--       gtag, dataLayer, GTM-, pageview, trackVisit, registrarVisita -- en
+--       las dos webs publicas (casa-tomas-story, touza-restaurant-website):
+--       cero resultados.
+--     - Las 30 Edge Functions de adminpanelct y la unica de
+--       casa-tomas-story (migrate-menu-data) revisadas por nombre y
+--       contenido: ninguna escribe en `visitas_producto`. La que mas se
+--       le parece por nombre, `registrar-metrica`, exige un usuario
+--       autenticado (Bearer token) y escribe en un proyecto Supabase
+--       DISTINTO (yfnrkmxnmtrqmdtfvqix.supabase.co, tabla `metricas`) --
+--       no toca este proyecto ni esta tabla.
+--     - pg_proc.prosrc de TODO public: ninguna funcion (trigger o RPC)
+--       menciona `visitas_producto`. La tabla no tiene trigger propio
+--       (pg_trigger vacio). cron.job: ninguna entrada la menciona.
+--   No se puede descartar con certeza absoluta un cliente HTTP externo que
+--   jamas haya llegado a insertar con exito (p.ej. mal configurado desde
+--   el principio) -- pero eso, por definicion, no es "algo que la usa hoy":
+--   no ha escrito una sola fila en 8 meses. El riesgo de cerrarlo es
+--   distinto en naturaleza al de `reservas`: alli habia trafico real que
+--   coordinar (ver el ORDEN DE DESPLIEGUE de 20260922170000); aqui no hay
+--   ningun trafico que perder porque no hay ninguno.
+--
+-- VEREDICTO: SE CIERRA
+--   Con cero filas en 8 meses, cero consumidores localizables en los 4
+--   repos (codigo ejecutable, no solo tipos), cero Edge Functions, cero
+--   funciones/triggers/cron internos, y cero rastro de tracking en las
+--   webs publicas, el balance de evidencia esta claramente del lado de
+--   "nadie la usa" y no del de "podria haber algo que no vemos". Se cierra
+--   el INSERT anonimo. Se preserva intacta la capacidad de
+--   `authenticated` (mismo WITH CHECK true, sin restriccion nueva) por si
+--   hay un consumidor autenticado no localizado -- exactamente el mismo
+--   criterio conservador que uso 20260922170000 con `reservas`.
+--
+--   Si en el futuro se quiere reactivar un contador de visitas publico, la
+--   recomendacion (no aplicada aqui, es solo nota) es no volver a dar
+--   INSERT anonimo directo con WITH CHECK(true) sobre la tabla: mejor una
+--   Edge Function con su propio limite de frecuencia/validacion, como ya
+--   se hace en `reservas-web` para reservas.
+--
+-- BONUS DE HIGIENE (no pedido, riesgo cero, mismo fichero por ser la misma
+-- tabla y el mismo hallazgo de esta sesion)
+--   anon conserva ademas el GRANT de SELECT a nivel de tabla
+--   (has_table_privilege('anon','public.visitas_producto','SELECT') = true)
+--   aunque ninguna politica RLS lo cubre -- la unica politica SELECT es
+--   "Admins pueden ver visitas", TO authenticated, USING is_admin(). Con
+--   RLS activo (ENABLE ROW LEVEL SECURITY, confirmado) Postgres deniega por
+--   defecto cuando ningun policy aplica al rol que consulta, asi que esto
+--   NUNCA expuso datos a anon en la practica -- no es la fuga que cierra
+--   esta migracion, es un privilegio de tabla inerte. Se revoca solo por
+--   higiene / defensa en profundidad (mismo patron que el BLOQUE 4 de
+--   20260918084909 sobre las vistas), sin cambiar ningun comportamiento
+--   observable.
+--
+-- RIESGO DE DESPLIEGUE -- bajo, sin orden obligatorio
+--   No hay ningun consumidor real que coordinar (ver arriba). Se puede
+--   aplicar en cualquier momento, no depende de ningun despliegue de
+--   frontend.
+--
+-- SI ALGO SE ROMPE
+--   Ejecutar a mano
+--   `supabase/rollbacks/20260925140000_cerrar_insert_anonimo_visitas_producto_ROLLBACK.sql`
+--   -- reabre el INSERT anonimo y el SELECT de tabla exactamente como
+--   estaban.
+-- ===========================================================================
+
+begin;
+
+-- Politica vigente hoy (combinada anon+authenticated). Se sustituye por una
+-- equivalente solo para authenticated: mismo WITH CHECK (true), ninguna
+-- restriccion nueva para quien ya podia escribir autenticado.
+drop policy if exists "Cualquiera puede registrar visitas" on public."visitas_producto";
+
+create policy "Autenticados pueden registrar visitas"
+  on public."visitas_producto"
+  for insert
+  to authenticated
+  with check (true);
+
+-- Sin el GRANT de base, cualquier politica futura "to anon" / "to public"
+-- que alguien vuelva a crear sobre visitas_producto queda inerte hasta que
+-- alguien conceda este privilegio otra vez explicitamente (mismo patron
+-- que 20260922170000 sobre reservas).
+revoke insert on public."visitas_producto" from anon;
+
+-- Bonus de higiene (ver cabecera): privilegio de tabla inerte, RLS ya lo
+-- bloqueaba en la practica.
+revoke select on public."visitas_producto" from anon;
+
+commit;
+
+-- ---------------------------------------------------------------------------
+-- CONSULTA DE VERIFICACION -- ejecutar ANTES y DESPUES de aplicar esta
+-- migracion. Solo lee, no escribe nada.
+-- ---------------------------------------------------------------------------
+--
+-- -- 1) Politicas de INSERT sobre visitas_producto, y a que rol aplican:
+-- select policyname, roles, with_check
+-- from pg_policies
+-- where schemaname = 'public' and tablename = 'visitas_producto' and cmd = 'INSERT'
+-- order by policyname;
+--
+-- -- 2) Privilegios de tabla para anon:
+-- select
+--   has_table_privilege('anon', 'public.visitas_producto', 'INSERT') as anon_puede_insertar,
+--   has_table_privilege('anon', 'public.visitas_producto', 'SELECT') as anon_puede_leer;
+--
+-- ANTES de esta migracion debe devolver:
+--   (1) una fila -- "Cualquiera puede registrar visitas" ({anon,authenticated}, true)
+--   (2) true, true
+--
+-- DESPUES de esta migracion debe devolver:
+--   (1) una fila -- "Autenticados pueden registrar visitas" ({authenticated}, true)
+--   (2) false, false
+-- ---------------------------------------------------------------------------
