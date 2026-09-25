@@ -65,17 +65,18 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        {!isCollapsed && (
-          <div className="flex items-center gap-2">
-            <UtensilsCrossed className="h-6 w-6 text-sidebar-primary" />
+      <SidebarHeader
+        className={`border-b border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
+      >
+        <div className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}>
+          <UtensilsCrossed className="h-6 w-6 text-sidebar-primary shrink-0" />
+          {!isCollapsed && (
             <div className="flex flex-col">
               <h2 className="text-lg font-semibold text-sidebar-foreground">Admin Panel</h2>
               <span className="text-xs text-muted-foreground">Gestión del Restaurante</span>
             </div>
-          </div>
-        )}
-        {isCollapsed && <UtensilsCrossed className="h-6 w-6 text-sidebar-primary mx-auto" />}
+          )}
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
@@ -101,11 +102,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className={`flex gap-2 ${isCollapsed ? 'flex-col' : 'flex-row'}`}>
+      <SidebarFooter
+        className={`border-t border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
+      >
+        <div className={`flex gap-2 ${isCollapsed ? "flex-col items-center" : "flex-row"}`}>
           <Button
             variant="ghost"
-            className={`text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'w-full justify-center px-2' : 'flex-1 justify-start'}`}
+            size={isCollapsed ? "icon" : "default"}
+            className={`text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? "" : "flex-1 justify-start"}`}
             onClick={() => signOut()}
           >
             <LogOut className="h-4 w-4 shrink-0" />
