@@ -3,21 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 import { InvitarUsuario } from "@/components/usuarios/InvitarUsuario";
-import { Shield, UserPlus, Users } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 
 export default function Usuarios() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
-            <p className="text-muted-foreground">
-              Administra roles y permisos de acceso a la aplicación
-            </p>
-          </div>
-        </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Usuarios" activa en
+            el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
 
         <Tabs defaultValue="usuarios" className="space-y-4">
           <TabsList>

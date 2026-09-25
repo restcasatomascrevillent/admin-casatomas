@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { format, subDays } from "date-fns";
-import { Activity, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,16 +89,15 @@ export default function TraficoWeb() {
   return (
     <SuperAdminLayout>
       <div className="space-y-6">
+        {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa
+            del menú lateral. Se conserva el subtítulo — no es relleno: dice de
+            dónde salen los datos (Vercel Web Analytics) y que incluye una
+            estimación de transferencia, algo que nadie esperaría solo por el
+            nombre — y el editor de peso de páginas, que es una acción. */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <Activity className="h-6 w-6 text-primary" aria-hidden />
-              Tráfico web
-            </h1>
-            <p className="text-muted-foreground">
-              Visitas de Casa Tomás y Touza (Vercel Web Analytics) y estimación de la transferencia de datos.
-            </p>
-          </div>
+          <p className="text-muted-foreground">
+            Visitas de Casa Tomás y Touza (Vercel Web Analytics) y estimación de la transferencia de datos.
+          </p>
           <EditorPesoPaginas />
         </div>
 

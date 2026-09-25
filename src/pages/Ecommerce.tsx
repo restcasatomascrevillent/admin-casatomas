@@ -19,12 +19,9 @@ export default function Ecommerce() {
   return (
     <SuperAdminLayout>
       <div className={cn(isTPV ? "h-full min-h-0 flex flex-col" : "space-y-6")}>
-        <div className={cn(isTPV ? "shrink-0" : "")}>
-          <h1 className="text-3xl font-bold">Ecommerce</h1>
-          <p className="text-muted-foreground">
-            Gestiona tu tienda online: productos, pedidos, stock y analíticas
-          </p>
-        </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Ecommerce" activa en
+            el menú lateral ya dice dónde estás, y el subtítulo repetía las
+            pestañas de abajo (Productos, Pedidos, Stock...). */}
 
         <Tabs
           value={seccionActiva}

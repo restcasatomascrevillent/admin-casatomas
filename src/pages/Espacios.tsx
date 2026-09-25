@@ -64,13 +64,10 @@ export default function Espacios() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Espacios para Reservas</h2>
-            <p className="text-muted-foreground">
-              Configura los espacios disponibles para reservas de clientes
-            </p>
-          </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Espacios" activa en
+            el menú lateral ya dice dónde estás. Se conserva el botón, que sí
+            es una acción. */}
+        <div className="flex justify-end">
           <Button onClick={() => setShowForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Espacio

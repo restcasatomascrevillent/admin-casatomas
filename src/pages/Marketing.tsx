@@ -9,12 +9,8 @@ export default function Marketing() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Newsletter</h2>
-          <p className="text-muted-foreground">
-            Envía comunicaciones a tus clientes
-          </p>
-        </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Newsletter" activa
+            en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
 
         <Tabs defaultValue="crear" className="space-y-6">
           <TabsList>

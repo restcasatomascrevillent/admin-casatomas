@@ -2,7 +2,7 @@ import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, ShieldAlert, ShoppingCart, Wallet, Star, Phone, Mail, Activity } from "lucide-react";
+import { Loader2, ShoppingCart, Wallet, Star, Phone, Mail, Activity } from "lucide-react";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -22,15 +22,9 @@ export default function SuperAdminPanel() {
   return (
     <SuperAdminLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="h-8 w-8 text-destructive" />
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Control del Admin Panel</h1>
-            <p className="text-muted-foreground">
-              Activa o desactiva qué secciones se ven en la barra lateral del Admin Panel
-            </p>
-          </div>
-        </div>
+        {/* Sin título de página (2026-09-25): la pestaña "Control del Panel"
+            activa en el menú lateral ya dice dónde estás, y el subtítulo
+            repetía lo que ya explica la CardDescription de justo abajo. */}
 
         <Card>
           <CardHeader>

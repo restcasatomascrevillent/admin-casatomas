@@ -5,10 +5,11 @@ export default function GestorGasto() {
   return (
     <SuperAdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Gestor de Gasto</h1>
-          <p className="text-muted-foreground">Previsualización de tu facturación con OficiososIA</p>
-        </div>
+        {/* Sin título "Gestor de Gasto" (2026-09-25): ya lo dice la pestaña
+            activa del menú lateral. Se conserva el subtítulo: aclara que esto
+            es la factura que le pasa OficiososIA al restaurante, no un gasto
+            del propio restaurante — no es obvio solo con el nombre. */}
+        <p className="text-muted-foreground">Previsualización de tu facturación con OficiososIA</p>
         <GestorGastoWidget />
       </div>
     </SuperAdminLayout>

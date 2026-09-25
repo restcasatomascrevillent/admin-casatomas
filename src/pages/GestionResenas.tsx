@@ -80,14 +80,11 @@ export default function GestionResenas() {
     return (
         <SuperAdminLayout>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h2 className="text-3xl font-bold tracking-tight">Reseñas Google</h2>
-                        <p className="text-muted-foreground">
-                            Sincronización en tiempo real desde Google Maps
-                        </p>
-                    </div>
+                {/* Sin título de página (2026-09-25): la pestaña "Reseñas
+                    Google" activa en el menú lateral ya dice dónde estás; el
+                    subtítulo era relleno. Se conserva el botón, que sí es una
+                    acción. */}
+                <div className="flex justify-end">
                     <Button onClick={handleSync} disabled={syncing} className="gap-2 self-start sm:self-auto">
                         <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                         {syncing ? "Sincronizando..." : "Sincronizar ahora"}

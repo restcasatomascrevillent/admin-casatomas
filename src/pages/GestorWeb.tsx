@@ -97,13 +97,14 @@ export default function GestorWeb() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Gestor Web</h2>
-          <p className="text-muted-foreground">
-            Todo lo que aparece en las webs de Casa Tomás y Touza y en el bot de la web: carta, novedades, menús,
-            tapas y asistente.
-          </p>
-        </div>
+        {/* Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa
+            del menú lateral. Se conserva el subtítulo: no es relleno, aclara
+            que la página cubre DOS webs distintas (Casa Tomás y Touza), algo
+            que el menú no dice. */}
+        <p className="text-muted-foreground">
+          Todo lo que aparece en las webs de Casa Tomás y Touza y en el bot de la web: carta, novedades, menús,
+          tapas y asistente.
+        </p>
 
         {loading ? (
           <Cargando />

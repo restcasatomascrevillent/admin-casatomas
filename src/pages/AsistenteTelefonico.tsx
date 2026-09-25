@@ -352,13 +352,11 @@ export default function AsistenteTelefonico() {
     return (
         <SuperAdminLayout>
             <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Asistente Telefónico</h2>
-                        <p className="text-muted-foreground text-sm">
-                            Monitorización en tiempo real del bot de voz y la atención telefónica.
-                        </p>
-                    </div>
+                {/* Sin título de página (2026-09-25): la pestaña "Asistente
+                    Tel." activa en el menú lateral ya dice dónde estás. Se
+                    conserva el interruptor de modo (Bot IA / Humano), que es
+                    una acción real. */}
+                <div className="flex justify-end">
                     {modeBadge}
                 </div>
 
