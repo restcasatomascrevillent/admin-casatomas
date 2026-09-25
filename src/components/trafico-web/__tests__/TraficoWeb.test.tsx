@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -21,6 +22,17 @@ vi.mock("@/integrations/supabase/client", () => {
     supabase: {
       rpc: vi.fn((nombre: string) => Promise.resolve({ data: rpcData[nombre] ?? [], error: null })),
       from: vi.fn((tabla: string) => chain(tabla)),
+      // `SuperAdminLayout` comprueba la sesión al montarse. Sin esto el mock
+      // no tiene `auth` y el render revienta con "Cannot read properties of
+      // undefined (reading 'onAuthStateChange')". Devuelve "sin sesión": a
+      // esta pantalla solo le importa que no lance, no quién ha entrado.
+      auth: {
+        getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
+        getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
+        onAuthStateChange: vi.fn(() => ({
+          data: { subscription: { unsubscribe: vi.fn() } },
+        })),
+      },
     },
   };
 });
@@ -35,12 +47,18 @@ vi.mock("@/hooks/useUserRole", () => ({
 
 import TraficoWeb from "@/pages/TraficoWeb";
 
+// `TraficoWeb` pasó a renderizarse dentro de `SuperAdminLayout`, cuyo menú
+// lateral usa `useNavigate()` y `useLocation()`. Esos hooks lanzan si no
+// encuentran un Router por encima, así que el render de prueba necesita uno.
+// Antes no hacía falta: la página era autónoma y no montaba ningún menú.
 const renderPagina = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
-      <TraficoWeb />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <TraficoWeb />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 };
 
