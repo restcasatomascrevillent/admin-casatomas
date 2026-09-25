@@ -140,14 +140,74 @@ export default function Reservas() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Sin título de página (2026-09-25): la pestaña "Reservas" activa en
-            el menú lateral ya dice dónde estás — repetirlo aquí solo restaba
-            espacio vertical. Se conserva el botón, que sí es una acción. */}
-        <div className="flex justify-end">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        {/* Pestañas y acción principal en la MISMA línea (2026-09-25, petición
+            del dueño): "Nueva Reserva" tenía su propia banda encima, que solo
+            servía para alinear un botón a la derecha y se comía ~64px de alto
+            (botón + separación). Ahora comparte fila con las pestañas —o con el
+            desplegable, cuando estas no caben—, que miden lo mismo (40px), así
+            que la fila queda alineada sin alto extra. Sin título de página: la
+            pestaña "Reservas" del menú lateral ya dice dónde estás. */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* `min-w-0`: deja que las pestañas se midan contra el hueco que
+              queda junto al botón — de eso vive `checkOverflow` para decidir si
+              cambia al desplegable. Sin esto no encogerían nunca. */}
+          <div className="flex-1 min-w-0">
+            {/* Muy estrecho: selector desplegable */}
+            <div className={tabsOverflow ? "block" : "sm:hidden"}>
+              <Select value={activeTab} onValueChange={handleTabChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona vista" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hoy">Hoy</SelectItem>
+                  <SelectItem value="reservas">
+                    Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
+                  </SelectItem>
+                  <SelectItem value="calendario">Calendario</SelectItem>
+                  <SelectItem value="blacklist">Blacklist</SelectItem>
+                  {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Tablet/desktop: pestañas */}
+            <div
+              ref={tabsContainerRef}
+              className={`hidden sm:block overflow-x-auto no-scrollbar ${
+                tabsOverflow ? "sm:h-0 sm:overflow-hidden sm:opacity-0 sm:pointer-events-none" : ""
+              }`}
+            >
+              <TabsList className="w-max min-w-max justify-start gap-1 p-1">
+                <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
+                <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
+                  Lista
+                  {countPendientes > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
+                      aria-label={`${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`}
+                      title="Solicitudes del bot sin resolver"
+                    >
+                      {countPendientes}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
+                <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
+                {isAdmin && (
+                  <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
+                    <Settings className="h-4 w-4" />
+                    <span className="hidden sm:inline">Configuración</span>
+                    <span className="sm:hidden">Config</span>
+                  </TabsTrigger>
+                )}
+              </TabsList>
+            </div>
+          </div>
+
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="shrink-0">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva
               </Button>
@@ -164,108 +224,55 @@ export default function Reservas() {
           </Dialog>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          {/* Muy estrecho: selector desplegable */}
-          <div className={`mb-3 ${tabsOverflow ? "block" : "sm:hidden"}`}>
-            <Select value={activeTab} onValueChange={handleTabChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecciona vista" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hoy">Hoy</SelectItem>
-                <SelectItem value="reservas">
-                  Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
-                </SelectItem>
-                <SelectItem value="calendario">Calendario</SelectItem>
-                <SelectItem value="blacklist">Blacklist</SelectItem>
-                {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
-              </SelectContent>
-            </Select>
-          </div>
+        {/* "Hoy" (2026-09-25, petición del dueño): el kanban por espacios
+            es la vista principal — lo primero que se ve al entrar en
+            /reservas. Sin lista/tabla aquí a propósito: con el kanban
+            delante, una tabla debajo solo duplicaba las mismas reservas. */}
+        <TabsContent value="hoy" className="mt-6">
+          <VistaHoy onEspacioClick={handleEspacioClick} />
+        </TabsContent>
 
-          {/* Tablet/desktop: pestañas */}
-          <div
-            ref={tabsContainerRef}
-            className={`hidden sm:block overflow-x-auto no-scrollbar ${
-              tabsOverflow ? "sm:h-0 sm:overflow-hidden sm:opacity-0 sm:pointer-events-none" : ""
-            }`}
-          >
-            <TabsList className="w-max min-w-max justify-start gap-1 p-1">
-              <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
-              <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
-                Lista
-                {countPendientes > 0 && (
-                  <span
-                    className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
-                    aria-label={`${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`}
-                    title="Solicitudes del bot sin resolver"
-                  >
-                    {countPendientes}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
-              <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
-              {isAdmin && (
-                <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Configuración</span>
-                  <span className="sm:hidden">Config</span>
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </div>
+        {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):
+            todas las reservas y solicitudes, de cualquier fecha —
+            incluida la de hoy, con su propio filtro de fecha y el atajo
+            "Hoy": no se oculta a propósito, así sigue pudiéndose buscar
+            una reserva de hoy cancelada o un dato que el kanban no
+            muestre. Las solicitudes del bot sin resolver (insignia roja)
+            siguen viviendo aquí, mezcladas como filas "Solicitud". */}
+        <TabsContent value="reservas" className="mt-6">
+          <section ref={listaRef} aria-labelledby="titulo-todas-reservas" className="space-y-3 scroll-mt-4">
+            <div>
+              <h3 id="titulo-todas-reservas" className="text-lg sm:text-xl font-semibold">Todas las reservas y solicitudes</h3>
+              <p className="text-muted-foreground text-xs sm:text-sm">
+                Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
+              </p>
+            </div>
+            <ListaReservasAvanzada
+              // `key`: si llega otro filtro por URL estando ya en la página
+              // (p. ej. desde la campana), la lista se reinicia con él.
+              key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
+              onEspacioClick={handleEspacioClick}
+              initialStatusFilter={statusFromUrl || undefined}
+              initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
+              solicitudesState={solicitudesState}
+            />
+          </section>
+        </TabsContent>
 
-          {/* "Hoy" (2026-09-25, petición del dueño): el kanban por espacios
-              es la vista principal — lo primero que se ve al entrar en
-              /reservas. Sin lista/tabla aquí a propósito: con el kanban
-              delante, una tabla debajo solo duplicaba las mismas reservas. */}
-          <TabsContent value="hoy" className="mt-6">
-            <VistaHoy onEspacioClick={handleEspacioClick} />
+        <TabsContent value="calendario" className="space-y-6 mt-6">
+          <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
+        </TabsContent>
+
+        <TabsContent value="blacklist" className="space-y-6 mt-6">
+          <GestionBlacklist />
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="configuracion" className="space-y-6 mt-6">
+            <ConfiguracionTurnos />
           </TabsContent>
-
-          {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):
-              todas las reservas y solicitudes, de cualquier fecha —
-              incluida la de hoy, con su propio filtro de fecha y el atajo
-              "Hoy": no se oculta a propósito, así sigue pudiéndose buscar
-              una reserva de hoy cancelada o un dato que el kanban no
-              muestre. Las solicitudes del bot sin resolver (insignia roja)
-              siguen viviendo aquí, mezcladas como filas "Solicitud". */}
-          <TabsContent value="reservas" className="mt-6">
-            <section ref={listaRef} aria-labelledby="titulo-todas-reservas" className="space-y-3 scroll-mt-4">
-              <div>
-                <h3 id="titulo-todas-reservas" className="text-lg sm:text-xl font-semibold">Todas las reservas y solicitudes</h3>
-                <p className="text-muted-foreground text-xs sm:text-sm">
-                  Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
-                </p>
-              </div>
-              <ListaReservasAvanzada
-                // `key`: si llega otro filtro por URL estando ya en la página
-                // (p. ej. desde la campana), la lista se reinicia con él.
-                key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
-                onEspacioClick={handleEspacioClick}
-                initialStatusFilter={statusFromUrl || undefined}
-                initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
-                solicitudesState={solicitudesState}
-              />
-            </section>
-          </TabsContent>
-
-          <TabsContent value="calendario" className="space-y-6 mt-6">
-            <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
-          </TabsContent>
-
-          <TabsContent value="blacklist" className="space-y-6 mt-6">
-            <GestionBlacklist />
-          </TabsContent>
-
-          {isAdmin && (
-            <TabsContent value="configuracion" className="space-y-6 mt-6">
-              <ConfiguracionTurnos />
-            </TabsContent>
-          )}
-        </Tabs>
-      </div>
+        )}
+      </Tabs>
     </DashboardLayout>
   );
 }

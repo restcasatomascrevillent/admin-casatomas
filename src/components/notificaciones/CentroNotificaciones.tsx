@@ -27,7 +27,14 @@ function timeAgo(dateStr: string): string {
   return `hace ${diffD}d`;
 }
 
-export function CentroNotificaciones() {
+interface CentroNotificacionesProps {
+  /** Clases para el botón-campana. Existe porque desde el 2026-09-25 la
+   * campana vive dentro del menú lateral (AppSidebar), que tiene su propia
+   * paleta (`sidebar-*`) distinta de la del resto del panel. */
+  className?: string;
+}
+
+export function CentroNotificaciones({ className }: CentroNotificacionesProps = {}) {
   const { notificaciones, countNoLeidas, marcarLeida, marcarTodasLeidas } =
     useNotificacionesDashboard();
   const navigate = useNavigate();
@@ -44,7 +51,16 @@ export function CentroNotificaciones() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-9 w-9">
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn("relative h-9 w-9", className)}
+          aria-label={
+            countNoLeidas > 0
+              ? `Notificaciones (${countNoLeidas} sin leer)`
+              : "Notificaciones"
+          }
+        >
           <Bell className="h-4 w-4" />
           {countNoLeidas > 0 && (
             <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-[10px] bg-destructive text-destructive-foreground">
@@ -53,7 +69,12 @@ export function CentroNotificaciones() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end" sideOffset={8}>
+      {/* `align="start"` (2026-09-25): la campana se mudó de la esquina
+          derecha de la cabecera al menú lateral (izquierda), así que el panel
+          debe crecer hacia la derecha. Con el "end" de antes quedaba anclado
+          al borde de la ventana por la corrección de colisiones, no al botón.
+          `collisionPadding` evita que se pegue al borde en móvil. */}
+      <PopoverContent className="w-80 p-0" align="start" sideOffset={8} collisionPadding={8}>
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b">
           <span className="text-sm font-medium">Notificaciones</span>

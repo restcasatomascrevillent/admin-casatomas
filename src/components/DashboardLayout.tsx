@@ -3,8 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,6 +16,13 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, fixedHeight = false }: DashboardLayoutProps) {
+  // Por debajo de 768px (`useIsMobile`) el menú lateral se renderiza como
+  // panel deslizante (Sheet) y SOLO se puede abrir desde fuera de él: sin esta
+  // barra no habría manera de navegar. Por eso el mismo `isMobile` decide
+  // dónde vive la campana — así solo hay UNA instancia montada en todo
+  // momento (dos suscripciones realtime al mismo canal sobraban).
+  const isMobile = useIsMobile();
+
   return (
     <SidebarProvider>
       <div
@@ -30,29 +36,27 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
             fixedHeight ? "h-screen overflow-hidden" : ""
           }`}
         >
-          {/* Cabecera única (2026-09-25): antes había dos franjas — esta con
-              "Gestión del Restaurante" + fecha, y debajo el título de cada
-              página, a veces repitiendo la fecha otra vez (p.ej. la tarjeta
-              del día en Reservas). Se funden en una sola franja compacta con
-              lo imprescindible: plegar menú, la ÚNICA fecha del panel y la
-              campana. "Gestión del Restaurante" no vuelve — ya lo dice el
-              propio sidebar (SidebarHeader en AppSidebar.tsx) — y el título
-              de cada página ya lo dice la pestaña activa del menú lateral. */}
-          <header className="h-12 sm:h-14 border-b border-border bg-card flex items-center gap-2 sm:gap-4 px-3 sm:px-6 sticky top-0 z-50 w-full shrink-0">
-            <SidebarTrigger className="shrink-0" />
-            <p className="flex-1 min-w-0 truncate text-sm sm:text-base font-medium text-foreground">
-              {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
-            </p>
-            <div className="shrink-0">
+          {/* Sin cabecera en escritorio (2026-09-25, petición del dueño):
+              la franja superior solo llevaba la fecha larga y la campana, y se
+              comía ~57px de alto en TODAS las páginas para no decir nada que
+              no se pudiera deducir. La fecha desaparece del panel (el
+              calendario sigue mostrando la del día que selecciones); el
+              plegador del menú se muda a la cabecera del propio sidebar y la
+              campana a su pie (AppSidebar.tsx) — "al otro lado", como pidió,
+              y sin ocupar alto. En móvil sí queda esta barra mínima: el
+              sidebar es un Sheet y no hay otra forma de abrirlo. */}
+          {isMobile && (
+            <header className="md:hidden h-12 border-b border-border bg-card flex items-center justify-between gap-2 px-3 sticky top-0 z-50 w-full shrink-0">
+              <SidebarTrigger className="shrink-0" />
               <CentroNotificaciones />
-            </div>
-          </header>
+            </header>
+          )}
           <main
             className={`flex-1 min-w-0 p-3 sm:p-6 ${
               fixedHeight ? "overflow-x-hidden overflow-y-auto min-h-0" : ""
             }`}
           >
-            {/* El sidebar y la cabecera sobreviven a un fallo del contenido: el usuario puede navegar a otra sección. */}
+            {/* El sidebar sobrevive a un fallo del contenido: el usuario puede navegar a otra sección. */}
             <RouteErrorBoundary>{children}</RouteErrorBoundary>
           </main>
         </div>
