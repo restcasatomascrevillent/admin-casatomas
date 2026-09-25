@@ -266,9 +266,6 @@ export function ListaUsuarios() {
                     )}
                     <div className="flex flex-col items-start">
                       <span className="font-medium">{getUserDisplayName(user)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {user.email || user.id}
-                      </span>
                     </div>
                   </div>
                 </TableCell>
