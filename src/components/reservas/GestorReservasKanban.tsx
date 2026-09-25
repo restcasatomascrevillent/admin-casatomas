@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent, CollisionDetection, Announcements } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { turnoDeHora } from "@/hooks/useDisponibilidad";
@@ -28,7 +28,7 @@ import {
   MARCA_POR_DEFECTO,
   normalizarMarca,
 } from "@/lib/reservas/negocios";
-import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { useAccionesServicioReserva, CLAVES_LISTAS_RESERVAS } from "@/hooks/useAccionesServicioReserva";
 import {
   comensalesEnEspacioTurno,
   evaluarMovimiento,
@@ -58,13 +58,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight, MoveRight, MoreVertical, Loader2 } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { ControlLlegada } from "./ControlLlegada";
+import { BlacklistModal } from "./BlacklistModal";
 
 // Estados del CHECK `reservas_estado_check`. Antes este mapa usaba "no-show"
 // (con guion, nunca casaba) y "rechazada" (no existe en la BD).
@@ -109,12 +110,16 @@ function ReservaCard({
   columnas,
   acciones,
   onMover,
+  onToggleImportante,
+  onBlacklist,
   isDragOverlay,
 }: {
   reserva: ReservaServicio;
   columnas: Columna[];
   acciones: Acciones;
   onMover: (reserva: ReservaServicio, destinoColumnaId: string) => void;
+  onToggleImportante: (reserva: ReservaServicio) => void;
+  onBlacklist: (reserva: ReservaServicio) => void;
   isDragOverlay?: boolean;
 }) {
   const movible = puedeMoverReserva(reserva.estado);
@@ -152,6 +157,7 @@ function ReservaCard({
         movible ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30" : "cursor-default opacity-60",
         isDragging && "opacity-30 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
+        (reserva as { en_blacklist?: boolean }).en_blacklist && "border-destructive/40 bg-destructive/5",
       )}
       aria-roledescription={movible ? "reserva arrastrable" : "reserva"}
       aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${estadoInfo.label}`}
@@ -160,8 +166,20 @@ function ReservaCard({
     >
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          {reserva.importante && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" aria-label="Importante" />}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform"
+            aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"}
+            aria-pressed={!!reserva.importante}
+          >
+            <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
+          </button>
           <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
+          {(reserva as { en_blacklist?: boolean }).en_blacklist && (
+            <ShieldBan className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="En lista negra" />
+          )}
         </div>
         <div
           className="flex items-center shrink-0"
@@ -212,6 +230,11 @@ function ReservaCard({
                   </DropdownMenuItem>
                 </>
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => onBlacklist(reserva)} className="text-destructive focus:text-destructive">
+                <ShieldBan className="h-3.5 w-3.5 mr-2" />
+                Añadir a blacklist
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           {movible && (
@@ -418,12 +441,37 @@ interface MovimientoPendiente {
 export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
+  const queryClient = useQueryClient();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
   const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
+  const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
+
+  // Marcar/desmarcar "importante" y añadir a blacklist: acciones que antes
+  // vivían solo en la tabla "Reservas de Hoy" (retirada 2026-09-25 al pasar
+  // el kanban a vista principal de "Hoy" — ver Reservas.tsx). Se traen aquí
+  // para no perder capacidad, no para duplicar UI.
+  const toggleImportante = async (reserva: ReservaServicio) => {
+    const nuevoValor = !reserva.importante;
+    const { error } = await supabase
+      .from("reservas" as any)
+      .update({ importante: nuevoValor })
+      .eq("id", reserva.id);
+
+    if (error) {
+      console.error("Error actualizando la reserva:", error);
+      toast.error("No se pudo actualizar la reserva: " + error.message);
+      return;
+    }
+
+    for (const clave of CLAVES_LISTAS_RESERVAS) {
+      queryClient.invalidateQueries({ queryKey: [clave] });
+    }
+    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
+  };
 
   const toggleMinimize = (colId: string) => {
     setMinimizedCols((prev) => {
@@ -734,6 +782,8 @@ export function GestorReservasKanban() {
                   columnas={columnas}
                   acciones={acciones}
                   onMover={solicitarMovimiento}
+                  onToggleImportante={toggleImportante}
+                  onBlacklist={setBlacklistReserva}
                 />
               ))}
             </KanbanColumn>
@@ -750,6 +800,8 @@ export function GestorReservasKanban() {
               columnas={columnas}
               acciones={acciones}
               onMover={solicitarMovimiento}
+              onToggleImportante={toggleImportante}
+              onBlacklist={setBlacklistReserva}
               isDragOverlay
             />
           ) : null}
@@ -781,6 +833,12 @@ export function GestorReservasKanban() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BlacklistModal
+        reserva={blacklistReserva}
+        open={!!blacklistReserva}
+        onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
+      />
     </div>
   );
 }

@@ -1,54 +1,32 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  coincideNegocio,
-  FILTRO_NEGOCIO_TODOS,
-  marcaDeReserva,
-  NEGOCIOS_PANEL,
-} from "@/lib/reservas/negocios";
+import { CalendarCheck, Users, MapPin, TrendingUp, type LucideIcon } from "lucide-react";
 import type { CifrasNegocio } from "@/lib/reservas/resumenNegocios";
-import { NegocioBadge } from "./NegocioBadge";
-import { Users, CalendarCheck, TrendingUp, MapPin, Clock, Phone, Mail, ShieldBan, List, Search, Star, LayoutGrid } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { BlacklistModal } from "./BlacklistModal";
-import { GestorReservasKanban } from "./GestorReservasKanban";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
-import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
-import { ControlLlegada } from "./ControlLlegada";
+import { GestorReservasKanban } from "./GestorReservasKanban";
+import { cn } from "@/lib/utils";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
 }
 
-// Estados admitidos por el CHECK `reservas_estado_check` de la base de datos.
-// Ojo: la clave de "no show" es `no_show` (con guion bajo); antes era "no-show"
-// y el filtro no casaba nunca. "rechazada" no existe y se ha eliminado.
-const ESTADOS_RESERVA = {
-  pendiente: { label: "Pendiente", color: "bg-yellow-500" },
-  verificada: { label: "Verificada", color: "bg-blue-500" },
-  confirmada: { label: "Confirmada", color: "bg-green-500" },
-  cancelada: { label: "Cancelada", color: "bg-red-500" },
-  // 'completada' = el cliente llegó (ver src/lib/reservas/servicioSala.ts).
-  completada: { label: "Llegó", color: "bg-emerald-600" },
-  no_show: { label: "No vino", color: "bg-gray-500" },
-};
-
+/**
+ * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
+ * 4 tarjetas grandes de ocupación + una tabla "Reservas de Hoy" + el kanban
+ * escondido detrás de un botón "Gestor de reservas" — en 1366px las 4
+ * tarjetas solas ya llenaban la pantalla y no se veía ni una reserva.
+ *
+ * Ahora: una franja compacta con los mismos 4 datos (+ desglose por
+ * negocio, que no se pierde) y, justo debajo, el kanban por espacios como
+ * protagonista — es la vista de servicio, así que es lo primero que se ve.
+ *
+ * Ojo: NO hay lista/tabla de reservas de hoy aquí (decisión explícita del
+ * dueño — "quita la lista de reservas de hoy, solo el kanban"). Buscar por
+ * nombre/teléfono, marcar importante y añadir a blacklist siguen
+ * disponibles, pero dentro del propio kanban (GestorReservasKanban.tsx) en
+ * vez de en una tabla aparte. Las reservas que NO son de hoy están en la
+ * pestaña "Lista".
+ */
 export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const {
     data: resumen,
     isLoading,
@@ -56,67 +34,14 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
     error: errorResumenDetalle,
     refetch: refetchResumen,
   } = useResumenOcupacionHoy();
-  const [filtroEstado, setFiltroEstado] = useState<string>("todos");
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroNegocio, setFiltroNegocio] = useState<string>(FILTRO_NEGOCIO_TODOS);
-  const [blacklistReserva, setBlacklistReserva] = useState<any>(null);
-  const [kanbanOpen, setKanbanOpen] = useState(false);
-  const acciones = useAccionesServicioReserva();
-  const hoy = format(new Date(), "yyyy-MM-dd");
-
-  const toggleImportante = async (reserva: any) => {
-    const nuevoValor = !reserva.importante;
-    // Antes no se comprobaba el error: si RLS o la red fallaban, el empleado leía
-    // "marcada como importante" y la estrella se quedaba apagada.
-    const { error } = await supabase
-      .from("reservas")
-      .update({ importante: nuevoValor })
-      .eq("id", reserva.id);
-
-    if (error) {
-      console.error("Error actualizando la reserva:", error);
-      toast.error("No se pudo actualizar la reserva: " + error.message);
-      return;
-    }
-
-    queryClient.invalidateQueries({ queryKey: ["reservas-hoy"] });
-    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
-  };
-
-  const {
-    data: reservasHoy,
-    isLoading: loadingReservas,
-    isError: errorReservas,
-    error: errorReservasDetalle,
-    refetch: refetchReservas,
-  } = useQuery({
-    queryKey: ["reservas-hoy", hoy],
-    queryFn: async () => {
-      // Reservas de hoy de TODOS los negocios (Casa Tomás y Touza · El
-      // Reservado, decisión del dueño 2026-09-24); cada fila lleva su insignia.
-      const { data, error } = await supabase
-        .from("reservas")
-        .select("*")
-        .eq("fecha", hoy)
-        .order("hora", { ascending: true });
-
-      if (error) throw error;
-      return data as any[];
-    },
-  });
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-4 sm:p-5">
-                <div className="h-16 bg-muted rounded" />
-              </CardContent>
-            </Card>
-          ))}
+      <div className="space-y-3 sm:space-y-4">
+        <div className="rounded-xl border bg-card/50 p-3 sm:p-4 animate-pulse">
+          <div className="h-10 sm:h-8 bg-muted rounded" />
         </div>
+        <div className="h-80 bg-muted/40 rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -135,361 +60,88 @@ export function VistaHoy({ onEspacioClick }: VistaHoyProps) {
   const porNegocio = resumen?.porNegocio ?? [];
 
   return (
-    <div className="space-y-6">
-      {/* Header con título + botón Gestor. Sin fecha (2026-09-25): ya
-          aparece una única vez en la cabecera global (DashboardLayout.tsx);
-          repetirla aquí era la duplicación más visible de la página. */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-3 rounded-xl bg-primary/10">
-            <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          </div>
-          <h3 className="text-base sm:text-lg font-semibold">Resumen de ocupación del día</h3>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Franja compacta de ocupación: los 4 datos que antes eran 4
+          tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
+          móvil) para que no compitan con el kanban por la pantalla. */}
+      <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
+          <IndicadorHoy
+            icon={CalendarCheck}
+            iconClass="bg-primary/10 text-primary"
+            label="Reservas hoy"
+            value={resumen?.totalReservas ?? 0}
+            detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
+            porNegocio={porNegocio}
+            cifra={(n) => `${n.totalReservas}`}
+          />
+          <IndicadorHoy
+            icon={Users}
+            iconClass="bg-accent/10 text-accent"
+            label="Comensales"
+            value={resumen?.totalComensales ?? 0}
+            porNegocio={porNegocio}
+            cifra={(n) => `${n.totalComensales}`}
+          />
+          <IndicadorHoy
+            icon={MapPin}
+            iconClass="bg-secondary/10 text-secondary"
+            label="Capacidad"
+            value={resumen?.capacidadTotal ?? 0}
+            porNegocio={porNegocio}
+            cifra={(n) => `${n.capacidadTotal}`}
+          />
+          <IndicadorHoy
+            icon={TrendingUp}
+            iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
+            label="Ocupación"
+            value={`${resumen?.porcentajeTotal ?? 0}%`}
+            porNegocio={porNegocio}
+            cifra={(n) => `${n.porcentajeTotal}%`}
+          />
         </div>
-        {/* Antes: variant="outline" + clases de `destructive` (rojo de "peligro"
-            para una acción normal, y borde/hover de outline mezclados). */}
-        <Button
-          size="sm"
-          className="gap-2 shrink-0 w-full sm:w-auto"
-          onClick={() => setKanbanOpen(true)}
-          aria-haspopup="dialog"
-        >
-          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-          Gestor de reservas
-        </Button>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-
-        <Card className="border-l-4 border-l-primary">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Reservas Hoy
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalReservas || 0}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  activas{reservasCanceladas > 0 ? ` · ${reservasCanceladas} cancelada(s)` : ""}
-                </p>
-                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.totalReservas}`} />
-              </div>
-              <div className="p-2 sm:p-3 rounded-full bg-primary/10">
-                <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-accent">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Comensales Esperados
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold">{resumen?.totalComensales || 0}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  sin canceladas
-                </p>
-                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.totalComensales}`} />
-              </div>
-              <div className="p-2 sm:p-3 rounded-full bg-accent/10">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-secondary">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Capacidad por turno
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold">{resumen?.capacidadTotal || 0}</p>
-                <DesgloseNegocios porNegocio={porNegocio} valor={(n) => `${n.capacidadTotal}`} />
-              </div>
-              <div className="p-2 sm:p-3 rounded-full bg-secondary/10">
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-green-500">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  Ocupación del día
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold">{resumen?.porcentajeTotal || 0}%</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  {resumen?.totalComensales || 0}/{resumen?.capacidadTotal || 0} plazas
-                </p>
-                {/* Cada negocio contra SU aforo: Touza nunca ocupa plazas del restaurante. */}
-                <DesgloseNegocios
-                  porNegocio={porNegocio}
-                  valor={(n) => `${n.porcentajeTotal}% (${n.totalComensales}/${n.capacidadTotal})`}
-                />
-              </div>
-              <div className="p-2 sm:p-3 rounded-full bg-green-500/10">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Lista de reservas del día */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2">
-              <List className="h-5 w-5" />
-              Reservas de Hoy
-            </CardTitle>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar nombre, email, teléfono..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  className="pl-9 w-full sm:w-[250px]"
-                />
-              </div>
-              <Select value={filtroNegocio} onValueChange={setFiltroNegocio}>
-                <SelectTrigger className="w-[150px]" aria-label="Filtrar por negocio">
-                  <SelectValue placeholder="Negocio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={FILTRO_NEGOCIO_TODOS}>Todos los negocios</SelectItem>
-                  {NEGOCIOS_PANEL.map((n) => (
-                    <SelectItem key={n.marca} value={n.marca}>
-                      {n.etiqueta}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {Object.entries(ESTADOS_RESERVA).map(([key, { label }]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loadingReservas ? (
-            <div className="text-center py-8 text-muted-foreground">Cargando reservas...</div>
-          ) : errorReservas ? (
-            <EstadoErrorCarga
-              titulo="las reservas de hoy"
-              error={errorReservasDetalle}
-              onReintentar={() => refetchReservas()}
-            />
-          ) : !reservasHoy?.length ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <CalendarCheck className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No hay reservas para hoy</p>
-            </div>
-          ) : (
-            <>
-              {(() => {
-                const term = busqueda.toLowerCase();
-                const reservasBuscadas = reservasHoy.filter(r => {
-                  const matchBusqueda = !term || 
-                    (r.nombre || "").toLowerCase().includes(term) ||
-                    (r.email || "").toLowerCase().includes(term) ||
-                    (r.telefono || "").toLowerCase().includes(term) ||
-                    (r.notas_cliente || "").toLowerCase().includes(term);
-                  return matchBusqueda && coincideNegocio(marcaDeReserva(r), filtroNegocio);
-                });
-                const reservasFiltradas = filtroEstado === "todos" 
-                  ? reservasBuscadas 
-                  : reservasBuscadas.filter(r => r.estado === filtroEstado);
-
-                if (!reservasFiltradas.length) {
-                  return (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No hay reservas con estado "{ESTADOS_RESERVA[filtroEstado as keyof typeof ESTADOS_RESERVA]?.label}"
-                    </div>
-                  );
-                }
-
-                return (
-                  <>
-                    {/* Mobile card view */}
-                    <div className="space-y-3 sm:hidden">
-                      {reservasFiltradas.map((reserva) => {
-                        const estadoInfo = ESTADOS_RESERVA[reserva.estado as keyof typeof ESTADOS_RESERVA] || { label: reserva.estado, color: "bg-gray-500" };
-                        return (
-                          <div key={reserva.id} className={cn("p-3 rounded-lg border", reserva.en_blacklist && "bg-destructive/5")}>
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-mono font-medium">
-                                  {typeof reserva.hora === 'string' ? reserva.hora.substring(0, 5) : reserva.hora}
-                                </span>
-                              </div>
-                              <Badge className={cn("text-white", estadoInfo.color)}>
-                                {estadoInfo.label}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <button onClick={() => toggleImportante(reserva)} className="shrink-0" aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"} aria-pressed={!!reserva.importante}>
-                                <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
-                              </button>
-                              <span className="font-medium text-sm">{reserva.nombre || "Sin nombre"}</span>
-                              {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
-                              <NegocioBadge marca={marcaDeReserva(reserva)} corta className="ml-auto" />
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <div className="flex items-center gap-3">
-                                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{reserva.numero_comensales}</span>
-                                {reserva.telefono && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{reserva.telefono}</span>}
-                              </div>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setBlacklistReserva(reserva)} aria-label={`Añadir a ${reserva.nombre || "este cliente"} a la lista negra`}>
-                                <ShieldBan className="h-3 w-3 text-destructive" />
-                              </Button>
-                            </div>
-                            <ControlLlegada reserva={reserva as any} acciones={acciones} className="mt-2" />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Desktop table view */}
-                    <div className="hidden sm:block">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Hora</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Contacto</TableHead>
-                            <TableHead>Comensales</TableHead>
-                            <TableHead>Estado</TableHead>
-                            <TableHead>Llegada</TableHead>
-                            <TableHead className="w-[50px]"><span className="sr-only">Lista negra</span></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {reservasFiltradas.map((reserva) => {
-                            const estadoInfo = ESTADOS_RESERVA[reserva.estado as keyof typeof ESTADOS_RESERVA] || { label: reserva.estado, color: "bg-gray-500" };
-                            return (
-                              <TableRow key={reserva.id} className={cn(reserva.en_blacklist && "bg-destructive/5")}>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-mono font-medium">
-                                      {typeof reserva.hora === 'string' ? reserva.hora.substring(0, 5) : reserva.hora}
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <button onClick={() => toggleImportante(reserva)} className="shrink-0 hover:scale-110 transition-transform" aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"} aria-pressed={!!reserva.importante}>
-                                      <Star className={cn("h-4 w-4", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
-                                    </button>
-                                    <span className="font-medium">{reserva.nombre || "Sin nombre"}</span>
-                                    {reserva.en_blacklist && <ShieldBan className="h-4 w-4 text-destructive" />}
-                                    <NegocioBadge marca={marcaDeReserva(reserva)} corta />
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                                    {reserva.telefono && <div className="flex items-center gap-1"><Phone className="h-3 w-3" />{reserva.telefono}</div>}
-                                    {reserva.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" />{reserva.email}</div>}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1"><Users className="h-4 w-4 text-muted-foreground" />{reserva.numero_comensales}</div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge className={cn("text-white", estadoInfo.color)}>{estadoInfo.label}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <ControlLlegada reserva={reserva as any} acciones={acciones} />
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10" onClick={() => setBlacklistReserva(reserva)} aria-label={`Añadir a ${reserva.nombre || "este cliente"} a la lista negra`}>
-                                    <ShieldBan className="h-3.5 w-3.5 text-destructive" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </>
-                );
-              })()}
-              {/* Este pie cuadra la lista con la tarjeta "Reservas Hoy": la tarjeta
-                  cuenta solo las activas y aquí se listan todos los estados. */}
-              <div className="mt-4 text-sm text-muted-foreground text-center">
-                {filtroEstado === "todos"
-                  ? `${reservasHoy.length} reservas en total (${reservasHoy.filter(r => !["cancelada", "no_show"].includes(r.estado)).length} activas)`
-                  : `${reservasHoy.filter(r => r.estado === filtroEstado).length} de ${reservasHoy.length} reservas`
-                }
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={kanbanOpen} onOpenChange={setKanbanOpen}>
-        <DialogContent className="max-w-[98vw] sm:max-w-[95vw] w-full h-[95vh] sm:h-[90vh] max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col p-3 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <LayoutGrid className="h-5 w-5" aria-hidden="true" />
-              Gestor de reservas por espacio
-            </DialogTitle>
-            <DialogDescription>
-              Reservas de hoy por espacio. Mueve una reserva de sala y marca quién ha llegado; nada de esto envía correos al cliente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-hidden flex-1 min-h-0">
-            <GestorReservasKanban />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <BlacklistModal
-        reserva={blacklistReserva}
-        open={!!blacklistReserva}
-        onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
-      />
+      <GestorReservasKanban />
     </div>
   );
 }
 
-/** Desglose de una cifra por negocio (solo si hay más de uno ese día). */
-function DesgloseNegocios({
+/** Un dato de la franja compacta: icono + número + (si hay 2 negocios) su desglose. */
+function IndicadorHoy({
+  icon: Icon,
+  iconClass,
+  label,
+  value,
+  detalle,
   porNegocio,
-  valor,
+  cifra,
 }: {
+  icon: LucideIcon;
+  iconClass: string;
+  label: string;
+  value: string | number;
+  detalle?: string;
   porNegocio: CifrasNegocio[];
-  valor: (n: CifrasNegocio) => string;
+  cifra: (n: CifrasNegocio) => string;
 }) {
-  if (porNegocio.length < 2) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-[10px] sm:text-xs text-muted-foreground" aria-label="Desglose por negocio">
-      {porNegocio.map((n) => (
-        <li key={n.negocio.marca} className="tabular-nums">
-          {n.negocio.nombre}: <span className="font-medium text-foreground">{valor(n)}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="flex items-center gap-2 min-w-0 sm:px-3 sm:first:pl-1">
+      <div className={cn("p-1.5 rounded-lg shrink-0", iconClass)}>
+        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground leading-none truncate">{label}</p>
+        <p className="text-base sm:text-lg font-bold leading-tight tabular-nums">
+          {value}
+          {detalle && <span className="ml-1 text-[10px] font-normal text-muted-foreground">{detalle}</span>}
+        </p>
+        {porNegocio.length > 1 && (
+          <p className="text-[10px] text-muted-foreground truncate tabular-nums" aria-label="Desglose por negocio">
+            {porNegocio.map((n) => `${n.negocio.nombre} ${cifra(n)}`).join(" · ")}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("reservas");
+  const [activeTab, setActiveTab] = useState<string>("hoy");
   const [tabsOverflow, setTabsOverflow] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -39,10 +39,15 @@ export default function Reservas() {
   // el formulario reescribiría la fecha continuamente.
   const datosNuevaReserva = useMemo(() => ({ fecha: new Date() }), [openDialog]);
 
-  // Leer parámetros de URL para controlar tab activo. Las pestañas antiguas
-  // (hoy, lista, solicitudes) se unificaron en "reservas" (2026-09-23);
-  // `resolverDeepLinkReservas` traduce los enlaces viejos — `?tab=solicitudes`
-  // abre "reservas" con el filtro "Solicitudes sin resolver".
+  // Leer parámetros de URL para controlar tab activo. `resolverDeepLinkReservas`
+  // (src/lib/reservas/vistaUnificada.ts, sin tocar en el rediseño 2026-09-25)
+  // sigue traduciendo los enlaces viejos: `?tab=solicitudes` o `?tab=reservas`
+  // abren la pestaña "Lista" (antes "Reservas") con su filtro; `?tab=hoy`
+  // (marcador de ANTES de la unificación del 2026-09-23) también cae en
+  // "Lista" por ese mismo resolver — NO en la pestaña "Hoy" nueva del kanban,
+  // que es un valor distinto que solo se alcanza por clic o por ser la
+  // pestaña por defecto. No hacía falta enlazar la nueva "Hoy" por URL: es lo
+  // primero que se ve al entrar en /reservas sin parámetros.
   const tabFromUrl = searchParams.get("tab");
   const destino = resolverDeepLinkReservas({
     tab: tabFromUrl,
@@ -167,8 +172,9 @@ export default function Reservas() {
                 <SelectValue placeholder="Selecciona vista" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="hoy">Hoy</SelectItem>
                 <SelectItem value="reservas">
-                  Reservas{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
+                  Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                 </SelectItem>
                 <SelectItem value="calendario">Calendario</SelectItem>
                 <SelectItem value="blacklist">Blacklist</SelectItem>
@@ -185,8 +191,9 @@ export default function Reservas() {
             }`}
           >
             <TabsList className="w-max min-w-max justify-start gap-1 p-1">
+              <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
               <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
-                Reservas
+                Lista
                 {countPendientes > 0 && (
                   <span
                     className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
@@ -209,17 +216,27 @@ export default function Reservas() {
             </TabsList>
           </div>
 
-          {/* Pestaña unificada (antes Hoy + Lista + Solicitudes): arriba
-              "Reservas de hoy", debajo la lista completa con las solicitudes
-              del bot mezcladas como filas "Solicitud". */}
-          <TabsContent value="reservas" className="space-y-8 mt-6">
+          {/* "Hoy" (2026-09-25, petición del dueño): el kanban por espacios
+              es la vista principal — lo primero que se ve al entrar en
+              /reservas. Sin lista/tabla aquí a propósito: con el kanban
+              delante, una tabla debajo solo duplicaba las mismas reservas. */}
+          <TabsContent value="hoy" className="mt-6">
             <VistaHoy onEspacioClick={handleEspacioClick} />
+          </TabsContent>
 
+          {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):
+              todas las reservas y solicitudes, de cualquier fecha —
+              incluida la de hoy, con su propio filtro de fecha y el atajo
+              "Hoy": no se oculta a propósito, así sigue pudiéndose buscar
+              una reserva de hoy cancelada o un dato que el kanban no
+              muestre. Las solicitudes del bot sin resolver (insignia roja)
+              siguen viviendo aquí, mezcladas como filas "Solicitud". */}
+          <TabsContent value="reservas" className="mt-6">
             <section ref={listaRef} aria-labelledby="titulo-todas-reservas" className="space-y-3 scroll-mt-4">
               <div>
                 <h3 id="titulo-todas-reservas" className="text-lg sm:text-xl font-semibold">Todas las reservas y solicitudes</h3>
                 <p className="text-muted-foreground text-xs sm:text-sm">
-                  Historial completo. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
+                  Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
                 </p>
               </div>
               <ListaReservasAvanzada
