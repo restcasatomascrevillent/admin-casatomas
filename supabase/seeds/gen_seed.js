@@ -1,10 +1,48 @@
 'use strict';
 const fs = require('fs');
 
+// ---------- Fechas (helpers) ----------
+// Se adelantan aqui, antes de "Config", porque TODAY y BLACKOUT_DATES ya necesitan
+// addDays() para calcularse solos (ver mas abajo). El resto de su uso (fechas[],
+// tryAddReserva, etc.) sigue igual que antes, mas abajo en el fichero.
+function toISO(d) { return d.toISOString().slice(0, 10); }
+function addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return toISO(d); }
+function dow(iso) { return new Date(iso + 'T00:00:00Z').getUTCDay(); } // 0=domingo
+
 // ---------- Config ----------
 const MARKER = '[DEMO-SEED]';
-const TODAY = '2026-09-23';
-const BLACKOUT_DATES = new Set(['2026-09-25']); // hoy+2: cron de recordatorios a las 08:00
+
+// TODAY: antes era una fecha fija ('2026-09-23', el dia en que se genero el seed la
+// primera vez). Cualquier dia posterior a ese, las reservas "de hoy" quedaban ancladas
+// al 23 y el panel de "Reservas de Hoy" salia vacio -- y volveria a salir vacio cada
+// dia que pasara. Ahora se calcula solo, en cada ejecucion de "node gen_seed.js".
+//
+// Zona horaria: el resto de este fichero sigue haciendo todos los calculos de fechas
+// relativas en UTC (new Date(iso + 'T00:00:00Z'), setUTCDate/getUTCDay -- ver addDays/dow
+// arriba), eso NO cambia. Lo unico que cambia es como se decide el string ISO de "hoy":
+// se toma el dia natural en Madrid (zona horaria del restaurante), no UTC ni la zona
+// horaria local de la maquina donde se ejecute el script. Motivo: si el generador se
+// lanza, por ejemplo, a las 00:30 hora de Espana, en UTC todavia es el dia anterior
+// (23:30 o 22:30 UTC segun sea CET o CEST) -- tomar la fecha UTC del momento tal cual
+// desplazaria "hoy" un dia hacia atras y descuadraria todo el rango (hoy-30 .. hoy+14).
+// Intl.DateTimeFormat con timeZone:'Europe/Madrid' ya resuelve el cambio de horario
+// CET/CEST por su cuenta, asi que basta con pedirle el dia natural de Madrid una vez al
+// arrancar el script. A partir de ese string ISO (TODAY), el resto de las fechas
+// relativas se siguen calculando en UTC exactamente igual que siempre.
+function todayEnMadrid() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date()); // locale en-CA -> formato YYYY-MM-DD
+}
+const TODAY = todayEnMadrid();
+
+// BLACKOUT_DATES: siempre TODAY + 2 (el cron de recordatorios de las 08:00 avisa de
+// reservas confirmadas para dentro de 2 dias; ese dia no se genera ninguna reserva de
+// demo -- ver README.md, seccion "Cron de recordatorios"). Antes era una fecha fija
+// ('2026-09-25', calculada a mano como 2026-09-23 + 2) que quedaba obsoleta al mismo
+// ritmo que TODAY. Ahora se deriva de TODAY, así que sigue siendo "hoy+2" de verdad en
+// cada regeneracion.
+const BLACKOUT_DATES = new Set([addDays(TODAY, 2)]); // hoy+2: cron de recordatorios a las 08:00
 const PAST_DAYS = 30;   // ultimo mes
 const FUTURE_DAYS = 14; // proximas dos semanas
 
@@ -67,10 +105,8 @@ function notaCliente() {
 }
 
 // ---------- Fechas ----------
-function toISO(d) { return d.toISOString().slice(0, 10); }
-function addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return toISO(d); }
-function dow(iso) { return new Date(iso + 'T00:00:00Z').getUTCDay(); } // 0=domingo
-
+// (toISO/addDays/dow se definen arriba, en "Fechas (helpers)", porque TODAY y
+// BLACKOUT_DATES ya los necesitan antes de llegar aqui)
 const fechas = [];
 for (let i = -PAST_DAYS; i <= FUTURE_DAYS; i++) {
   const f = addDays(TODAY, i);

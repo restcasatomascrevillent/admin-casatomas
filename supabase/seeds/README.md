@@ -12,6 +12,37 @@ verse vacío (reservas, gráficas) mientras no hay datos reales.
 > Desde septiembre de 2026 este seed **ya no crea personal ficticio** — solo
 > reservas. Ver "Qué ya no crea, y por qué" más abajo.
 
+## ⚠️ El seed caduca — hay que re-sembrarlo periódicamente
+
+`seed_demo_data.sql`, tal y como esté committeado en cada momento, tiene "hoy"
+congelado en la fecha en la que se generó (`TODAY`, dentro de `gen_seed.js`,
+calculada en el instante de ejecutar el generador — ver "Regenerar el seed"
+más abajo). Eso significa que las reservas pensadas para "hoy" — las que
+alimentan la pestaña **Reservas de Hoy** y el widget **Curva de Reservas por
+Hora** — quedan ancladas a esa fecha concreta, no a la fecha real del día en
+que alguien abra el panel.
+
+En la práctica: en cuanto pasa un día desde que se generó el fichero
+committeado, la pestaña "Reservas de Hoy" vuelve a salir vacía, aunque todas
+las filas `[DEMO-SEED]` sigan perfectamente sanas en la base — simplemente
+ninguna cae ya en la fecha de hoy. Esto es justo lo que le pasó al dueño el
+2026-09-25, con un seed que se había generado el 2026-09-23 (dos días antes) —
+ver el registro fechado al final de este documento.
+
+**Para que el panel vuelva a tener reservas de "hoy", hay que re-sembrar:**
+
+1. Regenerar `seed_demo_data.sql`: `node gen_seed.js seed_demo_data.sql`
+   (`TODAY` se recalcula solo en cada ejecución — no hay que editar nada a
+   mano).
+2. Ejecutar `cleanup_demo_data.sql` contra la base (borra únicamente las filas
+   `[DEMO-SEED]` viejas; nunca toca reservas reales).
+3. Ejecutar el `seed_demo_data.sql` recién regenerado en el paso 1.
+
+No existe (todavía) ningún cron ni Edge Function que haga esto solo: es un
+paso manual. Si el panel vuelve a mostrar "Reservas de Hoy" a cero y las filas
+`[DEMO-SEED]` de siempre siguen ahí en la base, este es el motivo — repite los
+tres pasos de arriba.
+
 ## Archivos
 
 | Archivo | Qué hace |
@@ -22,18 +53,29 @@ verse vacío (reservas, gráficas) mientras no hay datos reales.
 | `package.json` | `{ "type": "commonjs" }` — ámbito local para que `node gen_seed.js` (escrito en CommonJS) funcione aunque el `package.json` raíz del proyecto sea `"type": "module"`. No afecta a ningún otro paquete del repo. |
 | `README.md` | Este documento. |
 
-### Regenerar el seed (opcional)
+### Regenerar el seed
 
 ```bash
-node adminpanelct/supabase/seeds/gen_seed.js adminpanelct/supabase/seeds/seed_demo_data.sql
+node gen_seed.js seed_demo_data.sql
 ```
 
-Antes de regenerar, revisa las constantes al principio de `gen_seed.js`
-(`TODAY`, `PAST_DAYS`, `FUTURE_DAYS`, `BLACKOUT_DATES`, los `id` de
-`ESPACIOS`) — sobre todo `TODAY`, que hay que mantener al día si se ejecuta
-mucho después de 2026-09-23, para que el rango de fechas siga siendo "el
-último mes y las próximas dos semanas" de verdad y el día bloqueado por el
-cron de recordatorios se recalcule como `TODAY + 2`.
+(Ejecutar desde esta carpeta, `supabase/seeds/`. Desde la raíz del repo
+sería: `node adminpanelct/supabase/seeds/gen_seed.js adminpanelct/supabase/seeds/seed_demo_data.sql`.)
+
+`TODAY` y `BLACKOUT_DATES` ya **no** son constantes que haya que mantener a
+mano — antes lo eran, y ese era justo el bug que dejaba "Reservas de Hoy"
+vacío (ver aviso más arriba). Ahora: `TODAY` se calcula solo en cada
+ejecución (el día natural en Madrid, zona horaria del restaurante — el
+porqué, con el detalle del caso límite de ejecutar cerca de medianoche, está
+explicado en el comentario junto a `TODAY` en `gen_seed.js`), y
+`BLACKOUT_DATES` se deriva de `TODAY + 2` (el día que bloquea el cron de
+recordatorios de las 08:00). No hace falta tocar ninguna de las dos al
+regenerar.
+
+Lo que sí sigue siendo configuración manual, por si algún día cambia:
+`PAST_DAYS` / `FUTURE_DAYS` (cuánto rango de fechas generar) y los `id` de
+`ESPACIOS` (deben coincidir con las filas reales de `espacios_reserva` del
+proyecto).
 
 ## El marcador de demo
 
@@ -59,17 +101,26 @@ esto es real):
 
 ## Qué crea
 
-Rango de fechas: **2026-08-24 a 2026-10-07** (último mes + próximas dos semanas
-desde "hoy" = 2026-09-23), **excluyendo el 2026-09-25** — ver aviso del cron más
-abajo.
+Rango de fechas: **el último mes + las próximas dos semanas desde "hoy"**, en
+el momento de generar (`TODAY − 30` días a `TODAY + 14` días — ver
+`PAST_DAYS` / `FUTURE_DAYS` en `gen_seed.js`), **excluyendo siempre
+`TODAY + 2`** — ver aviso del cron más abajo. Como `TODAY` se recalcula en
+cada ejecución (ver "Regenerar el seed" más arriba), este rango se desplaza
+solo cada vez que se regenera el seed; los valores concretos de abajo
+corresponden a la última regeneración (2026-09-25: **2026-08-26 a
+2026-10-09**, excluyendo **2026-09-27**).
 
 | Tabla | Filas | Detalle |
 |---|---|---|
-| `reservas` | 266 | 255 marca `casa_tomas`, 11 marca `touza`. Estados mezclados (confirmada, verificada, pendiente, cancelada, completada, no_show), canales mezclados (web/teléfono/manual), tamaños de grupo de 2 a 12, horas repartidas en comida y cena, más volumen viernes/sábado y comida de domingo. |
+| `reservas` | 265 | 260 marca `casa_tomas`, 5 marca `touza`. Estados mezclados (confirmada, verificada, pendiente, cancelada, completada, no_show), canales mezclados (web/teléfono/manual), tamaños de grupo de 2 a 12, horas repartidas en comida y cena, más volumen viernes/sábado y comida de domingo. |
 
-Los números exactos pueden variar ligeramente si se regenera `seed_demo_data.sql`
-con `gen_seed.js` (usa aleatoriedad, aunque con semilla fija para que sea
-reproducible tal cual está committeado).
+Los números exactos (total de filas, reparto por marca/estado/canal, y el
+propio rango de fechas de arriba) cambian cada vez que se regenera
+`seed_demo_data.sql` con `gen_seed.js`: usa aleatoriedad con semilla fija, así
+que para un `TODAY` concreto el resultado es reproducible, pero `TODAY`
+cambia en cada regeneración y con él el resultado completo. La tabla de
+arriba describe el fichero tal y como está committeado ahora mismo, no una
+cifra fija para siempre.
 
 ### Por qué esta tabla y no otras
 
@@ -79,9 +130,11 @@ reproducible tal cual está committeado).
   futuras.
 - El widget **Curva de Reservas por Hora** (`CurvaReservasPorHora.tsx`) solo usa
   las reservas **de hoy** con `estado = 'confirmada'` (`useTodayConfirmedReservations`).
-  Por eso el seed refuerza especialmente el día de hoy (14 reservas, 12 de ellas
-  confirmadas) con horas concentradas en el pico de comida (14:00–14:30) y de
-  cena (21:00–21:30).
+  Por eso el seed refuerza especialmente el día de hoy (entre 12 y 16
+  reservas — comidaN y cenaN se sortean entre 6 y 8 cada uno —, la mayoría
+  confirmadas; en la última regeneración, 12 reservas y 8 confirmadas) con
+  horas concentradas en el pico de comida (14:00–14:30) y de cena
+  (21:00–21:30).
 
 No se ha tocado `resenas`, `solicitudes_pendientes`, `notificaciones_dashboard`
 ni `blacklist` — no forman parte de este encargo.
@@ -159,7 +212,11 @@ por este seed: le pasaría igual a un borrado manual de cualquier reserva real.
 `cleanup_demo_data.sql` **ya incluye el parche** para esto: al final borra de
 `ocupacion_diaria` cualquier fila huérfana (sin ninguna reserva real detrás,
 sea del origen que sea) dentro del rango de fechas que pudo tocar el seed
-(2026-08-24 a 2026-10-07), y solo ese rango. Verificado con la prueba
+(rango escrito a mano en el propio script — 2026-08-26 a 2026-10-09 mientras
+`seed_demo_data.sql` no se regenere de nuevo; hay que mantenerlo al día en
+cada regeneración, ver el aviso junto a esas fechas en `cleanup_demo_data.sql`
+y el registro fechado al final de este documento), y solo ese rango.
+Verificado con la prueba
 crear → borrar → contar (ver abajo): tras el borrado, `ocupacion_diaria` queda
 en 0 filas en ese rango.
 
@@ -218,12 +275,12 @@ funcionando tal y como lo estaba usando el dueño.
 - **`marca`**: reservas de ambas marcas (`casa_tomas` mayoritaria, `touza` en
   El Reservado).
 - **Cron de recordatorios** (`emails-reserva/recordatorios`, diario a las 08:00):
-  busca reservas **confirmadas** para dentro de 2 días. Con "hoy" = 2026-09-23,
-  esa fecha es **2026-09-25**, y el seed **no crea ninguna reserva** ese día
-  (ni confirmada ni de ningún otro estado) para no generar intentos de envío a
-  direcciones `@example.com` ni avisos en la campana de notificaciones. Si se
-  regenera el seed en otra fecha, hay que actualizar `TODAY` en `gen_seed.js` y
-  la fecha bloqueada seguirá siendo `TODAY + 2` automáticamente.
+  busca reservas **confirmadas** para dentro de 2 días (`TODAY + 2`), y el
+  seed **no crea ninguna reserva** ese día (ni confirmada ni de ningún otro
+  estado) para no generar intentos de envío a direcciones `@example.com` ni
+  avisos en la campana de notificaciones. `TODAY` y esa fecha bloqueada
+  (`BLACKOUT_DATES`) se recalculan solos en cada regeneración — no hace falta
+  tocar nada a mano (ver "Regenerar el seed" más arriba).
 - Los otros dos crons (`detectar-ausencias` a las 04:00, `reintentar-fallidos`
   cada 15 min) sí pueden llegar a procesar reservas de demo, pero como todos los
   emails son `@example.com` y los teléfonos son ficticios, no hay forma de que
@@ -264,3 +321,70 @@ el esquema encontramos:
 - ~~**Personal Activo** (Cocina / Sala / Otros)~~ — el widget se retiró del
   panel junto con toda la sección Personal (commit `a24b5b5`); este seed ya
   no lo alimenta ni falta que lo haga.
+
+## Registro — 2026-09-25: TODAY hardcodeado, panel en cero, corregido
+
+**El problema.** El dueño abrió el panel y "Reservas de Hoy" salía a cero. Las
+266 filas `[DEMO-SEED]` seguían todas en la base, pero ninguna caía en
+2026-09-25: `gen_seed.js` tenía `TODAY` fijado a fuego en `'2026-09-23'` (el
+día en que se generó el seed por primera vez) y `BLACKOUT_DATES` fijado a
+`['2026-09-25']` (calculado a mano como `TODAY + 2` en aquel momento). Iba a
+volver a pasar cada día que pasara desde entonces.
+
+**La corrección (en `gen_seed.js`).** `TODAY` ahora se calcula solo en cada
+ejecución, y `BLACKOUT_DATES` se deriva de `TODAY + 2` en vez de ser una
+fecha fija. Zona horaria: el resto del fichero sigue haciendo todos los
+cálculos de fechas relativas en UTC (`new Date(iso + 'T00:00:00Z')`,
+`setUTCDate`/`getUTCDay`) — eso no cambió. Lo que cambia es cómo se decide el
+string ISO de "hoy": se usa el día natural en **Madrid** (`Intl.DateTimeFormat`
+con `timeZone: 'Europe/Madrid'`, que ya resuelve CET/CEST solo), no UTC ni la
+zona horaria local de la máquina que ejecute el script — para que un
+`node gen_seed.js` lanzado, por ejemplo, a las 00:30 hora de España no calcule
+"hoy" como el día anterior (que es lo que pasaría tomando la fecha UTC del
+momento sin más, ya que a esa hora en España en UTC casi siempre sigue siendo
+el día de antes). El detalle completo está comentado en el propio fichero,
+junto a la constante `TODAY`.
+
+**Ciclo ejecutado contra producción** (proyecto `jeamoczmbfsnwkfjxcyo`), con
+`cleanup_demo_data.sql` y el `seed_demo_data.sql` recién regenerado, sin
+tocar migraciones ni desplegar nada:
+
+| Momento | `reservas` total | `[DEMO-SEED]` | Reales (resto) | Reservas hoy (2026-09-25) |
+|---|---|---|---|---|
+| Antes de tocar nada | 376 | 266 | 110 | 0 |
+| Tras `cleanup_demo_data.sql` | 110 | 0 | 110 | 0 |
+| Tras el nuevo `seed_demo_data.sql` | 375 | 265 | 110 | 12 |
+
+Reservas de hoy tras sembrar, por estado: **confirmada 8, verificada 3,
+pendiente 1** (12 en total).
+
+Las 110 reales se confirmaron idénticas antes y después por dos vías: el
+recuento por el marcador oficial (`notas_cliente NOT LIKE '[DEMO-SEED]%'`,
+110 → 110 → 110) y, como señal adicional no oficial, el patrón
+`email LIKE '%@test.com' OR telefono LIKE '612345%'` descrito en "Dato
+importante para quien lea esto después" (109 de las 110 — la diferencia de 1
+es solo una fila real con email/teléfono en otro formato, no algo que este
+cambio haya tocado).
+
+`trg_validar_capacidad` no se desactivó en ningún momento; tras sembrar, el
+uso máximo observado por `(fecha, turno, marca)` quedó muy por debajo del
+aforo (150 Casa Tomás / 20 Touza).
+
+**`cleanup_demo_data.sql` también se actualizó**, solo en los dos literales de
+fecha del parche de `ocupacion_diaria` (`2026-08-24`/`2026-10-07` →
+`2026-08-26`/`2026-10-09`, el rango real del `seed_demo_data.sql` que queda
+committeado tras este cambio) — sigue siendo un rango escrito a mano, no
+autocalculado; queda anotado en el propio fichero que hay que actualizarlo en
+cada regeneración futura, igual que este documento.
+
+**Hallazgo aparte, no tocado (fuera de este encargo):** al verificar
+`ocupacion_diaria` tras sembrar aparecieron 5 filas huérfanas el
+2026-10-08 (horas `14:00`, `14:30`, `14:45`, `15:30`, `15:45`). No las creó
+este seed — el generador nunca produce horas en `:45`, y el `2026-10-08` no
+estaba dentro del rango que tocó ni el borrado ni el sembrado de este ciclo —
+así que son un resto de otra causa anterior y no relacionada (probablemente
+el mismo bug de `trigger_actualizar_ocupacion` descrito más abajo en
+"Aviso sobre `ocupacion_diaria`", disparado alguna vez por una reserva real
+creada y luego borrada por fuera de este seed). Se dejaron intactas, siguiendo
+la misma regla que el resto de este documento: no tocar nada que este seed no
+haya creado.

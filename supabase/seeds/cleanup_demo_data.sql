@@ -31,8 +31,16 @@
 -- nuevos en supabase/seeds/, cero migraciones). En su lugar, este script limpia
 -- el resultado a mano: borra de ocupacion_diaria cualquier fila cuyo (fecha,hora)
 -- ya no tenga NINGUNA reserva real (huerfana), acotado al rango de fechas que
--- pudo tocar el seed (2026-08-24 a 2026-10-07) para no rozar nada fuera de ese
+-- pudo tocar el seed (2026-08-26 a 2026-10-09) para no rozar nada fuera de ese
 -- rango.
+--
+-- OJO -- este rango es literal, igual que TODAY lo era en gen_seed.js antes de este
+-- cambio: hay que volver a actualizarlo a mano (aqui y en la "Verificacion rapida" de
+-- mas abajo) cada vez que se regenere el seed con otro "hoy", copiando fecha_min/
+-- fecha_max del resumen que imprime "node gen_seed.js" por stdout. No se ha
+-- automatizado en este cambio (no formaba parte del encargo y tocar la logica de
+-- borrado de produccion sin poder probarla a fondo pareció mas riesgo que beneficio);
+-- queda anotado como posible mejora futura.
 --
 -- NUNCA ejecutar este script (ni seed_demo_data.sql) contra una base con datos
 -- reales de clientes. Ver README.md de esta carpeta.
@@ -47,7 +55,7 @@ DELETE FROM public.reservas        WHERE notas_cliente LIKE '[DEMO-SEED]%';
 -- fechas del seed y solo si de verdad no queda ninguna reserva para ese
 -- (fecha,hora) -- reales o de demo, da igual el origen.
 DELETE FROM public.ocupacion_diaria od
-WHERE od.fecha BETWEEN '2026-08-24' AND '2026-10-07'
+WHERE od.fecha BETWEEN '2026-08-26' AND '2026-10-09'  -- ver aviso arriba: actualizar en cada regeneracion del seed
   AND NOT EXISTS (
     SELECT 1 FROM public.reservas r WHERE r.fecha = od.fecha AND r.hora = od.hora
   );
@@ -57,5 +65,5 @@ COMMIT;
 -- Verificacion rapida (deberia devolver 0 filas en las dos):
 -- SELECT 'reservas' t, count(*) FROM public.reservas WHERE notas_cliente LIKE '[DEMO-SEED]%'
 -- UNION ALL SELECT 'ocupacion_diaria_huerfana', count(*) FROM public.ocupacion_diaria od
---   WHERE od.fecha BETWEEN '2026-08-24' AND '2026-10-07'
+--   WHERE od.fecha BETWEEN '2026-08-26' AND '2026-10-09'
 --   AND NOT EXISTS (SELECT 1 FROM public.reservas r WHERE r.fecha=od.fecha AND r.hora=od.hora);
