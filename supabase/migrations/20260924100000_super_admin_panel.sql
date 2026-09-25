@@ -19,9 +19,12 @@
 --      están activas en el sidebar. Lectura para cualquier autenticado
 --      (hace falta para pintar el sidebar), escritura solo para super admins.
 --
--- No toca user_roles, user_permissions ni ninguna política de la Fase 2 de
--- RLS (20260918120000_rls_por_permisos_de_seccion.sql): el super admin es un
--- nivel de acceso aparte, por encima de is_admin(), no un reemplazo.
+-- No toca la estructura de user_roles/user_permissions ni ninguna política de
+-- la Fase 2 de RLS (20260918120000_rls_por_permisos_de_seccion.sql): el
+-- super admin es un nivel de acceso aparte, por encima de is_admin(), no un
+-- reemplazo. Sí inserta una fila en user_roles (ver el INSERT al final): a
+-- pablitocandela15@gmail.com se le da también rol 'admin' del Admin Panel
+-- normal, no solo acceso a /super-admin.
 -- ============================================================================
 
 -- Tabla de super administradores (gestión manual vía SQL, no autoservicio)
@@ -124,3 +127,16 @@ SELECT id, email
 FROM auth.users
 WHERE email IN ('miguelbenito2003@gmail.com', 'pablitocandela15@gmail.com')
 ON CONFLICT (email) DO NOTHING;
+
+-- Además del Super Admin, pablitocandela15@gmail.com entra también como
+-- 'admin' en user_roles (misma tabla y mismo rol con el que ya se sembró a
+-- miguelbenito2003@gmail.com en 20251226144838): es lo que le da acceso
+-- completo al Admin Panel normal (is_admin() true, bypassea todo
+-- user_permissions). Sin esta fila, la cuenta solo entraría a /super-admin
+-- y no vería nada del sidebar normal salvo lo que un futuro admin le
+-- conceda a mano en Usuarios → Permisos.
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'admin'::app_role
+FROM auth.users
+WHERE email = 'pablitocandela15@gmail.com'
+ON CONFLICT (user_id, role) DO NOTHING;
