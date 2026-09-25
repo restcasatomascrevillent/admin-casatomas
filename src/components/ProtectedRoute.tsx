@@ -15,15 +15,14 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/dashboard": "dashboard",
   "/": "dashboard",
   "/reservas": "reservas",
-  "/espacios": "espacios",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
   "/facturas": "facturas",
   "/usuarios": "usuarios",
 };
-// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email y
-// Tráfico web ya no tienen ruta aquí: viven bajo /super-admin/* protegidas
-// por SuperAdminRoute.
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
+// Tráfico web y Espacios ya no tienen ruta aquí: viven bajo /super-admin/*
+// protegidas por SuperAdminRoute.
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();

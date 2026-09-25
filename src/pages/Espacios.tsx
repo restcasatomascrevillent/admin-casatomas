@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DashboardLayout } from "@/components/DashboardLayout";
+import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +49,7 @@ export default function Espacios() {
   // Si estamos configurando un espacio, mostrar el editor a pantalla completa
   if (espacioConfigurando) {
     return (
-      <DashboardLayout>
+      <SuperAdminLayout>
         <div className="h-[calc(100vh-120px)] flex flex-col">
           <EditorPlanoEspacio
             espacioId={espacioConfigurando.id}
@@ -57,12 +57,12 @@ export default function Espacios() {
             onBack={handleBackFromEditor}
           />
         </div>
-      </DashboardLayout>
+      </SuperAdminLayout>
     );
   }
 
   return (
-    <DashboardLayout>
+    <SuperAdminLayout>
       <div className="space-y-6">
         {/* Sin título de página (2026-09-25): la pestaña "Espacios" activa en
             el menú lateral ya dice dónde estás. Se conserva el botón, que sí
@@ -211,6 +211,6 @@ export default function Espacios() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

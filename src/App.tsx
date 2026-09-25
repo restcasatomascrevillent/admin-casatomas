@@ -41,9 +41,9 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
   </RouteErrorBoundary>
 );
 
-// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email y
-// Tráfico web viven exclusivamente bajo /super-admin/* (ver botón de
-// engranaje en AppSidebar).
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
+// Tráfico web y Espacios viven exclusivamente bajo /super-admin/* (ver botón
+// de engranaje en AppSidebar).
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
     <SuperAdminRoute>{contenido}</SuperAdminRoute>
@@ -68,7 +68,6 @@ const App = () => (
             <Route path="/" element={pagina(<Dashboard />)} />
             <Route path="/dashboard" element={pagina(<Dashboard />)} />
             <Route path="/reservas" element={pagina(<Reservas />)} />
-            <Route path="/espacios" element={pagina(<Espacios />)} />
             {/* Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Se
                 conserva la ruta para que marcadores/enlaces antiguos no den 404. */}
             <Route path="/trabajadores" element={<Navigate to="/" replace />} />
@@ -86,6 +85,7 @@ const App = () => (
             <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
             <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
             <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
+            <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </RouteErrorBoundary>

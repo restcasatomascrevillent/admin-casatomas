@@ -21,7 +21,6 @@ export interface UserRoleData {
 export const SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "reservas", label: "Reservas" },
-  { key: "espacios", label: "Espacios" },
   // "trabajadores" (Personal) retirada el 2026-09-23 (decisión del dueño).
   // Filas de user_permissions con section_key="trabajadores" que puedan
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
@@ -33,7 +32,7 @@ export const SECTIONS = [
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-// Email y Tráfico web se gestionan exclusivamente desde el Super Admin y ya
+// Email, Tráfico web y Espacios se gestionan exclusivamente desde el Super Admin y ya
 // no forman parte del Admin Panel normal.
 
 export type SectionKey = typeof SECTIONS[number]["key"];
