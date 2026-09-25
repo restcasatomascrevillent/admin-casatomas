@@ -114,9 +114,13 @@ INSERT INTO public.admin_feature_toggles (section_key, label, enabled) VALUES
   ('usuarios', 'Usuarios', true)
 ON CONFLICT (section_key) DO NOTHING;
 
--- Otorga acceso de super admin al propietario existente del sistema
+-- Otorga acceso de super admin al propietario existente del sistema y a la
+-- cuenta pedida explícitamente (pablitocandela15@gmail.com). Solo enlaza
+-- emails que YA existan en auth.users: si la cuenta de Supabase (login +
+-- contraseña) todavía no se creó, esta fila simplemente no se inserta y hay
+-- que volver a correr este INSERT después de crearla.
 INSERT INTO public.super_admins (user_id, email)
 SELECT id, email
 FROM auth.users
-WHERE email = 'miguelbenito2003@gmail.com'
+WHERE email IN ('miguelbenito2003@gmail.com', 'pablitocandela15@gmail.com')
 ON CONFLICT (email) DO NOTHING;
