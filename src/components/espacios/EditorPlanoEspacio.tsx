@@ -2,12 +2,13 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
-import { useMesas, useActualizarMesasSilent } from "@/hooks/useMesas";
+import { useMesas, useActualizarMesasSilent, useEliminarMesa } from "@/hooks/useMesas";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
 import { PanelLateral } from "./PanelLateral";
+import { esMesaTemporal, esMesaGrupoNueva, esMesaNoPersistida, planRepuntarAsignaciones } from "./planoUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface EditorPlanoEspacioProps {
   espacioId: string;
@@ -63,7 +66,19 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [zoomLevel, setZoomLevel] = useState(1);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [showMeasurements, setShowMeasurements] = useState(true);
-  
+
+  // Mesas fusionadas YA guardadas en BBDD que el usuario ha desagrupado en esta
+  // sesión de edición: hay que repuntar sus asignaciones_mesa a la primera mesa
+  // resultante y borrar la fila de la mesa fusionada al pulsar "Guardar"
+  // (mientras tanto solo viven en el canvas/estado local).
+  const [pendingUnmerges, setPendingUnmerges] = useState<Array<{ mesaId: string; nuevosMesaIds: string[] }>>([]);
+
+  // Recuento de asignaciones_mesa afectadas, para mostrar en los diálogos de
+  // confirmación de "Limpiar" y "Eliminar mesa" antes de borrar nada.
+  const [clearCounts, setClearCounts] = useState<{ total: number; futuras: number } | null>(null);
+  const [clearConfirmChecked, setClearConfirmChecked] = useState(false);
+  const [asignacionesSeleccionada, setAsignacionesSeleccionada] = useState(0);
+
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -77,6 +92,41 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const { data: mesas = [], isLoading: loadingMesas, refetch: refetchMesas } = useMesas(espacioId);
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
+  const eliminarMesa = useEliminarMesa();
+
+  // Repunta las asignaciones_mesa de `mesaOrigenId` hacia `mesaDestinoId` (fusión:
+  // originales -> mesa fusionada; desagrupar: mesa fusionada eliminada -> primera
+  // mesa resultante). Si la reserva ya está asignada en destino, la de origen se
+  // elimina en vez de actualizarse para no violar el UNIQUE(reserva_id, mesa_id).
+  const repuntarAsignacionesMesa = useCallback(async (mesaOrigenId: string, mesaDestinoId: string) => {
+    const { data: asignacionesOrigen, error: errOrigen } = await supabase
+      .from("asignaciones_mesa")
+      .select("id, reserva_id, mesa_id")
+      .eq("mesa_id", mesaOrigenId);
+    if (errOrigen) throw errOrigen;
+    if (!asignacionesOrigen || asignacionesOrigen.length === 0) return;
+
+    const { data: asignacionesDestino, error: errDestino } = await supabase
+      .from("asignaciones_mesa")
+      .select("reserva_id")
+      .eq("mesa_id", mesaDestinoId);
+    if (errDestino) throw errDestino;
+
+    const reservaIdsDestino = new Set((asignacionesDestino || []).map((a) => a.reserva_id));
+    const { aActualizar, aEliminar } = planRepuntarAsignaciones(asignacionesOrigen, reservaIdsDestino);
+
+    if (aEliminar.length > 0) {
+      const { error } = await supabase.from("asignaciones_mesa").delete().in("id", aEliminar);
+      if (error) throw error;
+    }
+    if (aActualizar.length > 0) {
+      const { error } = await supabase
+        .from("asignaciones_mesa")
+        .update({ mesa_id: mesaDestinoId })
+        .in("id", aActualizar);
+      if (error) throw error;
+    }
+  }, []);
 
   // Medir el contenedor
   useEffect(() => {
@@ -149,21 +199,25 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       });
 
       // Recopilar IDs de mesas originales que forman parte de mesas fusionadas
-      const idsOriginalesFusionadas = new Set<string>();
+      // (id de la mesa fusionada -> ids de sus originales ya persistidos)
+      const idsOriginalesFusionadasPorGrupo = new Map<string, string[]>();
       mesasCanvas.forEach(m => {
         if (m.isMerged && m.originalMesas) {
-          m.originalMesas.forEach(orig => {
-            if (!orig.id.startsWith('mesa-temp-')) {
-              idsOriginalesFusionadas.add(orig.id);
-            }
-          });
+          const originalesPersistidos = m.originalMesas
+            .map(orig => orig.id)
+            .filter(id => !esMesaNoPersistida(id));
+          if (originalesPersistidos.length > 0) {
+            idsOriginalesFusionadasPorGrupo.set(m.id, originalesPersistidos);
+          }
         }
       });
+      const idsOriginalesFusionadas = new Set<string>(
+        Array.from(idsOriginalesFusionadasPorGrupo.values()).flat()
+      );
 
       // Actualizar posiciones de mesas (solo las que no son temporales, no agrupadas nuevas, y no son originales de fusiones)
-      const mesasToUpdate = mesasCanvas.filter(m => 
-        !m.id.startsWith('mesa-temp-') && 
-        !m.id.startsWith('mesa-grupo-') &&
+      const mesasToUpdate = mesasCanvas.filter(m =>
+        !esMesaNoPersistida(m.id) &&
         !idsOriginalesFusionadas.has(m.id)
       );
       if (mesasToUpdate.length > 0) {
@@ -180,13 +234,47 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         await actualizarMesas.mutateAsync(updates);
       }
 
-      // Eliminar mesas originales que ahora forman parte de mesas fusionadas
-      for (const originalId of idsOriginalesFusionadas) {
-        await supabase.from('mesas').delete().eq('id', originalId);
+      // Mapa de ids temporales (mesa-temp-.../mesa-grupo-...) -> id real de BBDD,
+      // para poder resolver los pendingUnmerges y renombrar en canvas/estado.
+      const idTemporalAReal = new Map<string, string>();
+
+      // Insertar mesas sueltas nuevas: creadas con la herramienta del lienzo
+      // ("mesa-temp-...") o resultantes de desagrupar una mesa fusionada.
+      // Antes se descartaban al guardar y la mesa desaparecía en el próximo
+      // recargado del plano.
+      const mesasTempNuevas = mesasCanvas.filter(m => esMesaTemporal(m.id));
+      for (const mesaTemp of mesasTempNuevas) {
+        const { data: nuevaMesa, error } = await supabase
+          .from('mesas')
+          .insert({
+            espacio_id: espacioId,
+            nombre: mesaTemp.nombre,
+            capacidad: mesaTemp.capacidad,
+            forma: mesaTemp.forma,
+            ancho: mesaTemp.ancho,
+            alto: mesaTemp.alto,
+            pos_x: mesaTemp.posX,
+            pos_y: mesaTemp.posY,
+            is_merged: false,
+            etiqueta: mesaTemp.etiqueta || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (nuevaMesa) {
+          idTemporalAReal.set(mesaTemp.id, nuevaMesa.id);
+          setMesasCanvas(prev => prev.map(m => (m.id === mesaTemp.id ? { ...m, id: nuevaMesa.id } : m)));
+          // Sin esto, el objeto en el lienzo se queda con el id temporal: en el
+          // siguiente ciclo de carga no se reconoce como "ya en canvas" y se
+          // duplicaría la mesa al re-renderizar desde el estado ya actualizado.
+          canvasRef.current?.renameMesaId(mesaTemp.id, nuevaMesa.id);
+        }
       }
 
       // Crear mesas agrupadas nuevas (las que empiezan con mesa-grupo-)
-      const mesasGrupoNuevas = mesasCanvas.filter(m => m.id.startsWith('mesa-grupo-'));
+      const mesasGrupoNuevas = mesasCanvas.filter(m => esMesaGrupoNueva(m.id));
       for (const mesaGrupo of mesasGrupoNuevas) {
         // Crear la nueva mesa agrupada
         const { data: nuevaMesa, error } = await supabase
@@ -205,17 +293,70 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           })
           .select()
           .single();
-        
+
         if (error) throw error;
-        
-        // Actualizar el ID en el estado local
+
         if (nuevaMesa) {
-          setMesasCanvas(prev => prev.map(m => 
-            m.id === mesaGrupo.id 
+          idTemporalAReal.set(mesaGrupo.id, nuevaMesa.id);
+          // Actualizar el ID en el estado local
+          setMesasCanvas(prev => prev.map(m =>
+            m.id === mesaGrupo.id
               ? { ...m, id: nuevaMesa.id }
               : m
           ));
+          // Igual que con las mesas sueltas: el objeto en el lienzo debe
+          // pasar a usar el id real para no duplicarse en el próximo render.
+          canvasRef.current?.renameMesaId(mesaGrupo.id, nuevaMesa.id);
         }
+      }
+
+      // Repuntar las asignaciones_mesa de cada mesa original hacia su mesa
+      // fusionada (resolviendo el id real si la fusión se creó en esta misma
+      // sesión) ANTES de borrar la fila original — si no, el ON DELETE CASCADE
+      // de asignaciones_mesa.mesa_id se llevaba por delante las reservas.
+      for (const [grupoId, originalesIds] of idsOriginalesFusionadasPorGrupo) {
+        const grupoIdReal = idTemporalAReal.get(grupoId) ?? grupoId;
+        for (const originalId of originalesIds) {
+          await repuntarAsignacionesMesa(originalId, grupoIdReal);
+        }
+      }
+      // Eliminar mesas originales que ahora forman parte de mesas fusionadas
+      for (const originalId of idsOriginalesFusionadas) {
+        await supabase.from('mesas').delete().eq('id', originalId);
+      }
+
+      // Resuelve el id final (ya real en BBDD) de una mesa resultante de un
+      // desagrupe. Puede no estar ni en `idTemporalAReal` ni sobrevivir tal
+      // cual en `mesasCanvas` si el usuario la volvió a fusionar con otra
+      // ANTES de guardar (desagrupar -> re-fusionar en el mismo editado): en
+      // ese caso quedó absorbida como "original" dentro de otro grupo nuevo,
+      // así que seguimos la cadena hasta el grupo que sí sobrevive.
+      const resolverMesaFinal = (id: string, visitados = new Set<string>()): string => {
+        if (visitados.has(id)) return id; // corta si hubiera un ciclo
+        visitados.add(id);
+        const real = idTemporalAReal.get(id);
+        if (real) return real;
+        if (mesasCanvas.some(m => m.id === id)) return id; // sigue viva tal cual
+        const grupoQueLaAbsorbio = mesasCanvas.find(
+          m => m.isMerged && m.originalMesas?.some(o => o.id === id)
+        );
+        if (grupoQueLaAbsorbio) return resolverMesaFinal(grupoQueLaAbsorbio.id, visitados);
+        return id;
+      };
+
+      // Resolver los desagrupes pendientes de mesas fusionadas que YA estaban
+      // en BBDD: repuntar sus asignaciones a la primera mesa resultante y
+      // borrar la fila de la mesa fusionada (si no, quedaba como fila huérfana
+      // y sus reservas asignadas se perdían al no repuntarlas antes de borrar).
+      if (pendingUnmerges.length > 0) {
+        for (const pending of pendingUnmerges) {
+          const primerNuevoId = pending.nuevosMesaIds[0];
+          if (!primerNuevoId) continue;
+          const primerNuevoIdReal = resolverMesaFinal(primerNuevoId);
+          await repuntarAsignacionesMesa(pending.mesaId, primerNuevoIdReal);
+          await supabase.from('mesas').delete().eq('id', pending.mesaId);
+        }
+        setPendingUnmerges([]);
       }
 
       toast.success("Plano guardado correctamente");
@@ -226,7 +367,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     } finally {
       setIsSaving(false);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas, refetchMesas]);
+  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
 
   // Exportar imagen
   const handleExport = useCallback(() => {
@@ -240,6 +381,53 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     }
   }, [espacioNombre]);
 
+  // Antes de abrir el diálogo de "Limpiar", contar cuántas asignaciones_mesa
+  // (reservas con mesa asignada) se perderían — antes se borraba todo sin
+  // avisar y el ON DELETE CASCADE se llevaba por delante el historial completo.
+  const handleAbrirClearDialog = useCallback(async () => {
+    try {
+      const { data: mesasEspacio, error: errMesas } = await supabase
+        .from("mesas")
+        .select("id")
+        .eq("espacio_id", espacioId);
+      if (errMesas) throw errMesas;
+
+      const mesaIds = (mesasEspacio || []).map((m) => m.id);
+      if (mesaIds.length === 0) {
+        setClearCounts({ total: 0, futuras: 0 });
+        setClearConfirmChecked(false);
+        setShowClearDialog(true);
+        return;
+      }
+
+      const { data: asignaciones, error: errAsig } = await supabase
+        .from("asignaciones_mesa")
+        .select("id, reserva_id, reservas!inner(fecha)")
+        .in("mesa_id", mesaIds);
+      if (errAsig) throw errAsig;
+
+      // "sv-SE" da directamente YYYY-MM-DD en hora LOCAL (igual que hoyLocal() en
+      // EditorMenuTapasWeb/EditorNovedadesWeb) — con toISOString().slice(0,10) la
+      // fecha sale en UTC y de madrugada en España queda un día por detrás/delante.
+      const hoy = new Date().toLocaleDateString("sv-SE");
+      const total = asignaciones?.length || 0;
+      const futuras = (asignaciones || []).filter((a) => {
+        // El join "reservas!inner(fecha)" de supabase-js puede tipar la
+        // relación como objeto o como array según la versión; cubrimos ambos.
+        const relacion = a.reservas as { fecha?: string } | { fecha?: string }[] | null;
+        const fecha = Array.isArray(relacion) ? relacion[0]?.fecha : relacion?.fecha;
+        return !!fecha && fecha >= hoy;
+      }).length;
+
+      setClearCounts({ total, futuras });
+      setClearConfirmChecked(false);
+      setShowClearDialog(true);
+    } catch (error) {
+      console.error("Error al comprobar asignaciones antes de limpiar:", error);
+      toast.error("No se pudieron comprobar las reservas asociadas a las mesas");
+    }
+  }, [espacioId]);
+
   // Limpiar canvas (incluyendo mesas de la BBDD)
   const handleClear = useCallback(async () => {
     try {
@@ -248,19 +436,22 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         .from("mesas")
         .delete()
         .eq("espacio_id", espacioId);
-      
+
       if (error) throw error;
-      
+
       // Limpiar estado local
       setElementos([]);
       setMesasCanvas([]);
       setSelectedElement(null);
+      setPendingUnmerges([]);
       canvasRef.current?.clearCanvas();
-      
+
       // Refrescar datos
       refetchMesas();
-      
+
       setShowClearDialog(false);
+      setClearCounts(null);
+      setClearConfirmChecked(false);
       toast.success("Plano y mesas eliminados correctamente");
     } catch (error) {
       console.error("Error al limpiar:", error);
@@ -268,13 +459,56 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     }
   }, [espacioId, refetchMesas]);
 
-  // Eliminar elemento seleccionado
-  const handleDeleteSelected = useCallback(() => {
+  // Antes de abrir el diálogo de eliminar un elemento, si es una mesa ya
+  // persistida en BBDD, contar sus asignaciones_mesa para avisar al usuario.
+  const handleAbrirDeleteDialog = useCallback(async () => {
     if (!selectedElement) return;
-    
+    if (selectedElement.tipo === "mesa" && !esMesaNoPersistida(selectedElement.id)) {
+      try {
+        const { count, error } = await supabase
+          .from("asignaciones_mesa")
+          .select("id", { count: "exact", head: true })
+          .eq("mesa_id", selectedElement.id);
+        if (error) throw error;
+        setAsignacionesSeleccionada(count || 0);
+      } catch (error) {
+        console.error("Error al comprobar asignaciones de la mesa:", error);
+        setAsignacionesSeleccionada(0);
+      }
+    } else {
+      setAsignacionesSeleccionada(0);
+    }
+    setShowDeleteDialog(true);
+  }, [selectedElement]);
+
+  // Eliminar elemento seleccionado
+  const handleDeleteSelected = useCallback(async () => {
+    if (!selectedElement) return;
+
     if (selectedElement.tipo === "mesa") {
-      setMesasCanvas((prev) => prev.filter((m) => m.id !== selectedElement.id));
-      canvasRef.current?.removeElement(selectedElement.id);
+      if (esMesaNoPersistida(selectedElement.id)) {
+        // Mesa temporal (nunca guardada): solo hay que quitarla del estado local.
+        setMesasCanvas((prev) => prev.filter((m) => m.id !== selectedElement.id));
+        canvasRef.current?.removeElement(selectedElement.id);
+      } else {
+        // Mesa ya persistida en BBDD: antes esto solo la quitaba del canvas y
+        // reaparecía en el próximo "Guardar"/recarga porque nunca se borraba
+        // de verdad. Reutilizamos la misma mutación que usa PanelLateral.
+        try {
+          await eliminarMesa.mutateAsync(selectedElement.id);
+        } catch (error) {
+          console.error("Error al eliminar mesa:", error);
+          toast.error("Error al eliminar la mesa");
+          return;
+        }
+        setMesasCanvas((prev) => prev.filter((m) => m.id !== selectedElement.id));
+        canvasRef.current?.removeElement(selectedElement.id);
+        // useEliminarMesa ya muestra su propio toast de éxito: no dupliques con
+        // el genérico de abajo.
+        setSelectedElement(null);
+        setShowDeleteDialog(false);
+        return;
+      }
     } else {
       setElementos((prev) => prev.filter((e) => e.id !== selectedElement.id));
       canvasRef.current?.removeElement(selectedElement.id);
@@ -282,7 +516,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     setSelectedElement(null);
     setShowDeleteDialog(false);
     toast.success("Elemento eliminado");
-  }, [selectedElement]);
+  }, [selectedElement, eliminarMesa]);
 
   if (loadingPlano || loadingMesas) {
     return (
@@ -343,10 +577,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowClearDialog(true)}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAbrirClearDialog}
             className="rounded-lg text-destructive hover:text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" />
@@ -360,10 +594,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       </div>
 
       {/* Toolbar */}
-      <ToolbarDibujo 
-        activeTool={activeTool} 
+      <ToolbarDibujo
+        activeTool={activeTool}
         onToolChange={setActiveTool}
-        onDeleteSelected={() => selectedElement ? setShowDeleteDialog(true) : null}
+        onDeleteSelected={() => { if (selectedElement) handleAbrirDeleteDialog(); }}
         hasSelection={!!selectedElement}
         showMeasurements={showMeasurements}
         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
@@ -411,7 +645,16 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
           onUnmergeMesa={(mesaId) => {
-            canvasRef.current?.unmergeMesa(mesaId);
+            const nuevasMesas = canvasRef.current?.unmergeMesa(mesaId);
+            if (nuevasMesas && nuevasMesas.length > 0 && !esMesaNoPersistida(mesaId)) {
+              // La mesa fusionada ya estaba guardada en BBDD: al pulsar
+              // "Guardar" hay que repuntar sus asignaciones y borrar su fila
+              // (antes se perdía sin más al no rastrearse este caso).
+              setPendingUnmerges(prev => [
+                ...prev,
+                { mesaId, nuevosMesaIds: nuevasMesas.map(m => m.id) },
+              ]);
+            }
             setSelectedElement(null);
           }}
           onRemoveElement={(id) => {
@@ -430,18 +673,58 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
 
       {/* Dialog de confirmación para limpiar */}
-      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+      <AlertDialog
+        open={showClearDialog}
+        onOpenChange={(open) => {
+          setShowClearDialog(open);
+          if (!open) {
+            setClearCounts(null);
+            setClearConfirmChecked(false);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Limpiar todo el plano?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará TODOS los elementos del plano incluyendo paredes, áreas, puertas y 
-              <strong> todas las mesas guardadas en la base de datos</strong>. Esta acción no se puede deshacer.
+            <AlertDialogDescription asChild>
+              <div>
+                <p>
+                  Esta acción eliminará TODOS los elementos del plano incluyendo paredes, áreas, puertas y{" "}
+                  <strong>todas las mesas guardadas en la base de datos</strong>. Esta acción no se puede deshacer.
+                </p>
+                {clearCounts && clearCounts.total > 0 && (
+                  <p className="mt-2">
+                    Se van a perder <strong>{clearCounts.total}</strong> asignación(es) de reserva a mesa
+                    {clearCounts.futuras > 0 && (
+                      <>
+                        , de las cuales <strong>{clearCounts.futuras}</strong> son de reservas de hoy o futuras
+                      </>
+                    )}
+                    .
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {clearCounts && clearCounts.futuras > 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+              <Checkbox
+                id="confirmar-limpiar-futuras"
+                checked={clearConfirmChecked}
+                onCheckedChange={(checked) => setClearConfirmChecked(checked === true)}
+              />
+              <Label htmlFor="confirmar-limpiar-futuras" className="text-sm font-normal">
+                Entiendo que se perderán {clearCounts.futuras} reserva(s) de hoy o futuras con mesa asignada
+              </Label>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClear} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleClear}
+              disabled={!!clearCounts && clearCounts.futuras > 0 && !clearConfirmChecked}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Limpiar todo
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -454,10 +737,16 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este elemento?</AlertDialogTitle>
             <AlertDialogDescription>
-              {selectedElement?.tipo === "mesa" 
+              {selectedElement?.tipo === "mesa"
                 ? `Se eliminará la mesa "${selectedElement?.nombre || 'seleccionada'}".`
                 : `Se eliminará el elemento de tipo "${selectedElement?.tipo || 'seleccionado'}".`
               }
+              {selectedElement?.tipo === "mesa" && asignacionesSeleccionada > 0 && (
+                <>
+                  {" "}Tiene <strong>{asignacionesSeleccionada}</strong> reserva(s) asignada(s) que se
+                  desvincularán de la mesa.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

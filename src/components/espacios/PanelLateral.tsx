@@ -9,6 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink, Tag, X } from "lucide-react";
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
+import { esMesaNoPersistida } from "./planoUtils";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -66,9 +68,32 @@ export function PanelLateral({
     }
   };
   const [mesaToDelete, setMesaToDelete] = useState<{ id: string; nombre: string } | null>(null);
+  const [asignacionesMesaToDelete, setAsignacionesMesaToDelete] = useState(0);
 
   const crearMesa = useCrearMesa();
   const eliminarMesa = useEliminarMesa();
+
+  // Antes de pedir confirmación para eliminar, si la mesa ya está persistida
+  // en BBDD comprobamos cuántas reservas tiene asignadas para avisar: antes
+  // se podía borrar sin darse cuenta de que había reservas con esa mesa.
+  const handleAbrirEliminarMesa = async (mesa: { id: string; nombre: string }) => {
+    if (!esMesaNoPersistida(mesa.id)) {
+      try {
+        const { count, error } = await supabase
+          .from("asignaciones_mesa")
+          .select("id", { count: "exact", head: true })
+          .eq("mesa_id", mesa.id);
+        if (error) throw error;
+        setAsignacionesMesaToDelete(count || 0);
+      } catch (error) {
+        console.error("Error al comprobar asignaciones de la mesa:", error);
+        setAsignacionesMesaToDelete(0);
+      }
+    } else {
+      setAsignacionesMesaToDelete(0);
+    }
+    setMesaToDelete(mesa);
+  };
 
   const handleAddMesa = async () => {
     if (!newMesa.nombre.trim()) {
@@ -120,7 +145,7 @@ export function PanelLateral({
 
     try {
       // Si es una mesa temporal, solo quitarla del estado local
-      if (mesaToDelete.id.startsWith("mesa-temp-") || mesaToDelete.id.startsWith("mesa-grupo-")) {
+      if (esMesaNoPersistida(mesaToDelete.id)) {
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
         onRemoveElement?.(mesaToDelete.id);
         onSelectionChange(null);
@@ -136,6 +161,7 @@ export function PanelLateral({
       toast.error("Error al eliminar la mesa");
     } finally {
       setMesaToDelete(null);
+      setAsignacionesMesaToDelete(0);
     }
   };
 
@@ -244,7 +270,7 @@ export function PanelLateral({
                     variant="destructive"
                     size="sm"
                     className={`h-7 text-xs ${selectedElement.isMerged ? 'flex-1' : 'w-full'}`}
-                    onClick={() => setMesaToDelete({ id: selectedElement.id, nombre: selectedElement.nombre })}
+                    onClick={() => handleAbrirEliminarMesa({ id: selectedElement.id, nombre: selectedElement.nombre })}
                   >
                     <Trash2 className="h-3 w-3 mr-1" />
                     Eliminar
@@ -462,12 +488,26 @@ export function PanelLateral({
       </Collapsible>
 
       {/* Dialog de confirmación para eliminar mesa */}
-      <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
+      <AlertDialog
+        open={!!mesaToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMesaToDelete(null);
+            setAsignacionesMesaToDelete(0);
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar esta mesa?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará la mesa "{mesaToDelete?.nombre}". Esta acción no se puede deshacer.
+              {asignacionesMesaToDelete > 0 && (
+                <>
+                  {" "}Tiene <strong>{asignacionesMesaToDelete}</strong> reserva(s) asignada(s) que se
+                  desvincularán de la mesa.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

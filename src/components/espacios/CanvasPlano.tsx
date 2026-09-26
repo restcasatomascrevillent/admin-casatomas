@@ -4,6 +4,7 @@ import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, P
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
+import { calcularPuntosAbsolutosPared, calcularGeometriaRect, type Matrix2D } from "./planoUtils";
 
 interface CanvasPlanoProps {
   pixelsPerMeter: number;
@@ -29,9 +30,12 @@ export interface CanvasPlanoRef {
   removeElement: (id: string) => void;
   getCanvas: () => HTMLCanvasElement | null;
   setZoom: (zoom: number) => void;
-  unmergeMesa: (mesaId: string) => void;
+  /** Desagrupa una mesa fusionada y devuelve las mesas resultantes (o null si no había nada que desagrupar). */
+  unmergeMesa: (mesaId: string) => MesaCanvas[] | null;
   updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => void;
   centerOnContent: () => void;
+  /** Renombra el id (temporal -> real de BBDD) de una mesa ya presente en el canvas, en su objeto y en su etiqueta/bocadillo asociados. */
+  renameMesaId: (oldId: string, newId: string) => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -189,10 +193,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       onZoomChange?.(clampedZoom);
     },
     unmergeMesa: (mesaId: string) => {
-      if (!fabricCanvas) return;
-      
+      if (!fabricCanvas) return null;
+
       const mesaAgrupada = mesasCanvasRef.current.find(m => m.id === mesaId);
-      if (!mesaAgrupada || !mesaAgrupada.isMerged || !mesaAgrupada.originalMesas) return;
+      if (!mesaAgrupada || !mesaAgrupada.isMerged || !mesaAgrupada.originalMesas) return null;
       
       // Eliminar la mesa agrupada del canvas
       const objectsToRemove = fabricCanvas.getObjects().filter(o => {
@@ -334,6 +338,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       onMesasChange(updatedMesas);
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
+
+      // Devolver las mesas nuevas: el llamador (EditorPlanoEspacio) necesita
+      // saber si `mesaId` estaba persistida en BBDD para, al guardar, repuntar
+      // sus asignaciones_mesa a la primera mesa resultante y borrar su fila.
+      return newMesas;
+    },
+    renameMesaId: (oldId: string, newId: string) => {
+      if (!fabricCanvas) return;
+      fabricCanvas.getObjects().forEach((obj) => {
+        const customData = (obj as any).customData;
+        if (!customData) return;
+        if (customData.tipo === "mesa" && customData.id === oldId) {
+          customData.id = newId;
+        } else if (customData.parentId === oldId) {
+          customData.parentId = newId;
+        }
+      });
     },
     updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => {
       if (!fabricCanvas) return;
@@ -1175,6 +1196,68 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           
           // Verificar si se puede fusionar con otra mesa cercana
           setTimeout(() => checkAndMergeTables(canvas, target), 50);
+        } else if (customData?.tipo === "wall") {
+          // Pared: al mover/rotar/estirar sus controles, Fabric solo actualiza
+          // left/top/scaleX/scaleY/angle — x1..y2 originales quedan igual en
+          // el objeto. Hay que recalcular los extremos absolutos con la
+          // matriz de transformación para poder persistirlos (si no, "Guardar"
+          // nunca reflejaba el movimiento de una pared).
+          const line = target as InstanceType<typeof Line>;
+          const puntosLocales = line.calcLinePoints();
+          const matriz = line.calcTransformMatrix() as unknown as Matrix2D;
+          const { x1, y1, x2, y2 } = calcularPuntosAbsolutosPared(matriz, puntosLocales);
+
+          const currentElementos = elementosRef.current;
+          onElementosChange(
+            currentElementos.map((e) =>
+              e.id === customData.id ? { ...e, props: { ...e.props, x1, y1, x2, y2 } } : e
+            )
+          );
+
+          // Recolor según el nuevo ángulo y mover/regenerar su cota
+          const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+          line.set({ stroke: getWallLevelColor(angle) });
+
+          canvas.getObjects().forEach((obj) => {
+            const cd = (obj as any).customData;
+            if (cd?.tipo === "cota" && cd?.parentId === customData.id) {
+              canvas.remove(obj);
+            }
+          });
+          createWallCota(canvas, x1, y1, x2, y2, customData.id);
+
+          canvas.renderAll();
+        } else if (customData?.tipo === "area" || customData?.tipo === "door") {
+          // Área o puerta: hornear la escala del resize en width/height reales
+          // para que "Guardar" persista el nuevo tamaño/posición/rotación
+          // (antes no se hacía nada y el cambio se perdía al recargar el plano).
+          const rectObj = target as InstanceType<typeof Rect>;
+          const geometria = calcularGeometriaRect({
+            left: rectObj.left,
+            top: rectObj.top,
+            width: rectObj.width,
+            height: rectObj.height,
+            scaleX: rectObj.scaleX,
+            scaleY: rectObj.scaleY,
+            angle: rectObj.angle,
+          });
+
+          // Hornear la escala en el objeto para que no se acumule en futuros resizes
+          rectObj.set({
+            width: geometria.width,
+            height: geometria.height,
+            scaleX: 1,
+            scaleY: 1,
+          });
+
+          const currentElementos = elementosRef.current;
+          onElementosChange(
+            currentElementos.map((e) =>
+              e.id === customData.id ? { ...e, props: { ...e.props, ...geometria } } : e
+            )
+          );
+
+          canvas.renderAll();
         }
       }
     });
@@ -1386,10 +1469,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (elementosEnCanvas.has(elem.id)) return;
       
       let obj: FabricObject | null = null;
-      const x1 = elem.props?.x1 || elem.x1 || 0;
-      const y1 = elem.props?.y1 || elem.y1 || 0;
-      const x2 = elem.props?.x2 || elem.x2 || 0;
-      const y2 = elem.props?.y2 || elem.y2 || 0;
+      // OJO: usar ?? y no || — una pared/área en x=0 o y=0 es una posición
+      // válida, no "sin valor" (con || se perdía y se colapsaba a 0/undefined
+      // de forma casual, o se leía el campo equivocado si props.x1 era 0).
+      const x1 = elem.props?.x1 ?? elem.x1 ?? 0;
+      const y1 = elem.props?.y1 ?? elem.y1 ?? 0;
+      const x2 = elem.props?.x2 ?? elem.x2 ?? 0;
+      const y2 = elem.props?.y2 ?? elem.y2 ?? 0;
+      const anguloGuardado = elem.props?.angle ?? elem.angle ?? 0;
 
       switch (elem.tipo) {
         case "wall": {
@@ -1410,10 +1497,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         }
         case "area":
           obj = new Rect({
-            left: elem.props?.left || elem.left,
-            top: elem.props?.top || elem.top,
-            width: elem.props?.width || elem.width,
-            height: elem.props?.height || elem.height,
+            left: elem.props?.left ?? elem.left ?? 0,
+            top: elem.props?.top ?? elem.top ?? 0,
+            width: elem.props?.width ?? elem.width,
+            height: elem.props?.height ?? elem.height,
+            angle: anguloGuardado,
             fill: "rgba(59, 130, 246, 0.08)",
             stroke: "#3b82f6",
             strokeWidth: 2,
@@ -1424,10 +1512,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           break;
         case "door":
           obj = new Rect({
-            left: elem.props?.left || elem.left,
-            top: elem.props?.top || elem.top,
-            width: elem.props?.width || elem.width || 60,
-            height: elem.props?.height || elem.height || 12,
+            left: elem.props?.left ?? elem.left ?? 0,
+            top: elem.props?.top ?? elem.top ?? 0,
+            width: elem.props?.width ?? elem.width ?? 60,
+            height: elem.props?.height ?? elem.height ?? 12,
+            angle: anguloGuardado,
             fill: "#fef3c7",
             stroke: "#d97706",
             strokeWidth: 2,
@@ -1699,9 +1788,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         // Saltar si ya está en el canvas o en el estado local
         if (mesasEnCanvas.has(mesa.id) || mesasLocalesIds.has(mesa.id)) return;
 
-      // Las posiciones vienen en metros desde la BD
-      const posXMeters = mesa.pos_x || 0.5;
-      const posYMeters = mesa.pos_y || 0.5;
+      // Las posiciones vienen en metros desde la BD. OJO: usar ?? y no || —
+      // una mesa guardada en x=0 o y=0 (pegada al borde) es una posición
+      // válida, no "sin posición".
+      const posXMeters = mesa.pos_x ?? 0.5;
+      const posYMeters = mesa.pos_y ?? 0.5;
       const anchoCm = mesa.ancho || 80;
       const altoCm = mesa.alto || 80;
 
@@ -1992,10 +2083,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   };
 
-  // Función para crear cota (anotación de medida) en una pared
-  const createWallCota = (x1: number, y1: number, x2: number, y2: number, wallId: string) => {
-    if (!fabricCanvas) return;
-    
+  // Función para crear cota (anotación de medida) en una pared.
+  // OJO: recibe `canvas` como parámetro en vez de usar el estado `fabricCanvas`
+  // capturado por closure — el handler de object:modified para paredes vive en
+  // el efecto que crea el canvas (deps [canvasWidth, canvasHeight], no depende
+  // de `fabricCanvas`), así que esa closure quedaría con `fabricCanvas` desactualizado
+  // (null o una instancia ya `dispose()`ada) y la cota nunca se añadiría al mover/redimensionar una pared.
+  const createWallCota = (canvas: FabricCanvas, x1: number, y1: number, x2: number, y2: number, wallId: string) => {
+
     const dx = x2 - x1;
     const dy = y2 - y1;
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
@@ -2032,7 +2127,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     (cotaText as any).customData = { tipo: "cota", parentId: wallId };
     (cotaText as any).isCota = true;
-    fabricCanvas.add(cotaText);
+    canvas.add(cotaText);
   };
 
   const finishWallDrawing = () => {
@@ -2086,7 +2181,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(wall);
       
       // Añadir cota a la pared
-      createWallCota(x1, y1, x2, y2, id);
+      createWallCota(fabricCanvas, x1, y1, x2, y2, id);
       
       newElementos.push({
         id,
