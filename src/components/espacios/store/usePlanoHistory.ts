@@ -20,6 +20,13 @@ import {
 export interface PlanoSnapshot {
   elementos: unknown[];
   mesasCanvas: unknown[];
+  /**
+   * Desagrupes pendientes (mesas fusionadas ya persistidas en BBDD que el
+   * usuario desagrupó en esta sesión — ver EditorPlanoEspacio.pendingUnmerges).
+   * Opcional para no romper snapshots más simples (tests, otros consumidores):
+   * si el consumidor no la usa, undo/redo simplemente no la toca.
+   */
+  pendingUnmerges?: unknown[];
 }
 
 export interface UsePlanoHistoryResult {
@@ -37,17 +44,19 @@ export interface UsePlanoHistoryResult {
 
 /**
  * Hook de historial undo/redo (past/present/future, límite `limit`) para el
- * editor de plano. Ver AVISO en el reporte de la Fase 2: por ahora este hook
- * está TESTEADO pero NO está cableado dentro de `EditorPlanoEspacio.tsx` —
- * la restauración de un snapshot antiguo requeriría poder "recargar" el
- * canvas de Fabric.js desde un `elementos`/`mesasCanvas` arbitrario, y el
- * efecto que hoy carga elementos en `CanvasPlano.tsx` (líneas ~1599-1704)
- * está escrito para SOLO AÑADIR objetos que aún no existen en el canvas, no
- * para reconciliar (quitar los que ya no deberían estar) ni para
- * re-ejecutarse cuando cambia `elementos` desde fuera (sus deps son
- * `[fabricCanvas, planoConfig, pixelsPerMeter]`, no `elementos`). Cablear
- * undo/redo de verdad necesita antes una función de "recarga completa" en
- * `CanvasPlanoRef` — ver detalles en el informe final.
+ * editor de plano. Cableado en `EditorPlanoEspacio.tsx`: cada cambio
+ * confirmado (no las posiciones intermedias de un arrastre) hace `commit()`
+ * de un snapshot `{ elementos, mesasCanvas, pendingUnmerges }`; undo/redo
+ * restauran ese snapshot en React y piden a `CanvasPlanoRef.reloadFromSnapshot`
+ * que reconstruya el canvas de Fabric.js desde cero (clear + recrear), ya que
+ * el efecto de "cargar elementos" de `CanvasPlano.tsx` solo AÑADE objetos que
+ * faltan y no reconcilia. La carga inicial desde BBDD y el estado justo tras
+ * "Guardar" usan `reset()` en vez de `commit()`, para que no se pueda deshacer
+ * más allá de lo ya persistido. Las acciones que escriben en BBDD de forma
+ * inmediata (Limpiar, eliminar mesa persistida, "Añadir Mesa" del panel
+ * lateral) también usan `reset()` — un undo no puede revertir un DELETE/INSERT
+ * ya confirmado en BBDD sin re-ejecutar la mutación, así que se tratan como
+ * no deshacibles y se avisa con un toast.
  */
 export function usePlanoHistory(
   inicial: PlanoSnapshot,

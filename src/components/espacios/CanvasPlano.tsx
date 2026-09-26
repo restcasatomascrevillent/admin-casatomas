@@ -67,6 +67,17 @@ export interface CanvasPlanoRef {
   centerOnContent: () => void;
   /** Renombra el id (temporal -> real de BBDD) de una mesa ya presente en el canvas, en su objeto y en su etiqueta/bocadillo asociados. */
   renameMesaId: (oldId: string, newId: string) => void;
+  /**
+   * Vacía el canvas (igual que clearCanvas, sin tocar el grid) y lo
+   * reconstruye por completo a partir de un snapshot arbitrario de
+   * `elementos`/`mesasCanvas` — la operación que necesita undo/redo, que NO
+   * puede resolverse con el efecto de "cargar elementos" (ese solo AÑADE lo
+   * que falta, nunca reconcilia quitando lo que ya no debería estar). NO
+   * actualiza el estado de React (elementos/mesasCanvas): eso lo hace el
+   * llamador. Preserva el viewport (zoom/pan) actual y descarta la selección
+   * activa.
+   */
+  reloadFromSnapshot: (snapshot: { elementos: ElementoCanvas[]; mesasCanvas: MesaCanvas[] }) => void;
 }
 
 export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
@@ -406,6 +417,181 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         }
       });
     },
+    reloadFromSnapshot: (snapshot: { elementos: ElementoCanvas[]; mesasCanvas: MesaCanvas[] }) => {
+      if (!fabricCanvas) return;
+
+      // Los objetos que pudiera referenciar la selección activa van a
+      // desaparecer con el clear de abajo.
+      fabricCanvas.discardActiveObject();
+
+      // Quitar TODO excepto el grid (misma lógica que clearCanvas, pero sin
+      // notificar al padre — el estado de React lo gestiona el llamador).
+      fabricCanvas.getObjects()
+        .filter((obj) => !(obj as any).isGrid)
+        .forEach((obj) => fabricCanvas.remove(obj));
+
+      // Cancelar cualquier dibujo en curso (pared a medio trazar, etc.): un
+      // undo/redo a media acción de dibujo la descarta sin dejar basura.
+      tempLinesRef.current = [];
+      wallPointsRef.current = [];
+      previewLineRef.current = null;
+      measureTextRef.current = null;
+      setSnapIndicator(fabricCanvas, null);
+      clearAlignmentGuides(fabricCanvas);
+
+      // Adelantar los refs antes de reconstruir: si el usuario interactúa con
+      // el canvas antes de que React re-renderice con el nuevo estado, estos
+      // refs (que leen los handlers de mouse) ya deben reflejar el snapshot
+      // recién aplicado. También evita que el efecto de carga de mesas desde
+      // BD (mesasInitializedRef) vuelva a intentar cargar mesasDB por encima.
+      elementosRef.current = snapshot.elementos;
+      mesasCanvasRef.current = snapshot.mesasCanvas;
+      mesasInitializedRef.current = true;
+
+      // --- Reconstruir elementos (paredes/áreas/puertas), reusando el mismo
+      // switch que el efecto de carga inicial (líneas "Cargar elementos"). ---
+      snapshot.elementos.forEach((elem: any) => {
+        let obj: FabricObject | null = null;
+        const x1 = elem.props?.x1 ?? elem.x1 ?? 0;
+        const y1 = elem.props?.y1 ?? elem.y1 ?? 0;
+        const x2 = elem.props?.x2 ?? elem.x2 ?? 0;
+        const y2 = elem.props?.y2 ?? elem.y2 ?? 0;
+        const anguloGuardado = elem.props?.angle ?? elem.angle ?? 0;
+
+        switch (elem.tipo) {
+          case "wall":
+            obj = new Line([x1, y1, x2, y2], {
+              stroke: WALL_COLOR,
+              strokeWidth: getWallStrokeWidth(),
+              strokeLineCap: "square",
+              selectable: true,
+              hasControls: true,
+            });
+            break;
+          case "area":
+            obj = new Rect({
+              left: elem.props?.left ?? elem.left ?? 0,
+              top: elem.props?.top ?? elem.top ?? 0,
+              width: elem.props?.width ?? elem.width,
+              height: elem.props?.height ?? elem.height,
+              angle: anguloGuardado,
+              fill: "rgba(59, 130, 246, 0.08)",
+              stroke: "#3b82f6",
+              strokeWidth: 2,
+              strokeDashArray: [8, 4],
+              rx: 4,
+              ry: 4,
+            });
+            break;
+          case "door":
+            obj = new Rect({
+              left: elem.props?.left ?? elem.left ?? 0,
+              top: elem.props?.top ?? elem.top ?? 0,
+              width: elem.props?.width ?? elem.width ?? DOOR_WIDTH_METERS * pixelsPerMeterRef.current,
+              height: elem.props?.height ?? elem.height ?? DOOR_LEAF_THICKNESS_PX,
+              angle: anguloGuardado,
+              fill: "#fef3c7",
+              stroke: "#d97706",
+              strokeWidth: 2,
+              rx: 2,
+              ry: 2,
+            });
+            break;
+        }
+
+        if (!obj) return;
+        (obj as any).customData = { tipo: elem.tipo, id: elem.id };
+        fabricCanvas.add(obj);
+
+        if (elem.tipo === "wall") {
+          createWallCota(fabricCanvas, x1, y1, x2, y2, elem.id);
+        }
+
+        if (elem.tipo === "door") {
+          const doorRect = obj as InstanceType<typeof Rect>;
+          createDoorSwing(
+            fabricCanvas,
+            elem.id,
+            doorRect.left ?? 0,
+            doorRect.top ?? 0,
+            doorRect.width ?? DOOR_WIDTH_METERS * pixelsPerMeterRef.current,
+            doorRect.height ?? DOOR_LEAF_THICKNESS_PX,
+            anguloGuardado
+          );
+        }
+      });
+
+      // --- Reconstruir mesas, reusando exactamente los mismos helpers que
+      // usa el resto del componente para crear/etiquetar mesas. ---
+      snapshot.mesasCanvas.forEach((mesa) => {
+        const ppm = pixelsPerMeterRef.current;
+        const posXPixels = mesa.posX * ppm;
+        const posYPixels = mesa.posY * ppm;
+        const anchoPixels = (mesa.ancho / 100) * ppm;
+        const altoPixels = (mesa.alto / 100) * ppm;
+
+        const obj = createMesaTableObject({
+          id: mesa.id,
+          nombre: mesa.nombre,
+          capacidad: mesa.capacidad,
+          forma: mesa.forma,
+          anchoCm: mesa.ancho,
+          altoCm: mesa.alto,
+          posXPixels,
+          posYPixels,
+          rotacion: mesa.rotacion ?? 0,
+          isMerged: mesa.isMerged,
+          originalMesas: mesa.originalMesas,
+        });
+        fabricCanvas.add(obj);
+        renderSillasMesa(fabricCanvas, obj);
+
+        if (mesa.isMerged) {
+          const anchoM = (mesa.ancho / 100).toFixed(2);
+          const altoM = (mesa.alto / 100).toFixed(2);
+          const dimensionText = `${anchoM}x${altoM}m`;
+          const centerX = posXPixels + anchoPixels / 2;
+          const centerY = posYPixels + altoPixels / 2;
+          const minDimension = Math.min(anchoPixels, altoPixels);
+          const fontSize = Math.max(5, Math.min(10, minDimension / 8));
+
+          const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
+            left: centerX,
+            top: centerY,
+            fontSize,
+            fontFamily: "system-ui, sans-serif",
+            fontWeight: "600",
+            fill: "#166534",
+            textAlign: "center",
+            selectable: false,
+            evented: false,
+            originX: "center",
+            originY: "center",
+          });
+          (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
+          (label as any).isMesaLabel = true;
+          fabricCanvas.add(label);
+        } else {
+          createMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
+        }
+
+        if (mesa.etiqueta) {
+          createMesaBocadillo(mesa.id, mesa.etiqueta, posXPixels, posYPixels, anchoPixels, altoPixels);
+        }
+      });
+
+      // Respetar el toggle de "mostrar medidas" tal como estaba (las cotas se
+      // acaban de recrear siempre visibles).
+      if (!showMeasurements) {
+        fabricCanvas.getObjects().forEach((obj) => {
+          if ((obj as any).isCota) obj.visible = false;
+        });
+      }
+
+      // El viewport (zoom/pan) no se toca en ningún punto de arriba: se
+      // preserva tal cual estaba.
+      fabricCanvas.renderAll();
+    },
     updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => {
       if (!fabricCanvas) return;
       
@@ -611,7 +797,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         }
       }
     }
-  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
+  }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight, showMeasurements]);
 
   // Grosor de pared a escala real (~15cm), constante para todas.
   const getWallStrokeWidth = () => WALL_THICKNESS_METERS * pixelsPerMeterRef.current;

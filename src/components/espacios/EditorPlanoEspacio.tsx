@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
 import { PanelLateral } from "./PanelLateral";
+import { usePlanoHistory, type PlanoSnapshot } from "./store/usePlanoHistory";
+import { decidirModoSnapshot } from "./store/historySnapshotMode";
 import {
   esMesaTemporal,
   esMesaGrupoNueva,
@@ -104,6 +106,182 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const guardarPlano = useCrearOActualizarPlano();
   const actualizarMesas = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
+
+  // --- Historial undo/redo -------------------------------------------------
+  // Mantenemos elementos/mesasCanvas/pendingUnmerges como los únicos estados
+  // "fuente de verdad" (igual que antes de esto); el historial se sincroniza
+  // con ellos mediante un efecto reactivo en vez de envolver cada setter uno
+  // a uno — así cualquier sitio que ya llama a setElementos/setMesasCanvas/
+  // setPendingUnmerges (CanvasPlano, PanelLateral, este mismo componente)
+  // queda cubierto automáticamente.
+  const elementosRef = useRef(elementos);
+  const mesasCanvasRef = useRef(mesasCanvas);
+  const pendingUnmergesRef = useRef(pendingUnmerges);
+  useEffect(() => { elementosRef.current = elementos; }, [elementos]);
+  useEffect(() => { mesasCanvasRef.current = mesasCanvas; }, [mesasCanvas]);
+  useEffect(() => { pendingUnmergesRef.current = pendingUnmerges; }, [pendingUnmerges]);
+
+  const history = usePlanoHistory({ elementos: [], mesasCanvas: [], pendingUnmerges: [] });
+
+  // true mientras se hidrata el estado inicial desde BBDD: ningún cambio
+  // durante esta ventana debe registrarse en el historial. En cuanto se
+  // asienta (ver efecto de abajo) se hace un RESET —no un commit— para que
+  // ese sea el punto de partida y no se pueda deshacer más allá de él.
+  const isHydratingRef = useRef(true);
+  // true durante el guardado (handleSave): puede disparar varios
+  // setElementos/setMesasCanvas/setPendingUnmerges en renders sucesivos
+  // (renombrar ids temporales uno a uno) — se ignoran todos y al final se
+  // hace un único RESET con el estado ya persistido (ver saveGeneration).
+  const suppressHistoryRef = useRef(false);
+  // true mientras se aplica un snapshot de undo/redo al estado de React —
+  // evita que ese propio cambio de estado se registre como un commit nuevo.
+  const isApplyingHistoryRef = useRef(false);
+  // "commit" (normal) o "reset" (se consume una sola vez): las acciones que
+  // ya escriben en BBDD de forma inmediata (Limpiar, eliminar mesa
+  // persistida, "Añadir Mesa" del panel lateral) llaman a
+  // `marcarNoDeshacible()` antes de su cambio de estado correspondiente, así
+  // ese cambio se convierte en la nueva base no deshacible en vez de un paso
+  // de historial más.
+  const nextSnapshotModeRef = useRef<"commit" | "reset">("commit");
+  const pendingResetToastRef = useRef(false);
+  // Último snapshot ya reflejado en el historial (el que nosotros mismos
+  // acabamos de commitear/resetear) — permite distinguir, en el efecto que
+  // aplica undo/redo, un cambio de `history.present` causado por un undo/redo
+  // real de uno causado por nuestro propio commit/reset (misma referencia).
+  const lastAppliedPresentRef = useRef<PlanoSnapshot>(history.present);
+  const [saveGeneration, setSaveGeneration] = useState(0);
+
+  // Marca el PRÓXIMO cambio de elementos/mesasCanvas/pendingUnmerges como "no
+  // deshacible": en vez de un paso de historial, se convierte en la nueva
+  // base y se avisa con un toast. Pensado para acciones que ya escribieron en
+  // BBDD de forma inmediata (no diferida a "Guardar").
+  const marcarNoDeshacible = useCallback(() => {
+    nextSnapshotModeRef.current = "reset";
+    pendingResetToastRef.current = true;
+  }, []);
+
+  // Asienta el estado inicial cargado de BBDD como línea base del historial
+  // (RESET, no commit). OJO: no basta un timeout desde el montaje — mientras
+  // loadingPlano/loadingMesas sean true (la query de red puede tardar mucho
+  // más que unos ms) hay que seguir considerando "hidratación" en curso, o
+  // el primer undo real del usuario podría acabar borrando todo el plano
+  // cargado (ver AVISO en el informe de esta fase). CanvasPlano solo se monta
+  // cuando ambas ya son false (ver el `return` de más abajo), así que su
+  // propia hidratación —síncrona, sobre datos ya en memoria, sin más
+  // esperas de red— ocurre en los primeros efectos tras ese momento: 50ms de
+  // margen desde ahí es de sobra.
+  useEffect(() => {
+    if (loadingPlano || loadingMesas) {
+      isHydratingRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      isHydratingRef.current = false;
+      const snapshot: PlanoSnapshot = {
+        elementos: elementosRef.current,
+        mesasCanvas: mesasCanvasRef.current,
+        pendingUnmerges: pendingUnmergesRef.current,
+      };
+      history.reset(snapshot);
+      lastAppliedPresentRef.current = snapshot;
+    }, 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [espacioId, loadingPlano, loadingMesas]);
+
+  // Registra en el historial cada cambio "confirmado" de elementos/mesas/
+  // pendingUnmerges. object:moving (arrastre en curso) nunca llama a
+  // setElementos/setMesasCanvas desde CanvasPlano, solo object:modified (al
+  // soltar) lo hace — así que este efecto nunca se dispara a mitad de un
+  // arrastre, solo en pasos ya confirmados.
+  useEffect(() => {
+    const modo = decidirModoSnapshot({
+      isHydrating: isHydratingRef.current,
+      suppressed: suppressHistoryRef.current,
+      isApplyingHistory: isApplyingHistoryRef.current,
+      modoSolicitado: nextSnapshotModeRef.current,
+    });
+
+    if (modo === "skip") {
+      if (isApplyingHistoryRef.current) isApplyingHistoryRef.current = false;
+      return;
+    }
+
+    const snapshot: PlanoSnapshot = { elementos, mesasCanvas, pendingUnmerges };
+
+    if (modo === "reset") {
+      history.reset(snapshot);
+      nextSnapshotModeRef.current = "commit";
+      if (pendingResetToastRef.current) {
+        pendingResetToastRef.current = false;
+        toast.info("Esta acción no se puede deshacer.");
+      }
+    } else {
+      history.commit(snapshot);
+    }
+    lastAppliedPresentRef.current = snapshot;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementos, mesasCanvas, pendingUnmerges]);
+
+  // Tras un guardado completo (handleSave), asienta el estado ya persistido
+  // como nueva base no deshacible: los ids temporales ya renombrados a
+  // reales y pendingUnmerges vaciado no deben poder "deshacerse" hacia el
+  // estado pre-guardado (eso dejaría ids de canvas/BBDD desincronizados).
+  useEffect(() => {
+    if (saveGeneration === 0) return;
+    suppressHistoryRef.current = false;
+    const snapshot: PlanoSnapshot = {
+      elementos: elementosRef.current,
+      mesasCanvas: mesasCanvasRef.current,
+      pendingUnmerges: pendingUnmergesRef.current,
+    };
+    history.reset(snapshot);
+    lastAppliedPresentRef.current = snapshot;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveGeneration]);
+
+  // Aplica un snapshot de undo/redo real (detectado por desigualdad de
+  // referencia contra el último que nosotros mismos commiteamos/reseteamos)
+  // al estado de React y reconstruye el canvas desde cero.
+  useEffect(() => {
+    if (isHydratingRef.current) return;
+    if (history.present === lastAppliedPresentRef.current) return;
+
+    isApplyingHistoryRef.current = true;
+    lastAppliedPresentRef.current = history.present;
+
+    const snapshotElementos = (history.present.elementos as ElementoCanvas[]) ?? [];
+    const snapshotMesas = (history.present.mesasCanvas as MesaCanvas[]) ?? [];
+    const snapshotPendingUnmerges =
+      (history.present.pendingUnmerges as typeof pendingUnmerges) ?? [];
+
+    setElementos(snapshotElementos);
+    setMesasCanvas(snapshotMesas);
+    setPendingUnmerges(snapshotPendingUnmerges);
+    setSelectedElement(null);
+    canvasRef.current?.reloadFromSnapshot({ elementos: snapshotElementos, mesasCanvas: snapshotMesas });
+  }, [history.present]);
+
+  // Bloquear undo/redo mientras `handleSave` está en curso: ese guardado
+  // renombra ids temporales -> reales en varios pasos (uno por mesa, con
+  // `setMesasCanvas(prev => ...)` leyendo el `prev` más reciente) y usa
+  // `suppressHistoryRef` para que esos renombrados no generen commits — pero
+  // `suppressHistoryRef` NO impide que `history.undo()/redo()` se disparen
+  // igualmente. Un Ctrl+Z a mitad de guardado reemplazaría mesasCanvas/
+  // elementos por un snapshot antiguo justo cuando el siguiente paso del
+  // bucle de guardado va a hacer `setMesasCanvas(prev => prev.map(...))`
+  // sobre ese `prev` ya desincronizado del guardado en curso, dejando canvas
+  // y BBDD con ids distintos. El botón "Guardar" ya se deshabilita con
+  // `isSaving`; aquí se aplica la misma condición a deshacer/rehacer.
+  const handleUndo = useCallback(() => {
+    if (isSaving || !history.puedeDeshacer) return;
+    history.undo();
+  }, [history, isSaving]);
+
+  const handleRedo = useCallback(() => {
+    if (isSaving || !history.puedeRehacer) return;
+    history.redo();
+  }, [history, isSaving]);
 
   // Repunta las asignaciones_mesa de `mesaOrigenId` hacia `mesaDestinoId` (fusión:
   // originales -> mesa fusionada; desagrupar: mesa fusionada eliminada -> primera
@@ -218,6 +396,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   // Guardar plano
   const handleSave = useCallback(async () => {
     setIsSaving(true);
+    // Guardar renombra ids temporales -> reales en varios pasos (uno por
+    // mesa, cada uno tras su propio await de inserción) y vacía
+    // pendingUnmerges: nada de eso debe registrarse como pasos de historial
+    // deshacibles. Se ignoran todos hasta el reset final (ver saveGeneration).
+    suppressHistoryRef.current = true;
     try {
       // Calcular tamaño del canvas en píxeles
       const canvasWidth = realDimensions.width * PIXELS_PER_METER;
@@ -409,6 +592,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       toast.error("Error al guardar el plano");
     } finally {
       setIsSaving(false);
+      // Siempre (éxito o error): asienta el estado actual como nueva base no
+      // deshacible y reactiva el registro de historial. Si se hiciera solo en
+      // el camino de éxito, un error a mitad de guardado dejaría
+      // suppressHistoryRef atascado en `true` para siempre.
+      setSaveGeneration((v) => v + 1);
     }
   }, [espacioId, elementos, mesasCanvas, realDimensions, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
 
@@ -485,6 +673,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       if (error) throw error;
 
+      // El DELETE de arriba ya se ejecutó en BBDD: este cambio de estado no
+      // puede ser un paso de historial deshacible (deshacerlo no resucitaría
+      // las filas ya borradas), así que se convierte en la nueva base.
+      marcarNoDeshacible();
+
       // Limpiar estado local
       setElementos([]);
       setMesasCanvas([]);
@@ -503,7 +696,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       console.error("Error al limpiar:", error);
       toast.error("Error al eliminar las mesas");
     }
-  }, [espacioId, refetchMesas]);
+  }, [espacioId, refetchMesas, marcarNoDeshacible]);
 
   // Antes de abrir el diálogo de eliminar un elemento, si es una mesa ya
   // persistida en BBDD, contar sus asignaciones_mesa para avisar al usuario.
@@ -547,6 +740,9 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           toast.error("Error al eliminar la mesa");
           return;
         }
+        // El DELETE de arriba ya se ejecutó en BBDD: no puede ser un paso de
+        // historial deshacible.
+        marcarNoDeshacible();
         setMesasCanvas((prev) => prev.filter((m) => m.id !== selectedElement.id));
         canvasRef.current?.removeElement(selectedElement.id);
         // useEliminarMesa ya muestra su propio toast de éxito: no dupliques con
@@ -562,7 +758,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     setSelectedElement(null);
     setShowDeleteDialog(false);
     toast.success("Elemento eliminado");
-  }, [selectedElement, eliminarMesa]);
+  }, [selectedElement, eliminarMesa, marcarNoDeshacible]);
 
   // Atajos de teclado: coinciden con los que ya anunciaban los tooltips de la
   // barra de herramientas pero que hasta ahora no hacían nada (S/W/A/M/C/D,
@@ -573,7 +769,6 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       // Con cualquier diálogo (Alert)Dialog abierto — el de "Limpiar"/"Eliminar
       // elemento" de aquí mismo, o el de "Eliminar mesa" de PanelLateral, que
@@ -581,8 +776,29 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       // debe cambiar de herramienta ni reabrir el diálogo por detrás: antes
       // escribir "d" para confirmar mentalmente "delete" mientras el diálogo
       // tenía el foco (en un botón, no en un input) cambiaba la herramienta a
-      // "puerta" sin que el usuario se diera cuenta.
-      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      // "puerta" sin que el usuario se diera cuenta. Por el mismo motivo,
+      // tampoco debe deshacer/rehacer por detrás del diálogo.
+      const dialogAbierto = !!document.querySelector('[role="dialog"], [role="alertdialog"]');
+
+      // Deshacer/rehacer: Ctrl/Cmd+Z (deshacer), Ctrl/Cmd+Shift+Z o Ctrl+Y
+      // (rehacer) — antes de la comprobación genérica de Ctrl/Cmd/Alt de abajo,
+      // que si no los descartaría sin hacer nada.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === "z" || key === "y") {
+          if (dialogAbierto) return;
+          e.preventDefault();
+          if (key === "y" || (key === "z" && e.shiftKey)) {
+            handleRedo();
+          } else {
+            handleUndo();
+          }
+          return;
+        }
+      }
+
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (dialogAbierto) return;
 
       switch (e.key.toLowerCase()) {
         case "s":
@@ -620,7 +836,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedElement, handleAbrirDeleteDialog]);
+  }, [selectedElement, handleAbrirDeleteDialog, handleUndo, handleRedo]);
 
   if (loadingPlano || loadingMesas) {
     return (
@@ -709,6 +925,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         showMeasurements={showMeasurements}
         onToggleMeasurements={() => setShowMeasurements(!showMeasurements)}
         onCenterPlan={() => canvasRef.current?.centerOnContent()}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        puedeDeshacer={history.puedeDeshacer && !isSaving}
+        puedeRehacer={history.puedeRehacer && !isSaving}
       />
 
       {/* Main content */}
@@ -752,6 +972,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           pixelsPerMeter={PIXELS_PER_METER}
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
+          marcarNoDeshacible={marcarNoDeshacible}
           onUnmergeMesa={(mesaId) => {
             const nuevasMesas = canvasRef.current?.unmergeMesa(mesaId);
             if (nuevasMesas && nuevasMesas.length > 0 && !esMesaNoPersistida(mesaId)) {

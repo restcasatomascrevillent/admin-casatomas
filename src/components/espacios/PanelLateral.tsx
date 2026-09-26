@@ -10,6 +10,7 @@ import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, L
 import { useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
 import { esMesaNoPersistida } from "./planoUtils";
+import { mensajeNombreMesaDuplicado, nombreMesaDuplicado } from "./nombresMesa";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -33,6 +34,13 @@ interface PanelLateralProps {
   onUnmergeMesa?: (mesaId: string) => void;
   onRemoveElement?: (id: string) => void;
   onUpdateMesaEtiqueta?: (mesaId: string, etiqueta: string | null) => void;
+  /**
+   * Marca el PRÓXIMO cambio de mesasCanvas como "no deshacible": llamar justo
+   * antes de un `onMesasChange` que refleja una escritura en BBDD ya
+   * ejecutada (crear/eliminar mesa), para que ese cambio se convierta en la
+   * nueva base del historial en vez de un paso de undo/redo más.
+   */
+  marcarNoDeshacible?: () => void;
 }
 
 export function PanelLateral({
@@ -45,6 +53,7 @@ export function PanelLateral({
   onUnmergeMesa,
   onRemoveElement,
   onUpdateMesaEtiqueta,
+  marcarNoDeshacible,
 }: PanelLateralProps) {
   const [newMesa, setNewMesa] = useState({
     nombre: "",
@@ -101,6 +110,16 @@ export function PanelLateral({
       return;
     }
 
+    // Nombres únicos por espacio (2026-09-26): en producción el Salón acabó
+    // con dos mesas llamadas "9" porque nada lo impedía. La comprobación es
+    // contra las mesas ya en el canvas de este espacio (`mesasCanvas`), que
+    // incluye tanto las persistidas como las que se acaban de dibujar y aún
+    // no se han guardado.
+    if (nombreMesaDuplicado(newMesa.nombre, mesasCanvas)) {
+      toast.error(mensajeNombreMesaDuplicado(newMesa.nombre));
+      return;
+    }
+
     try {
       const result = await crearMesa.mutateAsync({
         espacio_id: espacioId,
@@ -125,6 +144,9 @@ export function PanelLateral({
           posX: result.pos_x || 1,
           posY: result.pos_y || 1,
         };
+        // La mesa ya se insertó en BBDD (arriba): este cambio no puede ser un
+        // paso de historial deshacible.
+        marcarNoDeshacible?.();
         onMesasChange([...mesasCanvas, nuevaMesa]);
       }
 
@@ -152,6 +174,9 @@ export function PanelLateral({
       } else {
         // Eliminar de la base de datos
         await eliminarMesa.mutateAsync(mesaToDelete.id);
+        // El DELETE de arriba ya se ejecutó en BBDD: no puede ser un paso de
+        // historial deshacible.
+        marcarNoDeshacible?.();
         onMesasChange(mesasCanvas.filter((m) => m.id !== mesaToDelete.id));
         onRemoveElement?.(mesaToDelete.id);
         onSelectionChange(null);

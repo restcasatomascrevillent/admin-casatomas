@@ -15,6 +15,8 @@ import {
   Trash2,
   Ruler,
   Focus,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 
 export type ToolType = "select" | "wall" | "area" | "mesa-rect" | "mesa-circular" | "door";
@@ -27,6 +29,10 @@ interface ToolbarDibujoProps {
   showMeasurements?: boolean;
   onToggleMeasurements?: () => void;
   onCenterPlan?: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  puedeDeshacer?: boolean;
+  puedeRehacer?: boolean;
 }
 
 interface ToolButton {
@@ -45,14 +51,18 @@ const tools: ToolButton[] = [
   { id: "door", icon: <DoorOpen className="h-4 w-4" />, label: "Puerta", shortcut: "D" },
 ];
 
-export function ToolbarDibujo({ 
-  activeTool, 
-  onToolChange, 
-  onDeleteSelected, 
+export function ToolbarDibujo({
+  activeTool,
+  onToolChange,
+  onDeleteSelected,
   hasSelection,
   showMeasurements = true,
   onToggleMeasurements,
   onCenterPlan,
+  onUndo,
+  onRedo,
+  puedeDeshacer = false,
+  puedeRehacer = false,
 }: ToolbarDibujoProps) {
   return (
     <TooltipProvider delayDuration={300}>
@@ -76,6 +86,44 @@ export function ToolbarDibujo({
         ))}
 
         <Separator orientation="vertical" className="h-6 mx-2" />
+
+        {(onUndo || onRedo) && (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onUndo}
+                  disabled={!puedeDeshacer}
+                  className="h-9 w-9 p-0"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Deshacer <span className="text-muted-foreground ml-1">(Ctrl+Z)</span></p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRedo}
+                  disabled={!puedeRehacer}
+                  className="h-9 w-9 p-0"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Rehacer <span className="text-muted-foreground ml-1">(Ctrl+Shift+Z)</span></p>
+              </TooltipContent>
+            </Tooltip>
+            <Separator orientation="vertical" className="h-6 mx-2" />
+          </>
+        )}
 
         {onToggleMeasurements && (
           <Tooltip>
