@@ -205,6 +205,7 @@ export default function Espacios() {
             if (!open) setEspacioEditando(null);
           }}
           espacio={espacioEditando}
+          onEspacioCreado={(e) => setEspacioConfigurando({ id: e.id, nombre: e.nombre })}
         />
 
         <AlertDialog open={!!espacioAEliminar} onOpenChange={() => setEspacioAEliminar(null)}>
