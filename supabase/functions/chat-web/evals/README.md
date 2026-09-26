@@ -200,3 +200,9 @@ la estructura y que todas las regex compilan. Las aserciones del escenario se ap
 respuesta; para comprobar un turno intermedio usa `"esperado": { ... }` dentro de ese turno. Un turno con
 `"veces": N` se repite N veces en la misma sesión, y `"mensaje": {"repetir": "texto ", "hasta": 600}` genera
 un mensaje largo.
+
+Antes de evaluar, `run.mjs` **normaliza** la respuesta (el informe guarda el texto original): apóstrofos y
+comillas tipográficas (`’ ‘ “ ”`) → `' "`, espacios/guiones no separables → normales, sin `**`/`__`, y
+`11:30 p.m.` / `p. m.` / `a.m.` tras un número → `11:30 pm` / `am`. Escribe las regex contra ese texto
+normalizado (p. ej. `don't`, no `don[’']t`). Cualquier `{{X}}` que no sea macro ni variable de entorno
+conocida es un error del `--dry-run`, y si falta una variable el escenario queda en `SKIP`, nunca en `FAIL`.

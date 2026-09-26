@@ -127,7 +127,7 @@
       "categoria": "info",
       "descripcion": "Friday hours in English",
       "turnos": [{ "mensaje": "What are your opening hours on Friday?" }],
-      "debe_contener": ["9[:.]00|9 ?am", "23[:.]30|11[:.]30 ?pm"],
+      "debe_contener": ["9[:.]00|9\\s?a\\.?\\s?m(?!\\p{L})", "23[:.]30|11[:.]30\\s?p\\.?\\s?m(?!\\p{L})"],
       "solo_horas_validas": true,
       "idioma_esperado": "en",
       "max_palabras": 70,
@@ -513,7 +513,7 @@
         { "mensaje": "Hola, ¿qué horario tenéis el sábado?", "esperado": { "idioma_esperado": "es" } },
         { "mensaje": "Sorry, I don't speak Spanish. What time do you close on Saturday?" }
       ],
-      "debe_contener": ["23[:.]30|11[:.]30 ?pm"],
+      "debe_contener": ["23[:.]30|11[:.]30\\s?p\\.?\\s?m(?!\\p{L})"],
       "idioma_esperado": "en",
       "max_palabras": 70,
       "criterio_juez": "La segunda respuesta está en INGLÉS (el usuario dijo que no habla español) y da el cierre del sábado 23:30.",

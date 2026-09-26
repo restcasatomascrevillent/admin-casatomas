@@ -182,6 +182,24 @@ function generarMensaje(m) {
   return s.slice(0, hasta);
 }
 
+/**
+ * Normaliza una respuesta ANTES de evaluarla (el texto original se guarda tal
+ * cual en el informe). Evita falsos negativos por tipografía del modelo:
+ *   - apóstrofos tipográficos (’ ‘ ʼ ′ → ') y comillas (“ ” „ ″ → "); « » se dejan
+ *   - espacios no separables / finos → espacio normal; guiones no separables → "-"
+ *   - negrita/cursiva Markdown (** __) fuera
+ *   - "11:30 p.m.", "11:30 p. m.", "9 a.m." → "11:30 pm", "9 am" (tras un dígito)
+ */
+export function normalizarRespuesta(t) {
+  return String(t ?? "")
+    .replace(/[\u2018\u2019\u201A\u201B\u02BC\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+    .replace(/[\u00A0\u2007\u2009\u200A\u202F]/g, " ")
+    .replace(/[\u2010\u2011]/g, "-")
+    .replace(/\*\*|__/g, "")
+    .replace(/(\d)\s*([ap])\.\s?m\.?(?![\p{L}\d])/giu, (_, d, ap) => `${d} ${ap.toLowerCase()}m`);
+}
+
 function contarPalabras(t) {
   return String(t).split(/\s+/).filter((w) => /[\p{L}\d]/u.test(w)).length;
 }
@@ -265,8 +283,17 @@ function validar(doc) {
   const macros = meta.macros ?? {};
   // Valores ficticios para poder compilar las regex aunque falten variables.
   const varsFicticias = { PLATO: "Plato", DO: "Rioja", PLATO_PRECIO_RE: "1[.,]00" };
+  // Plantillas {{X}} que no son ni macro ni variable de entorno conocida:
+  // error de escritura en escenarios.json (antes acababan en FAIL confusos).
+  const conocidas = new Set([...Object.keys(macros), ...Object.keys(varsFicticias)]);
+  const revisarPlantillas = (str, donde) => {
+    for (const m of String(str ?? "").matchAll(/\{\{(\w+)\}\}/g)) {
+      if (!conocidas.has(m[1])) errores.push(`${donde}: plantilla desconocida {{${m[1]}}}`);
+    }
+  };
 
   const probarRegex = (p, donde) => {
+    revisarPlantillas(p, donde);
     const { valor } = sustituir(p, "regex", macros, varsFicticias);
     try {
       compilar(valor);
@@ -318,11 +345,13 @@ function validar(doc) {
       const okMensaje = typeof m === "string" ||
         (m && typeof m.repetir === "string" && m.repetir.length > 0 && Number.isInteger(m.hasta) && m.hasta > 0);
       if (!okMensaje) errores.push(`${dt}: mensaje debe ser string o {repetir, hasta}`);
+      else revisarPlantillas(typeof m === "string" ? m : m.repetir, `${dt}.mensaje`);
       if (t?.idiom !== undefined && !IDIOMAS.includes(t.idiom)) errores.push(`${dt}: idiom inválido`);
       if (t?.veces !== undefined && !(Number.isInteger(t.veces) && t.veces >= 1)) errores.push(`${dt}: veces >= 1`);
       if (t?.esperado) validarAserciones(t.esperado, `${dt}.esperado`);
     }
     validarAserciones(e, donde);
+    revisarPlantillas(e.criterio_juez, `${donde}.criterio_juez`);
     const tieneAsercion = CLAVES_ASERCION.some((k) => e[k] !== undefined) || e.criterio_juez;
     if (!tieneAsercion) avisos.push(`${donde}: no tiene ninguna aserción`);
     if (!e.sin_modelo && !e.limites && !e.criterio_juez) avisos.push(`${donde}: sin criterio_juez`);
@@ -378,7 +407,21 @@ function planificar(doc, opts) {
       };
     }
     const globales = e.sin_modelo ? [] : compilarLista(doc._meta?.no_debe_contener_global);
-    const criterio = e.criterio_juez ? sustituir(e.criterio_juez, "texto", macros, vars).valor : null;
+    let criterio = null;
+    if (e.criterio_juez) {
+      const s = sustituir(e.criterio_juez, "texto", macros, vars);
+      s.faltan.forEach((k) => faltan.add(k));
+      criterio = s.valor;
+    }
+    // Red de seguridad genérica: cualquier {{X}} que siga sin resolver en un
+    // mensaje, una regex o el criterio deja el escenario en SKIP (con motivo),
+    // nunca en FAIL por comparar contra el literal "{{X}}".
+    const restos = [
+      ...turnos.map((t) => t.mensaje),
+      ...turnos.flatMap((t) => Object.values(t.re ?? {}).flat().filter((x) => !x.re).map((x) => x.fuente)),
+      criterio ?? "",
+    ].join("\n").matchAll(/\{\{(\w+)\}\}/g);
+    for (const m of restos) if (!(m[1] in macros)) faltan.add(m[1]);
 
     plan.push({ e, turnos, globales, criterio, faltan: [...faltan] });
   }
@@ -463,7 +506,8 @@ function evaluarTurno(turno, r, globales, horasValidas) {
   const notas = [];
   const esp = turno.esperado ?? {};
   const body = r.json ?? {};
-  const texto = typeof body.respuesta === "string" ? body.respuesta : "";
+  // Se evalúa sobre el texto NORMALIZADO; el informe guarda el original.
+  const texto = normalizarRespuesta(typeof body.respuesta === "string" ? body.respuesta : "");
 
   const successEsperado = esp.success_esperado ?? (esp.codigo_esperado ? false : true);
   if (body.success !== successEsperado) fallos.push(`success=${body.success}, se esperaba ${successEsperado}`);
@@ -851,4 +895,4 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   );
 }
 
-export { validar, planificar, evaluarTurno, precioARegex, contarPalabras };
+export { validar, planificar, evaluarTurno, precioARegex, contarPalabras, sustituir };
