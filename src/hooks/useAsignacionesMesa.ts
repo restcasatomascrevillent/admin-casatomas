@@ -48,21 +48,20 @@ export function useAsignacionesMesa(fecha?: string, espacioId?: string) {
           )
         `);
 
+      // Filtrar por fecha y espacio en el propio servidor (PostgREST) en vez de
+      // descargar todas las asignaciones y filtrar en JS.
+      if (fecha) {
+        query = query.eq("reservas.fecha", fecha);
+      }
+
+      if (espacioId) {
+        query = query.eq("mesas.espacio_id", espacioId);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filtrar por fecha y espacio en JS ya que el join es complejo
-      let filtered = data || [];
-      
-      if (fecha) {
-        filtered = filtered.filter((a: any) => a.reservas.fecha === fecha);
-      }
-      
-      if (espacioId) {
-        filtered = filtered.filter((a: any) => a.mesas.espacio_id === espacioId);
-      }
-
-      return filtered as AsignacionConDetalles[];
+      return (data || []) as AsignacionConDetalles[];
     },
     enabled: true,
   });

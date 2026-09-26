@@ -518,7 +518,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     alto: 80,
   });
 
-  const fechaActual = fecha || new Date().toISOString().split("T")[0];
+  const fechaActual = fecha || new Date().toLocaleDateString("sv-SE");
 
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
