@@ -68,6 +68,7 @@ import { ControlLlegada } from "./ControlLlegada";
 import { BlacklistModal } from "./BlacklistModal";
 import {
   ANCHO_COLUMNA_PLEGADA,
+  accionesSoloIcono,
   calcularDisposicion,
   type DisposicionKanban,
   type ItemColumna,
@@ -119,6 +120,7 @@ function ReservaCard({
   onToggleImportante,
   onBlacklist,
   isDragOverlay,
+  anchoColumna,
 }: {
   reserva: ReservaServicio;
   columnas: Columna[];
@@ -127,8 +129,16 @@ function ReservaCard({
   onToggleImportante: (reserva: ReservaServicio) => void;
   onBlacklist: (reserva: ReservaServicio) => void;
   isDragOverlay?: boolean;
+  /**
+   * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
+   * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
+   * en la misma pantalla conviven Casa Tomás (5 columnas) y Touza (3), así que
+   * sus columnas miden distinto y cada una decide por su cuenta.
+   */
+  anchoColumna?: number;
 }) {
   const movible = puedeMoverReserva(reserva.estado);
+  const soloIcono = accionesSoloIcono(anchoColumna);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
@@ -154,11 +164,83 @@ function ReservaCard({
   const marcaReserva = marcaDeReserva(reserva as { marca?: string | null });
   const destinos = columnas.filter((c) => c.id !== columnaActual && c.marca === marcaReserva);
 
+  // El menú «…» de la tarjeta. En columnas estrechas baja a la fila de
+  // acciones para dejarle al NOMBRE todo el ancho de la cabecera: con el menú
+  // arriba (más la estrella y el asa) al nombre le quedaban 10px a 124px de
+  // columna, o sea "L…". Abajo comparte fila con los iconos de llegada, que
+  // ahí sí sobra sitio.
+  const menuAcciones = (
+    <div
+      className="flex items-center shrink-0"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground"
+            aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
+          >
+            {acciones.estaEnCurso(reserva.id) ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <MoreVertical className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
+            <MoveRight className="h-3.5 w-3.5" />
+            Mover a…
+          </DropdownMenuLabel>
+          {movible ? (
+            destinos.map((c) => (
+              <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
+                {c.title}
+                {c.capacidadMax ? (
+                  <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
+                ) : null}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <DropdownMenuItem disabled>No se puede mover en este estado</DropdownMenuItem>
+          )}
+          {reserva.telefono && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <a href={`tel:${reserva.telefono}`}>
+                  <Phone className="h-3.5 w-3.5 mr-2" />
+                  Llamar
+                </a>
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => onBlacklist(reserva)} className="text-destructive focus:text-destructive">
+            <ShieldBan className="h-3.5 w-3.5 mr-2" />
+            Añadir a blacklist
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {/* Asa decorativa: se retira en columnas estrechas, donde esos 16px son
+          la diferencia entre ver el nombre y no verlo. La tarjeta entera
+          sigue siendo arrastrable. */}
+      {movible && !soloIcono && (
+        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
+      )}
+    </div>
+  );
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        "p-2.5 sm:p-3 rounded-lg border bg-card transition-shadow duration-200 group outline-none",
+        "rounded-lg border bg-card transition-shadow duration-200 group outline-none",
+        soloIcono ? "p-2" : "p-2.5 sm:p-3",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         movible ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30" : "cursor-default opacity-60",
         isDragging && "opacity-30 border-dashed border-primary/40",
@@ -182,7 +264,7 @@ function ReservaCard({
           >
             <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
           </button>
-          {/* `title`: con las columnas estrechas (160–220px) los nombres largos
+          {/* `title`: con las columnas estrechas (112–220px) los nombres largos
               se cortan con puntos suspensivos; el completo se lee al pasar el
               ratón, además de estar en el `aria-label` de la tarjeta. */}
           <span className="font-semibold text-sm truncate" title={reserva.nombre || "Sin nombre"}>
@@ -192,69 +274,20 @@ function ReservaCard({
             <ShieldBan className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="En lista negra" />
           )}
         </div>
-        <div
-          className="flex items-center shrink-0"
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground"
-                aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
-              >
-                {acciones.estaEnCurso(reserva.id) ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <MoreVertical className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
-                <MoveRight className="h-3.5 w-3.5" />
-                Mover a…
-              </DropdownMenuLabel>
-              {movible ? (
-                destinos.map((c) => (
-                  <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
-                    {c.title}
-                    {c.capacidadMax ? (
-                      <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
-                    ) : null}
-                  </DropdownMenuItem>
-                ))
-              ) : (
-                <DropdownMenuItem disabled>No se puede mover en este estado</DropdownMenuItem>
-              )}
-              {reserva.telefono && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <a href={`tel:${reserva.telefono}`}>
-                      <Phone className="h-3.5 w-3.5 mr-2" />
-                      Llamar
-                    </a>
-                  </DropdownMenuItem>
-                </>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onBlacklist(reserva)} className="text-destructive focus:text-destructive">
-                <ShieldBan className="h-3.5 w-3.5 mr-2" />
-                Añadir a blacklist
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {movible && (
-            <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
-          )}
-        </div>
+        {!soloIcono && menuAcciones}
       </div>
       <ContenidoTarjeta reserva={reserva} estadoInfo={estadoInfo} sinCabecera />
-      <ControlLlegada reserva={reserva} acciones={acciones} compacto className="mt-2" />
+      {soloIcono ? (
+        /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el
+           suelo de ancho de columna lo marca el elemento suelto más ancho y no
+           la fila entera. */
+        <div className="flex flex-wrap items-center gap-1 mt-2">
+          <ControlLlegada reserva={reserva} acciones={acciones} compacto soloIcono />
+          {menuAcciones}
+        </div>
+      ) : (
+        <ControlLlegada reserva={reserva} acciones={acciones} compacto className="mt-2" />
+      )}
     </div>
   );
 }
@@ -431,7 +464,7 @@ function KanbanColumn({
           recortado; `truncate` no servía de nada ahí dentro. Volviéndolo un
           bloque normal, la tarjeta mide lo que la columna y el nombre se corta
           con puntos suspensivos, como estaba previsto. Se notaba poco con
-          columnas de 224px y mucho al bajar el mínimo a 160. */}
+          columnas de 224px y mucho al bajar el mínimo. */}
       <ScrollArea
         className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block"
         style={{ maxHeight: alturaMaxima }}
@@ -466,7 +499,7 @@ function KanbanColumn({
  * Fila de columnas de UN negocio. Cumple los dos encargos del dueño:
  *
  *   · TODAS las columnas a la vista a la vez (2026-09-26). Ninguna se pliega
- *     sola: el ancho mínimo por columna es 160px, así que las 5 de Casa Tomás
+ *     sola: el ancho mínimo por columna es 112px, así que las 5 de Casa Tomás
  *     caben enteras en cualquier escritorio. Antes se plegaban solas las
  *     columnas vacías a un carril de 52px y, a 1456px, el dueño se encontraba
  *     con cuatro carriles y una sola columna abierta — "cuando abro todos se
@@ -1025,6 +1058,7 @@ export function GestorReservasKanban() {
                             onMover={solicitarMovimiento}
                             onToggleImportante={toggleImportante}
                             onBlacklist={setBlacklistReserva}
+                            anchoColumna={disposicion.anchoColumna}
                           />
                         ))}
                       </KanbanColumn>

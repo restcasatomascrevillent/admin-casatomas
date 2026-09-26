@@ -16,8 +16,10 @@
 //      borde del scroll y se veía medio título y media barra de aforo.
 //
 // Los dos encargos conviven porque el ancho mínimo por columna es bajo
-// (ANCHO_MIN_COLUMNA, 160px): con las 5 columnas de Casa Tomás caben enteras a
-// partir de ~864px útiles, o sea en cualquier escritorio. Solo si NI ASÍ caben
+// (ANCHO_MIN_COLUMNA, 112px): con las 5 columnas de Casa Tomás caben enteras a
+// partir de 624px útiles, o sea en cualquier escritorio desde 1024px. Para que
+// eso no sea a costa de la tarjeta, la botonera se queda en iconos cuando la
+// columna baja de ANCHO_MIN_BOTON_CON_TEXTO. Solo si NI ASÍ caben
 // (pantalla muy estrecha, o alguien añade muchos espacios) se recurre al
 // desplazamiento con imán, que es lo que garantiza que nada quede a medias.
 //
@@ -52,29 +54,60 @@
 export const GAP_KANBAN = 16;
 
 /**
- * Ancho mínimo de una columna, 160px. Sale de medir la tarjeta, no de un gusto:
- * la fila de acciones («Ha llegado» + el menú de tres puntos) necesita ~116px
- * de contenido y la columna añade ~44px de cromo (borde 2+2, `p-2` del cuerpo,
- * `p-3`/borde de la tarjeta). Por debajo de eso el botón «Ha llegado» se sale
- * de la tarjeta.
+ * Ancho mínimo de una columna, 112px. Sale de MEDIR la tarjeta en el
+ * navegador, no de la aritmética ni de un gusto (2026-09-26):
  *
- * Bajó de 224 a 160 el 2026-09-26: con 224 las 5 columnas de Casa Tomás
- * (Sin asignar + Comedor + Reservado + Salón + Terraza) pedían 1184px y a
- * 1456px de ventana solo hay ~1134 útiles (menos sidebar 256, padding 48 y el
- * marco del grupo 18). Faltaban 50px y eso disparaba toda la cascada de
- * recortes. A 160 piden 864: caben con 270px de sobra.
+ *   · 96px es el suelo duro: por debajo la insignia de estado («Confirmada»,
+ *     la etiqueta más larga) se sale de la tarjeta. Es el primer elemento que
+ *     se recorta, porque todo lo demás o se trunca con puntos suspensivos o
+ *     baja de línea.
+ *   · 112px deja 16px de margen sobre ese suelo —otra fuente o una etiqueta
+ *     más larga no lo tumban— y le da al NOMBRE 34px, que es más o menos donde
+ *     deja de ser un nombre y pasa a ser una inicial. El nombre dispone de
+ *     `ancho de columna − 78`.
+ *
+ * Historia: 224 → 160 → 112. Con 224 las 5 columnas de Casa Tomás (Sin
+ * asignar + Comedor + Reservado + Salón + Terraza) pedían 1184px y a 1456px de
+ * ventana solo hay 1119 útiles, así que se disparaba el plegado automático.
+ * Con 160 caben a 1456 y 1280 pero no a 1024 (687 útiles). Con 112 piden 624 y
+ * caben también a 1024, donde tocan a 124px por columna.
  */
-export const ANCHO_MIN_COLUMNA = 160;
+export const ANCHO_MIN_COLUMNA = 112;
+
+/**
+ * A partir de este ancho de columna la botonera de la tarjeta lleva texto
+ * («Ha llegado»); por debajo se queda en iconos (ver `accionesSoloIcono`).
+ *
+ * 152 y no otro número: medido en el navegador, la versión CON texto cabe
+ * hasta 146px de columna y a 144 el botón empieza a salirse. 152 deja seis
+ * píxeles de margen para no jugárselo al píxel.
+ */
+export const ANCHO_MIN_BOTON_CON_TEXTO = 152;
+
+/**
+ * ¿La botonera de las tarjetas de esta columna va sin textos? La decisión se
+ * toma con el ancho de la COLUMNA, no con el de la ventana: en la misma
+ * pantalla conviven Casa Tomás (5 columnas) y Touza (3), así que sus columnas
+ * miden distinto y cada fila decide por su cuenta.
+ *
+ * `null`/indefinido = no lo sabemos todavía (o la tarjeta no vive en una
+ * columna, como la que se arrastra): se asume ancho de sobra y va con texto.
+ */
+export function accionesSoloIcono(anchoColumna: number | null | undefined): boolean {
+  if (anchoColumna == null || !Number.isFinite(anchoColumna)) return false;
+  return anchoColumna < ANCHO_MIN_BOTON_CON_TEXTO;
+}
 
 /** Ancho máximo: por encima de esto las tarjetas quedan ridículamente anchas. */
 export const ANCHO_MAX_COLUMNA = 320;
 
 /**
- * Ancho mínimo de emergencia para pantallas absurdamente estrechas (< ~176px
- * útiles), donde respetar ANCHO_MIN_COLUMNA dejaría la columna más ancha que
- * la pantalla — y eso sí se vería cortado.
+ * Suelo duro medido: por debajo de 96px la insignia de estado se sale de la
+ * tarjeta. Solo se llega aquí en pantallas absurdamente estrechas, donde
+ * respetar ANCHO_MIN_COLUMNA dejaría la columna más ancha que la pantalla — y
+ * eso sí se vería cortado.
  */
-const ANCHO_MIN_EMERGENCIA = 130;
+const ANCHO_MIN_EMERGENCIA = 96;
 
 /** Ancho de una columna plegada A MANO (el carril vertical con el nombre girado). */
 export const ANCHO_COLUMNA_PLEGADA = 52;
@@ -177,7 +210,7 @@ export function calcularDisposicion(
   }
 
   // EL CASO QUE MANDA: ¿caben TODAS repartiéndose el hueco? Con el mínimo en
-  // 160px esto es cierto en cualquier escritorio, así que el kanban se queda
+  // 112px esto es cierto en cualquier escritorio, así que el kanban se queda
   // en "ajustado" y no hay ni scroll ni columnas escondidas.
   const anchoSiCaben = (anchoDisponible - anchoCarriles - gaps) / expandidas;
   if (anchoSiCaben >= ANCHO_MIN_COLUMNA) {

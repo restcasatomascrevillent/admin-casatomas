@@ -3,8 +3,10 @@ import * as kanbanLayout from "../kanbanLayout";
 import {
   ANCHO_COLUMNA_PLEGADA,
   ANCHO_MAX_COLUMNA,
+  ANCHO_MIN_BOTON_CON_TEXTO,
   ANCHO_MIN_COLUMNA,
   GAP_KANBAN,
+  accionesSoloIcono,
   anchoParaQueQuepanTodas,
   calcularDisposicion,
   columnasQueCaben,
@@ -119,10 +121,28 @@ describe("todas las columnas visibles a la vez", () => {
     expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(util);
   });
 
-  it("el mínimo por columna es bajo a propósito: 5 columnas caben en menos de 900px útiles", () => {
+  it("a 1024px TAMBIÉN caben las 5 a la vez (con 160 de mínimo no cabían)", () => {
+    const items = cols(CASA_TOMAS);
+    const util = UTILES_POR_VENTANA[1024];
+    const d = calcularDisposicion(items, util);
+    expect(d.modo).toBe("ajustado");
+    expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+    expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(util);
+    // Y ahí la botonera de las tarjetas se queda en iconos, que es lo que hace
+    // posible estrechar tanto sin recortar nada.
+    expect(accionesSoloIcono(d.anchoColumna)).toBe(true);
+  });
+
+  it("el mínimo por columna es bajo a propósito: 5 columnas caben en menos de 700px útiles", () => {
     // Traducción del encargo: antes que esconder una columna, estrecharlas.
-    expect(anchoParaQueQuepanTodas(cols(CASA_TOMAS))).toBeLessThanOrEqual(900);
-    expect(ANCHO_MIN_COLUMNA).toBeLessThanOrEqual(180);
+    expect(anchoParaQueQuepanTodas(cols(CASA_TOMAS))).toBeLessThanOrEqual(700);
+    expect(anchoParaQueQuepanTodas(cols(CASA_TOMAS))).toBeLessThanOrEqual(UTILES_POR_VENTANA[1024]);
+  });
+
+  it("el mínimo no baja del suelo medido en el que la insignia de estado se recorta (96px)", () => {
+    // Medido en navegador: por debajo de 96px de columna, «Confirmada» se sale
+    // de la tarjeta. El mínimo se queda por encima, con margen.
+    expect(ANCHO_MIN_COLUMNA).toBeGreaterThanOrEqual(96);
   });
 
   it("si caben al mínimo, SIEMPRE se muestran todas (nunca se desplaza pudiendo no hacerlo)", () => {
@@ -193,17 +213,87 @@ describe("ninguna columna pasa de su ancho máximo declarado", () => {
     expect(maquetar(d, items).scrollWidth).toBeLessThan(1600);
   });
 
-  it("al tocar el tope, el sobrante se va al hueco y el PASO sigue llenando el viewport", () => {
-    // 330px útiles con 5 columnas: solo cabe una por vista y sin tope mediría
-    // 330 (por encima del máximo). Se recorta a 320 y los 26px restantes pasan
-    // a ser separación, para que el paso siga siendo 346 y no asome media
-    // columna en las paradas.
-    const items = cols(CASA_TOMAS);
-    const d = calcularDisposicion(items, 330);
-    expect(d.anchoColumna).toBe(ANCHO_MAX_COLUMNA);
-    expect(d.margenes["c0"]).toBeGreaterThan(GAP_KANBAN);
-    expect(d.paradas[1] - d.paradas[0]).toBe(d.anchoColumna + d.margenes["c0"]);
-    d.paradas.forEach((_, i) => expect(partidasEn(d, items, i, 330)).toEqual([]));
+  it("el PASO entre paradas siempre llena el viewport, tope o no tope", () => {
+    // Esta es la invariante que protege el recorte al máximo: si el tope se
+    // aplicase al PASO (y no solo al ANCHO), el paso quedaría más corto que el
+    // viewport y volvería a asomar media columna. Se comprueba como propiedad
+    // y no con un ancho concreto porque, con ANCHO_MIN_COLUMNA en 112, el tope
+    // ya no llega a activarse por esta vía: se deja como red de seguridad por
+    // si el mínimo vuelve a subir.
+    for (const items of [cols(CASA_TOMAS), cols(8), cols(12)]) {
+      for (let ancho = 200; ancho <= 1200; ancho += 7) {
+        const d = calcularDisposicion(items, ancho);
+        if (d.modo !== "desplazable" || d.paradas.length < 2) continue;
+        const porVista = d.visiblesPorParada[0].length;
+        const paso = d.paradas[1] - d.paradas[0];
+        expect({ ancho, n: items.length, llena: porVista * paso >= ancho }).toEqual({
+          ancho,
+          n: items.length,
+          llena: true,
+        });
+      }
+    }
+  });
+
+  it("el hueco entre columnas nunca baja de la separación de diseño", () => {
+    for (const items of [cols(CASA_TOMAS), cols(8)]) {
+      for (let ancho = 200; ancho <= 1200; ancho += 11) {
+        const d = calcularDisposicion(items, ancho);
+        const huecos = items.slice(0, -1).map((i) => d.margenes[i.id]);
+        expect({ ancho, min: Math.min(...huecos) >= GAP_KANBAN }).toEqual({ ancho, min: true });
+      }
+    }
+  });
+});
+
+// ============================================================================
+// BOTONERA DE LA TARJETA: TEXTO O SOLO ICONOS
+// ----------------------------------------------------------------------------
+// Encargo del dueño (2026-09-26): antes que esconder columnas, encoger el
+// contenido. Por debajo de cierto ancho de COLUMNA el botón «Ha llegado» se
+// queda en el icono del check (con aria-label y title), y eso es lo que
+// permite que las 5 columnas quepan también a 1024px.
+// ============================================================================
+describe("accionesSoloIcono", () => {
+  it("con columnas anchas la botonera lleva texto", () => {
+    expect(accionesSoloIcono(ANCHO_MIN_BOTON_CON_TEXTO)).toBe(false);
+    expect(accionesSoloIcono(ANCHO_MAX_COLUMNA)).toBe(false);
+    expect(accionesSoloIcono(211)).toBe(false); // 1456px
+    expect(accionesSoloIcono(175)).toBe(false); // 1280px
+  });
+
+  it("con columnas estrechas se queda en iconos", () => {
+    expect(accionesSoloIcono(ANCHO_MIN_BOTON_CON_TEXTO - 1)).toBe(true);
+    expect(accionesSoloIcono(124)).toBe(true); // 1024px
+    expect(accionesSoloIcono(ANCHO_MIN_COLUMNA)).toBe(true);
+  });
+
+  it("sin ancho conocido (tarjeta arrastrándose, primer pintado) va con texto", () => {
+    expect(accionesSoloIcono(undefined)).toBe(false);
+    expect(accionesSoloIcono(null)).toBe(false);
+    expect(accionesSoloIcono(Number.NaN)).toBe(false);
+  });
+
+  it("el umbral deja margen sobre el ancho medido en el que el texto se sale (146px)", () => {
+    // Medido en navegador: con texto, la fila de acciones cabe hasta 146px de
+    // columna y a 144 el botón se sale de la tarjeta.
+    expect(ANCHO_MIN_BOTON_CON_TEXTO).toBeGreaterThan(146);
+  });
+
+  it("el mínimo de columna está por debajo del umbral: nunca hay columna con texto recortado", () => {
+    // Si el mínimo quedase por encima del umbral, habría anchos válidos donde
+    // la botonera lleva texto y no cabe. Esta es la relación que lo impide.
+    expect(ANCHO_MIN_COLUMNA).toBeLessThan(ANCHO_MIN_BOTON_CON_TEXTO);
+    expect(accionesSoloIcono(ANCHO_MIN_COLUMNA)).toBe(true);
+  });
+
+  it("la decisión va por columna, no por fila: dos negocios a la vez pueden diferir", () => {
+    // Misma pantalla (1024px, 687 útiles): Casa Tomás reparte entre 5 columnas
+    // y Touza entre 3, así que una fila va en iconos y la otra con texto.
+    const casaTomas = calcularDisposicion(cols(CASA_TOMAS), UTILES_POR_VENTANA[1024]);
+    const touza = calcularDisposicion(cols(3), UTILES_POR_VENTANA[1024]);
+    expect(accionesSoloIcono(casaTomas.anchoColumna)).toBe(true);
+    expect(accionesSoloIcono(touza.anchoColumna)).toBe(false);
   });
 });
 
