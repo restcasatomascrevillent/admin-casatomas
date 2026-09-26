@@ -3,7 +3,7 @@ import { CabeceraPestana } from "@/components/gestion-web/CabeceraPestana";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Eye, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import {
   configToDraft,
   draftToUpdate,
@@ -14,14 +14,17 @@ import {
 } from "@/hooks/useConfigBotWeb";
 import { usePlatos } from "@/hooks/usePlatos";
 import { useVinos } from "@/hooks/useVinos";
-import { useCanAccessSection } from "@/hooks/useUserRole";
 import { IDIOMAS } from "@/components/bot/constantesBot";
 import { BotIdiomaPanel } from "@/components/bot/BotIdiomaPanel";
 
 type DraftsPorIdioma = Record<IdiomaBotWeb, DraftBotWeb>;
 
 export default function TabBotWeb() {
-  const { canAccess: canEdit } = useCanAccessSection("gestion_bot", "edit");
+  // Esta pestaña ahora solo cuelga de /super-admin/bot-web (SuperAdminRoute),
+  // así que quien la vea ya es super admin: no hace falta comprobar el
+  // permiso de edición de "gestion_bot", que dejó de existir como sección
+  // asignable al mover el Bot Web al Super Admin.
+  const canEdit = true;
   const { configs, isLoading, isError, error, refetch, updateConfig } = useConfigBotWeb();
   const { platos, isLoading: loadingPlatos } = usePlatos();
   const { vinos, isLoading: loadingVinos } = useVinos();
@@ -182,17 +185,6 @@ export default function TabBotWeb() {
             </>
           }
         />
-
-        {!canEdit && (
-          <Alert>
-            <Eye className="h-4 w-4" />
-            <AlertTitle>Modo solo lectura</AlertTitle>
-            <AlertDescription>
-              Puedes consultar la configuración de los 3 idiomas y la vista previa, pero tu usuario no tiene
-              permiso para guardar cambios en esta sección.
-            </AlertDescription>
-          </Alert>
-        )}
 
         <Tabs value={activeIdioma} onValueChange={(v) => setActiveIdioma(v as IdiomaBotWeb)}>
           <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">

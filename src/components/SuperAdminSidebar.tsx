@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingCart, Wallet, Star, Phone, Mail, Activity, MapPin, Users, LogOut, ArrowLeft, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Wallet, Star, Phone, Mail, Activity, MapPin, Bot, Users, LogOut, ArrowLeft, ShieldAlert } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,6 +28,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
   { title: "Plantillas Email", url: "/super-admin/plantillas-email", icon: Mail },
   { title: "Tráfico web", url: "/super-admin/trafico-web", icon: Activity },
   { title: "Espacios", url: "/super-admin/espacios", icon: MapPin },
+  { title: "Bot Web", url: "/super-admin/bot-web", icon: Bot },
 ];
 
 export function SuperAdminSidebar() {

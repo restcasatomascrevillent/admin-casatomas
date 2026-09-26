@@ -27,14 +27,13 @@ export const SECTIONS = [
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
-  { key: "gestion_bot", label: "Gestor Web · Bot web" },
   { key: "marketing", label: "Newsletter" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-// Email, Tráfico web y Espacios se gestionan exclusivamente desde el Super Admin y ya
-// no forman parte del Admin Panel normal.
+// Email, Tráfico web, Espacios y Bot Web se gestionan exclusivamente desde el
+// Super Admin y ya no forman parte del Admin Panel normal.
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 

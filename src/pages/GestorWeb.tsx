@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BookOpen, Bot, CalendarDays, Loader2, Newspaper, UtensilsCrossed } from "lucide-react";
+import { BookOpen, CalendarDays, Loader2, Newspaper, UtensilsCrossed } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -13,34 +13,34 @@ import {
 } from "@/components/gestion-web/pestanasGestorWeb";
 
 // ---------------------------------------------------------------------------
-// Gestor Web: todo lo que se ve en las webs públicas y en el bot de la web.
+// Gestor Web: todo lo que se ve en las webs públicas.
 //
 // Antes eran tres entradas del menú (Gestor Carta, Gestor Web y Gestor Bot
 // Web). Ahora es una página con pestañas; la pestaña va en la URL
-// (?tab=carta|novedades|menus|tapas|bot) para que recargar o compartir el
-// enlace abra la misma pestaña. /gestor-carta y /gestion-bot redirigen aquí.
+// (?tab=carta|novedades|menus|tapas) para que recargar o compartir el
+// enlace abra la misma pestaña. /gestor-carta redirige aquí. El Bot Web se
+// retiró de aquí el 2026-09-26 y pasó a /super-admin/bot-web (exclusivo de
+// Super Admin); /gestion-bot ya no redirige a esta página.
 //
 // Permisos: cada pestaña conserva la sección de permisos que tenía su página
-// (gestor_carta, gestion_web, gestion_bot). Solo se muestran las pestañas que
-// el usuario puede ver; no se amplía el acceso de nadie.
+// (gestor_carta, gestion_web). Solo se muestran las pestañas que el usuario
+// puede ver; no se amplía el acceso de nadie.
 //
 // Las pestañas se cargan bajo demanda (lazy) y, una vez abiertas, se quedan
 // montadas aunque cambies a otra: así no se pierde lo que estuvieras
-// escribiendo (p. ej. los borradores de los 3 idiomas del bot).
+// escribiendo.
 // ---------------------------------------------------------------------------
 
 const TabCarta = lazy(() => import("@/components/gestion-web/tabs/TabCarta"));
 const TabNovedades = lazy(() => import("@/components/gestion-web/tabs/TabNovedades"));
 const TabMenus = lazy(() => import("@/components/gestion-web/tabs/TabMenusTapas").then((m) => ({ default: m.TabMenus })));
 const TabTapas = lazy(() => import("@/components/gestion-web/tabs/TabMenusTapas").then((m) => ({ default: m.TabTapas })));
-const TabBotWeb = lazy(() => import("@/components/gestion-web/tabs/TabBotWeb"));
 
 const COMPONENTES: Record<PestanaGestorWeb, ComponentType> = {
   carta: TabCarta,
   novedades: TabNovedades,
   menus: TabMenus,
   tapas: TabTapas,
-  bot: TabBotWeb,
 };
 
 const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = {
@@ -48,7 +48,6 @@ const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = 
   novedades: Newspaper,
   menus: UtensilsCrossed,
   tapas: CalendarDays,
-  bot: Bot,
 };
 
 const Cargando = () => (
@@ -107,8 +106,7 @@ export default function GestorWeb() {
             que la página cubre DOS webs distintas (Casa Tomás y Touza), algo
             que el menú no dice. */}
         <p className="text-muted-foreground">
-          Todo lo que aparece en las webs de Casa Tomás y Touza y en el bot de la web: carta, novedades, menús,
-          tapas y asistente.
+          Todo lo que aparece en las webs de Casa Tomás y Touza: carta, novedades, menús y tapas.
         </p>
 
         {loading ? (

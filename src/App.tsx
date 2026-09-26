@@ -17,8 +17,9 @@ import Reservas from "./pages/Reservas";
 import PlantillasEmail from "./pages/PlantillasEmail";
 import Espacios from "./pages/Espacios";
 import Ecommerce from "./pages/Ecommerce";
-// Gestor Web unifica Carta, Novedades, Menús, Tapas y Bot web en pestañas
-// (?tab=...). Las rutas antiguas /gestor-carta y /gestion-bot redirigen aquí.
+// Gestor Web unifica Carta, Novedades, Menús y Tapas en pestañas (?tab=...).
+// La ruta antigua /gestor-carta redirige aquí; /gestion-bot redirige ahora a
+// /super-admin/bot-web.
 import GestionWeb from "./pages/GestorWeb";
 import AsistenteTelefonico from "./pages/AsistenteTelefonico";
 import Marketing from "./pages/Marketing";
@@ -31,6 +32,7 @@ import TraficoWeb from "./pages/TraficoWeb";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminPanel from "./pages/SuperAdminPanel";
 import SuperAdminUsuarios from "./pages/SuperAdminUsuarios";
+import SuperAdminBotWeb from "./pages/SuperAdminBotWeb";
 
 const queryClient = new QueryClient();
 
@@ -46,8 +48,8 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
 );
 
 // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
-// Tráfico web y Espacios viven exclusivamente bajo /super-admin/* (ver botón
-// de engranaje en AppSidebar).
+// Tráfico web, Espacios y Bot Web viven exclusivamente bajo /super-admin/*
+// (ver botón de engranaje en AppSidebar).
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
     <SuperAdminRoute>{contenido}</SuperAdminRoute>
@@ -80,7 +82,7 @@ const App = () => (
                   <Route path="/trabajadores" element={<Navigate to="/" replace />} />
                   <Route path="/gestion-web" element={pagina(<GestionWeb />)} />
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
-                  <Route path="/gestion-bot" element={<Navigate to="/gestion-web?tab=bot" replace />} />
+                  <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
@@ -93,6 +95,7 @@ const App = () => (
                   <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
+                  <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
