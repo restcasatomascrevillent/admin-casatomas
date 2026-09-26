@@ -2,8 +2,14 @@
  * Tests para src/components/reservas/GestionMesasEspacios.tsx
  *
  * Estrategia: se mockean los hooks de Supabase (`useMesas`, `useEspaciosReserva`)
- * pero NO la lógica de cuadre (`src/lib/reservas/aforoMesas.ts`), que corre de
- * verdad — así estos tests también cubren que la pantalla lee bien las cifras.
+ * y el permiso (`useSuperAdmin`) pero NO la lógica de cuadre
+ * (`src/lib/reservas/aforoMesas.ts`), que corre de verdad — así estos tests
+ * también cubren que la pantalla lee bien las cifras.
+ *
+ * DECISIÓN DEL DUEÑO (2026-09-26): esta pantalla es de SOLO LECTURA. Las
+ * mesas se crean/editan/borran únicamente en el editor de plano (Super Admin
+ * › Espacios). Aquí solo se comprueba el cuadre de aforo y el botón/nota que
+ * lleva al editor según el permiso del usuario.
  *
  * El escenario por defecto es el ESTADO REAL DE PRODUCCIÓN del 2026-09-26, que
  * es el que motivó el encargo:
@@ -17,21 +23,22 @@
  *   El Reservado (touza)      20 declaradas ·  0 mesas ·  0 plazas
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
+vi.mock("@/hooks/useSuperAdmin");
 
-import {
-  useMesas,
-  useCrearMesa,
-  useActualizarMesa,
-  useEliminarMesa,
-} from "@/hooks/useMesas";
+const navigateMock = vi.fn();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return { ...actual, useNavigate: () => navigateMock };
+});
+
+import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { GestionMesasEspacios } from "@/components/reservas/GestionMesasEspacios";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -98,18 +105,18 @@ const MESAS_PRODUCCION = [
   mesa("m-t3", "e-terraza-ct", "Terraza 3", 4),
 ];
 
-const crearMutate = vi.fn().mockResolvedValue({ id: "m-nueva" });
-const actualizarMutate = vi.fn().mockResolvedValue({ id: "m-c1" });
-const eliminarMutate = vi.fn().mockResolvedValue(undefined);
-
 function montar({
   espacios = ESPACIOS_PRODUCCION,
   mesas = MESAS_PRODUCCION,
   cargando = false,
+  isSuperAdmin = true,
+  cargandoPermiso = false,
 }: {
   espacios?: unknown[];
   mesas?: unknown[];
   cargando?: boolean;
+  isSuperAdmin?: boolean;
+  cargandoPermiso?: boolean;
 } = {}) {
   vi.mocked(useEspaciosReserva).mockReturnValue({
     data: espacios,
@@ -119,19 +126,15 @@ function montar({
     data: mesas,
     isLoading: cargando,
   } as never);
-  vi.mocked(useCrearMesa).mockReturnValue({
-    mutateAsync: crearMutate,
-    isPending: false,
+  vi.mocked(useSuperAdmin).mockReturnValue({
+    isSuperAdmin,
+    loading: cargandoPermiso,
   } as never);
-  vi.mocked(useActualizarMesa).mockReturnValue({
-    mutateAsync: actualizarMutate,
-    isPending: false,
-  } as never);
-  vi.mocked(useEliminarMesa).mockReturnValue({
-    mutateAsync: eliminarMutate,
-    isPending: false,
-  } as never);
-  return render(<GestionMesasEspacios />);
+  return render(
+    <MemoryRouter>
+      <GestionMesasEspacios />
+    </MemoryRouter>,
+  );
 }
 
 /** Bloque (tarjeta) de un espacio, localizado por su nombre visible. */
@@ -147,9 +150,6 @@ function bloqueDe(nombre: string, ocurrencia = 0): HTMLElement {
 describe("GestionMesasEspacios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    crearMutate.mockResolvedValue({ id: "m-nueva" });
-    actualizarMutate.mockResolvedValue({ id: "m-c1" });
-    eliminarMutate.mockResolvedValue(undefined);
   });
 
   // ── Carga y estructura ─────────────────────────────────────────────────────
@@ -180,6 +180,13 @@ describe("GestionMesasEspacios", () => {
     expect(screen.getByText("El Reservado")).toBeInTheDocument();
     // "Terraza" está en los dos negocios
     expect(screen.getAllByText("Terraza")).toHaveLength(2);
+  });
+
+  it('dice en la descripción que las mesas se gestionan en el editor de plano', () => {
+    montar();
+    expect(
+      screen.getByText(/se dan de alta, editan y borran en el plano/i),
+    ).toBeInTheDocument();
   });
 
   // ── El descuadre se ve ─────────────────────────────────────────────────────
@@ -254,7 +261,7 @@ describe("GestionMesasEspacios", () => {
     expect(insigniasBloqueo).toHaveLength(1);
   });
 
-  // ── Mesas: listado ─────────────────────────────────────────────────────────
+  // ── Mesas: listado (solo lectura) ───────────────────────────────────────────
 
   it("lista las mesas de cada espacio con sus plazas", () => {
     montar();
@@ -287,147 +294,49 @@ describe("GestionMesasEspacios", () => {
     expect(within(bloqueDe("Sala X")).getByText("Unida")).toBeInTheDocument();
   });
 
-  // ── Mesas: alta ────────────────────────────────────────────────────────────
-
-  it("da de alta una mesa en el espacio elegido", async () => {
+  it("no ofrece ningún botón de añadir, editar ni borrar una mesa concreta", () => {
     montar();
-    fireEvent.click(within(bloqueDe("Reservado")).getByRole("button", { name: /Añadir mesa/i }));
-
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Nueva mesa");
-    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "  Mesa 1  " } });
-    fireEvent.change(screen.getByLabelText("Plazas"), { target: { value: "6" } });
-    fireEvent.click(screen.getByRole("button", { name: /Crear mesa/i }));
-
-    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
-    expect(crearMutate).toHaveBeenCalledWith({
-      espacio_id: "e-reservado-ct",
-      nombre: "Mesa 1",
-      etiqueta: null,
-      capacidad: 6,
-      forma: "rectangular",
-      activa: true,
-    });
+    expect(screen.queryByRole("button", { name: /Añadir mesa/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Editar (Comedor|Salón|Terraza)/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Borrar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // El único botón "Editar..." que queda es el que lleva al plano, no uno por mesa.
+    const botonesEditar = screen.getAllByRole("button", { name: /^Editar/i });
+    for (const boton of botonesEditar) {
+      expect(boton).toHaveTextContent(/Editar mesas en el plano/i);
+    }
   });
 
-  it("no manda posiciones al crear: eso se hace en el editor de plano", async () => {
-    montar();
-    fireEvent.click(within(bloqueDe("Interior")).getByRole("button", { name: /Añadir mesa/i }));
-    fireEvent.change(await screen.findByLabelText("Nombre"), { target: { value: "Barra" } });
-    fireEvent.click(screen.getByRole("button", { name: /Crear mesa/i }));
+  // ── Acceso al editor de plano ───────────────────────────────────────────────
 
-    await waitFor(() => expect(crearMutate).toHaveBeenCalled());
-    const payload = crearMutate.mock.calls[0][0];
-    expect(payload).not.toHaveProperty("pos_x");
-    expect(payload).not.toHaveProperty("pos_y");
-    expect(payload).not.toHaveProperty("ancho");
-    expect(payload).not.toHaveProperty("alto");
+  it('ofrece "Editar mesas en el plano" cuando el usuario puede entrar a Super Admin', () => {
+    montar({ isSuperAdmin: true });
+    const botones = screen.getAllByRole("button", { name: /Editar mesas en el plano/i });
+    expect(botones.length).toBeGreaterThan(0);
   });
 
-  it("guarda la etiqueta opcional cuando se rellena", async () => {
-    montar();
-    fireEvent.click(within(bloqueDe("Interior")).getByRole("button", { name: /Añadir mesa/i }));
-    fireEvent.change(await screen.findByLabelText("Nombre"), { target: { value: "Mesa 9" } });
-    fireEvent.change(screen.getByLabelText(/Etiqueta/i), { target: { value: "Junto a la ventana" } });
-    fireEvent.click(screen.getByRole("button", { name: /Crear mesa/i }));
-
-    await waitFor(() => expect(crearMutate).toHaveBeenCalled());
-    expect(crearMutate.mock.calls[0][0].etiqueta).toBe("Junto a la ventana");
-  });
-
-  it("no crea la mesa si falta el nombre", async () => {
-    montar();
-    fireEvent.click(within(bloqueDe("Interior")).getByRole("button", { name: /Añadir mesa/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /Crear mesa/i }));
-
-    expect(await screen.findByText(/Ponle un nombre a la mesa/i)).toBeInTheDocument();
-    expect(crearMutate).not.toHaveBeenCalled();
-  });
-
-  it("no crea la mesa si las plazas están fuera de rango", async () => {
-    montar();
-    fireEvent.click(within(bloqueDe("Interior")).getByRole("button", { name: /Añadir mesa/i }));
-    fireEvent.change(await screen.findByLabelText("Nombre"), { target: { value: "Mesa rara" } });
-    fireEvent.change(screen.getByLabelText("Plazas"), { target: { value: "0" } });
-    fireEvent.click(screen.getByRole("button", { name: /Crear mesa/i }));
-
-    expect(await screen.findByText(/Entre 1 y 50 plazas/i)).toBeInTheDocument();
-    expect(crearMutate).not.toHaveBeenCalled();
-  });
-
-  // ── Mesas: edición ─────────────────────────────────────────────────────────
-
-  it("precarga los datos de la mesa al editarla y guarda los cambios", async () => {
-    montar();
+  it("navega al editor del espacio correcto al pulsar el botón", () => {
+    montar({ isSuperAdmin: true });
     fireEvent.click(
-      within(bloqueDe("Comedor")).getByRole("button", { name: "Editar Comedor 1" }),
+      within(bloqueDe("Comedor")).getByRole("button", { name: /Editar mesas en el plano/i }),
     );
-
-    const dialogo = await screen.findByRole("dialog");
-    expect(dialogo).toHaveTextContent("Editar mesa");
-    expect(screen.getByLabelText("Nombre")).toHaveValue("Comedor 1");
-    expect(screen.getByLabelText("Plazas")).toHaveValue(2);
-
-    fireEvent.change(screen.getByLabelText("Plazas"), { target: { value: "4" } });
-    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/i }));
-
-    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
-    expect(actualizarMutate).toHaveBeenCalledWith({
-      id: "m-c1",
-      nombre: "Comedor 1",
-      etiqueta: null,
-      capacidad: 4,
-      forma: "rectangular",
-      activa: true,
-    });
+    expect(navigateMock).toHaveBeenCalledWith("/super-admin/espacios?editar=e-comedor");
   });
 
-  it("permite desactivar una mesa sin borrarla", async () => {
-    montar();
-    fireEvent.click(
-      within(bloqueDe("Comedor")).getByRole("button", { name: "Editar Comedor 1" }),
-    );
-    fireEvent.click(await screen.findByLabelText("Mesa en uso"));
-    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/i }));
-
-    await waitFor(() => expect(actualizarMutate).toHaveBeenCalled());
-    expect(actualizarMutate.mock.calls[0][0].activa).toBe(false);
+  it('muestra una nota en vez del botón cuando el usuario NO puede entrar a Super Admin', () => {
+    montar({ isSuperAdmin: false });
+    expect(
+      screen.queryByRole("button", { name: /Editar mesas en el plano/i }),
+    ).not.toBeInTheDocument();
+    const notas = screen.getAllByText(/Las mesas se gestionan en el plano/i);
+    expect(notas.length).toBeGreaterThan(0);
   });
 
-  it("cierra el diálogo sin guardar al cancelar", async () => {
-    montar();
-    fireEvent.click(within(bloqueDe("Interior")).getByRole("button", { name: /Añadir mesa/i }));
-    fireEvent.click(await screen.findByRole("button", { name: /Cancelar/i }));
-
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(crearMutate).not.toHaveBeenCalled();
-  });
-
-  // ── Mesas: borrado ─────────────────────────────────────────────────────────
-
-  it("pide confirmación antes de borrar una mesa", async () => {
-    montar();
-    fireEvent.click(
-      within(bloqueDe("Comedor")).getByRole("button", { name: "Borrar Comedor 2" }),
-    );
-
-    expect(await screen.findByText(/¿Borrar la mesa Comedor 2\?/i)).toBeInTheDocument();
-    expect(eliminarMutate).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /Borrar mesa/i }));
-    await waitFor(() => expect(eliminarMutate).toHaveBeenCalledWith("m-c2"));
-  });
-
-  it("no borra nada si se cancela la confirmación", async () => {
-    montar();
-    fireEvent.click(
-      within(bloqueDe("Comedor")).getByRole("button", { name: "Borrar Comedor 2" }),
-    );
-    fireEvent.click(await screen.findByRole("button", { name: /^Cancelar$/i }));
-
-    await waitFor(() =>
-      expect(screen.queryByText(/¿Borrar la mesa Comedor 2\?/i)).not.toBeInTheDocument(),
-    );
-    expect(eliminarMutate).not.toHaveBeenCalled();
+  it("no ofrece el botón mientras se resuelve el permiso de super admin", () => {
+    montar({ isSuperAdmin: true, cargandoPermiso: true });
+    expect(
+      screen.queryByRole("button", { name: /Editar mesas en el plano/i }),
+    ).not.toBeInTheDocument();
   });
 
   // ── Espacios desactivados ──────────────────────────────────────────────────

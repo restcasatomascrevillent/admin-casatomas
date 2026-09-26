@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 export default function Espacios() {
   const { data: espacios = [], isLoading } = useEspaciosReserva() as any;
   const { data: todasMesas = [], refetch: refetchMesas } = useMesas();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [showForm, setShowForm] = useState(false);
   const [espacioEditando, setEspacioEditando] = useState<any>();
@@ -40,10 +42,29 @@ export default function Espacios() {
     return todasMesas.filter((m) => m.espacio_id === espacioId).length;
   };
 
+  // Deep link `/super-admin/espacios?editar=<espacioId>` (2026-09-26): la
+  // pantalla de "Mesas y aforo por espacio" de Configuración enlaza aquí
+  // directamente al editor de un espacio, sin pasar por la lista de tarjetas.
+  // Se abre con el mismo estado que usa el botón "Configurar Plano y Mesas".
+  useEffect(() => {
+    const editarId = searchParams.get("editar");
+    if (!editarId) return;
+    if (espacioConfigurando?.id === editarId) return;
+    const espacio = espacios.find((e) => e?.id === editarId);
+    if (espacio) {
+      setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre });
+    }
+  }, [searchParams, espacios, espacioConfigurando]);
+
   // Callback para volver del editor - refrescar datos
   const handleBackFromEditor = () => {
     setEspacioConfigurando(null);
     refetchMesas(); // Refrescar conteo de mesas
+    if (searchParams.has("editar")) {
+      const siguientes = new URLSearchParams(searchParams);
+      siguientes.delete("editar");
+      setSearchParams(siguientes, { replace: true });
+    }
   };
 
   // Si estamos configurando un espacio, mostrar el editor a pantalla completa

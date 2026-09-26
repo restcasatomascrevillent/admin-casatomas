@@ -9,16 +9,20 @@
 //   "Que mande la suma de las mesas; para eso lo dejamos cableado, y de
 //    momento seguimos con la capacidad total."
 //
-// Esta pantalla hace DOS cosas y deliberadamente ninguna más:
+// DECISIÓN DEL DUEÑO (2026-09-26, revisión): las mesas se crean, editan y
+// borran ÚNICAMENTE en el editor de plano (Super Admin › Espacios ›
+// "Configurar Plano y Mesas": `src/pages/Espacios.tsx` →
+// `EditorPlanoEspacio.tsx`). Esta pantalla dejó de tener altas/edición/borrado
+// de mesas porque tener DOS sitios que las tocan se saltaba las salvaguardas
+// del editor (repuntar `asignaciones_mesa` antes de borrar originales
+// fusionadas, avisar con el recuento de reservas, exigir nombres únicos por
+// espacio) y creaba mesas sin posición en el plano — en producción hay dos
+// mesas "9" en el Salón por este motivo exacto.
 //
-//   1. Vía rápida para dar de alta / editar / borrar las mesas de cada espacio
-//      (nombre, etiqueta, plazas y forma). NO se colocan posiciones aquí: para
-//      eso está el editor de plano (Super Admin › Espacios › "Configurar Plano
-//      y Mesas"). Las mesas nuevas se crean con los valores por defecto de la
-//      tabla y quedan a la espera de que alguien las coloque en el plano.
-//
-//   2. Enseña, por espacio, la CAPACIDAD DECLARADA (`capacidad_maxima`) frente
-//      a la SUMA DE PLAZAS de sus mesas activas, y avisa cuando no cuadran.
+// Esta pantalla ahora hace SOLO UNA cosa: enseña, por espacio, la CAPACIDAD
+// DECLARADA (`capacidad_maxima`) frente a la SUMA DE PLAZAS de sus mesas
+// activas, avisa cuando no cuadran, y ofrece un acceso directo al editor de
+// plano de cada espacio para quien pueda usarlo.
 //
 // IMPORTANTE — es información, NO un bloqueo. Un espacio descuadrado se puede
 // guardar igual y se puede seguir reservando: hoy el aforo lo decide
@@ -32,7 +36,8 @@
 // replica exactamente el filtro del trigger (espacios activos + misma marca).
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -41,57 +46,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertTriangle,
   Check,
   Circle,
   LayoutGrid,
   Loader2,
-  Pencil,
-  Plus,
+  MapPinned,
   RectangleHorizontal,
-  Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  useMesas,
-  useCrearMesa,
-  useActualizarMesa,
-  useEliminarMesa,
-  type Mesa,
-} from "@/hooks/useMesas";
+import { useMesas, type Mesa } from "@/hooks/useMesas";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   calcularCuadrePorNegocio,
   calcularCuadres,
@@ -101,43 +70,6 @@ import {
 } from "@/lib/reservas/aforoMesas";
 import { agruparPorNegocio } from "@/lib/reservas/negocios";
 import { NegocioBadge } from "./NegocioBadge";
-
-// ── Formas que el plano sabe dibujar ────────────────────────────────────────
-// `CanvasPlano` solo distingue `forma === "circular"` de todo lo demás, así que
-// no se ofrecen formas que luego se pintarían como un rectángulo cualquiera.
-const FORMAS = [
-  { valor: "rectangular", etiqueta: "Rectangular" },
-  { valor: "circular", etiqueta: "Redonda" },
-] as const;
-
-type FormaMesa = (typeof FORMAS)[number]["valor"];
-
-const CAPACIDAD_MIN = 1;
-const CAPACIDAD_MAX = 50;
-
-interface BorradorMesa {
-  nombre: string;
-  etiqueta: string;
-  capacidad: number;
-  forma: FormaMesa;
-  activa: boolean;
-}
-
-const borradorVacio = (): BorradorMesa => ({
-  nombre: "",
-  etiqueta: "",
-  capacidad: 4,
-  forma: "rectangular",
-  activa: true,
-});
-
-const borradorDeMesa = (mesa: Mesa): BorradorMesa => ({
-  nombre: mesa.nombre ?? "",
-  etiqueta: mesa.etiqueta ?? "",
-  capacidad: Number.isFinite(Number(mesa.capacidad)) ? Number(mesa.capacidad) : 0,
-  forma: mesa.forma === "circular" ? "circular" : "rectangular",
-  activa: mesa.activa !== false,
-});
 
 const plural = (n: number, singular: string, plural_: string) =>
   `${n} ${n === 1 ? singular : plural_}`;
@@ -167,164 +99,16 @@ function BadgeCuadre({ cuadre }: { cuadre: CuadreEspacio }) {
   );
 }
 
-// ── Diálogo de alta / edición de una mesa ───────────────────────────────────
-
-interface DialogoMesaProps {
-  abierto: boolean;
-  onAbiertoChange: (abierto: boolean) => void;
-  espacioNombre: string;
-  /** Mesa a editar; `null` = alta nueva. */
-  mesa: Mesa | null;
-  guardando: boolean;
-  onGuardar: (borrador: BorradorMesa) => Promise<void>;
-}
-
-function DialogoMesa({
-  abierto,
-  onAbiertoChange,
-  espacioNombre,
-  mesa,
-  guardando,
-  onGuardar,
-}: DialogoMesaProps) {
-  // Quien lo usa lo monta y desmonta con cada apertura (`{dialogo && ...}`), así
-  // que el borrador arranca limpio en cada alta y con los datos de la mesa en
-  // cada edición: no hace falta resincronizar nada.
-  const [borrador, setBorrador] = useState<BorradorMesa>(() =>
-    mesa ? borradorDeMesa(mesa) : borradorVacio(),
-  );
-  const [tocado, setTocado] = useState(false);
-
-  const nombreVacio = borrador.nombre.trim().length === 0;
-  const capacidadInvalida =
-    !Number.isInteger(borrador.capacidad) ||
-    borrador.capacidad < CAPACIDAD_MIN ||
-    borrador.capacidad > CAPACIDAD_MAX;
-
-  const enviar = async () => {
-    setTocado(true);
-    if (nombreVacio || capacidadInvalida) return;
-    await onGuardar({ ...borrador, nombre: borrador.nombre.trim(), etiqueta: borrador.etiqueta.trim() });
-  };
-
-  return (
-    <Dialog open={abierto} onOpenChange={onAbiertoChange}>
-      <DialogContent className="sm:max-w-[460px]">
-        <DialogHeader>
-          <DialogTitle>{mesa ? "Editar mesa" : "Nueva mesa"}</DialogTitle>
-          <DialogDescription>
-            {espacioNombre}. La posición en el plano se ajusta en Espacios ›
-            Configurar Plano y Mesas.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="mesa-nombre">Nombre</Label>
-            <Input
-              id="mesa-nombre"
-              value={borrador.nombre}
-              placeholder="Ej: Mesa 1"
-              aria-invalid={tocado && nombreVacio}
-              onChange={(e) => setBorrador((b) => ({ ...b, nombre: e.target.value }))}
-            />
-            {tocado && nombreVacio && (
-              <p className="text-sm text-destructive">Ponle un nombre a la mesa.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mesa-etiqueta">Etiqueta (opcional)</Label>
-            <Input
-              id="mesa-etiqueta"
-              value={borrador.etiqueta}
-              placeholder="Ej: Junto a la ventana"
-              onChange={(e) => setBorrador((b) => ({ ...b, etiqueta: e.target.value }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="mesa-capacidad">Plazas</Label>
-              <Input
-                id="mesa-capacidad"
-                type="number"
-                inputMode="numeric"
-                min={CAPACIDAD_MIN}
-                max={CAPACIDAD_MAX}
-                value={Number.isFinite(borrador.capacidad) ? borrador.capacidad : ""}
-                aria-invalid={tocado && capacidadInvalida}
-                onChange={(e) =>
-                  setBorrador((b) => ({ ...b, capacidad: parseInt(e.target.value, 10) }))
-                }
-              />
-              {tocado && capacidadInvalida && (
-                <p className="text-sm text-destructive">
-                  Entre {CAPACIDAD_MIN} y {CAPACIDAD_MAX} plazas.
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="mesa-forma">Forma</Label>
-              <Select
-                value={borrador.forma}
-                onValueChange={(v) => setBorrador((b) => ({ ...b, forma: v as FormaMesa }))}
-              >
-                <SelectTrigger id="mesa-forma">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FORMAS.map((f) => (
-                    <SelectItem key={f.valor} value={f.valor}>
-                      {f.etiqueta}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div className="space-y-0.5 pr-4">
-              <Label htmlFor="mesa-activa">Mesa en uso</Label>
-              <p className="text-sm text-muted-foreground">
-                Las mesas desactivadas no suman plazas ni salen en el plano.
-              </p>
-            </div>
-            <Switch
-              id="mesa-activa"
-              checked={borrador.activa}
-              onCheckedChange={(v) => setBorrador((b) => ({ ...b, activa: v }))}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onAbiertoChange(false)}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={enviar} disabled={guardando}>
-            {guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-            {mesa ? "Guardar cambios" : "Crear mesa"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Bloque de un espacio ────────────────────────────────────────────────────
 
 interface BloqueEspacioProps {
   cuadre: CuadreEspacio;
   mesas: Mesa[];
-  onNueva: () => void;
-  onEditar: (mesa: Mesa) => void;
-  onBorrar: (mesa: Mesa) => void;
+  puedeAbrirPlano: boolean;
+  onAbrirPlano: () => void;
 }
 
-function BloqueEspacio({ cuadre, mesas, onNueva, onEditar, onBorrar }: BloqueEspacioProps) {
+function BloqueEspacio({ cuadre, mesas, puedeAbrirPlano, onAbrirPlano }: BloqueEspacioProps) {
   return (
     <div className="rounded-lg border p-3 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -405,26 +189,6 @@ function BloqueEspacio({ cuadre, mesas, onNueva, onEditar, onBorrar }: BloqueEsp
                   <span className="tabular-nums text-muted-foreground">
                     {plural(Number(mesa.capacidad) || 0, "plaza", "plazas")}
                   </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    aria-label={`Editar ${mesa.nombre}`}
-                    onClick={() => onEditar(mesa)}
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    aria-label={`Borrar ${mesa.nombre}`}
-                    onClick={() => onBorrar(mesa)}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </Button>
                 </div>
               </li>
             );
@@ -436,10 +200,16 @@ function BloqueEspacio({ cuadre, mesas, onNueva, onEditar, onBorrar }: BloqueEsp
         </p>
       )}
 
-      <Button type="button" variant="outline" size="sm" onClick={onNueva}>
-        <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-        Añadir mesa
-      </Button>
+      {puedeAbrirPlano ? (
+        <Button type="button" variant="outline" size="sm" onClick={onAbrirPlano}>
+          <MapPinned className="mr-2 h-4 w-4" aria-hidden="true" />
+          Editar mesas en el plano
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Las mesas se gestionan en el plano (Super Admin → Espacios).
+        </p>
+      )}
     </div>
   );
 }
@@ -474,17 +244,16 @@ function ResumenNegocio({ resumen }: { resumen: CuadreNegocio }) {
 // ── Pantalla ────────────────────────────────────────────────────────────────
 
 export function GestionMesasEspacios() {
+  const navigate = useNavigate();
   const { data: espaciosData, isLoading: cargandoEspacios } = useEspaciosReserva();
   const { data: mesas = [], isLoading: cargandoMesas } = useMesas(undefined, {
     incluirInactivas: true,
   });
-
-  const crearMesa = useCrearMesa();
-  const actualizarMesa = useActualizarMesa();
-  const eliminarMesa = useEliminarMesa();
-
-  const [dialogo, setDialogo] = useState<{ espacio: CuadreEspacio; mesa: Mesa | null } | null>(null);
-  const [aBorrar, setABorrar] = useState<Mesa | null>(null);
+  // El editor de plano vive en Super Admin › Espacios: solo quien puede
+  // entrar ahí (`SuperAdminRoute`, mismo criterio que `useSuperAdmin`) ve el
+  // botón que lleva allí. El resto ve una nota indicando dónde se gestionan
+  // las mesas, en vez de un botón que le llevaría a un login.
+  const { isSuperAdmin, loading: cargandoPermiso } = useSuperAdmin();
 
   const espacios = useMemo(
     () => ((espaciosData ?? []) as EspacioReserva[]).filter(Boolean),
@@ -502,47 +271,8 @@ export function GestionMesasEspacios() {
   const mesasDeEspacio = (espacioId: string) =>
     mesas.filter((m) => m.espacio_id === espacioId);
 
-  const guardarMesa = async (borrador: BorradorMesa) => {
-    if (!dialogo) return;
-    const { espacio, mesa } = dialogo;
-    try {
-      if (mesa) {
-        await actualizarMesa.mutateAsync({
-          id: mesa.id,
-          nombre: borrador.nombre,
-          etiqueta: borrador.etiqueta || null,
-          capacidad: borrador.capacidad,
-          forma: borrador.forma,
-          activa: borrador.activa,
-        });
-        toast.success("Mesa actualizada");
-      } else {
-        // No se envían `pos_x`/`pos_y`/`ancho`/`alto` a propósito: se dejan los
-        // valores por defecto de la tabla. Las posiciones se colocan en el
-        // editor de plano, que es quien conoce la escala de cada espacio.
-        await crearMesa.mutateAsync({
-          espacio_id: espacio.espacioId,
-          nombre: borrador.nombre,
-          etiqueta: borrador.etiqueta || null,
-          capacidad: borrador.capacidad,
-          forma: borrador.forma,
-          activa: borrador.activa,
-        });
-        toast.success("Mesa creada");
-      }
-      setDialogo(null);
-    } catch {
-      // Los hooks ya avisan con un toast de error.
-    }
-  };
-
-  const confirmarBorrado = async () => {
-    if (!aBorrar) return;
-    try {
-      await eliminarMesa.mutateAsync(aBorrar.id);
-    } finally {
-      setABorrar(null);
-    }
+  const abrirPlano = (espacioId: string) => {
+    navigate(`/super-admin/espacios?editar=${espacioId}`);
   };
 
   if (cargandoEspacios || cargandoMesas) {
@@ -563,8 +293,9 @@ export function GestionMesasEspacios() {
           <CardTitle className="text-lg">Mesas y aforo por espacio</CardTitle>
         </div>
         <CardDescription>
-          Da de alta las mesas de cada sala y comprueba si la capacidad declarada
-          cuadra con las plazas que suman sus mesas
+          Comprueba si la capacidad declarada de cada sala cuadra con las plazas que
+          suman sus mesas. Las mesas se dan de alta, editan y borran en el plano
+          (Super Admin → Espacios → "Configurar Plano y Mesas").
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -587,9 +318,8 @@ export function GestionMesasEspacios() {
                     key={cuadre.espacioId}
                     cuadre={cuadre}
                     mesas={mesasDeEspacio(cuadre.espacioId)}
-                    onNueva={() => setDialogo({ espacio: cuadre, mesa: null })}
-                    onEditar={(mesa) => setDialogo({ espacio: cuadre, mesa })}
-                    onBorrar={(mesa) => setABorrar(mesa)}
+                    puedeAbrirPlano={!cargandoPermiso && isSuperAdmin}
+                    onAbrirPlano={() => abrirPlano(cuadre.espacioId)}
                   />
                 ))}
               </div>
@@ -605,40 +335,6 @@ export function GestionMesasEspacios() {
           impiden guardar ni reservar.
         </p>
       </CardContent>
-
-      {dialogo && (
-        <DialogoMesa
-          abierto
-          onAbiertoChange={(abierto) => {
-            if (!abierto) setDialogo(null);
-          }}
-          espacioNombre={dialogo.espacio.nombre}
-          mesa={dialogo.mesa}
-          guardando={crearMesa.isPending || actualizarMesa.isPending}
-          onGuardar={guardarMesa}
-        />
-      )}
-
-      <AlertDialog open={!!aBorrar} onOpenChange={(abierto) => !abierto && setABorrar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Borrar la mesa {aBorrar?.nombre}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se quita del plano y deja de sumar plazas. No se puede deshacer. Si solo quieres
-              dejar de usarla temporalmente, edítala y desactiva "Mesa en uso".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmarBorrado}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Borrar mesa
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 }
