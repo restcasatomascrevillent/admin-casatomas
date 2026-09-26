@@ -11,6 +11,9 @@ import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
+import { ModoServicioPlano } from "@/components/reservas/servicio/ModoServicioPlano";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { LayoutGrid, Utensils } from "lucide-react";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -22,6 +25,12 @@ export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
+  // Dentro de una sala: "plano" es el editor/asignación de siempre
+  // (PlanoEspacio2D); "servicio" es la vista en vivo del modo servicio
+  // (Fase 4). Se resetea a "plano" cada vez que se entra en una sala nueva,
+  // para no dejar a alguien en modo servicio de la sala anterior sin darse
+  // cuenta.
+  const [vistaEspacio, setVistaEspacio] = useState<"plano" | "servicio">("plano");
   const [activeTab, setActiveTab] = useState<string>("hoy");
   const [tabsOverflow, setTabsOverflow] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
@@ -121,19 +130,47 @@ export default function Reservas() {
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
     if (espacio) {
+      setVistaEspacio("plano");
       setSelectedEspacio({ id: espacio.id, nombre: espacio.nombre });
     }
   };
 
-  // Si hay un espacio seleccionado, mostrar el plano 2D
+  // Si hay un espacio seleccionado, mostrar el plano 2D o el modo servicio
+  // (Fase 4) según el toggle. El propio componente de servicio ya trae su
+  // botón "Volver" (le pasamos el mismo `onBack`); el toggle se enseña
+  // encima de los dos para poder cambiar de vista sin salir de la sala.
   if (selectedEspacio) {
     return (
       <DashboardLayout>
-        <PlanoEspacio2D
-          espacioId={selectedEspacio.id}
-          espacioNombre={selectedEspacio.nombre}
-          onBack={() => setSelectedEspacio(null)}
-        />
+        <div className="mb-3 flex justify-end">
+          <ToggleGroup
+            type="single"
+            value={vistaEspacio}
+            onValueChange={(v) => v && setVistaEspacio(v as "plano" | "servicio")}
+            className="rounded-md border p-1"
+          >
+            <ToggleGroupItem value="plano" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              <LayoutGrid className="h-4 w-4" /> Plano
+            </ToggleGroupItem>
+            <ToggleGroupItem value="servicio" className="h-10 gap-1.5 px-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+              <Utensils className="h-4 w-4" /> Servicio
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        {vistaEspacio === "servicio" ? (
+          <ModoServicioPlano
+            espacioId={selectedEspacio.id}
+            espacioNombre={selectedEspacio.nombre}
+            onBack={() => setSelectedEspacio(null)}
+          />
+        ) : (
+          <PlanoEspacio2D
+            espacioId={selectedEspacio.id}
+            espacioNombre={selectedEspacio.nombre}
+            onBack={() => setSelectedEspacio(null)}
+          />
+        )}
       </DashboardLayout>
     );
   }

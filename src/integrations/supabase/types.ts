@@ -1050,12 +1050,15 @@ export type Database = {
           created_at: string
           dias_max_antelacion: number
           email_obligatorio: boolean
+          estancia_cena_minutos: number
+          estancia_comida_minutos: number
           id: string
           max_comensales_por_reserva: number
           max_reservas_por_email_dia: number
           max_reservas_por_telefono_dia: number
           min_comensales_por_reserva: number
           minutos_corte_antes_servicio: number
+          retraso_gracia_minutos: number
           telefono_obligatorio: boolean
           updated_at: string
         }
@@ -1064,12 +1067,15 @@ export type Database = {
           created_at?: string
           dias_max_antelacion?: number
           email_obligatorio?: boolean
+          estancia_cena_minutos?: number
+          estancia_comida_minutos?: number
           id?: string
           max_comensales_por_reserva?: number
           max_reservas_por_email_dia?: number
           max_reservas_por_telefono_dia?: number
           min_comensales_por_reserva?: number
           minutos_corte_antes_servicio?: number
+          retraso_gracia_minutos?: number
           telefono_obligatorio?: boolean
           updated_at?: string
         }
@@ -1078,12 +1084,15 @@ export type Database = {
           created_at?: string
           dias_max_antelacion?: number
           email_obligatorio?: boolean
+          estancia_cena_minutos?: number
+          estancia_comida_minutos?: number
           id?: string
           max_comensales_por_reserva?: number
           max_reservas_por_email_dia?: number
           max_reservas_por_telefono_dia?: number
           min_comensales_por_reserva?: number
           minutos_corte_antes_servicio?: number
+          retraso_gracia_minutos?: number
           telefono_obligatorio?: boolean
           updated_at?: string
         }
@@ -2884,6 +2893,8 @@ export type Database = {
           telefono: string | null
           updated_at: string | null
           solicitud_id: string | null
+          /** Solo existe si 20260926150000_modo_servicio_config_y_salida.sql está aplicada. */
+          salida_at: string | null
         }
         Insert: {
           canal?: string | null
@@ -2902,6 +2913,7 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
           solicitud_id?: string | null
+          salida_at?: string | null
         }
         Update: {
           canal?: string | null
@@ -2920,6 +2932,7 @@ export type Database = {
           telefono?: string | null
           updated_at?: string | null
           solicitud_id?: string | null
+          salida_at?: string | null
         }
         Relationships: [
           {

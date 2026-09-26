@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ShieldCheck, Clock, Users, Mail, Phone, CalendarDays, Loader2 } from "lucide-react";
+import { ShieldCheck, Clock, Users, Mail, Phone, CalendarDays, Loader2, UtensilsCrossed, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +27,11 @@ const configSchema = z.object({
   telefono_obligatorio: z.boolean(),
   email_obligatorio: z.boolean(),
   auto_confirmar: z.boolean(),
+  // Modo servicio (Fase 4): umbrales de tiempo del plano en vivo. Columnas
+  // nuevas de configuracion_reservas (20260926150000_modo_servicio_config_y_salida.sql).
+  estancia_comida_minutos: z.number().min(15).max(480),
+  estancia_cena_minutos: z.number().min(15).max(480),
+  retraso_gracia_minutos: z.number().min(0).max(180),
 });
 
 type ConfigFormValues = z.infer<typeof configSchema>;
@@ -47,6 +52,9 @@ export function ConfiguracionGeneralReservas() {
       telefono_obligatorio: true,
       email_obligatorio: false,
       auto_confirmar: false,
+      estancia_comida_minutos: 105,
+      estancia_cena_minutos: 120,
+      retraso_gracia_minutos: 15,
     },
   });
 
@@ -62,6 +70,11 @@ export function ConfiguracionGeneralReservas() {
         telefono_obligatorio: config.telefono_obligatorio,
         email_obligatorio: config.email_obligatorio,
         auto_confirmar: config.auto_confirmar,
+        // Ausentes si la migración de modo servicio aún no está aplicada: caen
+        // en el default del producto, nunca en `undefined`/`null` en el form.
+        estancia_comida_minutos: config.estancia_comida_minutos ?? 105,
+        estancia_cena_minutos: config.estancia_cena_minutos ?? 120,
+        retraso_gracia_minutos: config.retraso_gracia_minutos ?? 15,
       });
     }
   }, [config, form]);
@@ -327,6 +340,102 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Modo servicio (Fase 4): umbrales de tiempo del plano en vivo */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Timer className="h-4 w-4 text-muted-foreground" />
+                Modo servicio (plano en vivo)
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                <FormField
+                  control={form.control}
+                  name="estancia_comida_minutos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <UtensilsCrossed className="h-3.5 w-3.5" />
+                        Estancia estimada · Comida
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={15}
+                            max={480}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
+                          />
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Pasado este tiempo desde que se sentó, el plano marca la mesa como "por liberar"
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="estancia_cena_minutos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <UtensilsCrossed className="h-3.5 w-3.5" />
+                        Estancia estimada · Cena
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={15}
+                            max={480}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
+                          />
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Las cenas suelen alargarse más que las comidas: por eso es un valor aparte
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="retraso_gracia_minutos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        Margen antes de marcar retraso
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={180}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                          />
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Minutos tras la hora de la reserva antes de que el plano la pinte "retrasada". No cancela ni modifica la reserva.
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
