@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock } from "lucide-react";
+import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -187,6 +188,10 @@ export function ReservasHoy() {
             </Badge>
           )}
           <CalendarCheck className="h-5 w-5 text-primary" />
+          {/* La campana vivía en la cabecera del menú lateral (AppSidebar.tsx);
+              se mudó aquí para que el cubierto decorativo del sidebar pudiera
+              volver, a petición del dueño. */}
+          <CentroNotificaciones className="h-7 w-7" />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

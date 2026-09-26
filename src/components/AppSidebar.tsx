@@ -1,7 +1,6 @@
 import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, LogOut, Shield, Settings } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
-import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -44,7 +43,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
 ];
 
 export function AppSidebar() {
-  const { state, isMobile } = useSidebar();
+  const { state } = useSidebar();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -67,38 +66,26 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
-      {/* Plegador y campana (2026-09-25): vivían en la cabecera de página, que
-          se eliminó para recuperar alto (ver DashboardLayout.tsx). Aquí no
-          gastan ni un píxel del área de contenido y siguen presentes en TODAS
-          las secciones. Plegado, ambos se apilan en la columna de iconos sin
-          ensancharla; en el panel deslizante de móvil el plegador hace además
-          de botón de cerrar, que antes no había.
-          Desaparece de aquí el cubierto decorativo: con la campana dentro no
-          cabía todo y "Gestión del Restaurante" se cortaba a media palabra
-          (faltaban 11px medidos). Era puro adorno y el mismo icono ya
-          identifica "Reservas" en el menú, así que se va él y no el texto. */}
+      {/* El plegador vivía en la cabecera de página, que se eliminó para
+          recuperar alto (ver DashboardLayout.tsx); aquí no gasta ni un píxel
+          del área de contenido y sigue presente en TODAS las secciones.
+          La campana pasó a la tarjeta "Reservas de Hoy" del Dashboard (ver
+          ReservasHoy.tsx) para que el cubierto decorativo pudiera volver:
+          con los dos dentro no cabía todo y "Gestión del Restaurante" se
+          cortaba a media palabra (11px medidos). */}
       <SidebarHeader
         className={`border-b border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
       >
         <div className={`flex items-center gap-2 ${isCollapsed ? "flex-col justify-center" : ""}`}>
+          <UtensilsCrossed className="h-6 w-6 text-sidebar-primary shrink-0" />
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
               <h2 className="text-lg font-semibold text-sidebar-foreground truncate">Admin Panel</h2>
               <span className="text-xs text-muted-foreground truncate">Gestión del Restaurante</span>
             </div>
           )}
-          {/* En móvil el menú es un Sheet que se desmonta al cerrarse: la
-              campana no puede vivir aquí o dejaría de avisar. La monta
-              entonces la barra superior de móvil (DashboardLayout.tsx). */}
-          {!isMobile && (
-            <CentroNotificaciones
-              className={`h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent shrink-0 ${isCollapsed ? "" : "ml-auto"}`}
-            />
-          )}
           <SidebarTrigger
-            className={`text-sidebar-foreground hover:bg-sidebar-accent shrink-0 ${
-              !isCollapsed && isMobile ? "ml-auto" : ""
-            }`}
+            className={`text-sidebar-foreground hover:bg-sidebar-accent shrink-0 ${!isCollapsed ? "ml-auto" : ""}`}
           />
         </div>
       </SidebarHeader>
