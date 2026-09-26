@@ -229,6 +229,101 @@ describe("detectarPoligonoCerrado + areaShoelace + bboxPoligono", () => {
   it("devuelve null si hay menos de 3 paredes", () => {
     expect(detectarPoligonoCerrado([{ x1: 0, y1: 0, x2: 10, y2: 0 }])).toBeNull();
   });
+
+  it("detecta el mismo cuadrado sea cual sea el orden/dirección de dibujo de las paredes", () => {
+    // Mismo cuadrado 100x100 que el primer test, pero con las paredes en un
+    // orden totalmente distinto y direcciones mezcladas (simula al usuario
+    // dibujando los 4 lados en cualquier secuencia, algunos "al revés").
+    const paredes = [
+      { x1: 0, y1: 100, x2: 0, y2: 0 }, // izquierda (invertida)
+      { x1: 100, y1: 100, x2: 100, y2: 0 }, // derecha (invertida)
+      { x1: 0, y1: 0, x2: 100, y2: 0 }, // arriba
+      { x1: 0, y1: 100, x2: 100, y2: 100 }, // abajo
+    ];
+    const vertices = detectarPoligonoCerrado(paredes);
+    expect(vertices).not.toBeNull();
+    expect(vertices).toHaveLength(4);
+    expect(areaShoelace(vertices!)).toBeCloseTo(10000, 1);
+  });
+
+  it("con una partición interior (T-junction) devuelve el contorno EXTERIOR, no la mitad", () => {
+    // Cuadrado 100x100 partido en dos por un muro interior en x=50 — el muro
+    // superior e inferior quedan divididos en dos segmentos cada uno (así se
+    // forma el T-junction en el grafo: comparten nodo con la partición).
+    const paredes = [
+      { x1: 0, y1: 0, x2: 50, y2: 0 }, // arriba-izq
+      { x1: 50, y1: 0, x2: 100, y2: 0 }, // arriba-der
+      { x1: 100, y1: 0, x2: 100, y2: 100 }, // derecha
+      { x1: 100, y1: 100, x2: 50, y2: 100 }, // abajo-der
+      { x1: 50, y1: 100, x2: 0, y2: 100 }, // abajo-izq
+      { x1: 0, y1: 100, x2: 0, y2: 0 }, // izquierda
+      { x1: 50, y1: 0, x2: 50, y2: 100 }, // partición interior
+    ];
+    const vertices = detectarPoligonoCerrado(paredes);
+    expect(vertices).not.toBeNull();
+    // El contorno exterior tiene 6 vértices (incluye los dos T-junctions);
+    // el greedy anterior habría podido devolver una de las mitades (50x100).
+    expect(vertices).toHaveLength(6);
+    expect(areaShoelace(vertices!)).toBeCloseTo(10000, 1); // área completa, no 5000
+  });
+
+  it("ignora un muro suelto (dangling) que cuelga de una esquina", () => {
+    const paredes = [
+      { x1: 0, y1: 0, x2: 100, y2: 0 },
+      { x1: 100, y1: 0, x2: 100, y2: 100 },
+      { x1: 100, y1: 100, x2: 0, y2: 100 },
+      { x1: 0, y1: 100, x2: 0, y2: 0 },
+      { x1: 0, y1: 0, x2: 0, y2: -50 }, // pared suelta que no cierra nada
+    ];
+    const vertices = detectarPoligonoCerrado(paredes);
+    expect(vertices).not.toBeNull();
+    expect(vertices).toHaveLength(4);
+    expect(areaShoelace(vertices!)).toBeCloseTo(10000, 1);
+  });
+
+  it("detecta una sala en forma de L", () => {
+    const paredes = [
+      { x1: 0, y1: 0, x2: 150, y2: 0 },
+      { x1: 150, y1: 0, x2: 150, y2: 50 },
+      { x1: 150, y1: 50, x2: 50, y2: 50 },
+      { x1: 50, y1: 50, x2: 50, y2: 100 },
+      { x1: 50, y1: 100, x2: 0, y2: 100 },
+      { x1: 0, y1: 100, x2: 0, y2: 0 },
+    ];
+    const vertices = detectarPoligonoCerrado(paredes);
+    expect(vertices).not.toBeNull();
+    expect(vertices).toHaveLength(6);
+    expect(areaShoelace(vertices!)).toBeCloseTo(10000, 1);
+    expect(bboxPoligono(vertices!)).toEqual({ width: 150, height: 100 });
+  });
+
+  it("devuelve null con una polilínea abierta (sin ningún ciclo)", () => {
+    const paredes = [
+      { x1: 0, y1: 0, x2: 100, y2: 0 },
+      { x1: 100, y1: 0, x2: 100, y2: 100 },
+      { x1: 100, y1: 100, x2: 200, y2: 100 }, // se aleja en vez de cerrar
+    ];
+    expect(detectarPoligonoCerrado(paredes)).toBeNull();
+  });
+
+  it("con dos salas separadas (sin conexión entre sí) devuelve la de mayor área", () => {
+    const salaGrande = [
+      { x1: 0, y1: 0, x2: 100, y2: 0 },
+      { x1: 100, y1: 0, x2: 100, y2: 100 },
+      { x1: 100, y1: 100, x2: 0, y2: 100 },
+      { x1: 0, y1: 100, x2: 0, y2: 0 },
+    ];
+    const salaChica = [
+      { x1: 500, y1: 500, x2: 550, y2: 500 },
+      { x1: 550, y1: 500, x2: 550, y2: 550 },
+      { x1: 550, y1: 550, x2: 500, y2: 550 },
+      { x1: 500, y1: 550, x2: 500, y2: 500 },
+    ];
+    const vertices = detectarPoligonoCerrado([...salaChica, ...salaGrande]);
+    expect(vertices).not.toBeNull();
+    expect(vertices).toHaveLength(4);
+    expect(areaShoelace(vertices!)).toBeCloseTo(10000, 1); // la grande (100x100), no la chica (2500)
+  });
 });
 
 describe("snapRotationDeg", () => {

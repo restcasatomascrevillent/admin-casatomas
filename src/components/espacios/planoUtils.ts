@@ -178,42 +178,151 @@ export function snapToWallEndpoint(
   return best;
 }
 
+interface NodoGrafoParedes {
+  x: number;
+  y: number;
+}
+
+interface AristaGrafoParedes {
+  a: number; // índice de nodo
+  b: number; // índice de nodo
+}
+
 /**
- * Intenta ordenar un conjunto de segmentos de pared en un único polígono
- * cerrado (cada extremo coincide con el siguiente dentro de `tolerance` px).
- * Devuelve los vértices en orden, o null si no forman un lazo cerrado único
- * (paredes sueltas, en forma de "T", con huecos, etc.).
+ * Construye un grafo no dirigido a partir de los segmentos de pared,
+ * fusionando extremos que caen dentro de `tolerance` px en un único nodo.
+ * Esto es lo que permite representar un T-junction (partición interior que
+ * arranca a mitad de un muro exterior) como UN nodo compartido por 3 aristas,
+ * en vez de 2-3 puntos "casi iguales" pero distintos que el emparejamiento
+ * greedy anterior no sabía conciliar.
+ */
+function construirGrafoParedes(
+  paredes: SegmentoPared[],
+  tolerance: number
+): { nodos: NodoGrafoParedes[]; aristas: AristaGrafoParedes[] } {
+  const nodos: NodoGrafoParedes[] = [];
+
+  const indiceDeNodo = (punto: Punto): number => {
+    for (let i = 0; i < nodos.length; i++) {
+      if (Math.hypot(nodos[i].x - punto.x, nodos[i].y - punto.y) <= tolerance) {
+        return i;
+      }
+    }
+    nodos.push({ x: punto.x, y: punto.y });
+    return nodos.length - 1;
+  };
+
+  const aristas: AristaGrafoParedes[] = [];
+  for (const pared of paredes) {
+    const a = indiceDeNodo({ x: pared.x1, y: pared.y1 });
+    const b = indiceDeNodo({ x: pared.x2, y: pared.y2 });
+    // Segmento degenerado tras fusionar extremos (pared de longitud ~0, o
+    // ambos extremos cayeron en el mismo nodo): no aporta ninguna arista útil.
+    if (a === b) continue;
+    aristas.push({ a, b });
+  }
+
+  return { nodos, aristas };
+}
+
+// Límite de seguridad para la exploración de ciclos: en una planta real (unas
+// pocas decenas de paredes como mucho) nunca se acerca a este número, pero
+// evita que un grafo patológico (muchísimos huecos casi coincidentes) cuelgue
+// el navegador con una búsqueda exponencial.
+const MAX_CICLOS_EXPLORADOS = 20000;
+
+/**
+ * Enumera los ciclos simples del grafo (cada uno como lista ordenada de
+ * índices de nodo, sin repetir el primero al final) mediante DFS desde cada
+ * nodo, restringiendo cada búsqueda a nodos de índice >= al de partida (así
+ * cada ciclo se reporta una única vez, desde su nodo de índice mínimo, sin
+ * depender de qué pared se "vio primero" — al contrario que el greedy
+ * anterior). Contempla T-junctions de forma natural: en cada nodo se prueban
+ * TODAS las aristas salientes, no solo "la siguiente pared que cuadra".
+ */
+function enumerarCiclosSimples(
+  nodos: NodoGrafoParedes[],
+  aristas: AristaGrafoParedes[]
+): number[][] {
+  const adyacencia: Array<Array<{ vecino: number; aristaIdx: number }>> = nodos.map(() => []);
+  aristas.forEach((arista, idx) => {
+    adyacencia[arista.a].push({ vecino: arista.b, aristaIdx: idx });
+    adyacencia[arista.b].push({ vecino: arista.a, aristaIdx: idx });
+  });
+
+  const ciclos: number[][] = [];
+  let explorados = 0;
+
+  for (let inicio = 0; inicio < nodos.length; inicio++) {
+    const pila: number[] = [inicio];
+    const enPila = new Set<number>([inicio]);
+
+    const dfs = (actual: number, aristaEntrada: number): boolean => {
+      for (const { vecino, aristaIdx } of adyacencia[actual]) {
+        if (aristaIdx === aristaEntrada) continue; // no desandar la misma arista
+        if (vecino < inicio) continue; // ese ciclo se reporta desde su nodo de índice mínimo
+
+        explorados++;
+        if (explorados > MAX_CICLOS_EXPLORADOS) return false; // corte de seguridad
+
+        if (vecino === inicio) {
+          if (pila.length >= 3) ciclos.push([...pila]);
+          continue;
+        }
+
+        if (enPila.has(vecino)) continue; // ya usado en este camino: no sería un ciclo simple
+
+        pila.push(vecino);
+        enPila.add(vecino);
+        const seguir = dfs(vecino, aristaIdx);
+        pila.pop();
+        enPila.delete(vecino);
+        if (!seguir) return false;
+      }
+      return true;
+    };
+
+    if (!dfs(inicio, -1)) break;
+  }
+
+  return ciclos;
+}
+
+/**
+ * Encuentra, entre todos los polígonos cerrados que forman las paredes, el de
+ * MAYOR área (el contorno exterior de la sala). A diferencia del emparejamiento
+ * greedy nearest-neighbour anterior — que fallaba con T-junctions (particiones
+ * interiores), paredes sueltas o topologías con más de un lazo — esto:
+ * 1) fusiona extremos dentro de `tolerance` en nodos de un grafo,
+ * 2) busca TODOS los ciclos simples del grafo (una pared interior que cuelga
+ *    de un T-junction no rompe la detección: simplemente añade más ciclos,
+ *    más pequeños, que se descartan por área),
+ * 3) devuelve los vértices del ciclo de mayor área (shoelace), o null si no
+ *    hay ningún ciclo (paredes sueltas / polilínea abierta).
+ * Mantiene la misma firma/tipo de retorno que la versión anterior.
  */
 export function detectarPoligonoCerrado(paredes: SegmentoPared[], tolerance = 5): Punto[] | null {
   if (paredes.length < 3) return null;
 
-  const restantes = paredes.map((p) => ({ ...p }));
-  const cerca = (a: Punto, b: Punto) => Math.hypot(a.x - b.x, a.y - b.y) <= tolerance;
+  const { nodos, aristas } = construirGrafoParedes(paredes, tolerance);
+  if (nodos.length < 3 || aristas.length < 3) return null;
 
-  const primero = restantes.shift()!;
-  const vertices: Punto[] = [{ x: primero.x1, y: primero.y1 }];
-  let actual: Punto = { x: primero.x2, y: primero.y2 };
+  const ciclos = enumerarCiclosSimples(nodos, aristas);
+  if (ciclos.length === 0) return null;
 
-  while (restantes.length > 0) {
-    const idx = restantes.findIndex(
-      (p) => cerca({ x: p.x1, y: p.y1 }, actual) || cerca({ x: p.x2, y: p.y2 }, actual)
-    );
-    if (idx === -1) return null; // no forma un lazo continuo
+  let mejorVertices: Punto[] | null = null;
+  let mejorArea = -Infinity;
 
-    const [segmento] = restantes.splice(idx, 1);
-    const empiezaEnActual = cerca({ x: segmento.x1, y: segmento.y1 }, actual);
-    const siguiente = empiezaEnActual
-      ? { x: segmento.x2, y: segmento.y2 }
-      : { x: segmento.x1, y: segmento.y1 };
-
-    vertices.push(actual);
-    actual = siguiente;
+  for (const ciclo of ciclos) {
+    const vertices = ciclo.map((i) => ({ x: nodos[i].x, y: nodos[i].y }));
+    const area = areaShoelace(vertices);
+    if (area > mejorArea) {
+      mejorArea = area;
+      mejorVertices = vertices;
+    }
   }
 
-  // El lazo se cierra solo si el último punto vuelve al primer vértice
-  if (!cerca(actual, vertices[0])) return null;
-
-  return vertices;
+  return mejorVertices;
 }
 
 /** Área de un polígono simple mediante la fórmula del shoelace (valor absoluto). */

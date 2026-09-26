@@ -29,6 +29,10 @@ const ENDPOINT_SNAP_PX = 10;
 const ANGLE_SNAP_STEP_DEG = 15;
 const DOOR_WIDTH_METERS = 0.8;
 const DOOR_LEAF_THICKNESS_PX = 6;
+// Umbral en píxeles de PANTALLA (como ENDPOINT_SNAP_PX): hay que dividirlo
+// por canvas.getZoom() antes de compararlo contra distancias en coordenadas
+// de escena — si no, con zoom alejado el imán "se encoge" y con zoom
+// acercado "se agranda" en términos de lo que el usuario percibe en pantalla.
 const DOOR_WALL_SNAP_PX = 25;
 
 interface CanvasPlanoProps {
@@ -1360,7 +1364,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           if (customData?.tipo === "door") {
             const centerX = geometria.left + geometria.width / 2;
             const centerY = geometria.top + geometria.height / 2;
-            let mejorDist = DOOR_WALL_SNAP_PX;
+            // Umbral en unidades de escena equivalente a DOOR_WALL_SNAP_PX de
+            // pantalla, igual que el imán de extremos de pared (ENDPOINT_SNAP_PX
+            // / zoom) — usa el `canvas` local del closure, no `fabricCanvas`
+            // (este handler vive en el useEffect con deps [canvasWidth,
+            // canvasHeight], que no se re-ejecuta cuando solo cambia el zoom).
+            const zoomActual = canvas.getZoom() || 1;
+            let mejorDist = DOOR_WALL_SNAP_PX / zoomActual;
             let anclaje: { left: number; top: number; angle: number } | null = null;
 
             getWallSegments(canvas).forEach((seg) => {
@@ -2758,12 +2768,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const widthPx = DOOR_WIDTH_METERS * pixelsPerMeterRef.current;
     const heightPx = DOOR_LEAF_THICKNESS_PX;
 
-    // Anclar a la pared más cercana (si el clic cae a menos de ~25px de una):
-    // el hueco se centra sobre la pared y su ángulo se alinea con ella.
+    // Anclar a la pared más cercana (si el clic cae a menos de ~25px de
+    // PANTALLA de una, sea cual sea el zoom actual): el hueco se centra
+    // sobre la pared y su ángulo se alinea con ella.
     let centerX = x;
     let centerY = y;
     let angle = 0;
-    let mejorDist = DOOR_WALL_SNAP_PX;
+    const zoomActual = fabricCanvas.getZoom() || 1;
+    let mejorDist = DOOR_WALL_SNAP_PX / zoomActual;
 
     getWallSegments(fabricCanvas).forEach((seg) => {
       const proyeccion = proyectarPuntoEnSegmento({ x, y }, seg);
