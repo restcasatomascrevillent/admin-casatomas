@@ -119,24 +119,43 @@ export type Database = {
       }
       asignaciones_mesa: {
         Row: {
+          asignada_por: string | null
           created_at: string | null
+          espacio_id: string | null
+          fecha: string | null
           id: string
           mesa_id: string
           reserva_id: string
+          turno: string | null
         }
         Insert: {
+          asignada_por?: string | null
           created_at?: string | null
+          espacio_id?: string | null
+          fecha?: string | null
           id?: string
           mesa_id: string
           reserva_id: string
+          turno?: string | null
         }
         Update: {
+          asignada_por?: string | null
           created_at?: string | null
+          espacio_id?: string | null
+          fecha?: string | null
           id?: string
           mesa_id?: string
           reserva_id?: string
+          turno?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "asignaciones_mesa_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "asignaciones_mesa_mesa_id_fkey"
             columns: ["mesa_id"]
@@ -156,6 +175,64 @@ export type Database = {
             columns: ["reserva_id"]
             isOneToOne: false
             referencedRelation: "vista_reservas_pendientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asignaciones_mesa_descartadas: {
+        Row: {
+          descartada_at: string | null
+          espacio_id: string | null
+          fecha: string | null
+          id: string
+          mesa_id: string | null
+          mesa_nombre: string | null
+          motivo: string | null
+          reserva_id: string | null
+          turno: string | null
+        }
+        Insert: {
+          descartada_at?: string | null
+          espacio_id?: string | null
+          fecha?: string | null
+          id?: string
+          mesa_id?: string | null
+          mesa_nombre?: string | null
+          motivo?: string | null
+          reserva_id?: string | null
+          turno?: string | null
+        }
+        Update: {
+          descartada_at?: string | null
+          espacio_id?: string | null
+          fecha?: string | null
+          id?: string
+          mesa_id?: string | null
+          mesa_nombre?: string | null
+          motivo?: string | null
+          reserva_id?: string | null
+          turno?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asignaciones_mesa_descartadas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_descartadas_mesa_id_fkey"
+            columns: ["mesa_id"]
+            isOneToOne: false
+            referencedRelation: "mesas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asignaciones_mesa_descartadas_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
             referencedColumns: ["id"]
           },
         ]
@@ -3626,6 +3703,33 @@ export type Database = {
         }
         Relationships: []
       }
+      vista_asignacion_dia: {
+        Row: {
+          espacio_id: string | null
+          espacio_nombre: string | null
+          estado: string | null
+          fecha: string | null
+          grado: string | null
+          hora: string | null
+          marca: string | null
+          mesas_asignadas: number | null
+          mesas_nombres: string[] | null
+          nombre: string | null
+          numero_comensales: number | null
+          plazas_asignadas: number | null
+          reserva_id: string | null
+          turno: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservas_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vista_calidad_audio: {
         Row: {
           audio_metrics: Json | null
@@ -3928,6 +4032,19 @@ export type Database = {
         Args: { p_call_id: string; p_new_tools: Json }
         Returns: undefined
       }
+      asignar_mesas_reserva: {
+        Args: { p_mesa_ids: string[]; p_reserva_id: string }
+        Returns: {
+          asignada_por: string | null
+          created_at: string | null
+          espacio_id: string | null
+          fecha: string | null
+          id: string
+          mesa_id: string
+          reserva_id: string
+          turno: string | null
+        }[]
+      }
       buscar_contexto_chatbot: {
         Args: { embedding_query: string }
         Returns: Json
@@ -3983,6 +4100,16 @@ export type Database = {
       fn_aceptar_propuesta_solicitud: {
         Args: { p_solicitud_id: string; p_via?: string }
         Returns: Json
+      }
+      fn_asignaciones_futuras_de_mesas: {
+        Args: { p_mesa_ids: string[] }
+        Returns: {
+          fecha: string
+          mesa_id: string
+          mesa_nombre: string
+          reserva_nombre: string
+          turno: string
+        }[]
       }
       fn_normalizar_telefono: { Args: { p_telefono: string }; Returns: string }
       fn_rechazar_propuesta_solicitud: {

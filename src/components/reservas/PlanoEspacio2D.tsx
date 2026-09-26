@@ -1,24 +1,108 @@
+// ============================================================================
+// PLANO DE SALA — repartir MESAS a las reservas de un día y turno
+// ----------------------------------------------------------------------------
+// Encargo del dueño (2026-09-26):
+//   "a ver cómo hacemos esa vista para que esté lo más profesional y fácil de
+//    trabajar con ello"
+//   "hay que permitir asignar sala sin mesa y luego mesa, para ir cerrando los
+//    días poco a poco"
+//
+// Esto lo usa el personal DURANTE EL SERVICIO, con prisa. El encargado abre la
+// sala antes del servicio y va sentando las reservas del día.
+//
+// LA ASIGNACIÓN ES PROGRESIVA Y TIENE DOS GRADOS:
+//   1. SALA (`reservas.espacio_id`) — lo hace el kanban arrastrando tarjetas.
+//      NO se toca aquí.
+//   2. MESA (`asignaciones_mesa`) — ES LO QUE HACE ESTA PANTALLA.
+//
+// Una reserva CON SALA Y SIN MESA es un estado legítimo y normal: se llama
+// "pendiente de mesa". Nunca "error", nunca en rojo de error, y nunca hace
+// falta mesa para guardar nada.
+//
+// ----------------------------------------------------------------------------
+// CÓMO SE TRABAJA (2 clics para sentar una reserva normal)
+// ----------------------------------------------------------------------------
+//   1. Clic en la reserva del panel derecho ("Sentar").
+//   2. Clic en la mesa del plano. Guardado.
+//
+// Si la reserva no cabe en esa mesa, la barra de trabajo se queda abierta
+// invitando a JUNTAR otra mesa: "estos 6 caben juntando la 4 y la 5". El aviso
+// de capacidad NO bloquea — nunca. Cuando las plazas ya cubren a los
+// comensales, la barra se cierra sola y se puede pasar a la siguiente reserva.
+//
+// ----------------------------------------------------------------------------
+// QUIÉN MANDA SOBRE "MESA OCUPADA"
+// ----------------------------------------------------------------------------
+// La base de datos. El aviso del navegador es solo una cortesía para no gastar
+// un viaje al servidor; si dos camareros pelean por la misma mesa a la vez, el
+// RPC `asignar_mesas_reserva` rechaza con `MESA_OCUPADA:` y aquí se traduce con
+// `mensajeErrorAsignacion` y se refresca el plano con lo que hay de verdad.
+//
+// Todas las escrituras van por ese RPC (`useAsignarMesasReserva`), que
+// REEMPLAZA de golpe la lista de mesas de una reserva: así juntar dos mesas es
+// UNA operación atómica, y una lista vacía deja la reserva pendiente de mesa.
+//
+// La lógica pura (turnos, ajuste de capacidad, mensajes de error, resumen de
+// cierre) vive en `./asignacionPlano.ts`, con tests propios.
+// ============================================================================
+
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMesas, useCrearMesa, useActualizarMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
+import { useMesas, useCrearMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
-import { useAsignacionesMesa, useCrearAsignacion, useEliminarAsignacion, AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
-import { useReservasHoyPorEspacio } from "@/hooks/useOcupacionHoy";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { marcaDeEspacio } from "@/lib/reservas/negocios";
-import { 
-  DndContext, 
-  DragEndEvent, 
+import {
+  useAsignacionesMesa,
+  useAsignarMesasReserva,
+  AsignacionConDetalles,
+} from "@/hooks/useAsignacionesMesa";
+import {
+  ajusteCapacidad,
+  agruparPorReserva,
+  dateAFechaISO,
+  esFechaISO,
+  esFiltroTurno,
+  etiquetaFiltroTurno,
+  fechaISOaDate,
+  horaEnFiltro,
+  hoyLocal,
+  mesaOcupadaPor,
+  nombreMesasJuntas,
+  OPCIONES_TURNO,
+  plazasDeMesas,
+  resumenCierreDia,
+  turnoDeHora,
+  turnoParaConsulta,
+  useReservasDeSala,
+  type FiltroTurno,
+  type ReservaSala,
+} from "./asignacionPlano";
+import {
+  DndContext,
+  DragEndEvent,
   DragStartEvent,
-  DragOverEvent,
   DragOverlay,
   useSensor,
   useSensors,
@@ -27,24 +111,30 @@ import {
   useDroppable,
   useDraggable,
 } from "@dnd-kit/core";
-import { 
-  Plus, 
-  Trash2, 
-  ArrowLeft, 
-  Wand2, 
+import {
+  Plus,
+  Trash2,
+  ArrowLeft,
+  Wand2,
   FileDown,
   Move,
   Users,
   Clock,
-  Phone,
   X,
   GripVertical,
   Utensils,
-  AlertCircle,
   CheckCircle2,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Undo2,
+  Link2,
+  CircleDashed,
+  AlertTriangle,
+  Armchair,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -53,6 +143,11 @@ interface PlanoEspacio2DProps {
   espacioId: string;
   espacioNombre: string;
   onBack: () => void;
+  /**
+   * Día a mostrar, `YYYY-MM-DD`. OPCIONAL a propósito: `src/pages/Reservas.tsx`
+   * monta esta pantalla SIN fecha. Sin prop se lee `?fecha=` de la URL (por
+   * donde entra el calendario de ocupación) y, si tampoco, hoy.
+   */
   fecha?: string;
 }
 
@@ -82,141 +177,227 @@ interface ElementoPlano {
   props?: Record<string, any>;
 }
 
-interface Reserva {
-  id: string;
-  nombre: string;
-  hora: string;
-  numero_comensales: number;
-  estado: string;
-  telefono?: string;
+/** "14:00:00" → "14:00". */
+function horaCorta(hora: string | null | undefined): string {
+  return String(hora ?? "").slice(0, 5);
 }
 
-// Componente para reserva arrastrable y clickeable
-function DraggableReserva({ 
-  reserva, 
-  isAssigned,
-  isSelectedForClick,
-  onClickSelect,
-}: { 
-  reserva: Reserva; 
-  isAssigned: boolean;
-  isSelectedForClick?: boolean;
-  onClickSelect?: (reserva: Reserva) => void;
+/**
+ * Texto del ajuste de capacidad, sin lenguaje de error: "faltan plazas" es una
+ * observación, no un fallo.
+ *
+ * `diferencia` viene FIRMADA del contrato (`plazasAsignadas - comensales`:
+ * negativa cuando no caben), así que se pinta con `Math.abs` y el signo lo
+ * cuenta `estado`.
+ */
+function textoAjuste(comensales: number, plazas: number): { etiqueta: string; tono: string } {
+  const ajuste = ajusteCapacidad(comensales, plazas);
+  const magnitud = Math.abs(ajuste.diferencia);
+  switch (ajuste.estado) {
+    case "sin_mesa":
+      return { etiqueta: "Sin mesa todavía", tono: "border-slate-300 text-slate-600 dark:text-slate-300" };
+    case "excede":
+      return {
+        etiqueta: `Faltan ${magnitud} plaza${magnitud === 1 ? "" : "s"}`,
+        tono: "border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+      };
+    case "justo":
+      return {
+        etiqueta: "Justo",
+        tono: "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+      };
+    default:
+      return {
+        etiqueta: `Sobran ${magnitud}`,
+        tono: "border-sky-400 bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+      };
+  }
+}
+
+// ─── Tarjeta de reserva del panel ────────────────────────────────────────────
+
+/**
+ * Fila de reserva del panel derecho.
+ *
+ * Las acciones van SIEMPRE en la misma posición (ancho fijo a la derecha) para
+ * que no bailen entre filas: [asa de arrastre] [datos] [botón] [quitar].
+ */
+function TarjetaReserva({
+  reserva,
+  mesasAsignadas,
+  plazasAsignadas,
+  activa,
+  mostrarTurno,
+  onActivar,
+  onQuitarMesas,
+}: {
+  reserva: ReservaSala;
+  mesasAsignadas: string[];
+  plazasAsignadas: number;
+  activa: boolean;
+  /**
+   * Solo en "Todo el día". Con un turno concreto elegido todas las filas son de
+   * ese turno, así que la insignia no diría nada y le quitaría sitio al nombre
+   * (el panel mide 320 px).
+   */
+  mostrarTurno: boolean;
+  onActivar: (reserva: ReservaSala) => void;
+  onQuitarMesas?: (reserva: ReservaSala) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `reserva-${reserva.id}`,
     data: { type: "reserva", reserva },
-    disabled: isAssigned,
   });
 
-  const estadoColor = {
-    confirmada: "bg-green-500/20 border-green-500 text-green-700 dark:text-green-400",
-    pendiente: "bg-yellow-500/20 border-yellow-500 text-yellow-700 dark:text-yellow-400",
-    cancelada: "bg-red-500/20 border-red-500 text-red-700 dark:text-red-400",
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    // Solo activar click si no es drag
-    if (!isDragging && !isAssigned && onClickSelect) {
-      e.stopPropagation();
-      onClickSelect(reserva);
-    }
-  };
+  const tieneMesa = mesasAsignadas.length > 0;
+  const ajuste = textoAjuste(reserva.numero_comensales, plazasAsignadas);
 
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={handleClick}
       className={cn(
-        "group flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 transition-all duration-200",
-        isAssigned 
-          ? "bg-muted/50 border-muted opacity-60 cursor-not-allowed" 
-          : estadoColor[reserva.estado as keyof typeof estadoColor] || "bg-background border-border",
-        isDragging && "opacity-30 scale-95 shadow-inner",
-        !isAssigned && "cursor-pointer hover:shadow-lg hover:border-primary hover:bg-accent/40 hover:scale-[1.02]",
-        isSelectedForClick && "ring-4 ring-primary border-primary bg-primary/20 scale-[1.03] shadow-xl"
+        "flex items-center gap-2 rounded-lg border p-2 transition-colors",
+        tieneMesa
+          ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30"
+          : "border-border bg-card",
+        isDragging && "opacity-40",
+        activa && "border-primary ring-2 ring-primary/40",
       )}
-      style={{
-        touchAction: isAssigned ? 'auto' : 'none',
-      }}
     >
-      <div className={cn(
-        "p-1.5 sm:p-2 rounded-md flex-shrink-0 transition-all duration-200",
-        isAssigned ? "bg-muted" : "bg-background/50 group-hover:bg-primary/20 group-hover:scale-110",
-        isSelectedForClick && "bg-primary/30"
-      )}>
-        <GripVertical className={cn(
-          "h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground transition-colors",
-          !isAssigned && "group-hover:text-primary",
-          isSelectedForClick && "text-primary"
-        )} />
-      </div>
-      <div className="flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <p className="font-semibold text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{reserva.nombre}</p>
-          {isAssigned && (
-            <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
-          )}
-          {isSelectedForClick && (
-            <Badge className="bg-primary text-primary-foreground text-[8px] px-1 py-0">
-              Seleccionada
+      {/* Asa de arrastre: solo aquí, para que el clic de la fila no pelee con el arrastre */}
+      <button
+        type="button"
+        {...listeners}
+        {...attributes}
+        aria-label={`Arrastrar ${reserva.nombre} al plano`}
+        title="Arrastrar al plano"
+        className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        style={{ touchAction: "none" }}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
+      {/* Datos */}
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-semibold" title={reserva.nombre}>
+            {reserva.nombre}
+          </span>
+          {mostrarTurno && (
+            <Badge variant="outline" className="h-4 shrink-0 whitespace-nowrap px-1 py-0 text-[10px] font-medium">
+              {turnoDeHora(reserva.hora) === "comida" ? "Comida" : "Cena"}
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
-          <span className="flex items-center gap-0.5 sm:gap-1">
-            <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-            {reserva.hora}
+        <div className="mt-0.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
+          <span className="flex shrink-0 items-center gap-1 tabular-nums">
+            <Clock className="h-3 w-3" />
+            {horaCorta(reserva.hora)}
           </span>
-          <span className="flex items-center gap-0.5 sm:gap-1">
-            <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+          <span className="flex shrink-0 items-center gap-1 tabular-nums" title={`${reserva.numero_comensales} comensales`}>
+            <Users className="h-3 w-3" />
             {reserva.numero_comensales}
           </span>
+          {tieneMesa ? (
+            <span className="flex min-w-0 items-center gap-1" title={nombreMesasJuntas(mesasAsignadas)}>
+              {mesasAsignadas.length > 1 && <Link2 className="h-3 w-3 shrink-0 text-emerald-600" />}
+              <span className="truncate font-medium text-foreground">{nombreMesasJuntas(mesasAsignadas)}</span>
+            </span>
+          ) : (
+            <span className="flex shrink-0 items-center gap-1">
+              <CircleDashed className="h-3 w-3" />
+              Pendiente de mesa
+            </span>
+          )}
         </div>
       </div>
-      <Badge 
-        variant="outline" 
-        className={cn(
-          "text-[9px] sm:text-[10px] flex-shrink-0 px-1.5 sm:px-2 transition-colors",
-          isAssigned && "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700"
-        )}
+
+      {/* Plazas vs comensales — solo cuando ya hay mesa, si no no dice nada */}
+      {tieneMesa && (
+        <Badge
+          variant="outline"
+          className={cn("h-5 shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px] tabular-nums", ajuste.tono)}
+          title={`${plazasAsignadas} plazas asignadas para ${reserva.numero_comensales} comensales`}
+        >
+          {plazasAsignadas}/{reserva.numero_comensales}
+        </Badge>
+      )}
+
+      {/* Acciones — posición y ancho FIJOS en todas las filas.
+          El texto visible es corto para que quepa; el nombre completo de la
+          acción vive en `aria-label` (mismo criterio que ListaReservasAvanzada). */}
+      <Button
+        type="button"
+        size="sm"
+        variant={activa ? "default" : tieneMesa ? "outline" : "secondary"}
+        className="h-7 w-[72px] shrink-0 px-0 text-xs"
+        aria-label={
+          activa
+            ? `Dejar de elegir mesa para ${reserva.nombre}`
+            : tieneMesa
+              ? `Cambiar mesas de ${reserva.nombre}`
+              : `Sentar a ${reserva.nombre}`
+        }
+        onClick={() => onActivar(reserva)}
       >
-        {isAssigned ? "Asignada" : reserva.estado}
-      </Badge>
+        {activa ? "Eligiendo" : tieneMesa ? "Cambiar" : "Sentar"}
+      </Button>
+      {tieneMesa && onQuitarMesas ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+          aria-label={`Quitar mesas de ${reserva.nombre}`}
+          title="Quitar mesas"
+          onClick={() => onQuitarMesas(reserva)}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      ) : (
+        <span aria-hidden className="h-7 w-7 shrink-0" />
+      )}
     </div>
   );
 }
 
-// Componente para mesa con drop zone
-function DroppableMesa({ 
-  mesa, 
+// ─── Mesa del plano ──────────────────────────────────────────────────────────
+
+function MesaPlano({
+  mesa,
   mesaOriginal,
-  reserva, 
-  isSelected, 
+  asignacion,
+  esPrimeraDelGrupo,
+  mesasDelGrupo,
+  elegida,
+  modoAsignacion,
+  reservaActivaNombre,
+  comensalesActivos,
+  isSelected,
   isDragging,
   onDragStart,
-  onClick,
-  onRemoveAssignment,
-  isDropTarget,
-  draggingReserva,
-  selectedReservaForClick,
-  onClickAssign,
+  onSeleccionar,
+  onAlternar,
+  onQuitarMesas,
   scale,
-}: { 
-  mesa: Mesa; // Mesa con coordenadas en píxeles para render
-  mesaOriginal: Mesa; // Mesa con datos originales para callbacks
-  reserva?: AsignacionConDetalles;
+}: {
+  /** Mesa con coordenadas y tamaño YA en píxeles de pantalla. */
+  mesa: Mesa;
+  /** Mesa con los datos originales (metros / capacidad) para los callbacks. */
+  mesaOriginal: Mesa;
+  asignacion?: AsignacionConDetalles;
+  esPrimeraDelGrupo: boolean;
+  mesasDelGrupo: number;
+  elegida: boolean;
+  modoAsignacion: boolean;
+  reservaActivaNombre?: string | null;
+  comensalesActivos?: number | null;
   isSelected: boolean;
   isDragging: boolean;
   onDragStart: (e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => void;
-  onClick: () => void;
-  onRemoveAssignment?: () => void;
-  isDropTarget: boolean;
-  draggingReserva?: Reserva | null;
-  selectedReservaForClick?: Reserva | null;
-  onClickAssign?: (mesa: Mesa) => void;
+  onSeleccionar: (mesa: Mesa) => void;
+  onAlternar: (mesa: Mesa) => void;
+  onQuitarMesas?: () => void;
   scale: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -224,94 +405,63 @@ function DroppableMesa({
     data: { type: "mesa", mesa: mesaOriginal },
   });
 
-  // Calcular tamaño de fuente dinámico basado en dimensiones de la mesa
   const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
   const fontSize = Math.max(9, Math.min(14, minDimension * 0.18));
   const iconSize = Math.max(8, Math.min(12, minDimension * 0.12));
 
-  // Usar reserva seleccionada por click O por drag
-  const activeReservaForCompatibility = draggingReserva || selectedReservaForClick;
+  const ocupada = !!asignacion;
+  const ocupadaPorOtra = ocupada && !elegida;
 
-  // Lógica de compatibilidad
-  const getCompatibility = () => {
-    if (!activeReservaForCompatibility || reserva) return null;
-    
-    const comensales = activeReservaForCompatibility.numero_comensales;
-    const capacidad = mesaOriginal.capacidad;
-    
-    if (comensales > capacidad) {
-      return { type: 'incompatible', message: 'No cabe', icon: '✗' };
-    } else if (comensales === capacidad) {
-      return { type: 'perfect', message: '¡Perfecta!', icon: '✓' };
-    } else if (comensales >= capacidad - 1) {
-      return { type: 'good', message: 'Buena', icon: '○' };
-    } else {
-      return { type: 'oversized', message: 'Grande', icon: '+' };
-    }
-  };
+  // Encaje informativo mientras se está sentando a alguien. NO bloquea: una
+  // mesa pequeña se marca "se queda corta" pero se puede elegir igual para
+  // juntarla con otra.
+  const encaje = useMemo(() => {
+    if (!modoAsignacion || !comensalesActivos || ocupadaPorOtra) return null;
+    const capacidad = mesaOriginal.capacidad || 0;
+    if (comensalesActivos > capacidad) return "corta" as const;
+    if (comensalesActivos === capacidad) return "justa" as const;
+    return "sobra" as const;
+  }, [modoAsignacion, comensalesActivos, ocupadaPorOtra, mesaOriginal.capacidad]);
 
-  const compatibility = getCompatibility();
-  const canAcceptClick = selectedReservaForClick && !reserva && compatibility?.type !== 'incompatible';
-
-  // Escala de ampliación cuando está en hover durante drag - más grande para mesas pequeñas
-  const baseScale = minDimension < 40 ? 1.6 : minDimension < 60 ? 1.4 : 1.2;
-  const hoverScale = isOver && compatibility?.type !== 'incompatible' ? baseScale : 1;
-  const hoverZIndex = isOver ? 100 : (isDragging ? 60 : isSelected ? 30 : 10);
-
-  // Área de detección extendida para mesas pequeñas
   const minHitArea = 50 * scale;
   const mesaWidth = mesa.ancho || 60;
   const mesaHeight = mesa.alto || 60;
   const hitAreaPadding = Math.max(8, (minHitArea - Math.min(mesaWidth, mesaHeight)) / 2);
 
-  const getCompatibilityStyles = () => {
-    if (!compatibility) return '';
-    switch (compatibility.type) {
-      case 'incompatible':
-        return 'ring-2 ring-red-400 border-red-400 opacity-40 grayscale';
-      case 'perfect':
-        return 'ring-4 ring-green-400 border-green-500 bg-green-100 dark:bg-green-900/40 shadow-xl shadow-green-500/30';
-      case 'good':
-        return 'ring-3 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-lg shadow-blue-500/20';
-      case 'oversized':
-        return 'ring-2 ring-yellow-400 border-yellow-400 opacity-80 bg-yellow-50 dark:bg-yellow-900/20';
-      default:
-        return '';
-    }
+  const baseScale = minDimension < 40 ? 1.6 : minDimension < 60 ? 1.4 : 1.2;
+  const hoverScale = isOver ? baseScale : 1;
+  const hoverZIndex = isOver ? 100 : isDragging ? 60 : elegida || isSelected ? 30 : 10;
+
+  const estadoTexto = elegida
+    ? `elegida para ${reservaActivaNombre ?? "la reserva"}`
+    : asignacion
+      ? `ocupada por ${asignacion.reservas.nombre} a las ${horaCorta(asignacion.reservas.hora)}`
+      : "libre";
+
+  const manejarClic = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (modoAsignacion) onAlternar(mesaOriginal);
+    else onSeleccionar(mesaOriginal);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Si hay reserva seleccionada para asignar, hacer click
-    if (canAcceptClick && onClickAssign) {
-      e.preventDefault();
-      e.stopPropagation();
-      onClickAssign(mesaOriginal);
-      return;
-    }
-    
-    // Sino, iniciar drag
+  // El arrastre para RECOLOCAR la mesa solo se activa fuera del modo
+  // asignación: durante el reparto, un clic es un clic.
+  const manejarMouseDown = (e: React.MouseEvent) => {
+    if (modoAsignacion) return;
     e.preventDefault();
     e.stopPropagation();
     onDragStart(e, mesaOriginal);
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (canAcceptClick && onClickAssign) {
+  const manejarTouchStart = (e: React.TouchEvent) => {
+    if (modoAsignacion) {
       e.preventDefault();
       e.stopPropagation();
-      onClickAssign(mesaOriginal);
+      onAlternar(mesaOriginal);
       return;
     }
-    
     e.stopPropagation();
     onDragStart(e, mesaOriginal);
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isDragging) {
-      onClick();
-    }
   };
 
   return (
@@ -324,26 +474,32 @@ function DroppableMesa({
         width: mesaWidth + hitAreaPadding * 2,
         height: mesaHeight + hitAreaPadding * 2,
         zIndex: hoverZIndex,
-        touchAction: 'none',
+        touchAction: "none",
       }}
     >
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div
+            <button
+              type="button"
+              aria-label={`${mesaOriginal.nombre} · ${mesaOriginal.capacidad} plazas · ${estadoTexto}`}
+              aria-pressed={modoAsignacion ? elegida : undefined}
               className={cn(
-                "absolute flex flex-col items-center justify-center text-center select-none",
-                "border-2 shadow-sm",
+                "absolute flex select-none flex-col items-center justify-center border-2 text-center shadow-sm",
                 mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
-                isSelected && "border-primary ring-2 ring-primary/30",
-                !isSelected && !isDragging && "border-slate-300 dark:border-slate-600",
-                isDragging && "shadow-2xl border-primary ring-4 ring-primary/40 opacity-90",
-                reserva ? "bg-primary/20 border-primary" : "bg-white dark:bg-slate-800",
-                isOver && compatibility?.type !== 'incompatible' && "ring-4 ring-green-400 border-green-500 shadow-2xl shadow-green-500/40",
-                isOver && compatibility?.type === 'incompatible' && "ring-4 ring-red-400 border-red-500 opacity-50",
-                isDropTarget && !reserva && "border-dashed",
-                activeReservaForCompatibility && !reserva && getCompatibilityStyles(),
-                canAcceptClick ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+                // Libre / ocupada de un vistazo
+                ocupada
+                  ? "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/50"
+                  : "border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-800",
+                elegida && "border-primary bg-primary/25 ring-4 ring-primary/40",
+                isSelected && !elegida && "ring-2 ring-primary/30",
+                isDragging && "border-primary opacity-90 shadow-2xl ring-4 ring-primary/40",
+                // En modo asignación el resto se atenúa para que salten las opciones
+                modoAsignacion && ocupadaPorOtra && "opacity-50",
+                modoAsignacion && !ocupada && encaje === "justa" && "ring-2 ring-emerald-400",
+                modoAsignacion && !ocupada && encaje === "corta" && "ring-2 ring-amber-300",
+                isOver && "ring-4 ring-primary shadow-2xl",
+                modoAsignacion ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
               )}
               style={{
                 left: hitAreaPadding,
@@ -351,135 +507,109 @@ function DroppableMesa({
                 width: mesaWidth,
                 height: mesaHeight,
                 transform: `rotate(${mesa.rotacion || 0}deg) scale(${hoverScale})`,
-                transformOrigin: 'center center',
+                transformOrigin: "center center",
                 padding: Math.max(2, minDimension * 0.05),
-                transition: isDragging 
-                  ? 'box-shadow 100ms ease' 
-                  : 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease',
+                transition: isDragging
+                  ? "box-shadow 100ms ease"
+                  : "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease",
               }}
-              onMouseDown={handleMouseDown}
-              onTouchStart={handleTouchStart}
-              onClick={handleClick}
+              onMouseDown={manejarMouseDown}
+              onTouchStart={manejarTouchStart}
+              onClick={manejarClic}
             >
-              <span 
-                className="font-bold leading-tight text-center break-words pointer-events-none"
-                style={{ 
-                  fontSize: `${fontSize}px`,
-                  maxWidth: '100%',
-                  wordBreak: 'break-word',
-                  lineHeight: 1.1,
-                }}
+              <span
+                className="pointer-events-none break-words text-center font-bold leading-tight"
+                style={{ fontSize: `${fontSize}px`, maxWidth: "100%", wordBreak: "break-word", lineHeight: 1.1 }}
               >
                 {mesaOriginal.nombre}
               </span>
-              <div 
-                className="flex items-center gap-0.5 text-muted-foreground pointer-events-none"
+              <div
+                className="pointer-events-none flex items-center gap-0.5 text-muted-foreground tabular-nums"
                 style={{ fontSize: `${iconSize}px`, marginTop: 1 }}
               >
                 <Users style={{ width: iconSize, height: iconSize }} />
                 <span>{mesaOriginal.capacidad}</span>
               </div>
-            </div>
+            </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
             <div className="space-y-1">
               <p className="font-semibold">{mesaOriginal.nombre}</p>
-              <p className="text-xs">Capacidad: {mesaOriginal.capacidad} personas</p>
-              {compatibility && (
-                <p className={cn(
-                  "text-xs font-medium",
-                  compatibility.type === 'perfect' && "text-green-600",
-                  compatibility.type === 'good' && "text-blue-600",
-                  compatibility.type === 'oversized' && "text-yellow-600",
-                  compatibility.type === 'incompatible' && "text-red-600"
-                )}>
-                  {compatibility.message}
-                </p>
-              )}
-              {reserva && (
-                <div className="pt-1 border-t border-border mt-1">
-                  <p className="text-xs font-medium">{reserva.reservas.nombre}</p>
+              <p className="text-xs">{mesaOriginal.capacidad} plazas</p>
+              {asignacion ? (
+                <div className="mt-1 border-t border-border pt-1">
+                  <p className="text-xs font-medium">{asignacion.reservas.nombre}</p>
                   <p className="text-xs text-muted-foreground">
-                    {reserva.reservas.hora} · {reserva.reservas.numero_comensales} pax
+                    {horaCorta(asignacion.reservas.hora)} · {asignacion.reservas.numero_comensales} comensales
+                    {mesasDelGrupo > 1 && ` · ${mesasDelGrupo} mesas juntas`}
                   </p>
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Libre</p>
               )}
             </div>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
-      {/* Indicador de compatibilidad */}
-      {compatibility && !reserva && isOver && compatibility.type !== 'incompatible' && (
-        <div 
-          className={cn(
-            "absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap shadow-lg z-50 animate-in fade-in zoom-in-95 duration-150 pointer-events-none",
-            compatibility.type === 'perfect' && "bg-green-500 text-white",
-            compatibility.type === 'good' && "bg-blue-500 text-white",
-            compatibility.type === 'oversized' && "bg-yellow-500 text-white",
-          )}
-          style={{
-            top: -28,
-          }}
+      {/* Quién ocupa la mesa: nombre y hora legibles justo encima. Solo en la
+          primera mesa del grupo, para que dos mesas juntas no repitan cartel. */}
+      {asignacion && esPrimeraDelGrupo && (
+        <div
+          className="pointer-events-auto absolute left-1/2 z-20 min-w-max -translate-x-1/2 rounded-md bg-emerald-600 px-2 py-1 text-white shadow-lg"
+          style={{ top: -30, maxWidth: Math.max(130, mesaWidth * 1.6) }}
         >
-          {compatibility.icon} {compatibility.message}
-        </div>
-      )}
-
-      {/* Tarjeta de reserva asignada */}
-      {reserva && (
-        <div 
-          className="absolute left-1/2 -translate-x-1/2 z-20 bg-primary text-primary-foreground rounded-md shadow-lg px-2 py-1 min-w-max pointer-events-auto"
-          style={{ 
-            top: -28,
-            maxWidth: Math.max(120, mesaWidth * 1.5),
-          }}
-        >
-          {onRemoveAssignment && (
+          {onQuitarMesas && (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onRemoveAssignment();
+                onQuitarMesas();
               }}
-              className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full p-0.5 shadow-md hover:scale-110 transition-transform z-30"
+              aria-label={`Liberar las mesas de ${asignacion.reservas.nombre}`}
+              title="Quitar mesas"
+              className="absolute -right-1.5 -top-1.5 z-30 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow-md transition-transform hover:scale-110"
             >
               <X className="h-2.5 w-2.5" />
             </button>
           )}
-          <p className="font-semibold text-[11px] leading-tight truncate text-center pointer-events-none">
-            {reserva.reservas.nombre}
+          <p className="pointer-events-none truncate text-center text-[11px] font-semibold leading-tight">
+            {asignacion.reservas.nombre}
           </p>
-          <div className="flex items-center justify-center gap-1.5 text-[9px] opacity-90 pointer-events-none">
-            <span className="flex items-center gap-0.5">
-              <Clock className="h-2.5 w-2.5" />
-              {reserva.reservas.hora}
-            </span>
+          <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[9px] opacity-95 tabular-nums">
+            <span>{horaCorta(asignacion.reservas.hora)}</span>
             <span>·</span>
-            <span className="flex items-center gap-0.5">
-              <Users className="h-2.5 w-2.5" />
-              {reserva.reservas.numero_comensales}
-            </span>
+            <span>{asignacion.reservas.numero_comensales} pax</span>
+            {mesasDelGrupo > 1 && (
+              <>
+                <span>·</span>
+                <span className="flex items-center gap-0.5">
+                  <Link2 className="h-2.5 w-2.5" />
+                  {mesasDelGrupo}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* Etiqueta bocadillo */}
-      {mesaOriginal.etiqueta && (
-        <div 
-          className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none"
-          style={{ 
-            top: hitAreaPadding + mesaHeight + 4,
-          }}
+      {/* Mesas juntas que no llevan cartel: se marca que son parte de un grupo */}
+      {asignacion && !esPrimeraDelGrupo && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[9px] font-semibold text-white shadow"
+          style={{ top: -16 }}
         >
-          <div 
-            className="absolute left-1/2 -translate-x-1/2 -top-1 w-0 h-0"
-            style={{
-              borderLeft: '4px solid transparent',
-              borderRight: '4px solid transparent',
-              borderBottom: '4px solid #d97706',
-            }}
-          />
-          <div className="bg-amber-100 border border-amber-500 rounded px-1.5 py-0.5 text-[9px] font-medium text-amber-800 whitespace-nowrap shadow-sm">
+          Junta
+        </div>
+      )}
+
+      {/* Etiqueta fija de la mesa (p. ej. "junto a la ventana") */}
+      {mesaOriginal.etiqueta && (
+        <div
+          className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
+          style={{ top: hitAreaPadding + mesaHeight + 4 }}
+        >
+          <div className="whitespace-nowrap rounded border border-amber-500 bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-800 shadow-sm">
             {mesaOriginal.etiqueta}
           </div>
         </div>
@@ -488,16 +618,106 @@ function DroppableMesa({
   );
 }
 
+// ─── Pantalla ────────────────────────────────────────────────────────────────
+
 export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: PlanoEspacio2DProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Día y turno ───────────────────────────────────────────────────────────
+  // Prioridad: prop `fecha` > `?fecha=` de la URL > hoy. El parámetro se llama
+  // `fecha` y NO `date`: `src/pages/Reservas.tsx` ya usa `tab`, `status` y
+  // `date` para la pestaña Lista y no hay que pisárselos.
+  const fechaInicial = useMemo(() => {
+    if (esFechaISO(fecha)) return fecha as string;
+    const deUrl = searchParams.get("fecha");
+    if (esFechaISO(deUrl)) return deUrl as string;
+    return hoyLocal();
+    // Solo al montar: después manda el estado interno.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [fechaSel, setFechaSel] = useState<string>(fechaInicial);
+
+  // Turno por defecto: el del momento en que se abre la pantalla. El encargado
+  // entra antes o durante un servicio concreto, no a ver los dos mezclados.
+  const turnoInicial = useMemo<FiltroTurno>(() => {
+    const deUrl = searchParams.get("turno");
+    if (esFiltroTurno(deUrl)) return deUrl;
+    return turnoDeHora(new Date().toLocaleTimeString("es-ES", { hour12: false }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>(turnoInicial);
+
+  // Si el padre empieza a pasar `fecha` (o la cambia), se sigue.
+  useEffect(() => {
+    if (esFechaISO(fecha)) setFechaSel(fecha as string);
+  }, [fecha]);
+
+  /** Guarda día/turno en la URL sin tocar el resto de parámetros. */
+  const sincronizarUrl = useCallback(
+    (nuevaFecha: string, nuevoTurno: FiltroTurno) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          params.set("fecha", nuevaFecha);
+          params.set("turno", nuevoTurno);
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const cambiarFecha = useCallback(
+    (nueva: string) => {
+      if (!esFechaISO(nueva)) return;
+      setFechaSel(nueva);
+      setReservaActivaId(null);
+      setUltimoCambio(null);
+      sincronizarUrl(nueva, filtroTurno);
+    },
+    [filtroTurno, sincronizarUrl],
+  );
+
+  const moverDia = useCallback(
+    (dias: number) => {
+      const d = fechaISOaDate(fechaSel);
+      d.setDate(d.getDate() + dias);
+      cambiarFecha(dateAFechaISO(d));
+    },
+    [fechaSel, cambiarFecha],
+  );
+
+  const cambiarTurno = useCallback(
+    (nuevo: string) => {
+      // El ToggleGroup devuelve "" al desmarcar: se ignora, siempre hay turno.
+      if (!esFiltroTurno(nuevo)) return;
+      setFiltroTurno(nuevo);
+      setReservaActivaId(null);
+      sincronizarUrl(fechaSel, nuevo);
+    },
+    [fechaSel, sincronizarUrl],
+  );
+
+  // ── Estado de la pantalla ─────────────────────────────────────────────────
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [showAddMesa, setShowAddMesa] = useState(false);
+  const [mesaABorrar, setMesaABorrar] = useState<Mesa | null>(null);
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
-  const [activeReserva, setActiveReserva] = useState<Reserva | null>(null);
-  const [selectedReservaForClick, setSelectedReservaForClick] = useState<Reserva | null>(null);
+  const [activeReserva, setActiveReserva] = useState<ReservaSala | null>(null);
+  const [reservaActivaId, setReservaActivaId] = useState<string | null>(null);
+  /** Un solo nivel de deshacer, como se pidió: nada de historial infinito. */
+  const [ultimoCambio, setUltimoCambio] = useState<{
+    reservaId: string;
+    nombre: string;
+    mesaIdsAntes: string[];
+    descripcion: string;
+  } | null>(null);
+  const [aQuitarMesas, setAQuitarMesas] = useState<{ reserva: ReservaSala; mesas: string } | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
-  const [manualZoom, setManualZoom] = useState<number | null>(null); // null = auto-zoom
+  const [manualZoom, setManualZoom] = useState<number | null>(null);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -518,56 +738,316 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     alto: 80,
   });
 
-  const fechaActual = fecha || new Date().toLocaleDateString("sv-SE");
-
+  // ── Datos ─────────────────────────────────────────────────────────────────
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
-  const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(fechaActual, espacioId);
-  // Reservas de hoy del negocio de ESTE espacio (El Reservado => Touza).
-  const { data: espaciosPlano } = useEspaciosReserva();
-  const marcaPlano = marcaDeEspacio(((espaciosPlano ?? []) as any[]).find((e) => e.id === espacioId));
-  const { data: reservasHoy } = useReservasHoyPorEspacio(marcaPlano);
+  // El turno se le pasa AL HOOK (tercer parámetro): el filtrado por turno lo
+  // hace él con la misma regla del SQL, así que aquí no se repite.
+  const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(
+    fechaSel,
+    espacioId,
+    turnoParaConsulta(filtroTurno),
+  );
+  const { data: reservasDia } = useReservasDeSala(espacioId, fechaSel);
 
   const crearMesa = useCrearMesa();
   const actualizarMesasSilent = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
-  const crearAsignacion = useCrearAsignacion();
-  const eliminarAsignacion = useEliminarAsignacion();
+  const asignarMesas = useAsignarMesasReserva();
 
-  // Sensors para dnd-kit - mejorados para touch y pointer
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5, // Más sensible
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 5,
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
   );
 
-  // Obtener dimensiones y escala del plano guardado
+  // ── Turno: filtra reservas Y ocupación de mesas a la vez ──────────────────
+  // Sin esto el plano mezcla los dos servicios del día y "mesa ocupada" no
+  // significa nada: la 4 puede estar ocupada a las 14:00 y libre a las 21:00.
+  const reservasTurno = useMemo(
+    () => (reservasDia ?? []).filter((r) => horaEnFiltro(r.hora, filtroTurno)),
+    [reservasDia, filtroTurno],
+  );
+
+  // Ya vienen recortadas al turno por `useAsignacionesMesa`. Se conserva el
+  // nombre para que quede claro a qué servicio pertenece lo que se pinta.
+  const asignacionesTurno = useMemo(() => asignaciones ?? [], [asignaciones]);
+
+  const mesasPorId = useMemo(() => new Map(localMesas.map((m) => [m.id, m])), [localMesas]);
+  const asignacionesPorReserva = useMemo(() => agruparPorReserva(asignacionesTurno), [asignacionesTurno]);
+
+  /** Primera asignación de cada mesa en el turno (la que lleva el cartel). */
+  const asignacionDeMesa = useCallback(
+    (mesaId: string): AsignacionConDetalles | undefined =>
+      asignacionesTurno.find((a) => a.mesa_id === mesaId),
+    [asignacionesTurno],
+  );
+
+  const mesaIdsDe = useCallback(
+    (reservaId: string): string[] => (asignacionesPorReserva.get(reservaId) ?? []).map((a) => a.mesa_id),
+    [asignacionesPorReserva],
+  );
+
+  const nombresMesasDe = useCallback(
+    (reservaId: string): string[] =>
+      mesaIdsDe(reservaId).map((id) => mesasPorId.get(id)?.nombre ?? "Mesa"),
+    [mesaIdsDe, mesasPorId],
+  );
+
+  const reservaActiva = useMemo(
+    () => reservasTurno.find((r) => r.id === reservaActivaId) ?? null,
+    [reservasTurno, reservaActivaId],
+  );
+  const mesaIdsActivos = reservaActiva ? mesaIdsDe(reservaActiva.id) : [];
+  const plazasActivas = plazasDeMesas(mesaIdsActivos, mesasPorId);
+
+  const resumen = useMemo(
+    () => resumenCierreDia(reservasTurno, asignacionesPorReserva),
+    [reservasTurno, asignacionesPorReserva],
+  );
+
+  const mesasOcupadas = useMemo(
+    () => new Set(asignacionesTurno.map((a) => a.mesa_id)).size,
+    [asignacionesTurno],
+  );
+
+  const reservasPendientes = useMemo(
+    () => reservasTurno.filter((r) => mesaIdsDe(r.id).length === 0),
+    [reservasTurno, mesaIdsDe],
+  );
+  const reservasConMesa = useMemo(
+    () => reservasTurno.filter((r) => mesaIdsDe(r.id).length > 0),
+    [reservasTurno, mesaIdsDe],
+  );
+
+  // ── Guardar / deshacer ────────────────────────────────────────────────────
+
+  /**
+   * Única puerta de escritura. `mesaIds` es la lista COMPLETA que tendrá la
+   * reserva: vacía = quitarle las mesas (sigue con sala, pendiente de mesa).
+   */
+  const guardarMesas = useCallback(
+    async (
+      reserva: ReservaSala,
+      mesaIds: string[],
+      opciones?: { registrarDeshacer?: boolean; mensaje?: string },
+    ) => {
+      const antes = mesaIdsDe(reserva.id);
+      const nombresNuevos = mesaIds.map((id) => mesasPorId.get(id)?.nombre ?? "Mesa");
+
+      try {
+        // `silencioso`: el mensaje de éxito lo pone esta pantalla, que sabe
+        // nombrar las mesas ("María → Mesa 4 + Mesa 5"). El de ERROR lo pone el
+        // hook con `mensajeErrorAsignacion`, así que aquí NO se repite: dos
+        // avisos idénticos encima del otro.
+        await asignarMesas.mutateAsync({ reserva_id: reserva.id, mesa_ids: mesaIds, silencioso: true });
+      } catch {
+        // La base de datos es la que manda sobre "mesa ocupada": se refresca el
+        // plano con lo que hay de verdad ahora mismo.
+        await refetchAsignaciones();
+        return false;
+      }
+
+      if (opciones?.registrarDeshacer !== false) {
+        setUltimoCambio({
+          reservaId: reserva.id,
+          nombre: reserva.nombre,
+          mesaIdsAntes: antes,
+          descripcion:
+            mesaIds.length === 0
+              ? `Mesas quitadas a ${reserva.nombre}`
+              : `${reserva.nombre} en ${nombreMesasJuntas(nombresNuevos)}`,
+        });
+      }
+
+      await refetchAsignaciones();
+
+      const plazas = plazasDeMesas(mesaIds, mesasPorId);
+      const ajuste = ajusteCapacidad(reserva.numero_comensales, plazas);
+
+      if (mesaIds.length === 0) {
+        toast.success(`${reserva.nombre} se queda pendiente de mesa`);
+      } else {
+        toast.success(opciones?.mensaje ?? `${reserva.nombre} → ${nombreMesasJuntas(nombresNuevos)}`);
+      }
+
+      // AVISO, no bloqueo: es exactamente el caso "estos 6 caben juntando la 4
+      // y la 5", así que se guarda y se invita a juntar otra mesa.
+      if (ajuste.estado === "excede") {
+        toast.warning(
+          `${nombreMesasJuntas(nombresNuevos)} da ${plazas} plazas y son ${reserva.numero_comensales}: faltan ${Math.abs(
+            ajuste.diferencia,
+          )}. Puedes juntar otra mesa o dejarlo así.`,
+        );
+      }
+
+      // Si ya caben, se cierra la barra para poder pasar a la siguiente
+      // reserva; si no caben, se queda abierta invitando a juntar.
+      if (ajuste.estado !== "excede" && mesaIds.length > 0) setReservaActivaId(null);
+
+      return true;
+    },
+    [asignarMesas, mesaIdsDe, mesasPorId, refetchAsignaciones],
+  );
+
+  const deshacer = useCallback(async () => {
+    if (!ultimoCambio) return;
+    const reserva = (reservasDia ?? []).find((r) => r.id === ultimoCambio.reservaId);
+    try {
+      await asignarMesas.mutateAsync({
+        reserva_id: ultimoCambio.reservaId,
+        mesa_ids: ultimoCambio.mesaIdsAntes,
+        silencioso: true,
+      });
+    } catch {
+      // El error ya lo explica el hook; aquí solo se recoge el plano.
+      await refetchAsignaciones();
+      return;
+    }
+    await refetchAsignaciones();
+    setUltimoCambio(null);
+    const nombres = ultimoCambio.mesaIdsAntes.map((id) => mesasPorId.get(id)?.nombre ?? "Mesa");
+    toast.success(
+      ultimoCambio.mesaIdsAntes.length === 0
+        ? `Deshecho: ${reserva?.nombre ?? ultimoCambio.nombre} vuelve a estar pendiente de mesa`
+        : `Deshecho: ${reserva?.nombre ?? ultimoCambio.nombre} vuelve a ${nombreMesasJuntas(nombres)}`,
+    );
+  }, [ultimoCambio, reservasDia, asignarMesas, refetchAsignaciones, mesasPorId]);
+
+  // ── Interacción ───────────────────────────────────────────────────────────
+
+  const activarReserva = useCallback(
+    (reserva: ReservaSala) => {
+      setReservaActivaId((actual) => (actual === reserva.id ? null : reserva.id));
+      setSelectedMesa(null);
+    },
+    [],
+  );
+
+  const pedirQuitarMesas = useCallback(
+    (reserva: ReservaSala) => {
+      setAQuitarMesas({ reserva, mesas: nombreMesasJuntas(nombresMesasDe(reserva.id)) });
+    },
+    [nombresMesasDe],
+  );
+
+  // Se cierra el diálogo AL FINAL (en el `finally`), no antes de guardar, igual
+  // que `confirmarBorrado` en GestionMesasEspacios.tsx. Cerrarlo primero y
+  // hacer después el guardado + refetch interrumpe la secuencia de cierre de
+  // Radix a media animación: el diálogo se queda en el DOM con
+  // `data-state="closed"` y, lo grave, `document.body` se queda con
+  // `pointer-events: none`, o sea LA PANTALLA ENTERA CONGELADA justo en
+  // pleno servicio (verificado en el navegador: tras confirmar, ni "Deshacer"
+  // ni ninguna otra acción volvían a responder). De paso arregla que el título
+  // parpadeara como "¿Quitar las mesas de ?" al anularse el nombre antes de
+  // que el diálogo terminara de desaparecer.
+  const confirmarQuitarMesas = useCallback(async () => {
+    if (!aQuitarMesas) return;
+    const pendiente = aQuitarMesas;
+    try {
+      await guardarMesas(pendiente.reserva, []);
+      setReservaActivaId(null);
+    } finally {
+      setAQuitarMesas(null);
+    }
+  }, [aQuitarMesas, guardarMesas]);
+
+  /** Clic en una mesa mientras se sienta a una reserva: la añade o la quita. */
+  const alternarMesa = useCallback(
+    (mesa: Mesa) => {
+      if (!reservaActiva) return;
+      const actuales = mesaIdsDe(reservaActiva.id);
+
+      if (actuales.includes(mesa.id)) {
+        const restantes = actuales.filter((id) => id !== mesa.id);
+        if (restantes.length === 0) {
+          pedirQuitarMesas(reservaActiva);
+          return;
+        }
+        void guardarMesas(reservaActiva, restantes, {
+          mensaje: `${mesa.nombre} liberada · ${reservaActiva.nombre} en ${nombreMesasJuntas(
+            restantes.map((id) => mesasPorId.get(id)?.nombre ?? "Mesa"),
+          )}`,
+        });
+        return;
+      }
+
+      // Cortesía: avisar antes de gastar un viaje al servidor. La comprobación
+      // de verdad la hace la base de datos (ver cabecera del fichero).
+      const ocupada = mesaOcupadaPor(asignacionesTurno, mesa.id, reservaActiva.id);
+      if (ocupada) {
+        toast.error(
+          `${mesa.nombre} ya es de ${ocupada.reservas.nombre} (${horaCorta(ocupada.reservas.hora)}). Elige otra o quítasela primero.`,
+        );
+        return;
+      }
+
+      void guardarMesas(reservaActiva, [...actuales, mesa.id]);
+    },
+    [reservaActiva, mesaIdsDe, asignacionesTurno, guardarMesas, pedirQuitarMesas, mesasPorId],
+  );
+
+  const seleccionarMesa = useCallback((mesa: Mesa) => setSelectedMesa(mesa), []);
+
+  // Arrastrar una reserva a una mesa: la AÑADE a las que ya tenga, así que
+  // arrastrar la misma reserva a una segunda mesa las junta.
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    if (active.data.current?.type === "reserva") {
+      setActiveReserva(active.data.current.reserva as ReservaSala);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveReserva(null);
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const overData = over.data.current;
+    if (activeData?.type !== "reserva" || overData?.type !== "mesa") return;
+
+    const reserva = activeData.reserva as ReservaSala;
+    const mesa = overData.mesa as Mesa;
+    const actuales = mesaIdsDe(reserva.id);
+
+    if (actuales.includes(mesa.id)) {
+      toast.info(`${reserva.nombre} ya tiene la ${mesa.nombre}`);
+      return;
+    }
+
+    const ocupada = mesaOcupadaPor(asignacionesTurno, mesa.id, reserva.id);
+    if (ocupada) {
+      toast.error(
+        `${mesa.nombre} ya es de ${ocupada.reservas.nombre} (${horaCorta(ocupada.reservas.hora)}). Elige otra o quítasela primero.`,
+      );
+      return;
+    }
+
+    // Sin bloqueo por capacidad: se guarda y, si no caben, se avisa.
+    await guardarMesas(reserva, [...actuales, mesa.id]);
+  };
+
+  // ── Plano: dimensiones, zoom y pan (sin cambios de comportamiento) ────────
   const PIXELS_PER_METER = plano?.pixels_per_meter || 50;
   const realWidth = plano?.ancho_metros || 12;
   const realHeight = plano?.alto_metros || 8;
-  
-  // Canvas lógico basado en las dimensiones reales del plano
   const canvasWidth = realWidth * PIXELS_PER_METER;
   const canvasHeight = realHeight * PIXELS_PER_METER;
-  
-  const elementosPlano: ElementoPlano[] = plano?.configuracion?.elementos || [];
+  // Memoizado: sin esto el `|| []` crea un array nuevo en cada render y tira
+  // por tierra el `useMemo` de `contentBounds` (que es el cálculo caro).
+  const elementosPlano: ElementoPlano[] = useMemo(
+    () => plano?.configuracion?.elementos || [],
+    [plano?.configuracion?.elementos],
+  );
 
-  // Calcular bounding box del contenido real (paredes, elementos y mesas) - memoizado
   const contentBounds = useMemo(() => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
-    // Incluir elementos del plano
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
     elementosPlano.forEach((elem) => {
       const props = elem.props || elem;
-      
       if (elem.tipo === "wall" && props.x1 !== undefined) {
         minX = Math.min(minX, props.x1, props.x2);
         minY = Math.min(minY, props.y1, props.y2);
@@ -582,8 +1062,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         maxY = Math.max(maxY, props.top + h);
       }
     });
-    
-    // Incluir mesas (convertir de metros a pixels)
+
     localMesas.forEach((mesa) => {
       const x = (mesa.pos_x || 0) * PIXELS_PER_METER;
       const y = (mesa.pos_y || 0) * PIXELS_PER_METER;
@@ -594,60 +1073,51 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
     });
-    
-    // Si no hay contenido, usar todo el canvas
+
     if (minX === Infinity) {
-      return { minX: 0, minY: 0, maxX: canvasWidth, maxY: canvasHeight, width: canvasWidth, height: canvasHeight };
+      return {
+        minX: 0,
+        minY: 0,
+        maxX: canvasWidth,
+        maxY: canvasHeight,
+        width: canvasWidth,
+        height: canvasHeight,
+      };
     }
-    
-    // Añadir padding de exactamente 1 cuadro de grid (1 metro = PIXELS_PER_METER)
+
     const gridPadding = PIXELS_PER_METER;
-    
     minX = Math.max(0, minX - gridPadding);
     minY = Math.max(0, minY - gridPadding);
     maxX = Math.min(canvasWidth, maxX + gridPadding);
     maxY = Math.min(canvasHeight, maxY + gridPadding);
-    
+
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   }, [elementosPlano, localMesas, PIXELS_PER_METER, canvasWidth, canvasHeight]);
 
-  // Medir el contenedor para escalar responsivamente
   useEffect(() => {
     if (!containerRef.current) return;
-    
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        setContainerSize({
-          width: entry.contentRect.width,
-          height: entry.contentRect.height
-        });
+        setContainerSize({ width: entry.contentRect.width, height: entry.contentRect.height });
       }
     });
-    
     resizeObserver.observe(containerRef.current);
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calcular escala base (auto-zoom)
   const autoScale = useMemo(() => {
     if (containerSize.width <= 0 || containerSize.height <= 0) return 1;
     if (contentBounds.width <= 0 || contentBounds.height <= 0) return 1;
-    
     const padding = 32;
-    const availableWidth = containerSize.width - padding;
-    const availableHeight = containerSize.height - padding;
-    
     return Math.min(
-      availableWidth / contentBounds.width,
-      availableHeight / contentBounds.height
+      (containerSize.width - padding) / contentBounds.width,
+      (containerSize.height - padding) / contentBounds.height,
     );
   }, [containerSize.width, containerSize.height, contentBounds.width, contentBounds.height]);
 
-  // Usar zoom manual si está activo, sino auto-zoom
   const scale = manualZoom !== null ? manualZoom : autoScale;
 
-  // Controles de zoom
   const handleZoomIn = useCallback(() => {
     const currentScale = manualZoom !== null ? manualZoom : autoScale;
     setManualZoom(Math.min(currentScale * 1.25, 5));
@@ -658,193 +1128,86 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setManualZoom(Math.max(currentScale * 0.8, 0.2));
   }, [manualZoom, autoScale]);
 
-  // Centrar y ajustar vista - resetea al modo auto para ver todo el contenido centrado
   const handleCenterView = useCallback(() => {
-    // Resetear a modo auto-zoom (que ya calcula el scale óptimo)
-    // y resetear el pan para que el CSS center el contenido
     setManualZoom(null);
     setPanOffset({ x: 0, y: 0 });
   }, []);
 
-  // Zoom con rueda del ratón
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const currentScale = manualZoom !== null ? manualZoom : autoScale;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.min(Math.max(currentScale * delta, 0.2), 5);
-    setManualZoom(newScale);
-  }, [manualZoom, autoScale]);
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const currentScale = manualZoom !== null ? manualZoom : autoScale;
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      setManualZoom(Math.min(Math.max(currentScale * delta, 0.2), 5));
+    },
+    [manualZoom, autoScale],
+  );
 
-  // Handlers para pan con Espacio + click y atajo F para centrar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignorar si el foco está en un input o textarea
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-      
-      if (e.code === 'Space' && !isSpacePressed) {
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+      if (e.code === "Space" && !isSpacePressed) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
-      
-      // Atajo F para centrar
-      if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.code === "KeyF" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleCenterView();
       }
+      // Escape deja de sentar a la reserva activa: salida rápida sin ratón.
+      if (e.code === "Escape") setReservaActivaId(null);
     };
-    
+
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
+      if (e.code === "Space") {
         setIsSpacePressed(false);
         setIsPanning(false);
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
     };
   }, [isSpacePressed, handleCenterView]);
 
-  const handlePanStart = useCallback((e: React.MouseEvent) => {
-    if (isSpacePressed) {
-      e.preventDefault();
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-    }
-  }, [isSpacePressed, panOffset]);
+  const handlePanStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (isSpacePressed) {
+        e.preventDefault();
+        setIsPanning(true);
+        setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      }
+    },
+    [isSpacePressed, panOffset],
+  );
 
-  const handlePanMove = useCallback((e: React.MouseEvent) => {
-    if (isPanning && isSpacePressed) {
-      setPanOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-    }
-  }, [isPanning, isSpacePressed, panStart]);
+  const handlePanMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (isPanning && isSpacePressed) {
+        setPanOffset({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+      }
+    },
+    [isPanning, isSpacePressed, panStart],
+  );
 
-  const handlePanEnd = useCallback(() => {
-    setIsPanning(false);
-  }, []);
-  
-  // Offset para centrar el contenido
+  const handlePanEnd = useCallback(() => setIsPanning(false), []);
+
   const offsetX = contentBounds.minX;
   const offsetY = contentBounds.minY;
 
-  // Sincronizar mesas locales con datos del servidor
   useEffect(() => {
-    if (mesas) {
-      setLocalMesas(mesas);
-    }
+    if (mesas) setLocalMesas(mesas);
   }, [mesas]);
 
-  // Verificar si una reserva está asignada
-  const isReservaAsignada = useCallback((reservaId: string): boolean => {
-    return asignaciones?.some((a) => a.reserva_id === reservaId) || false;
-  }, [asignaciones]);
-
-  // Obtener reserva asignada a una mesa
-  const getReservaAsignada = useCallback((mesaId: string): AsignacionConDetalles | undefined => {
-    return asignaciones?.find((a) => a.mesa_id === mesaId);
-  }, [asignaciones]);
-
-  // Handlers para drag & drop de reservas
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    if (active.data.current?.type === "reserva") {
-      setActiveReserva(active.data.current.reserva);
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveReserva(null);
-
-    if (!over) return;
-
-    const activeData = active.data.current;
-    const overData = over.data.current;
-
-    if (activeData?.type === "reserva" && overData?.type === "mesa") {
-      const reserva = activeData.reserva as Reserva;
-      const mesa = overData.mesa as Mesa;
-
-      // Verificar capacidad
-      if (reserva.numero_comensales > mesa.capacidad) {
-        toast.warning(`La mesa ${mesa.nombre} solo tiene capacidad para ${mesa.capacidad} personas`);
-        return;
-      }
-
-      // Verificar si la mesa ya tiene asignación
-      const asignacionExistente = getReservaAsignada(mesa.id);
-      if (asignacionExistente) {
-        toast.error(`La mesa ${mesa.nombre} ya tiene una reserva asignada`);
-        return;
-      }
-
-      try {
-        await crearAsignacion.mutateAsync({
-          reserva_id: reserva.id,
-          mesa_id: mesa.id,
-        });
-        toast.success(`${reserva.nombre} asignado a ${mesa.nombre}`);
-        refetchAsignaciones();
-      } catch (error) {
-        console.error("Error al asignar:", error);
-      }
-    }
-  };
-
-  // Handler para seleccionar reserva por click
-  const handleClickSelectReserva = useCallback((reserva: Reserva) => {
-    if (selectedReservaForClick?.id === reserva.id) {
-      // Deseleccionar si ya está seleccionada
-      setSelectedReservaForClick(null);
-    } else {
-      setSelectedReservaForClick(reserva);
-      toast.info(`Ahora haz click en una mesa para asignar "${reserva.nombre}"`);
-    }
-  }, [selectedReservaForClick]);
-
-  // Handler para asignar reserva por click en mesa
-  const handleClickAssignToMesa = useCallback(async (mesa: Mesa) => {
-    if (!selectedReservaForClick) return;
-
-    // Verificar capacidad
-    if (selectedReservaForClick.numero_comensales > mesa.capacidad) {
-      toast.warning(`La mesa ${mesa.nombre} solo tiene capacidad para ${mesa.capacidad} personas`);
-      return;
-    }
-
-    // Verificar si la mesa ya tiene asignación
-    const asignacionExistente = getReservaAsignada(mesa.id);
-    if (asignacionExistente) {
-      toast.error(`La mesa ${mesa.nombre} ya tiene una reserva asignada`);
-      return;
-    }
-
-    try {
-      await crearAsignacion.mutateAsync({
-        reserva_id: selectedReservaForClick.id,
-        mesa_id: mesa.id,
-      });
-      toast.success(`${selectedReservaForClick.nombre} asignado a ${mesa.nombre}`);
-      setSelectedReservaForClick(null);
-      refetchAsignaciones();
-    } catch (error) {
-      console.error("Error al asignar:", error);
-    }
-  }, [selectedReservaForClick, getReservaAsignada, crearAsignacion, refetchAsignaciones]);
-
-  // Handlers de arrastre de mesas - unificado para mouse y touch
+  // ── Recolocar mesas en el plano ───────────────────────────────────────────
   const handleMesaDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
     setDragState({
       isDragging: true,
       mesaId: mesa.id,
@@ -856,36 +1219,41 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setSelectedMesa(mesa);
   }, []);
 
-  const handleMesaMove = useCallback((clientX: number, clientY: number) => {
-    if (!dragState.isDragging || !dragState.mesaId) return;
+  const handleMesaMove = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!dragState.isDragging || !dragState.mesaId) return;
+      const deltaX = (clientX - dragState.startX) / (PIXELS_PER_METER * scale);
+      const deltaY = (clientY - dragState.startY) / (PIXELS_PER_METER * scale);
 
-    // Delta en píxeles de pantalla, convertido a metros considerando la escala
-    const deltaX = (clientX - dragState.startX) / (PIXELS_PER_METER * scale);
-    const deltaY = (clientY - dragState.startY) / (PIXELS_PER_METER * scale);
+      setLocalMesas((prev) =>
+        prev.map((m) =>
+          m.id === dragState.mesaId
+            ? {
+                ...m,
+                pos_x: Math.max(0, Math.min(realWidth - (m.ancho || 80) / 100, dragState.offsetX + deltaX)),
+                pos_y: Math.max(0, Math.min(realHeight - (m.alto || 80) / 100, dragState.offsetY + deltaY)),
+              }
+            : m,
+        ),
+      );
+    },
+    [dragState, PIXELS_PER_METER, scale, realWidth, realHeight],
+  );
 
-    setLocalMesas((prev) =>
-      prev.map((m) =>
-        m.id === dragState.mesaId
-          ? {
-              ...m,
-              pos_x: Math.max(0, Math.min(realWidth - (m.ancho || 80) / 100, dragState.offsetX + deltaX)),
-              pos_y: Math.max(0, Math.min(realHeight - (m.alto || 80) / 100, dragState.offsetY + deltaY)),
-            }
-          : m
-      )
-    );
-  }, [dragState, PIXELS_PER_METER, scale, realWidth, realHeight]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => handleMesaMove(e.clientX, e.clientY),
+    [handleMesaMove],
+  );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    handleMesaMove(e.clientX, e.clientY);
-  }, [handleMesaMove]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (dragState.isDragging) {
-      e.preventDefault();
-      handleMesaMove(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, [dragState.isDragging, handleMesaMove]);
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (dragState.isDragging) {
+        e.preventDefault();
+        handleMesaMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    },
+    [dragState.isDragging, handleMesaMove],
+  );
 
   const handleMesaDragEnd = useCallback(() => {
     if (dragState.isDragging && dragState.mesaId) {
@@ -897,25 +1265,15 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     setDragState({ isDragging: false, mesaId: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   }, [dragState, localMesas, actualizarMesasSilent]);
 
-  const handleRemoveAssignment = async (asignacionId: string) => {
-    try {
-      await eliminarAsignacion.mutateAsync(asignacionId);
-      toast.success("Asignación eliminada");
-      refetchAsignaciones();
-    } catch (error) {
-      console.error("Error al eliminar asignación:", error);
-    }
-  };
-
+  // ── Alta y baja de mesas ──────────────────────────────────────────────────
   const handleAddMesa = async () => {
     if (!newMesa.nombre.trim()) {
       toast.error("Introduce un nombre para la mesa");
       return;
     }
-
     await crearMesa.mutateAsync({
       espacio_id: espacioId,
-      nombre: newMesa.nombre,
+      nombre: newMesa.nombre.trim(),
       capacidad: newMesa.capacidad,
       forma: newMesa.forma,
       ancho: newMesa.ancho,
@@ -923,23 +1281,32 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       pos_x: 50,
       pos_y: 50,
     });
-
     setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", ancho: 80, alto: 80 });
     setShowAddMesa(false);
   };
 
-  const handleDeleteMesa = async (id: string) => {
-    await eliminarMesa.mutateAsync(id);
-    setSelectedMesa(null);
+  // Mismo orden que `confirmarQuitarMesas`: primero se borra y el diálogo se
+  // cierra en el `finally`. Cerrarlo antes del await deja `pointer-events:
+  // none` pegado al body y la pantalla congelada (ver el comentario largo de
+  // `confirmarQuitarMesas`).
+  const confirmarBorrarMesa = async () => {
+    if (!mesaABorrar) return;
+    const mesa = mesaABorrar;
+    try {
+      await eliminarMesa.mutateAsync(mesa.id);
+      setSelectedMesa(null);
+    } finally {
+      setMesaABorrar(null);
+    }
   };
 
+  // ── PDF del servicio ──────────────────────────────────────────────────────
   const handleExportPDF = async () => {
     toast.info("Preparando PDF...");
     try {
       const { default: html2canvas } = await import("html2canvas");
       const { default: jsPDF } = await import("jspdf");
 
-      // Create a temporary container with all elements at 1:1 scale
       const tempContainer = document.createElement("div");
       tempContainer.style.position = "fixed";
       tempContainer.style.left = "-9999px";
@@ -950,14 +1317,12 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       tempContainer.style.overflow = "visible";
       document.body.appendChild(tempContainer);
 
-      // Create inner content div
       const contentDiv = document.createElement("div");
       contentDiv.style.position = "relative";
       contentDiv.style.width = "100%";
       contentDiv.style.height = "100%";
       tempContainer.appendChild(contentDiv);
 
-      // Render grid
       const gridSize = 50;
       for (let x = 0; x <= contentBounds.width; x += gridSize) {
         const line = document.createElement("div");
@@ -980,20 +1345,19 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         contentDiv.appendChild(line);
       }
 
-      // Render architectural elements (walls, areas, doors, etc.)
       elementosPlano.forEach((elem) => {
         const props = elem.props || elem;
         const elemDiv = document.createElement("div");
         elemDiv.style.position = "absolute";
-        
+
         switch (elem.tipo) {
-          case "wall":
+          case "wall": {
             const x1 = props.x1 ?? 0;
             const y1 = props.y1 ?? 0;
             const x2 = props.x2 ?? 0;
             const y2 = props.y2 ?? 0;
             const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
             elemDiv.style.left = `${x1 - offsetX}px`;
             elemDiv.style.top = `${y1 - offsetY}px`;
             elemDiv.style.width = `${length}px`;
@@ -1002,7 +1366,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             elemDiv.style.transform = `rotate(${angle}deg)`;
             elemDiv.style.transformOrigin = "0 50%";
             break;
-            
+          }
           case "rectangle":
           case "area":
             elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
@@ -1013,8 +1377,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             elemDiv.style.border = "2px solid #64748b";
             elemDiv.style.borderRadius = "4px";
             break;
-            
-          case "circle":
+          case "circle": {
             const radius = props.radius || elem.radius || 30;
             elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
             elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
@@ -1024,7 +1387,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             elemDiv.style.border = "2px solid #64748b";
             elemDiv.style.borderRadius = "50%";
             break;
-            
+          }
           case "door":
             elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
             elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
@@ -1034,7 +1397,6 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             elemDiv.style.border = "2px solid #d97706";
             elemDiv.style.borderRadius = "2px";
             break;
-            
           case "window":
             elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
             elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
@@ -1043,16 +1405,14 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             elemDiv.style.backgroundColor = "#bfdbfe";
             elemDiv.style.border = "2px solid #3b82f6";
             break;
-            
           default:
             return;
         }
         contentDiv.appendChild(elemDiv);
       });
 
-      // Render mesas
       localMesas.forEach((mesa) => {
-        const reserva = getReservaAsignada(mesa.id);
+        const asignacion = asignacionDeMesa(mesa.id);
         const posXPixels = (mesa.pos_x || 0) * PIXELS_PER_METER - offsetX;
         const posYPixels = (mesa.pos_y || 0) * PIXELS_PER_METER - offsetY;
         const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER;
@@ -1064,7 +1424,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.style.top = `${posYPixels}px`;
         mesaDiv.style.width = `${anchoPixels}px`;
         mesaDiv.style.height = `${altoPixels}px`;
-        mesaDiv.style.backgroundColor = reserva ? "#bbf7d0" : "#e5e7eb";
+        mesaDiv.style.backgroundColor = asignacion ? "#bbf7d0" : "#e5e7eb";
         mesaDiv.style.border = "2px solid #6b7280";
         mesaDiv.style.borderRadius = mesa.forma === "circular" ? "50%" : "8px";
         mesaDiv.style.display = "flex";
@@ -1076,8 +1436,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         mesaDiv.textContent = mesa.nombre;
         contentDiv.appendChild(mesaDiv);
 
-        // Add reservation card if assigned - improved styling
-        if (reserva) {
+        if (asignacion) {
           const cardDiv = document.createElement("div");
           cardDiv.style.position = "absolute";
           cardDiv.style.left = `${posXPixels + anchoPixels / 2}px`;
@@ -1094,18 +1453,17 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           cardDiv.style.textAlign = "center";
           cardDiv.style.lineHeight = "1.3";
           cardDiv.style.minWidth = "80px";
-          
-          // Create structured content
+
           const nameSpan = document.createElement("div");
           nameSpan.style.fontWeight = "700";
           nameSpan.style.fontSize = "12px";
-          nameSpan.textContent = reserva.reservas.nombre || "Sin nombre";
-          
+          nameSpan.textContent = asignacion.reservas.nombre || "Sin nombre";
+
           const infoSpan = document.createElement("div");
           infoSpan.style.fontSize = "10px";
           infoSpan.style.opacity = "0.9";
-          infoSpan.textContent = `${reserva.reservas.hora} · ${reserva.reservas.numero_comensales} pers.`;
-          
+          infoSpan.textContent = `${horaCorta(asignacion.reservas.hora)} · ${asignacion.reservas.numero_comensales} pers.`;
+
           cardDiv.appendChild(nameSpan);
           cardDiv.appendChild(infoSpan);
           contentDiv.appendChild(cardDiv);
@@ -1119,133 +1477,98 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         logging: false,
       });
 
-      // Clean up
       document.body.removeChild(tempContainer);
 
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const margin = 14;
 
-      // Header
       pdf.setFontSize(18);
       pdf.setFont("helvetica", "bold");
       pdf.text(`${espacioNombre}`, margin, 15);
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "normal");
-      pdf.text(`Fecha: ${new Date(fechaActual).toLocaleDateString("es-ES", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, margin, 22);
+      pdf.text(
+        `${fechaLegible(fechaSel)} · ${etiquetaFiltroTurno(filtroTurno)}`,
+        margin,
+        22,
+      );
 
-      // Floor plan image - fit properly
-      const maxImgWidth = pdfWidth - (margin * 2);
-      const maxImgHeight = 90; // Fixed height for floor plan
+      const maxImgWidth = pdfWidth - margin * 2;
+      const maxImgHeight = 90;
       const imgRatio = canvas.width / canvas.height;
       let imgWidth = maxImgWidth;
       let imgHeight = imgWidth / imgRatio;
-      
       if (imgHeight > maxImgHeight) {
         imgHeight = maxImgHeight;
         imgWidth = imgHeight * imgRatio;
       }
+      pdf.addImage(imgData, "PNG", (pdfWidth - imgWidth) / 2, 28, imgWidth, imgHeight);
 
-      const imgX = (pdfWidth - imgWidth) / 2;
-      pdf.addImage(imgData, "PNG", imgX, 28, imgWidth, imgHeight);
-
-      // Reservations list
       const tableStartY = 28 + imgHeight + 10;
-      
-      // Get all reservations with assignments
-      const reservasAsignadas = asignaciones?.map(a => {
-        const mesa = localMesas.find(m => m.id === a.mesa_id);
-        return {
-          nombre: a.reservas.nombre || "Sin nombre",
-          hora: a.reservas.hora,
-          comensales: a.reservas.numero_comensales,
-          mesa: mesa?.nombre || "Sin mesa",
-          notas: "",
-        };
-      }) || [];
+      const filas = reservasTurno
+        .map((r) => ({
+          nombre: r.nombre || "Sin nombre",
+          hora: horaCorta(r.hora),
+          comensales: r.numero_comensales,
+          mesa: nombreMesasJuntas(nombresMesasDe(r.id)) || "Pendiente de mesa",
+        }))
+        .sort((a, b) => a.hora.localeCompare(b.hora));
 
-      const reservasSinAsignar = reservasHoy?.filter(
-        r => !asignaciones?.some(a => a.reserva_id === r.id)
-      ).map(r => ({
-        nombre: r.nombre || "Sin nombre",
-        hora: r.hora,
-        comensales: r.numero_comensales,
-        mesa: "Sin asignar",
-        notas: "",
-      })) || [];
-
-      const todasReservas = [...reservasAsignadas, ...reservasSinAsignar].sort((a, b) => a.hora.localeCompare(b.hora));
-
-      if (todasReservas.length > 0) {
+      if (filas.length > 0) {
         pdf.setFontSize(14);
         pdf.setFont("helvetica", "bold");
-        pdf.text("Reservas del día", margin, tableStartY);
+        pdf.text("Reservas del servicio", margin, tableStartY);
 
-        // Table header
         pdf.setFontSize(10);
         pdf.setFont("helvetica", "bold");
-        const colWidths = [30, 50, 25, 40, pdfWidth - margin * 2 - 145];
-        const headers = ["Hora", "Cliente", "Personas", "Mesa", "Notas"];
+        const colWidths = [25, 60, 28, pdfWidth - margin * 2 - 113];
+        const headers = ["Hora", "Cliente", "Personas", "Mesa"];
         let xPos = margin;
         const headerY = tableStartY + 8;
-        
+
         pdf.setFillColor(240, 240, 240);
         pdf.rect(margin, headerY - 4, pdfWidth - margin * 2, 7, "F");
-        
         headers.forEach((header, i) => {
           pdf.text(header, xPos + 2, headerY);
           xPos += colWidths[i];
         });
 
-        // Table rows
         pdf.setFont("helvetica", "normal");
         let rowY = headerY + 8;
-        
-        todasReservas.forEach((reserva, index) => {
+        filas.forEach((fila, index) => {
           if (rowY > pdfHeight - 15) {
             pdf.addPage();
             rowY = 20;
           }
-
-          // Alternate row background
           if (index % 2 === 0) {
             pdf.setFillColor(250, 250, 250);
             pdf.rect(margin, rowY - 4, pdfWidth - margin * 2, 7, "F");
           }
-
           xPos = margin;
-          const rowData = [
-            reserva.hora,
-            reserva.nombre.substring(0, 25),
-            String(reserva.comensales),
-            reserva.mesa,
-            reserva.notas.substring(0, 40) + (reserva.notas.length > 40 ? "..." : ""),
-          ];
-          
-          rowData.forEach((cell, i) => {
-            pdf.text(cell, xPos + 2, rowY);
-            xPos += colWidths[i];
-          });
-          
+          [fila.hora, fila.nombre.substring(0, 30), String(fila.comensales), fila.mesa.substring(0, 40)].forEach(
+            (cell, i) => {
+              pdf.text(cell, xPos + 2, rowY);
+              xPos += colWidths[i];
+            },
+          );
           rowY += 7;
         });
 
-        // Summary
         pdf.setFont("helvetica", "bold");
-        pdf.text(`Total: ${todasReservas.length} reservas - ${todasReservas.reduce((acc, r) => acc + r.comensales, 0)} comensales`, margin, rowY + 5);
+        pdf.text(
+          `${filas.length} reservas · ${resumen.comensales} comensales · ${resumen.conMesa} con mesa · ${resumen.pendientesMesa} pendientes de mesa`,
+          margin,
+          rowY + 5,
+        );
       } else {
         pdf.setFontSize(12);
-        pdf.text("No hay reservas para este día", margin, tableStartY);
+        pdf.text("No hay reservas en este servicio", margin, tableStartY);
       }
 
-      pdf.save(`plano-${espacioNombre}-${fechaActual}.pdf`);
+      pdf.save(`plano-${espacioNombre}-${fechaSel}-${filtroTurno}.pdf`);
       toast.success("PDF exportado correctamente");
     } catch (error) {
       console.error("Error al exportar PDF:", error);
@@ -1255,7 +1578,6 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
   const handleCalcularDistribucion = async () => {
     toast.info("Calculando distribución óptima con IA...");
-    
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calcular-distribucion-mesas`,
@@ -1267,19 +1589,14 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           },
           body: JSON.stringify({
             espacioId,
-            fecha: fechaActual,
+            fecha: fechaSel,
             mesas: localMesas,
-            reservas: reservasHoy,
+            reservas: reservasTurno,
           }),
-        }
+        },
       );
-
-      if (!response.ok) {
-        throw new Error("Error en la respuesta del servidor");
-      }
-
+      if (!response.ok) throw new Error("Error en la respuesta del servidor");
       const result = await response.json();
-      
       if (result.asignaciones) {
         toast.success(`${result.asignaciones.length} mesas asignadas automáticamente`);
         refetchAsignaciones();
@@ -1290,59 +1607,45 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   };
 
-  // Renderizar elemento del plano
+  // ── Elementos arquitectónicos del plano ───────────────────────────────────
   const renderElementoPlano = (elem: ElementoPlano) => {
-    const baseStyle: React.CSSProperties = {
-      position: "absolute",
-      pointerEvents: "none",
-    };
-
-    // Las propiedades pueden estar en elem directamente o en elem.props
+    const baseStyle: React.CSSProperties = { position: "absolute", pointerEvents: "none" };
     const props = elem.props || elem;
 
     switch (elem.tipo) {
-      case "wall":
-        const x1 = props.x1;
-        const y1 = props.y1;
-        const x2 = props.x2;
-        const y2 = props.y2;
-        
-        if (x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined) {
-          const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-          const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-          return (
-            <div
-              key={elem.id}
-              style={{
-                ...baseStyle,
-                left: (x1 - offsetX) * scale,
-                top: (y1 - offsetY) * scale,
-                width: length * scale,
-                height: 6 * scale,
-                backgroundColor: "#374151",
-                transform: `rotate(${angle}deg)`,
-                transformOrigin: "0 50%",
-              }}
-            />
-          );
-        }
-        return null;
-
-      case "rectangle":
-      case "area":
-        const rectLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const rectTop = ((props.top || elem.top || 0) - offsetY) * scale;
-        const rectWidth = (props.width || elem.width || 100) * scale;
-        const rectHeight = (props.height || elem.height || 100) * scale;
+      case "wall": {
+        const { x1, y1, x2, y2 } = props;
+        if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return null;
+        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: rectLeft,
-              top: rectTop,
-              width: rectWidth,
-              height: rectHeight,
+              left: (x1 - offsetX) * scale,
+              top: (y1 - offsetY) * scale,
+              width: length * scale,
+              height: 6 * scale,
+              backgroundColor: "#374151",
+              transform: `rotate(${angle}deg)`,
+              transformOrigin: "0 50%",
+            }}
+          />
+        );
+      }
+
+      case "rectangle":
+      case "area":
+        return (
+          <div
+            key={elem.id}
+            style={{
+              ...baseStyle,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              width: (props.width || elem.width || 100) * scale,
+              height: (props.height || elem.height || 100) * scale,
               backgroundColor: props.fill || elem.fill || "rgba(226, 232, 240, 0.5)",
               border: `${2 * scale}px solid #64748b`,
               borderRadius: 4 * scale,
@@ -1350,17 +1653,15 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           />
         );
 
-      case "circle":
-        const circleLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const circleTop = ((props.top || elem.top || 0) - offsetY) * scale;
+      case "circle": {
         const radius = (props.radius || elem.radius || 30) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: circleLeft,
-              top: circleTop,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
               width: radius * 2,
               height: radius * 2,
               backgroundColor: props.fill || elem.fill || "#e2e8f0",
@@ -1369,21 +1670,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             }}
           />
         );
+      }
 
       case "door":
-        const doorLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const doorTop = ((props.top || elem.top || 0) - offsetY) * scale;
-        const doorWidth = (props.width || elem.width || 70) * scale;
-        const doorHeight = (props.height || elem.height || 12) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: doorLeft,
-              top: doorTop,
-              width: doorWidth,
-              height: doorHeight,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              width: (props.width || elem.width || 70) * scale,
+              height: (props.height || elem.height || 12) * scale,
               backgroundColor: "#fef3c7",
               border: `${2 * scale}px solid #d97706`,
               borderRadius: 2 * scale,
@@ -1391,17 +1689,15 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           />
         );
 
-      case "silla":
-        const sillaLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const sillaTop = ((props.top || elem.top || 0) - offsetY) * scale;
+      case "silla": {
         const sillaRadius = (props.radius || elem.radius || 15) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: sillaLeft,
-              top: sillaTop,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
               width: sillaRadius * 2,
               height: sillaRadius * 2,
               backgroundColor: "#fde68a",
@@ -1410,21 +1706,18 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
             }}
           />
         );
+      }
 
       case "elemento":
-        const elemLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const elemTop = ((props.top || elem.top || 0) - offsetY) * scale;
-        const elemWidth = (props.width || elem.width || 40) * scale;
-        const elemHeight = (props.height || elem.height || 40) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: elemLeft,
-              top: elemTop,
-              width: elemWidth,
-              height: elemHeight,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              width: (props.width || elem.width || 40) * scale,
+              height: (props.height || elem.height || 40) * scale,
               backgroundColor: "#94a3b8",
               border: `${1 * scale}px solid #475569`,
               borderRadius: 4 * scale,
@@ -1433,15 +1726,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
         );
 
       case "polygon":
-        const polyLeft = ((props.left || elem.left || 0) - offsetX) * scale;
-        const polyTop = ((props.top || elem.top || 0) - offsetY) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: polyLeft,
-              top: polyTop,
+              left: ((props.left || elem.left || 0) - offsetX) * scale,
+              top: ((props.top || elem.top || 0) - offsetY) * scale,
               width: 60 * scale,
               height: 60 * scale,
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
@@ -1455,48 +1746,44 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   };
 
-  // Estadísticas
-  const reservasPendientes = reservasHoy?.filter((r: any) => !isReservaAsignada(r.id)) || [];
-  const reservasAsignadas = reservasHoy?.filter((r: any) => isReservaAsignada(r.id)) || [];
-  const mesasOcupadas = asignaciones?.length || 0;
-  const mesasLibres = localMesas.length - mesasOcupadas;
-
   if (loadingMesas) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="flex h-96 items-center justify-center">
+        <div
+          role="status"
+          aria-label="Cargando"
+          className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"
+        />
       </div>
     );
   }
 
+  const esHoy = fechaSel === hoyLocal();
+  const ajusteActivo = reservaActiva ? textoAjuste(reservaActiva.numero_comensales, plazasActivas) : null;
+
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex flex-col gap-4 h-[calc(100vh-220px)]">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex min-h-[calc(100vh-220px)] flex-col gap-3">
+        {/* ── Cabecera ────────────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Volver
             </Button>
-            <div>
-              <h3 className="text-xl font-bold">{espacioNombre}</h3>
-              <p className="text-sm text-muted-foreground">
-                {new Date(fechaActual).toLocaleDateString("es-ES", { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
+            <div className="min-w-0">
+              <h3 className="truncate text-xl font-bold">{espacioNombre}</h3>
+              <p className="truncate text-sm text-muted-foreground">
+                Reparto de mesas · {fechaLegible(fechaSel)}
               </p>
             </div>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={deshacer} disabled={!ultimoCambio}>
+              <Undo2 className="mr-2 h-4 w-4" />
+              Deshacer
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowAddMesa(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Mesa
@@ -1512,67 +1799,227 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-blue-100">
-                <Utensils className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Mesas</p>
-                <p className="text-lg font-bold">{localMesas.length}</p>
-              </div>
+        {/* ── Barra de trabajo: día, turno y estado de cierre ─────────────── */}
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-3 p-3">
+            {/* Día */}
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Día anterior"
+                onClick={() => moverDia(-1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-9 min-w-[150px] justify-start px-3 font-normal"
+                    aria-label={`Cambiar día · ${fechaLegible(fechaSel)}`}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                    {/* Corta en el botón (cabe en la barra) y completa en la
+                        cabecera y en el `aria-label`: nada cortado sin salida. */}
+                    <span className="truncate tabular-nums">{fechaCorta(fechaSel)}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarUI
+                    mode="single"
+                    selected={fechaISOaDate(fechaSel)}
+                    onSelect={(d) => d && cambiarFecha(dateAFechaISO(d))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Día siguiente"
+                onClick={() => moverDia(1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={esHoy ? "default" : "outline"}
+                size="sm"
+                className="h-9"
+                onClick={() => cambiarFecha(hoyLocal())}
+              >
+                Hoy
+              </Button>
             </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-green-100">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Mesas Ocupadas</p>
-                <p className="text-lg font-bold">{mesasOcupadas}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-yellow-100">
-                <AlertCircle className="h-4 w-4 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Por Asignar</p>
-                <p className="text-lg font-bold">{reservasPendientes.length}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-md bg-primary/10">
-                <Users className="h-4 w-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Comensales</p>
-                <p className="text-lg font-bold">
-                  {reservasHoy?.reduce((acc: number, r: any) => acc + (r.numero_comensales || 0), 0) || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
 
-        {/* Main content */}
-        <div className="grid gap-4 grid-cols-1 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_350px] flex-1 min-h-0">
-          {/* Canvas del plano */}
-          <Card className="overflow-hidden flex flex-col">
-            <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-              <div 
+            {/* Turno */}
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Turno</span>
+              <ToggleGroup
+                type="single"
+                value={filtroTurno}
+                onValueChange={cambiarTurno}
+                variant="outline"
+                aria-label="Turno"
+                className="gap-0 [&>*:first-child]:rounded-r-none [&>*:last-child]:rounded-l-none [&>*:not(:first-child)]:-ml-px"
+              >
+                {OPCIONES_TURNO.map((o) => (
+                  <ToggleGroupItem
+                    key={o.valor}
+                    value={o.valor}
+                    title={o.detalle}
+                    className="h-9 whitespace-nowrap px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    {o.etiqueta}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+
+            {/* Estado de cierre del día — sin lenguaje de error */}
+            <div className="flex min-w-[220px] flex-1 flex-wrap items-center gap-x-4 gap-y-1">
+              <div className="min-w-[160px] flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {etiquetaFiltroTurno(filtroTurno)}: mesas repartidas
+                  </span>
+                  <span className="text-xs font-semibold tabular-nums">
+                    {resumen.conMesa}/{resumen.total}
+                  </span>
+                </div>
+                <Progress value={resumen.porcentaje} className="mt-1 h-2" />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className="h-6 gap-1 whitespace-nowrap border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-700 tabular-nums dark:bg-emerald-950/40 dark:text-emerald-300"
+                  title="Reservas que ya tienen mesa"
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  {resumen.conMesa} con mesa
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  title="Tienen sala pero todavía no mesa. Es normal: se van cerrando poco a poco."
+                >
+                  <CircleDashed className="h-3 w-3" />
+                  {resumen.pendientesMesa} pendientes de mesa
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  title="Mesas de esta sala libres en este turno"
+                >
+                  <Armchair className="h-3 w-3" />
+                  {Math.max(0, localMesas.length - mesasOcupadas)}/{localMesas.length} mesas libres
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  title="Comensales del turno"
+                >
+                  <Users className="h-3 w-3" />
+                  {resumen.comensales} comensales
+                </Badge>
+                {resumen.cerrado && (
+                  <Badge className="h-6 gap-1 whitespace-nowrap bg-emerald-600 px-2 text-[11px] text-white hover:bg-emerald-600">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Servicio cerrado
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {filtroTurno === "dia" && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+            Estás viendo <strong className="font-medium text-foreground">los dos servicios a la vez</strong>: una
+            misma mesa puede salir ocupada por la comida y por la cena. Elige Comida o Cena para repartir.
+          </p>
+        )}
+
+        {/* ── Barra de sentar (solo mientras se elige mesa) ───────────────── */}
+        {reservaActiva && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="shrink-0 text-sm">
+                  Sentando a <strong>{reservaActiva.nombre}</strong>
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums">
+                  <Clock className="h-3 w-3" />
+                  {horaCorta(reservaActiva.hora)}
+                  <span className="mx-1">·</span>
+                  <Users className="h-3 w-3" />
+                  {reservaActiva.numero_comensales} comensales
+                </span>
+                {mesaIdsActivos.length > 0 ? (
+                  <span className="flex min-w-0 flex-wrap items-center gap-1">
+                    {mesaIdsActivos.map((id) => (
+                      <Badge key={id} variant="secondary" className="h-6 gap-1 whitespace-nowrap px-2 text-[11px]">
+                        {mesasPorId.get(id)?.nombre ?? "Mesa"}
+                        <span className="text-muted-foreground tabular-nums">
+                          {mesasPorId.get(id)?.capacidad ?? 0}
+                        </span>
+                      </Badge>
+                    ))}
+                    <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
+                      = {plazasActivas} plaza{plazasActivas === 1 ? "" : "s"} para{" "}
+                      {reservaActiva.numero_comensales}
+                    </span>
+                    {ajusteActivo && (
+                      <Badge
+                        variant="outline"
+                        className={cn("h-6 whitespace-nowrap px-2 text-[11px]", ajusteActivo.tono)}
+                      >
+                        {ajusteActivo.etiqueta}
+                      </Badge>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Haz clic en una mesa del plano. Puedes elegir varias para juntarlas.
+                  </span>
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {mesaIdsActivos.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => pedirQuitarMesas(reservaActiva)}
+                  >
+                    <X className="mr-1.5 h-3.5 w-3.5" />
+                    Quitar mesas
+                  </Button>
+                )}
+                <Button size="sm" className="h-8" onClick={() => setReservaActivaId(null)}>
+                  Listo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Plano + panel ──────────────────────────────────────────────── */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_380px]">
+          {/* Plano */}
+          <Card className="flex flex-col overflow-hidden">
+            <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+              <div
                 ref={containerRef}
                 className={cn(
-                  "relative w-full flex-1 min-h-[400px] overflow-hidden",
+                  "relative min-h-[340px] w-full flex-1 overflow-hidden",
                   isSpacePressed && "cursor-grab",
-                  isPanning && "cursor-grabbing"
+                  isPanning && "cursor-grabbing",
                 )}
                 style={{
                   backgroundImage: `
@@ -1603,110 +2050,116 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                 <div
                   ref={canvasRef}
                   className="absolute"
-                  style={{ 
-                    width: contentBounds.width * scale, 
+                  style={{
+                    width: contentBounds.width * scale,
                     height: contentBounds.height * scale,
                     left: `calc(50% + ${panOffset.x}px)`,
                     top: `calc(50% + ${panOffset.y}px)`,
-                    transform: 'translate(-50%, -50%)',
+                    transform: "translate(-50%, -50%)",
                   }}
                 >
-
-                  {/* Elementos del plano (paredes, decoración, etc.) */}
                   {elementosPlano.map((elem) => renderElementoPlano(elem))}
 
-                  {/* Mesas - posicionadas según pos_x/pos_y en metros */}
                   {localMesas.map((mesa) => {
-                    const reserva = getReservaAsignada(mesa.id);
-                    const isSelected = selectedMesa?.id === mesa.id;
-                    const isDragging = dragState.mesaId === mesa.id;
-                    
-                    // Convertir posición de metros a píxeles, restar offset y aplicar escala
-                    const posXPixels = ((mesa.pos_x || 0) * PIXELS_PER_METER - offsetX) * scale;
-                    const posYPixels = ((mesa.pos_y || 0) * PIXELS_PER_METER - offsetY) * scale;
-                    // Dimensiones en cm convertidas a píxeles y escaladas
-                    const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER * scale;
-                    const altoPixels = ((mesa.alto || 80) / 100) * PIXELS_PER_METER * scale;
+                    const asignacion = asignacionDeMesa(mesa.id);
+                    const mesasDelGrupo = asignacion
+                      ? (asignacionesPorReserva.get(asignacion.reserva_id) ?? []).length
+                      : 0;
+                    const esPrimeraDelGrupo = asignacion
+                      ? (asignacionesPorReserva.get(asignacion.reserva_id) ?? [])[0]?.mesa_id === mesa.id
+                      : false;
 
                     return (
-                      <DroppableMesa
+                      <MesaPlano
                         key={mesa.id}
                         mesa={{
                           ...mesa,
-                          pos_x: posXPixels,
-                          pos_y: posYPixels,
-                          ancho: anchoPixels,
-                          alto: altoPixels,
+                          pos_x: ((mesa.pos_x || 0) * PIXELS_PER_METER - offsetX) * scale,
+                          pos_y: ((mesa.pos_y || 0) * PIXELS_PER_METER - offsetY) * scale,
+                          ancho: ((mesa.ancho || 80) / 100) * PIXELS_PER_METER * scale,
+                          alto: ((mesa.alto || 80) / 100) * PIXELS_PER_METER * scale,
                         }}
                         mesaOriginal={mesa}
-                        reserva={reserva}
-                        isSelected={isSelected}
-                        isDragging={isDragging}
+                        asignacion={asignacion}
+                        esPrimeraDelGrupo={esPrimeraDelGrupo}
+                        mesasDelGrupo={mesasDelGrupo}
+                        elegida={mesaIdsActivos.includes(mesa.id)}
+                        modoAsignacion={!!reservaActiva}
+                        reservaActivaNombre={reservaActiva?.nombre}
+                        comensalesActivos={reservaActiva?.numero_comensales ?? null}
+                        isSelected={selectedMesa?.id === mesa.id}
+                        isDragging={dragState.mesaId === mesa.id}
                         onDragStart={handleMesaDragStart}
-                        onClick={() => setSelectedMesa(mesa)}
-                        onRemoveAssignment={reserva ? () => handleRemoveAssignment(reserva.id) : undefined}
-                        isDropTarget={!!activeReserva || !!selectedReservaForClick}
-                        draggingReserva={activeReserva}
-                        selectedReservaForClick={selectedReservaForClick}
-                        onClickAssign={handleClickAssignToMesa}
+                        onSeleccionar={seleccionarMesa}
+                        onAlternar={alternarMesa}
+                        onQuitarMesas={
+                          asignacion && esPrimeraDelGrupo
+                            ? () => {
+                                const reserva = (reservasDia ?? []).find(
+                                  (r) => r.id === asignacion.reserva_id,
+                                );
+                                if (reserva) pedirQuitarMesas(reserva);
+                              }
+                            : undefined
+                        }
                         scale={scale}
                       />
                     );
                   })}
 
-                  {/* Mensaje si no hay mesas */}
                   {localMesas.length === 0 && elementosPlano.length === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                       <div className="text-center">
-                        <Move className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <Move className="mx-auto mb-2 h-12 w-12 opacity-50" />
                         <p>No hay configuración de plano</p>
                         <p className="text-sm">Configura el plano desde la sección Espacios</p>
                       </div>
                     </div>
                   )}
 
-                  {/* Indicador de drop zone cuando se arrastra */}
                   {activeReserva && localMesas.length > 0 && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-lg">
+                    <div className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-lg">
                       <span className="flex items-center gap-1.5">
                         <Move className="h-3 w-3" />
-                        Suelta en mesa verde o azul
+                        Suelta sobre una mesa libre
                       </span>
                     </div>
                   )}
 
-                  {/* Indicador cuando hay reserva seleccionada por click */}
-                  {selectedReservaForClick && !activeReserva && localMesas.length > 0 && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-medium shadow-lg animate-pulse">
+                  {reservaActiva && !activeReserva && localMesas.length > 0 && (
+                    <div className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-lg">
                       <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Click en una mesa para asignar "{selectedReservaForClick.nombre}"
+                        <Utensils className="h-3 w-3" />
+                        Clic en las mesas de {reservaActiva.nombre}
                       </span>
                     </div>
                   )}
                 </div>
-                
-                {/* Controles de zoom */}
-                <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-background/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-border">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={handleZoomOut}
-                    title="Alejar"
-                  >
+
+                {/* Leyenda: libre / ocupada de un vistazo */}
+                <div className="absolute left-2 top-2 flex items-center gap-2 rounded-md border border-border bg-background/90 px-2 py-1 text-[10px] shadow-sm backdrop-blur-sm">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded border-2 border-slate-300 bg-white" />
+                    Libre
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2.5 w-2.5 rounded border-2 border-emerald-500 bg-emerald-100" />
+                    Ocupada
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Link2 className="h-3 w-3 text-emerald-600" />
+                    Juntas
+                  </span>
+                </div>
+
+                <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-border bg-background/90 p-1 shadow-sm backdrop-blur-sm">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleZoomOut} aria-label="Alejar">
                     <ZoomOut className="h-4 w-4" />
                   </Button>
-                  <span className="text-xs font-medium min-w-[40px] text-center">
+                  <span className="min-w-[40px] text-center text-xs font-medium tabular-nums">
                     {Math.round(scale * 100)}%
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={handleZoomIn}
-                    title="Acercar"
-                  >
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleZoomIn} aria-label="Acercar">
                     <ZoomIn className="h-4 w-4" />
                   </Button>
                   <Button
@@ -1714,14 +2167,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                     size="icon"
                     className="h-7 w-7"
                     onClick={handleCenterView}
-                    title="Centrar"
+                    aria-label="Centrar plano"
                   >
                     <Maximize2 className="h-4 w-4" />
                   </Button>
                 </div>
 
-                {/* Indicador de dimensiones */}
-                <div className="absolute bottom-2 left-2 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
+                <div className="absolute bottom-2 left-2 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground tabular-nums">
                   {realWidth}m × {realHeight}m
                 </div>
               </div>
@@ -1729,227 +2181,239 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           </Card>
 
           {/* Panel lateral */}
-          <div className="space-y-4">
-            {/* Mesa seleccionada */}
-            {selectedMesa && (
+          <div className="flex min-h-0 flex-col gap-3">
+            {selectedMesa && !reservaActiva && (
               <Card>
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{selectedMesa.nombre}</CardTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="min-w-0 truncate text-base">{selectedMesa.nombre}</CardTitle>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-7 w-7 shrink-0"
+                      aria-label="Cerrar detalle de mesa"
                       onClick={() => setSelectedMesa(null)}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <p className="text-muted-foreground">Capacidad</p>
-                      <p className="font-medium">{selectedMesa.capacidad} pax</p>
+                      <p className="text-xs text-muted-foreground">Plazas</p>
+                      <p className="font-medium tabular-nums">{selectedMesa.capacidad}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Forma</p>
+                      <p className="text-xs text-muted-foreground">Forma</p>
                       <p className="font-medium capitalize">{selectedMesa.forma}</p>
                     </div>
                   </div>
 
-                  {getReservaAsignada(selectedMesa.id) && (
-                    <div className="p-3 bg-primary/10 rounded-lg">
-                      <p className="font-medium text-sm mb-2">Reserva Asignada</p>
-                      <div className="text-sm space-y-1">
-                        <p className="font-semibold">{getReservaAsignada(selectedMesa.id)?.reservas.nombre}</p>
-                        <div className="flex items-center gap-3 text-muted-foreground">
+                  {(() => {
+                    const asignacion = asignacionDeMesa(selectedMesa.id);
+                    if (!asignacion) {
+                      return (
+                        <p className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
+                          Libre en {etiquetaFiltroTurno(filtroTurno).toLowerCase()}.
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="rounded-lg bg-emerald-50 p-2.5 dark:bg-emerald-950/40">
+                        <p className="text-xs font-medium text-muted-foreground">Ocupada por</p>
+                        <p className="truncate text-sm font-semibold">{asignacion.reservas.nombre}</p>
+                        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {getReservaAsignada(selectedMesa.id)?.reservas.hora}
+                            {horaCorta(asignacion.reservas.hora)}
                           </span>
                           <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
-                            {getReservaAsignada(selectedMesa.id)?.reservas.numero_comensales}
+                            {asignacion.reservas.numero_comensales}
                           </span>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     size="sm"
-                    className="w-full"
-                    onClick={() => handleDeleteMesa(selectedMesa.id)}
+                    className="w-full text-destructive hover:bg-destructive/10"
+                    onClick={() => setMesaABorrar(selectedMesa)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar Mesa
+                    Borrar mesa
                   </Button>
                 </CardContent>
               </Card>
             )}
 
-            {/* Reservas - Panel mejorado */}
-            <Card className="flex flex-col overflow-hidden">
-              <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-primary/10">
-                      <Utensils className="h-4 w-4 text-primary" />
-                    </div>
-                    Reservas
+            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <CardHeader className="border-b pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+                    <Utensils className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="truncate">Reservas de {etiquetaFiltroTurno(filtroTurno).toLowerCase()}</span>
                   </CardTitle>
-                  <Badge variant="secondary" className="text-xs">
-                    {reservasHoy?.length || 0} total
+                  <Badge variant="secondary" className="shrink-0 tabular-nums">
+                    {reservasTurno.length}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-0 flex-1 flex flex-col min-h-0">
-                {!reservasHoy?.length ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                    <div className="p-3 rounded-full bg-muted mb-3">
+              <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+                {reservasTurno.length === 0 ? (
+                  <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
+                    <div className="mb-3 rounded-full bg-muted p-3">
                       <Utensils className="h-6 w-6 text-muted-foreground" />
                     </div>
-                    <p className="text-muted-foreground text-sm font-medium">Sin reservas hoy</p>
-                    <p className="text-muted-foreground text-xs">Las reservas aparecerán aquí</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Sin reservas en {etiquetaFiltroTurno(filtroTurno).toLowerCase()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Aquí solo salen las reservas que ya tienen esta sala
+                    </p>
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col min-h-0">
-                    {/* Instrucciones de uso - más estéticas */}
-                    <div className="px-3 py-2.5 bg-muted/50 border-b">
-                      <div className="flex gap-3">
-                        <div className="flex-1 flex items-center gap-2 p-2 rounded-lg bg-background border border-border/50">
-                          <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            <span className="font-medium text-foreground">Click</span> en reserva
+                  <ScrollArea className="min-h-0 flex-1">
+                    <div className="space-y-3 p-3">
+                      {/* Pendientes de mesa — primero, porque es lo que queda por hacer */}
+                      {reservasPendientes.length > 0 && (
+                        <div>
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              <CircleDashed className="h-3.5 w-3.5" />
+                              Pendientes de mesa
+                            </span>
+                            <Badge variant="outline" className="h-5 tabular-nums">
+                              {reservasPendientes.length}
+                            </Badge>
+                          </div>
+                          <div className="space-y-1.5">
+                            {reservasPendientes.map((r) => (
+                              <TarjetaReserva
+                                key={r.id}
+                                reserva={r}
+                                mesasAsignadas={[]}
+                                plazasAsignadas={0}
+                                activa={reservaActivaId === r.id}
+                                mostrarTurno={filtroTurno === "dia"}
+                                onActivar={activarReserva}
+                              />
+                            ))}
                           </div>
                         </div>
-                        <div className="flex items-center text-muted-foreground">→</div>
-                        <div className="flex-1 flex items-center gap-2 p-2 rounded-lg bg-background border border-border/50">
-                          <div className="flex items-center justify-center h-5 w-5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold">2</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            <span className="font-medium text-foreground">Click</span> en mesa
+                      )}
+
+                      {reservasConMesa.length > 0 && (
+                        <div>
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Con mesa
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="h-5 border-emerald-300 text-emerald-700 tabular-nums dark:text-emerald-400"
+                            >
+                              {reservasConMesa.length}
+                            </Badge>
+                          </div>
+                          <div className="space-y-1.5">
+                            {reservasConMesa.map((r) => (
+                              <TarjetaReserva
+                                key={r.id}
+                                reserva={r}
+                                mesasAsignadas={nombresMesasDe(r.id)}
+                                plazasAsignadas={plazasDeMesas(mesaIdsDe(r.id), mesasPorId)}
+                                activa={reservaActivaId === r.id}
+                                mostrarTurno={filtroTurno === "dia"}
+                                onActivar={activarReserva}
+                                onQuitarMesas={pedirQuitarMesas}
+                              />
+                            ))}
                           </div>
                         </div>
-                      </div>
-                      <p className="text-[9px] text-muted-foreground text-center mt-1.5">
-                        O arrastra directamente al plano
-                      </p>
+                      )}
                     </div>
-
-                    {/* Botón cancelar selección */}
-                    {selectedReservaForClick && (
-                      <div className="px-3 py-2 bg-primary/10 border-b border-primary/20">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full text-xs h-7 border-primary/30 hover:bg-primary/20"
-                          onClick={() => setSelectedReservaForClick(null)}
-                        >
-                          <X className="h-3 w-3 mr-1.5" />
-                          Cancelar selección
-                        </Button>
-                      </div>
-                    )}
-
-                    <ScrollArea className="flex-1">
-                      <div className="p-3 space-y-4">
-                        {/* Pendientes primero */}
-                        {reservasPendientes.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-                                <div className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
-                                <span className="text-[10px] font-semibold text-yellow-700 dark:text-yellow-400 uppercase tracking-wide">
-                                  Por asignar
-                                </span>
-                              </div>
-                              <Badge variant="outline" className="text-[10px] h-5">
-                                {reservasPendientes.length}
-                              </Badge>
-                            </div>
-                            <div className="space-y-1.5">
-                              {reservasPendientes.map((r: any) => (
-                                <DraggableReserva
-                                  key={r.id}
-                                  reserva={r}
-                                  isAssigned={false}
-                                  isSelectedForClick={selectedReservaForClick?.id === r.id}
-                                  onClickSelect={handleClickSelectReserva}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Separador visual */}
-                        {reservasPendientes.length > 0 && reservasAsignadas.length > 0 && (
-                          <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                              <div className="w-full border-t border-border" />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Asignadas */}
-                        {reservasAsignadas.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30">
-                                <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
-                                  Asignadas
-                                </span>
-                              </div>
-                              <Badge variant="outline" className="text-[10px] h-5 border-green-300 text-green-700 dark:text-green-400">
-                                {reservasAsignadas.length}
-                              </Badge>
-                            </div>
-                            <div className="space-y-1.5">
-                              {reservasAsignadas.map((r: any) => (
-                                <DraggableReserva
-                                  key={r.id}
-                                  reserva={r}
-                                  isAssigned={true}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
+                  </ScrollArea>
                 )}
+
+                <div className="border-t bg-muted/40 px-3 py-2">
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <strong className="font-medium text-foreground">Sentar:</strong> clic en la reserva y clic en la
+                    mesa. Para juntar mesas, sigue haciendo clic en más mesas.{" "}
+                    <strong className="font-medium text-foreground">Sin mesa no es un error:</strong> la reserva sigue
+                    en pie y se le puede dar mesa cuando toque.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
 
-        {/* Drag overlay - compacto para ver mejor las mesas */}
-        <DragOverlay dropAnimation={{
-          duration: 150,
-          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-        }}>
+        <DragOverlay dropAnimation={{ duration: 150, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
           {activeReserva && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border-2 border-primary bg-primary text-primary-foreground shadow-xl transform -rotate-1 scale-90 opacity-90">
+            <div className="flex -rotate-1 scale-90 items-center gap-1.5 rounded-lg border-2 border-primary bg-primary px-2 py-1 text-primary-foreground opacity-90 shadow-xl">
               <Users className="h-3 w-3" />
-              <span className="font-bold text-xs truncate max-w-[80px]">{activeReserva.nombre}</span>
-              <span className="text-[10px] opacity-80">{activeReserva.numero_comensales}p</span>
+              <span className="max-w-[80px] truncate text-xs font-bold">{activeReserva.nombre}</span>
+              <span className="text-[10px] tabular-nums opacity-80">{activeReserva.numero_comensales}p</span>
             </div>
           )}
         </DragOverlay>
 
-        {/* Dialog para añadir mesa */}
+        {/* ── Quitar mesas: confirmación, y sin lenguaje de error ─────────── */}
+        <AlertDialog open={!!aQuitarMesas} onOpenChange={(abierto) => !abierto && setAQuitarMesas(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Quitar las mesas de {aQuitarMesas?.reserva.nombre}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se liberan {aQuitarMesas?.mesas || "sus mesas"} y {aQuitarMesas?.reserva.nombre} se queda en{" "}
+                {espacioNombre} <strong>pendiente de mesa</strong>. La reserva sigue en pie: eso es normal y podrás
+                darle mesa más tarde.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmarQuitarMesas}>Quitar las mesas</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* ── Borrar mesa: confirmación ───────────────────────────────────── */}
+        <AlertDialog open={!!mesaABorrar} onOpenChange={(abierto) => !abierto && setMesaABorrar(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Borrar la mesa {mesaABorrar?.nombre}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Desaparece del plano de {espacioNombre} y deja de sumar plazas. No se puede deshacer. Si solo quieres
+                dejar de usarla, desactívala en Configuración › Mesas y aforo.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmarBorrarMesa}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Borrar mesa
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* ── Alta rápida de mesa ─────────────────────────────────────────── */}
         <Dialog open={showAddMesa} onOpenChange={setShowAddMesa}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Añadir Nueva Mesa</DialogTitle>
+              <DialogTitle>Añadir nueva mesa</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Nombre</Label>
+                <Label htmlFor="mesa-nombre">Nombre</Label>
                 <Input
+                  id="mesa-nombre"
                   value={newMesa.nombre}
                   onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
                   placeholder="Ej: Mesa 1, Terraza A..."
@@ -1957,8 +2421,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Capacidad</Label>
+                  <Label htmlFor="mesa-plazas">Plazas</Label>
                   <Input
+                    id="mesa-plazas"
                     type="number"
                     value={newMesa.capacidad}
                     onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 4 })}
@@ -1968,11 +2433,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                 </div>
                 <div>
                   <Label>Forma</Label>
-                  <Select
-                    value={newMesa.forma}
-                    onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}
-                  >
-                    <SelectTrigger>
+                  <Select value={newMesa.forma} onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}>
+                    <SelectTrigger aria-label="Forma de la mesa">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1985,18 +2447,20 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Ancho (px)</Label>
+                  <Label htmlFor="mesa-ancho">Ancho (cm)</Label>
                   <Input
+                    id="mesa-ancho"
                     type="number"
                     value={newMesa.ancho}
-                    onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 100 })}
+                    onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
                     min={50}
                     max={300}
                   />
                 </div>
                 <div>
-                  <Label>Alto (px)</Label>
+                  <Label htmlFor="mesa-alto">Alto (cm)</Label>
                   <Input
+                    id="mesa-alto"
                     type="number"
                     value={newMesa.alto}
                     onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 80 })}
@@ -2011,7 +2475,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                 </Button>
                 <Button onClick={handleAddMesa} disabled={crearMesa.isPending}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Crear Mesa
+                  Crear mesa
                 </Button>
               </div>
             </div>
@@ -2020,4 +2484,32 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       </div>
     </DndContext>
   );
+}
+
+/** "Viernes, 26 de septiembre de 2026" — con mayúscula inicial. */
+function fechaLegible(iso: string): string {
+  return conMayuscula(
+    fechaISOaDate(iso).toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }),
+  );
+}
+
+/** "Vie, 26 sept 2026" — para el botón de la barra, donde el espacio es oro. */
+function fechaCorta(iso: string): string {
+  return conMayuscula(
+    fechaISOaDate(iso).toLocaleDateString("es-ES", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+  );
+}
+
+function conMayuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
 }

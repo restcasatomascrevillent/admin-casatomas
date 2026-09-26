@@ -1,0 +1,363 @@
+-- ===========================================================================
+-- ROLLBACK de supabase/migrations/20260926140000_asignaciones_mesa_sin_solapes.sql
+-- ===========================================================================
+--
+-- Este fichero NO es una migracion y no debe copiarse a
+-- supabase/migrations/ (ver supabase/rollbacks/README.md sobre por que viven
+-- aqui separados: dentro de migrations/ la CLI los indexa como migraciones
+-- normales y `supabase db push` los ejecutaria en orden alfabetico justo
+-- despues de la migracion que revierten -- aqui seria de lo peor, porque
+-- `..._ROLLBACK.sql` ordena DESPUES de
+-- `20260926140000_asignaciones_mesa_sin_solapes.sql`: el indice unico, los
+-- tres triggers y la RPC se crearian y se borrarian en el mismo push, y el
+-- solape de mesas volveria a ser posible sin que nadie se enterara).
+--
+-- Se ejecuta A MANO (psql / SQL editor) y solo para deshacer un despliegue
+-- que salio mal.
+--
+-- ---------------------------------------------------------------------------
+-- *** LO PRIMERO: ESTO REABRE EL SOLAPE DE MESAS ***
+-- ---------------------------------------------------------------------------
+--   El objeto que de verdad impide que la misma mesa se le de a dos reservas
+--   del mismo dia y turno es el indice unico
+--   `uq_asignaciones_mesa_mesa_fecha_turno`. Este script lo BORRA.
+--
+--   En el momento en que se ejecute, nada en la base de datos impide el
+--   solape: ni el trigger, ni la RPC, ni el advisory lock (el candado
+--   serializa y da un mensaje bonito, pero NO es la garantia -- ver el
+--   bloque "POR QUE AQUI UN INDICE UNICO Y NO UN ADVISORY LOCK" de la
+--   migracion). Volver a estar como antes significa volver a poder sentar a
+--   dos familias en la misma mesa a la misma hora, y que nadie lo detecte
+--   hasta que las dos se presenten en la puerta.
+--
+--   No ejecutar esto "por limpiar". Solo si la migracion esta causando un
+--   problema peor que el solape.
+--
+-- ---------------------------------------------------------------------------
+-- QUE REVIERTE
+-- ---------------------------------------------------------------------------
+--   Borra, en orden inverso al de la migracion:
+--     * trigger  trg_mesas_auditar_asignaciones        (sobre mesas)
+--     * trigger  trg_reservas_sincronizar_asignaciones (sobre reservas)
+--     * trigger  trg_asignaciones_mesa_denormalizar    (sobre asignaciones_mesa)
+--     * funcion  public.mesas_auditar_asignaciones()
+--     * funcion  public.reservas_sincronizar_asignaciones()
+--     * funcion  public.asignaciones_mesa_denormalizar()
+--     * funcion  public.asignar_mesas_reserva(uuid, uuid[])
+--     * funcion  public.fn_asignaciones_futuras_de_mesas(uuid[])
+--     * vista    public.vista_asignacion_dia
+--     * indice   uq_asignaciones_mesa_mesa_fecha_turno   <-- el importante
+--     * indice   idx_asignaciones_mesa_fecha_turno
+--     * constraint asignaciones_mesa_turno_valido
+--     * constraint asignaciones_mesa_asignada_por_fkey
+--     * constraint asignaciones_mesa_espacio_id_fkey
+--     * columnas asignaciones_mesa.fecha / .turno / .espacio_id / .asignada_por
+--
+--   Y deja `asignaciones_mesa` tal como estaba antes: (id, reserva_id,
+--   mesa_id, created_at) + UNIQUE(reserva_id, mesa_id), con las dos FK en
+--   ON DELETE CASCADE.
+--
+-- ---------------------------------------------------------------------------
+-- QUE **NO** REVIERTE, Y ES DELIBERADO
+-- ---------------------------------------------------------------------------
+--   1. `public.asignaciones_mesa_descartadas` NO SE BORRA.
+--      Es la tabla de auditoria: contiene el registro de las asignaciones
+--      que el sistema tuvo que descartar (mesas fusionadas o borradas en el
+--      editor de plano, reservas movidas a un turno donde la mesa ya estaba
+--      pillada). Borrarla destruiria justo la prueba de lo que paso mientras
+--      la migracion estuvo activa, que es lo unico que no se puede
+--      reconstruir. Se queda huerfana y sin escritores -- inofensiva, unos
+--      kilobytes -- y se puede leer con calma para saber que reservas se
+--      quedaron sin mesa.
+--      Si de verdad se quiere borrar, el `drop table` esta al final del
+--      fichero COMENTADO, con su aviso. Leerlo antes de descomentarlo.
+--
+--   2. El `ON DELETE CASCADE` de `asignaciones_mesa.mesa_id` y de
+--      `asignaciones_mesa.reserva_id` sigue igual, porque la migracion nunca
+--      lo cambio (decision razonada en su cabecera: no romper el guardado
+--      del plano al fusionar mesas). Al borrar el trigger de auditoria, los
+--      borrados de mesa vuelven a llevarse las asignaciones EN SILENCIO,
+--      como antes.
+--
+--   3. El aforo. La migracion no lo toco: `trg_validar_capacidad` y
+--      `validar_capacidad_reserva()` quedan intactos y siguen sumando
+--      `espacios_reserva.capacidad_maxima` por marca
+--      (`20260922190000_aforo_por_marca.sql`). Ejecutar este rollback no
+--      altera el resultado de ninguna reserva.
+--
+--   4. Las notificaciones ya creadas en `notificaciones_dashboard` con
+--      `tipo = 'mesa_borrada_con_asignaciones'`. Se quedan en la campana como
+--      cualquier otro aviso historico; el panel las pinta con el icono
+--      generico (`TIPO_ICON[tipo] || Info`) y no navegan a ningun sitio.
+--      Si molestan: `delete from public.notificaciones_dashboard where tipo
+--      = 'mesa_borrada_con_asignaciones';`
+--
+-- ---------------------------------------------------------------------------
+-- QUE DATOS SE PIERDEN AL EJECUTARLO
+-- ---------------------------------------------------------------------------
+--   Las FILAS de `asignaciones_mesa` **NO se borran**: siguen ahi, con su
+--   reserva y su mesa. Lo que se pierde son las cuatro columnas nuevas de
+--   esas filas:
+--
+--     * `asignada_por`: QUIEN asigno cada mesa. Esto es informacion que no
+--       se puede reconstruir de ninguna manera. Si importa, copiarla ANTES
+--       (hay una consulta de respaldo al final de este fichero).
+--     * `fecha`, `turno`, `espacio_id`: son DERIVADAS, asi que se pueden
+--       recalcular de `reservas` y `mesas` si se vuelve a aplicar la
+--       migracion. No hay perdida real.
+--
+--   OJO CON EL ORDEN AL VOLVER A APLICAR: si mientras el rollback esta en
+--   vigor alguien mete dos asignaciones de la misma mesa en el mismo dia y
+--   turno (que es justo lo que el rollback vuelve a permitir), el
+--   `create unique index` de la migracion **fallara** al re-aplicarla y la
+--   dejara a medias -- toda dentro de su `begin/commit`, asi que no queda
+--   nada a medio aplicar, pero no entrara. Antes de re-aplicar, ejecutar la
+--   consulta de solapes del bloque final y resolver a mano los duplicados.
+--
+-- ---------------------------------------------------------------------------
+-- *** AVISO: SI EL PANEL YA LLAMA A LA RPC, NO EJECUTAR ESTO SOLO ***
+-- ---------------------------------------------------------------------------
+--   `public.asignar_mesas_reserva(uuid, uuid[])` y
+--   `public.vista_asignacion_dia` son el contrato con el TypeScript del
+--   panel (pantalla de asignacion de mesas, hooks de asignacion). Si ese
+--   codigo ya esta desplegado:
+--
+--     * Borrar la RPC NO da error al ejecutar este script. El panel revienta
+--       DESPUES, en el primer intento de asignar, con
+--       `Could not find the function public.asignar_mesas_reserva(...) in the
+--       schema cache` (PostgREST, 404/PGRST202) -- un error que no se parece
+--       en nada a un problema de mesas y cuesta de diagnosticar.
+--     * Borrar la vista deja la pantalla de asignacion sin datos, con un
+--       `relation "public.vista_asignacion_dia" does not exist`.
+--
+--   ORDEN CORRECTO si el panel ya lo usa:
+--     1) Desplegar primero el frontend SIN la pantalla de asignacion de
+--        mesas (revertir el despliegue que la introdujo).
+--     2) Comprobar que nada mas en la base la referencia (consulta 2 del
+--        bloque "COMPROBACION PREVIA").
+--     3) Solo entonces, ejecutar este rollback.
+--
+-- ---------------------------------------------------------------------------
+-- CUANDO USAR ESTO
+-- ---------------------------------------------------------------------------
+--   Los motivos legitimos son dos:
+--     a) El indice unico esta bloqueando trabajo real del restaurante porque
+--        el modelo "una mesa por turno" resulto ser demasiado rigido (p. ej.
+--        dos servicios seguidos en el mismo turno: comida temprana a las
+--        13:00 y segunda ronda a las 15:00 en la misma mesa). En ese caso el
+--        arreglo BUENO no es este rollback, es una migracion NUEVA que
+--        cambie la granularidad del solape (anadir un tercer valor a `turno`,
+--        o pasar a un rango horario con una restriccion de exclusion
+--        `EXCLUDE USING gist` sobre tstzrange). Este rollback es solo el
+--        parche de urgencia mientras se escribe eso.
+--     b) Se decide abandonar el enfoque y dejar la base limpia.
+--
+--   A fecha 2026-09-26 la migracion que revierte esta TODAVIA PENDIENTE
+--   (`supabase db push` bloqueado: historial local y remoto descuadrados por
+--   `20260925150523` y `20260925154109`, aplicadas en produccion sin
+--   commitear los ficheros). Si nunca se aplica, aqui no hay nada que
+--   revertir y ejecutar este script es un no-op: los `if exists` lo hacen
+--   inofensivo.
+--
+-- ---------------------------------------------------------------------------
+
+begin;
+
+-- ---------------------------------------------------------------------------
+-- 1. Triggers primero
+-- ---------------------------------------------------------------------------
+--   Antes que las funciones: un `drop function` con un trigger apuntando a
+--   ella falla (dependencia), y no se quiere usar CASCADE aqui para no
+--   arrastrar nada por sorpresa.
+drop trigger if exists trg_mesas_auditar_asignaciones        on public.mesas;
+drop trigger if exists trg_reservas_sincronizar_asignaciones on public.reservas;
+drop trigger if exists trg_asignaciones_mesa_denormalizar    on public.asignaciones_mesa;
+
+-- ---------------------------------------------------------------------------
+-- 2. Funciones
+-- ---------------------------------------------------------------------------
+drop function if exists public.mesas_auditar_asignaciones();
+drop function if exists public.reservas_sincronizar_asignaciones();
+drop function if exists public.asignaciones_mesa_denormalizar();
+
+--   OJO: leer el "AVISO: SI EL PANEL YA LLAMA A LA RPC" de arriba antes de
+--   ejecutar esta linea.
+drop function if exists public.asignar_mesas_reserva(uuid, uuid[]);
+
+drop function if exists public.fn_asignaciones_futuras_de_mesas(uuid[]);
+
+-- ---------------------------------------------------------------------------
+-- 3. Vista
+-- ---------------------------------------------------------------------------
+--   Va antes de borrar las columnas: la vista lee `asignaciones_mesa` a
+--   traves de una subconsulta lateral y un `drop column` con la vista viva
+--   fallaria por dependencia.
+drop view if exists public.vista_asignacion_dia;
+
+-- ---------------------------------------------------------------------------
+-- 4. Indices y restricciones
+-- ---------------------------------------------------------------------------
+--   *** ESTA ES LA LINEA QUE REABRE EL SOLAPE. *** A partir de aqui, dos
+--   reservas del mismo dia y turno pueden compartir mesa.
+drop index if exists public.uq_asignaciones_mesa_mesa_fecha_turno;
+
+drop index if exists public.idx_asignaciones_mesa_fecha_turno;
+
+alter table public.asignaciones_mesa
+  drop constraint if exists asignaciones_mesa_turno_valido;
+alter table public.asignaciones_mesa
+  drop constraint if exists asignaciones_mesa_asignada_por_fkey;
+alter table public.asignaciones_mesa
+  drop constraint if exists asignaciones_mesa_espacio_id_fkey;
+
+-- ---------------------------------------------------------------------------
+-- 5. Columnas
+-- ---------------------------------------------------------------------------
+--   Las FK y el CHECK de arriba caerian solos con el `drop column`, pero se
+--   borran explicitamente para que el script se lea como el inverso exacto
+--   de la migracion y para que, si alguien comenta solo el bloque de
+--   columnas, las restricciones desaparezcan igual.
+--
+--   NO se borra `created_at` ni ninguna columna original: solo las cuatro
+--   que anadio la migracion. Las filas de `asignaciones_mesa` se quedan.
+alter table public.asignaciones_mesa drop column if exists asignada_por;
+alter table public.asignaciones_mesa drop column if exists espacio_id;
+alter table public.asignaciones_mesa drop column if exists turno;
+alter table public.asignaciones_mesa drop column if exists fecha;
+
+--   `public.asignaciones_mesa_descartadas` NO se borra: es la auditoria.
+--   Ver "QUE NO REVIERTE, Y ES DELIBERADO", punto 1. El drop, si de verdad
+--   se quiere, esta comentado al final del fichero.
+
+commit;
+
+-- ---------------------------------------------------------------------------
+-- COMPROBACION PREVIA (ejecutar ANTES del bloque de arriba; solo lectura)
+-- ---------------------------------------------------------------------------
+--   1) RESPALDAR LA AUTORIA, que es lo unico irrecuperable. Guardar el
+--      resultado de esto en algun sitio antes de seguir:
+--      select a.id, a.reserva_id, a.mesa_id, m.nombre as mesa,
+--             a.fecha, a.turno, a.asignada_por, u.email as asigno,
+--             a.created_at
+--      from public.asignaciones_mesa a
+--      left join public.mesas m on m.id = a.mesa_id
+--      left join auth.users u on u.id = a.asignada_por
+--      order by a.fecha, a.turno;
+--      -- Si devuelve 0 filas, no hay nada que perder y se puede seguir sin
+--      -- mas. (A 2026-09-26 la tabla esta vacia.)
+--
+--   2) Que nada mas en la base referencie la RPC ni la vista (otra funcion,
+--      otra vista, una politica RLS):
+--      select p.proname
+--      from pg_proc p
+--      where p.pronamespace = 'public'::regnamespace
+--        and p.proname not in ('asignar_mesas_reserva',
+--                              'fn_asignaciones_futuras_de_mesas')
+--        and pg_get_functiondef(p.oid) like any (array[
+--              '%asignar_mesas_reserva%',
+--              '%vista_asignacion_dia%',
+--              '%fn_asignaciones_futuras_de_mesas%'
+--            ]);
+--      -- esperado: 0 filas
+--
+--      select dependent.relname as objeto_que_depende
+--      from pg_depend d
+--      join pg_rewrite rw on rw.oid = d.objid
+--      join pg_class dependent on dependent.oid = rw.ev_class
+--      where d.refobjid = 'public.asignaciones_mesa'::regclass
+--        and dependent.relkind = 'v'
+--        and dependent.relname <> 'vista_asignacion_dia';
+--      -- esperado: 0 filas. Si sale alguna vista, hay que mirarla antes de
+--      -- borrar las columnas o el drop column fallara por dependencia.
+--
+--   3) Y saber que se va a perder de la auditoria (aunque la tabla no se
+--      borre, conviene leerla antes de dejarla huerfana):
+--      select motivo, count(*) as cuantas,
+--             min(descartada_at) as primera, max(descartada_at) as ultima
+--      from public.asignaciones_mesa_descartadas
+--      group by motivo order by 1;
+--
+-- ---------------------------------------------------------------------------
+-- VERIFICACION POSTERIOR (solo lectura)
+-- ---------------------------------------------------------------------------
+--   1) `asignaciones_mesa` ha vuelto a sus cuatro columnas originales:
+--      select column_name, data_type, is_nullable
+--      from information_schema.columns
+--      where table_schema = 'public' and table_name = 'asignaciones_mesa'
+--      order by ordinal_position;
+--      -- esperado: id, reserva_id, mesa_id, created_at. Y NADA mas.
+--
+--   2) Los indices y restricciones que quedan son los de siempre:
+--      select i.relname, ix.indisunique
+--      from pg_index ix
+--      join pg_class i on i.oid = ix.indexrelid
+--      where ix.indrelid = 'public.asignaciones_mesa'::regclass
+--      order by i.relname;
+--      -- esperado: la pk + asignaciones_mesa_reserva_id_mesa_id_key
+--      --           (unique = true). NO debe aparecer
+--      --           uq_asignaciones_mesa_mesa_fecha_turno.
+--
+--   3) No queda ningun trigger ni ninguna funcion de la migracion:
+--      select tgname from pg_trigger
+--      where not tgisinternal
+--        and tgname in ('trg_asignaciones_mesa_denormalizar',
+--                       'trg_reservas_sincronizar_asignaciones',
+--                       'trg_mesas_auditar_asignaciones');
+--      -- esperado: 0 filas
+--
+--      select proname from pg_proc
+--      where pronamespace = 'public'::regnamespace
+--        and proname in ('asignaciones_mesa_denormalizar',
+--                        'asignar_mesas_reserva',
+--                        'reservas_sincronizar_asignaciones',
+--                        'mesas_auditar_asignaciones',
+--                        'fn_asignaciones_futuras_de_mesas');
+--      -- esperado: 0 filas
+--
+--   4) Las filas de asignaciones_mesa siguen ahi (el rollback no borra
+--      asignaciones, solo columnas):
+--      select count(*) from public.asignaciones_mesa;
+--      -- esperado: el mismo numero que antes de ejecutar el rollback
+--
+--   5) La auditoria sigue viva y legible:
+--      select count(*) from public.asignaciones_mesa_descartadas;
+--      -- esperado: el mismo numero que antes (no se borra a proposito)
+--
+--   6) El aforo sigue funcionando exactamente igual (el trigger nunca se
+--      toco, ni al aplicar la migracion ni al revertirla):
+--      select tgname, tgenabled, tgrelid::regclass
+--      from pg_trigger where tgname = 'trg_validar_capacidad';
+--      -- esperado: 1 fila, tgenabled = 'O', tabla = reservas
+--
+--   7) ANTES DE VOLVER A APLICAR LA MIGRACION: comprobar que nadie ha
+--      metido solapes mientras el rollback estaba en vigor, porque el
+--      `create unique index` fallaria. Con las columnas ya borradas, el
+--      solape hay que buscarlo derivando el turno desde `reservas`:
+--      select a.mesa_id, r.fecha,
+--             case when r.hora < '17:00:00'::time then 'comida' else 'cena' end as turno,
+--             count(*) as veces, array_agg(a.reserva_id) as reservas
+--      from public.asignaciones_mesa a
+--      join public.reservas r on r.id = a.reserva_id
+--      where r.estado <> 'cancelada'
+--      group by a.mesa_id, r.fecha, 3
+--      having count(*) > 1;
+--      -- esperado: 0 filas. Si sale alguna, resolverla A MANO (decidir que
+--      -- asignacion sobra y borrarla) ANTES de re-aplicar la migracion.
+--
+-- ---------------------------------------------------------------------------
+-- BORRAR TAMBIEN LA AUDITORIA (opcional, destructivo, NO recomendado)
+-- ---------------------------------------------------------------------------
+--   Solo si se decide abandonar el enfoque por completo y no interesa saber
+--   que reservas se quedaron sin mesa mientras la migracion estuvo activa.
+--   Esto SI destruye informacion que no se puede reconstruir de ninguna otra
+--   fuente: las mesas que se auditan aqui ya no existen en `mesas`.
+--
+--   Leer la tabla ANTES (consulta 3 de "COMPROBACION PREVIA") y, si acaso,
+--   exportarla.
+--
+--   -- drop table if exists public.asignaciones_mesa_descartadas;
+--
+--   Y, si tambien molestan los avisos que genero en la campana:
+--   -- delete from public.notificaciones_dashboard
+--   --  where tipo = 'mesa_borrada_con_asignaciones';
+-- ---------------------------------------------------------------------------
