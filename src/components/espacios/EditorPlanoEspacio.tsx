@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
@@ -8,7 +8,15 @@ import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
 import { PanelLateral } from "./PanelLateral";
-import { esMesaTemporal, esMesaGrupoNueva, esMesaNoPersistida, planRepuntarAsignaciones } from "./planoUtils";
+import {
+  esMesaTemporal,
+  esMesaGrupoNueva,
+  esMesaNoPersistida,
+  planRepuntarAsignaciones,
+  detectarPoligonoCerrado,
+  areaShoelace,
+  bboxPoligono,
+} from "./planoUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +45,8 @@ export interface MesaCanvas {
   alto: number;
   posX: number;
   posY: number;
+  /** Rotación en grados (0 = sin rotar). Se persiste en mesas.rotacion. */
+  rotacion?: number;
   isMerged?: boolean;
   originalMesas?: Array<{
     id: string;
@@ -175,6 +185,35 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     toast.success(`Escala aplicada: ${width}m × ${height}m`);
   }, []);
 
+  // Área real del local: si las paredes dibujadas forman un polígono cerrado
+  // (sus extremos coinciden dentro de una tolerancia de ~5px), se calcula el
+  // área real con la fórmula del shoelace en vez de mostrar siempre el
+  // ancho×alto "de catálogo" que venía de la BD (que podía no coincidir con
+  // lo dibujado). Si no hay un lazo cerrado, se mantiene el fallback anterior.
+  const areaReal = useMemo(() => {
+    const paredes = elementos
+      .filter((e) => e.tipo === "wall")
+      .map((e) => ({
+        x1: e.props?.x1 ?? 0,
+        y1: e.props?.y1 ?? 0,
+        x2: e.props?.x2 ?? 0,
+        y2: e.props?.y2 ?? 0,
+      }));
+    const vertices = detectarPoligonoCerrado(paredes, 5);
+    if (!vertices) return null;
+
+    const areaPx2 = areaShoelace(vertices);
+    const bbox = bboxPoligono(vertices);
+    const ppm2 = PIXELS_PER_METER * PIXELS_PER_METER;
+    if (areaPx2 <= 0) return null;
+
+    return {
+      areaM2: areaPx2 / ppm2,
+      widthM: bbox.width / PIXELS_PER_METER,
+      heightM: bbox.height / PIXELS_PER_METER,
+    };
+  }, [elementos, PIXELS_PER_METER]);
+
   // Guardar plano
   const handleSave = useCallback(async () => {
     setIsSaving(true);
@@ -227,6 +266,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           pos_y: mesa.posY,
           ancho: mesa.ancho,
           alto: mesa.alto,
+          rotacion: mesa.rotacion ?? 0,
           is_merged: mesa.isMerged || false,
           original_mesas: mesa.originalMesas || null,
           etiqueta: mesa.etiqueta || null,
@@ -255,6 +295,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             alto: mesaTemp.alto,
             pos_x: mesaTemp.posX,
             pos_y: mesaTemp.posY,
+            rotacion: mesaTemp.rotacion ?? 0,
             is_merged: false,
             etiqueta: mesaTemp.etiqueta || null,
           })
@@ -288,6 +329,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             alto: mesaGrupo.alto,
             pos_x: mesaGrupo.posX,
             pos_y: mesaGrupo.posY,
+            rotacion: mesaGrupo.rotacion ?? 0,
             is_merged: true,
             original_mesas: mesaGrupo.originalMesas as any,
           })
@@ -369,15 +411,18 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     }
   }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
 
-  // Exportar imagen
+  // Exportar imagen: PNG del contenido del plano (no del viewport con zoom/pan
+  // ni del grid) a 2x, resuelto en CanvasPlano.exportImage().
   const handleExport = useCallback(() => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (canvas) {
+    const dataUrl = canvasRef.current?.exportImage();
+    if (dataUrl) {
       const link = document.createElement("a");
       link.download = `plano-${espacioNombre}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = dataUrl;
       link.click();
       toast.success("Imagen exportada");
+    } else {
+      toast.error("No se pudo exportar la imagen");
     }
   }, [espacioNombre]);
 
@@ -518,6 +563,64 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     toast.success("Elemento eliminado");
   }, [selectedElement, eliminarMesa]);
 
+  // Atajos de teclado: coinciden con los que ya anunciaban los tooltips de la
+  // barra de herramientas pero que hasta ahora no hacían nada (S/W/A/M/C/D,
+  // Supr para borrar la selección con el MISMO diálogo de confirmación que el
+  // botón de la papelera, Esc para volver a "seleccionar").
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Con cualquier diálogo (Alert)Dialog abierto — el de "Limpiar"/"Eliminar
+      // elemento" de aquí mismo, o el de "Eliminar mesa" de PanelLateral, que
+      // vive en su propio estado y no es visible desde este componente — no
+      // debe cambiar de herramienta ni reabrir el diálogo por detrás: antes
+      // escribir "d" para confirmar mentalmente "delete" mientras el diálogo
+      // tenía el foco (en un botón, no en un input) cambiaba la herramienta a
+      // "puerta" sin que el usuario se diera cuenta.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+
+      switch (e.key.toLowerCase()) {
+        case "s":
+          setActiveTool("select");
+          break;
+        case "w":
+          setActiveTool("wall");
+          break;
+        case "a":
+          setActiveTool("area");
+          break;
+        case "m":
+          setActiveTool("mesa-rect");
+          break;
+        case "c":
+          setActiveTool("mesa-circular");
+          break;
+        case "d":
+          setActiveTool("door");
+          break;
+        case "escape":
+          setActiveTool("select");
+          break;
+        case "delete":
+        case "backspace":
+          if (selectedElement && !e.repeat) {
+            e.preventDefault();
+            handleAbrirDeleteDialog();
+          }
+          break;
+        default:
+          return;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedElement, handleAbrirDeleteDialog]);
+
   if (loadingPlano || loadingMesas) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)]">
@@ -537,7 +640,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           <div>
             <h2 className="text-xl font-semibold">{espacioNombre}</h2>
             <p className="text-sm text-muted-foreground">
-              Editor de plano • {realDimensions.width}m × {realDimensions.height}m • {(realDimensions.width * realDimensions.height).toFixed(0)} m²
+              Editor de plano •{" "}
+              {areaReal
+                ? `≈ ${areaReal.areaM2.toLocaleString("es-ES", { maximumFractionDigits: 1 })} m² · ${areaReal.widthM.toFixed(2)} × ${areaReal.heightM.toFixed(2)} m`
+                : `${realDimensions.width}m × ${realDimensions.height}m • ${(realDimensions.width * realDimensions.height).toFixed(0)} m²`}
             </p>
           </div>
         </div>
@@ -630,9 +736,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             onToolChange={setActiveTool}
             onZoomChange={setZoomLevel}
           />
-          {/* Indicador de modo pan */}
-          <div className="absolute bottom-3 left-3 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
-            🖱️ Rueda: Zoom • Espacio + Arrastrar: Mover
+          {/* Indicador de modo pan: compacto y semitransparente por defecto para
+              no tapar cotas u otros elementos cerca de la esquina inferior. */}
+          <div className="absolute bottom-2 left-2 text-[10px] leading-none text-muted-foreground bg-background/70 px-1.5 py-0.5 rounded opacity-60 pointer-events-none">
+            🖱️ Rueda: Zoom • Espacio+Arrastrar: Mover
           </div>
         </div>
 

@@ -7,6 +7,15 @@ import {
   esMesaTemporal,
   esMesaGrupoNueva,
   esMesaNoPersistida,
+  snapPointToGrid,
+  snapWallAngle,
+  snapToWallEndpoint,
+  detectarPoligonoCerrado,
+  areaShoelace,
+  bboxPoligono,
+  snapRotationDeg,
+  distribuirSillasRectangular,
+  distribuirSillasCirculo,
   type Matrix2D,
 } from "../planoUtils";
 
@@ -122,5 +131,147 @@ describe("identificadores de mesa no persistida", () => {
     expect(esMesaNoPersistida("mesa-temp-1")).toBe(true);
     expect(esMesaNoPersistida("mesa-grupo-1")).toBe(true);
     expect(esMesaNoPersistida("a1b2c3d4-real-uuid")).toBe(false);
+  });
+});
+
+describe("snapPointToGrid", () => {
+  it("redondea a la rejilla de 10cm (a 50px/m -> 5px)", () => {
+    expect(snapPointToGrid({ x: 23, y: 48 }, 50)).toEqual({ x: 25, y: 50 });
+  });
+
+  it("no cambia un punto ya alineado", () => {
+    expect(snapPointToGrid({ x: 100, y: 150 }, 50)).toEqual({ x: 100, y: 150 });
+  });
+});
+
+describe("snapWallAngle", () => {
+  it("ajusta a 0° un trazo casi horizontal", () => {
+    const resultado = snapWallAngle({ x: 0, y: 0 }, { x: 100, y: 4 }, false);
+    expect(resultado.y).toBeCloseTo(0, 5);
+    expect(resultado.x).toBeCloseTo(Math.hypot(100, 4), 1);
+  });
+
+  it("ajusta a 90° un trazo casi vertical", () => {
+    const resultado = snapWallAngle({ x: 0, y: 0 }, { x: 3, y: 100 }, false);
+    expect(resultado.x).toBeCloseTo(0, 5);
+    expect(resultado.y).toBeCloseTo(Math.hypot(3, 100), 1);
+  });
+
+  it("con freeform=true (Shift) no ajusta nada", () => {
+    const punto = { x: 97, y: 13 };
+    expect(snapWallAngle({ x: 0, y: 0 }, punto, true)).toEqual(punto);
+  });
+
+  it("conserva la longitud real tras el ajuste", () => {
+    const anchor = { x: 10, y: 10 };
+    const punto = { x: 10 + 70.7, y: 10 + 70.7 }; // ~45°
+    const resultado = snapWallAngle(anchor, punto, false);
+    const longitudOriginal = Math.hypot(punto.x - anchor.x, punto.y - anchor.y);
+    const longitudAjustada = Math.hypot(resultado.x - anchor.x, resultado.y - anchor.y);
+    expect(longitudAjustada).toBeCloseTo(longitudOriginal, 3);
+  });
+});
+
+describe("snapToWallEndpoint", () => {
+  const paredes = [
+    { x1: 0, y1: 0, x2: 100, y2: 0 },
+    { x1: 100, y1: 0, x2: 100, y2: 100 },
+  ];
+
+  it("encuentra el extremo más cercano dentro del umbral", () => {
+    expect(snapToWallEndpoint({ x: 103, y: 2 }, paredes, 10)).toEqual({ x: 100, y: 0 });
+  });
+
+  it("devuelve null si no hay ningún extremo dentro del umbral", () => {
+    expect(snapToWallEndpoint({ x: 50, y: 50 }, paredes, 10)).toBeNull();
+  });
+});
+
+describe("detectarPoligonoCerrado + areaShoelace + bboxPoligono", () => {
+  it("detecta un cuadrado cerrado formado por 4 paredes en cualquier orden", () => {
+    // Cuadrado de 100x100, con las paredes desordenadas y algunas invertidas
+    const paredes = [
+      { x1: 100, y1: 0, x2: 100, y2: 100 }, // derecha
+      { x1: 0, y1: 0, x2: 100, y2: 0 }, // arriba
+      { x1: 100, y1: 100, x2: 0, y2: 100 }, // abajo (invertida)
+      { x1: 0, y1: 100, x2: 0, y2: 0 }, // izquierda (invertida)
+    ];
+    const vertices = detectarPoligonoCerrado(paredes);
+    expect(vertices).not.toBeNull();
+    expect(vertices).toHaveLength(4);
+
+    const area = areaShoelace(vertices!);
+    expect(area).toBeCloseTo(10000, 1);
+
+    const bbox = bboxPoligono(vertices!);
+    expect(bbox).toEqual({ width: 100, height: 100 });
+  });
+
+  it("tolera pequeños huecos entre extremos (< tolerance)", () => {
+    const paredes = [
+      { x1: 0, y1: 0, x2: 100, y2: 0 },
+      { x1: 100, y1: 0, x2: 100, y2: 100 },
+      { x1: 100, y1: 100, x2: 0, y2: 102 }, // 2px de hueco, dentro de tolerance=5
+      { x1: 0, y1: 98, x2: 0, y2: 0 },
+    ];
+    expect(detectarPoligonoCerrado(paredes, 5)).not.toBeNull();
+  });
+
+  it("devuelve null si las paredes no cierran un lazo", () => {
+    const paredes = [
+      { x1: 0, y1: 0, x2: 100, y2: 0 },
+      { x1: 100, y1: 0, x2: 100, y2: 100 },
+      // Falta cerrar el resto del polígono
+    ];
+    expect(detectarPoligonoCerrado(paredes)).toBeNull();
+  });
+
+  it("devuelve null si hay menos de 3 paredes", () => {
+    expect(detectarPoligonoCerrado([{ x1: 0, y1: 0, x2: 10, y2: 0 }])).toBeNull();
+  });
+});
+
+describe("snapRotationDeg", () => {
+  it("redondea al múltiplo de 15° más cercano", () => {
+    expect(snapRotationDeg(37)).toBe(30);
+    expect(snapRotationDeg(38)).toBe(45);
+    expect(snapRotationDeg(-7)).toBe(-0);
+  });
+});
+
+describe("distribuirSillasRectangular", () => {
+  it("devuelve tantas sillas como la capacidad para una mesa de 4", () => {
+    const sillas = distribuirSillasRectangular(4, 120, 80);
+    expect(sillas).toHaveLength(4);
+  });
+
+  it("prioriza los lados largos: para una mesa muy alargada de 2, van en los lados largos", () => {
+    const sillas = distribuirSillasRectangular(2, 200, 80);
+    expect(sillas).toHaveLength(2);
+    // Ambas sillas deben estar en los lados largos (y = ±mitad del corto + margen)
+    sillas.forEach((s) => {
+      expect(Math.abs(s.y)).toBeGreaterThan(0);
+      expect(Math.abs(s.x)).toBeLessThan(100); // dentro del rango del lado largo
+    });
+  });
+
+  it("no revienta con capacidad 0 o dimensiones inválidas", () => {
+    expect(distribuirSillasRectangular(0, 80, 80)).toEqual([]);
+    expect(distribuirSillasRectangular(4, 0, 80)).toEqual([]);
+  });
+});
+
+describe("distribuirSillasCirculo", () => {
+  it("reparte las sillas a la misma distancia del centro", () => {
+    const sillas = distribuirSillasCirculo(6, 150);
+    expect(sillas).toHaveLength(6);
+    const radioEsperado = 150 / 2 + 14;
+    sillas.forEach((s) => {
+      expect(Math.hypot(s.x, s.y)).toBeCloseTo(radioEsperado, 5);
+    });
+  });
+
+  it("no revienta con capacidad 0", () => {
+    expect(distribuirSillasCirculo(0, 150)).toEqual([]);
   });
 });

@@ -451,6 +451,10 @@ export function PanelLateral({
                   <span>Mesa</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="w-4 h-1.5 bg-slate-800 rounded-sm" />
+                  <span>Pared</span>
+                </div>
+                <div className="flex items-center gap-2">
                   <div className="w-4 h-4 bg-blue-500/10 border border-blue-500 border-dashed rounded" />
                   <span>Área</span>
                 </div>
@@ -459,29 +463,12 @@ export function PanelLateral({
                   <span>Puerta</span>
                 </div>
               </div>
-              
-              {/* Leyenda de niveles de paredes */}
-              <div className="border-t pt-2">
-                <p className="text-xs text-muted-foreground mb-1.5">Nivel de paredes:</p>
-                <div className="grid grid-cols-2 gap-1 text-[10px]">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 bg-green-500 rounded-full" />
-                    <span>Recta (0°)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 bg-yellow-500 rounded-full" />
-                    <span>Casi (&lt;1°)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 bg-orange-500 rounded-full" />
-                    <span>Desviada (1-3°)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-1 bg-red-500 rounded-full" />
-                    <span>Muy (&gt;3°)</span>
-                  </div>
-                </div>
-              </div>
+
+              <p className="text-[10px] text-muted-foreground border-t pt-2">
+                Atajos: S seleccionar · W pared · A área · M mesa · C mesa circular ·
+                D puerta · Supr borrar · Esc cancelar. Al dibujar paredes, Shift
+                desactiva el ajuste a 0/45/90°.
+              </p>
             </CardContent>
           </CollapsibleContent>
         </Card>

@@ -4,7 +4,32 @@ import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, P
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
-import { calcularPuntosAbsolutosPared, calcularGeometriaRect, type Matrix2D } from "./planoUtils";
+import {
+  calcularPuntosAbsolutosPared,
+  calcularGeometriaRect,
+  snapPointToGrid,
+  snapWallAngle,
+  snapToWallEndpoint,
+  snapRotationDeg,
+  distribuirSillasRectangular,
+  distribuirSillasCirculo,
+  type Matrix2D,
+  type SegmentoPared,
+} from "./planoUtils";
+
+// Estilo arquitectónico de paredes: gris carbón uniforme (antes se coloreaban
+// en verde/amarillo/naranja/rojo según la desviación respecto a 0°, pero sin
+// ningún snapping era casi imposible dibujar una pared "verde" — la escala de
+// "nivel" no aportaba nada útil). Grosor ~15cm a escala real.
+const WALL_COLOR = "#1f2937";
+const WALL_COLOR_SELECTED = "#2563eb";
+const WALL_THICKNESS_METERS = 0.15;
+const GRID_SNAP_METERS = 0.1;
+const ENDPOINT_SNAP_PX = 10;
+const ANGLE_SNAP_STEP_DEG = 15;
+const DOOR_WIDTH_METERS = 0.8;
+const DOOR_LEAF_THICKNESS_PX = 6;
+const DOOR_WALL_SNAP_PX = 25;
 
 interface CanvasPlanoProps {
   pixelsPerMeter: number;
@@ -29,6 +54,8 @@ export interface CanvasPlanoRef {
   clearCanvas: () => void;
   removeElement: (id: string) => void;
   getCanvas: () => HTMLCanvasElement | null;
+  /** PNG (dataURL) del contenido del plano a 2x, sin grid, encuadrado a los límites del contenido dibujado. */
+  exportImage: () => string | null;
   setZoom: (zoom: number) => void;
   /** Desagrupa una mesa fusionada y devuelve las mesas resultantes (o null si no había nada que desagrupar). */
   unmergeMesa: (mesaId: string) => MesaCanvas[] | null;
@@ -86,6 +113,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const wallPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const tempLinesRef = useRef<Line[]>([]);
   const previewLineRef = useRef<Line | null>(null);
+  const snapIndicatorRef = useRef<InstanceType<typeof Circle> | null>(null);
   const pixelsPerMeterRef = useRef(pixelsPerMeter);
   const alignmentGuidesRef = useRef<Line[]>([]); // Guías de alineación
   const mesasInitializedRef = useRef(false); // Para controlar si las mesas ya fueron cargadas inicialmente
@@ -185,6 +213,77 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.renderAll();
     },
     getCanvas: () => canvasRef.current,
+    exportImage: () => {
+      if (!fabricCanvas) return null;
+
+      fabricCanvas.discardActiveObject();
+
+      const prevVpt = fabricCanvas.viewportTransform
+        ? [...fabricCanvas.viewportTransform]
+        : ([1, 0, 0, 1, 0, 0] as any);
+
+      // Ocultar temporalmente el grid y los indicadores de snap/guías: no
+      // deben salir en la imagen exportada (antes el export era un toDataURL
+      // literal del viewport, con zoom, pan y grid incluidos).
+      const hidden: FabricObject[] = [];
+      fabricCanvas.getObjects().forEach((obj) => {
+        if ((obj as any).isGrid || (obj as any).isSnapIndicator || (obj as any).isAlignmentGuide) {
+          if (obj.visible !== false) {
+            hidden.push(obj);
+            obj.visible = false;
+          }
+        }
+      });
+
+      try {
+        // Medir en coordenadas de mundo (viewport identidad) para exportar el
+        // contenido real, no lo que se ve encuadrado en pantalla.
+        fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0] as any);
+
+        const relevantTypes = ["wall", "area", "door", "mesa"];
+        const objects = fabricCanvas.getObjects().filter((obj) => {
+          const customData = (obj as any).customData;
+          return customData?.tipo && relevantTypes.includes(customData.tipo);
+        });
+
+        let left = 0, top = 0, width = fabricCanvas.getWidth(), height = fabricCanvas.getHeight();
+
+        if (objects.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          objects.forEach((obj) => {
+            obj.setCoords();
+            obj.getCoords().forEach((p) => {
+              minX = Math.min(minX, p.x);
+              minY = Math.min(minY, p.y);
+              maxX = Math.max(maxX, p.x);
+              maxY = Math.max(maxY, p.y);
+            });
+          });
+          if (isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+            const padding = 40;
+            left = minX - padding;
+            top = minY - padding;
+            width = maxX - minX + padding * 2;
+            height = maxY - minY + padding * 2;
+          }
+        }
+
+        fabricCanvas.renderAll();
+
+        return fabricCanvas.toDataURL({
+          format: "png",
+          left,
+          top,
+          width,
+          height,
+          multiplier: 2,
+        });
+      } finally {
+        hidden.forEach((obj) => { obj.visible = true; });
+        fabricCanvas.setViewportTransform(prevVpt as any);
+        fabricCanvas.renderAll();
+      }
+    },
     setZoom: (zoom: number) => {
       if (!fabricCanvas) return;
       const clampedZoom = Math.max(0.25, Math.min(3, zoom));
@@ -218,74 +317,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         
         const posXPixels = baseX + offsetX;
         const posYPixels = baseY;
-        
-        let obj: FabricObject;
-        
-        if (originalMesa.forma === "circular") {
-          const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-          obj = new Circle({
-            left: posXPixels,
-            top: posYPixels,
-            radius: radiusPixels,
-            fill: "#dbeafe",
-            stroke: "#2563eb",
-            strokeWidth: 2,
-            originX: "left",
-            originY: "top",
-            selectable: true,
-            hasControls: false,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockRotation: true,
-            hoverCursor: "move",
-            moveCursor: "move",
-            shadow: {
-              color: "rgba(0,0,0,0.1)",
-              blur: 8,
-              offsetX: 2,
-              offsetY: 2,
-            } as any,
-          });
-        } else {
-          obj = new Rect({
-            left: posXPixels,
-            top: posYPixels,
-            width: anchoPixels,
-            height: altoPixels,
-            fill: "#dbeafe",
-            stroke: "#2563eb",
-            strokeWidth: 2,
-            rx: 6,
-            ry: 6,
-            originX: "left",
-            originY: "top",
-            selectable: true,
-            hasControls: false,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockRotation: true,
-            hoverCursor: "move",
-            moveCursor: "move",
-            shadow: {
-              color: "rgba(0,0,0,0.1)",
-              blur: 8,
-              offsetX: 2,
-              offsetY: 2,
-            } as any,
-          });
-        }
-        
         const newId = `mesa-temp-${Date.now()}-${index}`;
-        
-        (obj as any).customData = {
-          tipo: "mesa",
+
+        const obj = createMesaTableObject({
           id: newId,
           nombre: originalMesa.nombre,
           capacidad: originalMesa.capacidad,
-        };
-        
+          forma: originalMesa.forma,
+          anchoCm: originalMesa.ancho,
+          altoCm: originalMesa.alto,
+          posXPixels,
+          posYPixels,
+        });
         fabricCanvas.add(obj);
-        
+        renderSillasMesa(fabricCanvas, obj);
+
         // Crear etiqueta
         const anchoM = (originalMesa.ancho / 100).toFixed(2);
         const altoM = (originalMesa.alto / 100).toFixed(2);
@@ -563,17 +609,35 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
   }), [fabricCanvas, onElementosChange, onMesasChange, initialZoom, onZoomChange, canvasWidth, canvasHeight]);
 
-  // Función para obtener color de nivel según ángulo de pared
-  const getWallLevelColor = (angle: number): string => {
-    // Normalizar ángulo a 0-90 (considerando simetría)
-    const normalizedAngle = Math.abs(angle % 90);
-    const deviation = Math.min(normalizedAngle, 90 - normalizedAngle);
-    
-    // Verde: exactamente 0°, Amarillo: <1°, Naranja: 1-3°, Rojo: > 3°
-    if (deviation === 0) return "#22c55e"; // Verde - exactamente recto
-    if (deviation < 1) return "#eab308"; // Amarillo - casi recto
-    if (deviation < 3) return "#f97316"; // Naranja - desviado
-    return "#ef4444"; // Rojo - muy desviado
+  // Grosor de pared a escala real (~15cm), constante para todas.
+  const getWallStrokeWidth = () => WALL_THICKNESS_METERS * pixelsPerMeterRef.current;
+
+  // Recoge los segmentos de pared actualmente en el canvas (para el snapping
+  // magnético a esquinas mientras se dibuja una nueva pared).
+  const getWallSegments = (canvas: FabricCanvas): SegmentoPared[] => {
+    const segmentos: SegmentoPared[] = [];
+    canvas.getObjects().forEach((obj) => {
+      const cd = (obj as any).customData;
+      if (cd?.tipo !== "wall") return;
+      const line = obj as InstanceType<typeof Line>;
+      segmentos.push({
+        x1: line.x1 ?? 0,
+        y1: line.y1 ?? 0,
+        x2: line.x2 ?? 0,
+        y2: line.y2 ?? 0,
+      });
+    });
+    // Incluir también los puntos ya colocados de la pared en curso.
+    const puntosEnCurso = wallPointsRef.current;
+    for (let i = 0; i < puntosEnCurso.length - 1; i++) {
+      segmentos.push({
+        x1: puntosEnCurso[i].x,
+        y1: puntosEnCurso[i].y,
+        x2: puntosEnCurso[i + 1].x,
+        y2: puntosEnCurso[i + 1].y,
+      });
+    }
+    return segmentos;
   };
 
   // Función para limpiar guías de alineación
@@ -589,12 +653,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     const MERGE_THRESHOLD = 15; // píxeles de proximidad para fusionar
 
-    const movedLeft = movedMesa.left || 0;
-    const movedTop = movedMesa.top || 0;
-    const movedWidth = (movedMesa as any).width || (movedMesa as any).radius * 2 || 0;
-    const movedHeight = (movedMesa as any).height || (movedMesa as any).radius * 2 || 0;
-    const movedRight = movedLeft + movedWidth;
-    const movedBottom = movedTop + movedHeight;
+    // OJO: usar getBoundingRect() (axis-aligned, en coordenadas de escena) y no
+    // left/top/width/height a pelo — con una mesa rotada (control mtr), left/top
+    // siguen siendo la esquina "antes de rotar" (Fabric rota siempre alrededor
+    // del centro), así que left+width ya no es el borde derecho real y la
+    // detección de adyacencia salía mal en cuanto la mesa tenía algo de ángulo.
+    movedMesa.setCoords();
+    const movedBox = movedMesa.getBoundingRect();
+    const movedLeft = movedBox.left;
+    const movedTop = movedBox.top;
+    const movedRight = movedBox.left + movedBox.width;
+    const movedBottom = movedBox.top + movedBox.height;
 
     // Buscar mesa cercana con la que fusionar
     let mesaToMerge: FabricObject | null = null;
@@ -604,12 +673,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const objData = (obj as any).customData;
       if (!objData || objData.tipo !== "mesa" || objData.id === movedData.id) return;
 
-      const objLeft = obj.left || 0;
-      const objTop = obj.top || 0;
-      const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
-      const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
-      const objRight = objLeft + objWidth;
-      const objBottom = objTop + objHeight;
+      obj.setCoords();
+      const objBox = obj.getBoundingRect();
+      const objLeft = objBox.left;
+      const objTop = objBox.top;
+      const objRight = objBox.left + objBox.width;
+      const objBottom = objBox.top + objBox.height;
 
       // Verificar si están adyacentes horizontalmente (lado a lado)
       const horizontallyAdjacent = 
@@ -659,10 +728,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       newAlto = mesa1.alto + mesa2.alto;
     }
 
-    // Calcular nueva posición (esquina superior izquierda del grupo)
-    const mergedLeft = mesaToMerge.left || 0;
-    const mergedTop = mesaToMerge.top || 0;
-    
+    // Calcular nueva posición (esquina superior izquierda del grupo) — misma
+    // bbox axis-aligned que arriba, por si `mesaToMerge` también está rotada.
+    const mergedBox = mesaToMerge.getBoundingRect();
+    const mergedLeft = mergedBox.left;
+    const mergedTop = mergedBox.top;
+
     const newPosX = Math.min(movedLeft, mergedLeft);
     const newPosY = Math.min(movedTop, mergedTop);
 
@@ -674,11 +745,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     canvas.remove(movedMesa);
     canvas.remove(mesaToMerge);
 
-    // Eliminar etiquetas asociadas
+    // Eliminar TODO lo asociado a ambas mesas: etiqueta, sillas y bocadillo
+    // (antes solo se quitaba la mesa-label; las sillas y el bocadillo de las
+    // dos mesas absorbidas quedaban huérfanos en el canvas — se veían
+    // duplicados junto a las sillas de la nueva mesa fusionada).
     canvas.getObjects().forEach(obj => {
-      const labelData = (obj as any).customData;
-      if (labelData?.tipo === "mesa-label" && 
-          (labelData?.parentId === movedData.id || labelData?.parentId === mergeData.id)) {
+      const childData = (obj as any).customData;
+      if (childData?.parentId === movedData.id || childData?.parentId === mergeData.id) {
         canvas.remove(obj);
       }
     });
@@ -687,40 +760,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const newAnchoPixels = newAncho / 100 * pixelsPerMeterRef.current;
     const newAltoPixels = newAlto / 100 * pixelsPerMeterRef.current;
 
-    const newMesa = new Rect({
-      left: newPosX,
-      top: newPosY,
-      width: newAnchoPixels,
-      height: newAltoPixels,
-      fill: "#bbf7d0", // Verde claro para indicar mesa agrupada
-      stroke: "#16a34a",
-      strokeWidth: 2,
-      rx: 6,
-      ry: 6,
-      originX: "left",
-      originY: "top",
-      hasControls: false,
-      lockScalingX: true,
-      lockScalingY: true,
-      lockRotation: true,
-      shadow: {
-        color: "rgba(0,0,0,0.1)",
-        blur: 8,
-        offsetX: 2,
-        offsetY: 2,
-      } as any,
-    });
-
-    (newMesa as any).customData = {
-      tipo: "mesa",
+    const newMesa = createMesaTableObject({
       id: newId,
       nombre: newNombre,
       capacidad: newCapacidad,
+      forma: "rectangular",
+      anchoCm: newAncho,
+      altoCm: newAlto,
+      posXPixels: newPosX,
+      posYPixels: newPosY,
       isMerged: true,
-      originalMesas: [movedData.id, mergeData.id],
-    };
+    });
+    // originalMesas aquí guarda solo los IDs de las dos mesas absorbidas (no
+    // el objeto completo que espera MesaCanvas["originalMesas"] — es una
+    // pieza interna del objeto Fabric, no del estado persistido).
+    (newMesa as any).customData.originalMesas = [movedData.id, mergeData.id];
 
     canvas.add(newMesa);
+    renderSillasMesa(canvas, newMesa);
 
     // Crear etiqueta para la nueva mesa
     const anchoM = (newAncho / 100).toFixed(2);
@@ -787,38 +844,48 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     const customData = (movingObj as any).customData;
     if (customData?.tipo !== "mesa") return;
-    
-    const movingLeft = movingObj.left || 0;
-    const movingTop = movingObj.top || 0;
-    const movingWidth = (movingObj as any).width || (movingObj as any).radius * 2 || 0;
-    const movingHeight = (movingObj as any).height || (movingObj as any).radius * 2 || 0;
-    
-    const movingRight = movingLeft + movingWidth;
-    const movingBottom = movingTop + movingHeight;
-    const movingCenterX = movingLeft + movingWidth / 2;
-    const movingCenterY = movingTop + movingHeight / 2;
-    
+
+    // OJO: usar getBoundingRect() (axis-aligned, en coordenadas de escena) para
+    // los bordes — con una mesa rotada left/top+width/height ya no describen
+    // el rectángulo visible (Fabric rota alrededor del centro, no de left/top),
+    // así que las guías/snap salían desalineadas en cuanto había algo de ángulo.
+    // Sí es correcto seguir aplicando el offset resultante a movingObj.left/top
+    // (el "pivote"): trasladar el objeto desplaza igual al pivote y a su bbox.
+    movingObj.setCoords();
+    const movingBox = movingObj.getBoundingRect();
+    // Bordes/centro para DETECTAR alineación: bbox axis-aligned real.
+    const movingLeft = movingBox.left;
+    const movingTop = movingBox.top;
+    const movingRight = movingBox.left + movingBox.width;
+    const movingBottom = movingBox.top + movingBox.height;
+    const movingCenterX = movingBox.left + movingBox.width / 2;
+    const movingCenterY = movingBox.top + movingBox.height / 2;
+    // Pivote real (movingObj.left/top) para APLICAR el snap: trasladar el
+    // objeto desplaza igual al pivote y a su bbox, así que el mismo offset
+    // calculado sobre los bordes de la bbox es válido aplicado aquí.
+    const movingPivotLeft = movingObj.left || 0;
+    const movingPivotTop = movingObj.top || 0;
+
     const SNAP_THRESHOLD = 8; // píxeles de tolerancia para snapping (reducido para movimiento más natural)
-    
+
     let snapX: number | null = null;
     let snapY: number | null = null;
     let snapXOffset = 0;
     let snapYOffset = 0;
-    
+
     canvas.getObjects().forEach(obj => {
       const objData = (obj as any).customData;
       if (!objData || objData.tipo !== "mesa" || objData.id === customData.id) return;
-      
-      const objLeft = obj.left || 0;
-      const objTop = obj.top || 0;
-      const objWidth = (obj as any).width || (obj as any).radius * 2 || 0;
-      const objHeight = (obj as any).height || (obj as any).radius * 2 || 0;
-      
-      const objRight = objLeft + objWidth;
-      const objBottom = objTop + objHeight;
-      const objCenterX = objLeft + objWidth / 2;
-      const objCenterY = objTop + objHeight / 2;
-      
+
+      obj.setCoords();
+      const objBox = obj.getBoundingRect();
+      const objLeft = objBox.left;
+      const objTop = objBox.top;
+      const objRight = objBox.left + objBox.width;
+      const objBottom = objBox.top + objBox.height;
+      const objCenterX = objBox.left + objBox.width / 2;
+      const objCenterY = objBox.top + objBox.height / 2;
+
       // Alineación vertical (bordes izquierdo, derecho, centro)
       const verticalAlignments = [
         { moving: movingLeft, target: objLeft, offset: objLeft - movingLeft },
@@ -882,17 +949,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     
     // Aplicar auto-snap si está habilitado
     if (applySnap) {
-      let newLeft = movingLeft;
-      let newTop = movingTop;
-      
+      let newLeft = movingPivotLeft;
+      let newTop = movingPivotTop;
+
       if (snapXOffset !== 0 && Math.abs(snapXOffset) < SNAP_THRESHOLD) {
-        newLeft = movingLeft + snapXOffset;
+        newLeft = movingPivotLeft + snapXOffset;
       }
       if (snapYOffset !== 0 && Math.abs(snapYOffset) < SNAP_THRESHOLD) {
-        newTop = movingTop + snapYOffset;
+        newTop = movingPivotTop + snapYOffset;
       }
-      
-      if (newLeft !== movingLeft || newTop !== movingTop) {
+
+      if (newLeft !== movingPivotLeft || newTop !== movingPivotTop) {
         movingObj.set({ left: newLeft, top: newTop });
       }
     }
@@ -909,7 +976,16 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       height: canvasHeight,
       backgroundColor: "#ffffff",
       selection: true,
+      // Selección con el color de acento (antes usaba el azul por defecto de
+      // Fabric, que coincidía "por casualidad" con el de las mesas).
+      selectionColor: "rgba(37, 99, 235, 0.08)",
+      selectionBorderColor: WALL_COLOR_SELECTED,
+      selectionLineWidth: 1,
     });
+    fabric.FabricObject.ownDefaults.borderColor = WALL_COLOR_SELECTED;
+    fabric.FabricObject.ownDefaults.cornerColor = WALL_COLOR_SELECTED;
+    fabric.FabricObject.ownDefaults.cornerStyle = "circle";
+    fabric.FabricObject.ownDefaults.transparentCorners = false;
 
     // Event handlers - Limitar selección a máximo 2 elementos
     const limitSelection = (selected: FabricObject[]) => {
@@ -1014,6 +1090,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           }
         }
       });
+
+      // Las sillas siguen a la mesa mientras se arrastra (no solo al soltar).
+      renderSillasMesa(canvas, mesaObj);
     };
 
     // Mostrar guías y mover etiquetas mientras se mueven las mesas
@@ -1073,6 +1152,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
                   });
                 }
               });
+
+              // Las sillas también deben seguir a la mesa durante el arrastre
+              // en selección múltiple (antes solo se movían en el caso de un
+              // objeto individual y se quedaban "atrás", desincronizadas).
+              renderSillasMesa(canvas, obj, { x: centerX, y: centerY });
             }
           }
         });
@@ -1136,10 +1220,15 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
                   });
                 }
               });
+
+              // Recolocar las sillas en la posición final (igual que en
+              // object:moving) — si no, tras soltar quedaban ancladas a la
+              // posición previa al arrastre en selección múltiple.
+              renderSillasMesa(canvas, obj, { x: centerX, y: centerY });
             }
           }
         });
-        
+
         // Aplicar todas las actualizaciones al estado
         if (updates.length > 0) {
           const currentMesas = mesasCanvasRef.current;
@@ -1159,41 +1248,58 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           // Aplicar auto-snap al soltar
           showAlignmentGuides(canvas, target, true);
           clearAlignmentGuides(canvas);
-          
-          const newPosXPixels = target.left || 0;
-          const newPosYPixels = target.top || 0;
-          
-          // Convertir de píxeles a metros para guardar
+
+          const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
+          const anchoPixels = (mesa?.ancho ?? customData.ancho ?? 80) / 100 * pixelsPerMeterRef.current;
+          const altoPixels = (mesa?.alto ?? customData.alto ?? 80) / 100 * pixelsPerMeterRef.current;
+
+          // Ajustar la rotación a pasos de 15° al soltar el control de giro.
+          // Con origen left/top, cambiar `angle` directamente desplaza el
+          // centro visual (Fabric solo compensa left/top automáticamente
+          // durante el arrastre interactivo del control) — por eso se
+          // recoloca explícitamente con setPositionByOrigin para que el
+          // centro no "salte" al redondear el ángulo.
+          const anguloActual = target.angle ?? 0;
+          const anguloAjustado = snapRotationDeg(anguloActual, ANGLE_SNAP_STEP_DEG);
+          if (Math.abs(anguloActual - anguloAjustado) > 0.01) {
+            const centroAntes = target.getCenterPoint();
+            target.set({ angle: anguloAjustado });
+            target.setPositionByOrigin(centroAntes, target.originX as any, target.originY as any);
+            target.setCoords();
+          }
+          customData.rotacion = anguloAjustado;
+
+          // Centro real del objeto (válido esté rotado o no) para derivar la
+          // posición "top-left sin rotar" que se persiste — igual que la que
+          // ya usaba PlanoEspacio2D (rota por CSS alrededor del centro).
+          const centro = target.getCenterPoint();
+          const newPosXPixels = centro.x - anchoPixels / 2;
+          const newPosYPixels = centro.y - altoPixels / 2;
           const newPosXMeters = newPosXPixels / pixelsPerMeterRef.current;
           const newPosYMeters = newPosYPixels / pixelsPerMeterRef.current;
-          
-          // Actualizar la etiqueta asociada a esta mesa
+
+          // Actualizar la etiqueta asociada a esta mesa (siempre centrada, angle 0)
           canvas.getObjects().forEach((labelObj) => {
             const labelData = (labelObj as any).customData;
             if (labelData?.tipo === "mesa-label" && labelData?.parentId === customData.id) {
-              const mesa = mesasCanvasRef.current.find(m => m.id === customData.id);
-              if (mesa) {
-                const anchoPixels = mesa.ancho / 100 * pixelsPerMeterRef.current;
-                const altoPixels = mesa.alto / 100 * pixelsPerMeterRef.current;
-                labelObj.set({
-                  left: newPosXPixels + anchoPixels / 2,
-                  top: newPosYPixels + altoPixels / 2,
-                });
-              }
+              labelObj.set({ left: centro.x, top: centro.y });
             }
           });
+
+          // Sillas: recalculadas según la posición/ángulo finales
+          renderSillasMesa(canvas, target);
           canvas.renderAll();
-          
-          // Actualizar estado guardando posición en METROS
+
+          // Actualizar estado guardando posición en METROS y la rotación
           const currentMesas = mesasCanvasRef.current;
           onMesasChange(
             currentMesas.map((m) =>
               m.id === customData.id
-                ? { ...m, posX: newPosXMeters, posY: newPosYMeters }
+                ? { ...m, posX: newPosXMeters, posY: newPosYMeters, rotacion: anguloAjustado }
                 : m
             )
           );
-          
+
           // Verificar si se puede fusionar con otra mesa cercana
           setTimeout(() => checkAndMergeTables(canvas, target), 50);
         } else if (customData?.tipo === "wall") {
@@ -1214,10 +1320,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             )
           );
 
-          // Recolor según el nuevo ángulo y mover/regenerar su cota
-          const angle = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
-          line.set({ stroke: getWallLevelColor(angle) });
-
+          // Mover/regenerar su cota tras el cambio de posición/ángulo
           canvas.getObjects().forEach((obj) => {
             const cd = (obj as any).customData;
             if (cd?.tipo === "cota" && cd?.parentId === customData.id) {
@@ -1250,12 +1353,49 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             scaleY: 1,
           });
 
+          // Puerta: re-anclarla a la pared más cercana a su centro (mismo
+          // criterio/umbral que al crearla en handleDoorClick) — si no, al
+          // arrastrar una puerta ya anclada se quedaba "flotando" separada de
+          // la pared en vez de deslizarse pegada a ella.
+          if (customData?.tipo === "door") {
+            const centerX = geometria.left + geometria.width / 2;
+            const centerY = geometria.top + geometria.height / 2;
+            let mejorDist = DOOR_WALL_SNAP_PX;
+            let anclaje: { left: number; top: number; angle: number } | null = null;
+
+            getWallSegments(canvas).forEach((seg) => {
+              const proyeccion = proyectarPuntoEnSegmento({ x: centerX, y: centerY }, seg);
+              const dist = Math.hypot(proyeccion.x - centerX, proyeccion.y - centerY);
+              if (dist <= mejorDist) {
+                mejorDist = dist;
+                anclaje = {
+                  left: proyeccion.x - geometria.width / 2,
+                  top: proyeccion.y - geometria.height / 2,
+                  angle: Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1) * (180 / Math.PI),
+                };
+              }
+            });
+
+            if (anclaje) {
+              rectObj.set(anclaje);
+              rectObj.setCoords();
+              geometria.left = anclaje.left;
+              geometria.top = anclaje.top;
+              geometria.angle = anclaje.angle;
+            }
+          }
+
           const currentElementos = elementosRef.current;
           onElementosChange(
             currentElementos.map((e) =>
               e.id === customData.id ? { ...e, props: { ...e.props, ...geometria } } : e
             )
           );
+
+          // La puerta movida/rotada: regenerar su arco de barrido en la nueva posición/ángulo
+          if (customData?.tipo === "door") {
+            createDoorSwing(canvas, customData.id, geometria.left, geometria.top, geometria.width, geometria.height, geometria.angle);
+          }
 
           canvas.renderAll();
         }
@@ -1396,51 +1536,51 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
-    // Extensión del grid más allá del área visible (para pan sin bordes)
-    const gridExtension = 5000; // píxeles de extensión en cada dirección
+    // Extensión del grid más allá del área visible, solo para poder panear un
+    // poco sin ver el borde — antes eran ±5000px fijos (~440 líneas siempre,
+    // sin importar el tamaño del canvas); ahora se limita a un margen
+    // razonable relativo al propio canvas.
+    const gridExtension = Math.max(canvasWidth, canvasHeight, 400) * 0.6;
     const gridStartX = -gridExtension;
     const gridStartY = -gridExtension;
     const gridEndX = canvasWidth + gridExtension;
     const gridEndY = canvasHeight + gridExtension;
 
-    // Colores del grid - uniformes para todo el canvas
-    const gridColorMedium = "#e2e8f0";
-    const gridColorStrong = "#cbd5e1";
-    
-    // Calcular líneas desde el inicio negativo hasta el final extendido
-    const startMeterX = Math.floor(gridStartX / pixelsPerMeter);
-    const endMeterX = Math.ceil(gridEndX / pixelsPerMeter);
-    const startMeterY = Math.floor(gridStartY / pixelsPerMeter);
-    const endMeterY = Math.ceil(gridEndY / pixelsPerMeter);
-    
-    // Líneas verticales - grid uniforme
-    for (let i = startMeterX; i <= endMeterX; i++) {
-      const x = i * pixelsPerMeter;
-      const isMajor = i % 5 === 0;
-      const line = new Line([x, gridStartY, x, gridEndY], {
-        stroke: isMajor ? gridColorStrong : gridColorMedium,
-        strokeWidth: isMajor ? 1.5 : 0.5,
+    // Colores del grid — más claros que antes (líneas de referencia, no protagonistas)
+    const gridColorMinor = "#eef1f5";
+    const gridColorMajor = "#e1e6ec";
+
+    const minorStepPx = 0.5 * pixelsPerMeter; // rejilla menor cada 0.5m
+    const majorStepPx = 1 * pixelsPerMeter; // rejilla mayor cada 1m
+
+    const startX = Math.floor(gridStartX / minorStepPx) * minorStepPx;
+    const startY = Math.floor(gridStartY / minorStepPx) * minorStepPx;
+
+    const addGridLine = (points: [number, number, number, number], isMajor: boolean) => {
+      const line = new Line(points, {
+        stroke: isMajor ? gridColorMajor : gridColorMinor,
+        strokeWidth: isMajor ? 1 : 0.5,
         selectable: false,
         evented: false,
+        hoverCursor: "default",
       });
       (line as any).isGrid = true;
+      (line as any).excludeFromExport = true;
+      (line as any).customData = { tipo: "grid" };
       fabricCanvas.add(line);
       fabricCanvas.sendObjectToBack(line);
+    };
+
+    // Líneas verticales
+    for (let x = startX; x <= gridEndX; x += minorStepPx) {
+      const isMajor = Math.abs(Math.round(x / majorStepPx) * majorStepPx - x) < 0.5;
+      addGridLine([x, gridStartY, x, gridEndY], isMajor);
     }
 
-    // Líneas horizontales - grid uniforme
-    for (let i = startMeterY; i <= endMeterY; i++) {
-      const y = i * pixelsPerMeter;
-      const isMajor = i % 5 === 0;
-      const line = new Line([gridStartX, y, gridEndX, y], {
-        stroke: isMajor ? gridColorStrong : gridColorMedium,
-        strokeWidth: isMajor ? 1.5 : 0.5,
-        selectable: false,
-        evented: false,
-      });
-      (line as any).isGrid = true;
-      fabricCanvas.add(line);
-      fabricCanvas.sendObjectToBack(line);
+    // Líneas horizontales
+    for (let y = startY; y <= gridEndY; y += minorStepPx) {
+      const isMajor = Math.abs(Math.round(y / majorStepPx) * majorStepPx - y) < 0.5;
+      addGridLine([gridStartX, y, gridEndX, y], isMajor);
     }
 
     fabricCanvas.renderAll();
@@ -1480,16 +1620,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
       switch (elem.tipo) {
         case "wall": {
-          // Calcular ángulo para determinar color de nivel
-          const dx = x2 - x1;
-          const dy = y2 - y1;
-          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          const levelColor = getWallLevelColor(angle);
-          
           obj = new Line([x1, y1, x2, y2], {
-            stroke: levelColor, // Color según nivel
-            strokeWidth: 10,
-            strokeLineCap: "round",
+            stroke: WALL_COLOR,
+            strokeWidth: getWallStrokeWidth(),
+            strokeLineCap: "square",
             selectable: true,
             hasControls: true,
           });
@@ -1514,8 +1648,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           obj = new Rect({
             left: elem.props?.left ?? elem.left ?? 0,
             top: elem.props?.top ?? elem.top ?? 0,
-            width: elem.props?.width ?? elem.width ?? 60,
-            height: elem.props?.height ?? elem.height ?? 12,
+            width: elem.props?.width ?? elem.width ?? DOOR_WIDTH_METERS * pixelsPerMeter,
+            height: elem.props?.height ?? elem.height ?? DOOR_LEAF_THICKNESS_PX,
             angle: anguloGuardado,
             fill: "#fef3c7",
             stroke: "#d97706",
@@ -1529,42 +1663,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (obj) {
         (obj as any).customData = { tipo: elem.tipo, id: elem.id };
         fabricCanvas.add(obj);
-        
-        // Añadir cota para paredes
+
+        // Añadir cota para paredes (mismo estilo — con ticks — que al dibujar/mover)
         if (elem.tipo === "wall") {
-          const dx = x2 - x1;
-          const dy = y2 - y1;
-          const lengthPx = Math.sqrt(dx * dx + dy * dy);
-          const lengthM = roundTo5cm(lengthPx / pixelsPerMeter);
-          
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          
-          const offsetDistance = 18;
-          const perpAngle = (angle + 90) * (Math.PI / 180);
-          const offsetX = Math.cos(perpAngle) * offsetDistance;
-          const offsetY = Math.sin(perpAngle) * offsetDistance;
-          
-          const cotaText = new FabricText(`${lengthM.toFixed(2)}m`, {
-            left: midX + offsetX,
-            top: midY + offsetY,
-            fontSize: 11,
-            fontFamily: "system-ui, sans-serif",
-            fontWeight: "600",
-            fill: "#374151",
-            backgroundColor: "rgba(255,255,255,0.85)",
-            padding: 3,
-            selectable: false,
-            evented: false,
-            originX: "center",
-            originY: "center",
-            angle: angle > 90 || angle < -90 ? angle + 180 : angle,
-          });
-          
-          (cotaText as any).customData = { tipo: "cota", parentId: elem.id };
-          (cotaText as any).isCota = true;
-          fabricCanvas.add(cotaText);
+          createWallCota(fabricCanvas, x1, y1, x2, y2, elem.id);
+        }
+
+        // Arco de barrido para puertas (mismo estilo que al crearlas nuevas)
+        if (elem.tipo === "door") {
+          const doorRect = obj as InstanceType<typeof Rect>;
+          createDoorSwing(
+            fabricCanvas,
+            elem.id,
+            doorRect.left ?? 0,
+            doorRect.top ?? 0,
+            doorRect.width ?? 40,
+            doorRect.height ?? 6,
+            anguloGuardado
+          );
         }
       }
     });
@@ -1673,73 +1789,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // Convertir cm a píxeles para dimensiones
       const anchoPixels = mesa.ancho / 100 * pixelsPerMeter;
       const altoPixels = mesa.alto / 100 * pixelsPerMeter;
-
-      let obj: FabricObject;
-      
-      // Colores según si es mesa agrupada o normal
-      const fillColor = mesa.isMerged ? "#bbf7d0" : "#dbeafe";
-      const strokeColor = mesa.isMerged ? "#16a34a" : "#2563eb";
       const labelColor = mesa.isMerged ? "#166534" : "#1e40af";
 
-      if (mesa.forma === "circular") {
-        const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-        obj = new Circle({
-          left: posXPixels,
-          top: posYPixels,
-          radius: radiusPixels,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: 2,
-          originX: "left",
-          originY: "top",
-          hasControls: false,
-          lockScalingX: true,
-          lockScalingY: true,
-          lockRotation: true,
-          shadow: {
-            color: "rgba(0,0,0,0.1)",
-            blur: 8,
-            offsetX: 2,
-            offsetY: 2,
-          } as any,
-        });
-      } else {
-        obj = new Rect({
-          left: posXPixels,
-          top: posYPixels,
-          width: anchoPixels,
-          height: altoPixels,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: 2,
-          rx: 6,
-          ry: 6,
-          originX: "left",
-          originY: "top",
-          hasControls: false,
-          lockScalingX: true,
-          lockScalingY: true,
-          lockRotation: true,
-          shadow: {
-            color: "rgba(0,0,0,0.1)",
-            blur: 8,
-            offsetX: 2,
-            offsetY: 2,
-          } as any,
-        });
-      }
-
-      (obj as any).customData = {
-        tipo: "mesa",
+      const obj = createMesaTableObject({
         id: mesa.id,
         nombre: mesa.nombre,
         capacidad: mesa.capacidad,
-        isMerged: mesa.isMerged || false,
-        originalMesas: mesa.originalMesas || null,
-      };
-
+        forma: mesa.forma,
+        anchoCm: mesa.ancho,
+        altoCm: mesa.alto,
+        posXPixels,
+        posYPixels,
+        rotacion: mesa.rotacion ?? 0,
+        isMerged: mesa.isMerged,
+        originalMesas: mesa.originalMesas,
+      });
       fabricCanvas.add(obj);
-      
+      renderSillasMesa(fabricCanvas, obj);
+
       // Etiqueta con estilo diferente para mesas agrupadas
       if (mesa.isMerged) {
         const anchoM = (mesa.ancho / 100).toFixed(2);
@@ -1749,7 +1816,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const centerY = posYPixels + altoPixels / 2;
         const minDimension = Math.min(anchoPixels, altoPixels);
         const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-        
+
         const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
           left: centerX,
           top: centerY,
@@ -1769,12 +1836,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       } else {
         addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
       }
-      
+
       // Si la mesa tiene etiqueta bocadillo, crearla
       if (mesa.etiqueta) {
         createMesaBocadillo(mesa.id, mesa.etiqueta, posXPixels, posYPixels, anchoPixels, altoPixels);
       }
-      
+
       mesasEnCanvas.add(mesa.id);
     });
 
@@ -1806,71 +1873,24 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
       // Colores según si es mesa agrupada o normal
       const isMerged = mesa.is_merged || false;
-      const fillColor = isMerged ? "#bbf7d0" : "#dbeafe";
-      const strokeColor = isMerged ? "#16a34a" : "#2563eb";
       const labelColor = isMerged ? "#166534" : "#1e40af";
 
-      let obj: FabricObject;
-
-      if (mesa.forma === "circular") {
-        const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-        obj = new Circle({
-          left: posXPixels,
-          top: posYPixels,
-          radius: radiusPixels,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: 2,
-          originX: "left",
-          originY: "top",
-          hasControls: false,
-          lockScalingX: true,
-          lockScalingY: true,
-          lockRotation: true,
-          shadow: {
-            color: "rgba(0,0,0,0.1)",
-            blur: 8,
-            offsetX: 2,
-            offsetY: 2,
-          } as any,
-        });
-      } else {
-        obj = new Rect({
-          left: posXPixels,
-          top: posYPixels,
-          width: anchoPixels,
-          height: altoPixels,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: 2,
-          rx: 6,
-          ry: 6,
-          originX: "left",
-          originY: "top",
-          hasControls: false,
-          lockScalingX: true,
-          lockScalingY: true,
-          lockRotation: true,
-          shadow: {
-            color: "rgba(0,0,0,0.1)",
-            blur: 8,
-            offsetX: 2,
-            offsetY: 2,
-          } as any,
-        });
-      }
-
-      (obj as any).customData = {
-        tipo: "mesa",
+      const obj = createMesaTableObject({
         id: mesa.id,
         nombre: mesa.nombre,
         capacidad: mesa.capacidad,
-        isMerged: isMerged,
-        originalMesas: mesa.original_mesas || null,
-      };
-
+        forma: mesa.forma as "rectangular" | "circular",
+        anchoCm,
+        altoCm,
+        posXPixels,
+        posYPixels,
+        rotacion: mesa.rotacion ?? 0,
+        isMerged,
+        originalMesas: (mesa.original_mesas as MesaCanvas["originalMesas"]) || undefined,
+      });
       fabricCanvas.add(obj);
-      
+      renderSillasMesa(fabricCanvas, obj);
+
       // Etiqueta con estilo diferente para mesas agrupadas
       if (isMerged) {
         const anchoM = (anchoCm / 100).toFixed(2);
@@ -1916,6 +1936,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         alto: altoCm,
         posX: posXMeters,
         posY: posYMeters,
+        rotacion: mesa.rotacion ?? 0,
         isMerged: isMerged,
         originalMesas: mesa.original_mesas || undefined,
         etiqueta: mesa.etiqueta || null,
@@ -1937,12 +1958,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (!fabricCanvas) return;
 
     const handleMouseDown = (opt: any) => {
+      // Ignorar clics de dibujo mientras se está paneando con Espacio+arrastrar
+      // (antes handleMouseDown no comprobaba spacePressed y cada click con
+      // Espacio pulsado añadía un punto de pared/mesa/etc. de todos modos).
+      if (spacePressed.current) return;
+
+      const e = opt.e as MouseEvent | undefined;
+      // e.detail > 1 es el 2º/3er click de un doble/triple clic: ya lo procesa
+      // handleDblClick (finishWallDrawing). Sin este filtro, terminar una
+      // pared con doble clic añadía también un punto duplicado en el mismo sitio.
+      if (e && e.detail > 1) return;
+
       // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const tool = activeToolRef.current;
 
       if (tool === "wall") {
-        handleWallClick(pointer.x, pointer.y);
+        handleWallClick(pointer.x, pointer.y, !!e?.shiftKey);
       } else if (tool === "area") {
         handleAreaClick(pointer.x, pointer.y);
       } else if (tool === "mesa-rect") {
@@ -1956,10 +1988,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     const handleMouseMove = (opt: any) => {
       if (activeToolRef.current !== "wall" || wallPointsRef.current.length === 0) return;
-      
+
       // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
       const pointer = fabricCanvas.getScenePoint(opt.e);
-      updatePreviewLine(pointer.x, pointer.y);
+      const e = opt.e as MouseEvent | undefined;
+      updatePreviewLine(pointer.x, pointer.y, !!e?.shiftKey);
     };
 
     const handleDblClick = () => {
@@ -1987,25 +2020,75 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
   }, [fabricCanvas]);
 
+  // Calcula el punto "final" real de un trazo de pared aplicando, en orden:
+  // 1) snap de ángulo a 15° (salvo Shift = freeform), 2) snap a rejilla de
+  // 10cm, 3) snap magnético a un extremo de pared existente (~10px de
+  // pantalla) que tiene prioridad si hay uno cerca.
+  const computeSnappedWallPoint = (
+    rawX: number,
+    rawY: number,
+    freeform: boolean
+  ): { x: number; y: number; snappedToEndpoint: boolean } => {
+    const points = wallPointsRef.current;
+    let punto = { x: rawX, y: rawY };
+
+    if (points.length > 0) {
+      punto = snapWallAngle(points[points.length - 1], punto, freeform, ANGLE_SNAP_STEP_DEG);
+    }
+    punto = snapPointToGrid(punto, pixelsPerMeterRef.current, GRID_SNAP_METERS);
+
+    if (fabricCanvas) {
+      const zoom = fabricCanvas.getZoom() || 1;
+      const thresholdSceneUnits = ENDPOINT_SNAP_PX / zoom;
+      const segmentos = getWallSegments(fabricCanvas);
+      const endpoint = snapToWallEndpoint(punto, segmentos, thresholdSceneUnits);
+      if (endpoint) {
+        return { x: endpoint.x, y: endpoint.y, snappedToEndpoint: true };
+      }
+    }
+
+    return { ...punto, snappedToEndpoint: false };
+  };
+
+  // Muestra/oculta un pequeño círculo indicador cuando el punto actual se ha
+  // enganchado magnéticamente a un extremo de pared existente.
+  const setSnapIndicator = (canvas: FabricCanvas, punto: { x: number; y: number } | null) => {
+    if (snapIndicatorRef.current) {
+      canvas.remove(snapIndicatorRef.current);
+      snapIndicatorRef.current = null;
+    }
+    if (!punto) return;
+    const indicator = new Circle({
+      left: punto.x,
+      top: punto.y,
+      radius: 6,
+      fill: "transparent",
+      stroke: "#2563eb",
+      strokeWidth: 2,
+      originX: "center",
+      originY: "center",
+      selectable: false,
+      evented: false,
+    });
+    (indicator as any).isSnapIndicator = true;
+    snapIndicatorRef.current = indicator;
+    canvas.add(indicator);
+  };
+
   // Funciones de dibujo
-  const handleWallClick = (x: number, y: number) => {
+  const handleWallClick = (rawX: number, rawY: number, freeform: boolean) => {
     if (!fabricCanvas) return;
 
     const points = wallPointsRef.current;
-    
+    const { x, y } = computeSnappedWallPoint(rawX, rawY, freeform);
+
     if (points.length > 0) {
       const lastPoint = points[points.length - 1];
-      
-      // Calcular ángulo para color de nivel
-      const dx = x - lastPoint.x;
-      const dy = y - lastPoint.y;
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      const levelColor = getWallLevelColor(angle);
-      
+
       const line = new Line([lastPoint.x, lastPoint.y, x, y], {
-        stroke: levelColor, // Color según nivel de la pared
-        strokeWidth: 10,
-        strokeLineCap: "round",
+        stroke: WALL_COLOR,
+        strokeWidth: getWallStrokeWidth(),
+        strokeLineCap: "square",
         selectable: false,
         evented: false,
       });
@@ -2018,49 +2101,48 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     fabricCanvas.renderAll();
   };
 
-  const updatePreviewLine = (x: number, y: number) => {
+  const updatePreviewLine = (rawX: number, rawY: number, freeform: boolean = false) => {
     if (!fabricCanvas) return;
-    
+
     const points = wallPointsRef.current;
     if (points.length === 0) return;
 
     const lastPoint = points[points.length - 1];
+    const { x, y, snappedToEndpoint } = computeSnappedWallPoint(rawX, rawY, freeform);
 
     if (previewLineRef.current) {
       fabricCanvas.remove(previewLineRef.current);
     }
-    
+
     // Limpiar texto de medida anterior
     if (measureTextRef.current) {
       fabricCanvas.remove(measureTextRef.current);
     }
 
-    // Calcular ángulo para color de nivel en tiempo real
     const dx = x - lastPoint.x;
     const dy = y - lastPoint.y;
-    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    const levelColor = getWallLevelColor(angle);
 
     const preview = new Line([lastPoint.x, lastPoint.y, x, y], {
-      stroke: levelColor, // Color dinámico según nivel
-      strokeWidth: 6,
+      stroke: freeform ? "#94a3b8" : WALL_COLOR,
+      strokeWidth: 4,
       strokeDashArray: [8, 4],
-      strokeLineCap: "round",
+      strokeLineCap: "square",
       selectable: false,
       evented: false,
     });
 
     previewLineRef.current = preview;
     fabricCanvas.add(preview);
-    
+    setSnapIndicator(fabricCanvas, snappedToEndpoint ? { x, y } : null);
+
     // Calcular longitud en metros (redondeada a 5cm) - reutilizar dx/dy calculados arriba
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
     const lengthM = roundTo5cm(lengthPx / pixelsPerMeterRef.current);
-    
+
     // Posición del texto (punto medio de la línea)
     const midX = (lastPoint.x + x) / 2;
     const midY = (lastPoint.y + y) / 2;
-    
+
     // Crear texto con la medida
     const measureText = new FabricText(`${lengthM.toFixed(2)}m`, {
       left: midX,
@@ -2076,10 +2158,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       originX: "center",
       originY: "center",
     });
-    
+
     measureTextRef.current = measureText;
     fabricCanvas.add(measureText);
-    
+
     fabricCanvas.renderAll();
   };
 
@@ -2095,39 +2177,125 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const dy = y2 - y1;
     const lengthPx = Math.sqrt(dx * dx + dy * dy);
     const lengthM = roundTo5cm(lengthPx / pixelsPerMeterRef.current);
-    
+
     // Punto medio de la pared
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2;
-    
+
     // Calcular ángulo de la pared
     const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-    
-    // Offset perpendicular para la cota
-    const offsetDistance = 18;
+
+    // Offset perpendicular para la línea de cota, por fuera del grosor de la
+    // pared (si no, con paredes gruesas la cota quedaba encima del trazo).
+    const offsetDistance = getWallStrokeWidth() / 2 + 14;
     const perpAngle = (angle + 90) * (Math.PI / 180);
-    const offsetX = Math.cos(perpAngle) * offsetDistance;
-    const offsetY = Math.sin(perpAngle) * offsetDistance;
-    
+    const perpX = Math.cos(perpAngle);
+    const perpY = Math.sin(perpAngle);
+    const offsetX = perpX * offsetDistance;
+    const offsetY = perpY * offsetDistance;
+
+    // Línea de cota (fina, paralela a la pared) con marcas ("ticks") en los extremos
+    const dimLine = new Line(
+      [x1 + offsetX, y1 + offsetY, x2 + offsetX, y2 + offsetY],
+      {
+        stroke: "#94a3b8",
+        strokeWidth: 1,
+        selectable: false,
+        evented: false,
+      }
+    );
+    (dimLine as any).customData = { tipo: "cota", parentId: wallId };
+    (dimLine as any).isCota = true;
+    canvas.add(dimLine);
+
+    const tickLen = 5;
+    [
+      { x: x1 + offsetX, y: y1 + offsetY },
+      { x: x2 + offsetX, y: y2 + offsetY },
+    ].forEach((p) => {
+      const tick = new Line(
+        [p.x - perpX * tickLen, p.y - perpY * tickLen, p.x + perpX * tickLen, p.y + perpY * tickLen],
+        { stroke: "#94a3b8", strokeWidth: 1, selectable: false, evented: false }
+      );
+      (tick as any).customData = { tipo: "cota", parentId: wallId };
+      (tick as any).isCota = true;
+      canvas.add(tick);
+    });
+
+    // Texto de la cota, siempre legible (nunca "boca abajo")
+    const midOffsetX = midX + offsetX + perpX * 8;
+    const midOffsetY = midY + offsetY + perpY * 8;
     const cotaText = new FabricText(`${lengthM.toFixed(2)}m`, {
-      left: midX + offsetX,
-      top: midY + offsetY,
-      fontSize: 11,
+      left: midOffsetX,
+      top: midOffsetY,
+      fontSize: 10,
       fontFamily: "system-ui, sans-serif",
       fontWeight: "600",
       fill: "#374151",
       backgroundColor: "rgba(255,255,255,0.85)",
-      padding: 3,
+      padding: 2,
       selectable: false,
       evented: false,
       originX: "center",
       originY: "center",
       angle: angle > 90 || angle < -90 ? angle + 180 : angle,
     });
-    
+
     (cotaText as any).customData = { tipo: "cota", parentId: wallId };
     (cotaText as any).isCota = true;
     canvas.add(cotaText);
+  };
+
+  const removeDoorSwing = (canvas: FabricCanvas, doorId: string) => {
+    canvas.getObjects().forEach((o) => {
+      const cd = (o as any).customData;
+      if (cd?.tipo === "door-swing" && cd?.parentId === doorId) canvas.remove(o);
+    });
+  };
+
+  // Dibuja el arco de barrido (cuarto de círculo) de una puerta: hoja +
+  // abanico desde la bisagra (el extremo izquierdo del hueco, antes de
+  // rotar). `left/top/width/height/angle` son los mismos que el Rect de la
+  // hoja de la puerta.
+  const createDoorSwing = (
+    canvas: FabricCanvas,
+    doorId: string,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    angle: number
+  ) => {
+    removeDoorSwing(canvas, doorId);
+
+    const rad = (angle * Math.PI) / 180;
+    // Bisagra: extremo izquierdo del hueco de puerta, antes de rotar; se
+    // rota manualmente por seno/coseno porque el Rect usa origen left/top.
+    const localHingeX = 0;
+    const localHingeY = height / 2;
+    const hingeX = left + localHingeX * Math.cos(rad) - localHingeY * Math.sin(rad);
+    const hingeY = top + localHingeX * Math.sin(rad) + localHingeY * Math.cos(rad);
+
+    const swing = new Circle({
+      left: hingeX,
+      top: hingeY,
+      radius: width,
+      startAngle: angle,
+      endAngle: angle + 90,
+      fill: "",
+      stroke: "#d97706",
+      strokeWidth: 1,
+      strokeDashArray: [3, 3],
+      originX: "center",
+      originY: "center",
+      selectable: false,
+      evented: false,
+    });
+    (swing as any).customData = { tipo: "door-swing", parentId: doorId };
+    canvas.add(swing);
+    // La hoja de la puerta debe quedar por encima de su propio arco de barrido
+    const doorLeaf = canvas.getObjects().find((o) => (o as any).customData?.tipo === "door" && (o as any).customData?.id === doorId);
+    if (doorLeaf) canvas.bringObjectToFront(doorLeaf);
   };
 
   const finishWallDrawing = () => {
@@ -2165,15 +2333,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
       
       const id = `wall-${Date.now()}-${i}`;
-      
-      // Calcular ángulo para determinar color de nivel
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      const levelColor = getWallLevelColor(angle);
-      
+
       const wall = new Line([x1, y1, x2, y2], {
-        stroke: levelColor, // Color según nivel
-        strokeWidth: 10,
-        strokeLineCap: "round",
+        stroke: WALL_COLOR,
+        strokeWidth: getWallStrokeWidth(),
+        strokeLineCap: "square",
         selectable: true,
         hasControls: true,
       });
@@ -2201,13 +2365,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(measureTextRef.current);
       measureTextRef.current = null;
     }
+    setSnapIndicator(fabricCanvas, null);
     tempLinesRef.current = [];
     wallPointsRef.current = [];
 
     fabricCanvas.renderAll();
     onToolChange("select");
   };
-  
+
 
   const cancelWallDrawing = () => {
     if (!fabricCanvas) return;
@@ -2221,9 +2386,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(measureTextRef.current);
       measureTextRef.current = null;
     }
+    setSnapIndicator(fabricCanvas, null);
     tempLinesRef.current = [];
     wallPointsRef.current = [];
-    
+
     fabricCanvas.renderAll();
   };
 
@@ -2252,6 +2418,153 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const currentElementos = elementosRef.current;
     onElementosChange([...currentElementos, { id, tipo: "area", props: { left: x - 60, top: y - 60, width: 120, height: 120 } }]);
     onToolChange("select");
+  };
+
+  // Helper único para construir el objeto Fabric de una mesa (Rect o Circle),
+  // en vez de repetir el mismo bloque en 5 sitios distintos (creación nueva,
+  // carga desde estado local, carga desde BD, desagrupar, fusionar). Origen
+  // left/top (igual que antes, NO se toca) para no romper el resto del
+  // código que asume esa convención al arrastrar/fusionar/alinear mesas;
+  // habilita solo el control de rotación (mtr) — el resto de controles de
+  // escalado quedan ocultos porque lockScalingX/Y siguen activos.
+  const createMesaTableObject = (opts: {
+    id: string;
+    nombre: string;
+    capacidad: number;
+    forma: "rectangular" | "circular";
+    anchoCm: number;
+    altoCm: number;
+    posXPixels: number;
+    posYPixels: number;
+    rotacion?: number;
+    isMerged?: boolean;
+    originalMesas?: MesaCanvas["originalMesas"];
+  }): FabricObject => {
+    const ppm = pixelsPerMeterRef.current;
+    const anchoPixels = (opts.anchoCm / 100) * ppm;
+    const altoPixels = (opts.altoCm / 100) * ppm;
+    const rotacion = opts.rotacion ?? 0;
+
+    const fillColor = opts.isMerged ? "#bbf7d0" : "#dbeafe";
+    const strokeColor = opts.isMerged ? "#16a34a" : "#2563eb";
+
+    const baseProps: any = {
+      left: opts.posXPixels,
+      top: opts.posYPixels,
+      fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth: 2,
+      originX: "left",
+      originY: "top",
+      angle: rotacion,
+      selectable: true,
+      hasControls: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      hoverCursor: "move",
+      moveCursor: "move",
+      shadow: { color: "rgba(0,0,0,0.1)", blur: 8, offsetX: 2, offsetY: 2 },
+    };
+
+    let obj: FabricObject;
+    if (opts.forma === "circular") {
+      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
+      obj = new Circle({ ...baseProps, radius: radiusPixels });
+    } else {
+      obj = new Rect({ ...baseProps, width: anchoPixels, height: altoPixels, rx: 6, ry: 6 });
+    }
+
+    (obj as InstanceType<typeof Rect>).setControlsVisibility({
+      tl: false, tr: false, bl: false, br: false,
+      ml: false, mr: false, mt: false, mb: false,
+      mtr: true,
+    });
+
+    (obj as any).customData = {
+      tipo: "mesa",
+      id: opts.id,
+      nombre: opts.nombre,
+      capacidad: opts.capacidad,
+      isMerged: opts.isMerged || false,
+      originalMesas: opts.originalMesas || null,
+      forma: opts.forma,
+      ancho: opts.anchoCm,
+      alto: opts.altoCm,
+      rotacion,
+    };
+
+    return obj;
+  };
+
+  const removeChairs = (canvas: FabricCanvas, mesaId: string) => {
+    canvas.getObjects().forEach((o) => {
+      const cd = (o as any).customData;
+      if (cd?.tipo === "mesa-chair" && cd?.parentId === mesaId) canvas.remove(o);
+    });
+  };
+
+  // (Re)dibuja las sillas alrededor de una mesa según su forma/capacidad,
+  // rotadas junto con la mesa. Se apoya en getCenterPoint(), que Fabric
+  // calcula correctamente sea cual sea el ángulo actual — evita tener que
+  // reinterpretar left/top a mano cuando la mesa está rotada.
+  const renderSillasMesa = (
+    canvas: FabricCanvas,
+    tableObj: FabricObject,
+    // Centro absoluto (coords de escena) a usar en vez de tableObj.getCenterPoint():
+    // necesario cuando `tableObj` es miembro de una ActiveSelection (mover 2
+    // mesas a la vez) — su left/top ahí son relativos al grupo, no al canvas,
+    // y getCenterPoint() no da la posición real donde se está dibujando.
+    centerOverride?: { x: number; y: number }
+  ) => {
+    const cd = (tableObj as any).customData;
+    if (!cd || cd.tipo !== "mesa") return;
+    removeChairs(canvas, cd.id);
+    if (!cd.capacidad || cd.capacidad <= 0) return;
+
+    const ppm = pixelsPerMeterRef.current;
+    const anchoPixels = (cd.ancho ?? 80) / 100 * ppm;
+    const altoPixels = (cd.alto ?? 80) / 100 * ppm;
+    const rotacion = tableObj.angle ?? 0;
+    const center = centerOverride ?? tableObj.getCenterPoint();
+
+    const sillas = cd.forma === "circular"
+      ? distribuirSillasCirculo(cd.capacidad, Math.min(anchoPixels, altoPixels))
+      : distribuirSillasRectangular(cd.capacidad, anchoPixels, altoPixels);
+
+    const rotRad = (rotacion * Math.PI) / 180;
+    const cos = Math.cos(rotRad);
+    const sin = Math.sin(rotRad);
+    const chairSize = Math.max(7, Math.min(14, Math.min(anchoPixels, altoPixels) * 0.16));
+
+    sillas.forEach((silla) => {
+      const rx = silla.x * cos - silla.y * sin;
+      const ry = silla.x * sin + silla.y * cos;
+      const chair = new Rect({
+        left: center.x + rx,
+        top: center.y + ry,
+        width: chairSize,
+        height: chairSize,
+        fill: "#f8fafc",
+        stroke: "#94a3b8",
+        strokeWidth: 1,
+        rx: 3,
+        ry: 3,
+        originX: "center",
+        originY: "center",
+        angle: silla.anguloDeg + rotacion,
+        selectable: false,
+        evented: false,
+      });
+      (chair as any).customData = { tipo: "mesa-chair", parentId: cd.id };
+      canvas.add(chair);
+    });
+
+    // La mesa debe quedar por encima de sus propias sillas — salvo que sea
+    // miembro de una ActiveSelection (2 mesas movidas a la vez), donde no es
+    // un objeto de primer nivel del canvas y reordenarla no aplica/no hace falta.
+    if (!(tableObj as any).group) {
+      canvas.bringObjectToFront(tableObj);
+    }
   };
 
   // Función para crear etiqueta de mesa (anchoCm/altoCm en cm, posXPixels/posYPixels en píxeles)
@@ -2388,78 +2701,26 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const posXMeters = posXPixels / pixelsPerMeterRef.current;
     const posYMeters = posYPixels / pixelsPerMeterRef.current;
 
-    let obj: FabricObject;
-
-    if (forma === "circular") {
-      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-      obj = new Circle({
-        left: posXPixels,
-        top: posYPixels,
-        radius: radiusPixels,
-        fill: "#dbeafe",
-        stroke: "#2563eb",
-        strokeWidth: 2,
-        originX: "left",
-        originY: "top",
-        selectable: true,
-        hasControls: false,
-        lockScalingX: true,
-        lockScalingY: true,
-        lockRotation: true,
-        hoverCursor: "move",
-        moveCursor: "move",
-        shadow: {
-          color: "rgba(0,0,0,0.1)",
-          blur: 8,
-          offsetX: 2,
-          offsetY: 2,
-        } as any,
-      });
-    } else {
-      obj = new Rect({
-        left: posXPixels,
-        top: posYPixels,
-        width: anchoPixels,
-        height: altoPixels,
-        fill: "#dbeafe",
-        stroke: "#2563eb",
-        strokeWidth: 2,
-        rx: 6,
-        ry: 6,
-        originX: "left",
-        originY: "top",
-        selectable: true,
-        hasControls: false,
-        lockScalingX: true,
-        lockScalingY: true,
-        lockRotation: true,
-        hoverCursor: "move",
-        moveCursor: "move",
-        shadow: {
-          color: "rgba(0,0,0,0.1)",
-          blur: 8,
-          offsetX: 2,
-          offsetY: 2,
-        } as any,
-      });
-    }
-
     const currentMesas = mesasCanvasRef.current;
     const mesaName = `Mesa ${currentMesas.length + 1}`;
 
-    (obj as any).customData = {
-      tipo: "mesa",
+    const obj = createMesaTableObject({
       id,
       nombre: mesaName,
       capacidad,
-      isNew: true,
-    };
+      forma,
+      anchoCm,
+      altoCm,
+      posXPixels,
+      posYPixels,
+    });
 
     fabricCanvas.add(obj);
-    
+    renderSillasMesa(fabricCanvas, obj);
+
     // Añadir etiqueta de la mesa (pasando cm y píxeles)
     createMesaLabel(id, mesaName, anchoCm, altoCm, forma, posXPixels, posYPixels);
-    
+
     fabricCanvas.setActiveObject(obj);
     fabricCanvas.renderAll();
 
@@ -2479,29 +2740,71 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     onToolChange("select");
   };
 
+  // Punto más cercano a `punto` sobre el segmento (clampado a sus extremos).
+  const proyectarPuntoEnSegmento = (punto: { x: number; y: number }, seg: SegmentoPared) => {
+    const dx = seg.x2 - seg.x1;
+    const dy = seg.y2 - seg.y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return { x: seg.x1, y: seg.y1 };
+    let t = ((punto.x - seg.x1) * dx + (punto.y - seg.y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    return { x: seg.x1 + t * dx, y: seg.y1 + t * dy };
+  };
+
   const handleDoorClick = (x: number, y: number) => {
     if (!fabricCanvas) return;
 
     const id = `door-${Date.now()}`;
+    const widthPx = DOOR_WIDTH_METERS * pixelsPerMeterRef.current;
+    const heightPx = DOOR_LEAF_THICKNESS_PX;
+
+    // Anclar a la pared más cercana (si el clic cae a menos de ~25px de una):
+    // el hueco se centra sobre la pared y su ángulo se alinea con ella.
+    let centerX = x;
+    let centerY = y;
+    let angle = 0;
+    let mejorDist = DOOR_WALL_SNAP_PX;
+
+    getWallSegments(fabricCanvas).forEach((seg) => {
+      const proyeccion = proyectarPuntoEnSegmento({ x, y }, seg);
+      const dist = Math.hypot(proyeccion.x - x, proyeccion.y - y);
+      if (dist <= mejorDist) {
+        mejorDist = dist;
+        centerX = proyeccion.x;
+        centerY = proyeccion.y;
+        angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1) * (180 / Math.PI);
+      }
+    });
+
+    const left = centerX - widthPx / 2;
+    const top = centerY - heightPx / 2;
+
     const door = new Rect({
-      left: x - 35,
-      top: y - 6,
-      width: 70,
-      height: 12,
+      left,
+      top,
+      width: widthPx,
+      height: heightPx,
+      angle,
       fill: "#fef3c7",
       stroke: "#d97706",
       strokeWidth: 2,
       rx: 2,
       ry: 2,
+      originX: "left",
+      originY: "top",
     });
 
     (door as any).customData = { tipo: "door", id };
     fabricCanvas.add(door);
+    createDoorSwing(fabricCanvas, id, left, top, widthPx, heightPx, angle);
     fabricCanvas.setActiveObject(door);
     fabricCanvas.renderAll();
 
     const currentElementos = elementosRef.current;
-    onElementosChange([...currentElementos, { id, tipo: "door", props: { left: x - 35, top: y - 6, width: 70, height: 12 } }]);
+    onElementosChange([
+      ...currentElementos,
+      { id, tipo: "door", props: { left, top, width: widthPx, height: heightPx, angle } },
+    ]);
     onToolChange("select");
   };
 
