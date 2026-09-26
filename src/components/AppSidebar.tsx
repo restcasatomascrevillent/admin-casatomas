@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 
@@ -49,6 +50,7 @@ export function AppSidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const { isAdmin, permissions, loading } = useUserRole();
+  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
   const isActive = (path: string) => currentPath === path;
@@ -56,11 +58,14 @@ export function AppSidebar() {
 
   // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
-    if (loading || togglesLoading) return false;
+    if (loading || togglesLoading || superAdminLoading) return false;
     if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
-    if (isAdmin) return true;
     const keys = Array.isArray(item.sectionKey) ? item.sectionKey : [item.sectionKey];
-    if (keys.includes("usuarios")) return false; // Solo admins
+    // Usuarios es solo para admins, no configurable por permisos (2026-09-26).
+    if (keys.includes("usuarios")) return isAdmin;
+    // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
+    // todo pase lo que pase en la tabla de permisos.
+    if (isSuperAdmin) return true;
     return keys.some((key) => permissions.find((p) => p.section_key === key)?.can_view);
   });
 

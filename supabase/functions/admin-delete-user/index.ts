@@ -102,10 +102,18 @@ Deno.serve(async (req) => {
     }
 
     if (targetRoleData?.role === "admin") {
-      return new Response(JSON.stringify({ error: "No se puede eliminar un usuario administrador" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      // Un admin normal no puede eliminar a otro admin; un super admin sí
+      // (tabla super_admins, la misma autorización que admin-set-super-admin).
+      const { data: isSuperAdminResult } = await supabaseAdmin.rpc("is_super_admin", {
+        _user_id: currentUser.id,
       });
+
+      if (!isSuperAdminResult && !currentUserIsSuperAdmin) {
+        return new Response(JSON.stringify({ error: "No se puede eliminar un usuario administrador" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);

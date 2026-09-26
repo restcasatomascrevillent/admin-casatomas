@@ -4,12 +4,19 @@
  * Estrategia:
  * - Se mockea @/integrations/supabase/client con el archivo __mocks__/client.ts
  * - Se mockea useAuth para controlar el usuario activo en cada test
+ * - Se mockea useSuperAdmin (useCanAccessSection lo consume directamente) para
+ *   controlar si el usuario es super admin sin depender de un
+ *   <SuperAdminProvider> real
  * - Se testan useUserRole y useCanAccessSection de forma unitaria
  *
  * useUserRole()/useCanAccessSection() pasaron a leer un contexto
  * (UserRoleProvider) en vez de tener su propio estado (2026-09-25): cada
  * renderHook necesita el `wrapper: UserRoleProvider` para que haya contexto
  * que leer.
+ *
+ * Ser "admin" ya no da acceso automático a todas las secciones (2026-09-26):
+ * useCanAccessSection ahora solo concede ese bypass a un super admin real
+ * (useSuperAdmin), igual que has_section_permission() en la base de datos.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -23,8 +30,15 @@ vi.mock("@/hooks/useAuth", () => ({
   useAuth: vi.fn(),
 }));
 
+// useSuperAdmin se mockea igual que useAuth: useCanAccessSection lo llama
+// directamente, así que no hace falta envolver con un <SuperAdminProvider>.
+vi.mock("@/hooks/useSuperAdmin", () => ({
+  useSuperAdmin: vi.fn(),
+}));
+
 import { supabase, resetSupabaseMocks } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useUserRole, useCanAccessSection, UserRoleProvider } from "@/hooks/useUserRole";
 
 // Tipos auxiliares
@@ -217,21 +231,51 @@ describe("useUserRole", () => {
 describe("useCanAccessSection", () => {
   beforeEach(() => {
     resetSupabaseMocks();
+    // Por defecto, nadie es super admin; los tests que lo necesiten lo sobrescriben.
+    vi.mocked(useSuperAdmin).mockReturnValue({ isSuperAdmin: false, loading: false });
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it("admin puede acceder a cualquier sección", async () => {
+  it("un admin normal SIN permisos explícitos ya no tiene acceso automático", async () => {
     vi.mocked(useAuth).mockReturnValue({
-      user: mockUser("miguelsantiagores@gmail.com") as any,
+      user: mockUser("admin@restaurante.com") as any,
       session: null,
       loading: false,
       signUp: vi.fn(),
       signIn: vi.fn(),
       signOut: vi.fn(),
     });
+
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { role: "admin" }, error: null }),
+      then: (onfulfilled: (v: unknown) => unknown) =>
+        Promise.resolve({ data: [], error: null }).then(onfulfilled),
+    }));
+
+    const { result } = renderHook(() => useCanAccessSection("reservas"), { wrapper: UserRoleProvider });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.canAccess).toBe(false);
+  });
+
+  it("un super admin puede acceder a cualquier sección aunque no tenga permisos explícitos", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: mockUser("superadmin@restaurante.com") as any,
+      session: null,
+      loading: false,
+      signUp: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.mocked(useSuperAdmin).mockReturnValue({ isSuperAdmin: true, loading: false });
 
     (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => ({
       select: vi.fn().mockReturnThis(),

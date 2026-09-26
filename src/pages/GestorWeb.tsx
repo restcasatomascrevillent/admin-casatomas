@@ -4,6 +4,7 @@ import { BookOpen, Bot, CalendarDays, Loader2, Newspaper, UtensilsCrossed } from
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   PESTANAS_GESTOR_WEB,
   esPestanaGestorWeb,
@@ -58,11 +59,15 @@ const Cargando = () => (
 
 export default function GestorWeb() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAdmin, permissions, loading } = useUserRole();
+  const { permissions, loading: roleLoading } = useUserRole();
+  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
+  const loading = roleLoading || superAdminLoading;
 
+  // Ser "admin" ya no da acceso a todas las pestañas (2026-09-26): solo un
+  // super admin las ve todas pase lo que pase en la tabla de permisos.
   const pestanasVisibles = useMemo(
-    () => PESTANAS_GESTOR_WEB.filter((p) => puedeVerSeccion(p.seccion, isAdmin, permissions)),
-    [isAdmin, permissions],
+    () => PESTANAS_GESTOR_WEB.filter((p) => puedeVerSeccion(p.seccion, isSuperAdmin, permissions)),
+    [isSuperAdmin, permissions],
   );
 
   const tabParam = searchParams.get("tab");

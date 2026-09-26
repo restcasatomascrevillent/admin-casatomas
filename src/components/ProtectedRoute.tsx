@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
@@ -27,10 +28,11 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, permissions, loading: roleLoading } = useUserRole();
+  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const loading = authLoading || roleLoading;
+  const loading = authLoading || roleLoading || superAdminLoading;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -47,12 +49,15 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
 
     if (sectionKeys.length === 0) return; // Ruta no mapeada, permitir acceso
 
-    // Los admins tienen acceso a todo
-    if (isAdmin) return;
+    // Los super admins tienen acceso a todo, pase lo que pase en la tabla de
+    // permisos (2026-09-26). Ser "admin" ya no basta: un admin ahora solo ve
+    // lo que le marquen sus permisos, salvo la sección de usuarios (abajo).
+    if (isSuperAdmin) return;
 
-    // La sección de usuarios es solo para admins
+    // La sección de usuarios es solo para admins (no configurable por
+    // permisos, igual que antes).
     if (sectionKeys.includes("usuarios")) {
-      navigate("/dashboard");
+      if (!isAdmin) navigate("/dashboard");
       return;
     }
 
@@ -65,7 +70,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     if (!puedeVer) {
       navigate("/dashboard");
     }
-  }, [user, loading, isAdmin, permissions, location.pathname, requiredSection, navigate]);
+  }, [user, loading, isAdmin, isSuperAdmin, permissions, location.pathname, requiredSection, navigate]);
 
   if (loading) {
     return (

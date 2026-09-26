@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useSuperAdmin } from "./useSuperAdmin";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
 
 export type AppRole = "admin" | "manager" | "staff";
@@ -140,11 +141,16 @@ export function useUserRole(): UserRoleData {
 }
 
 export function useCanAccessSection(sectionKey: SectionKey, permissionType: "view" | "edit" = "view") {
-  const { isAdmin, permissions, loading } = useUserRole();
+  const { permissions, loading } = useUserRole();
+  const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
 
-  if (loading) return { canAccess: false, loading: true };
+  if (loading || superAdminLoading) return { canAccess: false, loading: true };
 
-  if (isAdmin) return { canAccess: true, loading: false };
+  // Ser "admin" ya no da acceso automático a todo (2026-09-26): un admin solo
+  // ve lo que le marquen sus permisos, igual que un manager o un staff. El
+  // único acceso incondicional es el de super admin (tabla super_admins),
+  // igual que en has_section_permission() del lado de la base de datos.
+  if (isSuperAdmin) return { canAccess: true, loading: false };
 
   const permission = permissions.find(p => p.section_key === sectionKey);
 
