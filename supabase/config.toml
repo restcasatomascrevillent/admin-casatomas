@@ -93,6 +93,9 @@ verify_jwt = true
 [functions.list-users]
 verify_jwt = true
 
+[functions.admin-set-super-admin]
+verify_jwt = true
+
 # JWT de usuario + has_section_permission().
 [functions.chat-facturas]
 verify_jwt = true

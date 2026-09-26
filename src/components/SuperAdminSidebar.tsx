@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingCart, Wallet, Star, Phone, Mail, Activity, MapPin, LogOut, ArrowLeft, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Wallet, Star, Phone, Mail, Activity, MapPin, Users, LogOut, ArrowLeft, ShieldAlert } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { title: "Control del Panel", url: "/super-admin", icon: LayoutDashboard },
+  { title: "Usuarios", url: "/super-admin/usuarios", icon: Users },
   { title: "Ecommerce", url: "/super-admin/ecommerce", icon: ShoppingCart },
   { title: "Asistente Tel.", url: "/super-admin/asistente-telefonico", icon: Phone },
   { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },

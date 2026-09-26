@@ -37,15 +37,19 @@ const DEFAULT_STAFF_PERMISSIONS = EDITABLE_SECTIONS.map((section) => ({
 
 interface InvitarUsuarioProps {
   onSuccess?: () => void;
+  /** Solo en el área de Super Admin: permite marcar el usuario nuevo como
+   * super admin nada más crearlo. */
+  allowSuperAdmin?: boolean;
 }
 
-export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
+export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUsuarioProps) {
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<AppRole>("staff");
   const [loading, setLoading] = useState(false);
   const [selectedAccessConfig, setSelectedAccessConfig] = useState(MANUAL_OPTION);
+  const [createAsSuperAdmin, setCreateAsSuperAdmin] = useState(false);
   const [permissions, setPermissions] = useState<
     { section_key: string; can_view: boolean; can_edit: boolean }[]
   >(DEFAULT_STAFF_PERMISSIONS);
@@ -177,6 +181,7 @@ export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
       const { data, error } = await supabase.functions.invoke<{
         success?: boolean;
         error?: string;
+        userId?: string;
       }>("admin-create-user", {
         body: {
           username,
@@ -194,15 +199,32 @@ export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
         throw new Error(data?.error || "Error al crear el usuario");
       }
 
+      if (createAsSuperAdmin && data.userId) {
+        const { data: superAdminData, error: superAdminError } = await supabase.functions.invoke<{
+          success?: boolean;
+          error?: string;
+        }>("admin-set-super-admin", {
+          body: { userId: data.userId, makeSuperAdmin: true },
+        });
+
+        if (superAdminError || !superAdminData?.success) {
+          toast.error(
+            "Usuario creado, pero no se pudo dar acceso de super admin: " +
+              (superAdminData?.error || superAdminError?.message || "error desconocido")
+          );
+        }
+      }
+
       toast.success("Usuario creado correctamente");
       window.dispatchEvent(new Event("users-management-refresh"));
-      
+
       // Reset form
       setUsername("");
       setPassword("");
       setRole("staff");
       setSelectedAccessConfig(MANUAL_OPTION);
       setPermissions(DEFAULT_STAFF_PERMISSIONS);
+      setCreateAsSuperAdmin(false);
       onSuccess?.();
     } catch (error: unknown) {
       console.error("Error creating user:", error);
@@ -243,7 +265,20 @@ export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
+      {allowSuperAdmin && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+          <Checkbox
+            id="create-as-super-admin"
+            checked={createAsSuperAdmin}
+            onCheckedChange={(checked) => setCreateAsSuperAdmin(checked as boolean)}
+          />
+          <Label htmlFor="create-as-super-admin" className="cursor-pointer font-normal">
+            Crear como Super Admin (acceso total; la configuración de permisos de abajo no aplica)
+          </Label>
+        </div>
+      )}
+
+      <div className={`space-y-2 ${createAsSuperAdmin ? "opacity-50 pointer-events-none" : ""}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Label>Configuración de acceso</Label>
           <ConfigurarRolesModal
@@ -273,7 +308,7 @@ export function InvitarUsuario({ onSuccess }: InvitarUsuarioProps) {
         </p>
       </div>
 
-      <div className="space-y-2">
+      <div className={`space-y-2 ${createAsSuperAdmin ? "opacity-50 pointer-events-none" : ""}`}>
         <Label>Permisos por Sección</Label>
         <div className="border rounded-lg overflow-hidden">
           <Table>

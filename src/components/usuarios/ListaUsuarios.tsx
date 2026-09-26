@@ -29,9 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Settings, Shield, ShieldCheck, User, Trash2, Key } from "lucide-react";
+import { Loader2, Settings, Shield, ShieldAlert, ShieldCheck, User, Trash2, Key } from "lucide-react";
 import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
@@ -40,16 +41,25 @@ const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
   staff: { label: "Staff", color: "bg-gray-500" },
 };
 
-export function ListaUsuarios() {
+interface ListaUsuariosProps {
+  /** Solo en el área de Super Admin: permite gestionar el acceso de super
+   * admin de otros usuarios y actuar (contraseña) sobre usuarios admin, que
+   * en el Admin Panel normal no tienen ninguna acción disponible. */
+  canManageSuperAdmins?: boolean;
+}
+
+export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosProps) {
   const {
     users,
     loading,
     updateUserRole,
     setAllPermissions,
     updateUserPassword,
+    setSuperAdmin,
     deleteUser,
     fetchUsers,
   } = useUsersManagement();
+  const { user: currentUser } = useAuth();
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<
@@ -121,6 +131,17 @@ export function ListaUsuarios() {
   const handleDeleteUser = async (userId: string) => {
     if (confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")) {
       await deleteUser(userId);
+    }
+  };
+
+  const handleToggleSuperAdmin = async (user: ManagedUser) => {
+    const makeSuperAdmin = !user.is_super_admin;
+    const confirmMessage = makeSuperAdmin
+      ? `¿Dar acceso de super admin a ${getUserDisplayName(user)}?`
+      : `¿Quitar el acceso de super admin a ${getUserDisplayName(user)}?`;
+
+    if (confirm(confirmMessage)) {
+      await setSuperAdmin(user.id, makeSuperAdmin);
     }
   };
 
@@ -270,11 +291,19 @@ export function ListaUsuarios() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {user.role === "admin" ? (
-                    <Badge className={roleInfo?.color}>{roleInfo?.label}</Badge>
-                  ) : (
-                    <Badge variant="outline">Acceso por permisos</Badge>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {user.role === "admin" ? (
+                      <Badge className={roleInfo?.color}>{roleInfo?.label}</Badge>
+                    ) : (
+                      <Badge variant="outline">Acceso por permisos</Badge>
+                    )}
+                    {user.is_super_admin && (
+                      <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                        <ShieldAlert className="h-3 w-3" />
+                        Super Admin
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {user.role === "admin" ? (
@@ -288,7 +317,6 @@ export function ListaUsuarios() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {user.role !== "admin" && (
-                      <>
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
@@ -409,23 +437,42 @@ export function ListaUsuarios() {
                             </div>
                           </DialogContent>
                         </Dialog>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openPasswordDialog(user)}
-                        >
-                          <Key className="h-4 w-4 mr-1" />
-                          Contraseña
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
+                    )}
+                    {(user.role !== "admin" || canManageSuperAdmins) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openPasswordDialog(user)}
+                      >
+                        <Key className="h-4 w-4 mr-1" />
+                        Contraseña
+                      </Button>
+                    )}
+                    {canManageSuperAdmins && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={user.id === currentUser?.id}
+                        title={
+                          user.id === currentUser?.id
+                            ? "No puedes quitarte a ti mismo el acceso de super admin"
+                            : undefined
+                        }
+                        onClick={() => handleToggleSuperAdmin(user)}
+                      >
+                        <ShieldAlert className="h-4 w-4 mr-1" />
+                        {user.is_super_admin ? "Quitar Super Admin" : "Hacer Super Admin"}
+                      </Button>
+                    )}
+                    {user.role !== "admin" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 </TableCell>

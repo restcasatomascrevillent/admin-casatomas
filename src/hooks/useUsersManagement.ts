@@ -8,6 +8,7 @@ export interface ManagedUser {
   email: string;
   display_name: string | null;
   role: AppRole | null;
+  is_super_admin: boolean;
   created_at: string;
   permissions: {
     section_key: string;
@@ -93,14 +94,23 @@ export function useUsersManagement() {
         }
       }
 
-      const [{ data: rolesData, error: rolesError }, { data: permissionsData, error: permError }] =
-        await Promise.all([
-          supabase.from("user_roles").select("user_id, role, created_at"),
-          supabase.from("user_permissions").select("user_id, section_key, can_view, can_edit"),
-        ]);
+      const [
+        { data: rolesData, error: rolesError },
+        { data: permissionsData, error: permError },
+        { data: superAdminsData, error: superAdminsError },
+      ] = await Promise.all([
+        supabase.from("user_roles").select("user_id, role, created_at"),
+        supabase.from("user_permissions").select("user_id, section_key, can_view, can_edit"),
+        supabase.from("super_admins").select("user_id"),
+      ]);
 
       if (rolesError) throw rolesError;
       if (permError) throw permError;
+      if (superAdminsError) throw superAdminsError;
+
+      const superAdminIds = new Set(
+        (superAdminsData ?? []).map((s) => s.user_id).filter((id): id is string => !!id)
+      );
 
       const userMap = new Map<string, ManagedUser>();
 
@@ -110,6 +120,7 @@ export function useUsersManagement() {
           email: authUser.email,
           display_name: authUser.display_name,
           role: null,
+          is_super_admin: superAdminIds.has(userId),
           created_at: authUser.created_at,
           permissions: [],
         });
@@ -130,6 +141,7 @@ export function useUsersManagement() {
           email: "",
           display_name: null,
           role: r.role as AppRole,
+          is_super_admin: superAdminIds.has(r.user_id),
           created_at: r.created_at || "",
           permissions: [],
         });
@@ -143,6 +155,7 @@ export function useUsersManagement() {
             email: "",
             display_name: null,
             role: null,
+            is_super_admin: superAdminIds.has(p.user_id),
             created_at: "",
             permissions: [],
           };
@@ -278,6 +291,31 @@ export function useUsersManagement() {
     }
   };
 
+  const setSuperAdmin = async (userId: string, makeSuperAdmin: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
+        "admin-set-super-admin",
+        {
+          body: { userId, makeSuperAdmin },
+        }
+      );
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "No se pudo actualizar el acceso de super admin");
+
+      toast.success(
+        makeSuperAdmin ? "Usuario añadido como super admin" : "Acceso de super admin revocado"
+      );
+      fetchUsers();
+      return true;
+    } catch (error) {
+      console.error("Error updating super admin status:", error);
+      const message = await extractFunctionErrorMessage(error, "Error al actualizar el acceso de super admin");
+      toast.error(message);
+      return false;
+    }
+  };
+
   const inviteUser = async (email: string, role: AppRole, permissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
     try {
       // Crear usuario mediante Supabase Auth Admin (requiere service role key)
@@ -352,6 +390,7 @@ export function useUsersManagement() {
     updateUserPermission,
     setAllPermissions,
     updateUserPassword,
+    setSuperAdmin,
     inviteUser,
     assignRoleToNewUser,
     deleteUser,

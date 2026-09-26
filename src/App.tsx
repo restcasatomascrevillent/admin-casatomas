@@ -30,6 +30,7 @@ import GestionResenas from "./pages/GestionResenas";
 import TraficoWeb from "./pages/TraficoWeb";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminPanel from "./pages/SuperAdminPanel";
+import SuperAdminUsuarios from "./pages/SuperAdminUsuarios";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ const App = () => (
                   <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
+                  <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </RouteErrorBoundary>
