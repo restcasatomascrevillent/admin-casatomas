@@ -47,23 +47,67 @@ export interface MesaInput {
   etiqueta?: string | null;
 }
 
-export function useMesas(espacioId?: string) {
+export interface OpcionesMesas {
+  /**
+   * Trae TAMBIÉN las mesas desactivadas (`activa = false`). Por defecto `false`:
+   * el plano y el canvas solo quieren las mesas que están en uso.
+   *
+   * Lo necesita la gestión de mesas de Configuración (`GestionMesasEspacios`):
+   * allí una mesa desactivada tiene que seguir viéndose para poder reactivarla
+   * o borrarla — si no saliera, quedaría inaccesible desde la interfaz.
+   */
+  incluirInactivas?: boolean;
+  /**
+   * Permite montar el hook sin lanzar la consulta (mismas reglas de los hooks
+   * de React: no se puede llamar condicionalmente). `EspacioForm` lo usa para
+   * no pedir mesas cuando se está CREANDO un espacio que aún no existe.
+   */
+  habilitado?: boolean;
+}
+
+/**
+ * Mesas de un espacio (o de todos si no se pasa `espacioId`).
+ *
+ * OJO con sumar `capacidad` para calcular aforo: cuando el editor de plano
+ * fusiona mesas BORRA las filas originales y crea una sola fila con
+ * `is_merged = true` y la capacidad combinada (ver `EditorPlanoEspacio.tsx`,
+ * sobre la línea 183). Por eso sumar todas las mesas activas NO duplica
+ * plazas y no hay que excluir `is_merged`. La cuenta vive en
+ * `src/lib/reservas/aforoMesas.ts`, no la repitas a mano.
+ */
+export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
+  const incluirInactivas = opciones?.incluirInactivas === true;
+  const habilitado = opciones?.habilitado !== false;
+
   return useQuery({
-    queryKey: espacioId ? ["mesas", espacioId] : ["mesas"],
+    // La clave lleva `incluirInactivas` para que las dos variantes no se pisen
+    // en la caché (si compartieran clave, la pantalla de gestión podría acabar
+    // leyendo el resultado filtrado del plano, o al revés). Todas empiezan por
+    // "mesas", así que un `invalidateQueries({ queryKey: ["mesas"] })` sigue
+    // invalidando ambas por prefijo.
+    queryKey: incluirInactivas
+      ? ["mesas", espacioId ?? "todos", "con-inactivas"]
+      : espacioId
+        ? ["mesas", espacioId]
+        : ["mesas"],
+    enabled: habilitado,
     queryFn: async () => {
       let query = supabase
         .from("mesas")
         .select("*")
-        .eq("activa", true)
         .order("nombre");
-      
+
+      if (!incluirInactivas) {
+        query = query.eq("activa", true);
+      }
+
       if (espacioId) {
         query = query.eq("espacio_id", espacioId);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      
+
       // Convertir original_mesas de Json a OriginalMesaData[]
       return (data || []).map(mesa => ({
         ...mesa,
@@ -139,7 +183,12 @@ export function useActualizarMesasSilent() {
         };
         return supabase.from("mesas").update(dbData).eq("id", id);
       });
-      await Promise.all(updates);
+      const results = await Promise.all(updates);
+      // Promise.all no rechaza si Supabase devuelve { error } dentro de una respuesta
+      // resuelta con éxito (no lanza) — sin este check, un fallo de update pasaba
+      // desapercibido y el llamador creía que la posición/fusión se había guardado.
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });

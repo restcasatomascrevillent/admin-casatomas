@@ -15,6 +15,7 @@ import {
   useConfiguracionReservas,
   useActualizarConfiguracionReservas,
 } from "@/hooks/useConfiguracionReservas";
+import { GestionMesasEspacios } from "./GestionMesasEspacios";
 
 const configSchema = z.object({
   minutos_corte_antes_servicio: z.number().min(0).max(1440),
@@ -74,17 +75,25 @@ export function ConfiguracionGeneralReservas() {
     }
   };
 
+  // Las reglas generales y la gestión de mesas son dos tarjetas independientes
+  // de esta misma pestaña: si las reglas todavía están cargando, la de mesas
+  // (que tiene sus propias consultas) se pinta igualmente en vez de quedarse
+  // toda la pestaña detrás de un spinner.
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <>
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+        <GestionMesasEspacios />
+      </>
     );
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
@@ -340,5 +349,12 @@ export function ConfiguracionGeneralReservas() {
         </Form>
       </CardContent>
     </Card>
+
+    {/* Mesas por espacio + aviso de descuadre entre capacidad declarada y
+        plazas de las mesas. Vive aquí y no en `Reservas.tsx` para no tocar el
+        enrutado de pestañas: esta tarjeta ya se pinta dentro de la pestaña
+        Configuración. */}
+    <GestionMesasEspacios />
+    </>
   );
 }

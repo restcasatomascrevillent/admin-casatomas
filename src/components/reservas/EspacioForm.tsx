@@ -1,6 +1,8 @@
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -14,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useCrearEspacio, useActualizarEspacio, type EspacioReserva } from "@/hooks/useEspaciosReserva";
+import { useMesas } from "@/hooks/useMesas";
+import { calcularCuadreEspacio, textoEstadoCuadre } from "@/lib/reservas/aforoMesas";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +54,42 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
       activa: espacio?.activa ?? true,
     },
   });
+
+  // `EspacioForm` se queda MONTADO en `Espacios.tsx` (se renderiza siempre, solo
+  // cambia `open`), así que los `defaultValues` de arriba se calculan una única
+  // vez: sin este reset, abrir "Editar Salón" después de haber abierto otro
+  // espacio (o el alta) mostraba los datos de la vez anterior y se guardaban
+  // encima del espacio equivocado.
+  useEffect(() => {
+    if (!open) return;
+    form.reset({
+      nombre: espacio?.nombre || "",
+      descripcion: espacio?.descripcion || "",
+      capacidad_maxima: espacio?.capacidad_maxima || 10,
+      activa: espacio?.activa ?? true,
+    });
+  }, [open, espacio, form]);
+
+  // Plazas que suman las mesas de este espacio, para avisar si no cuadran con la
+  // capacidad que se está escribiendo. Solo se consulta al EDITAR: un espacio que
+  // aún no existe no tiene mesas.
+  const { data: mesas = [] } = useMesas(espacio?.id, {
+    incluirInactivas: true,
+    habilitado: !!espacio?.id,
+  });
+  const capacidadEscrita = form.watch("capacidad_maxima");
+  const cuadre = useMemo(() => {
+    if (!espacio) return null;
+    // Se compara contra el valor del formulario (no el guardado) para que el
+    // aviso reaccione mientras se teclea.
+    return calcularCuadreEspacio(
+      {
+        ...espacio,
+        capacidad_maxima: Number.isFinite(Number(capacidadEscrita)) ? Number(capacidadEscrita) : 0,
+      },
+      mesas,
+    );
+  }, [espacio, capacidadEscrita, mesas]);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -129,13 +169,49 @@ export const EspacioForm = ({ open, onOpenChange, espacio }: EspacioFormProps) =
                       type="number"
                       min="1"
                       {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      onChange={(e) => {
+                        // Vaciar el campo daba `NaN`, y con `NaN` el resolver de
+                        // zod fallaba con "expected number" en vez del mensaje
+                        // de capacidad mínima.
+                        const n = parseInt(e.target.value, 10);
+                        field.onChange(Number.isNaN(n) ? 0 : n);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Capacidad declarada frente a las plazas de las mesas. Es un AVISO:
+                no bloquea el guardado. Hoy el aforo lo decide la capacidad
+                declarada (trigger `trg_validar_capacidad`, sin tocar); la regla
+                de "que mande la suma de las mesas" está cableada y dormida en
+                `supabase/migrations/20260926120000_capacidad_efectiva_mesas.sql`.
+                Las mesas se dan de alta en Reservas › Configuración. */}
+            {cuadre && (
+              <div
+                role="status"
+                className={
+                  cuadre.descuadra
+                    ? "flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
+                    : "flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+                }
+              >
+                {cuadre.descuadra ? (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span>
+                  {cuadre.mesasActivas === 1 ? "1 mesa activa suma" : `${cuadre.mesasActivas} mesas activas suman`}{" "}
+                  <strong>{cuadre.plazasMesas}</strong> plazas.{" "}
+                  {cuadre.descuadra
+                    ? `${textoEstadoCuadre(cuadre)}. Puedes guardar igualmente.`
+                    : "Cuadra con la capacidad declarada."}
+                </span>
+              </div>
+            )}
 
             <FormField
               control={form.control}
