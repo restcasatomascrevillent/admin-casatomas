@@ -1,39 +1,53 @@
-import type { ReactNode } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
 
 interface CampoExplicadoProps {
-  icono?: ReactNode;
-  pregunta: string;
-  explicacion: string;
-  ejemplo?: ReactNode;
-  extra?: ReactNode;
+  /** id del control, para enlazar la etiqueta (omitir si el hijo es un grupo). */
+  htmlFor?: string;
+  etiqueta: string;
+  /** Texto corto bajo la etiqueta: qué es el campo. */
+  ayuda?: ReactNode;
+  /** Explicación larga del efecto real en el bot — plegada por defecto. */
+  efecto?: ReactNode;
+  /** Contenido alineado a la derecha de la etiqueta (contadores, acciones). */
+  accesorio?: ReactNode;
   children: ReactNode;
+  className?: string;
 }
 
-// Envoltorio común para cada pregunta de la pantalla: no solo dice el nombre
-// del campo ("Tono", "Instrucciones extra"...) sino qué efecto tiene de
-// verdad en lo que responde el bot, con un ejemplo concreto — antes esos
-// nombres se explicaban solos y no decían nada sobre su efecto real.
-export function CampoExplicado({ icono, pregunta, explicacion, ejemplo, extra, children }: CampoExplicadoProps) {
+// Campo dentro de una sección: etiqueta + ayuda de una línea + control. La
+// explicación larga de "qué efecto tiene en el bot" (antes siempre visible
+// en una caja por campo) queda plegada tras un disparador pequeño para no
+// dominar la pantalla, pero sigue a un clic.
+export function CampoExplicado({ htmlFor, etiqueta, ayuda, efecto, accesorio, children, className }: CampoExplicadoProps) {
+  const [abierto, setAbierto] = useState(false);
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {icono}
-          {pregunta}
-        </CardTitle>
-        <CardDescription>{explicacion}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {children}
-        {ejemplo && (
-          <div className="text-xs text-muted-foreground bg-muted/40 border rounded-md px-3 py-2 leading-relaxed">
-            <span className="font-medium text-foreground/80">Efecto en el bot: </span>
-            {ejemplo}
-          </div>
-        )}
-        {extra}
-      </CardContent>
-    </Card>
+    <div className={cn("space-y-2", className)}>
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <div className="min-w-0 space-y-0.5">
+          {htmlFor ? (
+            <Label htmlFor={htmlFor}>{etiqueta}</Label>
+          ) : (
+            <p className="text-sm font-medium leading-none">{etiqueta}</p>
+          )}
+          {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
+        </div>
+        {accesorio && <div className="flex shrink-0 items-center gap-2">{accesorio}</div>}
+      </div>
+      {children}
+      {efecto && (
+        <Collapsible open={abierto} onOpenChange={setAbierto}>
+          <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <ChevronRight className={cn("h-3 w-3 transition-transform", abierto && "rotate-90")} aria-hidden="true" />
+            Cómo afecta al bot
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-1.5 text-xs leading-relaxed text-muted-foreground">{efecto}</CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
   );
 }

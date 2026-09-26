@@ -1,30 +1,30 @@
-import { Bot, Loader2, MessageSquare, Save, Search, Utensils, Wine, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 import type { DraftBotWeb, IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
 import type { Plato } from "@/hooks/usePlatos";
 import type { Vino } from "@/hooks/useVinos";
 import { CampoExplicado } from "./CampoExplicado";
+import { SeccionBot } from "./SeccionBot";
+import { SelectorCartaBot } from "./SelectorCartaBot";
 import { AvisoHorarioContacto } from "./AvisoHorarioContacto";
 import { VistaPreviaBot } from "./VistaPreviaBot";
-import { EstadoGuardadoBadge } from "./EstadoGuardadoBadge";
-import { TONO_OPTIONS, combinarConInstruccionesEspañol } from "./constantesBot";
+import {
+  MAX_INSTRUCCIONES_EXTRA,
+  TONO_OPTIONS,
+  TONOS_UI,
+  combinarConInstruccionesEspañol,
+} from "./constantesBot";
 
 interface BotIdiomaPanelProps {
   idioma: IdiomaBotWeb;
   draft: DraftBotWeb;
   draftEspañol: DraftBotWeb;
   canEdit: boolean;
-  dirty: boolean;
-  saving: boolean;
-  saveError: string | null;
   onChange: (patch: Partial<DraftBotWeb>) => void;
   onTogglePlato: (nombre: string) => void;
   onToggleVino: (nombre: string) => void;
-  onSave: () => void;
   platosPorCategoria: Record<string, Plato[]>;
   vinosPorCategoria: Record<string, Vino[]>;
   loadingPlatos: boolean;
@@ -35,18 +35,17 @@ interface BotIdiomaPanelProps {
   onBuscarVinoChange: (v: string) => void;
 }
 
+// Formulario de UN idioma. El guardado vive en la barra superior de
+// TabBotWeb (un solo sitio para los 3 idiomas); aquí solo se edita el
+// borrador en memoria.
 export function BotIdiomaPanel({
   idioma,
   draft,
   draftEspañol,
   canEdit,
-  dirty,
-  saving,
-  saveError,
   onChange,
   onTogglePlato,
   onToggleVino,
-  onSave,
   platosPorCategoria,
   vinosPorCategoria,
   loadingPlatos,
@@ -57,264 +56,230 @@ export function BotIdiomaPanel({
   onBuscarVinoChange,
 }: BotIdiomaPanelProps) {
   const tonoOptions = TONO_OPTIONS[idioma];
+  const tonoConocido = tonoOptions.some((t) => t.value === draft.tono);
+  const ids = {
+    bienvenida: `bot-${idioma}-bienvenida`,
+    frases: `bot-${idioma}-frases`,
+    instrucciones: `bot-${idioma}-instrucciones`,
+    tono: `bot-${idioma}-tono`,
+    contador: `bot-${idioma}-instrucciones-contador`,
+  };
+  const largoInstrucciones = draft.instrucciones_extra.length;
+  const instruccionesExcedidas = largoInstrucciones > MAX_INSTRUCCIONES_EXTRA;
 
   return (
-    <div className="space-y-6">
-      <AvisoHorarioContacto
-        idioma={idioma}
-        texto={draft.instrucciones_extra}
-        textoEspañol={draftEspañol.instrucciones_extra}
-        canEdit={canEdit}
-        onCopiarDesdeEspañol={() =>
-          onChange({ instrucciones_extra: combinarConInstruccionesEspañol(draft.instrucciones_extra, draftEspañol.instrucciones_extra) })
-        }
-      />
-
-      {/* Tono */}
-      <CampoExplicado
-        icono={<Bot className="h-5 w-5" />}
-        pregunta="¿Cómo quieres que hable el bot?"
-        explicacion="Se inserta literalmente en las instrucciones del bot para este idioma — cambia CÓMO suena, no lo que sabe ni lo que puede hacer."
-        ejemplo={
-          <>
-            con "Divertido" un aviso de que no hay mesa libre puede sonar a "Uy, hoy nos lo ponéis difícil…"; con
-            "Formal" sonará más a "Lamentamos informarle de que no hay disponibilidad".
-          </>
-        }
-      >
-        <ToggleGroup
-          type="single"
-          value={draft.tono}
-          onValueChange={(val) => val && canEdit && onChange({ tono: val })}
-          className="flex flex-wrap gap-2"
+    <div className="space-y-4">
+      <SeccionBot titulo="Personalidad" descripcion="Cómo suena el bot en este idioma. No cambia lo que sabe ni lo que puede hacer.">
+        <CampoExplicado
+          etiqueta="Tono"
+          efecto={
+            <>
+              Se inserta literalmente en las instrucciones del bot de este idioma. Con "Divertido", un aviso de que no
+              hay mesa puede sonar a "Uy, hoy nos lo ponéis difícil…"; con "Formal", a "Lamentamos informarle de que no
+              hay disponibilidad".
+            </>
+          }
         >
-          {tonoOptions.map((t) => (
-            <ToggleGroupItem
-              key={t.value}
-              value={t.value}
-              disabled={!canEdit}
-              className="flex flex-col items-start gap-1 h-auto py-3 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          <RadioGroup
+            value={tonoConocido ? draft.tono : ""}
+            onValueChange={(val) => canEdit && onChange({ tono: val })}
+            disabled={!canEdit}
+            aria-label="Tono del bot"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            {tonoOptions.map((t, idx) => {
+              const ui = TONOS_UI[idx] ?? { label: t.label, desc: t.desc };
+              const seleccionado = draft.tono === t.value;
+              const itemId = `${ids.tono}-${t.value}`;
+              return (
+                <label
+                  key={t.value}
+                  htmlFor={itemId}
+                  className={cn(
+                    "relative flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-muted/40",
+                    "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+                    seleccionado && "border-primary bg-primary/5 hover:bg-primary/5",
+                    !canEdit && "cursor-not-allowed opacity-60",
+                  )}
+                >
+                  <RadioGroupItem id={itemId} value={t.value} className="mt-0.5 focus-visible:ring-0 focus-visible:ring-offset-0" />
+                  <span className="min-w-0 flex-1 space-y-0.5">
+                    <span className="block text-sm font-medium leading-none">{ui.label}</span>
+                    <span className="block text-xs text-muted-foreground">{ui.desc}</span>
+                    {idioma !== "es" && (
+                      <span className="block text-[11px] text-muted-foreground/80">
+                        Se guarda como <span className="font-mono">{t.value}</span>
+                      </span>
+                    )}
+                  </span>
+                  {seleccionado && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+                </label>
+              );
+            })}
+          </RadioGroup>
+          {!tonoConocido && draft.tono && (
+            <p className="text-xs text-muted-foreground">
+              Valor actual personalizado: <span className="font-mono">{draft.tono}</span>. Elige una opción para
+              sustituirlo.
+            </p>
+          )}
+        </CampoExplicado>
+      </SeccionBot>
+
+      <SeccionBot titulo="Mensajes" descripcion="Qué dice el bot al empezar y qué frases puede usar.">
+        <CampoExplicado
+          htmlFor={ids.bienvenida}
+          etiqueta="Mensaje de bienvenida"
+          ayuda="Lo que dice justo después de saludar en una conversación nueva."
+          efecto={
+            <>
+              No se envía tal cual: el bot ya calcula su propio "Buenos días / Buenas tardes / Buenas noches" según la
+              hora, y esto es lo que debería decir justo después.
+            </>
+          }
+        >
+          <Textarea
+            id={ids.bienvenida}
+            value={draft.mensaje_bienvenida}
+            onChange={(e) => onChange({ mensaje_bienvenida: e.target.value })}
+            placeholder="¡Hola! Soy el asistente virtual de Casa Tomás. ¿En qué puedo ayudarte?"
+            rows={2}
+            disabled={!canEdit}
+          />
+        </CampoExplicado>
+
+        <CampoExplicado
+          htmlFor={ids.frases}
+          etiqueta="Frases personalizadas"
+          ayuda="Frases de referencia que puede usar cuando vengan a cuento."
+          efecto={
+            <>
+              A diferencia de "Instrucciones extra", el bot no está obligado a usarlas: son inspiración de estilo, no un
+              guion que se repita en cada respuesta.
+            </>
+          }
+        >
+          <Textarea
+            id={ids.frases}
+            value={draft.frases_personalizadas}
+            onChange={(e) => onChange({ frases_personalizadas: e.target.value })}
+            placeholder={"Ej.:\n- ¡Que aproveche!\n- Te esperamos con los brazos abiertos"}
+            rows={3}
+            disabled={!canEdit}
+          />
+        </CampoExplicado>
+      </SeccionBot>
+
+      <SeccionBot
+        titulo="Conocimiento"
+        descripcion="Datos que el bot no tiene por su cuenta: horario, contacto, dirección, política de reservas…"
+      >
+        <CampoExplicado
+          htmlFor={ids.instrucciones}
+          etiqueta="Instrucciones extra"
+          ayuda="Texto libre en lenguaje natural. Es el único sitio del que el bot saca datos que no están en la carta."
+          accesorio={
+            <span
+              id={ids.contador}
+              className={cn(
+                "text-xs tabular-nums",
+                instruccionesExcedidas ? "font-medium text-destructive" : "text-muted-foreground",
+              )}
             >
-              <span className="font-medium">{t.label}</span>
-              <span className="text-xs opacity-70">{t.desc}</span>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </CampoExplicado>
-
-      {/* Mensaje de bienvenida */}
-      <CampoExplicado
-        icono={<MessageSquare className="h-5 w-5" />}
-        pregunta="¿Qué dice el bot al saludar?"
-        explicacion="Sugerencia para el primer mensaje de cada conversación nueva en este idioma."
-        ejemplo={
-          <>
-            no se envía tal cual: el bot ya calcula su propio "Buenos días / Buenas tardes / Buenas noches" según
-            la hora — esto se le da como lo que debería decir justo después de saludar.
-          </>
-        }
-      >
-        <Textarea
-          value={draft.mensaje_bienvenida}
-          onChange={(e) => onChange({ mensaje_bienvenida: e.target.value })}
-          placeholder="¡Hola! Soy el asistente virtual de Casa Tomás. ¿En qué puedo ayudarte?"
-          rows={2}
-          disabled={!canEdit}
-        />
-      </CampoExplicado>
-
-      {/* Platos a recomendar */}
-      <CampoExplicado
-        icono={<Utensils className="h-5 w-5" />}
-        pregunta="¿Qué platos debe recomendar?"
-        explicacion={`Los platos que el bot priorizará cuando un cliente pida sugerencias.${
-          draft.platos.length ? ` (${draft.platos.length} seleccionados)` : ""
-        }`}
-        ejemplo={
-          <>
-            es solo una prioridad DENTRO de lo que sigue activo en la pestaña Carta: si marcas un plato aquí pero lo
-            desactivas allí, el bot deja de poder mencionarlo — nunca inventa platos que no existan en la carta
-            real.
-          </>
-        }
-      >
-        {draft.platos.length > 0 && (
-          <div className="flex flex-wrap gap-2 pb-2 border-b">
-            {draft.platos.map((nombre) => (
-              <span
-                key={nombre}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-              >
-                {nombre}
-                {canEdit && (
-                  <button type="button" onClick={() => onTogglePlato(nombre)} className="hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar platos..."
-            value={buscarPlato}
-            onChange={(e) => onBuscarPlatoChange(e.target.value)}
-            className="pl-9"
+              {largoInstrucciones.toLocaleString("es-ES")} / {MAX_INSTRUCCIONES_EXTRA.toLocaleString("es-ES")}
+              <span className="sr-only"> caracteres</span>
+              {instruccionesExcedidas && <span className="sr-only">. Excede el máximo, recórtalo antes de guardar.</span>}
+            </span>
+          }
+          efecto={
+            <>
+              El bot las cumple al pie de la letra (regla del prompt: "si hay instrucciones extra, cúmplelas al pie de la
+              letra"). A diferencia del tono, esto se traslada tal cual.
+            </>
+          }
+        >
+          <AvisoHorarioContacto
+            idioma={idioma}
+            texto={draft.instrucciones_extra}
+            textoEspañol={draftEspañol.instrucciones_extra}
+            canEdit={canEdit}
+            onCopiarDesdeEspañol={() =>
+              onChange({
+                instrucciones_extra: combinarConInstruccionesEspañol(draft.instrucciones_extra, draftEspañol.instrucciones_extra),
+              })
+            }
           />
-        </div>
-
-        <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-          {loadingPlatos ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
-          ) : Object.keys(platosPorCategoria).length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No se encontraron platos</p>
-          ) : (
-            Object.entries(platosPorCategoria).map(([cat, items]) => (
-              <div key={cat}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
-                <div className="space-y-1">
-                  {items.map((p) => (
-                    <label
-                      key={p.id}
-                      className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <Checkbox
-                        checked={draft.platos.includes(p.nombre || "")}
-                        onCheckedChange={() => onTogglePlato(p.nombre || "")}
-                        disabled={!canEdit}
-                      />
-                      <span className="text-sm flex-1">{p.nombre}</span>
-                      {p.precio_eur != null && (
-                        <span className="text-xs text-muted-foreground">{p.precio_eur.toFixed(2)}€</span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CampoExplicado>
-
-      {/* Vinos a recomendar */}
-      <CampoExplicado
-        icono={<Wine className="h-5 w-5" />}
-        pregunta="¿Qué vinos debe recomendar?"
-        explicacion={`Los vinos que el bot priorizará cuando un cliente pida sugerencias.${
-          draft.vinos.length ? ` (${draft.vinos.length} seleccionados)` : ""
-        }`}
-        ejemplo={<>igual que con los platos: es prioridad dentro de los vinos activos en la pestaña Carta, nunca una lista cerrada ni inventada.</>}
-      >
-        {draft.vinos.length > 0 && (
-          <div className="flex flex-wrap gap-2 pb-2 border-b">
-            {draft.vinos.map((nombre) => (
-              <span
-                key={nombre}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-              >
-                {nombre}
-                {canEdit && (
-                  <button type="button" onClick={() => onToggleVino(nombre)} className="hover:text-destructive">
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar vinos..."
-            value={buscarVino}
-            onChange={(e) => onBuscarVinoChange(e.target.value)}
-            className="pl-9"
+          <Textarea
+            id={ids.instrucciones}
+            value={draft.instrucciones_extra}
+            onChange={(e) => onChange({ instrucciones_extra: e.target.value })}
+            maxLength={MAX_INSTRUCCIONES_EXTRA}
+            aria-describedby={ids.contador}
+            aria-invalid={instruccionesExcedidas || undefined}
+            placeholder={
+              "Ej.:\n- Horario: martes a jueves 09:30-23:00, viernes 09:00-23:30…\n- Teléfono: 966 10 78 87\n- Dirección: Carrer Santa Maria de la Cabeza 2, Crevillent\n- No se admiten reservas por la web, solo por teléfono"
+            }
+            rows={7}
+            disabled={!canEdit}
           />
-        </div>
+        </CampoExplicado>
+      </SeccionBot>
 
-        <div className="max-h-64 overflow-y-auto space-y-3 border rounded-md p-3">
-          {loadingVinos ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin" />
-            </div>
-          ) : Object.keys(vinosPorCategoria).length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No se encontraron vinos</p>
-          ) : (
-            Object.entries(vinosPorCategoria).map(([cat, items]) => (
-              <div key={cat}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">{cat}</p>
-                <div className="space-y-1">
-                  {items.map((v) => (
-                    <label
-                      key={v.id}
-                      className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <Checkbox
-                        checked={draft.vinos.includes(v.nombre || "")}
-                        onCheckedChange={() => onToggleVino(v.nombre || "")}
-                        disabled={!canEdit}
-                      />
-                      <span className="text-sm flex-1">{v.nombre}</span>
-                      {v.precio_eur != null && (
-                        <span className="text-xs text-muted-foreground">{v.precio_eur.toFixed(2)}€</span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </CampoExplicado>
-
-      {/* Instrucciones extra */}
-      <CampoExplicado
-        pregunta="¿Algo más que deba saber el bot?"
-        explicacion="Instrucciones libres en lenguaje natural. Es el ÚNICO sitio del que el bot saca horarios, dirección, teléfono, política de reservas, alérgenos especiales o cualquier otro dato que no esté en la carta."
-        ejemplo={<>el bot las cumple literalmente (regla del prompt: "si hay instrucciones extra, cúmplelas al pie de la letra") — a diferencia del tono, esto sí se traslada tal cual.</>}
+      <SeccionBot
+        titulo="Recomendaciones"
+        descripcion="Lo que el bot prioriza cuando un cliente pide sugerencias. Solo cuenta lo que siga activo en la Carta."
       >
-        <Textarea
-          value={draft.instrucciones_extra}
-          onChange={(e) => onChange({ instrucciones_extra: e.target.value })}
-          placeholder={"Ej:\n- Horario: martes a jueves 09:30-23:00, viernes 09:00-23:30...\n- Teléfono: 966 10 78 87\n- Dirección: Carrer Santa Maria de la Cabeza 2, Crevillent\n- No se admiten reservas por la web, solo por teléfono"}
-          rows={6}
-          disabled={!canEdit}
-        />
-      </CampoExplicado>
+        <div className="grid gap-5 lg:grid-cols-2 lg:gap-4">
+          <CampoExplicado
+            etiqueta="Platos"
+            accesorio={
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {draft.platos.length} seleccionado{draft.platos.length === 1 ? "" : "s"}
+              </span>
+            }
+            efecto={
+              <>
+                Es una prioridad dentro de lo activo en la pestaña Carta: si desactivas allí un plato marcado aquí, el bot
+                deja de mencionarlo. Nunca inventa platos que no estén en la carta real.
+              </>
+            }
+          >
+            <SelectorCartaBot
+              tipo="platos"
+              seleccionados={draft.platos}
+              porCategoria={platosPorCategoria}
+              loading={loadingPlatos}
+              buscar={buscarPlato}
+              onBuscarChange={onBuscarPlatoChange}
+              onToggle={onTogglePlato}
+              canEdit={canEdit}
+            />
+          </CampoExplicado>
 
-      {/* Frases personalizadas */}
-      <CampoExplicado
-        pregunta="¿Alguna frase o coletilla que quieras que use?"
-        explicacion="Frases de referencia que el bot puede recoger cuando venga a cuento."
-        ejemplo={<>a diferencia de "Instrucciones extra", el prompt no obliga a usarlas siempre — trátalas como inspiración de estilo, no como un guion que se repita en cada respuesta.</>}
-      >
-        <Textarea
-          value={draft.frases_personalizadas}
-          onChange={(e) => onChange({ frases_personalizadas: e.target.value })}
-          placeholder={"Ej:\n- ¡Que aproveche!\n- Te esperamos con los brazos abiertos"}
-          rows={3}
-          disabled={!canEdit}
-        />
-      </CampoExplicado>
+          <CampoExplicado
+            etiqueta="Vinos"
+            accesorio={
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {draft.vinos.length} seleccionado{draft.vinos.length === 1 ? "" : "s"}
+              </span>
+            }
+            efecto={<>Igual que con los platos: prioridad dentro de los vinos activos en la Carta, nunca una lista cerrada.</>}
+          >
+            <SelectorCartaBot
+              tipo="vinos"
+              seleccionados={draft.vinos}
+              porCategoria={vinosPorCategoria}
+              loading={loadingVinos}
+              buscar={buscarVino}
+              onBuscarChange={onBuscarVinoChange}
+              onToggle={onToggleVino}
+              canEdit={canEdit}
+            />
+          </CampoExplicado>
+        </div>
+      </SeccionBot>
 
       <VistaPreviaBot idioma={idioma} draft={draft} />
-
-      {/* Barra de guardado — honesta: nunca dice "guardado" hasta que Supabase lo confirma. */}
-      {canEdit && (
-        <div className="flex items-center justify-end gap-3 pb-6 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t">
-          <EstadoGuardadoBadge dirty={dirty} saving={saving} error={saveError} />
-          <Button size="lg" onClick={onSave} disabled={saving || !dirty}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar cambios en {idioma.toUpperCase()}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

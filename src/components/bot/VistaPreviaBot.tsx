@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, PlayCircle, Sparkles, TriangleAlert } from "lucide-react";
+import { Loader2, PlayCircle, TriangleAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { DraftBotWeb, IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
 
@@ -88,18 +88,14 @@ export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5" />
-          Vista previa
-        </CardTitle>
-        <CardDescription>
-          Así se comportará el bot en este idioma con la configuración que ves ahora mismo — se actualiza sola,
-          no hace falta guardar para verla.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="p-4">
+      <div className="mb-4 space-y-0.5">
+        <h3 className="text-base font-semibold">Vista previa</h3>
+        <p className="text-sm text-muted-foreground">
+          Cómo se comportará el bot en este idioma con lo que ves ahora. Se actualiza sola, sin guardar.
+        </p>
+      </div>
+      <div className="space-y-4">
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
             Primer mensaje de una conversación nueva
@@ -154,14 +150,15 @@ export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
         <div className="border-t pt-3">
           <Button type="button" variant="outline" size="sm" onClick={handleProbar} disabled={probando}>
             {probando ? (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" aria-hidden="true" />
             ) : (
-              <PlayCircle className="h-3.5 w-3.5 mr-1.5" />
+              <PlayCircle className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
             )}
             Probar el bot en vivo
           </Button>
           {resultado && (
             <div
+              role="status"
               className={`mt-2 text-xs rounded-md border p-2.5 leading-relaxed ${
                 resultado.tipo === "ok"
                   ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
@@ -175,7 +172,7 @@ export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
             </div>
           )}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

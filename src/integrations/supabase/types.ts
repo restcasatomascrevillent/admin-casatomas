@@ -604,6 +604,57 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_web_config: {
+        Row: {
+          activo: boolean
+          alerta_pct: number
+          duracion_max_min: number
+          id: boolean
+          max_chars: number
+          max_output_tokens: number
+          max_req_dia: number
+          max_req_ip_hora: number
+          max_req_sesion_hora: number
+          max_turnos: number
+          presupuesto_dia_usd: number
+          telefono: string
+          updated_at: string
+          url_reservas: string | null
+        }
+        Insert: {
+          activo?: boolean
+          alerta_pct?: number
+          duracion_max_min?: number
+          id?: boolean
+          max_chars?: number
+          max_output_tokens?: number
+          max_req_dia?: number
+          max_req_ip_hora?: number
+          max_req_sesion_hora?: number
+          max_turnos?: number
+          presupuesto_dia_usd?: number
+          telefono?: string
+          updated_at?: string
+          url_reservas?: string | null
+        }
+        Update: {
+          activo?: boolean
+          alerta_pct?: number
+          duracion_max_min?: number
+          id?: boolean
+          max_chars?: number
+          max_output_tokens?: number
+          max_req_dia?: number
+          max_req_ip_hora?: number
+          max_req_sesion_hora?: number
+          max_turnos?: number
+          presupuesto_dia_usd?: number
+          telefono?: string
+          updated_at?: string
+          url_reservas?: string | null
+        }
+        Relationships: []
+      }
       client_messages: {
         Row: {
           client_id: string
@@ -3561,6 +3612,19 @@ export type Database = {
             referencedColumns: ["session_id"]
           },
         ]
+      }
+      chat_web_uso_diario: {
+        Row: {
+          cached_tokens: number | null
+          completion_tokens: number | null
+          conversaciones: number | null
+          coste_usd: number | null
+          dia: string | null
+          peticiones: number | null
+          prompt_tokens: number | null
+          rechazadas: number | null
+        }
+        Relationships: []
       }
       vista_calidad_audio: {
         Row: {

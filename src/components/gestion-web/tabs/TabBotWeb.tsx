@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CabeceraPestana } from "@/components/gestion-web/CabeceraPestana";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw, Save } from "lucide-react";
 import {
   configToDraft,
   draftToUpdate,
@@ -12,12 +11,71 @@ import {
   type DraftBotWeb,
   type IdiomaBotWeb,
 } from "@/hooks/useConfigBotWeb";
-import { usePlatos } from "@/hooks/usePlatos";
-import { useVinos } from "@/hooks/useVinos";
-import { IDIOMAS } from "@/components/bot/constantesBot";
+import { usePlatos, type Plato } from "@/hooks/usePlatos";
+import { useVinos, type Vino } from "@/hooks/useVinos";
+import { IDIOMAS, MAX_INSTRUCCIONES_EXTRA, detectaInfoContacto } from "@/components/bot/constantesBot";
 import { BotIdiomaPanel } from "@/components/bot/BotIdiomaPanel";
+import { EstadoGuardadoBadge } from "@/components/bot/EstadoGuardadoBadge";
+import { SeccionProteccion } from "@/components/bot/SeccionProteccion";
+import { cn } from "@/lib/utils";
 
 type DraftsPorIdioma = Record<IdiomaBotWeb, DraftBotWeb>;
+
+// usePlatos/useVinos hacen select("*"), así que las filas traen también las
+// columnas traducidas aunque sus interfaces no las declaren.
+type ConTraduccion = { nombre_en?: string | null; nombre_fr?: string | null };
+
+// Mismo criterio que localizar() en supabase/functions/chat-web/index.ts: en
+// en/fr se usa nombre_<idioma> si tiene contenido y si no, el nombre español.
+// Así lo que se guarda en platos/vinos_recomendados coincide con los nombres
+// que la herramienta del bot devuelve en ese idioma.
+function nombreLocalizado(item: { nombre: string | null } & ConTraduccion, idioma: IdiomaBotWeb): string | null {
+  if (idioma === "en" && item.nombre_en?.trim()) return item.nombre_en.trim();
+  if (idioma === "fr" && item.nombre_fr?.trim()) return item.nombre_fr.trim();
+  return item.nombre;
+}
+
+// Filtra por búsqueda (nombre localizado, nombre español o categoría),
+// sustituye `nombre` por el localizado y agrupa por categoría.
+function agruparLocalizado<T extends { nombre: string | null; categoria: string | null } & ConTraduccion>(
+  items: T[],
+  idioma: IdiomaBotWeb,
+  buscar: string,
+): Record<string, T[]> {
+  const q = buscar.trim().toLowerCase();
+  const map: Record<string, T[]> = {};
+  for (const item of items) {
+    const nombre = nombreLocalizado(item, idioma);
+    if (!nombre) continue;
+    if (
+      q &&
+      !nombre.toLowerCase().includes(q) &&
+      !item.nombre?.toLowerCase().includes(q) &&
+      !item.categoria?.toLowerCase().includes(q)
+    ) {
+      continue;
+    }
+    const cat = item.categoria || "Sin categoría";
+    (map[cat] ??= []).push({ ...item, nombre });
+  }
+  return map;
+}
+
+function porIdioma<T>(fn: (idioma: IdiomaBotWeb) => T): Record<IdiomaBotWeb, T> {
+  return { es: fn("es"), en: fn("en"), fr: fn("fr") };
+}
+
+type EstadoIdioma = "cambios" | "error" | "incompleto" | "completo";
+
+// Indicador por idioma en el selector: prioridad a lo accionable (sin
+// guardar > error > le falta horario/contacto > todo bien). "incompleto" usa
+// la misma heurística aproximada que el checklist de "Instrucciones extra".
+const ESTADO_IDIOMA: Record<EstadoIdioma, { texto: string; punto: string }> = {
+  cambios: { texto: "Cambios sin guardar", punto: "bg-amber-500" },
+  error: { texto: "Error al guardar", punto: "bg-destructive" },
+  incompleto: { texto: "Falta información básica", punto: "border-2 border-amber-500 bg-transparent" },
+  completo: { texto: "Completo", punto: "bg-emerald-500" },
+};
 
 export default function TabBotWeb() {
   // Esta pestaña ahora solo cuelga de /super-admin/bot-web (SuperAdminRoute),
@@ -76,6 +134,13 @@ export default function TabBotWeb() {
     return !draftsIguales(drafts[idioma], savedBaseline[idioma]);
   };
 
+  const estadoIdioma = (idioma: IdiomaBotWeb): EstadoIdioma => {
+    if (isDirty(idioma)) return "cambios";
+    if (saveErrors[idioma]) return "error";
+    if (drafts && !detectaInfoContacto(drafts[idioma].instrucciones_extra).completa) return "incompleto";
+    return "completo";
+  };
+
   const updateDraft = (idioma: IdiomaBotWeb, patch: Partial<DraftBotWeb>) => {
     setDrafts((prev) => (prev ? { ...prev, [idioma]: { ...prev[idioma], ...patch } } : prev));
   };
@@ -100,6 +165,13 @@ export default function TabBotWeb() {
 
   const handleSave = async (idioma: IdiomaBotWeb) => {
     if (!drafts) return;
+    if (drafts[idioma].instrucciones_extra.length > MAX_INSTRUCCIONES_EXTRA) {
+      setSaveErrors((prev) => ({
+        ...prev,
+        [idioma]: `"Instrucciones extra" supera los ${MAX_INSTRUCCIONES_EXTRA} caracteres: recórtalo antes de guardar.`,
+      }));
+      return;
+    }
     setSavingIdioma(idioma);
     setSaveErrors((prev) => ({ ...prev, [idioma]: null }));
     try {
@@ -112,41 +184,25 @@ export default function TabBotWeb() {
     }
   };
 
-  // Listas de la carta real — compartidas por los 3 idiomas (son el mismo
-  // restaurante); solo cambia qué nombres están marcados en cada borrador.
-  const platosActivos = useMemo(() => {
-    const items = (platos || []).filter((p) => p.activado !== false && p.nombre);
-    if (!buscarPlato) return items;
-    const q = buscarPlato.toLowerCase();
-    return items.filter((p) => p.nombre?.toLowerCase().includes(q) || p.categoria?.toLowerCase().includes(q));
-  }, [platos, buscarPlato]);
-
-  const platosPorCategoria = useMemo(() => {
-    const map: Record<string, typeof platosActivos> = {};
-    platosActivos.forEach((p) => {
-      const cat = p.categoria || "Sin categoría";
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(p);
-    });
-    return map;
-  }, [platosActivos]);
-
-  const vinosActivos = useMemo(() => {
-    const items = (vinos || []).filter((v) => v.activado !== false && v.nombre);
-    if (!buscarVino) return items;
-    const q = buscarVino.toLowerCase();
-    return items.filter((v) => v.nombre?.toLowerCase().includes(q) || v.categoria?.toLowerCase().includes(q));
-  }, [vinos, buscarVino]);
-
-  const vinosPorCategoria = useMemo(() => {
-    const map: Record<string, typeof vinosActivos> = {};
-    vinosActivos.forEach((v) => {
-      const cat = v.categoria || "Sin categoría";
-      if (!map[cat]) map[cat] = [];
-      map[cat].push(v);
-    });
-    return map;
-  }, [vinosActivos]);
+  // Listas de la carta real — los mismos platos/vinos para los 3 idiomas,
+  // pero en EN/FR se muestran y se guardan con su nombre traducido (ver
+  // nombreLocalizado). ES queda igual que antes: `nombre`.
+  const platosActivos = useMemo(
+    () => ((platos || []) as (Plato & ConTraduccion)[]).filter((p) => p.activado !== false && p.nombre),
+    [platos],
+  );
+  const vinosActivos = useMemo(
+    () => ((vinos || []) as (Vino & ConTraduccion)[]).filter((v) => v.activado !== false && v.nombre),
+    [vinos],
+  );
+  const platosPorIdioma = useMemo(
+    () => porIdioma((idioma) => agruparLocalizado(platosActivos, idioma, buscarPlato)),
+    [platosActivos, buscarPlato],
+  );
+  const vinosPorIdioma = useMemo(
+    () => porIdioma((idioma) => agruparLocalizado(vinosActivos, idioma, buscarVino)),
+    [vinosActivos, buscarVino],
+  );
 
   if (isLoading || !drafts) {
     return (
@@ -173,65 +229,91 @@ export default function TabBotWeb() {
   }
 
   const idiomaActivo = IDIOMAS.find((i) => i.value === activeIdioma)!;
+  const dirtyActivo = isDirty(activeIdioma);
+  const savingActivo = savingIdioma === activeIdioma;
 
   return (
-      <div className="space-y-6">
-        <CabeceraPestana
-          titulo="Bot web"
-          descripcion={
-            <>
-              Cómo se comporta el chatbot de la web — estás editando la versión en{" "}
-              <span className="font-medium text-foreground">{idiomaActivo.label}</span>.
-            </>
+    <div className="space-y-4">
+      <Tabs
+        value={activeIdioma}
+        onValueChange={(v) => setActiveIdioma(v as IdiomaBotWeb)}
+        className="space-y-4"
+        onKeyDown={(e) => {
+          // Ctrl/Cmd+S guarda el idioma activo en vez de abrir "Guardar página".
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+            e.preventDefault();
+            if (canEdit && dirtyActivo && !savingActivo) handleSave(activeIdioma);
           }
-        />
+        }}
+      >
+        <h2 className="sr-only">Bot web</h2>
 
-        <Tabs value={activeIdioma} onValueChange={(v) => setActiveIdioma(v as IdiomaBotWeb)}>
-          <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
-            {IDIOMAS.map((i) => (
-              <TabsTrigger
-                key={i.value}
-                value={i.value}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all"
-              >
-                <span>{i.flag}</span>
-                <span>{i.label}</span>
-                {isDirty(i.value) && (
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-amber-500"
-                    title="Tiene cambios sin guardar"
-                  />
-                )}
-              </TabsTrigger>
-            ))}
+        {/* Barra de idioma + guardado. Pegada bajo la cabecera del layout
+            (h-14 / sm:h-16) con fondo sólido y borde: no tapa contenido ni usa
+            blur. Los márgenes negativos compensan el padding de <main>. */}
+        <div className="sticky top-14 z-30 -mx-3 flex flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 sm:top-16 sm:-mx-6 sm:px-6">
+          <TabsList aria-label="Idioma del bot" className="h-9">
+            {IDIOMAS.map((i) => {
+              const estado = ESTADO_IDIOMA[estadoIdioma(i.value)];
+              return (
+                <TabsTrigger key={i.value} value={i.value} className="gap-2 px-3" title={`${i.label}: ${estado.texto}`}>
+                  <span className="font-semibold uppercase">{i.value}</span>
+                  <span className="hidden text-muted-foreground sm:inline">{i.label}</span>
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", estado.punto)} aria-hidden="true" />
+                  <span className="sr-only">({estado.texto})</span>
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
 
-          {IDIOMAS.map((i) => (
-            <TabsContent key={i.value} value={i.value} className="mt-6">
-              <BotIdiomaPanel
-                idioma={i.value}
-                draft={drafts[i.value]}
-                draftEspañol={drafts.es}
-                canEdit={canEdit}
-                dirty={isDirty(i.value)}
-                saving={savingIdioma === i.value}
-                saveError={saveErrors[i.value]}
-                onChange={(patch) => updateDraft(i.value, patch)}
-                onTogglePlato={(nombre) => togglePlato(i.value, nombre)}
-                onToggleVino={(nombre) => toggleVino(i.value, nombre)}
-                onSave={() => handleSave(i.value)}
-                platosPorCategoria={platosPorCategoria}
-                vinosPorCategoria={vinosPorCategoria}
-                loadingPlatos={loadingPlatos}
-                loadingVinos={loadingVinos}
-                buscarPlato={buscarPlato}
-                buscarVino={buscarVino}
-                onBuscarPlatoChange={setBuscarPlato}
-                onBuscarVinoChange={setBuscarVino}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
+          {canEdit && (
+            <div className="flex items-center gap-2" aria-live="polite">
+              <EstadoGuardadoBadge dirty={dirtyActivo} saving={savingActivo} error={saveErrors[activeIdioma]} />
+              <Button
+                size="sm"
+                onClick={() => handleSave(activeIdioma)}
+                disabled={savingActivo || !dirtyActivo}
+                aria-label={`Guardar cambios en ${idiomaActivo.label}`}
+                title="Guardar (Ctrl+S)"
+              >
+                {savingActivo ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Save className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                )}
+                Guardar
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {IDIOMAS.map((i) => (
+          <TabsContent key={i.value} value={i.value} className="mt-0">
+            <BotIdiomaPanel
+              idioma={i.value}
+              draft={drafts[i.value]}
+              draftEspañol={drafts.es}
+              canEdit={canEdit}
+              onChange={(patch) => updateDraft(i.value, patch)}
+              onTogglePlato={(nombre) => togglePlato(i.value, nombre)}
+              onToggleVino={(nombre) => toggleVino(i.value, nombre)}
+              platosPorCategoria={platosPorIdioma[i.value]}
+              vinosPorCategoria={vinosPorIdioma[i.value]}
+              loadingPlatos={loadingPlatos}
+              loadingVinos={loadingVinos}
+              buscarPlato={buscarPlato}
+              buscarVino={buscarVino}
+              onBuscarPlatoChange={setBuscarPlato}
+              onBuscarVinoChange={setBuscarVino}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      {/* Global (no depende del idioma): interruptor, consumo y límites. Fuera
+          de <Tabs> para que Ctrl+S y la barra de guardado por idioma no le
+          afecten — tiene su propio botón "Guardar límites". */}
+      <SeccionProteccion />
+    </div>
   );
 }

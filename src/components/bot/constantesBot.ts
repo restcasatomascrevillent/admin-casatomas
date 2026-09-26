@@ -27,24 +27,36 @@ export interface TonoOpcion {
 // español, también al editar EN o FR).
 export const TONO_OPTIONS: Record<IdiomaBotWeb, TonoOpcion[]> = {
   es: [
-    { value: "cercano", label: "😊 Cercano", desc: "Amigable, como un camarero que ya te conoce" },
-    { value: "formal", label: "👔 Formal", desc: "Profesional y elegante" },
-    { value: "divertido", label: "🎉 Divertido", desc: "Desenfadado, con toques de humor" },
-    { value: "exclusivo", label: "✨ Exclusivo", desc: "Sofisticado, alta gastronomía" },
+    { value: "cercano", label: "Cercano", desc: "Amigable, como un camarero que ya te conoce" },
+    { value: "formal", label: "Formal", desc: "Profesional y elegante" },
+    { value: "divertido", label: "Divertido", desc: "Desenfadado, con toques de humor" },
+    { value: "exclusivo", label: "Exclusivo", desc: "Sofisticado, alta gastronomía" },
   ],
   en: [
-    { value: "warm", label: "😊 Warm", desc: "Friendly, like a waiter who already knows you" },
-    { value: "formal", label: "👔 Formal", desc: "Professional and elegant" },
-    { value: "fun", label: "🎉 Fun", desc: "Relaxed, with a touch of humour" },
-    { value: "exclusive", label: "✨ Exclusive", desc: "Sophisticated, fine dining" },
+    { value: "warm", label: "Warm", desc: "Friendly, like a waiter who already knows you" },
+    { value: "formal", label: "Formal", desc: "Professional and elegant" },
+    { value: "fun", label: "Fun", desc: "Relaxed, with a touch of humour" },
+    { value: "exclusive", label: "Exclusive", desc: "Sophisticated, fine dining" },
   ],
   fr: [
-    { value: "chaleureux", label: "😊 Chaleureux", desc: "Amical, comme un serveur qui vous connaît déjà" },
-    { value: "formel", label: "👔 Formel", desc: "Professionnel et élégant" },
-    { value: "amusant", label: "🎉 Amusant", desc: "Décontracté, avec une touche d'humour" },
-    { value: "exclusif", label: "✨ Exclusif", desc: "Sophistiqué, haute gastronomie" },
+    { value: "chaleureux", label: "Chaleureux", desc: "Amical, comme un serveur qui vous connaît déjà" },
+    { value: "formel", label: "Formel", desc: "Professionnel et élégant" },
+    { value: "amusant", label: "Amusant", desc: "Décontracté, avec une touche d'humour" },
+    { value: "exclusif", label: "Exclusif", desc: "Sophistiqué, haute gastronomie" },
   ],
 };
+
+// Etiquetas de la INTERFAZ (siempre en español, como el resto del panel).
+// Van en el mismo orden que cada lista de TONO_OPTIONS: la posición es el
+// "concepto" de tono y TONO_OPTIONS[idioma][i].value es lo que se guarda en
+// la fila de ese idioma. Así el selector se lee en español aunque se esté
+// editando EN o FR, sin cambiar lo que se persiste.
+export const TONOS_UI: { label: string; desc: string }[] = [
+  { label: "Cercano", desc: "Amigable, como un camarero que ya te conoce" },
+  { label: "Formal", desc: "Profesional y elegante" },
+  { label: "Divertido", desc: "Desenfadado, con toques de humor" },
+  { label: "Exclusivo", desc: "Sofisticado, alta gastronomía" },
+];
 
 export interface DeteccionContacto {
   horario: boolean;
@@ -54,23 +66,51 @@ export interface DeteccionContacto {
 }
 
 const PALABRAS_HORARIO = [
-  "horario", "horarios", "hours", "heures", "abrimos", "abierto",
+  "horario", "horarios", "hours", "heures", "horaire", "horaires", "abrimos", "abierto",
   "cerrado", "open", "closed", "fermé", "ferme", "ouvert",
 ];
 const PALABRAS_CONTACTO = [
-  "teléfono", "telefono", "tel.", "phone", "téléphone", "telephone",
+  "teléfono", "telefono", "tel", "tlf", "phone", "téléphone", "telephone",
   "email", "e-mail", "correo", "contacto", "contact",
 ];
 const PALABRAS_DIRECCION = [
   "dirección", "direccion", "address", "adresse", "calle", "carrer",
-  "street", "rue", "ubicación", "ubicacion", "location", "situé",
+  "street", "rue", "avenida", "avinguda", "avenue", "plaza", "plaça",
+  "ubicación", "ubicacion", "location", "situé", "situés", "située",
 ];
 
-const REGEX_HORA = /\b\d{1,2}[:h]\d{2}\b/i;
-const REGEX_TELEFONO = /\b\d[\d\s.-]{6,}\d\b/;
+// Una hora: "9:30", "09h30", "9h", "13 h", "9 am", "9pm", "9 a.m.". No se
+// aceptan "9.30"/"9,30" (se confunden con precios). Delante no puede haber
+// otro dígito ni separador decimal, y "h"/"am"/"pm" no pueden ir pegados a
+// una letra ("2 hours", "9 amigos").
+const REGEX_HORA =
+  /(?<![\d.,])(?:[01]?\d|2[0-3])(?:\s?[:h]\s?[0-5]\d|\s?h(?!\p{L})|\s?(?:a\.?m|p\.?m)\.?(?!\p{L}))/iu;
+// Candidatos a teléfono: tramo de dígitos con espacios, puntos, guiones o
+// paréntesis. Solo cuenta si suma entre 9 y 15 dígitos (España = 9; E.164 ≤
+// 15), así un rango de años "2025-2026" (8 dígitos) no pasa por teléfono.
+const REGEX_CANDIDATO_TELEFONO = /\+?\d[\d\s.()-]{6,}\d/g;
+const REGEX_EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 
-function contieneAlguna(texto: string, palabras: string[]): boolean {
-  return palabras.some((p) => texto.includes(p));
+function escaparRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Coincidencia por PALABRA completa, consciente de acentos (\b de JS solo
+// entiende ASCII): "rue" no casa con "true", ni "open" con "opening".
+function regexPalabras(palabras: string[]): RegExp {
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${palabras.map(escaparRegex).join("|")})(?![\\p{L}\\p{N}])`, "iu");
+}
+
+const RE_HORARIO = regexPalabras(PALABRAS_HORARIO);
+const RE_CONTACTO = regexPalabras(PALABRAS_CONTACTO);
+const RE_DIRECCION = regexPalabras(PALABRAS_DIRECCION);
+
+function contieneTelefono(texto: string): boolean {
+  for (const m of texto.matchAll(REGEX_CANDIDATO_TELEFONO)) {
+    const digitos = m[0].replace(/\D/g, "").length;
+    if (digitos >= 9 && digitos <= 15) return true;
+  }
+  return false;
 }
 
 // Heurística de detección, NO una certeza: busca patrones de hora/teléfono y
@@ -80,10 +120,10 @@ function contieneAlguna(texto: string, palabras: string[]): boolean {
 // dice "revísalo tú".
 export function detectaInfoContacto(texto: string | null | undefined): DeteccionContacto {
   const t = (texto ?? "").trim().toLowerCase();
-  const horario = REGEX_HORA.test(t) || contieneAlguna(t, PALABRAS_HORARIO);
-  const contacto = REGEX_TELEFONO.test(t) || t.includes("@") || contieneAlguna(t, PALABRAS_CONTACTO);
-  const direccion = contieneAlguna(t, PALABRAS_DIRECCION);
-  return { horario, contacto, direccion, completa: horario && contacto };
+  const horario = REGEX_HORA.test(t) || RE_HORARIO.test(t);
+  const contacto = contieneTelefono(t) || REGEX_EMAIL.test(t) || RE_CONTACTO.test(t);
+  const direccion = RE_DIRECCION.test(t);
+  return { horario, contacto, direccion, completa: horario && contacto && direccion };
 }
 
 // Usado por el botón "Copiar del español" en las pestañas EN/FR: nunca borra
@@ -94,3 +134,7 @@ export function combinarConInstruccionesEspañol(actual: string, español: strin
   const bloque = `${nota}\n${español}`;
   return actual.trim() ? `${actual}\n\n${bloque}` : bloque;
 }
+
+// Límite de "Instrucciones extra": va entero en el prompt de cada mensaje, así
+// que cuanto más largo, más caro y más diluido. Se muestra con contador.
+export const MAX_INSTRUCCIONES_EXTRA = 1500;
