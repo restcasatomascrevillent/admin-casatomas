@@ -51,7 +51,7 @@ const UserRoleContext = createContext<UserRoleData | null>(null);
  * contexto.
  */
 export function UserRoleProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +59,16 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const isSuperAdminUser = checkIsSuperAdmin(user?.email);
 
   useEffect(() => {
+    // Espera a que useAuth resuelva del todo antes de decidir nada. Sin este
+    // guard, en el instante en que `user` todavía es null (useAuth sigue
+    // validando la sesión) este efecto ya resolvía loading=false; cuando
+    // `user` llegaba un instante después, había un render en el que TANTO
+    // authLoading como este loading leían false a la vez → se veía el
+    // contenido de la página → y acto seguido este efecto volvía a poner
+    // loading=true para pedir el rol → aparecía el spinner encima. Ese
+    // "página y luego spinner" era exactamente esta carrera.
+    if (authLoading) return;
+
     if (!user) {
       setRole(null);
       setPermissions([]);
@@ -107,7 +117,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     };
 
     fetchRoleAndPermissions();
-  }, [user, isSuperAdminUser]);
+  }, [user, authLoading, isSuperAdminUser]);
 
   const isAdmin = role === "admin" || isSuperAdminUser;
 
