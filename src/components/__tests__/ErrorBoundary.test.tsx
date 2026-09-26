@@ -99,6 +99,52 @@ describe("ErrorBoundary", () => {
   });
 });
 
+describe("ErrorBoundary — chunk obsoleto tras un despliegue", () => {
+  const ExplotaChunk = () => {
+    throw new TypeError("Failed to fetch dynamically imported module: https://x/TabCarta-abc123.js");
+  };
+
+  const CLAVE = "gp-chunk-error-reload-en";
+
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    sessionStorage.removeItem(CLAVE);
+    vi.stubGlobal("location", { ...window.location, reload: vi.fn() });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    sessionStorage.removeItem(CLAVE);
+  });
+
+  it("recarga la página en vez de enseñar el error rojo", () => {
+    render(
+      <ErrorBoundary>
+        <ExplotaChunk />
+      </ErrorBoundary>,
+    );
+
+    expect(window.location.reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/Actualizando/i)).toBeInTheDocument();
+    expect(screen.queryByText("Esta sección no se ha podido cargar")).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(CLAVE)).not.toBeNull();
+  });
+
+  it("si ya se recargó hace poco (el chunk sigue roto de verdad), no recarga en bucle y enseña el error", () => {
+    sessionStorage.setItem(CLAVE, String(Date.now()));
+
+    render(
+      <ErrorBoundary>
+        <ExplotaChunk />
+      </ErrorBoundary>,
+    );
+
+    expect(window.location.reload).not.toHaveBeenCalled();
+    expect(screen.getByText("Esta sección no se ha podido cargar")).toBeInTheDocument();
+  });
+});
+
 describe("RouteErrorBoundary", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});

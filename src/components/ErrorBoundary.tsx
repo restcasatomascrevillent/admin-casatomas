@@ -24,6 +24,37 @@ interface ErrorBoundaryState {
   componentStack: string | null;
   /** Se incrementa en cada reintento para forzar el remontaje de los hijos. */
   intento: number;
+  /** true solo cuando ESTA instancia acaba de disparar window.location.reload(). */
+  recargando: boolean;
+}
+
+// Las pestañas/páginas que se cargan bajo demanda (lazy) piden un chunk .js
+// con un hash que cambia en cada build. Si el navegador lleva abierto un
+// index.html de un despliegue anterior y mientras tanto se publicó uno
+// nuevo, ese chunk ya no existe en el CDN (Vercel no conserva los assets de
+// builds viejos) y el import() falla con este mensaje (varía según
+// navegador). "Reintentar" no lo arregla: solo remonta componentes con el
+// mismo index.html viejo en memoria, así que pide exactamente la misma URL
+// rota otra vez. Hace falta una recarga de verdad para traer el index.html
+// actual con las rutas de chunk correctas.
+const PATRON_CHUNK_OBSOLETO = /dynamically imported module|importing a module script failed|chunkloaderror|loading chunk/i;
+
+function esErrorDeChunkObsoleto(error: Error): boolean {
+  return PATRON_CHUNK_OBSOLETO.test(`${error.name} ${error.message}`);
+}
+
+// No se reintenta la recarga automática más de una vez cada 15s: si tras
+// recargar el chunk sigue fallando (deploy roto, no solo desfasado), hay que
+// enseñar el error de verdad en vez de recargar en bucle. Es una ventana de
+// tiempo y no "una vez por pestaña" para que, si vuelve a pasar mucho más
+// tarde (otro despliegue mientras la pestaña sigue abierta), se pueda volver
+// a intentar solo.
+const CLAVE_RECARGA_INTENTADA = "gp-chunk-error-reload-en";
+const VENTANA_RECARGA_MS = 15_000;
+
+function seRecargoRecientemente(): boolean {
+  const marca = Number(sessionStorage.getItem(CLAVE_RECARGA_INTENTADA));
+  return Boolean(marca) && Date.now() - marca < VENTANA_RECARGA_MS;
 }
 
 /**
@@ -31,7 +62,7 @@ interface ErrorBoundaryState {
  * desmonta todo el árbol de React y deja el panel en blanco.
  */
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null, componentStack: null, intento: 0 };
+  state: ErrorBoundaryState = { error: null, componentStack: null, intento: 0, recargando: false };
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { error };
@@ -41,6 +72,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     const contexto = this.props.contexto ? ` [${this.props.contexto}]` : "";
     console.error(`[ErrorBoundary]${contexto} Error no controlado durante el render:`, error, errorInfo.componentStack);
     this.setState({ componentStack: errorInfo.componentStack ?? null });
+
+    if (esErrorDeChunkObsoleto(error) && !seRecargoRecientemente()) {
+      sessionStorage.setItem(CLAVE_RECARGA_INTENTADA, String(Date.now()));
+      // Estado local, no el cooldown compartido: el cooldown solo decide si
+      // ESTA vez toca recargar; el render necesita saber si la recarga la
+      // disparó de verdad esta instancia, para no enseñar "Actualizando…" a
+      // perpetuidad cuando el cooldown más adelante impida un nuevo intento.
+      this.setState({ recargando: true });
+      window.location.reload();
+    }
   }
 
   componentDidUpdate(prevProps: ErrorBoundaryProps) {
@@ -51,16 +92,29 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   reintentar = () => {
-    this.setState((estado) => ({ error: null, componentStack: null, intento: estado.intento + 1 }));
+    this.setState((estado) => ({ error: null, componentStack: null, intento: estado.intento + 1, recargando: false }));
   };
 
   render() {
-    const { error, componentStack, intento } = this.state;
+    const { error, componentStack, intento, recargando } = this.state;
     const { children, titulo, descripcion, pantallaCompleta } = this.props;
 
     if (!error) {
       // La `key` fuerza un remontaje limpio de los hijos al pulsar "Reintentar".
       return <Fragment key={intento}>{children}</Fragment>;
+    }
+
+    // Recarga automática en curso: en vez del error rojo, un mensaje neutro
+    // mientras el navegador trae el index.html actual (dura un instante).
+    if (recargando) {
+      return (
+        <div
+          className={`flex w-full flex-col items-center justify-center gap-3 p-3 sm:p-6 ${pantallaCompleta ? "min-h-screen bg-background" : "min-h-[50vh]"}`}
+        >
+          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Hay una versión nueva del panel. Actualizando…</p>
+        </div>
+      );
     }
 
     return (
