@@ -320,7 +320,10 @@ export function DetalleDiaEspacios({
 
   const espaciosPorId = useMemo(() => {
     const mapa = new Map<string, { nombre: string; marca: string }>();
-    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string }>) {
+    // `caracteristicas` va en el tipo porque es de donde `marcaDeEspacio` saca
+    // la marca (`caracteristicas->>'marca'`). Sin ella el cast mentía y
+    // `tsc -p tsconfig.app.json` lo cantaba (TS2559).
+    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string; caracteristicas?: unknown; marca?: string | null }>) {
       if (!e?.id) continue;
       mapa.set(e.id, { nombre: e.nombre, marca: marcaDeEspacio(e) });
     }

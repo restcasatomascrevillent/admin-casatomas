@@ -81,6 +81,7 @@ import {
 import {
   ajusteCapacidad,
   agruparPorReserva,
+  calcularDistribucionMesas,
   dateAFechaISO,
   esFechaISO,
   esFiltroTurno,
@@ -88,6 +89,7 @@ import {
   fechaISOaDate,
   horaEnFiltro,
   hoyLocal,
+  mensajeErrorAsignacion,
   mesaOcupadaPor,
   nombreMesasJuntas,
   OPCIONES_TURNO,
@@ -716,6 +718,8 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     descripcion: string;
   } | null>(null);
   const [aQuitarMesas, setAQuitarMesas] = useState<{ reserva: ReservaSala; mesas: string } | null>(null);
+  /** El reparto automático está en marcha: no se puede pulsar dos veces. */
+  const [repartiendo, setRepartiendo] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [manualZoom, setManualZoom] = useState<number | null>(null);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -1576,34 +1580,105 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     }
   };
 
+  /**
+   * Reparte de golpe las reservas que siguen pendientes de mesa.
+   *
+   * ANTES: llamaba por `fetch` a la Edge Function `calcular-distribucion-mesas`,
+   * que INSERTABA directamente en `asignaciones_mesa`. Dos problemas gordos:
+   *   1. Esa función NO EXISTE en el repositorio (`supabase/functions/` no la
+   *      tiene; la única referencia era esta llamada). O estaba desplegada sin
+   *      commitear —la misma enfermedad que las migraciones `20260925150523` y
+   *      `20260925154109`— o el botón llevaba roto desde siempre.
+   *   2. Insertando a pelo se salta TODO lo que añadió
+   *      `20260926140000_asignaciones_mesa_sin_solapes.sql`: el candado, la
+   *      validación de sala/estado/mesa activa y el índice único
+   *      `(mesa_id, fecha, turno)`. En cuanto se aplique la migración, sus
+   *      INSERT empezarían a ser rechazados a mitad, con un error críptico y
+   *      medio reparto hecho.
+   *
+   * AHORA: el reparto se calcula aquí con `calcularDistribucionMesas` (función
+   * pura y con tests) y se escribe por el MISMO camino que la asignación
+   * manual, el RPC `asignar_mesas_reserva`.
+   *
+   * UNA LLAMADA POR RESERVA, no una que las agrupe. Por qué:
+   *   - El contrato del RPC es "estas son TODAS las mesas de ESTA reserva":
+   *     recibe un solo `p_reserva_id`. Agrupar exigiría un RPC nuevo, o sea una
+   *     migración nueva, y `db push` está bloqueado: sería código que no se
+   *     puede aplicar ni probar.
+   *   - Cada llamada es atómica y coge el advisory lock, así que **ninguna
+   *     reserva puede quedarse a medio sentar**, que es la garantía que
+   *     importa.
+   *   - Lo que NO es atómico es el LOTE. Por eso, si una mesa se ocupa por el
+   *     camino, se PARA en seco (seguir aplicaría un plan ya caducado) y se
+   *     dice exactamente cuántas se sentaron, en cuál se paró y por qué.
+   */
   const handleCalcularDistribucion = async () => {
-    toast.info("Calculando distribución óptima con IA...");
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/calcular-distribucion-mesas`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            espacioId,
-            fecha: fechaSel,
-            mesas: localMesas,
-            reservas: reservasTurno,
-          }),
-        },
+    if (repartiendo) return;
+
+    const mesasLibres = localMesas
+      .filter((m) => m.activa !== false && !asignacionDeMesa(m.id))
+      .map((m) => ({ id: m.id, nombre: m.nombre, capacidad: m.capacidad }));
+
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: reservasPendientes,
+      mesasLibres,
+    });
+
+    if (propuestas.length === 0) {
+      toast.info(
+        reservasPendientes.length === 0
+          ? "No hay reservas pendientes de mesa en este turno."
+          : "No quedan mesas libres que cubran las reservas pendientes.",
       );
-      if (!response.ok) throw new Error("Error en la respuesta del servidor");
-      const result = await response.json();
-      if (result.asignaciones) {
-        toast.success(`${result.asignaciones.length} mesas asignadas automáticamente`);
-        refetchAsignaciones();
+      return;
+    }
+
+    setRepartiendo(true);
+    let aplicadas = 0;
+    let fallo: { nombre: string; motivo: string } | null = null;
+
+    try {
+      for (const propuesta of propuestas) {
+        try {
+          await asignarMesas.mutateAsync({
+            reserva_id: propuesta.reserva.id,
+            mesa_ids: propuesta.mesaIds,
+            silencioso: true,
+          });
+          aplicadas += 1;
+        } catch (error) {
+          fallo = { nombre: propuesta.reserva.nombre, motivo: mensajeErrorAsignacion(error) };
+          break;
+        }
       }
-    } catch (error) {
-      console.error("Error al calcular distribución:", error);
-      toast.error("Error al calcular distribución. Verifica que el servicio esté disponible.");
+    } finally {
+      // El lote no se puede deshacer de un botonazo (el deshacer es de un solo
+      // nivel): se limpia para no ofrecer un "Deshacer" que solo revertiría la
+      // última reserva y daría a entender que revierte todo el reparto.
+      setUltimoCambio(null);
+      await refetchAsignaciones();
+      setRepartiendo(false);
+    }
+
+    if (fallo) {
+      toast.error(
+        `Reparto detenido: se sentaron ${aplicadas} de ${propuestas.length}. Falló en ${fallo.nombre}: ${fallo.motivo} El plano ya está actualizado; vuelve a pulsar Repartir para seguir con el resto.`,
+        { duration: 12000 },
+      );
+      return;
+    }
+
+    toast.success(
+      aplicadas === 1 ? "Repartido: 1 reserva sentada." : `Repartido: ${aplicadas} reservas sentadas.`,
+    );
+
+    if (sinHueco.length > 0) {
+      toast.warning(
+        sinHueco.length === 1
+          ? `${sinHueco[0].nombre} se queda pendiente de mesa: no hay mesas libres que la cubran.`
+          : `${sinHueco.length} reservas se quedan pendientes de mesa: no hay mesas libres que las cubran.`,
+        { duration: 9000 },
+      );
     }
   };
 
@@ -1788,9 +1863,22 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
               <Plus className="mr-2 h-4 w-4" />
               Mesa
             </Button>
-            <Button variant="outline" size="sm" onClick={handleCalcularDistribucion}>
+            {/* "Repartir", no "Auto-asignar con IA": ya no llama a ninguna IA,
+                reparte aquí mismo con una regla explicable (los grupos grandes
+                primero, la mesa más justa que valga). */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCalcularDistribucion}
+              disabled={repartiendo || reservasPendientes.length === 0}
+              title={
+                reservasPendientes.length === 0
+                  ? "No hay reservas pendientes de mesa en este turno"
+                  : `Repartir mesas entre las ${reservasPendientes.length} reservas pendientes`
+              }
+            >
               <Wand2 className="mr-2 h-4 w-4" />
-              Auto-asignar
+              {repartiendo ? "Repartiendo…" : "Repartir"}
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               <FileDown className="mr-2 h-4 w-4" />

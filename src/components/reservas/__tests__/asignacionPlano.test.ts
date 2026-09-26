@@ -22,6 +22,7 @@ import {
   plazasDeMesas,
   resumenCierreDia,
   turnoParaConsulta,
+  calcularDistribucionMesas,
 } from "@/components/reservas/asignacionPlano";
 
 // ─── Filtro de turno ─────────────────────────────────────────────────────────
@@ -231,5 +232,120 @@ describe("hoyLocal", () => {
   it("devuelve la fecha de hoy en formato YYYY-MM-DD", () => {
     expect(hoyLocal()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(hoyLocal()).toBe(new Date().toLocaleDateString("sv-SE"));
+  });
+});
+
+// ─── Reparto automático ──────────────────────────────────────────────────────
+
+describe("calcularDistribucionMesas", () => {
+  const reserva = (id: string, comensales: number, hora = "13:00:00") => ({
+    id,
+    nombre: `Reserva ${id}`,
+    hora,
+    numero_comensales: comensales,
+    estado: "confirmada",
+    espacio_id: "sala-1",
+  });
+  const mesa = (nombre: string, capacidad: number) => ({ id: `m-${nombre}`, nombre, capacidad });
+
+  it("elige la mesa MÁS JUSTA que valga, no la primera que quepa", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("a", 2)],
+      mesasLibres: [mesa("M10", 10), mesa("M2", 2), mesa("M6", 6)],
+    });
+    expect(sinHueco).toEqual([]);
+    expect(propuestas).toHaveLength(1);
+    // Sentar a 2 en la de 10 desperdiciaría el plano.
+    expect(propuestas[0].mesaIds).toEqual(["m-M2"]);
+    expect(propuestas[0].plazas).toBe(2);
+  });
+
+  it("sienta primero a los grupos grandes, para que no se queden sin sitio", () => {
+    // Si se repartiera por orden de llegada, la pareja cogería la de 10 y el
+    // grupo de 10 se quedaría fuera.
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("pareja", 2, "13:00:00"), reserva("grupo", 10, "14:00:00")],
+      mesasLibres: [mesa("M10", 10), mesa("M2", 2)],
+    });
+    expect(sinHueco).toEqual([]);
+    const porReserva = Object.fromEntries(propuestas.map((p) => [p.reserva.id, p.mesaIds]));
+    expect(porReserva.grupo).toEqual(["m-M10"]);
+    expect(porReserva.pareja).toEqual(["m-M2"]);
+  });
+
+  it("junta mesas cuando ninguna llega sola (el caso de la 4 y la 5)", () => {
+    const { propuestas } = calcularDistribucionMesas({
+      reservas: [reserva("a", 6)],
+      mesasLibres: [mesa("M4", 4), mesa("M2", 2)],
+    });
+    expect(propuestas).toHaveLength(1);
+    expect(propuestas[0].mesaIds).toEqual(["m-M2", "m-M4"]); // ordenadas por nombre
+    expect(propuestas[0].plazas).toBe(6);
+  });
+
+  it("no junta más mesas de las que permite el tope", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("a", 8)],
+      mesasLibres: [mesa("A", 2), mesa("B", 2), mesa("C", 2), mesa("D", 2)],
+      maxMesasPorReserva: 3,
+    });
+    // 3 mesas de 2 son 6 < 8, así que no se propone nada disparatado.
+    expect(propuestas).toEqual([]);
+    expect(sinHueco.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("nunca reutiliza una mesa ya propuesta para otra reserva", () => {
+    const { propuestas } = calcularDistribucionMesas({
+      reservas: [reserva("a", 4, "13:00:00"), reserva("b", 4, "13:30:00")],
+      mesasLibres: [mesa("M4a", 4), mesa("M4b", 4)],
+    });
+    const todas = propuestas.flatMap((p) => p.mesaIds);
+    expect(todas).toHaveLength(2);
+    expect(new Set(todas).size).toBe(2);
+  });
+
+  it("deja en sinHueco a quien no cabe, sin tratarlo como error", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("cabe", 2), reserva("nocabe", 20)],
+      mesasLibres: [mesa("M2", 2)],
+    });
+    expect(propuestas.map((p) => p.reserva.id)).toEqual(["cabe"]);
+    expect(sinHueco.map((r) => r.id)).toEqual(["nocabe"]);
+  });
+
+  it("sin mesas libres no propone nada y no revienta", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("a", 2)],
+      mesasLibres: [],
+    });
+    expect(propuestas).toEqual([]);
+    expect(sinHueco.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("sin reservas pendientes no propone nada", () => {
+    expect(
+      calcularDistribucionMesas({ reservas: [], mesasLibres: [mesa("M4", 4)] }),
+    ).toEqual({ propuestas: [], sinHueco: [] });
+  });
+
+  it("es determinista: dos llamadas iguales proponen lo mismo", () => {
+    const entrada = {
+      reservas: [reserva("a", 4, "13:00:00"), reserva("b", 4, "13:00:00")],
+      mesasLibres: [mesa("M4a", 4), mesa("M4b", 4)],
+    };
+    const uno = calcularDistribucionMesas(entrada);
+    const dos = calcularDistribucionMesas(entrada);
+    expect(JSON.stringify(uno)).toBe(JSON.stringify(dos));
+  });
+
+  it("ignora mesas de capacidad cero o negativa y reservas sin comensales", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("vacia", 0), reserva("a", 2)],
+      mesasLibres: [mesa("rota", 0), mesa("M2", 2)],
+    });
+    expect(propuestas).toHaveLength(1);
+    expect(propuestas[0].reserva.id).toBe("a");
+    expect(propuestas[0].mesaIds).toEqual(["m-M2"]);
+    expect(sinHueco).toEqual([]);
   });
 });

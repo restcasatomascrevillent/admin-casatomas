@@ -257,3 +257,117 @@ export function useReservasDeSala(espacioId?: string, fecha?: string) {
     enabled: !!espacioId && !!fecha,
   });
 }
+
+// ─── Reparto automático ──────────────────────────────────────────────────────
+
+/** Lo mínimo que hace falta de una mesa para repartir. */
+export interface MesaDisponible {
+  id: string;
+  nombre: string;
+  capacidad: number;
+}
+
+export interface PropuestaAsignacion {
+  reserva: ReservaSala;
+  /** Mesas propuestas, ya ordenadas por nombre para que el texto sea estable. */
+  mesaIds: string[];
+  /** Suma de plazas de esas mesas. Siempre >= numero_comensales. */
+  plazas: number;
+}
+
+export interface DistribucionPropuesta {
+  propuestas: PropuestaAsignacion[];
+  /** Reservas para las que no quedan mesas que las cubran. NO es un error. */
+  sinHueco: ReservaSala[];
+}
+
+/**
+ * Reparte mesas libres entre las reservas que aún no tienen ninguna.
+ *
+ * ES UNA FUNCIÓN PURA: no escribe nada. Devuelve una propuesta que el
+ * componente aplica llamando al RPC `asignar_mesas_reserva`, el MISMO camino
+ * que la asignación manual. Antes esto lo hacía una Edge Function que insertaba
+ * directamente en `asignaciones_mesa` (ver el comentario de
+ * `handleCalcularDistribucion` en PlanoEspacio2D.tsx).
+ *
+ * CRITERIOS, y por qué:
+ *
+ *  - **Los grupos grandes primero.** Si primero se sientan los pequeños, la
+ *    mesa de 10 acaba con una pareja y el grupo de 10 se queda sin sitio. Al
+ *    revés no pasa: lo grande solo cabe donde cabe.
+ *  - **Para una sola mesa, la más justa que valga** (best fit): sentar a 2 en
+ *    la de 10 desperdicia el plano. Se elige la de menor capacidad que llegue.
+ *  - **Si no hay ninguna que llegue, se juntan mesas**, de mayor a menor para
+ *    usar las menos posibles, con un tope (`maxMesasPorReserva`, 3 por
+ *    defecto): juntar cuatro mesas para un grupo es algo que decide una
+ *    persona mirando la sala, no un reparto automático.
+ *  - **Nunca toca a quien ya tiene mesa.** El reparto solo rellena lo que está
+ *    pendiente: el trabajo manual del encargado no se pisa.
+ *  - **Determinista.** A igualdad de capacidad manda el nombre de la mesa, y a
+ *    igualdad de comensales la hora. Dos pulsaciones seguidas con los mismos
+ *    datos proponen lo mismo.
+ */
+export function calcularDistribucionMesas(params: {
+  reservas: readonly ReservaSala[];
+  mesasLibres: readonly MesaDisponible[];
+  maxMesasPorReserva?: number;
+}): DistribucionPropuesta {
+  const tope = Math.max(1, params.maxMesasPorReserva ?? 3);
+
+  const candidatas = [...(params.reservas ?? [])]
+    .filter((r) => r && Number(r.numero_comensales) > 0)
+    .sort(
+      (a, b) =>
+        b.numero_comensales - a.numero_comensales ||
+        String(a.hora).localeCompare(String(b.hora)) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+
+  // Piscina de libres, de menor a mayor capacidad.
+  const libres = [...(params.mesasLibres ?? [])]
+    .filter((m) => m && Number(m.capacidad) > 0)
+    .sort((a, b) => a.capacidad - b.capacidad || String(a.nombre).localeCompare(String(b.nombre)));
+
+  const propuestas: PropuestaAsignacion[] = [];
+  const sinHueco: ReservaSala[] = [];
+
+  const ordenarPorNombre = (ms: MesaDisponible[]) =>
+    [...ms].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
+
+  for (const reserva of candidatas) {
+    const faltan = reserva.numero_comensales;
+
+    // 1) La mesa más justa que llegue ella sola.
+    const indiceJusta = libres.findIndex((m) => m.capacidad >= faltan);
+    if (indiceJusta !== -1) {
+      const [mesa] = libres.splice(indiceJusta, 1);
+      propuestas.push({ reserva, mesaIds: [mesa.id], plazas: mesa.capacidad });
+      continue;
+    }
+
+    // 2) Juntar: de mayor a menor, las menos posibles, hasta el tope.
+    const grandesPrimero = [...libres].reverse();
+    const elegidas: MesaDisponible[] = [];
+    let suma = 0;
+    for (const mesa of grandesPrimero) {
+      if (elegidas.length >= tope || suma >= faltan) break;
+      elegidas.push(mesa);
+      suma += mesa.capacidad;
+    }
+
+    if (suma >= faltan && elegidas.length > 0) {
+      for (const mesa of elegidas) {
+        const i = libres.findIndex((m) => m.id === mesa.id);
+        if (i !== -1) libres.splice(i, 1);
+      }
+      const orden = ordenarPorNombre(elegidas);
+      propuestas.push({ reserva, mesaIds: orden.map((m) => m.id), plazas: suma });
+      continue;
+    }
+
+    // 3) No cabe: se queda pendiente de mesa, que es un estado legítimo.
+    sinHueco.push(reserva);
+  }
+
+  return { propuestas, sinHueco };
+}
