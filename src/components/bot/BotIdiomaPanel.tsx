@@ -2,25 +2,17 @@ import { Check } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import type { DraftBotWeb, IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
+import type { DraftBotWeb } from "@/hooks/useConfigBotWeb";
 import type { Plato } from "@/hooks/usePlatos";
 import type { Vino } from "@/hooks/useVinos";
 import { CampoExplicado } from "./CampoExplicado";
 import { SeccionBot } from "./SeccionBot";
 import { SelectorCartaBot } from "./SelectorCartaBot";
 import { AvisoHorarioContacto } from "./AvisoHorarioContacto";
-import { VistaPreviaBot } from "./VistaPreviaBot";
-import {
-  MAX_INSTRUCCIONES_EXTRA,
-  TONO_OPTIONS,
-  TONOS_UI,
-  combinarConInstruccionesEspañol,
-} from "./constantesBot";
+import { MAX_INSTRUCCIONES_EXTRA, TONO_OPTIONS, TONOS_UI } from "./constantesBot";
 
 interface BotIdiomaPanelProps {
-  idioma: IdiomaBotWeb;
   draft: DraftBotWeb;
-  draftEspañol: DraftBotWeb;
   canEdit: boolean;
   onChange: (patch: Partial<DraftBotWeb>) => void;
   onTogglePlato: (nombre: string) => void;
@@ -35,13 +27,11 @@ interface BotIdiomaPanelProps {
   onBuscarVinoChange: (v: string) => void;
 }
 
-// Formulario de UN idioma. El guardado vive en la barra superior de
-// TabBotWeb (un solo sitio para los 3 idiomas); aquí solo se edita el
-// borrador en memoria.
+// Formulario del bot en ESPAÑOL (el único idioma que se edita a mano: EN y
+// FR se traducen solos al guardar, ver useTraduccionBotWeb). El guardado
+// vive en la barra superior de TabBotWeb; aquí solo se edita el borrador.
 export function BotIdiomaPanel({
-  idioma,
   draft,
-  draftEspañol,
   canEdit,
   onChange,
   onTogglePlato,
@@ -55,28 +45,28 @@ export function BotIdiomaPanel({
   onBuscarPlatoChange,
   onBuscarVinoChange,
 }: BotIdiomaPanelProps) {
-  const tonoOptions = TONO_OPTIONS[idioma];
+  const tonoOptions = TONO_OPTIONS.es;
   const tonoConocido = tonoOptions.some((t) => t.value === draft.tono);
   const ids = {
-    bienvenida: `bot-${idioma}-bienvenida`,
-    frases: `bot-${idioma}-frases`,
-    instrucciones: `bot-${idioma}-instrucciones`,
-    tono: `bot-${idioma}-tono`,
-    contador: `bot-${idioma}-instrucciones-contador`,
+    bienvenida: "bot-es-bienvenida",
+    frases: "bot-es-frases",
+    instrucciones: "bot-es-instrucciones",
+    tono: "bot-es-tono",
+    contador: "bot-es-instrucciones-contador",
   };
   const largoInstrucciones = draft.instrucciones_extra.length;
   const instruccionesExcedidas = largoInstrucciones > MAX_INSTRUCCIONES_EXTRA;
 
   return (
     <div className="space-y-4">
-      <SeccionBot titulo="Personalidad" descripcion="Cómo suena el bot en este idioma. No cambia lo que sabe ni lo que puede hacer.">
+      <SeccionBot titulo="Personalidad" descripcion="Cómo suena el bot. No cambia lo que sabe ni lo que puede hacer.">
         <CampoExplicado
           etiqueta="Tono"
           efecto={
             <>
-              Se inserta literalmente en las instrucciones del bot de este idioma. Con "Divertido", un aviso de que no
-              hay mesa puede sonar a "Uy, hoy nos lo ponéis difícil…"; con "Formal", a "Lamentamos informarle de que no
-              hay disponibilidad".
+              Se inserta en las instrucciones del bot (en inglés y francés, con su equivalente: "Divertido" → "fun" /
+              "amusant"). Con "Divertido", un aviso de que no hay mesa puede sonar a "Uy, hoy nos lo ponéis difícil…";
+              con "Formal", a "Lamentamos informarle de que no hay disponibilidad".
             </>
           }
         >
@@ -106,11 +96,6 @@ export function BotIdiomaPanel({
                   <span className="min-w-0 flex-1 space-y-0.5">
                     <span className="block text-sm font-medium leading-none">{ui.label}</span>
                     <span className="block text-xs text-muted-foreground">{ui.desc}</span>
-                    {idioma !== "es" && (
-                      <span className="block text-[11px] text-muted-foreground/80">
-                        Se guarda como <span className="font-mono">{t.value}</span>
-                      </span>
-                    )}
                   </span>
                   {seleccionado && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
                 </label>
@@ -194,21 +179,12 @@ export function BotIdiomaPanel({
           efecto={
             <>
               El bot las cumple al pie de la letra (regla del prompt: "si hay instrucciones extra, cúmplelas al pie de la
-              letra"). A diferencia del tono, esto se traslada tal cual.
+              letra"). Se traduce automáticamente a inglés y francés al guardar, conservando horas, teléfonos y
+              direcciones tal cual.
             </>
           }
         >
-          <AvisoHorarioContacto
-            idioma={idioma}
-            texto={draft.instrucciones_extra}
-            textoEspañol={draftEspañol.instrucciones_extra}
-            canEdit={canEdit}
-            onCopiarDesdeEspañol={() =>
-              onChange({
-                instrucciones_extra: combinarConInstruccionesEspañol(draft.instrucciones_extra, draftEspañol.instrucciones_extra),
-              })
-            }
-          />
+          <AvisoHorarioContacto texto={draft.instrucciones_extra} />
           <Textarea
             id={ids.instrucciones}
             value={draft.instrucciones_extra}
@@ -278,8 +254,6 @@ export function BotIdiomaPanel({
           </CampoExplicado>
         </div>
       </SeccionBot>
-
-      <VistaPreviaBot idioma={idioma} draft={draft} />
     </div>
   );
 }

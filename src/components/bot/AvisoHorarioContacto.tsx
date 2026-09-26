@@ -1,27 +1,21 @@
-import { Check, Copy, Info, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, Info, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { detectaInfoContacto } from "./constantesBot";
-import type { IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
 
 interface AvisoHorarioContactoProps {
-  idioma: IdiomaBotWeb;
   texto: string;
-  textoEspañol: string;
-  canEdit: boolean;
-  onCopiarDesdeEspañol: () => void;
 }
 
 // El hueco real: chat-web/index.ts obliga al bot a decir "no lo sé" ante
 // horarios/dirección/teléfono salvo que esa info esté escrita en
 // "instrucciones_extra" DE ESE IDIOMA — no hay otro sitio de donde sacarla.
+// Solo se comprueba el español: EN/FR se traducen automáticamente de él.
 // Antes era un Alert amarillo enorme encima de todo; ahora es una línea de
 // comprobación compacta pegada al campo al que se refiere, con la
 // explicación larga en un tooltip.
-export function AvisoHorarioContacto({ idioma, texto, textoEspañol, canEdit, onCopiarDesdeEspañol }: AvisoHorarioContactoProps) {
+export function AvisoHorarioContacto({ texto }: AvisoHorarioContactoProps) {
   const deteccion = detectaInfoContacto(texto);
-  const puedeCopiarDeEspañol = canEdit && idioma !== "es" && textoEspañol.trim().length > 0;
 
   const items = [
     { clave: "horario", label: "Horario", ok: deteccion.horario },
@@ -47,7 +41,7 @@ export function AvisoHorarioContacto({ idioma, texto, textoEspañol, canEdit, on
               </TooltipTrigger>
               <TooltipContent className="max-w-xs text-xs leading-relaxed">
                 Nada de esto viene programado en el bot: si un cliente pregunta "¿a qué hora abrís?" o "¿dónde
-                estáis?", solo responde bien si la respuesta está escrita aquí, en este mismo idioma. Si no, dirá
+                estáis?", solo responde bien si la respuesta está escrita aquí (se traduce sola a inglés y francés). Si no, dirá
                 que no lo sabe. Con las reservas igual: no puede reservar, solo remitir a llamar o escribir si se lo
                 indicas. La detección es automática y aproximada — revísalo tú.
               </TooltipContent>
@@ -73,16 +67,10 @@ export function AvisoHorarioContacto({ idioma, texto, textoEspañol, canEdit, on
             ))}
           </ul>
         </div>
-        {puedeCopiarDeEspañol && (
-          <Button type="button" variant="outline" size="sm" className="h-7 bg-background px-2 text-xs" onClick={onCopiarDesdeEspañol}>
-            <Copy className="mr-1 h-3 w-3" aria-hidden="true" />
-            Copiar desde español
-          </Button>
-        )}
       </div>
       {!deteccion.completa && (
         <p className="text-xs text-muted-foreground">
-          El bot solo sabrá horario, contacto y dirección si los escribes aquí, en este idioma.
+          El bot solo sabrá horario, contacto y dirección si los escribes aquí.
         </p>
       )}
     </div>

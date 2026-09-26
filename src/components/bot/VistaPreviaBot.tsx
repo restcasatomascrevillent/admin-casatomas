@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, PlayCircle, TriangleAlert } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { supabase } from "@/integrations/supabase/client";
 import type { DraftBotWeb, IdiomaBotWeb } from "@/hooks/useConfigBotWeb";
+import { IDIOMAS } from "./constantesBot";
 
 interface VistaPreviaBotProps {
-  idioma: IdiomaBotWeb;
-  draft: DraftBotWeb;
+  /** es = borrador en edición; en/fr = lo último traducido y guardado. */
+  borradores: Record<IdiomaBotWeb, DraftBotWeb>;
 }
 
 const SALUDO: Record<IdiomaBotWeb, { manana: string; tarde: string; noche: string }> = {
@@ -74,7 +76,9 @@ async function probarBotEnVivo(idioma: IdiomaBotWeb): Promise<ResultadoPrueba> {
   }
 }
 
-export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
+export function VistaPreviaBot({ borradores }: VistaPreviaBotProps) {
+  const [idioma, setIdioma] = useState<IdiomaBotWeb>("es");
+  const draft = borradores[idioma];
   const saludo = useMemo(() => saludoActual(idioma), [idioma]);
   const [probando, setProbando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoPrueba | null>(null);
@@ -89,11 +93,33 @@ export function VistaPreviaBot({ idioma, draft }: VistaPreviaBotProps) {
 
   return (
     <Card className="p-4">
-      <div className="mb-4 space-y-0.5">
-        <h3 className="text-base font-semibold">Vista previa</h3>
-        <p className="text-sm text-muted-foreground">
-          Cómo se comportará el bot en este idioma con lo que ves ahora. Se actualiza sola, sin guardar.
-        </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div className="space-y-0.5">
+          <h3 className="text-base font-semibold">Vista previa</h3>
+          <p className="text-sm text-muted-foreground">
+            {idioma === "es"
+              ? "Cómo se comportará el bot con lo que ves ahora. Se actualiza sola, sin guardar."
+              : "Lo último traducido y guardado en este idioma (no incluye cambios sin guardar)."}
+          </p>
+        </div>
+        <ToggleGroup
+          type="single"
+          size="sm"
+          variant="outline"
+          value={idioma}
+          onValueChange={(v) => {
+            if (!v) return;
+            setIdioma(v as IdiomaBotWeb);
+            setResultado(null);
+          }}
+          aria-label="Idioma de la vista previa"
+        >
+          {IDIOMAS.map((i) => (
+            <ToggleGroupItem key={i.value} value={i.value} className="h-7 px-2 text-xs uppercase" title={i.label}>
+              {i.value}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
       <div className="space-y-4">
         <div>

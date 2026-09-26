@@ -13,7 +13,8 @@ export interface TonoOpcion {
 }
 
 // Mismo concepto de tono en los 3 idiomas, pero el VALOR que se guarda va en
-// el idioma de la fila que se está editando: buildSystemPrompt (en
+// el idioma de cada fila (el panel solo edita ES; EN/FR se derivan por
+// posición en traduccionBot.ts → tonoEquivalente): buildSystemPrompt (en
 // supabase/functions/chat-web/index.ts) mete este texto tal cual dentro del
 // prompt de ESE idioma ("Tone: ${tono}" / "Ton: ${tono}" / "Tono: ${tono}") —
 // guardar una palabra en español en la fila inglesa colaría una palabra
@@ -124,15 +125,6 @@ export function detectaInfoContacto(texto: string | null | undefined): Deteccion
   const contacto = contieneTelefono(t) || REGEX_EMAIL.test(t) || RE_CONTACTO.test(t);
   const direccion = RE_DIRECCION.test(t);
   return { horario, contacto, direccion, completa: horario && contacto && direccion };
-}
-
-// Usado por el botón "Copiar del español" en las pestañas EN/FR: nunca borra
-// lo que ya hubiera escrito en ese idioma, lo añade a continuación con una
-// nota para que quede claro que hace falta traducirlo/revisarlo.
-export function combinarConInstruccionesEspañol(actual: string, español: string): string {
-  const nota = "[Copiado del español — tradúcelo y revísalo antes de guardar]";
-  const bloque = `${nota}\n${español}`;
-  return actual.trim() ? `${actual}\n\n${bloque}` : bloque;
 }
 
 // Límite de "Instrucciones extra": va entero en el prompt de cada mensaje, así

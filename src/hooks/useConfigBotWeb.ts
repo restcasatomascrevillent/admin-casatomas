@@ -78,14 +78,14 @@ export function draftsIguales(a: DraftBotWeb, b: DraftBotWeb): boolean {
   );
 }
 
-const QUERY_KEY = ["configBotWeb"] as const;
+export const CONFIG_BOT_WEB_QUERY_KEY = ["configBotWeb"] as const;
+const QUERY_KEY = CONFIG_BOT_WEB_QUERY_KEY;
 
 // La tabla configBotWeb tiene 3 filas, una por idioma (es/en/fr) — la lee
-// supabase/functions/chat-web filtrando por `idioma`. Se piden las 3 de una
-// sola vez (antes se pedía una por idioma, con un spinner de pantalla
-// completa cada vez que se cambiaba de pestaña) para poder mostrar los 3
-// idiomas como pestañas permanentes sin perder ni recargar nada al saltar
-// de una a otra.
+// supabase/functions/chat-web filtrando por `idioma`. En el panel solo se
+// edita la fila ES; EN/FR las genera useTraduccionBotWeb (traducir-contenido,
+// modo "campos") justo después de guardar ES. Se piden las 3 de una vez para
+// mostrar el estado y el contenido de las traducciones.
 async function fetchTodasLasFilas(): Promise<ConfigBotWeb[]> {
   const { data, error } = await supabase.from("configBotWeb").select("*");
   if (error) throw error;
@@ -126,7 +126,7 @@ export function useConfigBotWeb() {
     },
     onSuccess: (idioma) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast({ title: `Configuración en ${idioma.toUpperCase()} guardada` });
+      toast({ title: idioma === "es" ? "Español guardado" : `Configuración en ${idioma.toUpperCase()} guardada` });
     },
     onError: (error: Error, variables) => {
       toast({

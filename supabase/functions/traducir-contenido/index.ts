@@ -13,10 +13,15 @@
 //
 // Modo bulk (relleno masivo, TAREA 5): ver bulk.ts. Gateado a la service
 // role key — implementado pero nunca invocado desde aquí.
+//
+// Modo genérico "campos" (Bot web): ver campos.ts. Se activa cuando el body
+// trae `campos` y NO trae `tipo`, así que los llamantes existentes
+// ({tipo, datos}) no cambian de comportamiento.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildPromptSpec, type TipoContenido } from "./prompts.ts";
 import { runBulkFill } from "./bulk.ts";
+import { buildCamposSpec, validarPayloadCampos } from "./campos.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -119,6 +124,25 @@ serve(async (req) => {
       const message = error instanceof Error ? error.message : "Error desconocido en modo bulk";
       console.error("[traducir-contenido/bulk]", message);
       return json({ ok: false, error: message }, 500);
+    }
+  }
+
+  // ---- Modo genérico: { campos, destino } (Bot web) --------------------
+  if (payload.tipo === undefined && payload.campos !== undefined) {
+    const v = validarPayloadCampos(payload);
+    if (!v.ok) return json({ error: v.error }, 400);
+    try {
+      const spec = buildCamposSpec(v.campos, v.destino, v.contexto);
+      // Todo vacío: nada que traducir, no se gasta una llamada a OpenAI.
+      const raw = spec.clavesATraducir.length ? await callOpenAI(spec.system, spec.userMessage) : {};
+      const traducciones = spec.mapResponse(raw);
+      return json({ ok: true, modo: "campos", traducciones });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error desconocido al traducir";
+      console.error("[traducir-contenido] modo=campos", message);
+      // Igual que el modo normal: 200 con ok:false para que el panel lo trate
+      // como "traducción pendiente" sin romper lo que ya guardó.
+      return json({ ok: false, modo: "campos", error: message });
     }
   }
 
