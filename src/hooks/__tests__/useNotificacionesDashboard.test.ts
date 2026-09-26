@@ -6,6 +6,7 @@
  * - Carga de notificaciones y cálculo de no leídas
  * - marcarLeida: actualiza estado local optimistamente
  * - marcarTodasLeidas: pone todas a leida=true
+ * - eliminarNotificacion: quita la notificación de la lista optimistamente
  * - Inserción realtime: nueva notificación se añade al inicio
  * - Suscripción / cleanup del canal realtime
  */
@@ -224,6 +225,114 @@ describe("useNotificacionesDashboard", () => {
     result.current.notificaciones.forEach((n) => {
       expect(n.leida).toBe(true);
     });
+  });
+
+  // ── eliminarNotificacion ───────────────────────────────────────────────────
+
+  it("eliminarNotificacion quita la notificación de la lista y decrementa countNoLeidas si no estaba leída", async () => {
+    const items = [
+      makeNotif({ id: "n-1", leida: false }),
+      makeNotif({ id: "n-2", leida: true }),
+    ];
+
+    let callCount = 0;
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      const isDelete = callCount > 1;
+      return {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        then: (onfulfilled: (v: unknown) => unknown) =>
+          Promise.resolve({
+            data: isDelete ? null : items,
+            error: null,
+          }).then(onfulfilled),
+      };
+    });
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.notificaciones).toHaveLength(2);
+    expect(result.current.countNoLeidas).toBe(1);
+
+    await act(async () => {
+      await result.current.eliminarNotificacion("n-1");
+    });
+
+    expect(result.current.notificaciones).toHaveLength(1);
+    expect(result.current.notificaciones.find((n) => n.id === "n-1")).toBeUndefined();
+    expect(result.current.countNoLeidas).toBe(0);
+  });
+
+  it("eliminarNotificacion no cambia countNoLeidas si la notificación ya estaba leída", async () => {
+    const items = [makeNotif({ id: "n-1", leida: true })];
+
+    let callCount = 0;
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      const isDelete = callCount > 1;
+      return {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        then: (onfulfilled: (v: unknown) => unknown) =>
+          Promise.resolve({
+            data: isDelete ? null : items,
+            error: null,
+          }).then(onfulfilled),
+      };
+    });
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.countNoLeidas).toBe(0);
+
+    await act(async () => {
+      await result.current.eliminarNotificacion("n-1");
+    });
+
+    expect(result.current.notificaciones).toHaveLength(0);
+    expect(result.current.countNoLeidas).toBe(0);
+  });
+
+  it("eliminarNotificacion revierte la lista si Supabase devuelve error", async () => {
+    const items = [makeNotif({ id: "n-1", leida: false })];
+
+    let callCount = 0;
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      const isDelete = callCount === 2;
+      return {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        then: (onfulfilled: (v: unknown) => unknown) =>
+          Promise.resolve(
+            isDelete
+              ? { data: null, error: { message: "delete failed" } }
+              : { data: items, error: null }
+          ).then(onfulfilled),
+      };
+    });
+
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.eliminarNotificacion("n-1");
+    });
+
+    // Tras el error, fetchNotificaciones() vuelve a traer la notificación
+    await waitFor(() =>
+      expect(result.current.notificaciones.find((n) => n.id === "n-1")).toBeDefined()
+    );
   });
 
   // ── Realtime ───────────────────────────────────────────────────────────────

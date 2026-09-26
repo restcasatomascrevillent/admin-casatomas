@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface NotificacionDashboard {
   id: string;
@@ -35,29 +36,65 @@ export function useNotificacionesDashboard() {
     setLoading(false);
   }, []);
 
+  // Optimista: refleja el cambio al instante y solo revierte si Supabase falla,
+  // para que marcar como leída / eliminar se sienta inmediato en el popover.
   const marcarLeida = async (id: string) => {
+    const notif = notificaciones.find((n) => n.id === id);
+    if (!notif || notif.leida) return;
+
+    setNotificaciones((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, leida: true } : n))
+    );
+    setCountNoLeidas((prev) => Math.max(0, prev - 1));
+
     const { error } = await supabase
       .from("notificaciones_dashboard")
       .update({ leida: true })
       .eq("id", id);
 
-    if (!error) {
-      setNotificaciones((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, leida: true } : n))
-      );
-      setCountNoLeidas((prev) => Math.max(0, prev - 1));
+    if (error) {
+      console.error("Error marcando notificación como leída:", error);
+      toast.error("No se pudo marcar la notificación como leída");
+      fetchNotificaciones();
     }
   };
 
   const marcarTodasLeidas = async () => {
+    if (countNoLeidas === 0) return;
+
+    setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
+    setCountNoLeidas(0);
+
     const { error } = await supabase
       .from("notificaciones_dashboard")
       .update({ leida: true })
       .eq("leida", false);
 
-    if (!error) {
-      setNotificaciones((prev) => prev.map((n) => ({ ...n, leida: true })));
-      setCountNoLeidas(0);
+    if (error) {
+      console.error("Error marcando todas las notificaciones como leídas:", error);
+      toast.error("No se pudieron marcar las notificaciones como leídas");
+      fetchNotificaciones();
+    }
+  };
+
+  const eliminarNotificacion = async (id: string) => {
+    const notif = notificaciones.find((n) => n.id === id);
+    if (!notif) return;
+
+    setNotificaciones((prev) => prev.filter((n) => n.id !== id));
+    if (!notif.leida) {
+      setCountNoLeidas((prev) => Math.max(0, prev - 1));
+    }
+
+    const { error } = await supabase
+      .from("notificaciones_dashboard")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error eliminando notificación:", error);
+      toast.error("No se pudo eliminar la notificación");
+      fetchNotificaciones();
     }
   };
 
@@ -90,5 +127,6 @@ export function useNotificacionesDashboard() {
     fetchNotificaciones,
     marcarLeida,
     marcarTodasLeidas,
+    eliminarNotificacion,
   };
 }

@@ -2,8 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bell, CheckCheck, Clock, AlertTriangle, Info } from "lucide-react";
+import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, Trash2 } from "lucide-react";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +34,7 @@ interface CentroNotificacionesProps {
 }
 
 export function CentroNotificaciones({ className }: CentroNotificacionesProps = {}) {
-  const { notificaciones, countNoLeidas, marcarLeida, marcarTodasLeidas } =
+  const { notificaciones, countNoLeidas, marcarLeida, marcarTodasLeidas, eliminarNotificacion } =
     useNotificacionesDashboard();
   const navigate = useNavigate();
 
@@ -54,7 +53,10 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
         <Button
           variant="ghost"
           size="icon"
-          className={cn("relative h-9 w-9", className)}
+          className={cn(
+            "relative h-9 w-9 transition-transform duration-150 hover:scale-105 active:scale-95",
+            className
+          )}
           aria-label={
             countNoLeidas > 0
               ? `Notificaciones (${countNoLeidas} sin leer)`
@@ -63,7 +65,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
         >
           <Bell className="h-4 w-4" />
           {countNoLeidas > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-[10px] bg-destructive text-destructive-foreground">
+            <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] animate-in justify-center rounded-full px-1 text-[10px] leading-none tabular-nums zoom-in-50 bg-destructive text-destructive-foreground">
               {countNoLeidas > 99 ? "99+" : countNoLeidas}
             </Badge>
           )}
@@ -82,7 +84,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs gap-1"
+              className="h-7 text-xs gap-1 transition-colors"
               onClick={marcarTodasLeidas}
             >
               <CheckCheck className="h-3 w-3" />
@@ -92,7 +94,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
         </div>
 
         {/* Lista */}
-        <ScrollArea className="max-h-[360px]">
+        <div className="max-h-[min(360px,60vh)] overflow-y-auto overscroll-contain custom-scrollbar">
           {notificaciones.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Sin notificaciones
@@ -102,51 +104,86 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
               {notificaciones.map((notif) => {
                 const Icon = TIPO_ICON[notif.tipo] || Info;
                 return (
-                  <button
+                  <div
                     key={notif.id}
                     className={cn(
-                      "w-full text-left p-3 hover:bg-muted/50 transition-colors flex gap-3",
+                      "group flex items-stretch gap-1 transition-colors hover:bg-muted/50",
                       !notif.leida && "bg-primary/5"
                     )}
-                    onClick={() => handleClick(notif)}
                   >
-                    <div className="shrink-0 mt-0.5">
-                      <Icon
-                        className={cn(
-                          "h-4 w-4",
-                          !notif.leida ? "text-amber-500" : "text-muted-foreground"
-                        )}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={cn(
-                          "text-sm truncate",
-                          !notif.leida && "font-medium"
-                        )}
-                      >
-                        {notif.titulo}
-                      </p>
-                      {notif.mensaje && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {notif.mensaje}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {timeAgo(notif.created_at)}
-                      </p>
-                    </div>
-                    {!notif.leida && (
-                      <div className="shrink-0 mt-1">
-                        <div className="h-2 w-2 rounded-full bg-primary" />
+                    <button
+                      type="button"
+                      className="flex flex-1 min-w-0 gap-3 p-3 text-left"
+                      onClick={() => handleClick(notif)}
+                    >
+                      <div className="shrink-0 mt-0.5">
+                        <Icon
+                          className={cn(
+                            "h-4 w-4",
+                            !notif.leida ? "text-amber-500" : "text-muted-foreground"
+                          )}
+                        />
                       </div>
-                    )}
-                  </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p
+                            className={cn(
+                              "text-sm truncate",
+                              !notif.leida && "font-medium"
+                            )}
+                          >
+                            {notif.titulo}
+                          </p>
+                          {!notif.leida && (
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                          )}
+                        </div>
+                        {notif.mensaje && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {notif.mensaje}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {timeAgo(notif.created_at)}
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-0.5 pr-2">
+                      {!notif.leida && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground transition-all hover:bg-primary/10 hover:text-primary active:scale-90"
+                          title="Marcar como leída"
+                          aria-label="Marcar como leída"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            marcarLeida(notif.id);
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive active:scale-90"
+                        title="Eliminar notificación"
+                        aria-label="Eliminar notificación"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          eliminarNotificacion(notif.id);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
