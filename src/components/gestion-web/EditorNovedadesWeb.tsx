@@ -54,7 +54,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
-import { CabeceraPestana } from "./CabeceraPestana";
 
 // ---------------------------------------------------------------------------
 // Novedades de la web (tabla `novedades`)
@@ -829,23 +828,22 @@ export function EditorNovedadesWeb() {
 
   // --- Render ---------------------------------------------------------------
   return (
-    <div className="space-y-6">
-      <CabeceraPestana
-        titulo="Novedades"
-        descripcion="Tarjetas de la sección «Novedades» de la web de Casa Tomás. Los cambios se ven en la web al momento."
-        acciones={
-          <Button onClick={empezarNueva}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nueva novedad
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Se muestran en la web de Casa Tomás y los cambios se ven al momento.
+        </p>
+        <Button onClick={empezarNueva}>
+          <Plus className="w-4 h-4 mr-1.5" />
+          Nueva novedad
+        </Button>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
-        <div className="space-y-6 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
           {/* ------------------------------------------------ Lista */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 Publicadas y guardadas
                 <Badge variant="secondary">{lista.length}</Badge>
@@ -855,7 +853,7 @@ export function EditorNovedadesWeb() {
                 lista es el de la web: usa las flechas para cambiarlo.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="p-4 pt-0 space-y-2">
               {isLoading ? (
                 <div className="space-y-2">
                   {[0, 1, 2].map((i) => (
@@ -1000,7 +998,7 @@ export function EditorNovedadesWeb() {
 
           {/* ------------------------------------------------ Formulario */}
           <Card ref={formRef} className={`scroll-mt-20 ${editando ? "border-primary" : ""}`}>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <CardTitle className="text-base flex items-center gap-2 flex-wrap">
@@ -1038,7 +1036,7 @@ export function EditorNovedadesWeb() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-5">
+            <CardContent className="p-4 pt-0 space-y-5">
               {/* Título y badge */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 space-y-1.5">

@@ -21,7 +21,6 @@ import {
 import { AlertCircle, CalendarDays, Edit2, Loader2, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
-import { CabeceraPestana } from "./CabeceraPestana";
 
 // ---------------------------------------------------------------------------
 // Menús diarios y tapas (tablas `menus_diarios` y `tapas`)
@@ -38,7 +37,6 @@ const SECCION_CONFIG: Record<
   SeccionEspecial,
   {
     table: "menus_diarios" | "tapas";
-    titulo: string;
     descripcion: string;
     singular: string;
     articulo: string;
@@ -47,16 +45,14 @@ const SECCION_CONFIG: Record<
 > = {
   menus_diarios: {
     table: "menus_diarios",
-    titulo: "Menús diarios",
-    descripcion: "El menú del día que aparece en la sección «Espacios» de la web de Casa Tomás.",
+    descripcion: "Se muestra en la sección «Espacios» de la web de Casa Tomás.",
     singular: "menú",
     articulo: "el",
     origenRebuild: "menu",
   },
   tapas: {
     table: "tapas",
-    titulo: "Tapas",
-    descripcion: "Las tapas del día que aparecen en la sección «Espacios» de la web de Casa Tomás.",
+    descripcion: "Se muestran en la sección «Espacios» de la web de Casa Tomás.",
     singular: "tapas",
     articulo: "las",
     origenRebuild: "tapas",
@@ -320,30 +316,27 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   }, [esMenu, primero, segundo, postre]);
 
   return (
-    <div className="space-y-6">
-      <CabeceraPestana
-        titulo={config.titulo}
-        descripcion={config.descripcion}
-        acciones={
-          <Button variant="outline" onClick={() => cargarDatos()} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-            Recargar
-          </Button>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{config.descripcion}</p>
+        <Button variant="outline" onClick={() => cargarDatos()} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+          Recargar
+        </Button>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
-        <div className="space-y-6 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
           {/* ---------------------------------------------- Lista */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 Guardados
                 <Badge variant="secondary">{registros.length}</Badge>
               </CardTitle>
               <CardDescription>Pulsa uno para editarlo. Eliminar lo quita en los tres idiomas.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[28rem] overflow-y-auto">
+            <CardContent className="p-4 pt-0 space-y-2 max-h-[28rem] overflow-y-auto">
               {isLoading ? (
                 [0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)
               ) : errorCarga ? (
@@ -419,7 +412,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           </Card>
           {/* ---------------------------------------------- Formulario */}
           <Card ref={formRef} className={`scroll-mt-20 ${editandoFecha ? "border-primary" : ""}`}>
-            <CardHeader className="pb-3">
+            <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                 {editandoFecha ? `Editar ${config.singular}` : esMenu ? "Nuevo menú del día" : "Nuevas tapas del día"}
                 {editandoFecha && (
@@ -432,7 +425,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                 Se escribe en español y se traduce solo al inglés y al francés al guardar.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 pt-0 space-y-4">
               <div className="space-y-1.5 max-w-xs">
                 <Label htmlFor={`${seccionActiva}-fecha`}>Día</Label>
                 <Input
