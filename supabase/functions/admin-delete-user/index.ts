@@ -101,6 +101,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Un super admin nunca se puede eliminar directamente, ni siquiera otro
+    // super admin: hay que quitarle antes el acceso de super admin (tabla
+    // super_admins) con admin-set-super-admin.
+    const { data: targetSuperAdminData } = await supabaseAdmin
+      .from("super_admins")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (targetSuperAdminData) {
+      return new Response(
+        JSON.stringify({ error: "No se puede eliminar a un super admin: quítale antes el acceso de super admin" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (targetRoleData?.role === "admin") {
       // Un admin normal no puede eliminar a otro admin; un super admin sí
       // (tabla super_admins, la misma autorización que admin-set-super-admin).

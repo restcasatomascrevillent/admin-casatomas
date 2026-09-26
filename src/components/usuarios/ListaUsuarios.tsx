@@ -316,7 +316,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    {(user.role !== "admin" || canManageSuperAdmins) && (
+                    {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
@@ -464,7 +464,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                         {user.is_super_admin ? "Quitar Super Admin" : "Hacer Super Admin"}
                       </Button>
                     )}
-                    {(user.role !== "admin" || canManageSuperAdmins) && (
+                    {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
                       <Button
                         variant="ghost"
                         size="sm"
