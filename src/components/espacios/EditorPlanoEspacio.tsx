@@ -16,6 +16,7 @@ import {
   detectarPoligonoCerrado,
   areaShoelace,
   bboxPoligono,
+  PIXELS_PER_METER,
 } from "./planoUtils";
 import {
   AlertDialog,
@@ -91,10 +92,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
   const canvasRef = useRef<CanvasPlanoRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Escala FIJA: 50 píxeles por metro (no cambia con el tamaño del contenedor)
-  const PIXELS_PER_METER = 50;
-  
+
+  // Escala FIJA: 50 píxeles por metro (no cambia con el tamaño del contenedor).
+  // Centralizada en planoUtils.ts (antes era una constante local aquí).
+
   // Escala: dimensiones reales en metros
   const [realDimensions, setRealDimensions] = useState({ width: 12, height: 8 });
 
@@ -212,7 +213,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       widthM: bbox.width / PIXELS_PER_METER,
       heightM: bbox.height / PIXELS_PER_METER,
     };
-  }, [elementos, PIXELS_PER_METER]);
+  }, [elementos]);
 
   // Guardar plano
   const handleSave = useCallback(async () => {
@@ -409,7 +410,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     } finally {
       setIsSaving(false);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, PIXELS_PER_METER, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
+  }, [espacioId, elementos, mesasCanvas, realDimensions, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
 
   // Exportar imagen: PNG del contenido del plano (no del viewport con zoom/pan
   // ni del grid) a 2x, resuelto en CanvasPlano.exportImage().

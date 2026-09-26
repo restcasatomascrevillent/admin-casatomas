@@ -4,6 +4,35 @@
  * testearlos con vitest sin necesidad de montar un canvas real.
  */
 
+// ---------------------------------------------------------------------------
+// Fase 2 — escala global del editor (Fabric.js, en src/components/espacios/**).
+//
+// NOTA: src/components/reservas/PlanoEspacio2D.tsx (el visor read-only de
+// reservas, fuera del alcance de este refactor) tiene su PROPIA constante
+// `const PIXELS_PER_METER = plano?.pixels_per_meter || 50;` — usa el valor
+// guardado en BD (con 50 de fallback) en vez de esta constante fija, así que
+// NO se ha tocado ni centralizado ahí. Cuando se aborde ese componente en una
+// fase posterior, unificar con estos mismos helpers.
+// ---------------------------------------------------------------------------
+
+/** Píxeles por metro del editor de plano (Fabric.js). Antes vivía duplicada
+ *  como constante local en EditorPlanoEspacio.tsx; centralizada aquí para que
+ *  cualquier futuro consumidor (p.ej. la migración a PlanoDocV2) use un único
+ *  origen de verdad. Valor sin cambios: 50. */
+export const PIXELS_PER_METER = 50;
+
+/** Convierte metros a píxeles de escena, con el `pixelsPerMeter` vigente
+ *  (por defecto el global `PIXELS_PER_METER`). */
+export function mToPx(metros: number, pixelsPerMeter: number = PIXELS_PER_METER): number {
+  return metros * pixelsPerMeter;
+}
+
+/** Convierte píxeles de escena a metros, con el `pixelsPerMeter` vigente
+ *  (por defecto el global `PIXELS_PER_METER`). */
+export function pxToM(pixeles: number, pixelsPerMeter: number = PIXELS_PER_METER): number {
+  return pixeles / pixelsPerMeter;
+}
+
 /** Matriz de transformación 2D de Fabric.js: [a, b, c, d, e, f]
  *  x' = a*x + c*y + e
  *  y' = b*x + d*y + f
