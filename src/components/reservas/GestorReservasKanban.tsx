@@ -69,7 +69,6 @@ import { BlacklistModal } from "./BlacklistModal";
 import {
   ANCHO_COLUMNA_PLEGADA,
   calcularDisposicion,
-  columnasAPlegarParaQueQuepan,
   type DisposicionKanban,
   type ItemColumna,
 } from "./kanbanLayout";
@@ -183,7 +182,12 @@ function ReservaCard({
           >
             <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
           </button>
-          <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
+          {/* `title`: con las columnas estrechas (160–220px) los nombres largos
+              se cortan con puntos suspensivos; el completo se lee al pasar el
+              ratón, además de estar en el `aria-label` de la tarjeta. */}
+          <span className="font-semibold text-sm truncate" title={reserva.nombre || "Sin nombre"}>
+            {reserva.nombre || "Sin nombre"}
+          </span>
           {(reserva as { en_blacklist?: boolean }).en_blacklist && (
             <ShieldBan className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="En lista negra" />
           )}
@@ -419,7 +423,19 @@ function KanbanColumn({
           </div>
         )}
       </div>
-      <ScrollArea className="flex-1" style={{ maxHeight: alturaMaxima }}>
+      {/* `[&>[data-radix-scroll-area-viewport]>div]:!block`: Radix mete dentro
+          del viewport un `<div style="min-width:100%; display:table">`, y una
+          caja `display:table` se dimensiona a MAX-CONTENT. Resultado: la
+          tarjeta crecía hasta el largo del nombre más largo (321px dentro de
+          una columna de 175) y lo que sobraba —la insignia de estado— quedaba
+          recortado; `truncate` no servía de nada ahí dentro. Volviéndolo un
+          bloque normal, la tarjeta mide lo que la columna y el nombre se corta
+          con puntos suspensivos, como estaba previsto. Se notaba poco con
+          columnas de 224px y mucho al bajar el mínimo a 160. */}
+      <ScrollArea
+        className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block"
+        style={{ maxHeight: alturaMaxima }}
+      >
         <div className={cn("p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl", isOver && "bg-primary/[0.02]")}>
           {children}
           {count === 0 && (
@@ -447,30 +463,31 @@ function KanbanColumn({
 }
 
 /**
- * Fila de columnas de UN negocio. Es la que garantiza que nunca se vea una
- * columna partida (encargo del dueño 2026-09-25).
+ * Fila de columnas de UN negocio. Cumple los dos encargos del dueño:
  *
- * Por qué una fila por negocio y no todas en la misma: cuando Casa Tomás
- * (4 columnas) y Touza convivían en la MISMA fila con scroll, el ancho pedido
- * era siempre mayor que el disponible y la última columna quedaba cortada por
- * el borde. Apilando los negocios, cada uno dispone del ancho completo, que es
- * justo lo que hace que en escritorio no haga falta ni scroll.
+ *   · TODAS las columnas a la vista a la vez (2026-09-26). Ninguna se pliega
+ *     sola: el ancho mínimo por columna es 160px, así que las 5 de Casa Tomás
+ *     caben enteras en cualquier escritorio. Antes se plegaban solas las
+ *     columnas vacías a un carril de 52px y, a 1456px, el dueño se encontraba
+ *     con cuatro carriles y una sola columna abierta — "cuando abro todos se
+ *     pierden". Ese automatismo ya no existe; plegar es un gesto manual.
+ *   · NUNCA se ve una columna partida (2026-09-25). Solo si ni al mínimo caben
+ *     (pantalla muy estrecha) se desplaza, y entonces con imán: al pararse el
+ *     scroll siempre hay columnas enteras a la vista.
  *
- * Dentro de la fila:
- *   · Mide su propio ancho con ResizeObserver (no se adivina por breakpoints:
- *     el ancho real depende del sidebar, que se pliega).
- *   · `kanbanLayout` reparte ese ancho. Si no caben, primero pliega las
- *     columnas VACÍAS (un carril de 52px en vez de 250) y, si aun así no
- *     caben, pagina en páginas del ancho exacto del viewport.
- *   · Paginado = scroll-snap por página + flechas + degradados en los bordes.
- *     Al pararse el scroll siempre hay columnas enteras a la vista.
+ * Por qué una fila por negocio y no todas en la misma: cuando Casa Tomás y
+ * Touza convivían en la MISMA fila con scroll, el ancho pedido era siempre
+ * mayor que el disponible y la última columna quedaba cortada por el borde.
+ * Apilando los negocios, cada uno dispone del ancho completo.
+ *
+ * El ancho se mide con ResizeObserver, no por breakpoints: el ancho real
+ * depende del sidebar, que se pliega.
  */
 function FilaNegocio({
   etiqueta,
   aforo,
   mostrarCabecera,
   items,
-  vacias,
   arrastrando,
   children,
 }: {
@@ -478,10 +495,8 @@ function FilaNegocio({
   aforo?: { comida: number; cena: number; capacidad: number };
   mostrarCabecera: boolean;
   items: ItemColumna[];
-  /** Columnas sin reservas: candidatas a plegarse solas si falta sitio. */
-  vacias: ReadonlySet<string>;
   arrastrando: boolean;
-  children: (disposicion: DisposicionKanban, autoPlegadas: ReadonlySet<string>) => React.ReactNode;
+  children: (disposicion: DisposicionKanban) => React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [ancho, setAncho] = useState(0);
@@ -496,14 +511,7 @@ function FilaNegocio({
     return () => observador.disconnect();
   }, []);
 
-  const autoPlegadas = useMemo(
-    () => columnasAPlegarParaQueQuepan(items, vacias, ancho),
-    [items, vacias, ancho],
-  );
-  const disposicion = useMemo(
-    () => calcularDisposicion(items.map((i) => ({ ...i, plegada: i.plegada || autoPlegadas.has(i.id) })), ancho),
-    [items, autoPlegadas, ancho],
-  );
+  const disposicion = useMemo(() => calcularDisposicion(items, ancho), [items, ancho]);
 
   const { paradas, visiblesPorParada } = disposicion;
   const desplazable = disposicion.modo === "desplazable";
@@ -623,7 +631,7 @@ function FilaNegocio({
             scrollSnapType: desplazable && !arrastrando ? "x mandatory" : undefined,
           }}
         >
-          {children(disposicion, autoPlegadas)}
+          {children(disposicion)}
           {disposicion.espacioFinal > 0 && (
             <div aria-hidden="true" className="shrink-0" style={{ width: disposicion.espacioFinal }} />
           )}
@@ -664,11 +672,11 @@ export function GestorReservasKanban() {
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
-  // Plegado de columnas: el usuario manda sobre el automático. `minimizedCols`
-  // son las que plegó a mano; `expandidasCols` las que desplegó a mano y que,
-  // por tanto, el plegado automático de columnas vacías ya no puede tocar.
+  // Columnas plegadas a carril, SIEMPRE por decisión del usuario: ya no hay
+  // plegado automático (2026-09-26, el dueño lo rechazó: "tienen que estar
+  // todos aunque ocupen menos espacio de ancho por columna"). Por defecto el
+  // conjunto está vacío, o sea: todas abiertas.
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
-  const [expandidasCols, setExpandidasCols] = useState<Set<string>>(new Set());
   const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
@@ -696,22 +704,12 @@ export function GestorReservasKanban() {
     toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
   };
 
-  /**
-   * `plegadaAhora` es lo que el usuario VE (puede estar plegada porque la
-   * plegó él o porque no cabía). Pulsar siempre hace lo contrario de lo que se
-   * ve, y deja constancia para que el automático no lo deshaga.
-   */
-  const togglePlegado = (colId: string, plegadaAhora: boolean) => {
+  /** Plegar/desplegar una columna a mano. Nada la vuelve a plegar por su cuenta. */
+  const togglePlegado = (colId: string) => {
     setMinimizedCols((prev) => {
       const next = new Set(prev);
-      if (plegadaAhora) next.delete(colId);
+      if (next.has(colId)) next.delete(colId);
       else next.add(colId);
-      return next;
-    });
-    setExpandidasCols((prev) => {
-      const next = new Set(prev);
-      if (plegadaAhora) next.add(colId);
-      else next.delete(colId);
       return next;
     });
   };
@@ -988,11 +986,6 @@ export function GestorReservasKanban() {
               id: col.id,
               plegada: minimizedCols.has(col.id),
             }));
-            // Vacías y no desplegadas a mano: las únicas que se pueden plegar
-            // solas para hacer sitio.
-            const vacias = new Set(
-              columnasGrupo.filter((col) => cuenta(col.id) === 0 && !expandidasCols.has(col.id)).map((col) => col.id),
-            );
             return (
               <FilaNegocio
                 key={negocio.marca}
@@ -1000,12 +993,11 @@ export function GestorReservasKanban() {
                 aforo={aforoPorNegocio[negocio.marca]}
                 mostrarCabecera={grupos.length > 1}
                 items={itemsFila}
-                vacias={vacias}
                 arrastrando={!!activeReserva}
               >
-                {(disposicion, autoPlegadas) =>
+                {(disposicion) =>
                   columnasGrupo.map((col) => {
-                    const plegada = minimizedCols.has(col.id) || autoPlegadas.has(col.id);
+                    const plegada = minimizedCols.has(col.id);
                     return (
                       <KanbanColumn
                         key={col.id}
@@ -1018,7 +1010,7 @@ export function GestorReservasKanban() {
                         count={cuenta(col.id)}
                         isActive={!!activeReserva}
                         minimized={plegada}
-                        onToggleMinimize={() => togglePlegado(col.id, plegada)}
+                        onToggleMinimize={() => togglePlegado(col.id)}
                         ancho={disposicion.anchoColumna}
                         margenDerecho={disposicion.margenes[col.id] ?? 0}
                         conIman={disposicion.idsConIman.includes(col.id)}
