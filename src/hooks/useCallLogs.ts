@@ -35,11 +35,23 @@ export interface UseCallLogsFilters {
   dateFrom?: string;
   dateTo?: string;
   intent?: string;
-  success?: "Pass" | "Fail";
+  /** Token de la UI, no el valor de la columna: se traduce con SUCCESS_EVALUATION_VALUES. */
+  success?: "pass" | "fail";
   sentiment?: string;
   callType?: "bot" | "human";
   limit?: number;
 }
+
+// `call_logs.success_evaluation` guarda tal cual el `analysis.successEvaluation`
+// que manda VAPI (rubrica PassFail, ver restaurante-phone/scripts/patch-assistant.js):
+// el webhook lo escribe sin normalizar. VAPI documenta esa rubrica como true/false,
+// no como "Pass"/"Fail", asi que comparar contra un unico literal deja la consulta
+// sin resultados. Se enumeran todas las variantes que pueden estar en la columna
+// (hay indice btree, asi que `in` sigue siendo indexable).
+const SUCCESS_EVALUATION_VALUES: Record<"pass" | "fail", string[]> = {
+  pass: ["true", "Pass", "pass", "passed"],
+  fail: ["false", "Fail", "fail", "failed"],
+};
 
 const CALL_LOGS_COLUMNS =
   "id,vapi_call_id,caller_number,call_type,status,started_at,ended_at,duration_seconds,summary,ended_reason,cost_total_usd,cost_total_eur,success_evaluation,structured_data";
@@ -71,7 +83,7 @@ export function useCallLogs(filters: UseCallLogsFilters = {}) {
       if (dateFrom) q = q.gte("started_at", dateFrom);
       if (dateTo) q = q.lte("started_at", dateTo);
       if (callType) q = q.eq("call_type", callType);
-      if (success) q = q.eq("success_evaluation", success);
+      if (success) q = q.in("success_evaluation", SUCCESS_EVALUATION_VALUES[success]);
       if (intent) q = q.eq("structured_data->>intent", intent);
       if (sentiment) q = q.eq("structured_data->>sentiment", sentiment);
 

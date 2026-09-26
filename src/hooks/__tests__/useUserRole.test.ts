@@ -36,7 +36,11 @@ vi.mock("@/hooks/useSuperAdmin", () => ({
   useSuperAdmin: vi.fn(),
 }));
 
-import { supabase, resetSupabaseMocks } from "@/integrations/supabase/client";
+import * as clienteMock from "@/integrations/supabase/client";
+// `resetSupabaseMocks` solo existe en el mock (__mocks__/client.ts), no en el
+// cliente real: se saca con un cast para no sumar un error de tipos.
+const { supabase } = clienteMock;
+const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
 import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useUserRole, useCanAccessSection, UserRoleProvider } from "@/hooks/useUserRole";

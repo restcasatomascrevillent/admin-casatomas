@@ -10,9 +10,8 @@ vi.mock("@/integrations/supabase/client");
 vi.mock("sonner");
 
 import * as clienteMock from "@/integrations/supabase/client";
-// `resetSupabaseMocks` solo existe en el mock (__mocks__/client.ts): se saca
-// con un cast para no sumar un error de tipos (los tests antiguos lo importan
-// directamente y cuentan en el baseline de tsc).
+// `resetSupabaseMocks` solo existe en el mock (__mocks__/client.ts), no en el
+// cliente real: se saca con un cast para no sumar un error de tipos.
 const { supabase } = clienteMock;
 const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
 import { toast } from "sonner";

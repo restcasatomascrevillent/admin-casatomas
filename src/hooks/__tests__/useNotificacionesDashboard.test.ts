@@ -16,7 +16,11 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 vi.mock("@/integrations/supabase/client");
 vi.mock("sonner");
 
-import { supabase, resetSupabaseMocks } from "@/integrations/supabase/client";
+import * as clienteMock from "@/integrations/supabase/client";
+// `resetSupabaseMocks` solo existe en el mock (__mocks__/client.ts), no en el
+// cliente real: se saca con un cast para no sumar un error de tipos.
+const { supabase } = clienteMock;
+const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
