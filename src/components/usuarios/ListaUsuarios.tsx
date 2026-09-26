@@ -82,6 +82,22 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     return user.email || `${user.id.slice(0, 8)}...`;
   };
 
+  // Si los permisos actuales del usuario coinciden exactamente con un rol
+  // preconfigurado (mismo rol base y mismo acceso en cada sección), se
+  // selecciona ese preset en vez de dejarlo en "Sin rol preconfigurado".
+  const findMatchingPreset = (
+    role: AppRole | null,
+    perms: { section_key: string; can_view: boolean }[]
+  ) =>
+    presets.find((preset) => {
+      if (preset.base_role !== role) return false;
+      return editableSections.every((section) => {
+        const actual = perms.find((p) => p.section_key === section.key)?.can_view ?? false;
+        const enPreset = preset.permissions.find((p) => p.section_key === section.key)?.can_view ?? false;
+        return actual === enPreset;
+      });
+    });
+
   const openPermissionsDialog = (user: ManagedUser) => {
     setSelectedUser(user);
     // Inicializar con permisos existentes o defaults
@@ -94,6 +110,13 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
       };
     });
     setEditingPermissions(perms);
+    const matchingPreset = findMatchingPreset(user.role, perms);
+    setSelectedPresetId(matchingPreset?.id ?? "manual");
+  };
+
+  const closePermissionsDialog = () => {
+    setSelectedUser(null);
+    setEditingPermissions([]);
     setSelectedPresetId("manual");
   };
 
@@ -124,8 +147,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
         await updateUserRole(selectedUser.id, selectedPreset.base_role);
       }
     }
-    setSelectedUser(null);
-    setSelectedPresetId("manual");
+    closePermissionsDialog();
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -317,7 +339,10 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
-                        <Dialog>
+                        <Dialog
+                          open={selectedUser?.id === user.id}
+                          onOpenChange={(open) => { if (!open) closePermissionsDialog(); }}
+                        >
                           <DialogTrigger asChild>
                             <Button
                               variant="outline"
@@ -429,7 +454,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                 </div>
                               </div>
                               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                                <Button variant="outline" onClick={() => setSelectedUser(null)}>
+                                <Button variant="outline" onClick={closePermissionsDialog}>
                                   Cancelar
                                 </Button>
                                 <Button onClick={savePermissions}>Guardar Permisos</Button>
