@@ -173,13 +173,12 @@ verify_jwt = true
 [functions.sync-google-reviews]
 verify_jwt = true
 
-# Endpoint público del chatbot de casa-tomas-story. No tiene autenticación
-# propia (es deliberado: los visitantes no están autenticados), pero su cliente
-# SIEMPRE manda `apikey` + `Authorization` con la publishable key, así que
-# `true` sale gratis y descarta bots sin cabeceras. La protección real es su
-# limitador de tasa persistente, que es fail-closed (503 si no puede consultarlo).
+# Endpoint público del chatbot de casa-tomas-story. Sin JWT (igual que
+# reservas-web): la web manda una publishable key `sb_publishable_…`, que no es
+# un JWT, y con `true` la pasarela respondería 401 a todo. La protección real es
+# el cupo `chat_web_reservar_cupo` + limitadores fail-closed (503 si fallan).
 [functions.chat-web]
-verify_jwt = true
+verify_jwt = false
 
 # Huérfanas: cero llamadores en los cuatro repos. Se dejan a `true` para que no
 # queden como endpoints abiertos mientras se decide si se borran.
