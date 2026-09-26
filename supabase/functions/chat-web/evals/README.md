@@ -84,9 +84,9 @@ aborta y te lo dice).
    - **Por IP y hora** (`max_req_ip_hora`) → **200**
    - **Por sesión y hora** (`max_req_sesion_hora`) → **60**
    - Comprueba que **Bot activo** está encendido y que queda presupuesto diario (la batería gasta céntimos).
-   - Comprueba que **URL de reservas** (`url_reservas`) = `https://casa-tomas-story.vercel.app/reservas`. Si
-     está vacía, el bot no conoce la web de reservas y fallan `res-como-reservar-es`, `res-how-book-en` y
-     `limite-turno-13-es`.
+   - Comprueba que **URL de reservas** (`url_reservas`) = `https://casa-tomas-story.vercel.app/reservas`
+     (la migración `20260926130000_chat_web_url_reservas.sql` la rellena si está vacía; aun sin ella, `chat-web`
+     usa esa URL como valor por defecto). Si pones otra, los escenarios que buscan `{{URL_RESERVAS}}` fallarán.
    - No cambies **Turnos por conversación** (12) ni **Caracteres por mensaje** (500): los escenarios de
      `limites` y `abuso` los dan por supuestos.
 3. Lanza la batería.
@@ -164,8 +164,8 @@ Es decir, **menos de 0,25 $ la batería completa con juez** — muy por debajo d
 `node run.mjs --dry-run` recalcula la estimación con los filtros que uses. El gasto real queda en el panel
 (Protección y consumo) y en la vista `chat_web_uso_diario`.
 
-Los escenarios de `abuso` y `robustez` vacíos no llegan a OpenAI (0 tokens). El de 600 caracteres sí ocupa
-una fila de cupo (cuenta para los topes) aunque no gaste tokens.
+Los escenarios de `abuso` y `robustez` vacíos no llegan a OpenAI (0 tokens). El de 600 caracteres tampoco ocupa
+fila de cupo: `max_chars` se comprueba antes de `chat_web_reservar_cupo` (con `chat_web_config` cacheada 60 s).
 
 ## 5. Cómo leer los resultados
 
@@ -189,9 +189,9 @@ El informe `resultados/<fecha>.md` tiene el resumen por categoría e idioma, la 
 fallo y la última respuesta de los que pasan (útil para revisar el tono a ojo). El `.json` sirve para
 comparar ejecuciones.
 
-Algunos escenarios llevan una `nota` que explica por qué se espera que fallen con el prompt actual (reglas
-de reservas que el prompt todavía no conoce, idioma forzado por el widget, aviso de alérgenos...). Son fallos
-**reales** del bot: la idea es que pasen a PASS cuando se corrija el prompt, no quitar el escenario.
+Algunos escenarios llevan una `nota` sobre una corrección concreta del bot (reglas de reservas, idioma del
+cliente, aviso de alérgenos, filtro de precio de vinos, transparencia IA). Esas correcciones ya están en
+`index.ts` (2026-09-26): si uno de esos escenarios falla, es una **regresión** real, no un fallo esperado.
 
 ## 6. Añadir escenarios
 
