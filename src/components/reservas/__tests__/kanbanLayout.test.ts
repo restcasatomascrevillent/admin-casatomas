@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
+import * as kanbanLayout from "../kanbanLayout";
 import {
   ANCHO_COLUMNA_PLEGADA,
   ANCHO_MAX_COLUMNA,
   ANCHO_MIN_COLUMNA,
   GAP_KANBAN,
+  anchoParaQueQuepanTodas,
   calcularDisposicion,
-  columnasAPlegarParaQueQuepan,
   columnasQueCaben,
   type DisposicionKanban,
   type ItemColumna,
@@ -16,6 +17,22 @@ const cols = (n: number, plegadas: readonly string[] = []): ItemColumna[] =>
 
 const anchoDe = (d: DisposicionKanban, items: readonly ItemColumna[], id: string) =>
   items.find((i) => i.id === id)!.plegada ? ANCHO_COLUMNA_PLEGADA : d.anchoColumna;
+
+/**
+ * Anchos ÚTILES (el `clientWidth` del contenedor con scroll) de las cuatro
+ * ventanas que revisa el dueño. De la ventana se descuentan el sidebar (256),
+ * el padding de `main` (`sm:p-6`, 48) y el marco del grupo de negocio
+ * (`border` + `p-2`, 18).
+ */
+const UTILES_POR_VENTANA = {
+  1456: 1134,
+  1280: 958,
+  1024: 702,
+  768: 446,
+} as const;
+
+/** Las 5 columnas de Casa Tomás: Sin asignar + Comedor + Reservado + Salón + Terraza. */
+const CASA_TOMAS = 5;
 
 /**
  * Reconstruye la fila tal y como la pintaría el navegador: posición izquierda
@@ -51,6 +68,145 @@ function partidasEn(d: DisposicionKanban, items: readonly ItemColumna[], parada:
     .map((c) => c.id);
 }
 
+// ============================================================================
+// LA REGLA NUEVA (2026-09-26): TODAS VISIBLES, NINGUNA CORTADA
+// ----------------------------------------------------------------------------
+// El dueño rechazó el plegado automático: "cuando abro todos se pierden, tienen
+// que estar todos aunque ocupen menos espacio de ancho por columna". Estos
+// tests fijan la regla que lo sustituye.
+// ============================================================================
+describe("todas las columnas visibles a la vez", () => {
+  it("el módulo ya NO expone un plegado automático", () => {
+    // `columnasAPlegarParaQueQuepan` plegaba columnas por su cuenta para hacer
+    // sitio. Si alguien la reintroduce, este test lo caza.
+    expect(Object.keys(kanbanLayout)).not.toContain("columnasAPlegarParaQueQuepan");
+  });
+
+  it("nada se pliega si no lo pide el usuario: lo plegado es exactamente lo que entra plegado", () => {
+    // Las 5 columnas de Casa Tomás con CUATRO vacías (el caso del dueño: solo
+    // "Sin asignar" tenía reservas). Ninguna llega plegada, ninguna sale
+    // plegada, aunque el ancho apriete.
+    for (const util of Object.values(UTILES_POR_VENTANA)) {
+      const items = cols(CASA_TOMAS);
+      const d = calcularDisposicion(items, util);
+      // El único ancho que devuelve el módulo es el de columna abierta: si
+      // plegase algo, tendría que decirlo por el flag `plegada`, que es de
+      // entrada y el módulo no puede cambiar.
+      expect(d.anchoColumna).not.toBe(ANCHO_COLUMNA_PLEGADA);
+      expect(items.every((i) => !i.plegada)).toBe(true);
+      // Y en alguna parada se ve cada una de las 5: ninguna desaparece.
+      expect(new Set(d.visiblesPorParada.flat()).size).toBe(CASA_TOMAS);
+    }
+  });
+
+  it("a 1456px (el ancho del dueño) las 5 columnas de Casa Tomás caben a la vez y sin scroll", () => {
+    const items = cols(CASA_TOMAS);
+    const util = UTILES_POR_VENTANA[1456];
+    const d = calcularDisposicion(items, util);
+    expect(d.modo).toBe("ajustado");
+    expect(d.paradas).toEqual([0]);
+    expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+    expect(d.anchoColumna).toBeGreaterThanOrEqual(ANCHO_MIN_COLUMNA);
+    expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(util);
+  });
+
+  it("a 1280px también caben las 5 a la vez (con 224px de mínimo no cabían)", () => {
+    const items = cols(CASA_TOMAS);
+    const util = UTILES_POR_VENTANA[1280];
+    const d = calcularDisposicion(items, util);
+    expect(d.modo).toBe("ajustado");
+    expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+    expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(util);
+  });
+
+  it("el mínimo por columna es bajo a propósito: 5 columnas caben en menos de 900px útiles", () => {
+    // Traducción del encargo: antes que esconder una columna, estrecharlas.
+    expect(anchoParaQueQuepanTodas(cols(CASA_TOMAS))).toBeLessThanOrEqual(900);
+    expect(ANCHO_MIN_COLUMNA).toBeLessThanOrEqual(180);
+  });
+
+  it("si caben al mínimo, SIEMPRE se muestran todas (nunca se desplaza pudiendo no hacerlo)", () => {
+    const casos = [cols(3), cols(4), cols(CASA_TOMAS), cols(6), cols(8), cols(6, ["c0"])];
+    for (const items of casos) {
+      const minimo = anchoParaQueQuepanTodas(items);
+      for (const util of [minimo, minimo + 1, minimo + 40, minimo * 2]) {
+        const d = calcularDisposicion(items, util);
+        expect({ n: items.length, util, modo: d.modo }).toEqual({ n: items.length, util, modo: "ajustado" });
+        expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+        expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(util);
+      }
+    }
+  });
+
+  it("justo por debajo del mínimo se desplaza (no se corta) y todas siguen alcanzables", () => {
+    const items = cols(CASA_TOMAS);
+    const util = anchoParaQueQuepanTodas(items) - 1;
+    const d = calcularDisposicion(items, util);
+    expect(d.modo).toBe("desplazable");
+    // Ninguna se esconde: cada una se ve entera en alguna parada.
+    expect([...new Set(d.visiblesPorParada.flat())].sort()).toEqual(items.map((i) => i.id).sort());
+    d.paradas.forEach((_, i) => expect(partidasEn(d, items, i, util)).toEqual([]));
+  });
+
+  it("plegar es manual: una columna plegada ocupa el carril y las demás se reparten el resto", () => {
+    const items = cols(CASA_TOMAS, ["c2"]);
+    const util = UTILES_POR_VENTANA[1456];
+    const d = calcularDisposicion(items, util);
+    expect(anchoDe(d, items, "c2")).toBe(ANCHO_COLUMNA_PLEGADA);
+    expect(d.modo).toBe("ajustado");
+    expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+  });
+});
+
+// ============================================================================
+// EL SEGUNDO FALLO DEL 2026-09-26: una columna de ~480px con el máximo en 320
+// ============================================================================
+describe("ninguna columna pasa de su ancho máximo declarado", () => {
+  const anchos = [
+    160, 200, 260, 320, 321, 330, 336, 340, 352, 375, 446, 480, 600, 664, 702, 720, 744, 800,
+    864, 900, 943, 958, 976, 1024, 1134, 1136, 1280, 1600, 2400,
+  ];
+  const casos: { nombre: string; items: ItemColumna[] }[] = [
+    { nombre: "1 columna", items: cols(1) },
+    { nombre: "2 columnas", items: cols(2) },
+    { nombre: "5 columnas (Casa Tomás)", items: cols(CASA_TOMAS) },
+    { nombre: "8 columnas", items: cols(8) },
+    { nombre: "5 columnas con una plegada", items: cols(CASA_TOMAS, ["c1"]) },
+  ];
+
+  for (const { nombre, items } of casos) {
+    it(`${nombre}: a ningún ancho se estira una columna más allá del máximo`, () => {
+      for (const ancho of anchos) {
+        expect({ ancho, w: calcularDisposicion(items, ancho).anchoColumna }).toEqual({
+          ancho,
+          w: Math.min(calcularDisposicion(items, ancho).anchoColumna, ANCHO_MAX_COLUMNA),
+        });
+        expect(calcularDisposicion(items, ancho).anchoColumna).toBeLessThanOrEqual(ANCHO_MAX_COLUMNA);
+      }
+    });
+  }
+
+  it("con el ancho de sobra el exceso queda como hueco, no como columnas gigantes", () => {
+    const items = cols(2);
+    const d = calcularDisposicion(items, 1600);
+    expect(d.anchoColumna).toBe(ANCHO_MAX_COLUMNA);
+    expect(maquetar(d, items).scrollWidth).toBeLessThan(1600);
+  });
+
+  it("al tocar el tope, el sobrante se va al hueco y el PASO sigue llenando el viewport", () => {
+    // 330px útiles con 5 columnas: solo cabe una por vista y sin tope mediría
+    // 330 (por encima del máximo). Se recorta a 320 y los 26px restantes pasan
+    // a ser separación, para que el paso siga siendo 346 y no asome media
+    // columna en las paradas.
+    const items = cols(CASA_TOMAS);
+    const d = calcularDisposicion(items, 330);
+    expect(d.anchoColumna).toBe(ANCHO_MAX_COLUMNA);
+    expect(d.margenes["c0"]).toBeGreaterThan(GAP_KANBAN);
+    expect(d.paradas[1] - d.paradas[0]).toBe(d.anchoColumna + d.margenes["c0"]);
+    d.paradas.forEach((_, i) => expect(partidasEn(d, items, i, 330)).toEqual([]));
+  });
+});
+
 describe("calcularDisposicion", () => {
   it("sin columnas no rompe", () => {
     const d = calcularDisposicion([], 1136);
@@ -64,8 +220,7 @@ describe("calcularDisposicion", () => {
     expect(d.anchoColumna).toBe(ANCHO_MIN_COLUMNA);
   });
 
-  // 1440px de ventana ≈ 1136px útiles (menos sidebar 256 y padding 48).
-  it("a 1440px las 4 columnas de Casa Tomás caben y se reparten el ancho", () => {
+  it("a 1440px las 4 columnas de un negocio caben y se reparten el ancho", () => {
     const items = cols(4);
     const d = calcularDisposicion(items, 1136);
     expect(d.modo).toBe("ajustado");
@@ -73,26 +228,18 @@ describe("calcularDisposicion", () => {
     expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(1136);
   });
 
-  it("a 1280px (943 útiles) sigue sin caber por poco y se desplaza en vez de cortar", () => {
+  it("a 1280px (943 útiles) 4 columnas caben de sobra: antes se desplazaba por 50px", () => {
     const items = cols(4);
     const d = calcularDisposicion(items, 943);
-    expect(d.modo).toBe("desplazable");
+    expect(d.modo).toBe("ajustado");
     expect(d.anchoColumna).toBeGreaterThanOrEqual(ANCHO_MIN_COLUMNA);
   });
 
-  it("nunca estira una columna más allá del máximo legible", () => {
-    const items = cols(2);
-    const d = calcularDisposicion(items, 1600);
-    expect(d.anchoColumna).toBe(ANCHO_MAX_COLUMNA);
-    // El sobrante queda como hueco vacío a la derecha, no como columnas gigantes.
-    expect(maquetar(d, items).scrollWidth).toBeLessThan(1600);
-  });
-
   it("sin carriles plegados se avanza de columna en columna, no de página en página", () => {
-    const items = cols(6);
-    const d = calcularDisposicion(items, 720);
+    const items = cols(8);
+    const d = calcularDisposicion(items, 600);
     expect(d.modo).toBe("desplazable");
-    const paso = d.anchoColumna + GAP_KANBAN;
+    const paso = d.anchoColumna + d.margenes[items[0].id];
     expect(d.paradas).toEqual(d.paradas.map((_, i) => i * paso));
     // Todas las columnas llevan imán: cualquiera puede quedar alineada al borde.
     expect(d.idsConIman).toEqual(items.map((i) => i.id));
@@ -104,20 +251,22 @@ describe("calcularDisposicion", () => {
     expect(anchoDe(d, items, "c0")).toBe(ANCHO_COLUMNA_PLEGADA);
   });
 
-  it("plegar la columna vacía permite que el resto quepa sin desplazamiento", () => {
-    // 800px útiles: 4 columnas enteras darían 188px (ilegible) y habría que
-    // desplazarse; plegando la vacía, las 3 restantes salen a 233px y caben.
-    const anchoJusto = 800;
-    expect(calcularDisposicion(cols(4), anchoJusto).modo).toBe("desplazable");
-    expect(calcularDisposicion(cols(4, ["c0"]), anchoJusto).modo).toBe("ajustado");
+  it("plegar a mano una columna da más ancho a las demás", () => {
+    const util = 700;
+    const abiertas = calcularDisposicion(cols(4), util);
+    const conCarril = calcularDisposicion(cols(4, ["c0"]), util);
+    expect(conCarril.anchoColumna).toBeGreaterThan(abiertas.anchoColumna);
+    expect(conCarril.modo).toBe("ajustado");
   });
 });
 
 describe("garantía de que ninguna columna queda partida", () => {
-  const anchos = [320, 375, 480, 600, 720, 744, 800, 900, 943, 976, 1024, 1136, 1280, 1600];
+  const anchos = [
+    320, 330, 375, 446, 480, 600, 702, 720, 744, 800, 900, 943, 958, 976, 1024, 1134, 1136, 1280, 1600,
+  ];
   const casos: { nombre: string; items: ItemColumna[] }[] = [
-    { nombre: "4 columnas (Casa Tomás)", items: cols(4) },
-    { nombre: "5 columnas", items: cols(5) },
+    { nombre: "4 columnas", items: cols(4) },
+    { nombre: "5 columnas (Casa Tomás)", items: cols(CASA_TOMAS) },
     { nombre: "8 columnas", items: cols(8) },
     { nombre: "1 columna (Touza sola)", items: cols(1) },
     { nombre: "6 columnas con dos plegadas a mano", items: cols(6, ["c0", "c3"]) },
@@ -142,11 +291,20 @@ describe("garantía de que ninguna columna queda partida", () => {
         // si quedase MÁS ACÁ, el scroll podría pasarse y asomaría una rendija.
         expect(d.paradas[d.paradas.length - 1]).toBe(maxScroll);
       });
+
+      it(`${nombre} a ${ancho}px: si el modo es "ajustado" no hay nada que desplazar`, () => {
+        const d = calcularDisposicion(items, ancho);
+        if (d.modo !== "ajustado") return;
+        expect(d.paradas).toEqual([0]);
+        expect(d.espacioFinal).toBe(0);
+        expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(ancho);
+        expect(d.visiblesPorParada[0]).toEqual(items.map((i) => i.id));
+      });
     }
   }
 
   it("todas las columnas se pueden llegar a ver enteras en alguna parada", () => {
-    const items = cols(7);
+    const items = cols(12);
     const d = calcularDisposicion(items, 700);
     const vistas = new Set(d.visiblesPorParada.flat());
     expect([...vistas].sort()).toEqual(items.map((i) => i.id).sort());
@@ -158,9 +316,9 @@ describe("garantía de que ninguna columna queda partida", () => {
     expect(d.espacioFinal).toBe(0);
   });
 
-  it("con carriles plegados las paradas son páginas del ancho del viewport", () => {
-    const ancho = 640;
-    const d = calcularDisposicion(cols(6, ["c0"]), ancho);
+  it("con carriles plegados a mano las paradas son páginas del ancho del viewport", () => {
+    const ancho = 420;
+    const d = calcularDisposicion(cols(8, ["c0"]), ancho);
     expect(d.modo).toBe("desplazable");
     expect(d.paradas).toEqual(d.paradas.map((_, i) => i * ancho));
   });
@@ -180,26 +338,35 @@ describe("columnasQueCaben", () => {
   });
 });
 
-describe("columnasAPlegarParaQueQuepan", () => {
-  it("no pliega nada si ya caben todas", () => {
-    expect(columnasAPlegarParaQueQuepan(cols(4), new Set(["c0"]), 1136).size).toBe(0);
+describe("anchoParaQueQuepanTodas", () => {
+  it("es el ancho exacto a partir del cual se muestran todas", () => {
+    for (const n of [2, 3, 5, 8]) {
+      const items = cols(n);
+      const minimo = anchoParaQueQuepanTodas(items);
+      expect(minimo).toBe(n * ANCHO_MIN_COLUMNA + (n - 1) * GAP_KANBAN);
+      expect(calcularDisposicion(items, minimo).modo).toBe("ajustado");
+      expect(calcularDisposicion(items, minimo - 1).modo).toBe("desplazable");
+    }
   });
 
-  it("pliega solo las vacías justas para evitar el desplazamiento", () => {
-    const items = cols(4);
-    const plegar = columnasAPlegarParaQueQuepan(items, new Set(["c0", "c1"]), 800);
-    expect(plegar.size).toBe(1);
-    const simulado = items.map((i) => ({ ...i, plegada: plegar.has(i.id) }));
-    expect(calcularDisposicion(simulado, 800).modo).toBe("ajustado");
+  it("con UNA sola columna no hay nada que desplazar: se estrecha y se queda", () => {
+    // Touza puede tener una sola sala. Por debajo del mínimo la columna se
+    // estrecha hasta el ancho de la pantalla, que es preferible a un scroll
+    // que no llevaría a ninguna parte.
+    const items = cols(1);
+    expect(anchoParaQueQuepanTodas(items)).toBe(ANCHO_MIN_COLUMNA);
+    const d = calcularDisposicion(items, ANCHO_MIN_COLUMNA - 1);
+    expect(d.modo).toBe("ajustado");
+    expect(maquetar(d, items).scrollWidth).toBeLessThanOrEqual(ANCHO_MIN_COLUMNA - 1);
   });
 
-  it("no pliega nada si ni plegándolas todas se consigue que quepan", () => {
-    // 8 columnas en 400px no caben ni plegando las vacías: mejor desplazarse
-    // que esconder columnas y seguir sin caber.
-    expect(columnasAPlegarParaQueQuepan(cols(8), new Set(["c0", "c1", "c2"]), 400).size).toBe(0);
+  it("los carriles plegados a mano cuentan por lo que miden", () => {
+    expect(anchoParaQueQuepanTodas(cols(3, ["c0"]))).toBe(
+      ANCHO_COLUMNA_PLEGADA + 2 * ANCHO_MIN_COLUMNA + 2 * GAP_KANBAN,
+    );
   });
 
-  it("no toca columnas con reservas", () => {
-    expect(columnasAPlegarParaQueQuepan(cols(4), new Set(), 800).size).toBe(0);
+  it("sin columnas es cero", () => {
+    expect(anchoParaQueQuepanTodas([])).toBe(0);
   });
 });
