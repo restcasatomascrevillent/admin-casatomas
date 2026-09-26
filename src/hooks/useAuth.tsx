@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,7 +16,38 @@ const signInSchema = z.object({
   password: z.string().min(1, "La contraseña es requerida"),
 });
 
-export const useAuth = () => {
+interface AuthContextValue {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  signUp: (
+    email: string,
+    password: string,
+    nombre_restaurante: string,
+    telefono?: string
+  ) => Promise<{ data?: unknown; error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ data?: unknown; error: Error | null }>;
+  signOut: () => Promise<{ error: Error | null }>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * Única suscripción a Supabase Auth para toda la app (2026-09-25).
+ *
+ * Antes, cada componente que llamaba a useAuth() creaba su propio
+ * useState/useEffect: su propia suscripción a onAuthStateChange, su propio
+ * getSession() y su propio getUser() (round-trip de red para validar el
+ * token). En una sola carga de /dashboard, ProtectedRoute + useUserRole +
+ * AppSidebar + useUserRole (otra vez) llamaban a useAuth() cuatro veces en
+ * paralelo — cuatro peticiones de red independientes, cada una resolviendo
+ * su propio `loading` en un momento distinto, disparando renders en
+ * cascada. Eso era el lag y el parpadeo (la pantalla se quedaba en blanco
+ * al entrar) al iniciar sesión, tanto en el Admin Panel como en el Super
+ * Admin. Ahora el estado vive una sola vez aquí, en AuthProvider, y useAuth()
+ * solo lee ese contexto: una suscripción, un getSession(), un getUser().
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,12 +233,15 @@ export const useAuth = () => {
     return { error: null };
   };
 
-  return {
-    user,
-    session,
-    loading,
-    signUp,
-    signIn,
-    signOut,
-  };
+  const value: AuthContextValue = { user, session, loading, signUp, signIn, signOut };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth debe usarse dentro de <AuthProvider>");
+  }
+  return context;
 };

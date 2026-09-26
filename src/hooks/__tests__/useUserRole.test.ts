@@ -1,10 +1,15 @@
 /**
- * Tests para src/hooks/useUserRole.ts
+ * Tests para src/hooks/useUserRole.tsx
  *
  * Estrategia:
  * - Se mockea @/integrations/supabase/client con el archivo __mocks__/client.ts
  * - Se mockea useAuth para controlar el usuario activo en cada test
  * - Se testan useUserRole y useCanAccessSection de forma unitaria
+ *
+ * useUserRole()/useCanAccessSection() pasaron a leer un contexto
+ * (UserRoleProvider) en vez de tener su propio estado (2026-09-25): cada
+ * renderHook necesita el `wrapper: UserRoleProvider` para que haya contexto
+ * que leer.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -20,7 +25,7 @@ vi.mock("@/hooks/useAuth", () => ({
 
 import { supabase, resetSupabaseMocks } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole, useCanAccessSection } from "@/hooks/useUserRole";
+import { useUserRole, useCanAccessSection, UserRoleProvider } from "@/hooks/useUserRole";
 
 // Tipos auxiliares
 const mockUser = (email: string, id = "user-123") => ({
@@ -88,7 +93,7 @@ describe("useUserRole", () => {
       then: () => new Promise(() => {}),
     });
 
-    const { result } = renderHook(() => useUserRole());
+    const { result } = renderHook(() => useUserRole(), { wrapper: UserRoleProvider });
     // En el primer render, loading debe ser true
     expect(result.current.loading).toBe(true);
   });
@@ -105,7 +110,7 @@ describe("useUserRole", () => {
 
     mockRoleQuery("admin", []);
 
-    const { result } = renderHook(() => useUserRole());
+    const { result } = renderHook(() => useUserRole(), { wrapper: UserRoleProvider });
 
     // Super admin se resuelve síncronamente sin esperar a Supabase
     await waitFor(() => {
@@ -126,7 +131,7 @@ describe("useUserRole", () => {
       signOut: vi.fn(),
     });
 
-    const { result } = renderHook(() => useUserRole());
+    const { result } = renderHook(() => useUserRole(), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -168,7 +173,7 @@ describe("useUserRole", () => {
       };
     });
 
-    const { result } = renderHook(() => useUserRole());
+    const { result } = renderHook(() => useUserRole(), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -199,7 +204,7 @@ describe("useUserRole", () => {
         Promise.resolve({ data: [], error: null }).then(onfulfilled),
     }));
 
-    const { result } = renderHook(() => useUserRole());
+    const { result } = renderHook(() => useUserRole(), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -236,7 +241,7 @@ describe("useCanAccessSection", () => {
         Promise.resolve({ data: [], error: null }).then(onfulfilled),
     }));
 
-    const { result } = renderHook(() => useCanAccessSection("reservas"));
+    const { result } = renderHook(() => useCanAccessSection("reservas"), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -267,7 +272,7 @@ describe("useCanAccessSection", () => {
         Promise.resolve({ data: [], error: null }).then(onfulfilled),
     }));
 
-    const { result } = renderHook(() => useCanAccessSection("usuarios"));
+    const { result } = renderHook(() => useCanAccessSection("usuarios"), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -302,7 +307,7 @@ describe("useCanAccessSection", () => {
         }).then(onfulfilled),
     }));
 
-    const { result } = renderHook(() => useCanAccessSection("reservas", "view"));
+    const { result } = renderHook(() => useCanAccessSection("reservas", "view"), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -337,7 +342,7 @@ describe("useCanAccessSection", () => {
         }).then(onfulfilled),
     }));
 
-    const { result } = renderHook(() => useCanAccessSection("reservas", "edit"));
+    const { result } = renderHook(() => useCanAccessSection("reservas", "edit"), { wrapper: UserRoleProvider });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -364,7 +369,7 @@ describe("useCanAccessSection", () => {
       then: () => new Promise(() => {}),
     });
 
-    const { result } = renderHook(() => useCanAccessSection("reservas"));
+    const { result } = renderHook(() => useCanAccessSection("reservas"), { wrapper: UserRoleProvider });
     expect(result.current.loading).toBe(true);
     expect(result.current.canAccess).toBe(false);
   });

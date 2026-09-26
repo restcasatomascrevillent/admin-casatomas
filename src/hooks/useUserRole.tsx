@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
@@ -37,7 +37,20 @@ export const SECTIONS = [
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 
-export function useUserRole(): UserRoleData {
+const UserRoleContext = createContext<UserRoleData | null>(null);
+
+/**
+ * Única consulta de rol/permisos para toda la app (2026-09-25).
+ *
+ * Mismo problema que useAuth: ProtectedRoute y AppSidebar llamaban cada uno
+ * a su propio useUserRole(), así que cada carga de página disparaba DOS
+ * consultas independientes a user_roles y user_permissions, con dos
+ * `loading` que resolvían en momentos distintos — parte del lag y el
+ * parpadeo al entrar. Ahora la consulta vive una sola vez aquí, en
+ * UserRoleProvider, y useUserRole()/useCanAccessSection() solo leen ese
+ * contexto.
+ */
+export function UserRoleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [role, setRole] = useState<AppRole | null>(null);
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
@@ -98,7 +111,22 @@ export function useUserRole(): UserRoleData {
 
   const isAdmin = role === "admin" || isSuperAdminUser;
 
-  return { role: isSuperAdminUser ? "admin" : role, isAdmin, permissions, loading };
+  const value: UserRoleData = {
+    role: isSuperAdminUser ? "admin" : role,
+    isAdmin,
+    permissions,
+    loading,
+  };
+
+  return <UserRoleContext.Provider value={value}>{children}</UserRoleContext.Provider>;
+}
+
+export function useUserRole(): UserRoleData {
+  const context = useContext(UserRoleContext);
+  if (!context) {
+    throw new Error("useUserRole debe usarse dentro de <UserRoleProvider>");
+  }
+  return context;
 }
 
 export function useCanAccessSection(sectionKey: SectionKey, permissionType: "view" | "edit" = "view") {
