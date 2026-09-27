@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import * as fabric from "fabric";
 import { Canvas as FabricCanvas, Rect, Circle, Line, FabricObject, FabricText, Point } from "fabric";
+import type { TextStyle } from "fabric";
+import { toast } from "sonner";
 import { ToolType } from "./ToolbarDibujo";
 import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
 import { Mesa } from "@/hooks/useMesas";
+import {
+  mensajeChoquesResueltos,
+  mesasCanvasParaNombre,
+  resolverChoquesNombresMesa,
+  siguienteNumeroMesaLibre,
+} from "./nombresMesa";
 import {
   calcularPuntosAbsolutosPared,
   calcularGeometriaRect,
@@ -52,6 +60,14 @@ interface CanvasPlanoProps {
   onSelectionChange: (element: any) => void;
   onToolChange: (tool: ToolType) => void;
   onZoomChange?: (zoom: number) => void;
+  /**
+   * Se acaba de dibujar una mesa con la herramienta del lienzo, con `nombre`
+   * como PRIMER número libre del espacio (una propuesta, no un dato real): el
+   * padre lo usa para llevar el foco al campo del número en el panel lateral,
+   * de modo que el dueño pueda corregirlo al momento por el número que esa
+   * mesa tiene de verdad en la sala.
+   */
+  onMesaCreada?: (mesaId: string, nombre: string) => void;
 }
 
 export interface CanvasPlanoRef {
@@ -63,6 +79,12 @@ export interface CanvasPlanoRef {
   setZoom: (zoom: number) => void;
   /** Desagrupa una mesa fusionada y devuelve las mesas resultantes (o null si no había nada que desagrupar). */
   unmergeMesa: (mesaId: string) => MesaCanvas[] | null;
+  /**
+   * Cambia el número de una mesa ya dibujada: actualiza su `customData.nombre`
+   * y redibuja su etiqueta con el número nuevo. El estado de React
+   * (`mesasCanvas`) y la BBDD los actualiza el llamador (`PanelLateral`).
+   */
+  updateMesaNombre: (mesaId: string, nombre: string) => void;
   updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => void;
   centerOnContent: () => void;
   /** Renombra el id (temporal -> real de BBDD) de una mesa ya presente en el canvas, en su objeto y en su etiqueta/bocadillo asociados. */
@@ -97,6 +119,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   onSelectionChange,
   onToolChange,
   onZoomChange,
+  onMesaCreada,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -325,18 +348,33 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       const newMesas: typeof mesasCanvasRef.current = [];
       let offsetX = 0;
-      
+
+      // NÚMEROS AL DESAGRUPAR: los nombres salen de `original_mesas` y pueden
+      // chocar con mesas que YA existan con ese número — el caso del Salón de
+      // producción, donde al fusionar nunca se borraron las filas originales
+      // (ver el comentario del borrado silencioso en EditorPlanoEspacio) y
+      // conviven con las fusionadas. El choque se resuelve con sufijo "-bis" y
+      // se avisa con un toast: nunca en silencio, porque este es el camino por
+      // el que se recuperan las mesas reales de un espacio roto y el dueño
+      // tiene que saber qué números revisar. La propia mesa fusionada no
+      // estorba: `is_merged` la excluye de la comprobación.
+      const nombresResueltos = resolverChoquesNombresMesa(
+        mesaAgrupada.originalMesas.map((o) => o.nombre),
+        mesasCanvasParaNombre(mesasCanvasRef.current),
+      );
+
       mesaAgrupada.originalMesas.forEach((originalMesa, index) => {
         const anchoPixels = originalMesa.ancho / 100 * pixelsPerMeterRef.current;
         const altoPixels = originalMesa.alto / 100 * pixelsPerMeterRef.current;
-        
+
         const posXPixels = baseX + offsetX;
         const posYPixels = baseY;
         const newId = `mesa-temp-${Date.now()}-${index}`;
+        const nombreAsignado = nombresResueltos[index]?.asignado ?? originalMesa.nombre;
 
         const obj = createMesaTableObject({
           id: newId,
-          nombre: originalMesa.nombre,
+          nombre: nombreAsignado,
           capacidad: originalMesa.capacidad,
           forma: originalMesa.forma,
           anchoCm: originalMesa.ancho,
@@ -347,39 +385,21 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         fabricCanvas.add(obj);
         renderSillasMesa(fabricCanvas, obj);
 
-        // Crear etiqueta
-        const anchoM = (originalMesa.ancho / 100).toFixed(2);
-        const altoM = (originalMesa.alto / 100).toFixed(2);
-        const dimensionText = originalMesa.forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
-        
-        const centerX = posXPixels + anchoPixels / 2;
-        const centerY = posYPixels + altoPixels / 2;
-        
-        const minDimension = Math.min(anchoPixels, altoPixels);
-        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-        
-        const label = new FabricText(`${originalMesa.nombre}\n${dimensionText}`, {
-          left: centerX,
-          top: centerY,
-          fontSize: fontSize,
-          fontFamily: "system-ui, sans-serif",
-          fontWeight: "600",
-          fill: "#1e40af",
-          textAlign: "center",
-          selectable: false,
-          evented: false,
-          originX: "center",
-          originY: "center",
+        crearMesaLabelEnCentro(fabricCanvas, {
+          mesaId: newId,
+          nombre: nombreAsignado,
+          capacidad: originalMesa.capacidad,
+          forma: originalMesa.forma,
+          anchoCm: originalMesa.ancho,
+          altoCm: originalMesa.alto,
+          centerX: posXPixels + anchoPixels / 2,
+          centerY: posYPixels + altoPixels / 2,
         });
-        
-        (label as any).customData = { tipo: "mesa-label", parentId: newId };
-        (label as any).isMesaLabel = true;
-        fabricCanvas.add(label);
-        
+
         // Añadir al array de nuevas mesas
         newMesas.push({
           id: newId,
-          nombre: originalMesa.nombre,
+          nombre: nombreAsignado,
           capacidad: originalMesa.capacidad,
           forma: originalMesa.forma,
           ancho: originalMesa.ancho,
@@ -387,10 +407,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           posX: posXPixels / pixelsPerMeterRef.current,
           posY: posYPixels / pixelsPerMeterRef.current,
         });
-        
+
         offsetX += anchoPixels + 20; // Separar las mesas un poco
       });
-      
+
+      const avisoNombres = mensajeChoquesResueltos(nombresResueltos);
+      if (avisoNombres) toast.warning(avisoNombres, { duration: 10000 });
+
       // Actualizar estado
       const updatedMesas = mesasCanvasRef.current
         .filter(m => m.id !== mesaId)
@@ -546,34 +569,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         fabricCanvas.add(obj);
         renderSillasMesa(fabricCanvas, obj);
 
-        if (mesa.isMerged) {
-          const anchoM = (mesa.ancho / 100).toFixed(2);
-          const altoM = (mesa.alto / 100).toFixed(2);
-          const dimensionText = `${anchoM}x${altoM}m`;
-          const centerX = posXPixels + anchoPixels / 2;
-          const centerY = posYPixels + altoPixels / 2;
-          const minDimension = Math.min(anchoPixels, altoPixels);
-          const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-
-          const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
-            left: centerX,
-            top: centerY,
-            fontSize,
-            fontFamily: "system-ui, sans-serif",
-            fontWeight: "600",
-            fill: "#166534",
-            textAlign: "center",
-            selectable: false,
-            evented: false,
-            originX: "center",
-            originY: "center",
-          });
-          (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
-          (label as any).isMesaLabel = true;
-          fabricCanvas.add(label);
-        } else {
-          createMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
-        }
+        createMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels, {
+          capacidad: mesa.capacidad,
+          isMerged: mesa.isMerged,
+        });
 
         if (mesa.etiqueta) {
           createMesaBocadillo(mesa.id, mesa.etiqueta, posXPixels, posYPixels, anchoPixels, altoPixels);
@@ -592,9 +591,49 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // preserva tal cual estaba.
       fabricCanvas.renderAll();
     },
+    updateMesaNombre: (mesaId: string, nombre: string) => {
+      if (!fabricCanvas) return;
+
+      const mesaObj = fabricCanvas.getObjects().find((o) => {
+        const customData = (o as any).customData;
+        return customData?.tipo === "mesa" && customData?.id === mesaId;
+      });
+      if (!mesaObj) return;
+
+      const customData = (mesaObj as any).customData;
+      customData.nombre = nombre;
+
+      // La etiqueta se rehace en vez de reescribir su texto: el tamaño de la
+      // fuente depende de lo que mida el texto (un "12" no ocupa lo mismo que
+      // un "3"), así que hay que recalcularlo con el helper de siempre.
+      fabricCanvas
+        .getObjects()
+        .filter((o) => {
+          const data = (o as any).customData;
+          return data?.tipo === "mesa-label" && data?.parentId === mesaId;
+        })
+        .forEach((o) => fabricCanvas.remove(o));
+
+      // getCenterPoint() vale esté la mesa rotada o no (con origen left/top,
+      // left/top ya no es la esquina visible en cuanto hay ángulo).
+      const centro = mesaObj.getCenterPoint();
+      crearMesaLabelEnCentro(fabricCanvas, {
+        mesaId,
+        nombre,
+        capacidad: customData.capacidad,
+        forma: customData.forma ?? "rectangular",
+        anchoCm: customData.ancho ?? 80,
+        altoCm: customData.alto ?? 80,
+        centerX: centro.x,
+        centerY: centro.y,
+        isMerged: customData.isMerged === true,
+      });
+
+      fabricCanvas.renderAll();
+    },
     updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => {
       if (!fabricCanvas) return;
-      
+
       // Primero eliminar el bocadillo existente si lo hay
       const existingBocadillo = fabricCanvas.getObjects().filter(o => {
         const customData = (o as any).customData;
@@ -969,34 +1008,18 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     canvas.add(newMesa);
     renderSillasMesa(canvas, newMesa);
 
-    // Crear etiqueta para la nueva mesa
-    const anchoM = (newAncho / 100).toFixed(2);
-    const altoM = (newAlto / 100).toFixed(2);
-    const dimensionText = `${anchoM}x${altoM}m`;
-    
-    const centerX = newPosX + newAnchoPixels / 2;
-    const centerY = newPosY + newAltoPixels / 2;
-    
-    const minDimension = Math.min(newAnchoPixels, newAltoPixels);
-    const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-
-    const label = new FabricText(`${newNombre} (${newCapacidad}p)\n${dimensionText}`, {
-      left: centerX,
-      top: centerY,
-      fontSize: fontSize,
-      fontFamily: "system-ui, sans-serif",
-      fontWeight: "600",
-      fill: "#166534",
-      textAlign: "center",
-      selectable: false,
-      evented: false,
-      originX: "center",
-      originY: "center",
+    // Crear etiqueta para la nueva mesa (nombre compuesto "7+8" en verde)
+    crearMesaLabelEnCentro(canvas, {
+      mesaId: newId,
+      nombre: newNombre,
+      capacidad: newCapacidad,
+      forma: "rectangular",
+      anchoCm: newAncho,
+      altoCm: newAlto,
+      centerX: newPosX + newAnchoPixels / 2,
+      centerY: newPosY + newAltoPixels / 2,
+      isMerged: true,
     });
-    
-    (label as any).customData = { tipo: "mesa-label", parentId: newId };
-    (label as any).isMesaLabel = true;
-    canvas.add(label);
 
     // Actualizar estado - eliminar las dos mesas antiguas y añadir la nueva
     const newPosXMeters = newPosX / pixelsPerMeterRef.current;
@@ -1905,74 +1928,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const mesasLocales = mesasCanvasRef.current;
     const newMesasCanvas: MesaCanvas[] = [];
 
-    // Función para añadir etiqueta de mesa
-    // NOTA: ancho/alto vienen en cm, posX/posY en PÍXELES (ya convertidos)
-    const addMesaLabel = (mesaId: string, nombre: string, anchoCm: number, altoCm: number, forma: string, posXPixels: number, posYPixels: number) => {
-      const anchoM = (anchoCm / 100).toFixed(2);
-      const altoM = (altoCm / 100).toFixed(2);
-      const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
-      
-      // Calcular dimensiones en píxeles para el label
-      const anchoPixels = anchoCm / 100 * pixelsPerMeter;
-      const altoPixels = altoCm / 100 * pixelsPerMeter;
-      
-      // Calcular tamaño de fuente que quepa dentro de la mesa
-      const minDimension = Math.min(anchoPixels, altoPixels);
-      const fontSize = Math.max(6, Math.min(10, minDimension / 8));
-      
-      // Crear texto temporal para medir
-      const tempLabel = new FabricText(`${nombre}\n${dimensionText}`, {
-        fontSize: fontSize,
-        fontFamily: "system-ui, sans-serif",
-        fontWeight: "600",
-      });
-      
-      // Si el texto es más ancho que la mesa, reducir más el tamaño
-      let finalFontSize = fontSize;
-      const maxWidth = anchoPixels * 0.85;
-      const maxHeight = altoPixels * 0.85;
-      
-      if (tempLabel.width && tempLabel.width > maxWidth) {
-        finalFontSize = finalFontSize * (maxWidth / tempLabel.width);
-      }
-      if (tempLabel.height && tempLabel.height > maxHeight) {
-        finalFontSize = Math.min(finalFontSize, finalFontSize * (maxHeight / tempLabel.height));
-      }
-      
-      finalFontSize = Math.max(5, finalFontSize);
-      
-      // Calcular centro según tipo de forma
-      let centerX: number;
-      let centerY: number;
-      
-      if (forma === "circular") {
-        const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-        centerX = posXPixels + radiusPixels;
-        centerY = posYPixels + radiusPixels;
-      } else {
-        centerX = posXPixels + anchoPixels / 2;
-        centerY = posYPixels + altoPixels / 2;
-      }
-      
-      const label = new FabricText(`${nombre}\n${dimensionText}`, {
-        left: centerX,
-        top: centerY,
-        fontSize: finalFontSize,
-        fontFamily: "system-ui, sans-serif",
-        fontWeight: "600",
-        fill: "#1e40af",
-        textAlign: "center",
-        selectable: false,
-        evented: false,
-        originX: "center",
-        originY: "center",
-      });
-      
-      (label as any).customData = { tipo: "mesa-label", parentId: mesaId };
-      (label as any).isMesaLabel = true;
-      fabricCanvas.add(label);
-    };
-
     // Primero cargar mesas del estado local (tienen prioridad)
     // NOTA: mesa.posX/posY están en METROS, hay que convertir a píxeles
     mesasLocales.forEach((mesa) => {
@@ -1985,7 +1940,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // Convertir cm a píxeles para dimensiones
       const anchoPixels = mesa.ancho / 100 * pixelsPerMeter;
       const altoPixels = mesa.alto / 100 * pixelsPerMeter;
-      const labelColor = mesa.isMerged ? "#166534" : "#1e40af";
 
       const obj = createMesaTableObject({
         id: mesa.id,
@@ -2003,35 +1957,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(obj);
       renderSillasMesa(fabricCanvas, obj);
 
-      // Etiqueta con estilo diferente para mesas agrupadas
-      if (mesa.isMerged) {
-        const anchoM = (mesa.ancho / 100).toFixed(2);
-        const altoM = (mesa.alto / 100).toFixed(2);
-        const dimensionText = `${anchoM}x${altoM}m`;
-        const centerX = posXPixels + anchoPixels / 2;
-        const centerY = posYPixels + altoPixels / 2;
-        const minDimension = Math.min(anchoPixels, altoPixels);
-        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-
-        const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
-          left: centerX,
-          top: centerY,
-          fontSize: fontSize,
-          fontFamily: "system-ui, sans-serif",
-          fontWeight: "600",
-          fill: labelColor,
-          textAlign: "center",
-          selectable: false,
-          evented: false,
-          originX: "center",
-          originY: "center",
-        });
-        (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
-        (label as any).isMesaLabel = true;
-        fabricCanvas.add(label);
-      } else {
-        addMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels);
-      }
+      // Etiqueta (verde y con el nombre compuesto si es una mesa agrupada)
+      createMesaLabel(mesa.id, mesa.nombre, mesa.ancho, mesa.alto, mesa.forma, posXPixels, posYPixels, {
+        capacidad: mesa.capacidad,
+        isMerged: mesa.isMerged,
+      });
 
       // Si la mesa tiene etiqueta bocadillo, crearla
       if (mesa.etiqueta) {
@@ -2069,7 +1999,6 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
       // Colores según si es mesa agrupada o normal
       const isMerged = mesa.is_merged || false;
-      const labelColor = isMerged ? "#166534" : "#1e40af";
 
       const obj = createMesaTableObject({
         id: mesa.id,
@@ -2087,35 +2016,11 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(obj);
       renderSillasMesa(fabricCanvas, obj);
 
-      // Etiqueta con estilo diferente para mesas agrupadas
-      if (isMerged) {
-        const anchoM = (anchoCm / 100).toFixed(2);
-        const altoM = (altoCm / 100).toFixed(2);
-        const dimensionText = `${anchoM}x${altoM}m`;
-        const centerX = posXPixels + anchoPixels / 2;
-        const centerY = posYPixels + altoPixels / 2;
-        const minDimension = Math.min(anchoPixels, altoPixels);
-        const fontSize = Math.max(5, Math.min(10, minDimension / 8));
-        
-        const label = new FabricText(`${mesa.nombre} (${mesa.capacidad}p)\n${dimensionText}`, {
-          left: centerX,
-          top: centerY,
-          fontSize: fontSize,
-          fontFamily: "system-ui, sans-serif",
-          fontWeight: "600",
-          fill: labelColor,
-          textAlign: "center",
-          selectable: false,
-          evented: false,
-          originX: "center",
-          originY: "center",
-        });
-        (label as any).customData = { tipo: "mesa-label", parentId: mesa.id };
-        (label as any).isMesaLabel = true;
-        fabricCanvas.add(label);
-      } else {
-        addMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels);
-      }
+      // Etiqueta (verde y con el nombre compuesto si es una mesa agrupada)
+      createMesaLabel(mesa.id, mesa.nombre, anchoCm, altoCm, mesa.forma, posXPixels, posYPixels, {
+        capacidad: mesa.capacidad,
+        isMerged,
+      });
 
       // Si la mesa tiene etiqueta bocadillo, crearla
       if (mesa.etiqueta) {
@@ -2763,53 +2668,187 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
   };
 
-  // Función para crear etiqueta de mesa (anchoCm/altoCm en cm, posXPixels/posYPixels en píxeles)
-  const createMesaLabel = (mesaId: string, nombre: string, anchoCm: number, altoCm: number, forma: string, posXPixels: number, posYPixels: number) => {
-    if (!fabricCanvas) return;
-    
-    // Calcular dimensiones en metros para mostrar
-    const anchoM = (anchoCm / 100).toFixed(2);
-    const altoM = (altoCm / 100).toFixed(2);
-    const dimensionText = forma === "circular" ? `Ø${anchoM}m` : `${anchoM}x${altoM}m`;
-    
-    // Calcular dimensiones en píxeles
-    const anchoPixels = anchoCm / 100 * pixelsPerMeterRef.current;
-    const altoPixels = altoCm / 100 * pixelsPerMeterRef.current;
-    
-    // Calcular tamaño de fuente que quepa
+  // =========================================================================
+  // ETIQUETA DE MESA — un solo helper para los 6 sitios que antes construían
+  // el FabricText a mano (dibujar mesa, cargar del estado local, cargar de
+  // BBDD, desagrupar, fusionar y reconstruir el snapshot de undo/redo).
+  //
+  // JERARQUÍA: el NÚMERO es el dato con el que el personal identifica la mesa
+  // ("la 7"), así que va en la primera línea, grande y en negrita; las plazas
+  // y las dimensiones van debajo, en texto secundario más pequeño. Antes todo
+  // el texto compartía un fontSize limitado a 5-10px y el número era
+  // ilegible de un vistazo.
+  //
+  // Se usa UN ÚNICO FabricText con `styles` por línea (no dos objetos de
+  // texto) porque los handlers de arrastre recolocan por
+  // `customData.tipo === "mesa-label"` asumiendo un objeto centrado en la
+  // mesa: dos objetos se apilarían uno encima del otro al mover la mesa.
+  // =========================================================================
+  /** Azul de mesa real (igual que antes). */
+  const MESA_LABEL_COLOR = "#1e40af";
+  /** Verde de mesa fusionada (igual que antes). */
+  const MESA_LABEL_COLOR_MERGED = "#166534";
+  /** Texto secundario (plazas/dimensiones): gris que se lee sobre azul y verde. */
+  const MESA_LABEL_COLOR_SEC = "#475569";
+  /** Por debajo de esto el número no se lee, así que se sacrifica la 2ª línea. */
+  const MESA_LABEL_MIN_NUMERO = 9;
+
+  const crearMesaLabelEnCentro = (
+    canvas: FabricCanvas,
+    opts: {
+      mesaId: string;
+      nombre: string;
+      capacidad?: number | null;
+      forma: string;
+      anchoCm: number;
+      altoCm: number;
+      /** Centro de la mesa en coordenadas de escena. */
+      centerX: number;
+      centerY: number;
+      isMerged?: boolean;
+    },
+  ): FabricText => {
+    const ppm = pixelsPerMeterRef.current;
+    const anchoPixels = (opts.anchoCm / 100) * ppm;
+    const altoPixels = (opts.altoCm / 100) * ppm;
+
+    // Texto secundario CORTO a propósito: cuanto menos ocupe, más grande puede
+    // ser el número. Las dimensiones van en cm ("80×80"), que es como se habla
+    // de una mesa, en vez del "0.80x0.80m" de antes (10 caracteres solo de
+    // medidas dejaban al número sin sitio).
+    const dimensionText =
+      opts.forma === "circular" ? `Ø${Math.round(opts.anchoCm)}` : `${Math.round(opts.anchoCm)}×${Math.round(opts.altoCm)}`;
+    const plazas = opts.capacidad && opts.capacidad > 0 ? `${opts.capacidad}p · ` : "";
+    const secundario = `${plazas}${dimensionText}`;
+    // Las fusionadas conservan su nombre compuesto ("7+8"), que es justo lo
+    // que hay que ver para saber de qué mesas está hecha.
+    const numero = (opts.nombre ?? "").trim() || "?";
+
     const minDimension = Math.min(anchoPixels, altoPixels);
-    const finalFontSize = Math.max(5, Math.min(10, minDimension / 8));
-    
-    // Centro de la mesa
-    let centerX: number;
-    let centerY: number;
-    
-    if (forma === "circular") {
-      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
-      centerX = posXPixels + radiusPixels;
-      centerY = posYPixels + radiusPixels;
-    } else {
-      centerX = posXPixels + anchoPixels / 2;
-      centerY = posYPixels + altoPixels / 2;
+    const colorNumero = opts.isMerged ? MESA_LABEL_COLOR_MERGED : MESA_LABEL_COLOR;
+    const maxWidth = anchoPixels * 0.86;
+    const maxHeight = altoPixels * 0.86;
+
+    /** Encoge `fontSize` hasta que el texto quepa en `anchoMax`/`altoMax`. */
+    const ajustar = (
+      texto: string,
+      fontSize: number,
+      fontWeight: string,
+      anchoMax: number,
+      altoMax: number,
+    ) => {
+      const medida = new FabricText(texto, {
+        fontSize,
+        fontFamily: "system-ui, sans-serif",
+        fontWeight,
+      });
+      let ajustado = fontSize;
+      if (medida.width && medida.width > anchoMax) ajustado = ajustado * (anchoMax / medida.width);
+      if (medida.height && medida.height > altoMax) {
+        ajustado = Math.min(ajustado, fontSize * (altoMax / medida.height));
+      }
+      return ajustado;
+    };
+
+    // 1) El NÚMERO manda: se le da todo el tamaño que quepa a lo ancho y ~60%
+    //    del alto (el resto se reserva para la línea secundaria).
+    const cabeSecundario = altoPixels >= 24;
+    let fontNumero = Math.max(
+      7,
+      ajustar(
+        numero,
+        Math.min(26, Math.max(MESA_LABEL_MIN_NUMERO, minDimension / 2.6)),
+        "700",
+        maxWidth,
+        cabeSecundario ? maxHeight * 0.6 : maxHeight,
+      ),
+    );
+
+    // 2) La línea secundaria se ajusta aparte: si para caber tuviera que
+    //    quedarse por debajo de 4px no se dibuja, y el número aprovecha todo el
+    //    alto. Nunca al revés: el número es el dato que identifica la mesa.
+    let fontSecundario = cabeSecundario
+      ? ajustar(secundario, Math.min(10, Math.max(4.5, fontNumero * 0.45)), "500", maxWidth, maxHeight * 0.34)
+      : 0;
+    const conSecundario = cabeSecundario && fontSecundario >= 4;
+    if (!conSecundario) {
+      fontSecundario = 0;
+      fontNumero = Math.max(7, ajustar(numero, Math.min(26, minDimension / 2), "700", maxWidth, maxHeight));
     }
-    
-    const label = new FabricText(`${nombre}\n${dimensionText}`, {
-      left: centerX,
-      top: centerY,
-      fontSize: finalFontSize,
+
+    const styles: TextStyle = {};
+    if (conSecundario) {
+      const fila: Record<number, any> = {};
+      for (let i = 0; i < secundario.length; i += 1) {
+        fila[i] = { fontSize: fontSecundario, fontWeight: "500", fill: MESA_LABEL_COLOR_SEC };
+      }
+      styles[1] = fila;
+    }
+
+    const label = new FabricText(conSecundario ? `${numero}\n${secundario}` : numero, {
+      left: opts.centerX,
+      top: opts.centerY,
+      fontSize: fontNumero,
       fontFamily: "system-ui, sans-serif",
-      fontWeight: "600",
-      fill: "#1e40af",
+      fontWeight: "700",
+      fill: colorNumero,
       textAlign: "center",
       selectable: false,
       evented: false,
       originX: "center",
       originY: "center",
+      styles,
     });
-    
-    (label as any).customData = { tipo: "mesa-label", parentId: mesaId };
+
+    (label as any).customData = { tipo: "mesa-label", parentId: opts.mesaId };
     (label as any).isMesaLabel = true;
-    fabricCanvas.add(label);
+    canvas.add(label);
+    return label;
+  };
+
+  /** Centro de una mesa a partir de su esquina superior izquierda (en píxeles). */
+  const centroMesaDesdeEsquina = (
+    forma: string,
+    anchoCm: number,
+    altoCm: number,
+    posXPixels: number,
+    posYPixels: number,
+  ) => {
+    const ppm = pixelsPerMeterRef.current;
+    const anchoPixels = (anchoCm / 100) * ppm;
+    const altoPixels = (altoCm / 100) * ppm;
+    if (forma === "circular") {
+      const radiusPixels = Math.min(anchoPixels, altoPixels) / 2;
+      return { centerX: posXPixels + radiusPixels, centerY: posYPixels + radiusPixels };
+    }
+    return { centerX: posXPixels + anchoPixels / 2, centerY: posYPixels + altoPixels / 2 };
+  };
+
+  // Etiqueta de mesa a partir de su esquina superior izquierda (anchoCm/altoCm
+  // en cm, posXPixels/posYPixels en píxeles).
+  const createMesaLabel = (
+    mesaId: string,
+    nombre: string,
+    anchoCm: number,
+    altoCm: number,
+    forma: string,
+    posXPixels: number,
+    posYPixels: number,
+    extra?: { capacidad?: number | null; isMerged?: boolean },
+  ) => {
+    if (!fabricCanvas) return;
+    const { centerX, centerY } = centroMesaDesdeEsquina(forma, anchoCm, altoCm, posXPixels, posYPixels);
+    crearMesaLabelEnCentro(fabricCanvas, {
+      mesaId,
+      nombre,
+      capacidad: extra?.capacidad,
+      forma,
+      anchoCm,
+      altoCm,
+      centerX,
+      centerY,
+      isMerged: extra?.isMerged,
+    });
   };
 
   // Función para crear etiqueta bocadillo debajo de la mesa
@@ -2898,7 +2937,16 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const posYMeters = posYPixels / pixelsPerMeterRef.current;
 
     const currentMesas = mesasCanvasRef.current;
-    const mesaName = `Mesa ${currentMesas.length + 1}`;
+    // NÚMERO DE LA MESA: se propone el PRIMER número libre del espacio, a
+    // secas ("7"), no `Mesa ${length + 1}`. Dos motivos:
+    //  1. `length + 1` no comprobaba nada: con tres mesas 1/2/3, borrar la 2 y
+    //     dibujar otra devolvía "Mesa 3" — un duplicado. Así se fabricaron los
+    //     números repetidos de producción.
+    //  2. En la sala el personal dice "la 7", no "la Mesa 7": el nombre de la
+    //     fila tiene que ser el número que se ve en la mesa de verdad.
+    // Es solo una PROPUESTA: `onMesaCreada` lleva el foco al campo del número
+    // del panel lateral para que el dueño ponga el real al momento.
+    const mesaName = siguienteNumeroMesaLibre(mesasCanvasParaNombre(currentMesas));
 
     const obj = createMesaTableObject({
       id,
@@ -2915,7 +2963,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     renderSillasMesa(fabricCanvas, obj);
 
     // Añadir etiqueta de la mesa (pasando cm y píxeles)
-    createMesaLabel(id, mesaName, anchoCm, altoCm, forma, posXPixels, posYPixels);
+    createMesaLabel(id, mesaName, anchoCm, altoCm, forma, posXPixels, posYPixels, { capacidad });
 
     fabricCanvas.setActiveObject(obj);
     fabricCanvas.renderAll();
@@ -2934,6 +2982,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     onMesasChange([...currentMesas, newMesa]);
     onToolChange("select");
+    // El número propuesto es solo eso: avisamos al padre para que el dueño
+    // pueda corregirlo inmediatamente en el panel lateral.
+    onMesaCreada?.(id, mesaName);
   };
 
   // Punto más cercano a `punto` sobre el segmento (clampado a sus extremos).

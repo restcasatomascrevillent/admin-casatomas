@@ -405,9 +405,22 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
                 ) : (
                   <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 )}
+                {/* Se cuentan las mesas REALES (`mesasReales`), no todas las
+                    filas activas: las uniones del editor de plano
+                    (`is_merged = true`) no aportan aforo porque sus originales
+                    pueden seguir vivas en la tabla, así que se nombran aparte.
+                    Tiene que decir el MISMO número que la tarjeta "Mesas y aforo
+                    por espacio" de Reservas › Configuración — ver la cabecera de
+                    `src/lib/reservas/aforoMesas.ts`. */}
                 <span>
-                  {cuadre.mesasActivas === 1 ? "1 mesa activa suma" : `${cuadre.mesasActivas} mesas activas suman`}{" "}
-                  <strong>{cuadre.plazasMesas}</strong> plazas.{" "}
+                  {cuadre.mesasReales === 1 ? "1 mesa activa suma" : `${cuadre.mesasReales} mesas activas suman`}{" "}
+                  <strong>{cuadre.plazasMesas}</strong> plazas
+                  {cuadre.mesasFusionadas > 0
+                    ? `, más ${
+                        cuadre.mesasFusionadas === 1 ? "1 mesa juntada" : `${cuadre.mesasFusionadas} mesas juntadas`
+                      } con ${cuadre.plazasFusionadas} plazas que no cuentan para el aforo`
+                    : ""}
+                  .{" "}
                   {cuadre.descuadra
                     ? `${textoEstadoCuadre(cuadre)}. Puedes guardar igualmente.`
                     : "Cuadra con la capacidad declarada."}

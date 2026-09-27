@@ -66,14 +66,19 @@ export interface OpcionesMesas {
 }
 
 /**
- * Mesas de un espacio (o de todos si no se pasa `espacioId`).
+ * Mesas de un espacio (o de todos si no se pasa `espacioId`). El `select("*")`
+ * trae también `is_merged` y `activa`, que hacen falta para el aforo.
  *
- * OJO con sumar `capacidad` para calcular aforo: cuando el editor de plano
- * fusiona mesas BORRA las filas originales y crea una sola fila con
- * `is_merged = true` y la capacidad combinada (ver `EditorPlanoEspacio.tsx`,
- * sobre la línea 183). Por eso sumar todas las mesas activas NO duplica
- * plazas y no hay que excluir `is_merged`. La cuenta vive en
- * `src/lib/reservas/aforoMesas.ts`, no la repitas a mano.
+ * OJO con sumar `capacidad` para calcular aforo: HAY QUE EXCLUIR LAS FILAS
+ * FUSIONADAS (`is_merged = true`). Al fusionar, el editor de plano intenta
+ * borrar las filas originales pero lo hace sin comprobar el error del DELETE
+ * (`EditorPlanoEspacio.tsx`, líneas ~551 y ~583), y supabase-js RESUELVE en vez
+ * de rechazar cuando RLS o una clave ajena lo impiden: el borrado puede fallar
+ * en silencio y dejar vivas la unión Y sus originales. Sumarlas todas cuenta
+ * las mismas sillas dos veces (en producción, 2026-09-27: el Salón decía 64
+ * plazas cuando tiene 36; la Terraza decía 12 sin tener ni una mesa real).
+ * La cuenta buena vive en `src/lib/reservas/aforoMesas.ts` — no la repitas a
+ * mano.
  */
 export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
   const incluirInactivas = opciones?.incluirInactivas === true;
@@ -118,6 +123,33 @@ export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
   });
 }
 
+/**
+ * NOMBRE DE MESA REPETIDO: traduce el choque del índice único a algo legible.
+ *
+ * El número de mesa vive en `mesas.nombre` (un `text`; no hay columna `numero` y
+ * no se va a crear). El índice único parcial `uq_mesas_espacio_nombre_real`
+ * —sobre `(espacio_id, lower(regexp_replace(btrim(nombre), '\s+', ' ', 'g')))`
+ * con `where coalesce(is_merged, false) = false and coalesce(activa, true) =
+ * true`— es la ÚNICA garantía real de que no se repita: la validación de
+ * cliente se queda obsoleta en cuanto hay dos pestañas abiertas o dos usuarios
+ * a la vez, y en producción ya hay DOS mesas "9" en el Salón por no tenerlo.
+ *
+ * Postgres devuelve `23505` (unique_violation) con el nombre del índice en el
+ * mensaje. Sin esto, el usuario veía un "Error al crear/actualizar mesa" opaco y
+ * no tenía forma de saber que el problema era el número repetido. Lo usan los DOS
+ * caminos que escriben el nombre: `useCrearMesa` (el alta del editor de plano) y
+ * `useActualizarMesa` (el renombrado de la tarjeta de Configuración).
+ */
+const esNumeroDeMesaRepetido = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: unknown; message?: unknown; details?: unknown };
+  const texto = [e.message, e.details].filter((t) => typeof t === "string").join(" ");
+  // El nombre del índice es la señal inequívoca; el código 23505 sobre `mesas`
+  // solo puede venir de este índice o de la clave primaria (un choque de UUID,
+  // que no pasa), así que vale como red de seguridad si el mensaje no lo trae.
+  return /uq_mesas_espacio_nombre_real/i.test(texto) || e.code === "23505";
+};
+
 export function useCrearMesa() {
   const queryClient = useQueryClient();
 
@@ -135,7 +167,17 @@ export function useCrearMesa() {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
     },
     onError: (error) => {
-      toast.error("Error al crear mesa");
+      // El alta es por donde entra el choque en la práctica: el editor de plano
+      // crea mesas desde tres sitios (panel lateral, dibujando en el lienzo y el
+      // alta en rango de hasta 40 de golpe, que inserta una a una y para en el
+      // primer fallo). El texto está redactado para que también se entienda leído
+      // en medio de un lote: dice que ESA mesa no se creó, sin dar por hecho que
+      // fuera la única.
+      toast.error(
+        esNumeroDeMesaRepetido(error)
+          ? "Ya hay una mesa con ese número en este espacio: esa mesa no se ha creado. Usa otro número."
+          : "Error al crear mesa",
+      );
       console.error(error);
     },
   });
@@ -164,7 +206,11 @@ export function useActualizarMesa() {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
     },
     onError: (error) => {
-      toast.error("Error al actualizar mesa");
+      toast.error(
+        esNumeroDeMesaRepetido(error)
+          ? "Ya hay una mesa con ese número en este espacio. Usa otro número."
+          : "Error al actualizar mesa",
+      );
       console.error(error);
     },
   });

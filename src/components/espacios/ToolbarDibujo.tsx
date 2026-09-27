@@ -40,14 +40,22 @@ interface ToolButton {
   icon: React.ReactNode;
   label: string;
   shortcut?: string;
+  /** Segunda línea del tooltip, para explicar lo que no es obvio al pulsar. */
+  descripcion?: string;
 }
+
+// El número de la mesa (que vive en `mesas.nombre`) es el dato con el que el
+// personal la identifica en la sala, así que la herramienta lo dice en claro:
+// el que se pone al dibujar es solo el primer número libre y hay que
+// corregirlo por el real.
+const NUMERO_PROPUESTO = "Se numera con el primer número libre: corrígelo en el panel de la derecha.";
 
 const tools: ToolButton[] = [
   { id: "select", icon: <MousePointer className="h-4 w-4" />, label: "Seleccionar", shortcut: "S" },
   { id: "wall", icon: <Minus className="h-4 w-4" />, label: "Pared", shortcut: "W" },
   { id: "area", icon: <Square className="h-4 w-4" />, label: "Área", shortcut: "A" },
-  { id: "mesa-rect", icon: <Square className="h-4 w-4 fill-current" />, label: "Mesa rectangular", shortcut: "M" },
-  { id: "mesa-circular", icon: <Circle className="h-4 w-4 fill-current" />, label: "Mesa circular", shortcut: "C" },
+  { id: "mesa-rect", icon: <Square className="h-4 w-4 fill-current" />, label: "Mesa rectangular", shortcut: "M", descripcion: NUMERO_PROPUESTO },
+  { id: "mesa-circular", icon: <Circle className="h-4 w-4 fill-current" />, label: "Mesa circular", shortcut: "C", descripcion: NUMERO_PROPUESTO },
   { id: "door", icon: <DoorOpen className="h-4 w-4" />, label: "Puerta", shortcut: "D" },
 ];
 
@@ -81,6 +89,9 @@ export function ToolbarDibujo({
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <p>{tool.label} {tool.shortcut && <span className="text-muted-foreground ml-1">({tool.shortcut})</span>}</p>
+              {tool.descripcion && (
+                <p className="text-xs text-muted-foreground max-w-56">{tool.descripcion}</p>
+              )}
             </TooltipContent>
           </Tooltip>
         ))}

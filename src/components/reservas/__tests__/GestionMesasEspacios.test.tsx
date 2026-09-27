@@ -1,18 +1,21 @@
 /**
  * Tests para src/components/reservas/GestionMesasEspacios.tsx
  *
- * Estrategia: se mockean los hooks de Supabase (`useMesas`, `useEspaciosReserva`)
- * y el permiso (`useSuperAdmin`) pero NO la lógica de cuadre
- * (`src/lib/reservas/aforoMesas.ts`), que corre de verdad — así estos tests
- * también cubren que la pantalla lee bien las cifras.
+ * Estrategia: se mockean los hooks de Supabase (`useMesas`, `useActualizarMesa`,
+ * `useEspaciosReserva`) y el permiso (`useSuperAdmin`) pero NO la lógica de
+ * cuadre (`src/lib/reservas/aforoMesas.ts`) ni el helper de nombres
+ * (`src/components/espacios/nombresMesa.ts`), que corren de verdad — así estos
+ * tests también cubren que la pantalla lee bien las cifras y que valida el
+ * número con el MISMO criterio que el índice único de Postgres.
  *
- * DECISIÓN DEL DUEÑO (2026-09-26): esta pantalla es de SOLO LECTURA. Las
- * mesas se crean/editan/borran únicamente en el editor de plano (Super Admin
- * › Espacios). Aquí solo se comprueba el cuadre de aforo y el botón/nota que
- * lleva al editor según el permiso del usuario.
+ * ENCARGO DEL DUEÑO (2026-09-27), que cambia la decisión del 26: el NÚMERO de
+ * mesa se corrige AQUÍ ("en sala se dice 'la 7'"), pero las mesas se siguen
+ * dando de alta y borrando SOLO en el editor de plano. O sea: esta pantalla
+ * tiene edición del número y NO tiene crear/borrar.
  *
- * El escenario por defecto es el ESTADO REAL DE PRODUCCIÓN del 2026-09-26, que
- * es el que motivó el encargo:
+ * El escenario por defecto es el ESTADO REAL DE PRODUCCIÓN del 2026-09-26 (aún
+ * sin uniones en los fixtures; las uniones se prueban aparte con los datos
+ * verificados el 2026-09-27):
  *
  *   Comedor (casa_tomas)      50 declaradas ·  2 mesas ·  4 plazas
  *   Salón (casa_tomas)        50 declaradas · 15 mesas · 64 plazas
@@ -23,12 +26,13 @@
  *   El Reservado (touza)      20 declaradas ·  0 mesas ·  0 plazas
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
 vi.mock("@/hooks/useSuperAdmin");
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -36,7 +40,7 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => navigateMock };
 });
 
-import { useMesas } from "@/hooks/useMesas";
+import { useMesas, useActualizarMesa } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { GestionMesasEspacios } from "@/components/reservas/GestionMesasEspacios";
@@ -84,6 +88,10 @@ const mesa = (
   ...extra,
 });
 
+/** Fila de UNIÓN, tal como la guarda el editor de plano: nombre compuesto + is_merged. */
+const union = (id: string, espacio_id: string, nombre: string, capacidad: number) =>
+  mesa(id, espacio_id, nombre, capacidad, { is_merged: true });
+
 const ESPACIOS_PRODUCCION = [
   espacio("e-comedor", "Comedor", 50, "casa_tomas"),
   espacio("e-salon", "Salón", 50, "casa_tomas"),
@@ -105,18 +113,22 @@ const MESAS_PRODUCCION = [
   mesa("m-t3", "e-terraza-ct", "Terraza 3", 4),
 ];
 
+const mutateAsyncMock = vi.fn();
+
 function montar({
   espacios = ESPACIOS_PRODUCCION,
   mesas = MESAS_PRODUCCION,
   cargando = false,
   isSuperAdmin = true,
   cargandoPermiso = false,
+  guardando = false,
 }: {
   espacios?: unknown[];
   mesas?: unknown[];
   cargando?: boolean;
   isSuperAdmin?: boolean;
   cargandoPermiso?: boolean;
+  guardando?: boolean;
 } = {}) {
   vi.mocked(useEspaciosReserva).mockReturnValue({
     data: espacios,
@@ -125,6 +137,10 @@ function montar({
   vi.mocked(useMesas).mockReturnValue({
     data: mesas,
     isLoading: cargando,
+  } as never);
+  vi.mocked(useActualizarMesa).mockReturnValue({
+    mutateAsync: mutateAsyncMock,
+    isPending: guardando,
   } as never);
   vi.mocked(useSuperAdmin).mockReturnValue({
     isSuperAdmin,
@@ -145,11 +161,37 @@ function bloqueDe(nombre: string, ocurrencia = 0): HTMLElement {
   return bloque as HTMLElement;
 }
 
+/** Abre el editor del número de una mesa y devuelve el input. */
+function editarNumeroDe(nombreMesa: string): HTMLInputElement {
+  fireEvent.click(
+    screen.getByRole("button", { name: new RegExp(`Cambiar el número de la mesa ${nombreMesa}$`) }),
+  );
+  return screen.getByRole("textbox", {
+    name: new RegExp(`Número de la mesa ${nombreMesa}$`),
+  }) as HTMLInputElement;
+}
+
+const botonGuardar = () => screen.getByRole("button", { name: "Guardar" });
+
+/**
+ * Aviso del campo, localizado A TRAVÉS de `aria-describedby` — así el test
+ * comprueba de paso que el aviso está bien asociado al input. Hace falta porque
+ * el aviso de descuadre del espacio también es `role="status"`.
+ */
+function avisoDe(input: HTMLInputElement): HTMLElement {
+  const id = input.getAttribute("aria-describedby");
+  const aviso = id ? document.getElementById(id) : null;
+  if (!aviso) throw new Error("El campo no tiene ningún aviso asociado por aria-describedby");
+  expect(aviso).toHaveAttribute("role", "status");
+  return aviso;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("GestionMesasEspacios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mutateAsyncMock.mockResolvedValue({});
   });
 
   // ── Carga y estructura ─────────────────────────────────────────────────────
@@ -182,11 +224,13 @@ describe("GestionMesasEspacios", () => {
     expect(screen.getAllByText("Terraza")).toHaveLength(2);
   });
 
-  it('dice en la descripción que las mesas se gestionan en el editor de plano', () => {
+  it("dice en la descripción que las mesas se dan de alta en el plano y que el número se corrige aquí", () => {
     montar();
+    // El texto sale en la cabecera de la tarjeta y también en la nota de cada espacio.
     expect(
-      screen.getByText(/se dan de alta, editan y borran en el plano/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/se dan de alta y se borran en el plano/i).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/corrige aquí el número/i)).toBeInTheDocument();
   });
 
   // ── El descuadre se ve ─────────────────────────────────────────────────────
@@ -225,14 +269,14 @@ describe("GestionMesasEspacios", () => {
     montar();
     expect(bloqueDe("Salón")).toHaveTextContent(/No impide reservar/i);
     expect(
-      screen.getByText(/Los avisos de arriba no\s+impiden guardar ni reservar/i),
+      screen.getByText(/Los avisos de\s+arriba no impiden guardar ni reservar/i),
     ).toBeInTheDocument();
   });
 
   it("no avisa cuando un espacio cuadra", () => {
     montar({
       espacios: [espacio("e-ok", "Sala Cuadrada", 8, "casa_tomas")],
-      mesas: [mesa("m-1", "e-ok", "Mesa 1", 4), mesa("m-2", "e-ok", "Mesa 2", 4)],
+      mesas: [mesa("m-1", "e-ok", "1", 4), mesa("m-2", "e-ok", "2", 4)],
     });
     const bloque = bloqueDe("Sala Cuadrada");
     expect(bloque).toHaveTextContent(/Cuadra/);
@@ -261,7 +305,56 @@ describe("GestionMesasEspacios", () => {
     expect(insigniasBloqueo).toHaveLength(1);
   });
 
-  // ── Mesas: listado (solo lectura) ───────────────────────────────────────────
+  // ── Mesas reales vs mesas juntadas (datos reales del 2026-09-27) ────────────
+
+  it("separa mesas reales de mesas juntadas: el Salón pasa de 64 plazas a 36", () => {
+    // Producción, 2026-09-27: el Salón tiene 15 filas de las que 7 son uniones
+    // (nombres compuestos "2+1", "3+4", "11+10"...). 8 mesas reales suman 36
+    // plazas; las 7 uniones suman 28 que YA están contadas en las originales.
+    montar({
+      espacios: [espacio("e-salon", "Salón", 50, "casa_tomas")],
+      mesas: [
+        ...Array.from({ length: 6 }, (_, i) => mesa(`m-r${i}`, "e-salon", `${i + 1}`, 4)),
+        mesa("m-g1", "e-salon", "20", 6),
+        mesa("m-g2", "e-salon", "21", 6),
+        ...Array.from({ length: 7 }, (_, i) => union(`m-u${i}`, "e-salon", `${i}+${i + 1}`, 4)),
+      ],
+    });
+    const salon = bloqueDe("Salón");
+    expect(salon).toHaveTextContent(/8 mesas\s*=\s*36 plazas/);
+    expect(salon).toHaveTextContent(/\+\s*7 juntadas\s*\(\s*28 plazas, no cuentan para el aforo\)/);
+    // Y el descuadre se cuenta sobre las reales: 36 frente a 50 declaradas.
+    expect(salon).toHaveTextContent(/Faltan 14 plazas/i);
+  });
+
+  it("señala las mesas unidas en el plano", () => {
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "1+2", 8, { is_merged: true })],
+    });
+    expect(within(bloqueDe("Sala X")).getByText("Unida")).toBeInTheDocument();
+  });
+
+  it("un espacio con SOLO uniones dice qué hacer, no un genérico 'sin mesas'", () => {
+    // Terraza en producción (2026-09-27): 3 filas y las 3 son uniones, así que
+    // no queda ni una mesa real y su aforo real es 0. Eso es correcto y hay que
+    // enseñarlo: su plano está roto.
+    montar({
+      espacios: [espacio("e-terraza", "Terraza", 50, "casa_tomas")],
+      mesas: [
+        union("m-u1", "e-terraza", "2+1", 4),
+        union("m-u2", "e-terraza", "3+4", 4),
+        union("m-u3", "e-terraza", "15+14", 4),
+      ],
+    });
+    const terraza = bloqueDe("Terraza");
+    expect(terraza).toHaveTextContent(/0 mesas\s*=\s*0 plazas/);
+    expect(terraza).toHaveTextContent(/\+\s*3 juntadas\s*\(\s*12 plazas, no cuentan/);
+    expect(terraza).toHaveTextContent(/Solo mesas unidas/i);
+    expect(terraza).toHaveTextContent(/Las 3 mesas de este espacio son uniones/i);
+    expect(terraza).toHaveTextContent(/se perdieron las originales al fusionarlas/i);
+    expect(terraza).toHaveTextContent(/volver a darlas de alta en el editor de plano/i);
+  });
 
   it("lista las mesas de cada espacio con sus plazas", () => {
     montar();
@@ -286,25 +379,175 @@ describe("GestionMesasEspacios", () => {
     expect(bloque).toHaveTextContent(/1 mesa\s*=\s*4 plazas/);
   });
 
-  it("señala las mesas unidas en el plano", () => {
-    montar({
-      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
-      mesas: [mesa("m-1", "e-x", "Mesa 1+2", 8, { is_merged: true })],
-    });
-    expect(within(bloqueDe("Sala X")).getByText("Unida")).toBeInTheDocument();
-  });
+  // ── Edición del NÚMERO de mesa (encargo del 2026-09-27) ────────────────────
 
-  it("no ofrece ningún botón de añadir, editar ni borrar una mesa concreta", () => {
+  it("se puede corregir el número de una mesa, pero NO hay crear ni borrar mesas", () => {
+    // Sustituye al test de "solo lectura" del 2026-09-26: el dueño cambió de
+    // criterio y el número se edita aquí. Lo que sigue estando SOLO en el editor
+    // de plano es dar de alta y borrar.
     montar();
     expect(screen.queryByRole("button", { name: /Añadir mesa/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Editar (Comedor|Salón|Terraza)/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nueva mesa/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Borrar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Eliminar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    // El único botón "Editar..." que queda es el que lleva al plano, no uno por mesa.
-    const botonesEditar = screen.getAllByRole("button", { name: /^Editar/i });
-    for (const boton of botonesEditar) {
+    // El único botón "Editar..." sigue siendo el que lleva al plano.
+    for (const boton of screen.getAllByRole("button", { name: /^Editar/i })) {
       expect(boton).toHaveTextContent(/Editar mesas en el plano/i);
     }
+    // Y cada mesa real tiene su botón de cambiar el número.
+    expect(
+      screen.getAllByRole("button", { name: /^Cambiar el número de la mesa/ }).length,
+    ).toBe(MESAS_PRODUCCION.length);
+  });
+
+  it("al abrir el editor aparece el número actual en un campo con nombre accesible", () => {
+    montar();
+    const input = editarNumeroDe("Comedor 1");
+    expect(input).toHaveValue("Comedor 1");
+    expect(input).not.toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("guarda el número nuevo recortando los espacios", async () => {
+    montar();
+    const input = editarNumeroDe("Comedor 1");
+    fireEvent.change(input, { target: { value: "  7  " } });
+    expect(botonGuardar()).toBeEnabled();
+    fireEvent.click(botonGuardar());
+    expect(mutateAsyncMock).toHaveBeenCalledWith({ id: "m-c1", nombre: "7" });
+    // Al terminar el guardado el editor se cierra solo.
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: /Número de la mesa/ })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("guarda con Enter y cancela con Escape", async () => {
+    montar();
+    let input = editarNumeroDe("Comedor 1");
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(mutateAsyncMock).toHaveBeenCalledWith({ id: "m-c1", nombre: "7" });
+    await waitFor(() =>
+      expect(screen.queryByRole("textbox", { name: /Número de la mesa/ })).not.toBeInTheDocument(),
+    );
+
+    input = editarNumeroDe("Comedor 2");
+    fireEvent.change(input, { target: { value: "8" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: /Número de la mesa/ })).not.toBeInTheDocument();
+    expect(mutateAsyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("avisa en vivo y no deja guardar si el número ya existe en ese espacio", () => {
+    // Caso real: el Salón tiene DOS mesas "9" en producción porque nada lo
+    // impedía. Aquí se comprueba con el mismo criterio que el índice único:
+    // mismo espacio, normalizando espacios y mayúsculas.
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "7", 4), mesa("m-2", "e-x", "9", 6)],
+    });
+    const input = editarNumeroDe("7");
+    fireEvent.change(input, { target: { value: "9" } });
+    // El aviso está asociado al campo para que lo lea un lector de pantalla.
+    expect(avisoDe(input)).toHaveTextContent(/Ya hay una mesa llamada "9"/i);
+    expect(botonGuardar()).toBeDisabled();
+    expect(input).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.click(botonGuardar());
+    expect(mutateAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("detecta el duplicado aunque cambien mayúsculas y espacios (igual que el índice)", () => {
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "Barra 1", 4), mesa("m-2", "e-x", "Mesa 9", 6)],
+    });
+    const input = editarNumeroDe("Barra 1");
+    fireEvent.change(input, { target: { value: "  mesa   9 " } });
+    expect(botonGuardar()).toBeDisabled();
+  });
+
+  it("un número libre sí se puede guardar", () => {
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "7", 4), mesa("m-2", "e-x", "9", 6)],
+    });
+    const input = editarNumeroDe("7");
+    fireEvent.change(input, { target: { value: "8" } });
+    expect(input).not.toHaveAttribute("aria-describedby");
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(botonGuardar()).toBeEnabled();
+  });
+
+  it("una mesa no choca consigo misma (se excluye su propio id)", () => {
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "7", 4), mesa("m-2", "e-x", "9", 6)],
+    });
+    const input = editarNumeroDe("7");
+    fireEvent.change(input, { target: { value: "7" } });
+    expect(botonGuardar()).toBeEnabled();
+    // Y guardar lo mismo no lanza ningún UPDATE.
+    fireEvent.click(botonGuardar());
+    expect(mutateAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("no deja guardar un número vacío (la columna nombre es NOT NULL)", () => {
+    montar();
+    const input = editarNumeroDe("Comedor 1");
+    fireEvent.change(input, { target: { value: "   " } });
+    expect(avisoDe(input)).toHaveTextContent(/no puede quedar vacío/i);
+    expect(botonGuardar()).toBeDisabled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(mutateAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("avisa sin bloquear cuando el nombre no lleva ningún número", () => {
+    // En producción hay una mesa llamada "o" en el Comedor: un tecleo suelto.
+    // Pero hay salas con "Barra" o "1A" y el dueño decide, así que solo se avisa.
+    montar();
+    const input = editarNumeroDe("Comedor 1");
+    fireEvent.change(input, { target: { value: "Barra" } });
+    expect(avisoDe(input)).toHaveTextContent(/no lleva ningún número/i);
+    expect(botonGuardar()).toBeEnabled();
+  });
+
+  it("una mesa UNIDA no tiene campo de edición y explica por qué", () => {
+    montar({
+      espacios: [espacio("e-x", "Sala X", 10, "casa_tomas")],
+      mesas: [mesa("m-1", "e-x", "7", 4), union("m-u", "e-x", "11+10", 8)],
+    });
+    expect(
+      screen.queryByRole("button", { name: /Cambiar el número de la mesa 11\+10/ }),
+    ).not.toBeInTheDocument();
+    // La real sí se puede renombrar.
+    expect(
+      screen.getByRole("button", { name: /Cambiar el número de la mesa 7$/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByTitle(/El número de una mesa unida lo genera el editor de plano/i))
+      .toHaveTextContent("11+10");
+  });
+
+  it("si el guardado falla, el campo sigue abierto con lo escrito", async () => {
+    montar();
+    mutateAsyncMock.mockRejectedValueOnce({ code: "23505", message: "uq_mesas_espacio_nombre_real" });
+    const input = editarNumeroDe("Comedor 1");
+    fireEvent.change(input, { target: { value: "9" } });
+    fireEvent.click(botonGuardar());
+    await waitFor(() => expect(mutateAsyncMock).toHaveBeenCalled());
+    // El aviso humano lo da `useActualizarMesa` por toast; aquí lo que importa
+    // es no perder lo que el usuario había escrito.
+    expect(
+      screen.getByRole("textbox", { name: /Número de la mesa Comedor 1$/ }),
+    ).toHaveValue("9");
+  });
+
+  it("mientras guarda, el campo y los botones quedan bloqueados", () => {
+    montar({ guardando: true });
+    const input = editarNumeroDe("Comedor 1");
+    expect(input).toBeDisabled();
+    expect(botonGuardar()).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   });
 
   // ── Acceso al editor de plano ───────────────────────────────────────────────
@@ -328,8 +571,17 @@ describe("GestionMesasEspacios", () => {
     expect(
       screen.queryByRole("button", { name: /Editar mesas en el plano/i }),
     ).not.toBeInTheDocument();
-    const notas = screen.getAllByText(/Las mesas se gestionan en el plano/i);
+    const notas = screen.getAllByText(/Las mesas se dan de alta y se borran en el plano \(Super Admin/i);
     expect(notas.length).toBeGreaterThan(0);
+  });
+
+  it("corregir el número NO está detrás del permiso de super admin", () => {
+    // El encargo del dueño es que se pueda arreglar el número desde la pestaña
+    // de Configuración, sin pasar por Super Admin.
+    montar({ isSuperAdmin: false });
+    expect(
+      screen.getAllByRole("button", { name: /^Cambiar el número de la mesa/ }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("no ofrece el botón mientras se resuelve el permiso de super admin", () => {
@@ -347,7 +599,7 @@ describe("GestionMesasEspacios", () => {
         espacio("e-on", "Sala Activa", 10, "casa_tomas"),
         espacio("e-off", "Sala Cerrada", 40, "casa_tomas", false),
       ],
-      mesas: [mesa("m-1", "e-on", "Mesa 1", 10)],
+      mesas: [mesa("m-1", "e-on", "1", 10)],
     });
     expect(within(bloqueDe("Sala Cerrada")).getByText("Desactivado")).toBeInTheDocument();
     // El resumen por negocio replica el filtro del trigger (`activa = true`):

@@ -80,6 +80,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [showMeasurements, setShowMeasurements] = useState(true);
 
+  // Mesa recién dibujada con la herramienta del lienzo: su número es solo el
+  // PRIMER NÚMERO LIBRE propuesto, así que el panel lateral enfoca su campo de
+  // número para que el dueño escriba el real de la sala sin buscar nada.
+  const [mesaRecienCreadaId, setMesaRecienCreadaId] = useState<string | null>(null);
+
   // Mesas fusionadas YA guardadas en BBDD que el usuario ha desagrupado en esta
   // sesión de edición: hay que repuntar sus asignaciones_mesa a la primera mesa
   // resultante y borrar la fila de la mesa fusionada al pulsar "Guardar"
@@ -547,6 +552,22 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         }
       }
       // Eliminar mesas originales que ahora forman parte de mesas fusionadas
+      // ⚠️ ESTE DELETE NO COMPROBADO ES EL ORIGEN DEL ESTADO ROTO EN PRODUCCIÓN
+      // (2026-09-27). No se lee el `{ error }` que devuelve supabase-js, y
+      // supabase-js RESUELVE (no rechaza) cuando RLS o una FK rechazan el
+      // borrado: el fallo pasa desapercibido y el usuario ve "Plano guardado
+      // correctamente" (más abajo) igual. Las dos consecuencias, ambas vivas
+      // hoy en la BBDD:
+      //   - si el borrado FALLA: la fusionada y sus originales conviven, y
+      //     sumar capacidades duplica el aforo (Salón: 15 filas, 64 plazas
+      //     sumadas contra 36 reales);
+      //   - si el borrado FUNCIONA: las mesas reales y SUS NÚMEROS desaparecen
+      //     y solo quedan fusiones (Terraza: 3 filas, las 3 fusionadas, ni una
+      //     mesa real) — recuperables únicamente leyendo el JSON de
+      //     `original_mesas`.
+      // Los dos INSERT de arriba (líneas ~489 y ~523) SÍ comprueban el error,
+      // así que esto es una omisión, no un criterio. NO se arregla aquí a
+      // propósito: cambiar el comportamiento del guardado es su propia tarea.
       for (const originalId of idsOriginalesFusionadas) {
         await supabase.from('mesas').delete().eq('id', originalId);
       }
@@ -580,6 +601,11 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           if (!primerNuevoId) continue;
           const primerNuevoIdReal = resolverMesaFinal(primerNuevoId);
           await repuntarAsignacionesMesa(pending.mesaId, primerNuevoIdReal);
+          // ⚠️ MISMO AGUJERO que el borrado de originales de arriba: tampoco se
+          // comprueba el `{ error }`, y supabase-js resuelve si RLS o una FK lo
+          // rechazan. Si falla, la fila de la mesa fusionada sobrevive junto a
+          // las mesas recién desagrupadas (aforo duplicado otra vez) y el
+          // usuario ve "Plano guardado correctamente". Sin arreglar a propósito.
           await supabase.from('mesas').delete().eq('id', pending.mesaId);
         }
         setPendingUnmerges([]);
@@ -956,6 +982,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             onSelectionChange={setSelectedElement}
             onToolChange={setActiveTool}
             onZoomChange={setZoomLevel}
+            onMesaCreada={(mesaId, nombre) => {
+              setMesaRecienCreadaId(mesaId);
+              toast.info(`Mesa ${nombre} (primer número libre). Escribe el número real de la sala.`);
+            }}
           />
           {/* Indicador de modo pan: compacto y semitransparente por defecto para
               no tapar cotas u otros elementos cerca de la esquina inferior. */}
@@ -970,9 +1000,15 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           selectedElement={selectedElement}
           mesasCanvas={mesasCanvas}
           pixelsPerMeter={PIXELS_PER_METER}
+          realDimensions={realDimensions}
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
           marcarNoDeshacible={marcarNoDeshacible}
+          mesaRecienCreadaId={mesaRecienCreadaId}
+          onMesaRecienCreadaAtendida={() => setMesaRecienCreadaId(null)}
+          onRenombrarMesaEnCanvas={(mesaId, nombre) => {
+            canvasRef.current?.updateMesaNombre(mesaId, nombre);
+          }}
           onUnmergeMesa={(mesaId) => {
             const nuevasMesas = canvasRef.current?.unmergeMesa(mesaId);
             if (nuevasMesas && nuevasMesas.length > 0 && !esMesaNoPersistida(mesaId)) {

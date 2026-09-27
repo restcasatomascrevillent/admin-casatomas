@@ -16,6 +16,7 @@ import {
   snapRotationDeg,
   distribuirSillasRectangular,
   distribuirSillasCirculo,
+  calcularRejillaMesas,
   type Matrix2D,
 } from "../planoUtils";
 
@@ -368,5 +369,89 @@ describe("distribuirSillasCirculo", () => {
 
   it("no revienta con capacidad 0", () => {
     expect(distribuirSillasCirculo(0, 150)).toEqual([]);
+  });
+});
+
+describe("calcularRejillaMesas", () => {
+  const espacio = { width: 12, height: 8 };
+
+  it("sin mesas no devuelve posiciones", () => {
+    const r = calcularRejillaMesas({ cantidad: 0, anchoCm: 80, altoCm: 80, espacio });
+    expect(r.posiciones).toEqual([]);
+    expect(r.desborda).toBe(false);
+  });
+
+  it("devuelve una posición por mesa y ninguna repetida (nada de apilarlas en 1,1)", () => {
+    const r = calcularRejillaMesas({ cantidad: 12, anchoCm: 80, altoCm: 80, espacio });
+    expect(r.posiciones).toHaveLength(12);
+    const claves = new Set(r.posiciones.map((p) => `${p.x},${p.y}`));
+    expect(claves.size).toBe(12);
+    expect(r.desborda).toBe(false);
+  });
+
+  it("llena por filas: la segunda fila baja y vuelve a empezar por la izquierda", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 4,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio: { width: 4, height: 6 },
+      separacion: 0.5,
+      margen: 0.5,
+    });
+    // 3m de ancho útil con mesas de 1m y 0,5m de hueco => 2 columnas
+    // (3 mesas necesitarían 1+0,5+1+0,5+1 = 4m).
+    expect(r.columnas).toBe(2);
+    expect(r.posiciones[0]).toEqual({ x: 0.5, y: 0.5 });
+    expect(r.posiciones[1]).toEqual({ x: 2, y: 0.5 });
+    expect(r.posiciones[2]).toEqual({ x: 0.5, y: 2 });
+    expect(r.posiciones[3]).toEqual({ x: 2, y: 2 });
+  });
+
+  it("ninguna mesa se sale del plano", () => {
+    const r = calcularRejillaMesas({ cantidad: 40, anchoCm: 150, altoCm: 150, espacio });
+    r.posiciones.forEach((p) => {
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(espacio.width - 1.5);
+      expect(p.y).toBeLessThanOrEqual(espacio.height - 1.5);
+    });
+  });
+
+  it("avisa con desborda cuando no caben todas sin solaparse", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 20,
+      anchoCm: 200,
+      altoCm: 200,
+      espacio: { width: 4, height: 4 },
+    });
+    expect(r.posiciones).toHaveLength(20);
+    expect(r.desborda).toBe(true);
+  });
+
+  it("aprieta la separación antes de darse por vencido", () => {
+    // 6 mesas de 1x1 en 3,6 x 3,6 (3,2 útiles): con 0,3 de hueco salen 2
+    // columnas y 3 filas que no caben en alto; apretando a 0,1 caben 3
+    // columnas en 2 filas y sí cabe.
+    const r = calcularRejillaMesas({
+      cantidad: 6,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio: { width: 3.6, height: 3.6 },
+      margen: 0.2,
+    });
+    expect(r.desborda).toBe(false);
+    expect(r.columnas).toBe(3);
+    expect(r.filas).toBe(2);
+  });
+
+  it("nunca baja de una columna aunque la mesa sea más ancha que el plano", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 2,
+      anchoCm: 300,
+      altoCm: 100,
+      espacio: { width: 1, height: 1 },
+    });
+    expect(r.columnas).toBe(1);
+    expect(r.posiciones).toHaveLength(2);
   });
 });

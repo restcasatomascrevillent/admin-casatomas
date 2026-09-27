@@ -481,3 +481,90 @@ export function distribuirSillasCirculo(capacidad: number, diametro: number): Po
   }
   return sillas;
 }
+
+// ---------------------------------------------------------------------------
+// REJILLA PARA EL ALTA EN LOTE DE MESAS
+// ---------------------------------------------------------------------------
+
+export interface OpcionesRejillaMesas {
+  /** Cuántas mesas hay que colocar. */
+  cantidad: number;
+  /** Ancho de cada mesa en CENTÍMETROS (como en `mesas.ancho`). */
+  anchoCm: number;
+  /** Alto/largo de cada mesa en CENTÍMETROS (como en `mesas.alto`). */
+  altoCm: number;
+  /** Dimensiones del espacio en METROS (las del editor: `realDimensions`). */
+  espacio: { width: number; height: number };
+  /** Separación entre mesas en metros (se reduce sola si no caben). */
+  separacion?: number;
+  /** Margen respecto al borde del plano, en metros. */
+  margen?: number;
+}
+
+export interface RejillaMesas {
+  /** Esquina superior izquierda de cada mesa, en METROS (como `mesas.pos_x/pos_y`). */
+  posiciones: Punto[];
+  /** Columnas que ha usado la rejilla. */
+  columnas: number;
+  /** Filas que ha usado la rejilla. */
+  filas: number;
+  /** `true` si no caben todas dentro del plano sin solaparse (el dueño tendrá que recolocar). */
+  desborda: boolean;
+}
+
+/**
+ * Coloca `cantidad` mesas en una rejilla sencilla dentro del plano.
+ *
+ * Existe para el alta en lote del panel lateral: `handleAddMesa` (alta de una
+ * en una) mete todas las mesas en `pos_x: 1, pos_y: 1`, así que dar de alta 12
+ * seguidas las apilaba una encima de otra y había que separarlas a mano antes
+ * de poder distinguirlas. Las posiciones se recortan para no salirse del
+ * plano; si ni reduciendo la separación caben todas, `desborda` avisa de que
+ * quedarán solapadas y habrá que arrastrarlas.
+ */
+export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
+  const cantidad = Math.max(0, Math.floor(opts.cantidad || 0));
+  if (cantidad === 0) return { posiciones: [], columnas: 0, filas: 0, desborda: false };
+
+  const anchoM = Math.max(0.1, (opts.anchoCm || 80) / 100);
+  const altoM = Math.max(0.1, (opts.altoCm || 80) / 100);
+  const margen = opts.margen ?? 0.3;
+  const anchoPlano = Math.max(anchoM, opts.espacio?.width || anchoM);
+  const altoPlano = Math.max(altoM, opts.espacio?.height || altoM);
+
+  const utilAncho = Math.max(anchoM, anchoPlano - margen * 2);
+  const utilAlto = Math.max(altoM, altoPlano - margen * 2);
+
+  const disponer = (separacion: number) => {
+    const columnas = Math.max(1, Math.floor((utilAncho + separacion) / (anchoM + separacion)));
+    const filas = Math.ceil(cantidad / columnas);
+    const altoNecesario = filas * altoM + (filas - 1) * separacion;
+    return { columnas, filas, separacion, cabe: altoNecesario <= utilAlto };
+  };
+
+  // Primero con la separación pedida; si no caben en alto, se aprieta la
+  // rejilla antes de darse por vencido.
+  let disposicion = disponer(opts.separacion ?? 0.3);
+  if (!disposicion.cabe) {
+    const apretada = disponer(0.1);
+    if (apretada.cabe || apretada.columnas > disposicion.columnas) disposicion = apretada;
+  }
+
+  const { columnas, filas, separacion } = disposicion;
+  const maxX = Math.max(0, anchoPlano - anchoM);
+  const maxY = Math.max(0, altoPlano - altoM);
+
+  const posiciones: Punto[] = [];
+  for (let i = 0; i < cantidad; i += 1) {
+    const col = i % columnas;
+    const fila = Math.floor(i / columnas);
+    const x = margen + col * (anchoM + separacion);
+    const y = margen + fila * (altoM + separacion);
+    posiciones.push({
+      x: Math.round(Math.min(Math.max(0, x), maxX) * 100) / 100,
+      y: Math.round(Math.min(Math.max(0, y), maxY) * 100) / 100,
+    });
+  }
+
+  return { posiciones, columnas, filas, desborda: !disposicion.cabe };
+}
