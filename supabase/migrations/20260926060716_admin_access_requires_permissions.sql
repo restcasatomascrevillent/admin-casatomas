@@ -1,19 +1,26 @@
+-- RECONSTRUIDA DESDE PRODUCCION EL 27/09/2026.
+-- Esta migracion se aplico desde el editor SQL de Supabase sin commitear el
+-- fichero, asi que figuraba en supabase_migrations.schema_migrations pero no
+-- en el repositorio, y eso bloqueaba `supabase db push` para todo el equipo.
+-- El SQL de aqui abajo es EXACTAMENTE el que guarda el registro (columna
+-- `statements`), no una reescritura. Ya esta aplicada: no vuelve a ejecutarse.
+
 -- Ser "admin" ya no da acceso automático a todas las secciones: ahora un
 -- admin solo ve lo que le marquen sus permisos en user_permissions, igual
 -- que un manager o un staff. El único acceso incondicional que queda es el
 -- de super admin (tabla super_admins), consistente con SuperAdminRoute y con
--- la función admin-set-super-admin.
+-- la nueva función admin-set-super-admin.
 CREATE OR REPLACE FUNCTION public.has_section_permission(_user_id uuid, _section text, _permission text)
  RETURNS boolean
  LANGUAGE sql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT
+  SELECT 
     CASE WHEN public.is_super_admin(_user_id) THEN true
     ELSE EXISTS (
       SELECT 1 FROM public.user_permissions
-      WHERE user_id = _user_id
+      WHERE user_id = _user_id 
         AND section_key = _section
         AND (
           (_permission = 'view' AND can_view = true) OR
