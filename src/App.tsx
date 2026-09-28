@@ -27,6 +27,7 @@ import NotFound from "./pages/NotFound";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
 import GestorGasto from "./pages/GestorGasto";
+import Costes from "./pages/Costes";
 import GestionResenas from "./pages/GestionResenas";
 import TraficoWeb from "./pages/TraficoWeb";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
@@ -91,6 +92,7 @@ const App = () => (
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
                   <Route path="/super-admin/asistente-telefonico" element={paginaSuperAdmin(<AsistenteTelefonico />)} />
                   <Route path="/super-admin/gestor-gasto" element={paginaSuperAdmin(<GestorGasto />)} />
+                  <Route path="/super-admin/costes" element={paginaSuperAdmin(<Costes />)} />
                   <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
                   <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />

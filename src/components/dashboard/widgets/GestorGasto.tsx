@@ -41,8 +41,17 @@ const conceptos = [
   },
 ];
 
+/**
+ * Total que se le factura al restaurante, calculado desde `conceptos`.
+ *
+ * Se exporta para que la pantalla de Costes del sistema pueda comparar el coste
+ * real contra lo facturado sin copiar la cifra: si aquí se cambia un precio, el
+ * margen de allí se mueve solo y no puede quedar desfasado.
+ */
+export const TOTAL_MENSUAL_FACTURADO_EUR = conceptos.reduce((sum, c) => sum + c.precio, 0);
+
 export function GestorGasto() {
-  const totalMensual = conceptos.reduce((sum, c) => sum + c.precio, 0);
+  const totalMensual = TOTAL_MENSUAL_FACTURADO_EUR;
   const proximoPago = new Date();
   proximoPago.setDate(1);
   proximoPago.setMonth(proximoPago.getMonth() + 1);
