@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { ExternalLink, Loader2, AlertTriangle, EyeOff } from "lucide-react";
+import { ExternalLink, Loader2, Pencil, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { AlertaValidacion } from "@/hooks/useFacturas";
+import { Button } from "@/components/ui/button";
 
 const BUCKET = "facturas-originales";
 /** Vida de la URL firmada. Corta a proposito: el enlace no debe poder reenviarse. */
@@ -26,22 +25,33 @@ interface BotonOriginalProps {
  *                        el fallback usado mientras no existan los secrets GOOGLE_*.
  *                        Al ser privado hace falta pedir una URL firmada al vuelo.
  *
- * Si no hay ninguno de los dos no se pinta nada: el original se perdio.
+ * Si no hay ninguno de los dos NO se devuelve `null`: se pinta el boton
+ * deshabilitado con el porque en el `title`. Mismo criterio que
+ * `ListaReservasAvanzada` — lo que no aplica a una fila sale apagado, nunca se
+ * quita, porque si no los botones bailan de sitio al bajar por la lista.
  */
 export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo" }: BotonOriginalProps) {
   const [cargando, setCargando] = useState(false);
 
-  if (!driveUrl && !archivoPath) return null;
-
   const clases =
     variant === "mobile"
-      ? "inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:opacity-60"
-      : "inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded-md transition-colors disabled:opacity-60";
+      ? "inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40"
+      : "inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-md text-blue-600 xl:w-7 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40";
 
-  const icono =
-    cargando
-      ? <Loader2 className={variant === "mobile" ? "h-3 w-3 animate-spin" : "h-4 w-4 animate-spin"} />
-      : <ExternalLink className={variant === "mobile" ? "h-3 w-3" : "h-4 w-4"} />;
+  if (!driveUrl && !archivoPath) {
+    return (
+      <button type="button" disabled className={clases} title="No se guardó el documento original de este registro">
+        <ExternalLink className={variant === "mobile" ? "h-3 w-3" : "h-4 w-4"} />
+        {variant === "mobile" && label}
+      </button>
+    );
+  }
+
+  const icono = cargando ? (
+    <Loader2 className={variant === "mobile" ? "h-3 w-3 animate-spin" : "h-4 w-4 animate-spin"} />
+  ) : (
+    <ExternalLink className={variant === "mobile" ? "h-3 w-3" : "h-4 w-4"} />
+  );
 
   // Drive: enlace normal, sin pasar por Supabase.
   if (driveUrl) {
@@ -66,9 +76,7 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
     if (cargando || !archivoPath) return;
     setCargando(true);
     try {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(archivoPath, SEGUNDOS_FIRMA);
+      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(archivoPath, SEGUNDOS_FIRMA);
       if (error || !data?.signedUrl) throw new Error(error?.message || "URL no disponible");
       window.open(data.signedUrl, "_blank", "noopener,noreferrer");
     } catch (err) {
@@ -93,75 +101,87 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
   );
 }
 
-/**
- * Aviso de que el OCR leyo importes que no cuadran (descuadres, precios
- * desproporcionados). No bloquea nada: solo señala lo que hay que revisar.
- */
-export function BadgeAlertas({ alertas }: { alertas: AlertaValidacion[] }) {
-  if (!alertas || alertas.length === 0) return null;
-
-  const graves = alertas.filter((a) => a.severidad === "alta").length;
-  const color = graves > 0
-    ? "bg-red-50 text-red-700 border-red-200"
-    : "bg-amber-50 text-amber-700 border-amber-200";
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            onClick={(e) => e.stopPropagation()}
-            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${color}`}
-          >
-            <AlertTriangle className="h-3 w-3 shrink-0" />
-            {alertas.length}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          <p className="mb-1 font-semibold">Importes que conviene revisar</p>
-          <ul className="list-disc space-y-1 pl-4 text-xs">
-            {alertas.slice(0, 4).map((a, i) => (
-              <li key={i}>{a.mensaje}</li>
-            ))}
-          </ul>
-          {alertas.length > 4 && (
-            <p className="mt-1 text-xs opacity-70">y {alertas.length - 4} mas…</p>
-          )}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+interface AccionesDocumentoProps {
+  driveUrl: string | null;
+  archivoPath: string | null;
+  onEditar: () => void;
+  onPreguntarIA?: () => void;
+  tipo: "factura" | "albarán";
 }
 
 /**
- * Indicador de que nadie ha marcado este documento como "verificado" desde
- * el dialogo de edicion (campo `facturas.verificada`).
- *
- * Es DISTINTO de `BadgeAlertas`: un documento puede no tener ninguna alerta
- * de cordura de importes (`alertas_validacion` vacio) y aun asi no estar
- * revisado por una persona. Antes de esto, `verificada` solo se veia dentro
- * de `EditarFacturaDialog`, asi que la unica forma de saber que quedaba
- * pendiente de revisar era abrir documento por documento.
+ * Los textos van escritos, no compuestos con `${tipo}`: "factura" es femenino
+ * y "albaran" masculino, y concatenando salia "Analizar este factura".
  */
-export function BadgeSinVerificar({ verificada }: { verificada: boolean }) {
-  if (verificada) return null;
+const TEXTOS = {
+  factura: {
+    editar: "Editar esta factura (y marcarla como verificada)",
+    ia: "Analizar esta factura con la IA",
+  },
+  "albarán": {
+    editar: "Editar este albarán (y marcarlo como verificado)",
+    ia: "Analizar este albarán con la IA",
+  },
+} as const;
 
+/**
+ * Las tres acciones de fila, SIEMPRE las mismas y SIEMPRE en la misma X:
+ * ver el original · editar · preguntar a la IA.
+ *
+ * Antes "Escaneo" era una columna propia con su cabecera. Se une aqui por dos
+ * motivos: gana una columna entera de ancho (cabecera + relleno + borde) en
+ * una tabla que no cabia, y deja de poder apagarse desde el selector de
+ * columnas, que era una forma tonta de perder el acceso al papel original.
+ *
+ * Los tres son solo icono hasta 1279 px; el de la IA gana la etiqueta "IA" en
+ * `xl` y "Asistente IA" a partir de 1536 px. Ninguno desaparece nunca: el de
+ * ver el original sale deshabilitado cuando no se guardo el escaneo, para que
+ * los botones no bailen de sitio al bajar por la lista.
+ */
+export function AccionesDocumento({
+  driveUrl,
+  archivoPath,
+  onEditar,
+  onPreguntarIA,
+  tipo,
+}: AccionesDocumentoProps) {
+  const textos = TEXTOS[tipo];
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
-          >
-            <EyeOff className="h-3 w-3 shrink-0" />
-            Sin revisar
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          <p>Nadie ha marcado este documento como verificado todavia (interruptor "Marcar como verificada" en Editar).</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center justify-end gap-0.5 xl:gap-1">
+      <BotonOriginal driveUrl={driveUrl} archivoPath={archivoPath} variant="desktop" />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-6 shrink-0 p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:w-7"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEditar();
+        }}
+        title={textos.editar}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      {onPreguntarIA && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-6 shrink-0 justify-center gap-1.5 whitespace-nowrap p-0 text-[11px] font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)] xl:w-auto xl:px-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPreguntarIA();
+          }}
+          title={textos.ia}
+        >
+          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          {/* El texto entra por tramos. "Asistente IA" pide ~74 px y a 1280 px
+              era justo lo que hacia desbordar la tabla (medido: 938 px de
+              minimo contra 924 px utiles), asi que ahi se queda en "IA" —que
+              se entiende, porque la pestaña de arriba se llama igual— y la
+              etiqueta larga vuelve a 1536 px, donde sobra sitio. */}
+          <span className="hidden xl:inline 2xl:hidden">IA</span>
+          <span className="hidden 2xl:inline">Asistente IA</span>
+        </Button>
+      )}
+    </div>
   );
 }

@@ -112,25 +112,30 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
 
   return (
     <TableRow className="hover:bg-muted/20 group/prod">
+      {/* El desglose va en una tabla `table-fixed`: el nombre del producto lleva
+          `truncate`, o sea `nowrap`, y en un reparto automatico eso hace que la
+          columna reclame el ancho del nombre mas largo ("LOMO DE BACALAO
+          DESALADO CONGELADO IQF 400/600G CAJA 5KG" son ~360 px) y aparezca un
+          segundo scroll horizontal dentro de la fila desplegada. */}
       <TableCell className="py-2.5 font-medium">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
             <Pencil className="h-3 w-3" />
           </Button>
-          <span className="truncate">{p.producto_nombre}</span>
+          <span className="truncate" title={p.producto_nombre}>{p.producto_nombre}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground">
+      <TableCell className="py-2.5 text-right text-muted-foreground whitespace-nowrap">
         <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
         <span className="text-xs">{p.unidad || ""}</span>
       </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums">
+      <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5">
           {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
           <span>{formatCurrency(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums text-foreground">{formatCurrency(p.precio)}</TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">{formatCurrency(p.precio)}</TableCell>
     </TableRow>
   );
 };
