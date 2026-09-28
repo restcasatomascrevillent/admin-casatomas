@@ -180,6 +180,29 @@ describe("validarEstructura — formas que hoy se cuelan", () => {
     expect(r.problemas.some((p) => p.campo === "fecha")).toBe(true);
   });
 
+  it("ACEPTA fecha null: hay documentos reales sin fecha impresa", () => {
+    // La factura 1-701405 de Insula Roma (38.jpg) no lleva ninguna fecha. Con
+    // `fecha` obligatoria, el modelo se la inventaba: se le vio sacarla de una
+    // nota a lapiz al margen ("Servir Agosto 25" -> 2025-08-25). Permitir null
+    // es lo que evita esa invencion.
+    expect(validarEstructura(doc({ fecha: null })).ok).toBe(true);
+  });
+
+  it("y avisa de que se va a guardar con la fecha de subida", () => {
+    const d = comprobarCuadre(doc({ fecha: null }));
+    expect(d.map((x) => x.codigo)).toContain("fecha_ausente");
+  });
+
+  it("un documento sin fecha Y sin precios avisa solo de la fecha", () => {
+    // El `return` temprano de sin_importes no puede tragarse este aviso.
+    const d = comprobarCuadre(doc({
+      fecha: null, sin_importes: true,
+      productos: [linea({ precio_unitario: null, total: null })],
+      subtotal: null, iva: null, total: null,
+    }));
+    expect(d.map((x) => x.codigo)).toEqual(["fecha_ausente"]);
+  });
+
   it("rechaza numero_documento vacio o ausente", () => {
     expect(validarEstructura(doc({ numero_documento: "" })).ok).toBe(false);
     expect(validarEstructura(doc({ numero_documento: undefined as unknown as string })).ok).toBe(false);

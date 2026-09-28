@@ -144,6 +144,20 @@ puedes cometer aquí: convierte 111 kilos de jamón en 111.800 €.
 Un mismo documento puede mezclar las dos convenciones: tres decimales en las
 columnas de cantidad y peso, dos decimales en las de dinero.
 
+NO DES POR HECHO EL FORMATO ESPAÑOL. Algunos proveedores emiten con el
+formato anglosajón (punto decimal, coma de millares), y algún documento mezcla
+los dos en la misma tabla:
+
+  "1,130.47"  → 1130.47    (anglosajón: la coma es de millares)
+  "1.130,47"  → 1130.47    (español: el punto es de millares)
+
+Cómo decidirlo sin equivocarse: el separador que esté MÁS A LA DERECHA es el
+decimal. Y si detrás de un separador hay exactamente 3 cifras y no hay ningún
+otro separador, mira el resto de la columna y el total antes de decidir: en
+una columna de dinero suele ser de millares, y en una de peso, decimales.
+Comprueba siempre que la interpretación que elijas hace que las líneas sumen
+el total impreso. Si no suma, has elegido mal el separador.
+
 Devuelve SIEMPRE números JSON con punto decimal y SIN separador de miles.
 NUNCA devuelvas 1234,56 ni "1.234,56" ni 1.234 para un valor que vale mil doscientos treinta y cuatro con cincuenta y seis.
 

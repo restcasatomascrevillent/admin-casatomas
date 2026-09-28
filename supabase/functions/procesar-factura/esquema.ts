@@ -82,9 +82,9 @@ export const DOCUMENTO_JSON_SCHEMA = {
         description: "Numero de factura o albaran, tal cual aparece impreso, con sus ceros y prefijos.",
       },
       fecha: {
-        type: "string",
+        type: ["string", "null"],
         description:
-          "Fecha del documento en formato YYYY-MM-DD. OJO: en Espana se escribe DD/MM/AAAA, asi que 03/09/2026 es 2026-09-03, NO 2026-03-09.",
+          "Fecha del documento en formato YYYY-MM-DD. OJO: en Espana se escribe DD/MM/AAAA, asi que 03/09/2026 es 2026-09-03, NO 2026-03-09. Usa la fecha de emision o entrega IMPRESA. Si el documento no trae ninguna fecha impresa, devuelve null: no la deduzcas de un vencimiento, de una nota a mano ni de un numero de serie.",
       },
       sin_importes: {
         type: "boolean",
@@ -181,7 +181,7 @@ export interface DocumentoExtraido {
   proveedor: string | null;
   cif: string | null;
   numero_documento: string;
-  fecha: string;
+  fecha: string | null;
   /** El documento no lleva ningun importe en euros (albaran de entrega). */
   sin_importes: boolean;
   productos: LineaExtraida[];
@@ -251,8 +251,13 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
   if (typeof d.numero_documento !== "string" || d.numero_documento.trim() === "") {
     push("numero_documento", "obligatorio y no puede venir vacio");
   }
-  if (typeof d.fecha !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) {
-    push("fecha", `se esperaba YYYY-MM-DD, llego ${JSON.stringify(d.fecha)}`);
+  // `fecha` puede ser null a proposito. Hay documentos reales sin ninguna
+  // fecha impresa (la factura 1-701405 de Insula Roma es uno), y exigir un
+  // string obliga al modelo a INVENTARSELA: se vio sacarla de una nota a
+  // lapiz al margen. Mas vale un hueco, que luego se rellena con la fecha de
+  // subida dejando constancia, que una fecha falsa que nadie va a cuestionar.
+  if (d.fecha !== null && (typeof d.fecha !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d.fecha))) {
+    push("fecha", `se esperaba YYYY-MM-DD o null, llego ${JSON.stringify(d.fecha)}`);
   }
   if (!esStringONull(d.proveedor)) push("proveedor", "debe ser texto o null");
   if (!esStringONull(d.cif)) push("cif", "debe ser texto o null");
@@ -393,6 +398,20 @@ const eur = (n: number) => `${n.toFixed(2)} EUR`;
 export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
   const out: Descuadre[] = [];
   const lineas = datos.productos ?? [];
+
+  // Sin fecha impresa: se guardara con la de subida (la columna es NOT NULL),
+  // asi que tiene que quedar dicho. Una fecha inventada en contabilidad no la
+  // cuestiona nadie despues.
+  if (datos.fecha === null) {
+    out.push({
+      codigo: "fecha_ausente",
+      severidad: "media",
+      mensaje:
+        "El documento no trae ninguna fecha impresa. Se guarda con la fecha de subida: " +
+        "confirmala contra el original antes de darla por buena.",
+      detalle: { numero_documento: datos.numero_documento },
+    });
+  }
 
   // Un albaran de entrega sin precios es CORRECTO, no un documento a medias:
   // Joselito y Guillen son asi. No hay nada que cuadrar y no debe salir ni un
