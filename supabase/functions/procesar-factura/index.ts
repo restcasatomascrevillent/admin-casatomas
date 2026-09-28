@@ -1,6 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { toNumber } from "./normalizacion.ts";
+import {
+  comprobarCuadre,
+  DOCUMENTO_JSON_SCHEMA,
+  describirProblemas,
+  descuadresComoAlertas,
+  mensajeCorrectivo,
+  validarEstructura,
+  type Descuadre,
+  type DocumentoExtraido,
+} from "./esquema.ts";
 
 // ============================================================================
 //  procesar-factura  ·  OCR de facturas/albaranes SIN n8n
@@ -35,98 +45,125 @@ const DRIVE_ENABLED = !!(G_CLIENT_ID && G_CLIENT_SECRET && G_REFRESH_TOKEN && G_
 // Creado por la migracion 20260919110000_facturas_archivo_original_y_validacion.sql
 const STORAGE_BUCKET = "facturas-originales";
 
-// Prompt de Vision — COPIADO VERBATIM del workflow n8n "OCR Facturas".
+// ─── Prompt de Vision ────────────────────────────────────────────────────────
+//  REESCRITO. El anterior venía COPIADO VERBATIM del workflow n8n "OCR
+//  Facturas" y nunca se había revisado. Lo que se le encontró al leerlo
+//  entero, y que este arregla:
+//
+//   1. Dedicaba ~50 líneas a dibujar la estructura JSON de salida, dos veces
+//      (una para factura y otra para albarán, idénticas salvo el texto de
+//      `observaciones`). Eso ahora lo impone `DOCUMENTO_JSON_SCHEMA` con
+//      `strict: true`, que el modelo NO PUEDE incumplir. Repetirlo en el
+//      prompt solo añadía tokens y una fuente de contradicción.
+//   2. Los ejemplos mostraban `"cantidad": 0.0` y `"precio_unitario": 0.00`,
+//      que invitan a devolver ceros literales cuando el modelo duda.
+//      Se han quitado: ahora cada campo se describe en el esquema.
+//   3. Pedía un campo `notas` de texto libre "Si es bonificado o dto 100%"
+//      que `normalizarDatos` tiraba a la basura y que no tiene columna en
+//      `productos_factura`. Sustituido por el booleano `bonificada`, que sí
+//      se usa (evita marcar como descuadre una línea de regalo).
+//   4. Sobre el formato numérico decía una sola frase: `Convierte siempre a
+//      formato estándar (ej: "1.200,50" -> 1200.50)`. Insuficiente para el
+//      punto más delicado del documento: en España "." es separador de MILES
+//      y "," es DECIMAL, y confundirlos mueve la coma un lugar. Ahora es una
+//      sección con ejemplos de los dos sentidos.
+//   5. No decía NADA sobre precio por kilo frente a precio por pieza. Es
+//      justo lo que falla en el albarán de Joselito (12 jamones a 9.316,67
+//      EUR/ud). Ahora hay regla explícita y el campo `base_precio`.
+//   6. No pedía ninguna comprobación aritmética antes de responder. Una
+//      factura trae redundancia de serie (línea = cantidad x precio, suma de
+//      líneas = subtotal, subtotal + IVA = total) y el prompt la ignoraba.
+//      Ahora es un paso obligatorio.
+//   7. No decía nada del formato de fecha de entrada. En España se escribe
+//      DD/MM/AAAA y el modelo puede leerlo como MM/DD. Ahora es explícito.
 const VISION_SYSTEM_PROMPT = `Eres un sistema experto de análisis documental para contabilidad en España.
 
-Tu objetivo es ANALIZAR VISUALMENTE la imagen de un documento comercial y extraer los datos en un JSON estricto. El documento puede ser una FACTURA o un ALBARÁN.
+Analizas VISUALMENTE documentos comerciales españoles (facturas y albaranes) de un RESTAURANTE y extraes sus datos. La forma exacta de la salida la impone el esquema JSON de la respuesta; tú concéntrate en LEER BIEN.
 
- RETO DE GENERALIZACIÓN:
-Este sistema procesa miles de documentos de proveedores distintos.
-Los nombres de las columnas CAMBIAN (ej: "Importe" puede ser Precio Unitario en un documento y Total en otro).
-El orden de las columnas CAMBIA.
-Algunos tienen descuentos del 100% (productos bonificados con coste 0).
+Cada documento es de un proveedor distinto: los nombres de las columnas cambian ("Importe" puede ser el precio unitario en un documento y el total en otro), el orden cambia, y algunas líneas son bonificaciones con coste 0.
 
-1. CLASIFICACIÓN DEL DOCUMENTO
-Determina si es FACTURA o ALBARÁN basándote en el texto explícito del documento.
-Prioridad: Si dice "Albarán", "Nota de entrega" o "Delivery Note" -> ALBARÁN (incluso si tiene precios e IVA).
-Si dice "Factura" o "Invoice" -> FACTURA.
+════════════════════════════════════════════
+1. CLASIFICACIÓN
+════════════════════════════════════════════
+Si dice "Albarán", "Nota de entrega" o "Delivery Note" → albaran, AUNQUE lleve precios e IVA.
+Si dice "Factura" o "Invoice" → factura.
 
-2. EXTRACCIÓN DE PRODUCTOS (MOTOR LÓGICO)
-Para extraer correctamente la tabla de productos, aplica estas reglas de inteligencia:
+════════════════════════════════════════════
+2. NÚMEROS: FORMATO ESPAÑOL (lo más delicado)
+════════════════════════════════════════════
+En España el punto separa los MILES y la coma separa los DECIMALES. Al revés que en inglés. Confundirlos mueve la coma de sitio y multiplica o divide el importe por mil.
 
-A. Detección de Columnas por Lógica Matemática (CRÍTICO):
-No confíes solo en los nombres de las cabeceras. Busca patrones numéricos en las líneas para identificar las columnas:
-Identifica la CANTIDAD (suele ser un número entero pequeño: 1, 6, 12, 24...).
-Identifica dos valores monetarios grandes en la línea.
-Aplica la prueba: ¿Valor_A * Cantidad ≈ Valor_B?
-Si SÍ: Valor_A es el PRECIO UNITARIO y Valor_B es el TOTAL LÍNEA.
+  "1.200,50"  → 1200.50     (mil doscientos con cincuenta)
+  "9.316,67"  → 9316.67     (nueve mil trescientos dieciséis con sesenta y siete)
+  "931,67"    → 931.67      (novecientos treinta y uno con sesenta y siete)
+  "120.580"   → 120580      (ciento veinte mil quinientos ochenta)
+  "120,58"    → 120.58      (ciento veinte con cincuenta y ocho)
+  "1.234.567,89" → 1234567.89
 
-B. Gestión de "Bonificaciones" y Descuentos 100%:
-Si encuentras líneas con Cantidad > 0 pero Total = 0.00 (o muy cercano a 0), NO LAS ELIMINES.
-Son productos bonificados/regalo.
-En el JSON: precio_unitario: (el valor real si aparece, o 0), total: 0.
+Devuelve SIEMPRE números JSON con punto decimal y SIN separador de miles.
+NUNCA devuelvas 1234,56 ni "1.234,56" ni 1.234 para un valor que vale mil doscientos treinta y cuatro con cincuenta y seis.
 
-C. Limpieza de Datos:
-Descripción: Extrae el nombre del producto limpiando códigos de referencia internos o lotes si es posible.
-Formato Numérico: Convierte siempre a formato estándar (ej: "1.200,50" -> 1200.50).
+Antes de dar un importe por bueno, pregúntate si el orden de magnitud tiene sentido: un restaurante no paga 9.000 € por un jamón ni 120.000 € por una entrega de género. Si un número te sale desproporcionado, casi siempre es (a) la coma leída un lugar más a la derecha, (b) el total de la línea metido en la columna del precio unitario, o (c) un dígito mal leído. Vuelve a mirar la imagen.
 
-3. VENTAJA VISUAL
-Al ver directamente la imagen del documento:
-- Puedes identificar la ESTRUCTURA de las tablas visualmente
-- Distinguir cabeceras de datos
-- Identificar subtotales, IVA y totales por su posición en el documento
-- Leer texto que un OCR podría confundir
+════════════════════════════════════════════
+3. FECHAS
+════════════════════════════════════════════
+En España se escribe DD/MM/AAAA. "03/09/2026" es el 3 de SEPTIEMBRE, no el 9 de marzo.
+Devuelve siempre AAAA-MM-DD. Usa la fecha DEL DOCUMENTO (emisión o entrega), nunca la de hoy.
 
-4. SALIDA JSON (ESTRICTA)
-Devuelve SOLAMENTE el JSON. No añadas explicaciones ni bloques de código markdown.
+════════════════════════════════════════════
+4. TABLA DE LÍNEAS
+════════════════════════════════════════════
+A. Identificar las columnas por aritmética, no por el nombre de la cabecera.
+   Localiza la CANTIDAD y dos importes en la línea, y comprueba cuál cumple:
+     cantidad × precio_unitario = total_línea
+   El que multiplica es el PRECIO UNITARIO; el resultado es el TOTAL DE LÍNEA.
 
-Estructura si es FACTURA:
-{
-"tipo": "factura",
-"proveedor": "Nombre detectado",
-"cif": "CIF detectado",
-"numero_documento": "Nº Factura",
-"fecha": "YYYY-MM-DD",
-"productos": [
-{
-"nombre": "Descripción limpia",
-"cantidad": 0.0,
-"unidad": "ud/kg/litro/null",
-"precio_unitario": 0.00,
-"total": 0.00,
-"notas": "Si es bonificado o dto 100%"
-}
-],
-"subtotal": 0.00,
-"iva": 0.00,
-"total": 0.00,
-"observaciones": "Forma de pago, vencimientos, notas",
-"resumen": "Frase de 1-2 líneas describiendo semánticamente el documento: tipo de productos/servicios suministrados, nombre del proveedor, importe total y contexto de uso o categoría"
-}
+B. PRECIO UNITARIO vs PRECIO POR KILO. Muchos proveedores de alimentación
+   facturan al peso. Si la columna de precio dice €/kg, EUR/Kg, "precio kilo"
+   o similar, entonces:
+     - precio_unitario es el precio POR KILO
+     - base_precio = "por_kg"
+     - cantidad son los KILOS (puede llevar decimales: 7.35)
+   Si el precio es por pieza o por unidad de venta, base_precio = "por_unidad".
+   Regla que decide siempre: elige la combinación que cumpla
+   cantidad × precio_unitario = total_línea.
+   Si el documento muestra a la vez un precio por kilo y un precio por pieza,
+   pon en precio_unitario el que cuadre con el total de la línea, y marca
+   base_precio en consecuencia.
+   NO pongas nunca el total de la línea en precio_unitario.
 
-Estructura si es ALBARÁN:
-{
-"tipo": "albaran",
-"proveedor": "Nombre detectado",
-"cif": "CIF detectado",
-"numero_documento": "Nº Albarán",
-"fecha": "YYYY-MM-DD",
-"productos": [
-{
-"nombre": "Descripción limpia",
-"cantidad": 0.0,
-"unidad": "ud/kg/litro/null",
-"precio_unitario": 0.00,
-"total": 0.00,
-"notas": "Si es bonificado o dto 100%"
-}
-],
-"subtotal": 0.00,
-"iva": 0.00,
-"total": 0.00,
-"observaciones": "Dirección envío, transportista, notas entrega",
-"resumen": "Frase de 1-2 líneas describiendo semánticamente el documento: tipo de productos/servicios suministrados, nombre del proveedor, importe total y contexto de uso o categoría"
-}`;
+C. Bonificaciones y descuentos del 100%: líneas con cantidad > 0 e importe 0
+   son regalos. NO LAS ELIMINES. Marca bonificada = true, pon total = 0 y el
+   precio_unitario real si aparece.
+   Para el resto de líneas, bonificada = false.
+
+D. Descripción: el nombre del producto, quitando códigos internos y lotes.
+
+E. IVA: el campo "iva" es el IMPORTE en euros, no el porcentaje. Si el
+   documento dice "IVA 10%" y abajo "48,97 €", el valor es 48.97, no 10.
+   Si hay varios tipos de IVA, suma los importes.
+
+F. Si el documento no declara subtotal, IVA o total (habitual en albaranes),
+   devuelve null en ese campo. No los inventes ni los calcules tú.
+
+════════════════════════════════════════════
+5. COMPROBACIÓN OBLIGATORIA ANTES DE RESPONDER
+════════════════════════════════════════════
+Repasa estas tres igualdades. Son la forma de cazar tus propios errores de lectura:
+
+  (1) para cada línea:   cantidad × precio_unitario = total_línea
+  (2) suma de todas las líneas = subtotal (o el total, si no hay subtotal)
+  (3) subtotal + iva = total
+
+Si alguna no cuadra, VUELVE A MIRAR LA IMAGEN en esa zona concreta y corrige el dígito mal leído. Los que más se confunden a baja resolución son 3/8, 5/6, 1/7, 0/9 y 6/0, además del punto y la coma.
+
+No inventes ni ajustes valores para forzar el cuadre. Si tras revisarlo el documento sigue sin cuadrar porque así está impreso (un descuento no desglosado, portes, un redondeo), devuelve lo que pone realmente: hay una validación posterior que lo revisará.
+
+════════════════════════════════════════════
+6. RESUMEN
+════════════════════════════════════════════
+El campo "resumen" son 1-2 frases que se usan para búsqueda semántica: qué tipo de género o servicio es, qué proveedor, importe total y para qué sirve en el restaurante.`;
 
 // ─── Helpers numéricos / normalización (portado de "Parsear Respuesta IA") ───
 // `toNumber` (y el parseo de importes en varios formatos) vive en
@@ -154,6 +191,10 @@ function normalizarDatos(data: any) {
     fecha = new Date().toISOString().split("T")[0];
   }
 
+  // `toNumber` se mantiene aunque con `json_schema` estricto los importes ya
+  // llegan como `number`: es defensa en profundidad (deja el número tal cual
+  // si ya lo es) y sigue cubriendo el caso de que el esquema no se aplique.
+  // Ver normalizacion.ts para la ambigüedad "." / "," del formato español.
   const productos = Array.isArray(data.productos)
     ? data.productos.map((p: any, i: number) => ({
         nombre: (p.nombre || "").trim() || `Producto ${i + 1}`,
@@ -161,6 +202,13 @@ function normalizarDatos(data: any) {
         unidad: (p.unidad || "unidades").toLowerCase().trim(),
         precio_unitario: toNumber(p.precio_unitario, true),
         total: toNumber(p.total, true),
+        // `base_precio` y `bonificada` NO tienen columna en
+        // `productos_factura` y el insert no los manda (mapea campo a campo).
+        // Se conservan aquí porque son los que dan sentido a los números:
+        // distinguen un precio por kilo de uno por pieza, y una línea de
+        // regalo de un descuadre real. Se usan en los logs y en el cuadre.
+        base_precio: p.base_precio ?? "desconocida",
+        bonificada: p.bonificada === true,
       }))
     : [];
 
@@ -390,6 +438,10 @@ async function completarFactura(
   archivo: any,
   b64: string,
   mimeType: string,
+  // Descuadres detectados ANTES de guardar (ver `extraerConCuadre`). Llegan ya
+  // con el formato de `validar_cordura_factura` para poder mezclarlos.
+  // deno-lint-ignore no-explicit-any
+  alertasPrevias: any[] = [],
 ): Promise<Response> {
   // 7) Productos: embeddings en batch (1 sola llamada) + insert masivo
   if (datos.productos.length > 0) {
@@ -419,7 +471,19 @@ async function completarFactura(
       { p_factura_id: facturaId },
     );
     if (valErr) throw new Error(valErr.message);
-    alertas = Array.isArray(alertasData) ? alertasData : [];
+    const alertasSql = Array.isArray(alertasData) ? alertasData : [];
+
+    // Mezcla pre-guardado + post-guardado, sin duplicar por `codigo`.
+    // Las dos comprobaciones miran los MISMOS números, así que casi todo
+    // coincide; manda la versión SQL porque además cruza con el histórico.
+    // Lo que sí aporta el pre-guardado es lo que SQL no llega a ver con sus
+    // tolerancias: en particular `iva_incoherente`, donde SQL admite un 1%
+    // del total (en una factura de 5.000 EUR, 50 EUR de error) y aquí la
+    // tolerancia es el redondeo real, un céntimo por línea.
+    const codigosSql = new Set(alertasSql.map((a) => a?.codigo));
+    const soloPrevias = alertasPrevias.filter((a) => !codigosSql.has(a?.codigo));
+    alertas = [...alertasSql, ...soloPrevias];
+
     if (alertas.length > 0) {
       console.warn(
         `[validacion] ${datos.tipo} ${datos.numero_documento} con ${alertas.length} alerta(s):`,
@@ -434,6 +498,17 @@ async function completarFactura(
   } catch (valError) {
     // Que falle la validación no invalida el documento, pero tiene que verse.
     console.error("[validacion] Error validando importes:", valError);
+    // Si la RPC no llegó a responder, al menos no se pierden los descuadres
+    // que ya se detectaron antes de guardar: eran los que iban a avisar de un
+    // documento mal leído, y son justo lo que no debe caerse en silencio.
+    if (alertas.length === 0 && alertasPrevias.length > 0) {
+      alertas = alertasPrevias;
+      const { error: updErr } = await supabase
+        .from("facturas")
+        .update({ alertas_validacion: alertas })
+        .eq("id", facturaId);
+      if (updErr) console.error("[validacion] Tampoco se pudieron guardar las previas:", updErr.message);
+    }
   }
 
   // 9) Archivar el original: Drive si está configurado, Supabase Storage si no.
@@ -625,6 +700,156 @@ async function autenticar(req: Request): Promise<
   return { ok: true, userId: user.id };
 }
 
+// ─── Extracción: esquema estricto + validación + un reintento correctivo ────
+//
+//  ANTES: una sola llamada con `response_format: { type: "json_object" }`, que
+//  solo garantiza que el texto devuelto sea JSON parseable. Nada comprobaba la
+//  FORMA (campos de más, de menos, o con el tipo equivocado) ni que los
+//  NÚMEROS cuadrasen entre sí. Un documento mal leído se guardaba entero y en
+//  silencio, y la única red era `validar_cordura_factura`, que corre DESPUÉS
+//  de insertar y se limita a anotar avisos que alguien tiene que mirar a mano.
+//
+//  AHORA, tres redes en cascada:
+//   1. `response_format: { type: "json_schema", strict: true }` — el modelo no
+//      puede devolver otra forma. El error salta en origen.
+//   2. `validarEstructura` — por si el esquema no se aplicase (cambio de
+//      modelo, degradación de la API). Falla diciendo qué campo está mal.
+//   3. `comprobarCuadre` + UN reintento — si los números no cuadran entre sí,
+//      se le devuelve al modelo el descuadre concreto y se le pide que vuelva
+//      a mirar la imagen. Esto es lo que evita tener que repasar a mano.
+//
+//  El reintento es UNO solo, y deliberadamente:
+//   - Cuesta otra llamada completa (la imagen viaja de nuevo en el historial).
+//   - Si a la segunda sigue sin cuadrar, insistir rara vez ayuda: o el
+//     documento está impreso así, o la imagen no da más de sí.
+//   - Nunca bloquea el guardado. Un documento con un aviso sigue siendo mejor
+//     que ningún documento; lo que no puede pasar es guardarlo SIN el aviso.
+
+const MODELO_VISION = "gpt-5-mini";
+
+/** Peso de un conjunto de descuadres, para poder comparar dos intentos.
+ *  Una alerta 'alta' (precio o total inverosímil) pesa más que diez 'media'. */
+function peso(descuadres: Descuadre[]): number {
+  return descuadres.reduce((acc, d) => acc + (d.severidad === "alta" ? 10 : 1), 0);
+}
+
+// deno-lint-ignore no-explicit-any
+async function llamarVision(mensajes: any[]): Promise<unknown> {
+  const res = await fetch(`${OPENAI}/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+    body: JSON.stringify({
+      model: MODELO_VISION,
+      max_completion_tokens: 16000,
+      // El modo fuerte. `gpt-5-mini` declara `structured_outputs` entre sus
+      // capacidades y admite `v1/chat/completions`, así que esto es válido
+      // para el modelo que ya se venía usando: no hay cambio de modelo.
+      response_format: { type: "json_schema", json_schema: DOCUMENTO_JSON_SCHEMA },
+      messages: mensajes,
+    }),
+  });
+  if (!res.ok) throw new Error(`Vision ${res.status}: ${await res.text()}`);
+
+  const json = await res.json();
+  const choice = json?.choices?.[0];
+
+  // Con Structured Outputs una negativa del modelo llega en su propio campo,
+  // no como JSON malformado. Distinguirla evita un "JSON inválido" engañoso.
+  if (choice?.message?.refusal) {
+    throw new Error(`El modelo rechazó procesar el documento: ${choice.message.refusal}`);
+  }
+  // Un JSON cortado por el límite de tokens parsea mal y el error no dice por
+  // qué. Con 16.000 tokens no debería pasar, pero si pasa hay que saberlo.
+  if (choice?.finish_reason === "length") {
+    throw new Error(
+      "La respuesta del modelo se cortó por el límite de tokens (documento con demasiadas líneas). " +
+      "El JSON está incompleto y no se guarda nada.",
+    );
+  }
+
+  const raw = choice?.message?.content;
+  if (!raw) throw new Error("Vision no devolvió contenido");
+  if (typeof raw !== "string") return raw;
+  // El destripado de ``` ya no hace falta con json_schema, pero se mantiene:
+  // cuesta nada y cubre el caso de que la API degrade a texto libre.
+  return JSON.parse(raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+}
+
+/** Parsea + valida la forma. Lanza con la RUTA de los campos que fallan. */
+function validarOLanzar(parsed: unknown, contexto: string): DocumentoExtraido {
+  const v = validarEstructura(parsed);
+  if (!v.ok) {
+    throw new Error(
+      `La extracción no cumple el contrato (${contexto}): ${describirProblemas(v.problemas)}`,
+    );
+  }
+  return v.datos;
+}
+
+/**
+ * Extrae el documento y, si los números no cuadran, le pide UNA vez al modelo
+ * que vuelva a mirar. Devuelve la mejor de las dos lecturas y los descuadres
+ * que queden, para dejarlos anotados en `alertas_validacion`.
+ */
+async function extraerConCuadre(
+  // deno-lint-ignore no-explicit-any
+  contentBlock: any,
+): Promise<{ documento: DocumentoExtraido; descuadres: Descuadre[]; intentos: number }> {
+  // deno-lint-ignore no-explicit-any
+  const mensajes: any[] = [
+    { role: "system", content: VISION_SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: [
+        contentBlock,
+        {
+          type: "text",
+          text:
+            "Analiza visualmente este documento comercial español (factura o albarán) y extrae sus datos. " +
+            "Antes de responder, comprueba las tres igualdades de la sección 5.",
+        },
+      ],
+    },
+  ];
+
+  const primera = validarOLanzar(await llamarVision(mensajes), "primer intento");
+  const descuadres1 = comprobarCuadre(primera);
+  if (descuadres1.length === 0) return { documento: primera, descuadres: [], intentos: 1 };
+
+  console.warn(
+    `[extraccion] ${primera.tipo} ${primera.numero_documento}: ${descuadres1.length} descuadre(s) ` +
+    `en el primer intento (${descuadres1.map((d) => d.codigo).join(", ")}). Se pide relectura.`,
+  );
+
+  let segunda: DocumentoExtraido;
+  let descuadres2: Descuadre[];
+  try {
+    // El historial incluye el bloque de imagen del primer turno, así que el
+    // modelo vuelve a tener el documento delante — que es justo lo que se le
+    // pide: que mire otra vez los píxeles, no que recalcule sobre su respuesta.
+    mensajes.push({ role: "assistant", content: JSON.stringify(primera) });
+    mensajes.push({ role: "user", content: mensajeCorrectivo(descuadres1) });
+    segunda = validarOLanzar(await llamarVision(mensajes), "reintento");
+    descuadres2 = comprobarCuadre(segunda);
+  } catch (e) {
+    // Que falle el reintento no puede perder la primera lectura: se guarda
+    // esa, con sus avisos.
+    console.error("[extraccion] El reintento falló, se conserva el primer intento:", e);
+    return { documento: primera, descuadres: descuadres1, intentos: 2 };
+  }
+
+  // Se queda la lectura con menos problemas. En empate, la segunda: es la que
+  // ha mirado el documento sabiendo dónde estaba el descuadre.
+  if (peso(descuadres2) <= peso(descuadres1)) {
+    console.log(
+      `[extraccion] Relectura aceptada: ${descuadres1.length} -> ${descuadres2.length} descuadre(s).`,
+    );
+    return { documento: segunda, descuadres: descuadres2, intentos: 2 };
+  }
+  console.warn("[extraccion] La relectura salió peor que el primer intento; se conserva el primero.");
+  return { documento: primera, descuadres: descuadres1, intentos: 2 };
+}
+
 // ─── Handler ─────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -651,27 +876,14 @@ serve(async (req) => {
       ? { type: "file", file: { filename: archivo.nombre || "document.pdf", file_data: `data:application/pdf;base64,${b64}` } }
       : { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}`, detail: "high" } };
 
-    // 2) GPT-5 Vision
-    const visionRes = await fetch(`${OPENAI}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-      body: JSON.stringify({
-        model: "gpt-5-mini",
-        max_completion_tokens: 16000,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: VISION_SYSTEM_PROMPT },
-          { role: "user", content: [contentBlock, { type: "text", text: "Analiza visualmente este documento comercial español (factura o albarán) y extrae todos los datos en el formato JSON especificado." }] },
-        ],
-      }),
-    });
-    if (!visionRes.ok) throw new Error(`Vision ${visionRes.status}: ${await visionRes.text()}`);
-    const raw = (await visionRes.json())?.choices?.[0]?.message?.content;
-    if (!raw) throw new Error("Vision no devolvió contenido");
-    const parsed = typeof raw === "string"
-      ? JSON.parse(raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim())
-      : raw;
-    const datos = normalizarDatos(parsed);
+    // 2) Extracción con reintento correctivo (ver `extraerConCuadre`)
+    const extraccion = await extraerConCuadre(contentBlock);
+    const datos = normalizarDatos(extraccion.documento);
+    const alertasPrevias = descuadresComoAlertas(extraccion.descuadres, "pre-guardado");
+    console.log(
+      `[extraccion] ${datos.tipo} ${datos.numero_documento}: ${extraccion.intentos} intento(s), ` +
+      `${datos.productos.length} linea(s), ${extraccion.descuadres.length} descuadre(s) sin resolver.`,
+    );
 
     // 3) Cliente Supabase (service role)
     const supabase = createClient(
@@ -739,7 +951,9 @@ serve(async (req) => {
     // relanza `innerError` tal cual pase lo que pase con la limpieza (ver
     // `compensarFacturaHuerfana`).
     try {
-      return await completarFactura(supabase, facturaId, datos, archivo, b64, mimeType);
+      return await completarFactura(
+        supabase, facturaId, datos, archivo, b64, mimeType, alertasPrevias,
+      );
     } catch (innerError) {
       await compensarFacturaHuerfana(supabase, facturaId, innerError);
       throw innerError;
