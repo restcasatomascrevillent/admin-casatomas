@@ -629,3 +629,189 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
     detalle: { ...d.detalle, origen },
   }));
 }
+
+// ─── 4. Deduccion aritmetica de un total que el documento NO imprime ────────
+//
+//  EL CASO QUE LO MOTIVA. Factura F/25011959 de Salazones Garre: es una
+//  FACTURA (no un albaran), trae tres lineas con importe leido
+//  (208,32 + 105,00 + 123,60) y en la foto el bloque de totales se quedo
+//  FUERA DEL ENCUADRE. El modelo hizo lo correcto —no inventar lo que no
+//  puede ver— y la fila quedo con subtotal, iva y total a NULL. Pero 436,92
+//  no es un dato inexistente: es la suma EXACTA de tres numeros que si estan
+//  leidos, y perderla es tirar informacion que ya teniamos.
+//
+//  ESTO NO ES LO MISMO QUE EL MODELO INVENTANDO IMPORTES.
+//  La diferencia tiene que quedar clara en el codigo y en la base de datos:
+//
+//   · `contarCambiosNumericos` + `MAX_CAMBIOS_RELECTURA` defienden de que el
+//     MODELO altere valores YA LEIDOS para forzar el cuadre (ReceiptBench).
+//     Esa defensa NO SE TOCA aqui: no se sube el umbral, no se esquiva, y no
+//     se deduce nada dentro del ciclo de relectura.
+//   · `deducirImportes` corre DESPUES de `comprobarCuadre`, en NUESTRO
+//     codigo, con aritmetica exacta, y SOLO RELLENA HUECOS (`null`). No
+//     sobrescribe jamas un valor leido, asi que no puede hacer callar a
+//     ninguna comprobacion: un campo que estaba a null no se habia comparado
+//     con nada.
+//   · El resultado queda marcado como `deducido` en `facturas.total_origen`
+//     (migracion 20260928160000). Un total leido del papel y un total
+//     calculado por nosotros no son el mismo dato, y el dueno tiene que
+//     poder distinguirlos de un vistazo.
+//
+//  QUE ES HONESTAMENTE DEDUCIBLE — Y QUE NO
+//  ----------------------------------------
+//  De las lineas solas sale UN numero: su suma, que es la BASE IMPONIBLE. El
+//  IVA no sale de ahi: el tipo puede ser el 10% (alimentacion), el 21%, o
+//  varios en el mismo documento, y elegir uno seria inventarselo. De ahi las
+//  tres reglas:
+//
+//    A. `subtotal` e `iva` LEIDOS y `total` ausente -> total = subtotal + iva.
+//       Aritmetica exacta sobre dos importes impresos. Cero supuestos.
+//    B. NI `subtotal` NI `iva` impresos, y TODAS las lineas con importe ->
+//       total = suma de lineas. Unico supuesto: que el papel no tenga un
+//       bloque de IVA que no hemos llegado a ver. Por eso este caso ademas
+//       deja aviso en `alertas_validacion` pidiendo contrastar con el papel.
+//    C. Cualquier otra combinacion -> NO SE DEDUCE NADA. Si el documento
+//       imprime PARTE del bloque de totales (solo la base, o solo el IVA) es
+//       que ese bloque existe y solo hemos leido un trozo de el; completarlo
+//       nosotros seria reconstruirlo a ojo, no calcularlo.
+//
+//  `subtotal` e `iva` NO SE DEDUCEN NUNCA, ni siquiera cuando saldrian de una
+//  resta. Dos razones:
+//    (1) el IVA no es derivable de las lineas — ese es justo el reparto que no
+//        se puede adivinar, y un IVA inventado es indistinguible de uno leido;
+//    (2) `comprobarCuadre` usa `subtotal ?? total` como REFERENCIA contra la
+//        que compara la suma de lineas. Si escribieramos ahi esa misma suma,
+//        la comprobacion se estaria comparando consigo misma y dejaria de
+//        detectar nada. La redundancia aritmetica del documento es la unica
+//        senal que hay: no se gasta rellenando huecos.
+//
+//  Un albaran SIN PRECIOS (el caso Joselito) sale por el primer `return`:
+//  `sin_importes` significa que en el papel no hay ni un euro, asi que no hay
+//  nada que sumar y el documento se queda —correctamente— SIN TOTAL.
+
+/** De donde sale el importe de `facturas.total`. Mismo vocabulario que la
+ *  columna `facturas.total_origen`. */
+export type OrigenImporte = "leido" | "deducido";
+
+/** Como se ha llegado al total deducido. Va en `detalle.metodo` del aviso. */
+export type MetodoDeduccion = "subtotal_mas_iva" | "suma_lineas";
+
+/** Fila de `facturas.alertas_validacion`: mismo formato que devuelve
+ *  `validar_cordura_factura` en SQL. */
+export interface AlertaValidacion {
+  codigo: string;
+  severidad: Severidad;
+  mensaje: string;
+  detalle: Record<string, unknown>;
+}
+
+export interface Deduccion {
+  /** Hoy solo se deduce el total. `subtotal` e `iva` no son derivables. */
+  campo: "total";
+  valor: number;
+  metodo: MetodoDeduccion;
+  /** Aviso para `alertas_validacion`: que el total no se leyo tiene que
+   *  verse tambien donde se miran los avisos, no solo en la columna. */
+  alerta: AlertaValidacion;
+}
+
+/** Redondeo a centimos. `208.32 + 105 + 123.6` da 436.92000000000004 en coma
+ *  flotante, y eso llegaria tal cual a una columna NUMERIC(10,2). */
+const redondear2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * Rellena `total` cuando el documento no lo imprime pero SI se puede calcular
+ * con aritmetica exacta a partir de lo que si esta leido.
+ *
+ * Devuelve SIEMPRE un documento nuevo (no muta la entrada) y, si ha deducido
+ * algo, la `Deduccion` con el metodo y el aviso que hay que guardar.
+ *
+ * Invariantes que este codigo mantiene, y que los tests fijan:
+ *  - nunca sobrescribe un `total` leido del documento;
+ *  - nunca escribe en `subtotal` ni en `iva`;
+ *  - nunca deduce sobre un documento `sin_importes` (albaran sin precios);
+ *  - nunca deduce si alguna linea se quedo sin importe (la suma no seria la
+ *    del documento, sino la de lo que se pudo leer).
+ */
+export function deducirImportes(datos: DocumentoExtraido): {
+  datos: DocumentoExtraido;
+  deduccion: Deduccion | null;
+} {
+  const sinDeducir = { datos, deduccion: null };
+
+  // Albaran sin un solo importe impreso: no hay nada que sumar. (Joselito)
+  if (datos.sin_importes) return sinDeducir;
+
+  // Un total leido del papel manda siempre. Aqui solo se rellenan huecos.
+  if (esNumeroFinito(datos.total)) return sinDeducir;
+
+  // ── A) El bloque de totales esta impreso salvo su ultima linea ──
+  if (esNumeroFinito(datos.subtotal) && esNumeroFinito(datos.iva)) {
+    const total = redondear2(datos.subtotal + datos.iva);
+    return {
+      datos: { ...datos, total },
+      deduccion: {
+        campo: "total",
+        valor: total,
+        metodo: "subtotal_mas_iva",
+        alerta: {
+          codigo: "total_deducido",
+          severidad: "media",
+          mensaje:
+            `El documento no declara total a pagar. Se ha CALCULADO como base ${eur(datos.subtotal)} ` +
+            `+ IVA ${eur(datos.iva)} = ${eur(total)}: aritmetica exacta sobre dos importes que si ` +
+            `estan impresos, pero el total NO se ha leido del papel.`,
+          detalle: {
+            metodo: "subtotal_mas_iva",
+            subtotal: datos.subtotal,
+            iva: datos.iva,
+            total,
+            origen: "deduccion",
+          },
+        },
+      },
+    };
+  }
+
+  // ── C) Medio bloque de totales leido: no se completa a ojo ──
+  //    Si hay base pero no IVA (o al reves), el documento SI tiene bloque de
+  //    totales y solo hemos leido un trozo. Lo que falta no es calculable: el
+  //    tipo de IVA no esta impreso en ninguna otra parte del documento.
+  if (esNumeroFinito(datos.subtotal) || esNumeroFinito(datos.iva)) return sinDeducir;
+
+  // ── B) Lo unico que hay son lineas: su suma es lo unico deducible ──
+  const lineas = datos.productos ?? [];
+  if (lineas.length === 0) return sinDeducir;
+  // TODAS las lineas tienen que traer importe. Si falta el de una, la suma no
+  // es la del documento: es la de lo que se pudo leer, y pasarla por total
+  // seria dar por completo un numero incompleto.
+  if (!lineas.every((l) => esNumeroFinito(l.total))) return sinDeducir;
+
+  const suma = redondear2(lineas.reduce((acc, l) => acc + (l.total as number), 0));
+
+  return {
+    datos: { ...datos, total: suma },
+    deduccion: {
+      campo: "total",
+      valor: suma,
+      metodo: "suma_lineas",
+      alerta: {
+        codigo: "total_deducido",
+        severidad: "media",
+        mensaje:
+          `El documento no declara ni base imponible, ni IVA, ni total: el bloque de totales no se ve ` +
+          `(recortado, tapado o fuera del encuadre). Se ha CALCULADO sumando sus ${lineas.length} ` +
+          `linea(s): ${eur(suma)}. Ese importe es la BASE de las lineas: si el original llevaba un ` +
+          `desglose de IVA que no aparece en la imagen, el total real sera mayor. Contrastalo con el ` +
+          `papel antes de darlo por bueno.`,
+        detalle: {
+          metodo: "suma_lineas",
+          num_lineas: lineas.length,
+          suma_lineas: suma,
+          total: suma,
+          origen: "deduccion",
+        },
+      },
+    },
+  };
+}

@@ -4,6 +4,7 @@ import { toNumber } from "./normalizacion.ts";
 import {
   comprobarCuadre,
   contarCambiosNumericos,
+  deducirImportes,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
@@ -12,6 +13,7 @@ import {
   validarEstructura,
   type Descuadre,
   type DocumentoExtraido,
+  type OrigenImporte,
 } from "./esquema.ts";
 import { diagnosticoResolucion } from "./imagen.ts";
 
@@ -530,6 +532,9 @@ async function completarFactura(
   // con el formato de `validar_cordura_factura` para poder mezclarlos.
   // deno-lint-ignore no-explicit-any
   alertasPrevias: any[] = [],
+  // Procedencia de `facturas.total` (ver paso 2b del handler). Solo viaja
+  // hasta la respuesta: la columna ya la escribió el insert del paso 6.
+  totalOrigen: OrigenImporte | null = null,
 ): Promise<Response> {
   // 7) Productos: embeddings en batch (1 sola llamada) + insert masivo
   if (datos.productos.length > 0) {
@@ -640,6 +645,8 @@ async function completarFactura(
         numero_documento: datos.numero_documento,
         proveedor: datos.proveedor,
         total: datos.total,
+        // 'deducido' = lo calculamos nosotros sumando, no se leyó del papel.
+        total_origen: totalOrigen,
         factura_id: facturaId,
         alertas: alertas.length,
         alertas_graves: alertasAltas,
@@ -1011,8 +1018,41 @@ serve(async (req) => {
 
     // 2) Extracción con reintento correctivo (ver `extraerConCuadre`)
     const extraccion = await extraerConCuadre(contentBlock);
-    const datos = normalizarDatos(extraccion.documento);
-    const alertasPrevias = descuadresComoAlertas(extraccion.descuadres, "pre-guardado");
+
+    // 2b) Deducción aritmética del total que el documento no imprime.
+    //
+    //     Va DESPUÉS de `extraerConCuadre` a propósito, y eso es lo que la
+    //     separa de la defensa contra el modelo: cuando se llega aquí, la
+    //     relectura ya se ha pedido, ya se ha comparado con
+    //     `contarCambiosNumericos` y ya se ha aceptado o descartado. Esto no
+    //     participa en esa decisión, no relaja ningún umbral y no habla con
+    //     OpenAI: es aritmética nuestra sobre números que el modelo ya leyó, y
+    //     solo rellena huecos (`null`). Nunca toca un importe leído, así que
+    //     no puede silenciar ningún descuadre de `comprobarCuadre`.
+    //
+    //     Qué es deducible y qué no (subtotal e IVA NUNCA lo son): ver el
+    //     bloque 4 de esquema.ts.
+    const { datos: documento, deduccion } = deducirImportes(extraccion.documento);
+    const datos = normalizarDatos(documento);
+
+    // Procedencia del importe que se va a guardar en `facturas.total`:
+    // 'leido' = lo puso el modelo leyendo el papel; 'deducido' = lo hemos
+    // calculado aquí; null = no hay total. Es la columna que permite pintar
+    // el aviso de "calculado, no leído" en el panel.
+    const totalOrigen: OrigenImporte | null =
+      datos.total === null ? null : deduccion ? "deducido" : "leido";
+
+    const alertasPrevias = [
+      ...descuadresComoAlertas(extraccion.descuadres, "pre-guardado"),
+      // El aviso de la deducción ya viene con `detalle.origen = "deduccion"`.
+      ...(deduccion ? [deduccion.alerta] : []),
+    ];
+    if (deduccion) {
+      console.warn(
+        `[deduccion] ${datos.tipo} ${datos.numero_documento}: el documento no trae total. ` +
+        `Calculado ${deduccion.valor} por "${deduccion.metodo}". Se guarda con total_origen='deducido'.`,
+      );
+    }
     console.log(
       `[extraccion] ${datos.tipo} ${datos.numero_documento}: ${extraccion.intentos} intento(s), ` +
       `${datos.productos.length} linea(s), ${extraccion.descuadres.length} descuadre(s) sin resolver.`,
@@ -1065,6 +1105,10 @@ serve(async (req) => {
         subtotal: datos.subtotal,
         iva: datos.iva,
         total: datos.total,
+        // Procedencia de `total`. Ver la migración 20260928160000: la columna
+        // es lo que impide que un importe calculado por nosotros se confunda
+        // con uno impreso en el papel.
+        total_origen: totalOrigen,
         observaciones: datos.observaciones,
         resumen: datos.resumen,
         embedding: vec(facturaEmbedding),
@@ -1085,7 +1129,7 @@ serve(async (req) => {
     // `compensarFacturaHuerfana`).
     try {
       return await completarFactura(
-        supabase, facturaId, datos, archivo, b64, mimeType, alertasPrevias,
+        supabase, facturaId, datos, archivo, b64, mimeType, alertasPrevias, totalOrigen,
       );
     } catch (innerError) {
       await compensarFacturaHuerfana(supabase, facturaId, innerError);

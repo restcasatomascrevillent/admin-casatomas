@@ -30,6 +30,20 @@ export interface Factura {
   subtotal: number | null;
   iva: number | null;
   total: number | null;
+  /**
+   * De donde sale `total`:
+   *   'leido'    — lo extrajo el modelo del documento (lo pone el papel).
+   *   'deducido' — NO lo pone el papel: lo calculo `procesar-factura` con
+   *                aritmetica exacta (subtotal + IVA, o la suma de las
+   *                lineas) porque el bloque de totales no se veia en la
+   *                imagen. Caso real: factura F/25011959 de Salazones Garre,
+   *                cuyo bloque de totales se quedo fuera del encuadre.
+   *   null       — el documento no tiene total (albaran sin precios).
+   * Un total deducido por suma de lineas es la BASE de esas lineas: si el
+   * original llevaba IVA que no se ve, el importe real es mayor. Por eso hay
+   * que poder distinguirlo en pantalla de uno leido.
+   */
+  total_origen: "leido" | "deducido" | null;
   observaciones: string | null;
   productos: ProductoFactura[];
   drive_url: string | null;
@@ -50,7 +64,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     .from('facturas')
     .select(`
       id, tipo, numero_documento, proveedor, cif, fecha,
-      subtotal, iva, total, observaciones, drive_url, archivo_path,
+      subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total
@@ -88,6 +102,11 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       subtotal: doc.subtotal != null ? Number(doc.subtotal) : null,
       iva: doc.iva != null ? Number(doc.iva) : null,
       total: doc.total != null ? Number(doc.total) : null,
+      // Solo se acepta el vocabulario que declara la columna. Cualquier otra
+      // cosa (o la columna sin migrar todavia) se trata como "no consta", que
+      // es mas honesto que asumir que se leyo del papel.
+      total_origen:
+        doc.total_origen === "leido" || doc.total_origen === "deducido" ? doc.total_origen : null,
       observaciones: doc.observaciones,
       productos,
       drive_url: doc.drive_url ?? null,
@@ -128,6 +147,15 @@ export const useUpdateFactura = () => {
         subtotal: updates.subtotal,
         iva: updates.iva,
         total: updates.total,
+        // Si un humano guarda el total desde el panel, ese importe deja de
+        // ser deducido: lo ha puesto una persona con el documento delante.
+        // Sin esto, una factura corregida a mano seguiria luciendo el
+        // distintivo de "calculado, no leido" para siempre.
+        // El rastro NO se pierde: el aviso `total_deducido` sigue en
+        // `alertas_validacion`, que esta pantalla no toca.
+        ...(updates.total !== undefined
+          ? { total_origen: updates.total === null ? null : ("leido" as const) }
+          : {}),
         observaciones: updates.observaciones,
         verificada: updates.verificada,
       };

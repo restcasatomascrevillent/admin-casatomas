@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   comprobarCuadre,
   contarCambiosNumericos,
+  deducirImportes,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
@@ -617,5 +618,261 @@ describe("descuadresComoAlertas — mismo formato que validar_cordura_factura", 
     ]) for (const x of comprobarCuadre(d)) emitidos.add(x.codigo);
 
     for (const c of emitidos) expect(DE_SQL).toContain(c);
+  });
+});
+
+// ============================================================================
+//  5. deducirImportes — recuperar un total que el documento no imprime
+// ----------------------------------------------------------------------------
+//  Caso real: factura F/25011959 de Salazones Garre (24/12/2025). Es una
+//  FACTURA, trae tres lineas con importe leido, y en la foto el bloque de
+//  totales se quedo FUERA DEL ENCUADRE. El modelo hizo lo correcto —no
+//  inventar lo que no ve— y la fila quedo con subtotal, iva y total a NULL,
+//  cuando antes valia 436,92.
+//
+//  Lo que estos tests fijan no es solo que 436,92 vuelva: es DONDE esta la
+//  frontera. Deducir con aritmetica exacta en nuestro codigo y que el modelo
+//  invente numeros para que le cuadren las sumas son cosas opuestas, y la
+//  unica forma de que no se confundan es que las reglas esten escritas:
+//   · nunca se pisa un valor leido,
+//   · nunca se escribe en subtotal ni en iva (el IVA no es derivable),
+//   · nunca se deduce sobre un albaran sin precios,
+//   · nunca se deduce con una linea sin importe,
+//   · y el umbral de `MAX_CAMBIOS_RELECTURA` sigue donde estaba.
+// ============================================================================
+
+/** Las tres lineas tal y como estan impresas en F/25011959. */
+const lineasGarre = (): LineaExtraida[] => [
+  linea({ nombre: "HUEVA DE MARUCA CALIDAD EXTRA", cantidad: 4.96, unidad: "kg", base_precio: "por_kg", precio_unitario: 42, total: 208.32 }),
+  linea({ nombre: "HUEVA DE MUJOL SELECCION EXTRA", cantidad: 1.5, unidad: "kg", base_precio: "por_kg", precio_unitario: 70, total: 105 }),
+  linea({ nombre: "BONITO ENTERO", cantidad: 10.3, unidad: "kg", base_precio: "por_kg", precio_unitario: 12, total: 123.6 }),
+];
+
+/** F/25011959 tal y como la lee hoy el modelo: lineas si, totales no. */
+const garre = (over: Partial<DocumentoExtraido> = {}) =>
+  doc({
+    tipo: "factura",
+    proveedor: "SALAZONES GARRE",
+    cif: "B-73028474",
+    numero_documento: "F/25011959",
+    fecha: "2025-12-24",
+    sin_importes: false,
+    productos: lineasGarre(),
+    subtotal: null,
+    iva: null,
+    total: null,
+    ...over,
+  });
+
+/** Documento con `total` ausente y el bloque de totales leido a medias. La
+ *  linea se construye cuadrando con el subtotal cuando lo hay, para que el
+ *  unico dato en discusion sea que falta del bloque. */
+const doTotalAusente = (over: { subtotal: number | null; iva: number | null }) => {
+  const importe = over.subtotal ?? 436.92;
+  return deducirImportes(
+    doc({
+      productos: [linea({ cantidad: 1, precio_unitario: importe, total: importe })],
+      subtotal: over.subtotal,
+      iva: over.iva,
+      total: null,
+    }),
+  );
+};
+
+describe("deducirImportes — Salazones Garre F/25011959 (totales fuera del encuadre)", () => {
+  it("recupera los 436,92 sumando las tres lineas", () => {
+    const { datos, deduccion } = deducirImportes(garre());
+    expect(datos.total).toBe(436.92);
+    expect(deduccion?.valor).toBe(436.92);
+    expect(deduccion?.metodo).toBe("suma_lineas");
+  });
+
+  it("lo redondea a centimos: 208.32 + 105 + 123.6 da 436.92000000000004 en coma flotante", () => {
+    // Sin redondear, ese numero llega tal cual a una columna NUMERIC(10,2).
+    expect(208.32 + 105 + 123.6).not.toBe(436.92);
+    expect(deducirImportes(garre()).datos.total).toBe(436.92);
+  });
+
+  it("NO inventa el reparto subtotal/IVA: los dos siguen a null", () => {
+    // Es la parte que no se puede derivar. El tipo podria ser el 10% de
+    // alimentacion o el 21%, y no esta impreso en ninguna parte.
+    const { datos } = deducirImportes(garre());
+    expect(datos.subtotal).toBeNull();
+    expect(datos.iva).toBeNull();
+  });
+
+  it("deja un aviso que dice que el importe esta CALCULADO, no leido", () => {
+    const { deduccion } = deducirImportes(garre());
+    expect(deduccion?.alerta.codigo).toBe("total_deducido");
+    expect(deduccion?.alerta.severidad).toBe("media");
+    expect(deduccion?.alerta.mensaje).toMatch(/CALCULADO/);
+    expect(deduccion?.alerta.detalle.origen).toBe("deduccion");
+    expect(deduccion?.alerta.detalle.num_lineas).toBe(3);
+  });
+
+  it("el aviso advierte de que ese importe es la BASE si habia IVA sin ver", () => {
+    // Lo unico que se asume en este camino es que no hay un bloque de IVA
+    // fuera del encuadre. Como es un supuesto, tiene que estar dicho.
+    const { deduccion } = deducirImportes(garre());
+    expect(deduccion?.alerta.mensaje).toMatch(/BASE/);
+    expect(deduccion?.alerta.mensaje).toMatch(/mayor/);
+  });
+
+  it("no muta el documento de entrada", () => {
+    const entrada = garre();
+    deducirImportes(entrada);
+    expect(entrada.total).toBeNull();
+  });
+});
+
+describe("deducirImportes — lo que NO se toca", () => {
+  it("un total LEIDO del papel no se recalcula aunque no cuadre con las lineas", () => {
+    // Si el papel dice 500 y las lineas suman 436,92, el descuadre es un dato
+    // y lo canta `comprobarCuadre`. Pisarlo con la suma seria exactamente el
+    // comportamiento del que defiende `contarCambiosNumericos`.
+    const leido = garre({ total: 500 });
+    const { datos, deduccion } = deducirImportes(leido);
+    expect(datos.total).toBe(500);
+    expect(deduccion).toBeNull();
+    expect(codigos(leido)).toContain("descuadre_cabecera");
+  });
+
+  it("un total leido de 0 (documento todo bonificado) tampoco se pisa", () => {
+    const regalo = doc({
+      productos: [linea({ total: 0, precio_unitario: 0, bonificada: true })],
+      subtotal: null, iva: null, total: 0,
+    });
+    expect(deducirImportes(regalo).deduccion).toBeNull();
+    expect(deducirImportes(regalo).datos.total).toBe(0);
+  });
+
+  it("el albaran de Joselito SIN PRECIOS se queda SIN TOTAL", () => {
+    // El caso que no puede romperse: `sin_importes` significa que en el papel
+    // no hay ni un euro. No hay nada que sumar, y un total ahi solo podria
+    // salir de un calculo inventado — que es el bug original.
+    const joselito = doc({
+      tipo: "albaran",
+      proveedor: "JOSELITO",
+      numero_documento: "2509134",
+      sin_importes: true,
+      productos: [
+        linea({ nombre: "JAMON JOSELITO G.R. (2)", cantidad: 12, peso_kg: 111.8, base_precio: "desconocida", precio_unitario: null, total: null }),
+        linea({ nombre: "JAMON JOSELITO G.R. (1)", cantidad: 1, peso_kg: 9.78, base_precio: "desconocida", precio_unitario: null, total: null }),
+      ],
+      subtotal: null, iva: null, total: null,
+    });
+    const { datos, deduccion } = deducirImportes(joselito);
+    expect(datos.total).toBeNull();
+    expect(datos.subtotal).toBeNull();
+    expect(datos.iva).toBeNull();
+    expect(deduccion).toBeNull();
+  });
+
+  it("un albaran sin precios NO cuela ni aunque olvide marcar sin_importes", () => {
+    // Cinturon y tirantes: si `sin_importes` viniese mal puesto, las lineas
+    // siguen sin importe y la regla de 'todas las lineas con importe' corta.
+    const sinMarca = doc({
+      tipo: "albaran",
+      sin_importes: false,
+      productos: [linea({ precio_unitario: null, total: null }), linea({ precio_unitario: null, total: null })],
+      subtotal: null, iva: null, total: null,
+    });
+    expect(deducirImportes(sinMarca).deduccion).toBeNull();
+    expect(deducirImportes(sinMarca).datos.total).toBeNull();
+  });
+
+  it("basta con que UNA linea se quede sin importe para no deducir nada", () => {
+    // La suma seria la de lo que se pudo leer, no la del documento. Darla por
+    // total es presentar un numero incompleto como completo.
+    const incompleto = garre({
+      productos: [...lineasGarre().slice(0, 2), linea({ nombre: "BONITO ENTERO", precio_unitario: null, total: null })],
+    });
+    expect(deducirImportes(incompleto).deduccion).toBeNull();
+    expect(deducirImportes(incompleto).datos.total).toBeNull();
+  });
+
+  it("un documento sin ninguna linea no da pie a deducir un total de cero", () => {
+    const vacio = garre({ productos: [] });
+    expect(deducirImportes(vacio).deduccion).toBeNull();
+    expect(deducirImportes(vacio).datos.total).toBeNull();
+  });
+});
+
+describe("deducirImportes — el bloque de totales a medias no se reconstruye", () => {
+  it("con subtotal e IVA leidos y total ausente, total = subtotal + IVA", () => {
+    // Aritmetica exacta sobre dos importes impresos: cero supuestos.
+    const { datos, deduccion } = doTotalAusente({ subtotal: 489.74, iva: 101.59 });
+    expect(datos.total).toBe(591.33);
+    expect(deduccion?.metodo).toBe("subtotal_mas_iva");
+    expect(deduccion?.alerta.detalle.metodo).toBe("subtotal_mas_iva");
+  });
+
+  it("con subtotal leido pero SIN IVA no se deduce: el tipo no esta impreso", () => {
+    // Que el documento imprima la base significa que TIENE bloque de totales
+    // y solo hemos leido un trozo. Completarlo seria reconstruirlo a ojo.
+    const { datos, deduccion } = doTotalAusente({ subtotal: 436.92, iva: null });
+    expect(datos.total).toBeNull();
+    expect(deduccion).toBeNull();
+  });
+
+  it("con IVA leido pero SIN base tampoco se deduce", () => {
+    const { datos, deduccion } = doTotalAusente({ subtotal: null, iva: 43.69 });
+    expect(datos.total).toBeNull();
+    expect(deduccion).toBeNull();
+  });
+
+  it("nunca escribe en subtotal ni en iva, tampoco por resta", () => {
+    // Deducir `iva = total - subtotal` seria exacto, pero destruiria la
+    // redundancia con la que `comprobarCuadre` detecta un total mal leido:
+    // la comprobacion (c) pasaria siempre por construccion.
+    const { datos } = doTotalAusente({ subtotal: 489.74, iva: 101.59 });
+    expect(datos.subtotal).toBe(489.74);
+    expect(datos.iva).toBe(101.59);
+  });
+});
+
+describe("deducirImportes — no puede silenciar ninguna comprobacion", () => {
+  it("solo rellena huecos, asi que `comprobarCuadre` ve lo mismo antes y despues", () => {
+    // Un documento con descuadre real: el total leido no es la suma de lineas.
+    const malo = garre({ total: 500 });
+    const antes = comprobarCuadre(malo);
+    const { datos } = deducirImportes(malo);
+    expect(comprobarCuadre(datos)).toEqual(antes);
+    expect(antes.map((d) => d.codigo)).toContain("descuadre_cabecera");
+  });
+
+  it("la referencia de `comprobarCuadre` sigue siendo el subtotal LEIDO", () => {
+    // Si la deduccion escribiese la suma de lineas en `subtotal`, esta
+    // comprobacion se compararia consigo misma y no detectaria nada.
+    const conSubtotalMalo = garre({ subtotal: 500, iva: 50 });
+    const { datos } = deducirImportes(conSubtotalMalo);
+    expect(datos.subtotal).toBe(500);
+    expect(comprobarCuadre(datos).map((d) => d.codigo)).toContain("descuadre_cabecera");
+  });
+
+  it("el umbral de la relectura sigue siendo 3: deducir no lo toca", () => {
+    // La defensa contra el modelo que reescribe el documento para que cuadre
+    // es independiente de esto y no se relaja.
+    expect(MAX_CAMBIOS_RELECTURA).toBe(3);
+  });
+
+  it("una relectura que reescribe medio documento se sigue descartando", () => {
+    const antes = garre();
+    const recompuesto = garre({
+      productos: [
+        linea({ cantidad: 4.96, precio_unitario: 40, total: 198.4 }),
+        linea({ cantidad: 1.5, precio_unitario: 65, total: 97.5 }),
+        linea({ cantidad: 10.3, precio_unitario: 11, total: 113.3 }),
+      ],
+      subtotal: 409.2, iva: 40.92, total: 450.12,
+    });
+    expect(contarCambiosNumericos(antes, recompuesto).total).toBeGreaterThan(MAX_CAMBIOS_RELECTURA);
+  });
+
+  it("el aviso de la deduccion tiene el mismo formato que los de validar_cordura_factura", () => {
+    // La UI y el chatbot no tienen que distinguir de donde vino cada alerta.
+    const { deduccion } = deducirImportes(garre());
+    expect(Object.keys(deduccion!.alerta).sort()).toEqual(["codigo", "detalle", "mensaje", "severidad"]);
+    expect(["alta", "media"]).toContain(deduccion!.alerta.severidad);
   });
 });

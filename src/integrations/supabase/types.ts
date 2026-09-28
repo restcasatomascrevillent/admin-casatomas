@@ -1403,6 +1403,7 @@ export type Database = {
           subtotal: number | null
           tipo: string
           total: number | null
+          total_origen: string | null
           updated_at: string | null
           verificada: boolean | null
         }
@@ -1426,6 +1427,7 @@ export type Database = {
           subtotal?: number | null
           tipo: string
           total?: number | null
+          total_origen?: string | null
           updated_at?: string | null
           verificada?: boolean | null
         }
@@ -1449,6 +1451,7 @@ export type Database = {
           subtotal?: number | null
           tipo?: string
           total?: number | null
+          total_origen?: string | null
           updated_at?: string | null
           verificada?: boolean | null
         }
