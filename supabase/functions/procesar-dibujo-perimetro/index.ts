@@ -33,6 +33,14 @@
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// La aritmética (perímetro y área) la hacemos nosotros, no el modelo: ver la
+// justificación medida en geometria.ts.
+import {
+  areaPoligono,
+  longitudSegmento,
+  perimetroDeParedes,
+  redondear,
+} from "./geometria.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,25 +50,47 @@ const corsHeaders = {
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
-// gpt-5-mini: el mismo modelo (y el mismo tier) que ya usa procesar-factura,
-// la otra función de este proyecto que interpreta contenido visual con
-// OpenAI. Justificación:
-//   - Soporta `response_format: json_object`, que es lo que de verdad hace
-//     falta aquí: la versión Lovable/Gemini original extraía el JSON con un
-//     regex sobre texto libre (línea `content.match(/\{[\s\S]*\}/)`), frágil
-//     por diseño. Con json_object el modelo está obligado a devolver JSON
-//     válido; se conserva el regex solo como red de seguridad.
-//   - Tiene visión, que es el requisito explícito del encargo. La entrada de
-//     ESTA función concreta no incluye una imagen — son coordenadas de los
-//     puntos del trazo, no un snapshot del canvas (ver `points` más abajo) —
-//     así que hoy no se ejercita esa capacidad. Se mantiene el mismo modelo
-//     igualmente por consistencia con procesar-factura (misma clave, mismo
-//     comportamiento probado en este proyecto) y por si en el futuro se
-//     decide mandar también una captura del canvas.
-//   - Es la opción "mini": la tarea es pequeña (una lista de puntos, una
-//     respuesta de unas pocas paredes) y ocurre de forma interactiva mientras
-//     el usuario dibuja, así que conviene barata y rápida, no el modelo top.
-const MODEL = "gpt-5-mini";
+// gpt-5.4-mini. Sustituye a gpt-5-mini, que dejaba esta función al borde del
+// fallo (y, con dibujos algo más complejos que los medidos, en fallo seguro).
+//
+// El problema con gpt-5-mini era el RAZONAMIENTO INTERNO: gasta tokens de
+// razonamiento del mismo presupuesto que `max_completion_tokens`, y en los
+// croquis reales del restaurante consumía 2.752–3.072 de los 4.000 que había
+// configurados ANTES de escribir un solo carácter de JSON. Cuando el
+// presupuesto se agota, la API devuelve `finish_reason: "length"` con
+// `content` VACÍO, el parseo de abajo falla y el usuario recibe
+// "No se pudo extraer JSON válido" tras haber pagado la llamada entera.
+// Reproducido de forma determinista bajando el tope (ver el error explícito
+// de truncamiento más abajo, añadido justo para que esto no vuelva a
+// diagnosticarse a ciegas).
+//
+// gpt-5.4-mini emite CERO tokens de razonamiento, así que el tope vuelve a
+// ser lo que debe ser — un límite, no una reserva que el modelo se come — y
+// además:
+//   - Es ~10× más rápido: 2,1–3,4 s frente a 28–29 s de gpt-5-mini en el
+//     croquis del comedor. Eso importa mucho aquí, porque el `AbortController`
+//     de más abajo corta a los 30 s: gpt-5-mini estaba a uno o dos segundos de
+//     que el timeout lo matase en cada llamada.
+//   - Sale más barato que el modelo anterior.
+//   - Acepta `temperature` (los modelos *luna* la rechazan con HTTP 400; si
+//     algún día se cambia a uno de ellos hay que quitar ese campo del cuerpo).
+//   - Recupera la geometría exacta: en el croquis del comedor devolvió las 8
+//     paredes y las 8 esquinas clavadas al metro, y en la terraza las 4.
+//
+// Sigue soportando `response_format: json_object`, que es lo que de verdad
+// hace falta: la versión Lovable/Gemini original extraía el JSON con un regex
+// sobre texto libre, frágil por diseño. Se conserva el regex como red de
+// seguridad.
+//
+// ⚠️ La familia a la que pertenecía gpt-5-mini se apaga el 11 de diciembre de
+// 2026, así que este cambio era obligado igualmente.
+const MODEL = "gpt-5.4-mini";
+
+// El tope es un MÁXIMO, no una reserva: subirlo no encarece nada (se paga por
+// tokens realmente emitidos) y es la causa raíz del fallo que arregla este
+// cambio. 16.000 deja margen de sobra incluso si un futuro modelo vuelve a
+// razonar. Las respuestas reales ocupan 288–560 tokens.
+const MAX_COMPLETION_TOKENS = 16000;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -68,6 +98,7 @@ function json(body: unknown, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
 
 // ─── Autenticación / autorización (mismo patrón que procesar-factura) ───────
 // ⚠️ `verify_jwt` NO sirve como autenticación en este proyecto: la anon key es
@@ -199,7 +230,7 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
         },
         body: JSON.stringify({
           model: MODEL,
-          max_completion_tokens: 4000,
+          max_completion_tokens: MAX_COMPLETION_TOKENS,
           response_format: { type: "json_object" },
           messages: [{ role: "user", content: prompt }],
         }),
@@ -219,7 +250,25 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
+    const choice = data.choices?.[0];
+    const content = choice?.message?.content || "";
+
+    // Truncamiento: la causa exacta del fallo que arregla este cambio. Si el
+    // modelo se queda sin presupuesto, la API responde 200 con
+    // `finish_reason: "length"` y `content` vacío. Antes eso caía en el
+    // genérico "No se pudo extraer JSON válido", que no decía nada y obligaba
+    // a diagnosticar a ciegas una llamada ya pagada. Ahora se nombra.
+    if (choice?.finish_reason === "length") {
+      const razonamiento = data.usage?.completion_tokens_details?.reasoning_tokens;
+      console.error(
+        `[procesar-dibujo-perimetro] Respuesta truncada: se agotaron los ${MAX_COMPLETION_TOKENS} tokens` +
+          (razonamiento ? ` (${razonamiento} en razonamiento interno)` : ""),
+      );
+      return json({
+        error:
+          "El modelo agotó el presupuesto de tokens antes de responder. Prueba con un dibujo más sencillo o avisa al administrador.",
+      });
+    }
 
     // Extraer JSON de la respuesta (json_object ya lo garantiza casi siempre;
     // se deja el fallback por si acaso, igual que hacía la versión anterior).
@@ -239,27 +288,57 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
       throw new Error("La respuesta de OpenAI no tiene el formato esperado (walls/corners)");
     }
 
-    // Convertir metros de vuelta a píxeles — idéntico a la versión anterior.
+    // Paredes en metros, tal y como las devuelve el modelo. `lengthMeters` se
+    // RECALCULA a partir de los propios extremos del segmento en lugar de
+    // confiar en el campo `length`: es la misma cuenta, pero hecha por
+    // nosotros, y así no puede quedar descuadrado respecto a las coordenadas.
     // deno-lint-ignore no-explicit-any
-    const wallsInPixels = result.walls.map((wall: any) => ({
-      x1: parseFloat(wall.x1) * pixelsPerMeter,
-      y1: parseFloat(wall.y1) * pixelsPerMeter,
-      x2: parseFloat(wall.x2) * pixelsPerMeter,
-      y2: parseFloat(wall.y2) * pixelsPerMeter,
-      lengthMeters: parseFloat(wall.length),
-    }));
+    const wallsInMeters = result.walls.map((wall: any) => {
+      const x1 = parseFloat(wall.x1);
+      const y1 = parseFloat(wall.y1);
+      const x2 = parseFloat(wall.x2);
+      const y2 = parseFloat(wall.y2);
+      return { x1, y1, x2, y2, lengthMeters: longitudSegmento(x1, y1, x2, y2) };
+    });
 
     // deno-lint-ignore no-explicit-any
-    const cornersInPixels = result.corners.map((corner: any) => ({
-      x: parseFloat(corner.x) * pixelsPerMeter,
-      y: parseFloat(corner.y) * pixelsPerMeter,
+    const cornersInMeters = result.corners.map((corner: any) => ({
+      x: parseFloat(corner.x),
+      y: parseFloat(corner.y),
     }));
+
+    // Perímetro y área los calculamos nosotros (ver geometria.ts y su test:
+    // el modelo clava la forma pero falla el área de una planta no convexa).
+    // Si por lo que sea no se pueden calcular, se cae a lo que dijo el modelo
+    // para no romper el contrato de salida.
+    const perimetroCalculado = perimetroDeParedes(wallsInMeters);
+    const areaCalculada = areaPoligono(cornersInMeters);
+
+    // Convertir metros de vuelta a píxeles — idéntico a la versión anterior.
+    const wallsInPixels = wallsInMeters.map(
+      (wall: { x1: number; y1: number; x2: number; y2: number; lengthMeters: number }) => ({
+        x1: wall.x1 * pixelsPerMeter,
+        y1: wall.y1 * pixelsPerMeter,
+        x2: wall.x2 * pixelsPerMeter,
+        y2: wall.y2 * pixelsPerMeter,
+        lengthMeters: redondear(wall.lengthMeters),
+      }),
+    );
+
+    const cornersInPixels = cornersInMeters.map(
+      (corner: { x: number; y: number }) => ({
+        x: corner.x * pixelsPerMeter,
+        y: corner.y * pixelsPerMeter,
+      }),
+    );
 
     return json({
       walls: wallsInPixels,
       corners: cornersInPixels,
-      perimeter: result.perimeter,
-      area: result.area,
+      perimeter: perimetroCalculado !== null
+        ? redondear(perimetroCalculado)
+        : result.perimeter,
+      area: areaCalculada !== null ? redondear(areaCalculada) : result.area,
     });
   } catch (error) {
     console.error("[procesar-dibujo-perimetro] Error:", error);
