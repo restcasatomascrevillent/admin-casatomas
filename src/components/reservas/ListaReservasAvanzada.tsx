@@ -45,6 +45,7 @@ import {
   CalendarPlus,
   Settings2,
   ClipboardCheck,
+  Armchair,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -88,6 +89,10 @@ import {
   filtrarFilasUnificadas,
   unificarReservasYSolicitudes,
 } from "@/lib/reservas/vistaUnificada";
+// Quién puede saltar al plano de su sala para que le den mesa, y con qué
+// texto cuando no puede. Módulo compartido con la pestaña Hoy a propósito: el
+// dueño pidió que las dos pantallas digan exactamente lo mismo.
+import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 
 // Mismo tipo que consume ModalVerificacionReserva.tsx — fuente única del
 // contrato con `reservas` (incluye espacio_id y, si la migración
@@ -164,7 +169,25 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // Estado). Medido con las 377 filas reales, lo que la tabla pide como mínimo
 // es 653 px a 1024 px de ventana y 864 px a 1280 px, por debajo de los 688 y
 // 944 px útiles de cada caso. Si se toca algo de aquí, vuelve a medirlo.
-const ANCHO_ACCIONES = "w-[224px] xl:w-[244px]";
+//
+// 2026-09-28 · la SEXTA ranura de acciones ("Dar mesa") ensancha esta primera
+// columna. Cuentas hechas a mano, PENDIENTES de medir en el navegador a
+// 1024 px (aquí no hay forma de calcular diseño):
+//   · ancho real del contenido de la celda de acciones = relleno + ranuras +
+//     huecos + el borde derecho:
+//       lg  12 + (16 + 76 + 5×24) + 6×2 + 1 = 237 px  (antes 211: 4 iconos)
+//       xl  16 + (16 + 88 + 5×28) + 6×4 + 1 = 285 px  (antes 253)
+//     o sea +26 px en `lg` y +32 px en `xl`, que es justo lo que se sube aquí
+//     para conservar el mismo margen que tenía la sugerencia sobre el
+//     contenido (13 px de sobra en `lg`; en `xl` la sugerencia ya iba por
+//     debajo del contenido, y la tabla la estira sola).
+//   · suma de anchos sugeridos a 1024 px: 250+74+120+40+40+152 = 676 px de
+//     los ~688 útiles. Cabe, pero el colchón baja de 38 px a 12 px. Si al
+//     medir apareciera scroll horizontal, lo siguiente que hay que apretar en
+//     la franja `lg` es ANCHO_PRINCIPAL (76 px — ojo: "Confirmar" es la
+//     etiqueta más larga y ya va justa) o el `gap-0.5` de CeldaAcciones.
+//     NUNCA recortar insignias ni dejar que aparezca el scroll horizontal.
+const ANCHO_ACCIONES = "w-[250px] xl:w-[276px]";
 const ANCHO_FECHA = "w-[74px] xl:w-[116px]";
 // OJO con el `max-w` de Cliente: el nombre lleva `truncate`, o sea
 // `white-space: nowrap`, y en una tabla de reparto automático eso hace que la
@@ -243,9 +266,10 @@ function AccionIcono({
         disabled={disabled || !onClick}
         onClick={onClick}
         className={cn(
-          // 24 px de 1024 a 1279 px, 28 px a partir de ahí: los ~26 px que se
-          // ahorran aquí se los queda la columna Cliente, que es la que peor
-          // lo pasa en pantalla estrecha.
+          // 24 px de 1024 a 1279 px, 28 px a partir de ahí: con las seis
+          // ranuras (5 iconos + 6 huecos) son ~32 px los que se ahorran aquí
+          // en `lg`, y se los queda la columna Cliente, que es la que peor lo
+          // pasa en pantalla estrecha.
           "h-6 w-6 shrink-0 [&_svg]:size-3.5 xl:h-7 xl:w-7",
           destructiva &&
             "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
@@ -328,7 +352,7 @@ function CeldaAcciones({
     <TableCell
       className={cn(
         // Relleno propio, más apretado que `CELDA`: esta columna es la más
-        // ancha de todas y sus 5 ranuras no cambian de tamaño con la pantalla.
+        // ancha de todas y sus 6 ranuras no cambian de tamaño con la pantalla.
         "px-1.5 py-2 align-middle xl:px-2",
         ANCHO_ACCIONES,
         "sticky left-0 z-10 border-r border-border/60",
@@ -345,7 +369,7 @@ function CeldaAcciones({
   );
 }
 
-/** Una de las cinco ranuras de acción. `onClick` ausente = deshabilitada. */
+/** Una de las seis ranuras de acción. `onClick` ausente = deshabilitada. */
 interface Accion {
   titulo: string;
   onClick?: () => void;
@@ -353,15 +377,26 @@ interface Accion {
 }
 
 /**
+ * Ranura "Dar mesa" de una fila de SOLICITUD: siempre deshabilitada. Una
+ * solicitud del bot todavía no es una reserva (otra tabla, otro ciclo de
+ * vida), así que no hay nada que sentar hasta que se convierta. El texto lo
+ * pone el módulo compartido —`resolverSaltoAsignacion(null)`— y no se escribe
+ * aquí, para que la lista y la pestaña Hoy digan lo mismo palabra por palabra.
+ * Se calcula una sola vez: es constante.
+ */
+const DAR_MESA_SOLICITUD: Accion = { titulo: resolverSaltoAsignacion(null).titulo };
+
+/**
  * El MISMO juego de acciones para todas las filas, reservas y solicitudes, en
- * el mismo orden y en la misma X: selección · principal · verificar ·
- * gestionar · cancelar · lista negra. Lo que no aplica a una fila sale
- * deshabilitado (2026-09-26, petición del dueño: antes cada fila traía un
+ * el mismo orden y en la misma X: selección · principal · dar mesa ·
+ * verificar · gestionar · cancelar · lista negra. Lo que no aplica a una fila
+ * sale deshabilitado (2026-09-26, petición del dueño: antes cada fila traía un
  * número distinto de botones y cambiaban de sitio al bajar por la lista).
  */
 function AccionesUnificadas({
   seleccion,
   principal,
+  darMesa,
   verificar,
   gestionar,
   cancelar,
@@ -370,6 +405,8 @@ function AccionesUnificadas({
   /** `undefined` = no hay selección en toda la lista (sin permiso de edición). */
   seleccion?: ReactNode;
   principal: Accion & { etiqueta: string; icono: ReactNode };
+  /** Salto al plano de SU sala, en SU día, con la reserva señalada. */
+  darMesa: Accion;
   verificar: Accion;
   gestionar: Accion;
   cancelar: Accion;
@@ -386,6 +423,15 @@ function AccionesUnificadas({
       >
         {principal.icono}
       </AccionPrincipal>
+      {/* "Dar mesa": abre el plano de la sala de ESA reserva, en SU fecha y
+          con ella ya señalada, en vez de obligar a deducir la sala y buscarla
+          dentro. Va SIN `destructiva` a propósito: "con sala pero sin mesa" es
+          trabajo pendiente normal, no un error ni un aviso, y el rojo diría lo
+          contrario (ver el encabezado de `saltoAsignacion.ts`). El sillón es
+          el mismo icono con el que el plano dibuja las mesas. */}
+      <AccionIcono etiqueta={darMesa.titulo} onClick={darMesa.onClick}>
+        <Armchair />
+      </AccionIcono>
       <AccionIcono etiqueta={verificar.titulo} onClick={verificar.onClick}>
         <ClipboardCheck />
       </AccionIcono>
@@ -499,6 +545,13 @@ function tituloCancelar(estado: string, canEdit: boolean, nombre: string) {
 interface ListaReservasAvanzadaProps {
   onEditReserva?: (reserva: Reservation) => void;
   onEspacioClick?: (espacioId: string) => void;
+  /**
+   * Salto al plano de la sala de una reserva, para darle mesa. Opcional como
+   * `onEspacioClick`: si la pantalla que monta la lista no tiene plano al que
+   * llevar, el botón se queda en su sitio pero deshabilitado — nunca
+   * desaparece, o los botones bailarían de una fila a otra.
+   */
+  onAsignarMesa?: (destino: DestinoAsignacion) => void;
   initialStatusFilter?: string;
   initialDateFilter?: Date;
   /**
@@ -512,6 +565,7 @@ interface ListaReservasAvanzadaProps {
 export function ListaReservasAvanzada({
   onEditReserva,
   onEspacioClick,
+  onAsignarMesa,
   initialStatusFilter,
   initialDateFilter,
   solicitudesState,
@@ -572,6 +626,39 @@ export function ListaReservasAvanzada({
   const { data: espaciosData } = useEspaciosReserva();
   const espacios = useMemo(() => ((espaciosData ?? []) as any[]), [espaciosData]);
   const marcaSolicitud = (s: SolicitudPendiente) => marcaDeSolicitud(s, espacios);
+  // Nombre de sala por id, para que el `title` de "Dar mesa" diga a DÓNDE
+  // lleva ("Abrir el plano en Comedor para darle mesa"). Sale de los espacios
+  // que la lista ya tiene cargados: ni una consulta más por esto.
+  const nombresDeSala = useMemo(() => {
+    const porId = new Map<string, string>();
+    for (const e of espacios) if (e?.id) porId.set(String(e.id), String(e.nombre ?? ""));
+    return porId;
+  }, [espacios]);
+
+  /**
+   * Ranura "Dar mesa" de una fila de RESERVA. Ni la decisión ni el texto se
+   * escriben aquí: los pone `resolverSaltoAsignacion`, compartido con la
+   * pestaña Hoy. Si la reserva no tiene sala, el botón se queda deshabilitado
+   * diciendo que primero hay que dársela desde «Gestionar», en vez de abrir un
+   * plano en el que esa reserva no aparecería.
+   *
+   * No se pasa `yaTieneMesa` a propósito: la mesa concreta no está en
+   * `reservas` sino en `asignaciones_mesa`, así que saberlo costaría otra
+   * consulta para las 375+ filas de la lista solo para cambiar una frase del
+   * tooltip. El plano, nada más abrirse, ya enseña si está sentada o no.
+   */
+  const accionDarMesa = (reserva: Reservation): Accion => {
+    const { destino, titulo } = resolverSaltoAsignacion(reserva, {
+      nombreSala: reserva.espacio_id ? nombresDeSala.get(reserva.espacio_id) ?? null : null,
+    });
+    return {
+      // Si esta pantalla no trae a dónde saltar, el botón sigue ocupando su
+      // sitio pero no promete un plano que no existe. Esto NO es un motivo del
+      // módulo compartido (que habla de la reserva): es que aquí no hay plano.
+      titulo: onAsignarMesa ? titulo : "Dar mesa: esta pantalla no lleva al plano de sala",
+      onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
+    };
+  };
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -1185,6 +1272,7 @@ export function ListaReservasAvanzada({
                         confirmar: () => updateReservationStatus(reservation.id, "confirmada"),
                       },
                     )}
+                    darMesa={accionDarMesa(reservation)}
                     verificar={{
                       titulo:
                         reservation.estado === "pendiente"
@@ -1320,6 +1408,7 @@ export function ListaReservasAvanzada({
                           aceptar: () => handleAceptarUnaClic(reservation),
                           confirmar: () => updateReservationStatus(reservation.id, "confirmada"),
                         })}
+                        darMesa={accionDarMesa(reservation)}
                         verificar={{
                           titulo:
                             reservation.estado === "pendiente"
@@ -1618,8 +1707,8 @@ function FilaSolicitud({
       )}
     >
       {/* Mismas ranuras que una fila de reserva y en el mismo orden: lo que
-          una solicitud no puede hacer (verificar, cancelar, lista negra) sale
-          deshabilitado, no desaparece. */}
+          una solicitud no puede hacer (dar mesa, verificar, cancelar, lista
+          negra) sale deshabilitado, no desaparece. */}
       <CeldaAcciones franja fondo={FONDOS.destacada.acciones}>
         <AccionesUnificadas
           seleccion={canEdit ? null : undefined}
@@ -1633,6 +1722,7 @@ function FilaSolicitud({
             icono: <CalendarPlus />,
             onClick: canEdit && abierta ? onConvertir : undefined,
           }}
+          darMesa={DAR_MESA_SOLICITUD}
           verificar={{ titulo: "Verificar: solo para reservas" }}
           gestionar={{
             titulo: "Gestionar: propuesta al cliente, salas y notas",

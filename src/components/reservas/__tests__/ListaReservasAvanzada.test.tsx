@@ -9,6 +9,12 @@
  *   3. cancelar una reserva pide confirmación y, si se descarta el diálogo,
  *      no cancela nada.
  *
+ * Y lo que pidió el 2026-09-28: desde la lista se puede "dar mesa", o sea
+ * saltar al plano de la sala de ESA reserva, en SU fecha y con ella señalada.
+ * Esa ranura es la sexta y obedece la misma regla que las demás: cuando no
+ * aplica (reserva sin sala, solicitud del bot) se queda deshabilitada con el
+ * porqué en el `title`, nunca desaparece.
+ *
  * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
  * diseño): eso se mide en el navegador con datos reales.
  */
@@ -82,7 +88,8 @@ import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanza
 const HOY = format(new Date(), "yyyy-MM-dd");
 const MANANA = format(addDays(new Date(), 1), "yyyy-MM-dd");
 
-const reserva = (id: string, estado: string, nombre: string) => ({
+/** `espacioId` = sala ya repartida; `null` = todavía sin sala (lo normal). */
+const reserva = (id: string, estado: string, nombre: string, espacioId: string | null = null) => ({
   id,
   nombre,
   telefono: "+34 600 111 222",
@@ -93,7 +100,7 @@ const reserva = (id: string, estado: string, nombre: string) => ({
   estado,
   canal: "telefono",
   notas_cliente: null,
-  espacio_id: null,
+  espacio_id: espacioId,
   importante: false,
   en_blacklist: false,
 });
@@ -131,11 +138,11 @@ const estadoSolicitudes = {
   marcarConvertida: vi.fn().mockResolvedValue(true),
 } as unknown as Parameters<typeof ListaReservasAvanzada>[0]["solicitudesState"];
 
-async function montar() {
+async function montar(props: Partial<Parameters<typeof ListaReservasAvanzada>[0]> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const vista = render(
     <QueryClientProvider client={client}>
-      <ListaReservasAvanzada solicitudesState={estadoSolicitudes} />
+      <ListaReservasAvanzada solicitudesState={estadoSolicitudes} {...props} />
     </QueryClientProvider>,
   );
   // En jsdom NO hay media queries, así que se montan a la vez la tabla y las
@@ -148,16 +155,20 @@ async function montar() {
   return { ...vista, tabla };
 }
 
+/** Botones de la celda de acciones de una fila, en orden de pantalla. */
+const botonesDeFila = (fila: HTMLElement) =>
+  [...fila.querySelector("td")!.querySelectorAll("button")].filter((b) => b.getAttribute("role") !== "checkbox");
+
 /** Etiquetas de los botones de la celda de acciones de una fila. */
-const accionesDeFila = (fila: HTMLElement) => {
-  const celda = fila.querySelector("td")!;
-  return [...celda.querySelectorAll("button")]
-    .filter((b) => b.getAttribute("role") !== "checkbox")
-    .map((b) => ({
-      etiqueta: b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "",
-      deshabilitado: b.hasAttribute("disabled"),
-    }));
-};
+const accionesDeFila = (fila: HTMLElement) =>
+  botonesDeFila(fila).map((b) => ({
+    etiqueta: b.getAttribute("aria-label") ?? b.textContent?.trim() ?? "",
+    deshabilitado: b.hasAttribute("disabled"),
+  }));
+
+/** Fila de la tabla que habla de ese cliente. */
+const filaDe = (tabla: HTMLElement, texto: string) =>
+  ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).find((f) => f.textContent?.includes(texto))!;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -166,6 +177,8 @@ beforeEach(() => {
     reserva("res-verificada", "verificada", "Berta Verificada"),
     reserva("res-confirmada", "confirmada", "Carlos Confirmado"),
     reserva("res-cancelada", "cancelada", "Diana Cancelada"),
+    // Única con sala repartida: es la que puede saltar al plano.
+    reserva("res-con-sala", "confirmada", "Elena ConSala", "esp-comedor"),
   ];
 });
 
@@ -182,73 +195,148 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
   it("pinta el MISMO juego de acciones, en el mismo orden, en todas las filas", async () => {
     const { tabla } = await montar();
     const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
-    expect(filas.length).toBe(5); // 4 reservas + 1 solicitud
+    expect(filas.length).toBe(6); // 5 reservas + 1 solicitud
 
     const cuantas = filas.map((f) => accionesDeFila(f).length);
     expect(new Set(cuantas).size).toBe(1);
-    expect(cuantas[0]).toBe(5);
+    expect(cuantas[0]).toBe(6);
 
-    // La segunda acción de cada fila es siempre "Verificar", la tercera
-    // "Gestionar", la cuarta "Cancelar" y la quinta "lista negra".
+    // El orden es siempre el mismo: principal, "dar mesa", "Verificar",
+    // "Gestionar", "Cancelar" y "lista negra".
     for (const fila of filas) {
       const acciones = accionesDeFila(fila);
-      expect(acciones[1].etiqueta).toMatch(/^Verificar/);
-      expect(acciones[2].etiqueta).toMatch(/^Gestionar/);
-      expect(acciones[3].etiqueta).toMatch(/cancelada|Cancelar|permiso|Descartar/i);
-      expect(acciones[4].etiqueta).toMatch(/lista negra/i);
+      expect(acciones[1].etiqueta).toMatch(/mesa/i);
+      expect(acciones[2].etiqueta).toMatch(/^Verificar/);
+      expect(acciones[3].etiqueta).toMatch(/^Gestionar/);
+      expect(acciones[4].etiqueta).toMatch(/cancelada|Cancelar|permiso|Descartar/i);
+      expect(acciones[5].etiqueta).toMatch(/lista negra/i);
     }
   });
 
   it("lo que no aplica a una fila sale deshabilitado, no se quita", async () => {
-    const { tabla } = await montar();
-    const porNombre = (texto: string) =>
-      ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).find((f) => f.textContent?.includes(texto))!;
+    const { tabla } = await montar({ onAsignarMesa: vi.fn() });
+    const porNombre = (texto: string) => filaDe(tabla, texto);
 
-    // Reserva pendiente: puede aceptarse y verificarse; no se gestiona.
+    // Reserva pendiente: puede aceptarse y verificarse; no se gestiona, y sin
+    // sala tampoco se le puede dar mesa todavía.
     const pendiente = accionesDeFila(porNombre("Ana Pendiente"));
     expect(pendiente[0].etiqueta).toBe("Aceptar");
     expect(pendiente[0].deshabilitado).toBe(false);
-    expect(pendiente[1].deshabilitado).toBe(false); // verificar
-    expect(pendiente[2].deshabilitado).toBe(true); // gestionar (solo solicitudes)
+    expect(pendiente[1].deshabilitado).toBe(true); // dar mesa (todavía sin sala)
+    expect(pendiente[2].deshabilitado).toBe(false); // verificar
+    expect(pendiente[3].deshabilitado).toBe(true); // gestionar (solo solicitudes)
 
     // Verificada: la principal pasa a "Confirmar" y ya no se verifica.
     const verificada = accionesDeFila(porNombre("Berta Verificada"));
     expect(verificada[0].etiqueta).toBe("Confirmar");
     expect(verificada[0].deshabilitado).toBe(false);
-    expect(verificada[1].deshabilitado).toBe(true);
+    expect(verificada[2].deshabilitado).toBe(true);
 
     // Confirmada: no hay nada que aceptar ni confirmar, pero el botón sigue ahí.
     const confirmada = accionesDeFila(porNombre("Carlos Confirmado"));
     expect(confirmada[0].deshabilitado).toBe(true);
-    expect(confirmada[3].deshabilitado).toBe(false); // cancelar sí
+    expect(confirmada[4].deshabilitado).toBe(false); // cancelar sí
 
     // Cancelada: tampoco se vuelve a cancelar.
     const cancelada = accionesDeFila(porNombre("Diana Cancelada"));
-    expect(cancelada[3].deshabilitado).toBe(true);
+    expect(cancelada[4].deshabilitado).toBe(true);
+
+    // Con sala: la única que puede saltar al plano a por su mesa.
+    const conSala = accionesDeFila(porNombre("Elena ConSala"));
+    expect(conSala[1].deshabilitado).toBe(false);
 
     // Solicitud del bot: su acción principal es "Convertir" y se gestiona,
-    // pero no se verifica, ni se cancela, ni se mete en la lista negra.
+    // pero no se le da mesa, ni se verifica, ni se cancela, ni se mete en la
+    // lista negra.
     const sol = accionesDeFila(porNombre("Familia Ballester"));
     expect(sol[0].etiqueta).toBe("Convertir");
     expect(sol[0].deshabilitado).toBe(false);
     expect(sol[1].deshabilitado).toBe(true);
-    expect(sol[2].deshabilitado).toBe(false);
-    expect(sol[3].deshabilitado).toBe(true);
+    expect(sol[2].deshabilitado).toBe(true);
+    expect(sol[3].deshabilitado).toBe(false);
     expect(sol[4].deshabilitado).toBe(true);
+    expect(sol[5].deshabilitado).toBe(true);
+  });
+});
+
+describe("ListaReservasAvanzada · «Dar mesa» salta al plano de su sala", () => {
+  /** La ranura "dar mesa" es la segunda: principal · DAR MESA · verificar… */
+  const botonDarMesa = (tabla: HTMLElement, cliente: string) => botonesDeFila(filaDe(tabla, cliente))[1];
+
+  it("con sala y fecha: abre el plano de ESA sala, en SU día y con ella señalada", async () => {
+    const onAsignarMesa = vi.fn();
+    const { tabla } = await montar({ onAsignarMesa });
+    const boton = botonDarMesa(tabla, "Elena ConSala");
+
+    expect(boton.hasAttribute("disabled")).toBe(false);
+    expect(boton.getAttribute("aria-label")).toMatch(/darle mesa/i);
+    // "Con sala pero sin mesa" es trabajo pendiente normal, no un error: este
+    // botón NUNCA se pinta como destructivo (petición del dueño).
+    expect(boton.className).not.toMatch(/destructive/);
+
+    fireEvent.click(boton);
+    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
+    expect(onAsignarMesa).toHaveBeenCalledWith({
+      espacioId: "esp-comedor",
+      fecha: HOY,
+      reservaId: "res-con-sala",
+      // La fixture es de las 21:30, así que el destino manda al plano al turno
+      // de CENA. Sin esto el plano abriría en el turno del reloj y la reserva
+      // no saldría en su panel.
+      turno: "cena",
+    });
+  });
+
+  it("sin sala: el botón NO desaparece, se queda deshabilitado y dice qué falta", async () => {
+    const onAsignarMesa = vi.fn();
+    const { tabla } = await montar({ onAsignarMesa });
+    const boton = botonDarMesa(tabla, "Ana Pendiente");
+
+    expect(boton).toBeInTheDocument();
+    expect(boton.hasAttribute("disabled")).toBe(true);
+    // El motivo lo escribe el módulo compartido con la pestaña Hoy: primero
+    // hay que darle sala, y se hace desde «Gestionar».
+    const titulo = boton.getAttribute("aria-label") ?? "";
+    expect(titulo).toMatch(/sala/i);
+    expect(titulo).toMatch(/Gestionar/);
+    // El `title` va también en el botón para que se vea al pasar por encima.
+    expect(boton.getAttribute("title")).toBe(titulo);
+
+    fireEvent.click(boton);
+    expect(onAsignarMesa).not.toHaveBeenCalled();
+  });
+
+  it("una solicitud del bot tiene el botón, deshabilitado: todavía no es una reserva", async () => {
+    const onAsignarMesa = vi.fn();
+    const { tabla } = await montar({ onAsignarMesa });
+    const boton = botonDarMesa(tabla, "Familia Ballester");
+
+    expect(boton).toBeInTheDocument();
+    expect(boton.hasAttribute("disabled")).toBe(true);
+    expect(boton.getAttribute("aria-label")).toMatch(/todavía no es una reserva/i);
+
+    fireEvent.click(boton);
+    expect(onAsignarMesa).not.toHaveBeenCalled();
+  });
+
+  it("una fila de solicitud tiene EXACTAMENTE los mismos botones que una de reserva", async () => {
+    const { tabla } = await montar({ onAsignarMesa: vi.fn() });
+    const reservaConSala = botonesDeFila(filaDe(tabla, "Elena ConSala"));
+    const solicitudBot = botonesDeFila(filaDe(tabla, "Familia Ballester"));
+
+    expect(solicitudBot.length).toBe(reservaConSala.length);
+    expect(solicitudBot.length).toBe(6);
   });
 });
 
 describe("ListaReservasAvanzada · cancelar pide confirmación", () => {
   const abrirCancelacion = async () => {
     const { tabla } = await montar();
-    const fila = ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).find((f) =>
-      f.textContent?.includes("Ana Pendiente"),
-    )!;
-    fireEvent.click(accionesBotones(fila)[3]);
+    // Quinta ranura: principal · dar mesa · verificar · gestionar · CANCELAR.
+    fireEvent.click(accionesBotones(filaDe(tabla, "Ana Pendiente"))[4]);
     return await screen.findByRole("alertdialog");
   };
-  const accionesBotones = (fila: HTMLElement) =>
-    [...fila.querySelector("td")!.querySelectorAll("button")].filter((b) => b.getAttribute("role") !== "checkbox");
+  const accionesBotones = botonesDeFila;
 
   it("no cancela al primer clic: abre un diálogo que dice qué reserva es", async () => {
     const dialogo = await abrirCancelacion();
