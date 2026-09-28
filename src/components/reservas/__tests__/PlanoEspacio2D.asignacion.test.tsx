@@ -23,7 +23,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 // ─── Doble en memoria ─────────────────────────────────────────────────────────
 
@@ -208,18 +208,31 @@ const RESERVAS = [
   reserva("r-romero", "Cena Romero", "21:00:00", 4),
 ];
 
+/**
+ * Espía de la URL: deja los parámetros a la vista para poder comprobar qué
+ * escribe la pantalla (`?fecha=`, `?turno=` y el `?reserva=` que se consume).
+ */
+function SondaUrl() {
+  const { search } = useLocation();
+  return <span data-testid="url-search">{search}</span>;
+}
+
 function montar({
   ruta = `/reservas?fecha=${FECHA}&turno=comida`,
   mesas = MESAS,
   reservas = RESERVAS,
   asignaciones = [] as Array<{ id: string; reserva_id: string; mesa_id: string }>,
   fechaProp,
+  turnoProp,
+  reservaIdProp,
 }: {
   ruta?: string;
   mesas?: unknown[];
   reservas?: unknown[];
   asignaciones?: Array<{ id: string; reserva_id: string; mesa_id: string }>;
   fechaProp?: string;
+  turnoProp?: "comida" | "cena";
+  reservaIdProp?: string;
 } = {}) {
   h.store.reservas = reservas as any[];
   h.store.mesas = mesas as any[];
@@ -240,7 +253,9 @@ function montar({
     },
   });
 
-  return render(
+  // El árbol se arma aparte para poder REPINTARLO con otra reserva señalada sin
+  // desmontar el plano (dos saltos seguidos).
+  const arbol = (reservaId?: string, turno?: "comida" | "cena") => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[ruta]}>
         <PlanoEspacio2D
@@ -248,11 +263,27 @@ function montar({
           espacioNombre="Salón"
           onBack={vi.fn()}
           fecha={fechaProp}
+          turno={turno}
+          reservaId={reservaId}
         />
+        <SondaUrl />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+
+  const utils = render(arbol(reservaIdProp, turnoProp));
+  return {
+    ...utils,
+    /**
+     * Señala otro destino, como haría el padre sin cambiar de pantalla: el
+     * turno viaja CON la reserva, igual que en `saltoAsignacion.ts`.
+     */
+    saltarA: (id: string, turno?: "comida" | "cena") => utils.rerender(arbol(id, turno)),
+  };
 }
+
+/** Parámetros de la URL tal como están ahora mismo. */
+const paramsUrl = () => new URLSearchParams(screen.getByTestId("url-search").textContent ?? "");
 
 /** Botón de una mesa del plano, por su nombre (el estado va detrás). */
 const botonMesa = (nombre: string) =>
@@ -449,6 +480,207 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     await esperarReserva("Familia Pérez");
     fireEvent.click(screen.getByRole("radio", { name: "Todo el día" }));
     expect(await screen.findByText(/los dos servicios a la vez/i)).toBeInTheDocument();
+  });
+
+  // ── Entrar señalando una reserva concreta ─────────────────────────────────
+  //
+  // El caso que hay que proteger: el plano abre en COMIDA (`?turno=comida`) y
+  // se señala una reserva de CENA. Si el turno no acabara en cena, el salto
+  // llevaría a un panel donde esa reserva NO está.
+  //
+  // Hay DOS vías y las dos se prueban:
+  //   · la buena, la del salto de verdad: el turno llega hecho en la prop
+  //     `turno` (lo deduce `saltoAsignacion.ts` de la hora) y entra al montar;
+  //   · el respaldo, para `?reserva=` de la URL, que no trae prop: ahí el turno
+  //     se deduce de la hora de la reserva ya dentro del plano.
+
+  it("con el turno en la prop, abre en ese turno aunque la URL diga otro", async () => {
+    // Nada de `reservaId`: se prueba SOLO la prioridad del turno.
+    montar({ ruta: `/reservas?fecha=${FECHA}&turno=comida`, turnoProp: "cena" });
+
+    expect(await screen.findByText("Cena Romero")).toBeInTheDocument();
+    expect(screen.queryByText("Familia Pérez")).not.toBeInTheDocument();
+  });
+
+  it("el salto por prop abre en el turno de la reserva y la deja activa", async () => {
+    // Justo el caso medido en el navegador: mediodía, reserva de cena.
+    montar({ reservaIdProp: "r-romero", turnoProp: "cena" });
+
+    await esperarReserva("Cena Romero");
+    expect(screen.queryByText("Familia Pérez")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Cena Romero" }),
+    ).toBeInTheDocument();
+  });
+
+  it("el turno deducido de la hora no pisa el que manda el padre", async () => {
+    // Combinación que en la práctica no se da (prop `turno` y `reservaId`
+    // salen del MISMO destino), pero fija quién manda: la prop.
+    montar({ reservaIdProp: "r-ana", turnoProp: "cena" });
+
+    await screen.findByText("Cena Romero");
+    expect(screen.queryByText("Ana López")).not.toBeInTheDocument();
+  });
+
+  it("dos saltos seguidos a turnos distintos sin volver a montar el plano", async () => {
+    const { saltarA } = montar({ reservaIdProp: "r-romero", turnoProp: "cena" });
+    await esperarReserva("Cena Romero");
+
+    saltarA("r-ana", "comida");
+
+    await esperarReserva("Ana López");
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Ana López" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cena Romero")).not.toBeInTheDocument();
+  });
+
+  it("un salto nuevo al mismo turno lo recoloca aunque el usuario lo hubiera cambiado", async () => {
+    const { saltarA } = montar({
+      // Dos cenas distintas: el segundo salto trae la MISMA prop `turno`, así
+      // que lo único que cambia es la reserva.
+      reservas: [...RESERVAS, reserva("r-vidal", "Cena Vidal", "21:30:00", 2)],
+      reservaIdProp: "r-romero",
+      turnoProp: "cena",
+    });
+    await esperarReserva("Cena Romero");
+
+    // El encargado se va a mirar la comida...
+    fireEvent.click(screen.getByRole("radio", { name: "Comida" }));
+    await esperarReserva("Familia Pérez");
+
+    // ...y desde la lista le mandan otra cena. Como `turno` vale lo mismo que
+    // antes, sin mirar también a la reserva el filtro se quedaría en comida y
+    // la reserva a sentar no saldría.
+    saltarA("r-vidal", "cena");
+    await esperarReserva("Cena Vidal");
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Cena Vidal" }),
+    ).toBeInTheDocument();
+  });
+
+  it("sin prop, el `?reserva=` de la URL sigue deduciendo el turno de la hora", async () => {
+    montar({ ruta: `/reservas?fecha=${FECHA}&turno=comida&reserva=r-romero` });
+
+    await esperarReserva("Cena Romero");
+    expect(screen.queryByText("Familia Pérez")).not.toBeInTheDocument();
+  });
+
+  it("señalar una reserva de cena abriendo en comida mueve el turno al suyo", async () => {
+    montar({ reservaIdProp: "r-romero" });
+
+    // Sale la de cena...
+    await esperarReserva("Cena Romero");
+    // ...y ya no las de comida: el turno es el de la reserva señalada.
+    expect(screen.queryByText("Familia Pérez")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ana López")).not.toBeInTheDocument();
+  });
+
+  it("deja la reserva señalada activa y lista para sentar", async () => {
+    montar({ reservaIdProp: "r-romero" });
+    await esperarReserva("Cena Romero");
+
+    // El botón de su fila ya está en "Eligiendo" y la barra de trabajo abierta.
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Cena Romero" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Sentando a/)).toBeInTheDocument();
+  });
+
+  it("se asoma a la tarjeta de la reserva señalada, aunque el panel sea largo", async () => {
+    // jsdom no implementa `scrollIntoView`; se pone uno de mentira que apunte
+    // sobre QUÉ elemento se ha llamado.
+    const asomadas: HTMLElement[] = [];
+    const original = (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView = function (
+      this: HTMLElement,
+    ) {
+      asomadas.push(this);
+    };
+
+    try {
+      montar({ reservaIdProp: "r-romero" });
+      await esperarReserva("Cena Romero");
+
+      await waitFor(() =>
+        expect(asomadas.some((el) => el.dataset.reservaFila === "r-romero")).toBe(true),
+      );
+    } finally {
+      (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView = original;
+    }
+  });
+
+  it("hace lo mismo cuando la reserva llega por `?reserva=` de la URL", async () => {
+    montar({ ruta: `/reservas?fecha=${FECHA}&turno=comida&reserva=r-romero` });
+
+    await esperarReserva("Cena Romero");
+    expect(screen.queryByText("Familia Pérez")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Cena Romero" }),
+    ).toBeInTheDocument();
+  });
+
+  it("la prop manda sobre el `?reserva=` de la URL", async () => {
+    montar({
+      ruta: `/reservas?fecha=${FECHA}&turno=cena&reserva=r-romero`,
+      reservaIdProp: "r-ana",
+    });
+
+    await esperarReserva("Ana López");
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Ana López" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cena Romero")).not.toBeInTheDocument();
+  });
+
+  it("si la reserva señalada no es de esta sala ni de este día, avisa sin romper nada", async () => {
+    montar({ reservaIdProp: "r-de-otra-sala" });
+
+    // El plano se queda como estaba: mismo día, mismo turno, todo en su sitio.
+    await esperarReserva("Familia Pérez");
+    await waitFor(() => expect(avisos("info").join(" ")).toMatch(/no está en Salón/i));
+    // Ni rojo ni lenguaje de error.
+    expect(avisos("error")).toHaveLength(0);
+    // Y no queda ninguna reserva sentándose.
+    expect(screen.queryByText(/Sentando a/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sentar a Familia Pérez" })).toBeInTheDocument();
+  });
+
+  it("consume `?reserva=` y lo borra de la URL, dejando fecha y turno", async () => {
+    montar({ ruta: `/reservas?fecha=${FECHA}&turno=comida&reserva=r-romero` });
+    await esperarReserva("Cena Romero");
+
+    // Se borra para que al cambiar de día (o al recargar) no se vuelva a
+    // preseleccionar una reserva que ya no pinta nada ahí.
+    await waitFor(() => expect(paramsUrl().get("reserva")).toBeNull());
+    expect(paramsUrl().get("fecha")).toBe(FECHA);
+    // Y el turno que queda guardado es el DERIVADO de la reserva.
+    expect(paramsUrl().get("turno")).toBe("cena");
+  });
+
+  it("dos saltos seguidos a reservas distintas sin volver a montar el plano", async () => {
+    const { saltarA } = montar({ reservaIdProp: "r-romero" });
+    await esperarReserva("Cena Romero");
+
+    saltarA("r-ana");
+
+    // Vuelve a comida, con Ana activa: el segundo encargo se atiende igual.
+    await esperarReserva("Ana López");
+    expect(
+      screen.getByRole("button", { name: "Dejar de elegir mesa para Ana López" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Cena Romero")).not.toBeInTheDocument();
+  });
+
+  it("no se le pelea el turno al usuario si lo cambia a mano tras el salto", async () => {
+    montar({ reservaIdProp: "r-romero" });
+    await esperarReserva("Cena Romero");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Comida" }));
+
+    // El salto ya se consumió: nadie devuelve el filtro a cena.
+    await esperarReserva("Familia Pérez");
+    expect(screen.queryByText("Cena Romero")).not.toBeInTheDocument();
   });
 
   // ── Sentar en 2 clics ─────────────────────────────────────────────────────

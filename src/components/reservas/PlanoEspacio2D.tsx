@@ -31,6 +31,22 @@
 // comensales, la barra se cierra sola y se puede pasar a la siguiente reserva.
 //
 // ----------------------------------------------------------------------------
+// ENTRAR SEÑALANDO UNA RESERVA (`reservaId` / `?reserva=`)
+// ----------------------------------------------------------------------------
+// El plano se puede abrir apuntando a UNA reserva concreta, lista para sentar
+// (desde la lista y desde la pestaña Hoy). Dos cosas de ese salto no son
+// evidentes y están comentadas donde pasan:
+//   · EL TURNO ENTRA AL MONTAR, COMO LA FECHA. El panel solo lista el turno
+//     elegido, y por defecto es el del reloj: saltar a una cena a mediodía sin
+//     mover el turno lleva a un panel donde la reserva NO está. Quien lanza el
+//     salto ya sabe la hora, así que manda el turno hecho (prop `turno`);
+//     deducirlo aquí DESPUÉS de montar se probó y no se aplicaba (ver la prop).
+//     La deducción sigue viva solo como respaldo de la vía `?reserva=`.
+//   · `?reserva=` SE BORRA EN CUANTO SE ATIENDE. Es un encargo de un solo uso,
+//     no un filtro: pegado en la URL volvería a preseleccionar esa reserva al
+//     cambiar de día o al recargar.
+//
+// ----------------------------------------------------------------------------
 // QUIÉN MANDA SOBRE "MESA OCUPADA"
 // ----------------------------------------------------------------------------
 // La base de datos. El aviso del navegador es solo una cortesía para no gastar
@@ -100,6 +116,7 @@ import {
   useReservasDeSala,
   type FiltroTurno,
   type ReservaSala,
+  type Turno,
 } from "./asignacionPlano";
 import {
   DndContext,
@@ -151,6 +168,27 @@ interface PlanoEspacio2DProps {
    * donde entra el calendario de ocupación) y, si tampoco, hoy.
    */
   fecha?: string;
+  /**
+   * Turno con el que abrir. HERMANO de `fecha`, y por el mismo motivo: entra al
+   * montar, no después.
+   *
+   * Lo deduce de la hora de la reserva quien lanza el salto
+   * (`src/lib/reservas/saltoAsignacion.ts`), no esta pantalla. Medido en el
+   * navegador el 2026-09-28: cuando el plano intentaba deducirlo DESPUÉS de
+   * montarse —esperando a que cargaran las reservas del día y entonces
+   * `setFiltroTurno`— ese cambio no llegaba a aplicarse nunca (la URL sí
+   * quedaba en `turno=cena` y la reserva sí quedaba activa, pero el panel
+   * seguía en comida y la reserva a sentar no salía). Lo que se pasa como PROP
+   * AL MONTAR, en cambio, funciona siempre: es la vía que ya usaba `fecha`.
+   */
+  turno?: Turno;
+  /**
+   * Reserva a preseleccionar al abrir, para sentarla. OPCIONAL igual que
+   * `fecha`: solo llega cuando se entra POR UNA RESERVA. Sin prop se lee
+   * `?reserva=` de la URL y, si tampoco, no se señala ninguna y el plano se
+   * comporta igual que siempre.
+   */
+  reservaId?: string;
 }
 
 interface DragState {
@@ -257,6 +295,9 @@ function TarjetaReserva({
   return (
     <div
       ref={setNodeRef}
+      // Marca para que la pantalla pueda asomarse a ESTA fila cuando se entra
+      // señalando la reserva (ver el salto de `?reserva=`).
+      data-reserva-fila={reserva.id}
       className={cn(
         "flex items-center gap-2 rounded-lg border p-2 transition-colors",
         tieneMesa
@@ -622,7 +663,14 @@ function MesaPlano({
 
 // ─── Pantalla ────────────────────────────────────────────────────────────────
 
-export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: PlanoEspacio2DProps) {
+export function PlanoEspacio2D({
+  espacioId,
+  espacioNombre,
+  onBack,
+  fecha,
+  turno,
+  reservaId,
+}: PlanoEspacio2DProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -643,7 +691,13 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
 
   // Turno por defecto: el del momento en que se abre la pantalla. El encargado
   // entra antes o durante un servicio concreto, no a ver los dos mezclados.
+  //
+  // Prioridad calcada a la de `fecha`: prop `turno` > `?turno=` de la URL >
+  // el del reloj. La prop va PRIMERO porque es la que trae el salto por
+  // reserva, y ese turno es el único que sabe a qué servicio se quiere entrar
+  // (ver el comentario de la prop: deducirlo después de montar no se aplicaba).
   const turnoInicial = useMemo<FiltroTurno>(() => {
+    if (esFiltroTurno(turno)) return turno;
     const deUrl = searchParams.get("turno");
     if (esFiltroTurno(deUrl)) return deUrl;
     return turnoDeHora(new Date().toLocaleTimeString("es-ES", { hour12: false }));
@@ -651,12 +705,58 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   }, []);
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>(turnoInicial);
 
+  // Tercer parámetro del mismo mecanismo, con la MISMA prioridad que `fecha`:
+  // prop `reservaId` > `?reserva=` de la URL > ninguna. Se llama `reserva` por
+  // lo mismo que el día se llama `fecha` y no `date`: los nombres cortos de
+  // `src/pages/Reservas.tsx` ya están cogidos y no hay que pisárselos.
+  //
+  // No se valida el formato (a diferencia de `?fecha=`, donde una fecha
+  // imposible rompería la consulta): un id que no exista simplemente no
+  // aparecerá en las reservas del día y se avisa sin romper nada.
+  const reservaSenaladaInicial = useMemo(() => {
+    const dePropiedad = (reservaId ?? "").trim();
+    if (dePropiedad) return dePropiedad;
+    const deUrl = (searchParams.get("reserva") ?? "").trim();
+    return deUrl || null;
+    // Solo al montar, igual que `fechaInicial` y `turnoInicial`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** Salto pendiente de atender. Encargo de UN SOLO USO, no un filtro. */
+  const [reservaSenalada, setReservaSenalada] = useState<string | null>(reservaSenaladaInicial);
+
   // Si el padre empieza a pasar `fecha` (o la cambia), se sigue.
   useEffect(() => {
     if (esFechaISO(fecha)) setFechaSel(fecha as string);
   }, [fecha]);
 
-  /** Guarda día/turno en la URL sin tocar el resto de parámetros. */
+  // Y lo mismo con la reserva señalada: así dos saltos seguidos a reservas
+  // distintas funcionan sin desmontar el plano (en el primero la prop ya valía
+  // eso, en el segundo cambia y entra un encargo nuevo).
+  useEffect(() => {
+    const id = (reservaId ?? "").trim();
+    if (id) setReservaSenalada(id);
+  }, [reservaId]);
+
+  // El turno del salto, igual. Depende TAMBIÉN de `reservaId` a propósito: dos
+  // saltos seguidos al mismo turno traen la misma prop `turno`, y si en medio
+  // el usuario hubiera cambiado el filtro a mano, sin esto el segundo salto lo
+  // dejaría en el turno equivocado y la reserva no saldría. Solo se reaplica
+  // cuando el PADRE señala algo nuevo; un cambio a mano no toca las props, así
+  // que al usuario no se le pelea el filtro.
+  useEffect(() => {
+    if (esFiltroTurno(turno)) setFiltroTurno(turno);
+  }, [turno, reservaId]);
+
+  /**
+   * Guarda día/turno en la URL sin tocar el resto de parámetros, y de paso
+   * BORRA `reserva`.
+   *
+   * Lo de borrar no es un descuido: `?reserva=` es el salto con el que se entra
+   * señalando una reserva, y se agota al atenderlo. Si se quedara pegado, al
+   * cambiar de día o al recargar se volvería a preseleccionar una reserva que
+   * ya no pinta nada en lo que se está viendo — y `cambiarFecha`/`cambiarTurno`
+   * precisamente acaban de soltar la reserva activa.
+   */
   const sincronizarUrl = useCallback(
     (nuevaFecha: string, nuevoTurno: FiltroTurno) => {
       setSearchParams(
@@ -664,6 +764,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
           const params = new URLSearchParams(prev);
           params.set("fecha", nuevaFecha);
           params.set("turno", nuevoTurno);
+          params.delete("reserva");
           return params;
         },
         { replace: true },
@@ -677,6 +778,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       if (!esFechaISO(nueva)) return;
       setFechaSel(nueva);
       setReservaActivaId(null);
+      // Si quedaba un salto sin atender, el usuario acaba de decir a mano dónde
+      // quiere estar: manda él, no el encargo con el que se entró.
+      setReservaSenalada(null);
       setUltimoCambio(null);
       sincronizarUrl(nueva, filtroTurno);
     },
@@ -698,6 +802,9 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
       if (!esFiltroTurno(nuevo)) return;
       setFiltroTurno(nuevo);
       setReservaActivaId(null);
+      // Igual que al cambiar de día: elegir turno a mano cancela el salto que
+      // aún no se hubiera atendido. Nunca se le pelea el filtro al usuario.
+      setReservaSenalada(null);
       sincronizarUrl(fechaSel, nuevo);
     },
     [fechaSel, sincronizarUrl],
@@ -710,6 +817,17 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
   const [localMesas, setLocalMesas] = useState<Mesa[]>([]);
   const [activeReserva, setActiveReserva] = useState<ReservaSala | null>(null);
   const [reservaActivaId, setReservaActivaId] = useState<string | null>(null);
+  /**
+   * Tarjeta a la que hay que asomarse tras un salto.
+   *
+   * Va aparte de `reservaActivaId` porque el scroll NO se puede hacer en el
+   * mismo momento de activarla: al cambiar el turno, su tarjeta todavía no está
+   * en el DOM — aparece en el render siguiente. Se deja apuntado y el efecto lo
+   * reintenta con cada lista nueva hasta que la encuentra.
+   */
+  const [reservaAEnfocar, setReservaAEnfocar] = useState<string | null>(null);
+  /** Contenedor de las tarjetas del panel, para buscar dentro solo ahí. */
+  const panelReservasRef = useRef<HTMLDivElement>(null);
   /** Un solo nivel de deshacer, como se pidió: nada de historial infinito. */
   const [ultimoCambio, setUltimoCambio] = useState<{
     reservaId: string;
@@ -822,6 +940,98 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
     () => reservasTurno.filter((r) => mesaIdsDe(r.id).length > 0),
     [reservasTurno, mesaIdsDe],
   );
+
+  // ── Salto: abrir señalando una reserva, lista para sentar ─────────────────
+
+  /**
+   * Atiende el encargo de `reservaId` / `?reserva=`: deja la reserva activa y,
+   * SOLO SI EL TURNO NO HA VENIDO POR PROP, lo deduce de su hora.
+   *
+   * POR QUÉ EL TURNO IMPORTA TANTO
+   * El panel solo lista `reservasTurno`, y el turno por defecto es el del
+   * momento de abrir la pantalla (`turnoDeHora(new Date()...)`). Si alguien
+   * salta a una reserva de CENA a mediodía y el turno se queda en comida, el
+   * salto lleva a un panel donde esa reserva NO está: la pantalla se abre
+   * "vacía" y quien venía a sentarla no la encuentra.
+   *
+   * POR QUÉ DEDUCIRLO AQUÍ ES SOLO EL RESPALDO
+   * Esta vía —esperar a que carguen las reservas del día y entonces
+   * `setFiltroTurno`— NO funciona en el navegador: medido el 2026-09-28,
+   * saltando desde Hoy y desde la lista a una cena siendo mediodía, la URL sí
+   * quedaba en `turno=cena` y `setReservaActivaId` sí se aplicaba, pero el
+   * panel seguía en comida (muestreado cada 40 ms durante 1,9 s: nunca llegaba
+   * a cena). O sea: de las tres cosas que hace este efecto, justo el
+   * `setFiltroTurno` se perdía. No se ha podido aislar el mecanismo exacto
+   * —apunta a que la instancia que ejecuta este efecto no es la que acaba
+   * pintando, por un remontaje o una carrera con la navegación de
+   * `setSearchParams`—, pero la forma de la prueba es clara: lo que llega como
+   * PROP AL MONTAR es fiable, y lo que se escribe con `setState` después, en
+   * este camino, no. De ahí que el turno viaje ahora con el destino
+   * (`saltoAsignacion.ts`) y entre por `turnoInicial`.
+   *
+   * Se conserva la deducción porque la vía `?reserva=` de la URL no trae prop
+   * `turno` y ahí sigue haciendo falta. Cuando la prop existe, ella manda: este
+   * efecto ni toca el filtro.
+   *
+   * UNA SOLA VEZ POR SALTO: el encargo se consume (`setReservaSenalada(null)`)
+   * en cuanto se atiende, encontrada o no. Después el filtro es del usuario, y
+   * si él cambia de turno a mano nadie se lo vuelve a mover.
+   */
+  useEffect(() => {
+    if (!reservaSenalada) return;
+    // `undefined` = las reservas del día todavía están cargando. Sin esta
+    // espera se diría "no está" antes de haber mirado.
+    if (!reservasDia) return;
+
+    const reserva = reservasDia.find((r) => r.id === reservaSenalada);
+    setReservaSenalada(null);
+
+    if (!reserva) {
+      // Ni error ni rojo: que la reserva sea de otra sala o de otro día es un
+      // caso normal (la han movido, o se viene de un enlace viejo). El plano se
+      // queda EXACTAMENTE como estaba, sin cambiar de día ni de turno.
+      toast.info(
+        `Esa reserva no está en ${espacioNombre} el ${fechaCorta(fechaSel)}. Puede que sea de otra sala o de otro día.`,
+      );
+      sincronizarUrl(fechaSel, filtroTurno);
+      return;
+    }
+
+    // Con prop manda la prop —ya la puso `turnoInicial` al montar—; sin ella,
+    // la hora de la reserva.
+    const turnoDestino: FiltroTurno = esFiltroTurno(turno) ? turno : turnoDeHora(reserva.hora);
+    if (!esFiltroTurno(turno)) setFiltroTurno(turnoDestino);
+    // Se fija DIRECTO, no con `activarReserva`: esa función ALTERNA, así que un
+    // segundo salto a la misma reserva la apagaría justo cuando se pedía verla.
+    setReservaActivaId(reserva.id);
+    setSelectedMesa(null);
+    setReservaAEnfocar(reserva.id);
+    // Deja la URL en `?fecha=&turno=` (con el turno del destino) y sin
+    // `reserva`: ver `sincronizarUrl`.
+    sincronizarUrl(fechaSel, turnoDestino);
+  }, [reservaSenalada, reservasDia, fechaSel, filtroTurno, turno, espacioNombre, sincronizarUrl]);
+
+  /** Asomarse a la tarjeta señalada en cuanto exista. */
+  useEffect(() => {
+    if (!reservaAEnfocar) return;
+    // La tarjeta solo existe si la reserva entra en el turno que se está
+    // pintando; si no, se espera al render en que sí.
+    if (!reservasTurno.some((r) => r.id === reservaAEnfocar)) return;
+
+    // Se busca por `data-` recorriendo, y no con un selector de atributo, para
+    // no tener que escapar el id.
+    const fila = Array.from(
+      panelReservasRef.current?.querySelectorAll<HTMLElement>("[data-reserva-fila]") ?? [],
+    ).find((el) => el.dataset.reservaFila === reservaAEnfocar);
+    if (!fila) return;
+
+    // `nearest` y sin `behavior: "smooth"`: si la tarjeta ya se ve no se mueve
+    // nada, y si no, se mueve lo justo. En pleno servicio un salto de scroll
+    // largo y animado despista más que ayuda.
+    // El `?.` es por jsdom, que no implementa `scrollIntoView`.
+    fila.scrollIntoView?.({ block: "nearest" });
+    setReservaAEnfocar(null);
+  }, [reservaAEnfocar, reservasTurno]);
 
   // ── Guardar / deshacer ────────────────────────────────────────────────────
 
@@ -2365,7 +2575,7 @@ export function PlanoEspacio2D({ espacioId, espacioNombre, onBack, fecha }: Plan
                   </div>
                 ) : (
                   <ScrollArea className="min-h-0 flex-1">
-                    <div className="space-y-3 p-3">
+                    <div ref={panelReservasRef} className="space-y-3 p-3">
                       {/* Pendientes de mesa — primero, porque es lo que queda por hacer */}
                       {reservasPendientes.length > 0 && (
                         <div>
