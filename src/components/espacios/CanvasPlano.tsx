@@ -22,8 +22,10 @@ import {
   distribuirSillasRectangular,
   distribuirSillasCirculo,
   type Matrix2D,
+  type Punto,
   type SegmentoPared,
 } from "./planoUtils";
+import { calcularPuertaEnMuro, centroRectFabric } from "./puertaGeometria";
 
 // Estilo arquitectónico de paredes: gris carbón uniforme (antes se coloreaban
 // en verde/amarillo/naranja/rojo según la desviación respecto a 0°, pero sin
@@ -42,6 +44,59 @@ const DOOR_LEAF_THICKNESS_PX = 6;
 // de escena — si no, con zoom alejado el imán "se encoge" y con zoom
 // acercado "se agranda" en términos de lo que el usuario percibe en pantalla.
 const DOOR_WALL_SNAP_PX = 25;
+
+/**
+ * Proximidad (en px de escena; a 50 px/m son 30 cm) a la que dos mesas se
+ * consideran "juntas" y por tanto candidatas a UNIRSE en una sola.
+ *
+ * OJO con el historial de esta constante: antes bastaba con soltar una mesa
+ * a esta distancia de otra para que las dos desaparecieran y se sustituyeran
+ * en silencio por una fusionada ("7+8", capacidad sumada). Es decir: el gesto
+ * normal de montar una fila de mesas en una sala destruía las mesas. Hoy la
+ * fusión solo ocurre si el usuario la pide expresamente (ver `ofrecerFusion`).
+ */
+export const MERGE_THRESHOLD = 15;
+
+/** Caja envolvente (axis-aligned, coordenadas de escena) de una mesa. */
+export interface CajaMesa {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export type DireccionFusion = "horizontal" | "vertical";
+
+/**
+ * ¿Están estas dos cajas lo bastante juntas como para ofrecer unirlas, y en
+ * qué sentido? Devuelve null si no lo están.
+ *
+ * Se usan bounding boxes axis-aligned (`getBoundingRect()`) y no
+ * left/top/width/height a pelo: con una mesa rotada, left/top siguen siendo
+ * la esquina "antes de rotar" y left+width ya no es el borde derecho real.
+ */
+export function detectarAdyacenciaMesas(
+  a: CajaMesa,
+  b: CajaMesa,
+  umbral: number = MERGE_THRESHOLD
+): DireccionFusion | null {
+  const aRight = a.left + a.width;
+  const aBottom = a.top + a.height;
+  const bRight = b.left + b.width;
+  const bBottom = b.top + b.height;
+
+  // Lado a lado: bordes verticales pegados + solape en vertical.
+  const adyacenteH = Math.abs(aRight - b.left) < umbral || Math.abs(a.left - bRight) < umbral;
+  const solapaV = a.top < bBottom && aBottom > b.top;
+
+  // Una encima de otra: bordes horizontales pegados + solape en horizontal.
+  const adyacenteV = Math.abs(aBottom - b.top) < umbral || Math.abs(a.top - bBottom) < umbral;
+  const solapaH = a.left < bRight && aRight > b.left;
+
+  if (adyacenteH && solapaV) return "horizontal";
+  if (adyacenteV && solapaH) return "vertical";
+  return null;
+}
 
 interface CanvasPlanoProps {
   pixelsPerMeter: number;
@@ -68,6 +123,17 @@ interface CanvasPlanoProps {
    * mesa tiene de verdad en la sala.
    */
   onMesaCreada?: (mesaId: string, nombre: string) => void;
+  /**
+   * La herramienta "Sala" acaba de dibujar una habitación rectangular de
+   * `widthMeters` x `heightMeters` (medidas ya redondeadas a 5 cm).
+   *
+   * PENDIENTE DE CABLEAR: las dimensiones reales del plano viven en
+   * `EditorPlanoEspacio` (`realDimensions`), que es quien debería ajustarlas
+   * al tamaño recién dibujado. Si no se pasa esta prop no pasa nada malo: la
+   * sala se dibuja igual (sus 4 paredes) y las dimensiones del lienzo se
+   * quedan como estaban.
+   */
+  onRoomDrawn?: (widthMeters: number, heightMeters: number) => void;
 }
 
 export interface CanvasPlanoRef {
@@ -120,6 +186,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   onToolChange,
   onZoomChange,
   onMesaCreada,
+  onRoomDrawn,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -155,11 +222,38 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const pixelsPerMeterRef = useRef(pixelsPerMeter);
   const alignmentGuidesRef = useRef<Line[]>([]); // Guías de alineación
   const mesasInitializedRef = useRef(false); // Para controlar si las mesas ya fueron cargadas inicialmente
+  // Herramienta "Sala": esquina donde empezó el arrastre y rectángulo de
+  // previsualización que se redibuja mientras se arrastra.
+  const roomStartRef = useRef<Punto | null>(null);
+  const roomPreviewRef = useRef<InstanceType<typeof Rect> | null>(null);
 
   // Sincronizar refs
   useEffect(() => {
     activeToolRef.current = activeTool;
   }, [activeTool]);
+
+  // MODO DIBUJO: con cualquier herramienta que no sea "Seleccionar", el
+  // lienzo deja de buscar objetos bajo el cursor. Antes daba igual porque la
+  // herramienta se desarmaba sola tras cada objeto; ahora que sigue armada
+  // (ver `finishWallDrawing`), sin esto un clic sobre una mesa ya dibujada
+  // crearía otra encima Y además arrastraría la de debajo.
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    const dibujando = activeTool !== "select";
+    fabricCanvas.selection = !dibujando;
+    fabricCanvas.skipTargetFind = dibujando;
+    fabricCanvas.defaultCursor = dibujando ? "crosshair" : "default";
+    fabricCanvas.hoverCursor = dibujando ? "crosshair" : "move";
+
+    // Cambiar de herramienta a mitad de un trazo no debe dejar restos: antes
+    // salir de "Pared" con una polilínea a medias dejaba sus líneas
+    // provisionales pegadas al plano para siempre. Ahora que las
+    // herramientas siguen armadas se cambia de una a otra mucho más a menudo.
+    if (activeTool !== "wall") cancelWallDrawing();
+    if (activeTool !== "room") cancelRoomDrawing();
+
+    fabricCanvas.requestRenderAll();
+  }, [fabricCanvas, activeTool]);
 
   useEffect(() => {
     elementosRef.current = elementos;
@@ -849,12 +943,17 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const cd = (obj as any).customData;
       if (cd?.tipo !== "wall") return;
       const line = obj as InstanceType<typeof Line>;
-      segmentos.push({
-        x1: line.x1 ?? 0,
-        y1: line.y1 ?? 0,
-        x2: line.x2 ?? 0,
-        y2: line.y2 ?? 0,
-      });
+      // OJO: x1/y1/x2/y2 del objeto son los de CUANDO SE CREÓ la línea. Al
+      // mover, rotar o estirar una pared, Fabric solo actualiza
+      // left/top/scaleX/scaleY/angle y deja x1..y2 intactos (el handler de
+      // object:modified ya lo documenta y lo recalcula con la matriz, pero
+      // solo para persistirlo: nunca lo reescribe en el objeto). Leerlos a
+      // pelo aquí hacía que, en cuanto se movía una pared, tanto el imán de
+      // puertas como el imán de extremos apuntasen a su posición ANTIGUA.
+      // La matriz de transformación, en cambio, siempre está al día.
+      const puntosLocales = line.calcLinePoints();
+      const matriz = line.calcTransformMatrix() as unknown as Matrix2D;
+      segmentos.push(calcularPuntosAbsolutosPared(matriz, puntosLocales));
     });
     // Incluir también los puntos ya colocados de la pared en curso.
     const puntosEnCurso = wallPointsRef.current;
@@ -875,66 +974,60 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     alignmentGuidesRef.current = [];
   };
 
-  // Función para detectar y agrupar mesas cercanas
-  const checkAndMergeTables = (canvas: FabricCanvas, movedMesa: FabricObject) => {
+  /**
+   * Busca una mesa adyacente a `mesa` con la que se podría fusionar.
+   * SOLO BUSCA: no toca nada. Quien decide fusionar es el usuario.
+   */
+  const buscarMesaFusionable = (
+    canvas: FabricCanvas,
+    mesa: FabricObject
+  ): { mesa: FabricObject; direccion: DireccionFusion } | null => {
+    const datos = (mesa as any).customData;
+    if (datos?.tipo !== "mesa") return null;
+
+    mesa.setCoords();
+    const cajaA = mesa.getBoundingRect();
+
+    let encontrada: { mesa: FabricObject; direccion: DireccionFusion } | null = null;
+    canvas.getObjects().forEach((obj) => {
+      const objData = (obj as any).customData;
+      if (!objData || objData.tipo !== "mesa" || objData.id === datos.id) return;
+      obj.setCoords();
+      const direccion = detectarAdyacenciaMesas(cajaA, obj.getBoundingRect());
+      if (direccion) encontrada = { mesa: obj, direccion };
+    });
+    return encontrada;
+  };
+
+  /**
+   * Fusiona dos mesas en una sola ("7+8", capacidad sumada).
+   *
+   * OPERACIÓN DESTRUCTIVA: las dos mesas originales dejan de existir como
+   * tales. Hasta ahora se disparaba SOLA, con un setTimeout, cada vez que se
+   * soltaba una mesa a menos de 30 cm de otra — o sea, cada vez que se monta
+   * una fila normal de mesas en una sala. Sin confirmación, sin aviso y sin
+   * forma de saber qué había pasado: así acabó la Terraza con 3 filas
+   * fusionadas y ninguna mesa real. Ahora SOLO se llama desde `ofrecerFusion`,
+   * es decir, cuando el usuario pulsa expresamente "Unir mesas".
+   */
+  const fusionarMesas = (
+    canvas: FabricCanvas,
+    movedMesa: FabricObject,
+    mesaToMerge: FabricObject,
+    mergeDirection: DireccionFusion
+  ) => {
     const movedData = (movedMesa as any).customData;
     if (movedData?.tipo !== "mesa") return;
-
-    const MERGE_THRESHOLD = 15; // píxeles de proximidad para fusionar
 
     // OJO: usar getBoundingRect() (axis-aligned, en coordenadas de escena) y no
     // left/top/width/height a pelo — con una mesa rotada (control mtr), left/top
     // siguen siendo la esquina "antes de rotar" (Fabric rota siempre alrededor
-    // del centro), así que left+width ya no es el borde derecho real y la
-    // detección de adyacencia salía mal en cuanto la mesa tenía algo de ángulo.
+    // del centro), así que left+width ya no es el borde derecho real.
     movedMesa.setCoords();
+    mesaToMerge.setCoords();
     const movedBox = movedMesa.getBoundingRect();
     const movedLeft = movedBox.left;
     const movedTop = movedBox.top;
-    const movedRight = movedBox.left + movedBox.width;
-    const movedBottom = movedBox.top + movedBox.height;
-
-    // Buscar mesa cercana con la que fusionar
-    let mesaToMerge: FabricObject | null = null;
-    let mergeDirection: "horizontal" | "vertical" | null = null;
-
-    canvas.getObjects().forEach(obj => {
-      const objData = (obj as any).customData;
-      if (!objData || objData.tipo !== "mesa" || objData.id === movedData.id) return;
-
-      obj.setCoords();
-      const objBox = obj.getBoundingRect();
-      const objLeft = objBox.left;
-      const objTop = objBox.top;
-      const objRight = objBox.left + objBox.width;
-      const objBottom = objBox.top + objBox.height;
-
-      // Verificar si están adyacentes horizontalmente (lado a lado)
-      const horizontallyAdjacent = 
-        Math.abs(movedRight - objLeft) < MERGE_THRESHOLD || 
-        Math.abs(movedLeft - objRight) < MERGE_THRESHOLD;
-      
-      const verticalOverlap = 
-        (movedTop < objBottom && movedBottom > objTop);
-
-      // Verificar si están adyacentes verticalmente (uno encima del otro)
-      const verticallyAdjacent = 
-        Math.abs(movedBottom - objTop) < MERGE_THRESHOLD || 
-        Math.abs(movedTop - objBottom) < MERGE_THRESHOLD;
-      
-      const horizontalOverlap = 
-        (movedLeft < objRight && movedRight > objLeft);
-
-      if (horizontallyAdjacent && verticalOverlap) {
-        mesaToMerge = obj;
-        mergeDirection = "horizontal";
-      } else if (verticallyAdjacent && horizontalOverlap) {
-        mesaToMerge = obj;
-        mergeDirection = "vertical";
-      }
-    });
-
-    if (!mesaToMerge || !mergeDirection) return;
 
     const mergeData = (mesaToMerge as any).customData;
     
@@ -1049,6 +1142,57 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     onMesasChange(updatedMesas);
     canvas.setActiveObject(newMesa);
     canvas.renderAll();
+
+    // Nunca en silencio: se dice qué ha pasado y cómo volver atrás.
+    toast.success(`Mesas ${mesa1.nombre} y ${mesa2.nombre} unidas en «${newNombre}»`, {
+      description: `Ahora es una sola mesa de ${newCapacidad} comensales. Si no era lo que querías, pulsa Ctrl+Z para deshacerlo.`,
+      duration: 10000,
+    });
+  };
+
+  /**
+   * Clave estable de un par de mesas, para no repetir la misma oferta de
+   * fusión una y otra vez mientras la selección no cambia.
+   */
+  const ultimaFusionOfrecidaRef = useRef<string | null>(null);
+
+  /**
+   * Ofrece unir dos mesas adyacentes. Esta es la ÚNICA puerta de entrada a
+   * `fusionarMesas`: aparece cuando el usuario selecciona expresamente dos
+   * mesas juntas, y no hace nada hasta que pulse "Unir mesas".
+   */
+  const ofrecerFusion = (
+    canvas: FabricCanvas,
+    mesaA: FabricObject,
+    mesaB: FabricObject,
+    direccion: DireccionFusion
+  ) => {
+    const idA = (mesaA as any).customData?.id;
+    const idB = (mesaB as any).customData?.id;
+    const datosA = mesasCanvasRef.current.find((m) => m.id === idA);
+    const datosB = mesasCanvasRef.current.find((m) => m.id === idB);
+    if (!datosA || !datosB) return;
+
+    const capacidad = datosA.capacidad + datosB.capacidad;
+    toast(`¿Unir la mesa ${datosA.nombre} con la ${datosB.nombre}?`, {
+      id: `fusion-${idA}-${idB}`,
+      duration: 12000,
+      description: `Quedaría una sola mesa «${datosA.nombre}+${datosB.nombre}» de ${capacidad} comensales, y las dos dejarían de existir por separado.`,
+      action: {
+        label: "Unir mesas",
+        onClick: () => {
+          // El plano puede haber cambiado entre que se ofrece y se acepta
+          // (otra mesa borrada, canvas recreado por un resize del contenedor).
+          const objetos = canvas.getObjects();
+          if (!objetos.includes(mesaA) || !objetos.includes(mesaB)) {
+            toast.error("Esas mesas ya no están en el plano: vuelve a seleccionarlas.");
+            return;
+          }
+          fusionarMesas(canvas, mesaA, mesaB, direccion);
+        },
+      },
+      cancel: { label: "No", onClick: () => {} },
+    });
   };
 
   // Función para mostrar guías de alineación y hacer auto-snap
@@ -1221,7 +1365,32 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
       return false;
     };
-    
+
+    // Ofrecer unir dos mesas. Se mira la selección COMPLETA
+    // (`getActiveObjects()`) y no `e.selected`, que en selection:updated solo
+    // trae lo que se acaba de añadir.
+    const revisarOfertaDeFusion = () => {
+      const mesas = canvas
+        .getActiveObjects()
+        .filter((o) => (o as any).customData?.tipo === "mesa");
+      if (mesas.length !== 2) {
+        ultimaFusionOfrecidaRef.current = null;
+        return;
+      }
+      const [a, b] = mesas;
+      a.setCoords();
+      b.setCoords();
+      const direccion = detectarAdyacenciaMesas(a.getBoundingRect(), b.getBoundingRect());
+      if (!direccion) {
+        ultimaFusionOfrecidaRef.current = null;
+        return;
+      }
+      const clave = [(a as any).customData.id, (b as any).customData.id].sort().join("|");
+      if (ultimaFusionOfrecidaRef.current === clave) return;
+      ultimaFusionOfrecidaRef.current = clave;
+      ofrecerFusion(canvas, a, b, direccion);
+    };
+
     canvas.on("selection:created", (e) => {
       const selected = e.selected || [];
       if (limitSelection(selected)) return;
@@ -1231,6 +1400,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const customData = (obj as any).customData;
         onSelectionChange(customData || null);
       }
+      revisarOfertaDeFusion();
     });
 
     canvas.on("selection:updated", (e) => {
@@ -1242,11 +1412,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         const customData = (obj as any).customData;
         onSelectionChange(customData || null);
       }
+      revisarOfertaDeFusion();
     });
 
     canvas.on("selection:cleared", () => {
       onSelectionChange(null);
       clearAlignmentGuides(canvas);
+      ultimaFusionOfrecidaRef.current = null;
     });
 
     // Función helper para actualizar posición de una mesa y su etiqueta durante el movimiento
@@ -1513,8 +1685,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
             )
           );
 
-          // Verificar si se puede fusionar con otra mesa cercana
-          setTimeout(() => checkAndMergeTables(canvas, target), 50);
+          // AQUÍ YA NO SE FUSIONA NADA. Antes había un
+          // `setTimeout(() => checkAndMergeTables(canvas, target), 50)` que
+          // destruía las dos mesas y las sustituía por una fusionada en
+          // cuanto quedaban a menos de 30 cm con algo de solape — es decir,
+          // al colocar una fila normal de mesas. La fusión ahora se ofrece
+          // solo al seleccionar expresamente dos mesas juntas
+          // (`revisarOfertaDeFusion`), y la ejecuta el usuario.
         } else if (customData?.tipo === "wall") {
           // Pared: al mover/rotar/estirar sus controles, Fabric solo actualiza
           // left/top/scaleX/scaleY/angle — x1..y2 originales quedan igual en
@@ -1571,36 +1748,40 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           // arrastrar una puerta ya anclada se quedaba "flotando" separada de
           // la pared en vez de deslizarse pegada a ella.
           if (customData?.tipo === "door") {
-            const centerX = geometria.left + geometria.width / 2;
-            const centerY = geometria.top + geometria.height / 2;
+            // Centro GEOMÉTRICO real de la hoja, válido para cualquier ángulo.
+            // El Rect tiene origen left/top y gira ALREDEDOR DE ESA ESQUINA,
+            // así que `left + width/2` NO es el centro salvo con angle = 0.
+            // Con la fórmula ingenua el punto de búsqueda se iba entre 28 y 40
+            // px para ángulos de 90/135/180/-90 — más que el propio umbral del
+            // imán (DOOR_WALL_SNAP_PX = 25 px), así que este re-anclaje era
+            // CÓDIGO MUERTO en cualquier pared que no fuese horizontal: una
+            // puerta perfectamente pegada a su pared "medía" 28 px de
+            // separación y se descartaba. Con el centro bien calculado, además,
+            // las puertas ya mal colocadas se recolocan solas al primer
+            // arrastre. (Se calcula a mano y no con `getCenterPoint()` porque
+            // ese incluye el grosor del trazo: mezclar las dos convenciones
+            // desplazaría la puerta ~1 px en cada arrastre.)
+            const centro = centroRectFabric(geometria);
             // Umbral en unidades de escena equivalente a DOOR_WALL_SNAP_PX de
             // pantalla, igual que el imán de extremos de pared (ENDPOINT_SNAP_PX
             // / zoom) — usa el `canvas` local del closure, no `fabricCanvas`
             // (este handler vive en el useEffect con deps [canvasWidth,
             // canvasHeight], que no se re-ejecuta cuando solo cambia el zoom).
             const zoomActual = canvas.getZoom() || 1;
-            let mejorDist = DOOR_WALL_SNAP_PX / zoomActual;
-            let anclaje: { left: number; top: number; angle: number } | null = null;
+            const puerta = calcularPuertaEnMuro(
+              centro,
+              getWallSegments(canvas),
+              geometria.width,
+              geometria.height,
+              DOOR_WALL_SNAP_PX / zoomActual
+            );
 
-            getWallSegments(canvas).forEach((seg) => {
-              const proyeccion = proyectarPuntoEnSegmento({ x: centerX, y: centerY }, seg);
-              const dist = Math.hypot(proyeccion.x - centerX, proyeccion.y - centerY);
-              if (dist <= mejorDist) {
-                mejorDist = dist;
-                anclaje = {
-                  left: proyeccion.x - geometria.width / 2,
-                  top: proyeccion.y - geometria.height / 2,
-                  angle: Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1) * (180 / Math.PI),
-                };
-              }
-            });
-
-            if (anclaje) {
-              rectObj.set(anclaje);
+            if (puerta.anclada) {
+              rectObj.set({ left: puerta.left, top: puerta.top, angle: puerta.angle });
               rectObj.setCoords();
-              geometria.left = anclaje.left;
-              geometria.top = anclaje.top;
-              geometria.angle = anclaje.angle;
+              geometria.left = puerta.left;
+              geometria.top = puerta.top;
+              geometria.angle = puerta.angle;
             }
           }
 
@@ -1685,9 +1866,13 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (e.code === 'Space') {
         spacePressed.current = false;
         setIsPanning(false);
-        fabricCanvas.defaultCursor = 'default';
-        fabricCanvas.hoverCursor = 'move';
-        fabricCanvas.selection = true;
+        // Restaurar según la herramienta activa, no a pelo: si hay una
+        // herramienta de dibujo armada, el lienzo debe seguir en modo dibujo
+        // tras soltar el Espacio.
+        const dibujando = activeToolRef.current !== "select";
+        fabricCanvas.defaultCursor = dibujando ? 'crosshair' : 'default';
+        fabricCanvas.hoverCursor = dibujando ? 'crosshair' : 'move';
+        fabricCanvas.selection = !dibujando;
       }
     };
 
@@ -2074,7 +2259,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const tool = activeToolRef.current;
 
-      if (tool === "wall") {
+      if (tool === "room") {
+        // Arrastre: aquí solo se marca la esquina de partida.
+        roomStartRef.current = snapPointToGrid(
+          { x: pointer.x, y: pointer.y },
+          pixelsPerMeterRef.current,
+          GRID_SNAP_METERS
+        );
+      } else if (tool === "wall") {
         handleWallClick(pointer.x, pointer.y, !!e?.shiftKey);
       } else if (tool === "area") {
         handleAreaClick(pointer.x, pointer.y);
@@ -2088,12 +2280,29 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     const handleMouseMove = (opt: any) => {
-      if (activeToolRef.current !== "wall" || wallPointsRef.current.length === 0) return;
+      if (spacePressed.current) return;
+      const tool = activeToolRef.current;
+
+      if (tool === "room") {
+        if (!roomStartRef.current) return;
+        const pointer = fabricCanvas.getScenePoint(opt.e);
+        updateRoomPreview(pointer.x, pointer.y);
+        return;
+      }
+
+      if (tool !== "wall" || wallPointsRef.current.length === 0) return;
 
       // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const e = opt.e as MouseEvent | undefined;
       updatePreviewLine(pointer.x, pointer.y, !!e?.shiftKey);
+    };
+
+    const handleMouseUp = (opt: any) => {
+      if (spacePressed.current) return;
+      if (activeToolRef.current !== "room" || !roomStartRef.current) return;
+      const pointer = fabricCanvas.getScenePoint(opt.e);
+      finishRoomDrawing(pointer.x, pointer.y);
     };
 
     const handleDblClick = () => {
@@ -2103,19 +2312,39 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const destino = e.target as HTMLElement | null;
+      const enCampo =
+        destino?.tagName === "INPUT" ||
+        destino?.tagName === "TEXTAREA" ||
+        destino?.isContentEditable === true;
+
       if (e.key === "Escape") {
+        // Esc cancela lo que se esté dibujando; volver a "Seleccionar" ya lo
+        // hace el editor padre con el mismo Esc.
         cancelWallDrawing();
+        cancelRoomDrawing();
+        return;
+      }
+
+      // Atajo "R" de la herramienta Sala. El resto de atajos los gestiona el
+      // editor padre; la "r" no está en su switch, así que no hay conflicto.
+      if (enCampo || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if (e.key.toLowerCase() === "r") {
+        onToolChange("room");
       }
     };
 
     fabricCanvas.on("mouse:down", handleMouseDown);
     fabricCanvas.on("mouse:move", handleMouseMove);
+    fabricCanvas.on("mouse:up", handleMouseUp);
     fabricCanvas.on("mouse:dblclick", handleDblClick);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       fabricCanvas.off("mouse:down", handleMouseDown);
       fabricCanvas.off("mouse:move", handleMouseMove);
+      fabricCanvas.off("mouse:up", handleMouseUp);
       fabricCanvas.off("mouse:dblclick", handleDblClick);
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -2399,6 +2628,61 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     if (doorLeaf) canvas.bringObjectToFront(doorLeaf);
   };
 
+  /**
+   * Crea las paredes (Line + cota + ElementoCanvas) de una polilínea de
+   * puntos y devuelve los elementos nuevos SIN tocar el estado de React.
+   * Lo comparten el trazado libre de paredes (`finishWallDrawing`) y la
+   * herramienta de sala rectangular (`finishRoomDrawing`), que no es más que
+   * una polilínea de 5 puntos cerrada.
+   */
+  const crearParedesDesdePuntos = (puntos: Punto[]): ElementoCanvas[] => {
+    if (!fabricCanvas) return [];
+
+    const nuevos: ElementoCanvas[] = [];
+    const sello = Date.now();
+
+    for (let i = 0; i < puntos.length - 1; i++) {
+      const x1 = puntos[i].x;
+      const y1 = puntos[i].y;
+      const x2 = puntos[i + 1].x;
+      const y2 = puntos[i + 1].y;
+
+      // Calcular longitud de la pared
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      // Solo crear paredes con longitud significativa (más de 5 píxeles)
+      if (length < 5) {
+        console.log('[SKIP] Pared muy corta ignorada:', length, 'px');
+        continue;
+      }
+
+      const id = `wall-${sello}-${i}`;
+
+      const wall = new Line([x1, y1, x2, y2], {
+        stroke: WALL_COLOR,
+        strokeWidth: getWallStrokeWidth(),
+        strokeLineCap: "square",
+        selectable: true,
+        hasControls: true,
+      });
+      (wall as any).customData = { tipo: "wall", id };
+      fabricCanvas.add(wall);
+
+      // Añadir cota a la pared
+      createWallCota(fabricCanvas, x1, y1, x2, y2, id);
+
+      nuevos.push({
+        id,
+        tipo: "wall",
+        props: { x1, y1, x2, y2 },
+      });
+    }
+
+    return nuevos;
+  };
+
   const finishWallDrawing = () => {
     if (!fabricCanvas) return;
 
@@ -2413,49 +2697,8 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.remove(line);
     });
 
-    // Crear paredes permanentes con cotas y color de nivel - filtrar paredes de longitud 0
-    const currentElementos = elementosRef.current;
-    const newElementos: ElementoCanvas[] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const x1 = points[i].x;
-      const y1 = points[i].y;
-      const x2 = points[i + 1].x;
-      const y2 = points[i + 1].y;
-      
-      // Calcular longitud de la pared
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const length = Math.sqrt(dx * dx + dy * dy);
-      
-      // Solo crear paredes con longitud significativa (más de 5 píxeles)
-      if (length < 5) {
-        console.log('[SKIP] Pared muy corta ignorada:', length, 'px');
-        continue;
-      }
-      
-      const id = `wall-${Date.now()}-${i}`;
-
-      const wall = new Line([x1, y1, x2, y2], {
-        stroke: WALL_COLOR,
-        strokeWidth: getWallStrokeWidth(),
-        strokeLineCap: "square",
-        selectable: true,
-        hasControls: true,
-      });
-      (wall as any).customData = { tipo: "wall", id };
-      fabricCanvas.add(wall);
-      
-      // Añadir cota a la pared
-      createWallCota(fabricCanvas, x1, y1, x2, y2, id);
-      
-      newElementos.push({
-        id,
-        tipo: "wall",
-        props: { x1, y1, x2, y2 },
-      });
-    }
-
-    onElementosChange([...currentElementos, ...newElementos]);
+    const newElementos = crearParedesDesdePuntos(points);
+    onElementosChange([...elementosRef.current, ...newElementos]);
 
     // Limpiar
     if (previewLineRef.current) {
@@ -2471,7 +2714,10 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     wallPointsRef.current = [];
 
     fabricCanvas.renderAll();
-    onToolChange("select");
+    // LA HERRAMIENTA NO SE DESARMA. Antes, cada objeto colocado devolvía el
+    // lienzo a "Seleccionar", así que montar una sala era herramienta-clic,
+    // herramienta-clic, herramienta-clic... Ahora sigue armada hasta que se
+    // pulse Esc o el botón "Seleccionar" (el editor ya mapea Esc -> select).
   };
 
 
@@ -2492,6 +2738,131 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     wallPointsRef.current = [];
 
     fabricCanvas.renderAll();
+  };
+
+  // ------------------------------------------------------------------
+  // Herramienta "Sala": un solo arrastre emite las 4 paredes de una
+  // habitación rectangular. Dibujar las paredes a mano ya funcionaba bien
+  // (polilínea con imán de 15°, rejilla de 10 cm y extremos magnéticos),
+  // pero cerrar un rectángulo a mano son 5 clics y cuatro oportunidades de
+  // equivocarse; esto es el gesto que faltaba para partir de cero.
+  // ------------------------------------------------------------------
+
+  /** Rectángulo (ya ajustado a la rejilla) entre el inicio del arrastre y el punto actual. */
+  const rectanguloSala = (rawX: number, rawY: number) => {
+    const inicio = roomStartRef.current;
+    if (!inicio) return null;
+    const fin = snapPointToGrid(
+      { x: rawX, y: rawY },
+      pixelsPerMeterRef.current,
+      GRID_SNAP_METERS
+    );
+    return {
+      left: Math.min(inicio.x, fin.x),
+      top: Math.min(inicio.y, fin.y),
+      width: Math.abs(fin.x - inicio.x),
+      height: Math.abs(fin.y - inicio.y),
+    };
+  };
+
+  const limpiarPreviewSala = () => {
+    if (!fabricCanvas) return;
+    if (roomPreviewRef.current) {
+      fabricCanvas.remove(roomPreviewRef.current);
+      roomPreviewRef.current = null;
+    }
+    if (measureTextRef.current) {
+      fabricCanvas.remove(measureTextRef.current);
+      measureTextRef.current = null;
+    }
+  };
+
+  const cancelRoomDrawing = () => {
+    if (!roomStartRef.current && !roomPreviewRef.current) return;
+    roomStartRef.current = null;
+    limpiarPreviewSala();
+    fabricCanvas?.renderAll();
+  };
+
+  /** Rectángulo de previsualización + medidas en metros mientras se arrastra. */
+  const updateRoomPreview = (rawX: number, rawY: number) => {
+    if (!fabricCanvas) return;
+    const rect = rectanguloSala(rawX, rawY);
+    if (!rect) return;
+
+    limpiarPreviewSala();
+
+    const preview = new Rect({
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      fill: "rgba(31, 41, 55, 0.04)",
+      stroke: WALL_COLOR,
+      strokeWidth: 3,
+      strokeDashArray: [8, 4],
+      originX: "left",
+      originY: "top",
+      selectable: false,
+      evented: false,
+    });
+    (preview as any).isTemp = true;
+    roomPreviewRef.current = preview;
+    fabricCanvas.add(preview);
+
+    const anchoM = roundTo5cm(rect.width / pixelsPerMeterRef.current);
+    const altoM = roundTo5cm(rect.height / pixelsPerMeterRef.current);
+    const medidas = new FabricText(`${anchoM.toFixed(2)} × ${altoM.toFixed(2)} m`, {
+      left: rect.left + rect.width / 2,
+      top: rect.top + rect.height / 2,
+      fontSize: 14,
+      fontFamily: "system-ui, sans-serif",
+      fontWeight: "bold",
+      fill: "#1f2937",
+      backgroundColor: "rgba(255,255,255,0.9)",
+      padding: 4,
+      selectable: false,
+      evented: false,
+      originX: "center",
+      originY: "center",
+    });
+    measureTextRef.current = medidas;
+    fabricCanvas.add(medidas);
+
+    fabricCanvas.renderAll();
+  };
+
+  const finishRoomDrawing = (rawX: number, rawY: number) => {
+    if (!fabricCanvas) return;
+    const rect = rectanguloSala(rawX, rawY);
+    cancelRoomDrawing();
+    if (!rect) return;
+
+    // Un clic suelto (sin arrastrar) no es una sala: se avisa en vez de
+    // dejar cuatro paredes de longitud cero por el plano.
+    const MIN_LADO_PX = 5;
+    if (rect.width < MIN_LADO_PX || rect.height < MIN_LADO_PX) {
+      toast.info("Arrastra en diagonal para marcar el ancho y el largo de la sala.");
+      return;
+    }
+
+    const esquinas: Punto[] = [
+      { x: rect.left, y: rect.top },
+      { x: rect.left + rect.width, y: rect.top },
+      { x: rect.left + rect.width, y: rect.top + rect.height },
+      { x: rect.left, y: rect.top + rect.height },
+      { x: rect.left, y: rect.top },
+    ];
+
+    const nuevos = crearParedesDesdePuntos(esquinas);
+    if (nuevos.length === 0) return;
+    onElementosChange([...elementosRef.current, ...nuevos]);
+    fabricCanvas.renderAll();
+
+    const anchoM = roundTo5cm(rect.width / pixelsPerMeterRef.current);
+    const altoM = roundTo5cm(rect.height / pixelsPerMeterRef.current);
+    toast.success(`Sala de ${anchoM.toFixed(2)} × ${altoM.toFixed(2)} m dibujada (4 paredes).`);
+    onRoomDrawn?.(anchoM, altoM);
   };
 
   const handleAreaClick = (x: number, y: number) => {
@@ -2518,7 +2889,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     const currentElementos = elementosRef.current;
     onElementosChange([...currentElementos, { id, tipo: "area", props: { left: x - 60, top: y - 60, width: 120, height: 120 } }]);
-    onToolChange("select");
+    // La herramienta sigue armada: ver `finishWallDrawing`.
   };
 
   // Helper único para construir el objeto Fabric de una mesa (Rect o Circle),
@@ -2981,52 +3352,49 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     onMesasChange([...currentMesas, newMesa]);
-    onToolChange("select");
+    // La herramienta sigue armada: ver `finishWallDrawing`.
     // El número propuesto es solo eso: avisamos al padre para que el dueño
     // pueda corregirlo inmediatamente en el panel lateral.
     onMesaCreada?.(id, mesaName);
   };
 
-  // Punto más cercano a `punto` sobre el segmento (clampado a sus extremos).
-  const proyectarPuntoEnSegmento = (punto: { x: number; y: number }, seg: SegmentoPared) => {
-    const dx = seg.x2 - seg.x1;
-    const dy = seg.y2 - seg.y1;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) return { x: seg.x1, y: seg.y1 };
-    let t = ((punto.x - seg.x1) * dx + (punto.y - seg.y1) * dy) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-    return { x: seg.x1 + t * dx, y: seg.y1 + t * dy };
-  };
-
-  const handleDoorClick = (x: number, y: number) => {
+  const handleDoorClick = (rawX: number, rawY: number) => {
     if (!fabricCanvas) return;
 
     const id = `door-${Date.now()}`;
     const widthPx = DOOR_WIDTH_METERS * pixelsPerMeterRef.current;
     const heightPx = DOOR_LEAF_THICKNESS_PX;
 
+    // Rejilla de 10 cm, igual que las paredes (`handleWallClick` ya la
+    // aplicaba y la puerta no: colocarla dejaba coordenadas con decimales
+    // arbitrarios que no cuadraban con nada del plano).
+    const punto = snapPointToGrid(
+      { x: rawX, y: rawY },
+      pixelsPerMeterRef.current,
+      GRID_SNAP_METERS
+    );
+
     // Anclar a la pared más cercana (si el clic cae a menos de ~25px de
     // PANTALLA de una, sea cual sea el zoom actual): el hueco se centra
     // sobre la pared y su ángulo se alinea con ella.
-    let centerX = x;
-    let centerY = y;
-    let angle = 0;
+    //
+    // ESTE ERA EL FALLO DE "la puerta no va bien": el `left`/`top` se sacaba
+    // con `centro - tamaño/2`, que solo es la inversa correcta de la
+    // transformación de Fabric cuando angle = 0, porque el Rect gira
+    // alrededor de su esquina left/top y no de su centro. En una sala
+    // rectangular dibujada en el sentido de las agujas del reloj, la pared de
+    // arriba (0°) salía bien, pero la derecha (90°) dejaba la puerta a 57 cm
+    // de la pared, la de abajo (180°) a 81 cm y la izquierda (-90°) a 57 cm.
+    // Y como el mismo muro da 0° o 180° según en qué sentido se dibujara, el
+    // fallo parecía aleatorio. `calcularPuertaEnMuro` usa la inversa exacta.
     const zoomActual = fabricCanvas.getZoom() || 1;
-    let mejorDist = DOOR_WALL_SNAP_PX / zoomActual;
-
-    getWallSegments(fabricCanvas).forEach((seg) => {
-      const proyeccion = proyectarPuntoEnSegmento({ x, y }, seg);
-      const dist = Math.hypot(proyeccion.x - x, proyeccion.y - y);
-      if (dist <= mejorDist) {
-        mejorDist = dist;
-        centerX = proyeccion.x;
-        centerY = proyeccion.y;
-        angle = Math.atan2(seg.y2 - seg.y1, seg.x2 - seg.x1) * (180 / Math.PI);
-      }
-    });
-
-    const left = centerX - widthPx / 2;
-    const top = centerY - heightPx / 2;
+    const { left, top, angle } = calcularPuertaEnMuro(
+      punto,
+      getWallSegments(fabricCanvas),
+      widthPx,
+      heightPx,
+      DOOR_WALL_SNAP_PX / zoomActual
+    );
 
     const door = new Rect({
       left,
@@ -3054,7 +3422,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       ...currentElementos,
       { id, tipo: "door", props: { left, top, width: widthPx, height: heightPx, angle } },
     ]);
-    onToolChange("select");
+    // La herramienta sigue armada: ver `finishWallDrawing`.
   };
 
   return (

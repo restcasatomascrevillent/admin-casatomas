@@ -12,6 +12,7 @@ import {
   Square,
   Circle,
   DoorOpen,
+  Frame,
   Trash2,
   Ruler,
   Focus,
@@ -19,7 +20,7 @@ import {
   Redo2,
 } from "lucide-react";
 
-export type ToolType = "select" | "wall" | "area" | "mesa-rect" | "mesa-circular" | "door";
+export type ToolType = "select" | "wall" | "area" | "mesa-rect" | "mesa-circular" | "door" | "room";
 
 interface ToolbarDibujoProps {
   activeTool: ToolType;
@@ -52,6 +53,13 @@ const NUMERO_PROPUESTO = "Se numera con el primer número libre: corrígelo en e
 
 const tools: ToolButton[] = [
   { id: "select", icon: <MousePointer className="h-4 w-4" />, label: "Seleccionar", shortcut: "S" },
+  {
+    id: "room",
+    icon: <Frame className="h-4 w-4" />,
+    label: "Sala rectangular",
+    shortcut: "R",
+    descripcion: "Arrastra en diagonal y se dibujan las 4 paredes de la sala de una vez.",
+  },
   { id: "wall", icon: <Minus className="h-4 w-4" />, label: "Pared", shortcut: "W" },
   { id: "area", icon: <Square className="h-4 w-4" />, label: "Área", shortcut: "A" },
   { id: "mesa-rect", icon: <Square className="h-4 w-4 fill-current" />, label: "Mesa rectangular", shortcut: "M", descripcion: NUMERO_PROPUESTO },
@@ -190,7 +198,7 @@ export function ToolbarDibujo({
         </Tooltip>
 
         <div className="ml-auto text-xs text-muted-foreground px-2">
-          Clic para añadir • Doble clic para terminar pared • Esc para cancelar
+          La herramienta sigue activa: coloca varios seguidos • Doble clic para terminar pared • Esc vuelve a Seleccionar
         </div>
       </div>
     </TooltipProvider>
