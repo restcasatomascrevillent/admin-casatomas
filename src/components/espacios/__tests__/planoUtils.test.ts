@@ -17,7 +17,10 @@ import {
   distribuirSillasRectangular,
   distribuirSillasCirculo,
   calcularRejillaMesas,
+  rectanguloDeMesa,
+  rectangulosSolapan,
   type Matrix2D,
+  type RectanguloOcupado,
 } from "../planoUtils";
 
 describe("transformarPunto", () => {
@@ -453,5 +456,139 @@ describe("calcularRejillaMesas", () => {
     });
     expect(r.columnas).toBe(1);
     expect(r.posiciones).toHaveLength(2);
+  });
+
+  it("sin mesas ya colocadas no dice que haya esquivado nada", () => {
+    const r = calcularRejillaMesas({ cantidad: 3, anchoCm: 80, altoCm: 80, espacio });
+    expect(r.esquivoOcupadas).toBe(false);
+  });
+});
+
+describe("rectangulosSolapan / rectanguloDeMesa", () => {
+  const a: RectanguloOcupado = { x: 0, y: 0, width: 1, height: 1 };
+
+  it("detecta el solape", () => {
+    expect(rectangulosSolapan(a, { x: 0.5, y: 0.5, width: 1, height: 1 })).toBe(true);
+  });
+
+  it("dos rectángulos separados no se pisan", () => {
+    expect(rectangulosSolapan(a, { x: 2, y: 2, width: 1, height: 1 })).toBe(false);
+  });
+
+  it("tocarse justo por el borde no cuenta como pisarse", () => {
+    expect(rectangulosSolapan(a, { x: 1, y: 0, width: 1, height: 1 })).toBe(false);
+  });
+
+  it("con holgura sí cuenta: hay que dejar aire entre mesas", () => {
+    expect(rectangulosSolapan(a, { x: 1, y: 0, width: 1, height: 1 }, 0.05)).toBe(true);
+  });
+
+  it("no revienta con nulos", () => {
+    expect(rectangulosSolapan(a, null as unknown as RectanguloOcupado)).toBe(false);
+  });
+
+  it("convierte una mesa del canvas (cm) a su rectángulo en metros", () => {
+    expect(rectanguloDeMesa({ posX: 1.5, posY: 2, ancho: 120, alto: 80 })).toEqual({
+      x: 1.5,
+      y: 2,
+      width: 1.2,
+      height: 0.8,
+    });
+  });
+
+  it("una mesa pegada al borde (0,0) conserva su posición", () => {
+    expect(rectanguloDeMesa({ posX: 0, posY: 0, ancho: 150, alto: 150 })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1.5,
+      height: 1.5,
+    });
+  });
+});
+
+// El segundo lote de una sala empezaba otra vez en (0,3 · 0,3) y caía encima
+// del primero: había que separar 20 mesas a mano antes de poder ver el plano.
+describe("calcularRejillaMesas con mesas ya colocadas", () => {
+  const espacio = { width: 12, height: 8 };
+  const opcionesBase = { anchoCm: 100, altoCm: 100, espacio, separacion: 0.5, margen: 0.5 };
+
+  it("no coloca ninguna mesa encima de una que ya estaba", () => {
+    const ocupadas: RectanguloOcupado[] = [
+      { x: 0.5, y: 0.5, width: 1, height: 1 },
+      { x: 2, y: 0.5, width: 1, height: 1 },
+    ];
+    const r = calcularRejillaMesas({ ...opcionesBase, cantidad: 3, ocupadas });
+    expect(r.posiciones).toHaveLength(3);
+    expect(r.esquivoOcupadas).toBe(true);
+    r.posiciones.forEach((p) => {
+      ocupadas.forEach((o) => {
+        expect(rectangulosSolapan({ x: p.x, y: p.y, width: 1, height: 1 }, o)).toBe(false);
+      });
+    });
+  });
+
+  it("empieza justo en el primer hueco libre, sin dejar agujeros de más", () => {
+    const r = calcularRejillaMesas({
+      ...opcionesBase,
+      cantidad: 1,
+      ocupadas: [{ x: 0.5, y: 0.5, width: 1, height: 1 }],
+    });
+    // El primer hueco (0,5 · 0,5) está pillado: va al segundo de la fila.
+    expect(r.posiciones[0]).toEqual({ x: 2, y: 0.5 });
+  });
+
+  it("las mesas del propio lote tampoco se pisan entre ellas", () => {
+    const r = calcularRejillaMesas({
+      ...opcionesBase,
+      cantidad: 6,
+      ocupadas: [{ x: 0.5, y: 0.5, width: 1, height: 1 }],
+    });
+    const claves = new Set(r.posiciones.map((p) => `${p.x},${p.y}`));
+    expect(claves.size).toBe(6);
+  });
+
+  it("si el plano está lleno avisa con desborda en vez de colgarse", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 4,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio: { width: 3.6, height: 3.6 },
+      margen: 0.2,
+      // Tapa el plano entero: no queda un solo hueco libre.
+      ocupadas: [{ x: 0, y: 0, width: 4, height: 4 }],
+    });
+    expect(r.posiciones).toHaveLength(4);
+    expect(r.desborda).toBe(true);
+    expect(r.esquivoOcupadas).toBe(true);
+  });
+
+  it("deja aire entre la mesa nueva y la ya colocada (holgura)", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 1,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio,
+      separacion: 0,
+      margen: 0.5,
+      holgura: 0.3,
+      // Ocupa hasta x = 1,5: sin holgura la siguiente cabría pegada en 1,5.
+      ocupadas: [{ x: 0.5, y: 0.5, width: 1, height: 1 }],
+    });
+    expect(r.posiciones[0].x).toBeGreaterThanOrEqual(1.8);
+  });
+
+  it("ignora rectángulos basura en vez de descolocarlo todo", () => {
+    const sinBasura = calcularRejillaMesas({ ...opcionesBase, cantidad: 2 });
+    const conBasura = calcularRejillaMesas({
+      ...opcionesBase,
+      cantidad: 2,
+      ocupadas: [
+        { x: Number.NaN, y: 0, width: 1, height: 1 },
+        { x: 0, y: 0, width: 0, height: 0 },
+        null as unknown as RectanguloOcupado,
+      ],
+    });
+    expect(conBasura.posiciones).toEqual(sinBasura.posiciones);
+    expect(conBasura.esquivoOcupadas).toBe(false);
   });
 });

@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink, Tag, X, Check, Hash, Rows3 } from "lucide-react";
+import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink, Tag, X, Check, Hash, Rows3, Ruler } from "lucide-react";
 import { useActualizarMesa, useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
 import { MesaCanvas } from "./EditorPlanoEspacio";
-import { calcularRejillaMesas, esMesaNoPersistida } from "./planoUtils";
+import { calcularRejillaMesas, esMesaNoPersistida, rectanguloDeMesa, type RectanguloOcupado } from "./planoUtils";
 import {
   MAX_MESAS_POR_LOTE,
-  generarNumerosMesaEnRango,
   mensajeChoquesLoteNombresMesa,
   mensajeNombreMesaDuplicado,
   mesasCanvasParaNombre,
@@ -21,6 +22,34 @@ import {
   normalizarNombreMesa,
   siguienteNumeroMesaLibre,
 } from "./nombresMesa";
+import {
+  MAX_CAPACIDAD_MESA,
+  MAX_LADO_MESA_CM,
+  MIN_CAPACIDAD_MESA,
+  MIN_LADO_MESA_CM,
+  PRESETS_MESA,
+  PRESET_MESA_POR_DEFECTO,
+  actualizarFilaLote,
+  anadirNombresAlLote,
+  aplicarCapacidadAFilas,
+  aplicarPresetAFila,
+  aplicarPresetAFilas,
+  medidasMesaTexto,
+  motivoFalloAltaMesa,
+  normalizarCapacidadMesa,
+  normalizarLadoMesaCm,
+  parsearListaNumerosMesa,
+  presetMesaPorId,
+  presetMesaQueEncaja,
+  quitarFilaLote,
+  resumenAltaLoteMesas,
+  resumenFilasLote,
+  type FilaLoteMesa,
+  type FormaMesa,
+  type PresetMesa,
+  type ResultadoAltaMesa,
+  type ResumenAltaLoteMesas,
+} from "./lotesMesa";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -158,37 +187,123 @@ export function PanelLateral({
   const [mesaToDelete, setMesaToDelete] = useState<{ id: string; nombre: string } | null>(null);
   const [asignacionesMesaToDelete, setAsignacionesMesaToDelete] = useState(0);
 
-  // Alta en lote: el dueño teclea TODO (desde, hasta, capacidad y forma). No se
-  // pre-rellena ningún rango: cuántas mesas hay en cada sala solo lo sabe él.
-  const [lote, setLote] = useState({
-    desde: "",
-    hasta: "",
-    capacidad: 2,
-    forma: "rectangular" as "rectangular" | "circular",
+  // --- Capacidad y tamaño de la mesa SELECCIONADA -------------------------
+  // Hasta ahora de una mesa ya creada solo se podía cambiar el número y la
+  // etiqueta: la capacidad y las medidas se elegían al crearla y no había
+  // forma de corregirlas sin borrarla y volverla a crear.
+  const [mesaEdit, setMesaEdit] = useState({
+    capacidad: "2",
+    ancho: "80",
+    alto: "80",
+    forma: "rectangular" as FormaMesa,
   });
+
+  // --- ALTA EN LOTE (rehecho 2026-09-28) -----------------------------------
+  // Antes: un rango «desde–hasta» con UNA forma y UNA capacidad para todo.
+  // Una sala de verdad (12 de 2 plazas, 5 de 4 y 3 redondas de 6, numeradas
+  // 1-8, 11-16 y T1-T6) necesitaba tres o cuatro lotes y corregirlo a mano.
+  // Ahora: el cuadro de texto PROPONE números (lista libre con rangos y
+  // prefijos) y la tabla de abajo es la que manda — cada fila se puede
+  // ajustar por separado antes de tocar la base de datos.
+  const [loteTexto, setLoteTexto] = useState("");
+  const [presetLote, setPresetLote] = useState<PresetMesa>(PRESET_MESA_POR_DEFECTO);
+  const [capacidadParaTodas, setCapacidadParaTodas] = useState("");
+  const [filasLote, setFilasLote] = useState<FilaLoteMesa[]>([]);
   const [creandoLote, setCreandoLote] = useState(false);
+  const [progresoLote, setProgresoLote] = useState(0);
+  const [resumenLote, setResumenLote] = useState<ResumenAltaLoteMesas | null>(null);
 
   const crearMesa = useCrearMesa();
   const actualizarMesa = useActualizarMesa();
   const eliminarMesa = useEliminarMesa();
+  const queryClient = useQueryClient();
 
-  const loteAncho = lote.forma === "circular" ? 150 : 80;
-  const loteAlto = lote.forma === "circular" ? 150 : 80;
-  const loteRango = useMemo(
-    () =>
-      lote.desde.trim() === "" || lote.hasta.trim() === ""
-        ? { numeros: [] as string[], error: null as string | null }
-        : generarNumerosMesaEnRango(Number(lote.desde), Number(lote.hasta)),
-    [lote.desde, lote.hasta],
-  );
-  // Se validan TODOS los números antes de insertar ninguno.
+  // Los números que el dueño está tecleando, ya interpretados (para el aviso
+  // en vivo). No son todavía el lote: al lote entran al pulsar «Añadir».
+  const listaLote = useMemo(() => parsearListaNumerosMesa(loteTexto), [loteTexto]);
+
+  // Se validan TODOS los números del lote antes de insertar ninguno.
+  const nombresLote = useMemo(() => filasLote.map((f) => f.nombre), [filasLote]);
   const loteChoques = useMemo(
-    () => nombresMesaDuplicadosEnLote(loteRango.numeros, mesasParaNombre),
-    [loteRango.numeros, mesasParaNombre],
+    () => nombresMesaDuplicadosEnLote(nombresLote, mesasParaNombre),
+    [nombresLote, mesasParaNombre],
   );
   const loteAvisoChoques = mensajeChoquesLoteNombresMesa(loteChoques);
+  /** Nombres normalizados que hay que marcar en rojo fila a fila. */
+  const nombresLoteConProblema = useMemo(() => {
+    const conflictivos = new Set<string>();
+    [...loteChoques.yaExisten, ...loteChoques.repetidosEnLote].forEach((n) =>
+      conflictivos.add(normalizarNombreMesa(n)),
+    );
+    return conflictivos;
+  }, [loteChoques]);
+  const hayFilasSinNumero = useMemo(
+    () => filasLote.some((f) => normalizarNombreMesa(f.nombre).length === 0),
+    [filasLote],
+  );
+  const totalesLote = useMemo(() => resumenFilasLote(filasLote), [filasLote]);
   const puedeCrearLote =
-    !creandoLote && loteRango.numeros.length > 0 && !loteRango.error && !loteChoques.hayChoques;
+    !creandoLote && filasLote.length > 0 && !loteChoques.hayChoques && !hayFilasSinNumero;
+
+  /** Sitio que ya ocupan las mesas dibujadas, para no colocar las nuevas encima.
+   *  (Las paredes y áreas no llegan a este panel: ver `calcularRejillaMesas`.) */
+  const rectangulosMesasCanvas = useMemo<RectanguloOcupado[]>(
+    () =>
+      mesasCanvas.map((m) =>
+        rectanguloDeMesa({ posX: m.posX, posY: m.posY, ancho: m.ancho, alto: m.alto }),
+      ),
+    [mesasCanvas],
+  );
+
+  // Sincronizar los campos de capacidad/tamaño con la mesa seleccionada.
+  useEffect(() => {
+    if (!mesaSeleccionada) return;
+    setMesaEdit({
+      capacidad: String(mesaSeleccionada.capacidad ?? 2),
+      ancho: String(mesaSeleccionada.ancho ?? 80),
+      alto: String(mesaSeleccionada.alto ?? 80),
+      forma: mesaSeleccionada.forma === "circular" ? "circular" : "rectangular",
+    });
+  }, [
+    mesaSeleccionada?.id,
+    mesaSeleccionada?.capacidad,
+    mesaSeleccionada?.ancho,
+    mesaSeleccionada?.alto,
+    mesaSeleccionada?.forma,
+  ]);
+
+  /** Lo que se guardaría: siempre valores válidos, nunca un NaN en la base. */
+  const mesaEditNormalizada = useMemo(() => {
+    const ancho = normalizarLadoMesaCm(mesaEdit.ancho);
+    return {
+      capacidad: normalizarCapacidadMesa(mesaEdit.capacidad),
+      forma: mesaEdit.forma,
+      // Una circular se describe por su diámetro: ancho y alto van juntos.
+      ancho,
+      alto: mesaEdit.forma === "circular" ? ancho : normalizarLadoMesaCm(mesaEdit.alto),
+    };
+  }, [mesaEdit]);
+
+  const mesaEditSinCambios =
+    !!mesaSeleccionada &&
+    mesaEditNormalizada.capacidad === mesaSeleccionada.capacidad &&
+    mesaEditNormalizada.forma ===
+      (mesaSeleccionada.forma === "circular" ? "circular" : "rectangular") &&
+    mesaEditNormalizada.ancho === mesaSeleccionada.ancho &&
+    mesaEditNormalizada.alto === mesaSeleccionada.alto;
+
+  const puedeGuardarMedidasMesa =
+    !!mesaSeleccionada &&
+    !mesaSeleccionadaEsFusionada &&
+    !mesaEditSinCambios &&
+    !actualizarMesa.isPending;
+
+  const presetMesaSeleccionada = presetMesaQueEncaja({
+    forma: mesaEditNormalizada.forma,
+    anchoCm: mesaEditNormalizada.ancho,
+    altoCm: mesaEditNormalizada.alto,
+    capacidad: mesaEditNormalizada.capacidad,
+  });
 
   // Cambiar el NÚMERO de una mesa ya existente. Si la mesa está en BBDD se
   // escribe al momento (igual que "Añadir Mesa"), así que ese cambio no puede
@@ -231,16 +346,73 @@ export function PanelLateral({
     }
   };
 
-  // Alta de un RANGO de mesas ("de la 7 a la 18"). Se valida todo el lote
-  // antes de tocar la BBDD y se colocan en rejilla para que no acaben las N
-  // apiladas en (1,1) como hace el alta de una en una.
-  const handleAddLote = async () => {
-    if (loteRango.error) {
-      toast.error(loteRango.error);
+  /**
+   * Guarda la capacidad / la forma / el tamaño de la mesa seleccionada.
+   * Mismo camino que el renombrado: validar -> escribir en BBDD ->
+   * `marcarNoDeshacible` -> actualizar el estado del canvas.
+   */
+  const handleGuardarMedidasMesa = async () => {
+    if (!mesaSeleccionada || mesaSeleccionadaEsFusionada) return;
+    const cambios = mesaEditNormalizada;
+
+    try {
+      if (!esMesaNoPersistida(mesaSeleccionada.id)) {
+        await actualizarMesa.mutateAsync({ id: mesaSeleccionada.id, ...cambios });
+        marcarNoDeshacible?.();
+      }
+      onMesasChange(
+        mesasCanvas.map((m) => (m.id === mesaSeleccionada.id ? { ...m, ...cambios } : m)),
+      );
+      onSelectionChange({ ...mesaSeleccionada, ...cambios });
+      toast.success(
+        `Mesa ${mesaSeleccionada.nombre}: ${cambios.capacidad} plaza(s) · ${medidasMesaTexto(cambios.forma, cambios.ancho, cambios.alto)}`,
+      );
+    } catch (error) {
+      // useActualizarMesa ya avisa por toast; aquí solo queda el rastro.
+      console.error("Error al cambiar la capacidad o el tamaño de la mesa:", error);
+    }
+  };
+
+  /** Mete en el lote los números que el dueño acaba de teclear. */
+  const handleAnadirNumerosALote = () => {
+    if (listaLote.error) {
+      toast.error(listaLote.error);
       return;
     }
-    if (loteRango.numeros.length === 0) {
-      toast.error("Indica desde qué número hasta qué número.");
+    const resultado = anadirNombresAlLote(filasLote, listaLote.numeros, presetLote);
+    setFilasLote(resultado.filas);
+    setResumenLote(null);
+    setLoteTexto("");
+    listaLote.avisos.forEach((aviso) => toast.info(aviso));
+    if (resultado.yaEstaban.length > 0) {
+      toast.info(`Ya estaban en la lista: ${resultado.yaEstaban.join(", ")}.`);
+    }
+    if (resultado.error) toast.warning(resultado.error);
+  };
+
+  /**
+   * Alta del lote entero.
+   *
+   * DOS DECISIONES QUE NO SON OBVIAS:
+   *
+   * 1. NO PARA EN EL PRIMER FALLO. Antes, si reventaba la mesa 13 quedaban 12
+   *    creadas, 8 sin crear y un mensaje que no decía cuáles: el dueño tenía
+   *    que ir adivinando. Ahora se intentan todas, se recoge el resultado de
+   *    cada una y al final se dice exactamente qué se creó y qué no.
+   * 2. INSERTA CONTRA SUPABASE DIRECTAMENTE en vez de usar `useCrearMesa`.
+   *    Esa mutación lanza un toast de error POR CADA fallo, y en un lote de 40
+   *    eso son 40 toasts tapando la pantalla. El error se traduce aquí con
+   *    `motivoFalloAltaMesa`, que replica la traducción del 23505 de
+   *    `useMesas.ts:143-151`, y la caché se invalida UNA sola vez al final
+   *    (que es lo que hace que el lienzo repinte las mesas nuevas).
+   */
+  const handleAddLote = async () => {
+    if (filasLote.length === 0) {
+      toast.error("Añade primero los números de las mesas.");
+      return;
+    }
+    if (hayFilasSinNumero) {
+      toast.error("Hay mesas sin número en la lista: ponles uno o quítalas.");
       return;
     }
     if (loteChoques.hayChoques) {
@@ -248,69 +420,110 @@ export function PanelLateral({
       return;
     }
 
-    const rejilla = calcularRejillaMesas({
-      cantidad: loteRango.numeros.length,
-      anchoCm: loteAncho,
-      altoCm: loteAlto,
-      espacio: realDimensions ?? { width: 12, height: 8 },
-    });
-
     setCreandoLote(true);
-    const creadas: MesaCanvas[] = [];
-    try {
-      for (let i = 0; i < loteRango.numeros.length; i += 1) {
-        const posicion = rejilla.posiciones[i] ?? { x: 1, y: 1 };
-        // Una a una y en secuencia: así se puede comprobar el error de cada
-        // inserción y parar en el primer fallo diciendo cuántas se crearon.
-        const result = await crearMesa.mutateAsync({
-          espacio_id: espacioId,
-          nombre: loteRango.numeros[i],
-          capacidad: lote.capacidad,
-          forma: lote.forma,
-          ancho: loteAncho,
-          alto: loteAlto,
-          pos_x: posicion.x,
-          pos_y: posicion.y,
-        });
-        if (!result) throw new Error(`No se pudo crear la mesa ${loteRango.numeros[i]}`);
-        creadas.push({
-          id: result.id,
-          nombre: result.nombre,
-          capacidad: result.capacidad,
-          forma: result.forma as "rectangular" | "circular",
-          ancho: result.ancho || loteAncho,
-          alto: result.alto || loteAlto,
-          posX: result.pos_x ?? posicion.x,
-          posY: result.pos_y ?? posicion.y,
-        });
-      }
+    setProgresoLote(0);
+    setResumenLote(null);
 
-      toast.success(
-        `${creadas.length} mesa(s) creada(s): ${creadas.map((m) => m.nombre).join(", ")}`,
-      );
-      if (rejilla.desborda) {
-        toast.warning(
-          "No caben todas en el plano sin solaparse: recolócalas arrastrándolas o agranda el espacio.",
-        );
+    // Se va ocupando sitio sobre la marcha: cada mesa creada estorba a la
+    // siguiente, igual que las que ya estaban dibujadas.
+    const ocupadas: RectanguloOcupado[] = [...rectangulosMesasCanvas];
+    const creadas: MesaCanvas[] = [];
+    const resultados: ResultadoAltaMesa[] = [];
+    const clavesFallidas = new Set<string>();
+    let avisoDesborde = false;
+
+    try {
+      for (let i = 0; i < filasLote.length; i += 1) {
+        const fila = filasLote[i];
+        const nombre = fila.nombre.trim();
+        const capacidad = normalizarCapacidadMesa(fila.capacidad);
+        const ancho = normalizarLadoMesaCm(fila.anchoCm);
+        const alto = fila.forma === "circular" ? ancho : normalizarLadoMesaCm(fila.altoCm);
+
+        const rejilla = calcularRejillaMesas({
+          cantidad: 1,
+          anchoCm: ancho,
+          altoCm: alto,
+          espacio: realDimensions ?? { width: 12, height: 8 },
+          ocupadas,
+        });
+        const posicion = rejilla.posiciones[0] ?? { x: 0.3, y: 0.3 };
+        if (rejilla.desborda) avisoDesborde = true;
+
+        try {
+          const { data, error } = await supabase
+            .from("mesas")
+            .insert({
+              espacio_id: espacioId,
+              nombre,
+              capacidad,
+              forma: fila.forma,
+              ancho,
+              alto,
+              pos_x: posicion.x,
+              pos_y: posicion.y,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          if (!data) throw new Error(`La base no ha devuelto la mesa ${nombre}`);
+
+          creadas.push({
+            id: data.id,
+            nombre: data.nombre,
+            capacidad: data.capacidad,
+            forma: data.forma as FormaMesa,
+            ancho: data.ancho || ancho,
+            alto: data.alto || alto,
+            // OJO con `??` y no `||`: x=0 o y=0 (pegada al borde) es válido.
+            posX: data.pos_x ?? posicion.x,
+            posY: data.pos_y ?? posicion.y,
+          });
+          ocupadas.push({
+            x: posicion.x,
+            y: posicion.y,
+            width: ancho / 100,
+            height: alto / 100,
+          });
+          resultados.push({ nombre, ok: true });
+        } catch (error) {
+          console.error(`Error al crear la mesa ${nombre}:`, error);
+          resultados.push({ nombre, ok: false, motivo: motivoFalloAltaMesa(error) });
+          clavesFallidas.add(fila.clave);
+        }
+
+        setProgresoLote(i + 1);
       }
-      setLote((prev) => ({ ...prev, desde: "", hasta: "" }));
-    } catch (error) {
-      console.error("Error al crear el lote de mesas:", error);
-      toast.error(
-        creadas.length === 0
-          ? "No se ha podido crear ninguna mesa."
-          : `Se han creado ${creadas.length} mesa(s) (${creadas
-              .map((m) => m.nombre)
-              .join(", ")}) y ha fallado la siguiente. Revisa y vuelve a intentarlo con el resto.`,
-      );
     } finally {
       setCreandoLote(false);
-      if (creadas.length > 0) {
-        // Las filas ya están en BBDD: este cambio de estado no puede ser un
-        // paso de deshacer.
-        marcarNoDeshacible?.();
-        onMesasChange([...mesasCanvas, ...creadas]);
-      }
+      setProgresoLote(0);
+    }
+
+    const resumen = resumenAltaLoteMesas(resultados);
+    setResumenLote(resumen);
+
+    if (creadas.length > 0) {
+      // Las filas ya están en BBDD: este cambio de estado no puede ser un
+      // paso de deshacer.
+      marcarNoDeshacible?.();
+      onMesasChange([...mesasCanvas, ...creadas]);
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+    }
+
+    if (resumen.hayFallos) {
+      toast.error(resumen.mensaje, { duration: 12000 });
+      // En la lista se dejan SOLO las que fallaron, con el tipo y la capacidad
+      // que ya tenían: el mismo botón sirve para reintentar justo esas.
+      setFilasLote((prev) => prev.filter((f) => clavesFallidas.has(f.clave)));
+    } else {
+      toast.success(resumen.mensaje);
+      setFilasLote([]);
+    }
+
+    if (avisoDesborde) {
+      toast.warning(
+        "No caben todas en el plano sin solaparse: recolócalas arrastrándolas o agranda el espacio.",
+      );
     }
   };
 
@@ -375,17 +588,19 @@ export function PanelLateral({
 
     // POSICIÓN INICIAL: antes TODAS las mesas creadas desde aquí nacían en
     // (1, 1) metros, así que dar de alta varias seguidas las apilaba una encima
-    // de otra y no se veían. Se reutiliza la rejilla del alta en lote y se coge
-    // el hueco número `mesasCanvas.length`: no garantiza que esté libre (el
-    // dueño puede haber arrastrado una mesa justo ahí), pero ya no se apilan
-    // todas en el mismo punto. La posición definitiva la pone él arrastrando.
+    // de otra y no se veían. Luego se pasó a coger el hueco número
+    // `mesasCanvas.length` de la rejilla, que tampoco garantizaba nada si el
+    // dueño había arrastrado mesas. Ahora se pide el PRIMER hueco libre de
+    // verdad, pasando las mesas ya colocadas como ocupadas. La posición
+    // definitiva la sigue poniendo él arrastrando.
     const hueco =
       calcularRejillaMesas({
-        cantidad: mesasCanvas.length + 1,
+        cantidad: 1,
         anchoCm: newMesa.ancho,
         altoCm: altoMesa,
         espacio: realDimensions ?? { width: 12, height: 8 },
-      }).posiciones[mesasCanvas.length] ?? { x: 1, y: 1 };
+        ocupadas: rectangulosMesasCanvas,
+      }).posiciones[0] ?? { x: 1, y: 1 };
 
     try {
       const result = await crearMesa.mutateAsync({
@@ -551,10 +766,140 @@ export function PanelLateral({
                     </>
                   )}
                 </div>
-                <div className="text-xs flex items-center gap-1">
-                  <Users className="h-3 w-3 text-muted-foreground" />
-                  <span>{selectedElement.capacidad} personas</span>
-                </div>
+                {/* CAPACIDAD Y TAMAÑO de una mesa YA creada. Antes solo se
+                    podían elegir al darla de alta: si la mesa 7 resultaba ser
+                    de 4 y no de 2, había que borrarla y rehacerla. Mismo camino
+                    que el renombrado de arriba (validar -> BBDD -> canvas). */}
+                {mesaSeleccionadaEsFusionada ? (
+                  <div className="text-xs flex items-center gap-1">
+                    <Users className="h-3 w-3 text-muted-foreground" />
+                    <span>{selectedElement.capacidad} personas</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1 border-t pt-2">
+                    <Label className="text-xs flex items-center gap-1">
+                      <Ruler className="h-3 w-3" />
+                      Capacidad y tamaño
+                    </Label>
+
+                    <select
+                      aria-label="Tipo de mesa"
+                      className="h-7 w-full rounded-md border border-input bg-background px-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={presetMesaSeleccionada?.id ?? ""}
+                      onChange={(e) => {
+                        const preset = presetMesaPorId(e.target.value);
+                        if (!preset) return;
+                        setMesaEdit({
+                          capacidad: String(preset.capacidad),
+                          ancho: String(preset.anchoCm),
+                          alto: String(preset.altoCm),
+                          forma: preset.forma,
+                        });
+                      }}
+                    >
+                      {!presetMesaSeleccionada && <option value="">Personalizada</option>}
+                      {PRESETS_MESA.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.etiqueta} · {p.medidas}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-3 gap-1">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="mesa-sel-capacidad" className="text-[10px]">
+                          Plazas
+                        </Label>
+                        <Input
+                          id="mesa-sel-capacidad"
+                          type="number"
+                          min={MIN_CAPACIDAD_MESA}
+                          max={MAX_CAPACIDAD_MESA}
+                          className="h-7 text-xs px-1"
+                          value={mesaEdit.capacidad}
+                          onChange={(e) => setMesaEdit({ ...mesaEdit, capacidad: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label htmlFor="mesa-sel-ancho" className="text-[10px]">
+                          {mesaEdit.forma === "circular" ? "Ø (cm)" : "Ancho"}
+                        </Label>
+                        <Input
+                          id="mesa-sel-ancho"
+                          type="number"
+                          min={MIN_LADO_MESA_CM}
+                          max={MAX_LADO_MESA_CM}
+                          className="h-7 text-xs px-1"
+                          value={mesaEdit.ancho}
+                          onChange={(e) => setMesaEdit({ ...mesaEdit, ancho: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label htmlFor="mesa-sel-alto" className="text-[10px]">
+                          Largo
+                        </Label>
+                        <Input
+                          id="mesa-sel-alto"
+                          type="number"
+                          min={MIN_LADO_MESA_CM}
+                          max={MAX_LADO_MESA_CM}
+                          className="h-7 text-xs px-1"
+                          value={mesaEdit.forma === "circular" ? mesaEdit.ancho : mesaEdit.alto}
+                          disabled={mesaEdit.forma === "circular"}
+                          onChange={(e) => setMesaEdit({ ...mesaEdit, alto: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <div className="flex flex-1 gap-1">
+                        <Button
+                          variant={mesaEdit.forma === "rectangular" ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1 h-7"
+                          title="Rectangular"
+                          onClick={() => setMesaEdit({ ...mesaEdit, forma: "rectangular" })}
+                        >
+                          <Square className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant={mesaEdit.forma === "circular" ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1 h-7"
+                          title="Circular"
+                          onClick={() => setMesaEdit({ ...mesaEdit, forma: "circular" })}
+                        >
+                          <Circle className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs shrink-0"
+                        onClick={handleGuardarMedidasMesa}
+                        disabled={!puedeGuardarMedidasMesa}
+                        title="Guardar capacidad y tamaño"
+                      >
+                        <Check className="h-3 w-3" />
+                      </Button>
+                    </div>
+
+                    <p className="text-[10px] text-muted-foreground">
+                      {mesaEditSinCambios ? (
+                        <>
+                          {selectedElement.capacidad} plaza(s) ·{" "}
+                          {medidasMesaTexto(
+                            selectedElement.forma === "circular" ? "circular" : "rectangular",
+                            selectedElement.ancho,
+                            selectedElement.alto,
+                          )}
+                        </>
+                      ) : (
+                        "Pulsa ✓ para guardar. El dibujo del plano recoge el tamaño nuevo al volver a abrirlo."
+                      )}
+                    </p>
+                  </div>
+                )}
                 {selectedElement.isMerged && (
                   <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700">
                     Mesa agrupada
@@ -771,7 +1116,12 @@ export function PanelLateral({
             <div className="flex items-center justify-between p-3 cursor-pointer">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Rows3 className="h-4 w-4" />
-                Añadir varias (rango)
+                Cargar la sala
+                {filasLote.length > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {filasLote.length}
+                  </Badge>
+                )}
               </div>
               {openAddLote ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </div>
@@ -779,95 +1129,249 @@ export function PanelLateral({
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3">
               <p className="text-[10px] text-muted-foreground">
-                Para cargar de golpe las mesas de una sala: escribe desde qué número hasta qué
-                número, con la misma capacidad y forma. Máximo {MAX_MESAS_POR_LOTE} de una vez.
+                Escribe los números de la sala —admite rangos, saltos y prefijos— y ajusta
+                después solo las mesas que sean distintas. Máximo {MAX_MESAS_POR_LOTE} de una vez.
               </p>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Desde</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    placeholder="Ej: 1"
-                    value={lote.desde}
-                    onChange={(e) => setLote({ ...lote, desde: e.target.value })}
-                    className="h-8"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Hasta</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    inputMode="numeric"
-                    placeholder="Ej: 12"
-                    value={lote.hasta}
-                    onChange={(e) => setLote({ ...lote, hasta: e.target.value })}
-                    className="h-8"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Forma</Label>
-                  <div className="flex gap-1">
-                    <Button
-                      variant={lote.forma === "rectangular" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 h-7"
-                      onClick={() => setLote({ ...lote, forma: "rectangular", capacidad: 2 })}
-                    >
-                      <Square className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant={lote.forma === "circular" ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1 h-7"
-                      onClick={() => setLote({ ...lote, forma: "circular", capacidad: 6 })}
-                    >
-                      <Circle className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Capacidad</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={lote.capacidad}
-                    onChange={(e) => setLote({ ...lote, capacidad: parseInt(e.target.value) || 1 })}
-                    className="h-8"
-                  />
-                </div>
-              </div>
-
-              {loteRango.error ? (
-                <p className="text-[10px] text-destructive">{loteRango.error}</p>
-              ) : loteAvisoChoques ? (
-                <p className="text-[10px] text-destructive">{loteAvisoChoques}</p>
-              ) : loteRango.numeros.length > 0 ? (
-                <p className="text-[10px] text-muted-foreground">
-                  Se crearán <strong>{loteRango.numeros.length}</strong> mesa(s) de{" "}
-                  {lote.capacidad} plaza(s) y{" "}
-                  {lote.forma === "circular" ? `Ø${loteAncho} cm` : `${loteAncho}×${loteAlto} cm`}:{" "}
-                  {loteRango.numeros.join(", ")}. Luego puedes cambiar el tamaño de cada una y
-                  colocarlas arrastrándolas.
+              {/* 1) Los números. El cuadro de texto solo PROPONE: manda la lista. */}
+              <div className="space-y-1">
+                <Label htmlFor="lote-numeros" className="text-xs">
+                  Números de mesa
+                </Label>
+                <Textarea
+                  id="lote-numeros"
+                  value={loteTexto}
+                  onChange={(e) => setLoteTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAnadirNumerosALote();
+                    }
+                  }}
+                  placeholder="1-8, 11-16, T1-T6, 20"
+                  rows={2}
+                  className={`min-h-[52px] text-xs ${
+                    loteTexto.trim() && listaLote.error
+                      ? "border-destructive focus-visible:ring-destructive"
+                      : ""
+                  }`}
+                  aria-invalid={!!loteTexto.trim() && !!listaLote.error}
+                  aria-describedby="lote-numeros-ayuda"
+                />
+                <p
+                  id="lote-numeros-ayuda"
+                  className={`text-[10px] ${
+                    loteTexto.trim() && listaLote.error ? "text-destructive" : "text-muted-foreground"
+                  }`}
+                >
+                  {loteTexto.trim() && listaLote.error
+                    ? listaLote.error
+                    : listaLote.numeros.length > 0
+                      ? `${listaLote.numeros.length} número(s): ${listaLote.numeros.join(", ")}. Pulsa Enter para añadirlos.`
+                      : "Rangos (1-8), saltos (11-16) y prefijos (T1-T6), separados por comas. Enter para añadir."}
                 </p>
-              ) : null}
+                <Button
+                  variant="secondary"
+                  className="w-full h-7 text-xs"
+                  onClick={handleAnadirNumerosALote}
+                  disabled={creandoLote || !loteTexto.trim() || !!listaLote.error}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Añadir a la lista
+                </Button>
+              </div>
 
-              <Button
-                className="w-full h-8 text-xs"
-                onClick={handleAddLote}
-                disabled={!puedeCrearLote}
-              >
+              {/* 2) Tipo de mesa: forma + tamaño + plazas de una vez. */}
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo de mesa</Label>
+                <div className="grid grid-cols-2 gap-1">
+                  {PRESETS_MESA.map((p) => (
+                    <Button
+                      key={p.id}
+                      variant={presetLote.id === p.id ? "default" : "outline"}
+                      size="sm"
+                      className="h-auto flex-col items-start gap-0 py-1 px-1 text-[10px] leading-tight"
+                      title={`${p.etiqueta} · ${p.medidas} · ${p.capacidad} plaza(s)`}
+                      onClick={() => {
+                        setPresetLote(p);
+                        setFilasLote((prev) => aplicarPresetAFilas(prev, p));
+                      }}
+                    >
+                      <span className="flex items-center gap-1 font-medium">
+                        {p.forma === "circular" ? (
+                          <Circle className="h-2.5 w-2.5" />
+                        ) : (
+                          <Square className="h-2.5 w-2.5" />
+                        )}
+                        {p.etiqueta}
+                      </span>
+                      <span className="opacity-70">{p.medidas}</span>
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Se usa para las mesas nuevas y se aplica a todas las de la lista. Solo la
+                  redonda es circular: el plano únicamente distingue redonda de rectangular.
+                </p>
+              </div>
+
+              {filasLote.length > 0 && (
+                <div className="flex items-end gap-1">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="lote-capacidad-todas" className="text-xs">
+                      Plazas para todas
+                    </Label>
+                    <Input
+                      id="lote-capacidad-todas"
+                      type="number"
+                      min={MIN_CAPACIDAD_MESA}
+                      max={MAX_CAPACIDAD_MESA}
+                      placeholder="Ej: 4"
+                      value={capacidadParaTodas}
+                      onChange={(e) => setCapacidadParaTodas(e.target.value)}
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 shrink-0 text-xs"
+                    disabled={!capacidadParaTodas.trim()}
+                    onClick={() => {
+                      setFilasLote((prev) =>
+                        aplicarCapacidadAFilas(prev, normalizarCapacidadMesa(capacidadParaTodas)),
+                      );
+                      setCapacidadParaTodas("");
+                    }}
+                  >
+                    Aplicar
+                  </Button>
+                </div>
+              )}
+
+              {/* 3) La lista: una línea por mesa, para tocar solo las que cambian. */}
+              {filasLote.length > 0 && (
+                <div className="rounded-md border">
+                  <div className="flex items-center justify-between bg-muted/50 px-2 py-1 text-[10px] text-muted-foreground">
+                    <span>
+                      {totalesLote.total} mesa(s) · {totalesLote.plazas} plazas
+                    </span>
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        setFilasLote([]);
+                        setResumenLote(null);
+                      }}
+                    >
+                      Vaciar lista
+                    </button>
+                  </div>
+                  <ScrollArea className="h-52">
+                    <div className="space-y-1 p-1">
+                      {filasLote.map((fila) => {
+                        const normalizado = normalizarNombreMesa(fila.nombre);
+                        const problema =
+                          normalizado.length === 0 || nombresLoteConProblema.has(normalizado);
+                        return (
+                          <div key={fila.clave} className="flex items-center gap-1">
+                            <Input
+                              aria-label={`Número de la mesa ${fila.nombre}`}
+                              value={fila.nombre}
+                              onChange={(e) =>
+                                setFilasLote((prev) =>
+                                  actualizarFilaLote(prev, fila.clave, { nombre: e.target.value }),
+                                )
+                              }
+                              className={`h-7 min-w-0 flex-1 px-1 text-xs ${
+                                problema ? "border-destructive focus-visible:ring-destructive" : ""
+                              }`}
+                              aria-invalid={problema}
+                            />
+                            <select
+                              aria-label={`Tipo de la mesa ${fila.nombre}`}
+                              title={medidasMesaTexto(fila.forma, fila.anchoCm, fila.altoCm)}
+                              className="h-7 w-[86px] shrink-0 rounded-md border border-input bg-background px-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={fila.presetId ?? ""}
+                              onChange={(e) => {
+                                const preset = presetMesaPorId(e.target.value);
+                                if (preset) {
+                                  setFilasLote((prev) => aplicarPresetAFila(prev, fila.clave, preset));
+                                }
+                              }}
+                            >
+                              {fila.presetId === null && <option value="">Personalizada</option>}
+                              {PRESETS_MESA.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.etiqueta}
+                                </option>
+                              ))}
+                            </select>
+                            <Input
+                              type="number"
+                              min={MIN_CAPACIDAD_MESA}
+                              max={MAX_CAPACIDAD_MESA}
+                              aria-label={`Plazas de la mesa ${fila.nombre}`}
+                              value={fila.capacidad}
+                              onChange={(e) =>
+                                setFilasLote((prev) =>
+                                  actualizarFilaLote(prev, fila.clave, {
+                                    capacidad: normalizarCapacidadMesa(e.target.value),
+                                  }),
+                                )
+                              }
+                              className="h-7 w-11 shrink-0 px-1 text-xs"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-6 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                              aria-label={`Quitar la mesa ${fila.nombre} de la lista`}
+                              onClick={() =>
+                                setFilasLote((prev) => quitarFilaLote(prev, fila.clave))
+                              }
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              {loteAvisoChoques && (
+                <p className="text-[10px] text-destructive">{loteAvisoChoques}</p>
+              )}
+              {hayFilasSinNumero && (
+                <p className="text-[10px] text-destructive">
+                  Hay mesas sin número en la lista: ponles uno o quítalas.
+                </p>
+              )}
+
+              {/* Qué ha fallado, mesa a mesa. El alta ya no para en el primer
+                  error: las que fallaron se quedan en la lista para reintentar. */}
+              {resumenLote?.hayFallos && (
+                <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2">
+                  <p className="text-[10px] font-medium text-destructive">{resumenLote.mensaje}</p>
+                  <ul className="space-y-0.5 text-[10px] text-destructive">
+                    {resumenLote.fallidas.map((f) => (
+                      <li key={f.nombre}>
+                        Mesa {f.nombre}: {f.motivo}.
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <Button className="w-full h-8 text-xs" onClick={handleAddLote} disabled={!puedeCrearLote}>
                 <Plus className="h-3 w-3 mr-1" />
                 {creandoLote
-                  ? "Creando mesas..."
-                  : `Crear ${loteRango.numeros.length > 0 ? loteRango.numeros.length : ""} mesas`.trim()}
+                  ? `Creando mesas… ${progresoLote}/${filasLote.length}`
+                  : filasLote.length === 0
+                    ? "Crear mesas"
+                    : `Crear ${filasLote.length} mesa${filasLote.length === 1 ? "" : "s"} (${totalesLote.plazas} plazas)`}
               </Button>
             </CardContent>
           </CollapsibleContent>

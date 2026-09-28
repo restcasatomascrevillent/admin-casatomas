@@ -486,6 +486,50 @@ export function distribuirSillasCirculo(capacidad: number, diametro: number): Po
 // REJILLA PARA EL ALTA EN LOTE DE MESAS
 // ---------------------------------------------------------------------------
 
+/**
+ * Rectángulo ya ocupado del plano, en METROS y con el mismo criterio que
+ * `mesas.pos_x/pos_y` (esquina superior izquierda) — ver `rectanguloDeMesa`.
+ */
+export interface RectanguloOcupado {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Rectángulo (en metros) que ocupa una mesa del canvas, cuyo tamaño está en cm.
+ *  Para una mesa circular es su caja envolvente, que es justo lo que hace falta
+ *  para no colocar otra encima. */
+export function rectanguloDeMesa(mesa: {
+  posX: number;
+  posY: number;
+  ancho: number;
+  alto: number;
+}): RectanguloOcupado {
+  return {
+    x: mesa?.posX ?? 0,
+    y: mesa?.posY ?? 0,
+    width: Math.max(0, (mesa?.ancho ?? 80) / 100),
+    height: Math.max(0, (mesa?.alto ?? 80) / 100),
+  };
+}
+
+/** ¿Se pisan dos rectángulos (con `holgura` metros de aire obligatorio entre
+ *  ellos)? Tocarse justo por el borde con holgura 0 NO cuenta como pisarse. */
+export function rectangulosSolapan(
+  a: RectanguloOcupado,
+  b: RectanguloOcupado,
+  holgura = 0,
+): boolean {
+  if (!a || !b) return false;
+  return (
+    a.x < b.x + b.width + holgura &&
+    b.x < a.x + a.width + holgura &&
+    a.y < b.y + b.height + holgura &&
+    b.y < a.y + a.height + holgura
+  );
+}
+
 export interface OpcionesRejillaMesas {
   /** Cuántas mesas hay que colocar. */
   cantidad: number;
@@ -499,6 +543,19 @@ export interface OpcionesRejillaMesas {
   separacion?: number;
   /** Margen respecto al borde del plano, en metros. */
   margen?: number;
+  /**
+   * Trozos del plano que YA están ocupados, en METROS: las mesas que el dueño
+   * ya ha colocado (`rectanguloDeMesa`). Los huecos de la rejilla que caigan
+   * encima se saltan, así un segundo lote no aterriza sobre el primero.
+   *
+   * Es deliberadamente una lista de rectángulos y no "las mesas": así el día
+   * que el editor le pase también las paredes y áreas dibujadas (hoy
+   * `PanelLateral` no las recibe como prop) el alta en lote las esquivará sin
+   * tocar esta función.
+   */
+  ocupadas?: readonly RectanguloOcupado[];
+  /** Aire mínimo, en metros, entre una mesa nueva y algo ya ocupado. */
+  holgura?: number;
 }
 
 export interface RejillaMesas {
@@ -506,25 +563,34 @@ export interface RejillaMesas {
   posiciones: Punto[];
   /** Columnas que ha usado la rejilla. */
   columnas: number;
-  /** Filas que ha usado la rejilla. */
+  /** Filas que ha usado la rejilla (las que ocuparían las mesas sin esquivar nada). */
   filas: number;
   /** `true` si no caben todas dentro del plano sin solaparse (el dueño tendrá que recolocar). */
   desborda: boolean;
+  /** `true` si se ha saltado algún hueco por estar ocupado por otra mesa. */
+  esquivoOcupadas: boolean;
 }
 
 /**
  * Coloca `cantidad` mesas en una rejilla sencilla dentro del plano.
  *
  * Existe para el alta en lote del panel lateral: `handleAddMesa` (alta de una
- * en una) mete todas las mesas en `pos_x: 1, pos_y: 1`, así que dar de alta 12
+ * en una) metía todas las mesas en `pos_x: 1, pos_y: 1`, así que dar de alta 12
  * seguidas las apilaba una encima de otra y había que separarlas a mano antes
  * de poder distinguirlas. Las posiciones se recortan para no salirse del
  * plano; si ni reduciendo la separación caben todas, `desborda` avisa de que
  * quedarán solapadas y habrá que arrastrarlas.
+ *
+ * Con `ocupadas` (las mesas que ya están colocadas) la rejilla SALTA los huecos
+ * pisados: antes, el segundo lote de una sala empezaba otra vez en (0,3 · 0,3)
+ * y caía justo encima del primero. Sin `ocupadas` el resultado es exactamente
+ * el de siempre, para no cambiarle el sitio a nadie.
  */
 export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
   const cantidad = Math.max(0, Math.floor(opts.cantidad || 0));
-  if (cantidad === 0) return { posiciones: [], columnas: 0, filas: 0, desborda: false };
+  if (cantidad === 0) {
+    return { posiciones: [], columnas: 0, filas: 0, desborda: false, esquivoOcupadas: false };
+  }
 
   const anchoM = Math.max(0.1, (opts.anchoCm || 80) / 100);
   const altoM = Math.max(0.1, (opts.altoCm || 80) / 100);
@@ -554,17 +620,71 @@ export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
   const maxX = Math.max(0, anchoPlano - anchoM);
   const maxY = Math.max(0, altoPlano - altoM);
 
-  const posiciones: Punto[] = [];
-  for (let i = 0; i < cantidad; i += 1) {
-    const col = i % columnas;
-    const fila = Math.floor(i / columnas);
+  /** Esquina superior izquierda del hueco `indice` de la rejilla, ya recortada
+   *  al plano y redondeada a centímetros. */
+  const hueco = (indice: number): Punto => {
+    const col = indice % columnas;
+    const fila = Math.floor(indice / columnas);
     const x = margen + col * (anchoM + separacion);
     const y = margen + fila * (altoM + separacion);
-    posiciones.push({
+    return {
       x: Math.round(Math.min(Math.max(0, x), maxX) * 100) / 100,
       y: Math.round(Math.min(Math.max(0, y), maxY) * 100) / 100,
-    });
+    };
+  };
+
+  const ocupadas = (opts.ocupadas ?? []).filter(
+    (r) =>
+      !!r &&
+      Number.isFinite(r.x) &&
+      Number.isFinite(r.y) &&
+      Number.isFinite(r.width) &&
+      Number.isFinite(r.height) &&
+      r.width > 0 &&
+      r.height > 0,
+  );
+
+  // Sin nada que esquivar: el comportamiento de toda la vida, hueco a hueco.
+  if (ocupadas.length === 0) {
+    const posiciones: Punto[] = [];
+    for (let i = 0; i < cantidad; i += 1) posiciones.push(hueco(i));
+    return { posiciones, columnas, filas, desborda: !disposicion.cabe, esquivoOcupadas: false };
   }
 
-  return { posiciones, columnas, filas, desborda: !disposicion.cabe };
+  // Con mesas ya colocadas hay que mirar MÁS huecos que mesas por colocar, así
+  // que se recorre la rejilla entera del plano (no solo las `filas` que
+  // ocuparían las mesas nuevas si estuviera vacío).
+  const filasDelPlano = Math.max(
+    filas,
+    Math.floor((utilAlto + separacion) / (altoM + separacion)),
+  );
+  const huecosDelPlano = Math.max(cantidad, columnas * filasDelPlano);
+  const holgura = Math.max(0, opts.holgura ?? 0.05);
+
+  const posiciones: Punto[] = [];
+  let esquivoOcupadas = false;
+  let desborda = !disposicion.cabe;
+  let indice = 0;
+
+  while (posiciones.length < cantidad) {
+    const punto = hueco(indice);
+    const esHuecoReal = indice < huecosDelPlano;
+    indice += 1;
+
+    if (esHuecoReal) {
+      const rect: RectanguloOcupado = { x: punto.x, y: punto.y, width: anchoM, height: altoM };
+      if (ocupadas.some((o) => rectangulosSolapan(rect, o, holgura))) {
+        esquivoOcupadas = true;
+        continue;
+      }
+    } else {
+      // Se han acabado los huecos libres del plano: las que quedan se apilan
+      // sobre la rejilla y el dueño tendrá que arrastrarlas.
+      desborda = true;
+    }
+
+    posiciones.push(punto);
+  }
+
+  return { posiciones, columnas, filas, desborda, esquivoOcupadas };
 }
