@@ -483,6 +483,69 @@ export function mensajeCorrectivo(descuadres: Descuadre[]): string {
   );
 }
 
+/**
+ * Cuenta cuantos valores NUMERICOS cambian entre dos lecturas del mismo
+ * documento, y devuelve cuales.
+ *
+ * POR QUE EXISTE ESTO
+ * -------------------
+ * Pedirle al modelo que "vuelva a mirar porque no cuadra" tiene un riesgo
+ * documentado: hay medidas publicadas (ReceiptBench, 2026) de modelos que
+ * ALTERAN precios de linea e INVENTAN importes de IVA para hacer que las
+ * sumas cuadren. Es decir, el propio criterio con el que se detecta el error
+ * es el que el modelo aprende a satisfacer, si hace falta falseando datos.
+ *
+ * La defensa no es dejar de comprobar la aritmetica —seguiria siendo la unica
+ * senal disponible— sino mirar COMO cambia la segunda lectura:
+ *
+ *  - Corregir de verdad un digito mal leido cambia UNO o DOS numeros.
+ *  - Recomponer el documento para que cuadre cambia MUCHOS.
+ *
+ * Asi que una relectura que reescribe medio documento es sospechosa aunque
+ * cuadre perfectamente, y se descarta. Mejor un documento con un aviso que un
+ * documento limpio e inventado.
+ */
+export function contarCambiosNumericos(
+  antes: DocumentoExtraido,
+  despues: DocumentoExtraido,
+): { total: number; campos: string[] } {
+  const campos: string[] = [];
+  const cmp = (campo: string, a: unknown, b: unknown) => {
+    const na = esNumeroFinito(a) ? a : null;
+    const nb = esNumeroFinito(b) ? b : null;
+    if (na === null && nb === null) return;
+    // Se comparan a dos decimales: un 110 frente a un 110.00000001 no es un
+    // cambio de lectura, es coma flotante.
+    if (na === null || nb === null || Math.abs(na - nb) > 0.005) campos.push(campo);
+  };
+
+  cmp("subtotal", antes.subtotal, despues.subtotal);
+  cmp("iva", antes.iva, despues.iva);
+  cmp("total", antes.total, despues.total);
+
+  // Si cambia el numero de lineas, ya es una reescritura por si sola.
+  const n = Math.max(antes.productos?.length ?? 0, despues.productos?.length ?? 0);
+  if ((antes.productos?.length ?? 0) !== (despues.productos?.length ?? 0)) {
+    campos.push("productos.length");
+  }
+  for (let i = 0; i < n; i++) {
+    const a = antes.productos?.[i];
+    const b = despues.productos?.[i];
+    if (!a || !b) continue;
+    cmp(`productos[${i}].cantidad`, a.cantidad, b.cantidad);
+    cmp(`productos[${i}].precio_unitario`, a.precio_unitario, b.precio_unitario);
+    cmp(`productos[${i}].total`, a.total, b.total);
+  }
+
+  return { total: campos.length, campos };
+}
+
+/** Por encima de esto, una relectura deja de parecer la correccion de un
+ *  digito y empieza a parecer una recomposicion del documento. Tres permite
+ *  el caso legitimo mas habitual: un precio unitario mal leido arrastra el
+ *  total de su linea y el subtotal. */
+export const MAX_CAMBIOS_RELECTURA = 3;
+
 /** Descuadres -> filas para `facturas.alertas_validacion`, mismo formato que
  *  devuelve `validar_cordura_factura` en SQL para que la UI y el chatbot no
  *  tengan que distinguir de donde vino cada alerta. */

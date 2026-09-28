@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   comprobarCuadre,
+  contarCambiosNumericos,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
+  MAX_CAMBIOS_RELECTURA,
   mensajeCorrectivo,
   validarEstructura,
   type DocumentoExtraido,
@@ -399,6 +401,71 @@ describe("comprobarCuadre — deteccion de linea descuadrada", () => {
 // ============================================================================
 //  5. Encaje con lo que ya existe
 // ============================================================================
+
+describe("contarCambiosNumericos — defensa contra el cuadre inventado", () => {
+  // Hay medidas publicadas (ReceiptBench, 2026) de modelos que alteran precios
+  // e inventan importes de IVA para forzar que las sumas cuadren. Como el
+  // reintento le pide justamente que cuadre, hace falta distinguir "ha
+  // corregido un digito" de "ha reescrito el documento".
+
+  it("no ve cambios entre una lectura y ella misma", () => {
+    expect(contarCambiosNumericos(doc(), doc()).total).toBe(0);
+  });
+
+  it("corregir un digito mal leido cuenta como UN cambio", () => {
+    // El caso MR FRIOSAT resuelto bien: solo se toca el total.
+    const antes = doc({ subtotal: 489.74, iva: 101.59, total: 585.33 });
+    const despues = doc({ subtotal: 489.74, iva: 101.59, total: 591.33 });
+    const c = contarCambiosNumericos(antes, despues);
+    expect(c.total).toBe(1);
+    expect(c.campos).toEqual(["total"]);
+    expect(c.total).toBeLessThanOrEqual(MAX_CAMBIOS_RELECTURA);
+  });
+
+  it("un precio mal leido que arrastra su linea y el subtotal sigue siendo aceptable", () => {
+    const antes = doc({
+      productos: [linea({ cantidad: 12, precio_unitario: 9316.67, total: 111800.04 })],
+      subtotal: 111800.04, iva: 11180, total: 122980.04,
+    });
+    const despues = doc({
+      productos: [linea({ cantidad: 12, precio_unitario: 931.67, total: 11180.04 })],
+      subtotal: 111800.04, iva: 11180, total: 122980.04,
+    });
+    expect(contarCambiosNumericos(antes, despues).total).toBeLessThanOrEqual(MAX_CAMBIOS_RELECTURA);
+  });
+
+  it("reescribir medio documento se detecta y supera el umbral", () => {
+    const antes = doc({
+      productos: [linea({ total: 100 }), linea({ total: 50, precio_unitario: 5 })],
+      subtotal: 150, iva: 15, total: 165,
+    });
+    const despues = doc({
+      productos: [
+        linea({ cantidad: 11, precio_unitario: 11, total: 121 }),
+        linea({ cantidad: 7, precio_unitario: 7, total: 49 }),
+      ],
+      subtotal: 170, iva: 17, total: 187,
+    });
+    expect(contarCambiosNumericos(antes, despues).total).toBeGreaterThan(MAX_CAMBIOS_RELECTURA);
+  });
+
+  it("cambiar el numero de lineas cuenta por si solo", () => {
+    const c = contarCambiosNumericos(
+      doc({ productos: [linea(), linea()] }),
+      doc({ productos: [linea()] }),
+    );
+    expect(c.campos).toContain("productos.length");
+  });
+
+  it("no confunde el ruido de coma flotante con un cambio de lectura", () => {
+    const c = contarCambiosNumericos(doc({ total: 110 }), doc({ total: 110.000000001 }));
+    expect(c.total).toBe(0);
+  });
+
+  it("null -> numero SI es un cambio (rellenar un hueco que no se veia)", () => {
+    expect(contarCambiosNumericos(doc({ iva: null }), doc({ iva: 10 })).campos).toContain("iva");
+  });
+});
 
 describe("descuadresComoAlertas — mismo formato que validar_cordura_factura", () => {
   it("produce codigo/severidad/mensaje/detalle y marca el origen", () => {

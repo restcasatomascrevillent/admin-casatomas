@@ -3,14 +3,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { toNumber } from "./normalizacion.ts";
 import {
   comprobarCuadre,
+  contarCambiosNumericos,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
+  MAX_CAMBIOS_RELECTURA,
   mensajeCorrectivo,
   validarEstructura,
   type Descuadre,
   type DocumentoExtraido,
 } from "./esquema.ts";
+import { diagnosticoResolucion } from "./imagen.ts";
 
 // ============================================================================
 //  procesar-factura  ·  OCR de facturas/albaranes SIN n8n
@@ -838,11 +841,29 @@ async function extraerConCuadre(
     return { documento: primera, descuadres: descuadres1, intentos: 2 };
   }
 
+  // Antes de quedarse con la relectura hay que mirar CÓMO ha cambiado, no
+  // solo si cuadra mejor. Hay medidas publicadas de modelos que alteran
+  // precios e inventan importes de IVA para forzar el cuadre: es decir, el
+  // propio criterio con el que se detecta el error es el que aprenden a
+  // satisfacer. Una corrección real toca uno o dos números; una
+  // recomposición toca medio documento. Ver `contarCambiosNumericos`.
+  const cambios = contarCambiosNumericos(primera, segunda);
+  if (cambios.total > MAX_CAMBIOS_RELECTURA) {
+    console.warn(
+      `[extraccion] Relectura DESCARTADA: cambia ${cambios.total} valores numéricos ` +
+      `(${cambios.campos.slice(0, 8).join(", ")}${cambios.campos.length > 8 ? "..." : ""}). ` +
+      `Eso no es corregir un dígito, es reescribir el documento para que cuadre. ` +
+      `Se conserva la primera lectura con sus avisos.`,
+    );
+    return { documento: primera, descuadres: descuadres1, intentos: 2 };
+  }
+
   // Se queda la lectura con menos problemas. En empate, la segunda: es la que
   // ha mirado el documento sabiendo dónde estaba el descuadre.
   if (peso(descuadres2) <= peso(descuadres1)) {
     console.log(
-      `[extraccion] Relectura aceptada: ${descuadres1.length} -> ${descuadres2.length} descuadre(s).`,
+      `[extraccion] Relectura aceptada: ${descuadres1.length} -> ${descuadres2.length} descuadre(s), ` +
+      `${cambios.total} valor(es) corregido(s): ${cambios.campos.join(", ") || "ninguno"}.`,
     );
     return { documento: segunda, descuadres: descuadres2, intentos: 2 };
   }
@@ -872,6 +893,33 @@ serve(async (req) => {
     console.log(`[procesar-factura] ${archivo.nombre} (${mimeType}) — user ${auth.userId}`);
 
     // 1) Bloque de contenido para Vision
+    //
+    //    Antes, mide qué resolución va a ver REALMENTE el modelo. Solo para
+    //    imágenes: con un PDF el bloque `type: "file"` deja que OpenAI extraiga
+    //    por su cuenta el texto y las imágenes de cada página, y ahí no hay
+    //    nada que medir desde aquí.
+    //
+    //    El reescalado de `detail: "high"` (lado corto topado en 768 px) hace
+    //    que una foto de móvil de 4032x3024 llegue al modelo como 1024x768, es
+    //    decir ~88 DPI sobre un A4. A esa resolución los dígitos pequeños de
+    //    una tabla de líneas se confunden, que es exactamente el error de
+    //    MR FRIOSAT (591,33 leído como 585,33). Dejarlo en el log convierte esa
+    //    sospecha en un número por documento. Solo mide y avisa: no toca la
+    //    imagen (en Deno no hay canvas, y recortar hay que hacerlo antes de
+    //    subir).
+    if (!isPdf) {
+      try {
+        // Basta la cabecera: ~64 KB de base64 sobran para el SOF de un JPEG.
+        const cabecera = atob(b64.slice(0, 65536));
+        const bytes = new Uint8Array(cabecera.length);
+        for (let i = 0; i < cabecera.length; i++) bytes[i] = cabecera.charCodeAt(i);
+        const diag = diagnosticoResolucion(bytes);
+        if (diag) console.log(diag);
+      } catch {
+        // Medir es informativo: si falla, no puede impedir el procesado.
+      }
+    }
+
     const contentBlock = isPdf
       ? { type: "file", file: { filename: archivo.nombre || "document.pdf", file_data: `data:application/pdf;base64,${b64}` } }
       : { type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}`, detail: "high" } };
