@@ -29,23 +29,20 @@ El bloqueo de
 `20260925154109` se habían aplicado sin commitear los ficheros) se resolvió recuperando y
 commiteando esas cinco migraciones sin fichero, en el commit `e0796e3`.
 
-**Todos los rollbacks de esta tabla revierten migraciones ya aplicadas en producción, salvo
-`20260928120000_mesas_asignaciones_rls_por_seccion_ROLLBACK.sql`**, que revierte una
-migración escrita el 2026-09-28 y **todavía sin aplicar**: el dueño pidió expresamente no
-aplicar nada sin su confirmación, y queda pendiente una decisión suya (si crear y borrar
-mesas debe exigir super admin en vez de la sección `reservas`; ver el bloque «DECISIÓN
-PENDIENTE» dentro de la migración). Mientras esa migración no se aplique, **ejecutar su
-rollback no hace falta y no haría nada útil**: intentaría recrear políticas que ya existen y
-fallaría en el primer `create policy` por nombre duplicado. `supabase db push` ya **no** está
-bloqueado.
+**Todos los rollbacks de esta tabla revierten migraciones ya aplicadas en producción**,
+incluidos `20260927100000_mesas_numero_fiable_ROLLBACK.sql` y
+`20260928120000_mesas_asignaciones_rls_por_seccion_ROLLBACK.sql`. Este último se aplicó el
+2026-09-28 con `supabase db push --linked` (era la única pendiente; confirmado con
+`--dry-run` antes), en su **opción A**: gestionar mesas va por permisos de sección
+`reservas`, no por super admin, porque para el dueño super admin es un rol de desarrollo y
+no de operación del restaurante. `supabase db push` ya **no** está bloqueado.
 
-El resto sí revierten migraciones ya aplicadas,
-incluido `20260927100000_mesas_numero_fiable_ROLLBACK.sql`. Corregido el 2026-09-28: la
+Corregido el 2026-09-28: la
 versión anterior de este párrafo decía que `20260927100000` estaba pendiente y que la última
 aplicada era `20260926150000`, y lo advertía porque se escribió sin acceso de lectura a
 Supabase. Ya se comprobó contra `supabase_migrations.schema_migrations`, y las cinco últimas
-versiones aplicadas son `20260927100000`, `20260926150000`, `20260926140000`,
-`20260926130000` y `20260926121000`.
+versiones aplicadas son `20260928120000`, `20260927100000`, `20260926150000`,
+`20260926140000` y `20260926130000`.
 
 Consecuencia práctica: el índice `uq_mesas_espacio_nombre_real` **existe hoy en producción**,
 con esta definición (verificada, no deducida):

@@ -1,20 +1,29 @@
 -- ===========================================================================
 -- ##                                                                       ##
--- ##                          NO APLICADA                                  ##
+-- ##            APLICADA EN PRODUCCION el 2026-09-28                       ##
 -- ##                                                                       ##
--- ##   Estado a 2026-09-28: fichero ESCRITO Y LISTO pero SIN APLICAR, a    ##
--- ##   peticion expresa del dueno ("db push ya NO esta bloqueado, pero NO  ##
--- ##   apliques nada sin mi confirmacion"). `supabase db push` funciona:   ##
--- ##   el historial local y el remoto vuelven a coincidir desde el commit  ##
--- ##   e0796e3. Lo que falta es la DECISION del bloque "DECISION           ##
--- ##   PENDIENTE" de mas abajo, no la capacidad de aplicar.                ##
+-- ##   `supabase db push --linked` sobre jeamoczmbfsnwkfjxcyo. Era la      ##
+-- ##   UNICA migracion pendiente (comprobado con --dry-run antes).         ##
 -- ##                                                                       ##
--- ##   TODO lo que se afirma aqui sobre el estado actual SI esta           ##
--- ##   verificado contra produccion (jeamoczmbfsnwkfjxcyo) el 2026-09-28   ##
--- ##   con `supabase db query --linked`: pg_policies, pg_proc,             ##
--- ##   pg_class.relforcerowsecurity, information_schema.role_table_grants, ##
--- ##   super_admins y user_permissions. No hay nada deducido de los        ##
--- ##   ficheros de migrations/.                                            ##
+-- ##   Se aplico la OPCION A del bloque "DECISION" de mas abajo, por       ##
+-- ##   criterio del dueno: "super admin es solo para mi y para mi          ##
+-- ##   companero, desarrolladores que vemos mas cosas; el resto si que     ##
+-- ##   puede entrar cualquier usuario autenticado con permisos de          ##
+-- ##   secciones". Es decir: super admin es un rol de DESARROLLO, no de    ##
+-- ##   operacion del restaurante; gestionar mesas es operacion, asi que    ##
+-- ##   va por permisos de seccion. La opcion B queda descartada por        ##
+-- ##   criterio, no por coste.                                            ##
+-- ##                                                                       ##
+-- ##   VERIFICADO DESPUES DE APLICAR (contra el catalogo, no contra este   ##
+-- ##   SQL): 12 politicas, ninguna con rol public/anon; `anon` sin ningun  ##
+-- ##   privilegio en las tres tablas; `authenticated` sin TRUNCATE;        ##
+-- ##   relforcerowsecurity sigue false; asignar_mesas_reserva sigue        ##
+-- ##   SECURITY INVOKER; los 4 usuarios reales leen y escriben (el dueno   ##
+-- ##   incluido) y un autenticado sin la seccion ve 0 filas y no escribe.  ##
+-- ##   supabase/tests/mesas_rls_test.sql pasa entero (T1-T11).             ##
+-- ##                                                                       ##
+-- ##   Si hay que revertir: supabase/rollbacks/20260928120000_mesas_       ##
+-- ##   asignaciones_rls_por_seccion_ROLLBACK.sql, a mano.                  ##
 -- ##                                                                       ##
 -- ===========================================================================
 --
@@ -133,14 +142,14 @@
 --   tabla, no la lista de emails. Los dos caminos que importan funcionan.
 --
 -- ---------------------------------------------------------------------------
--- DECISION PENDIENTE DEL DUENO -- NO LA TOMA ESTE FICHERO
+-- DECISION -- RESUELTA POR EL DUENO EL 2026-09-28: OPCION A
 -- ---------------------------------------------------------------------------
 --
 --   "Gestionar mesas" (configuracion) y "asignar mesas" (operacion diaria)
 --   PODRIAN ir en secciones distintas. Este fichero las pone en la MISMA
---   (`reservas`) porque es la opcion que no rompe nada. La alternativa:
+--   (`reservas`). La alternativa que se descarto:
 --
---     OPCION A (la que esta escrita abajo): mesas INSERT/DELETE con
+--     OPCION A (LA APLICADA, la que esta escrita abajo): mesas INSERT/DELETE con
 --       can_write_section('reservas'). Nadie pierde nada. Pero camarero1
 --       conserva crear/borrar mesas (ver arriba).
 --

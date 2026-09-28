@@ -308,4 +308,89 @@ end;
 $$;
 reset role;
 
+-- ---------------------------------------------------------------------------
+-- T10 la RPC `asignar_mesas_reserva` sigue funcionando para quien tiene la
+--     seccion. Es SECURITY INVOKER: hace delete+insert sobre asignaciones_mesa
+--     CON LA RLS DEL QUE LLAMA, asi que depende de
+--     asignaciones_mesa_insert_seccion y ..._delete_seccion. Si esto se pone
+--     rojo, se rompe asignar mesas, que es justo lo que se acaba de construir.
+--
+--     Fecha muy futura a proposito: no compite con reservas reales por aforo.
+-- ---------------------------------------------------------------------------
+insert into public.reservas (id, fecha, hora, numero_comensales, espacio_id, marca, estado, canal)
+values ('00000000-0000-0000-0000-00000000e5a1',
+        current_date + 300, '14:00', 2,
+        '00000000-0000-0000-0000-0000000e5a01', 'casa_tomas', 'confirmada', 'manual');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000ca01","role":"authenticated"}';
+
+do $$
+declare n int;
+begin
+  select count(*) into n
+    from public.asignar_mesas_reserva(
+           '00000000-0000-0000-0000-00000000e5a1',
+           array['00000000-0000-0000-0000-00000000e501']::uuid[]);
+  assert n = 1, format('T10a: la RPC devolvio %s filas en vez de 1', n);
+
+  assert (select count(*) from public.asignaciones_mesa
+           where reserva_id = '00000000-0000-0000-0000-00000000e5a1') = 1,
+         'T10b: la RPC no dejo la asignacion escrita';
+
+  -- El trigger SECURITY DEFINER `asignaciones_mesa_denormalizar` rellena
+  -- fecha/turno/espacio_id. Si la RLS lo hubiera bloqueado, saldria NULL.
+  assert (select turno from public.asignaciones_mesa
+           where reserva_id = '00000000-0000-0000-0000-00000000e5a1') = 'comida',
+         'T10c: el trigger denormalizar no relleno el turno (14:00 -> comida)';
+
+  -- Reasignar: es el camino delete+insert, el que mas depende de la RLS.
+  select count(*) into n
+    from public.asignar_mesas_reserva(
+           '00000000-0000-0000-0000-00000000e5a1',
+           array['00000000-0000-0000-0000-00000000e501']::uuid[]);
+  assert n = 1, format('T10d: reasignar devolvio %s filas en vez de 1', n);
+  assert (select count(*) from public.asignaciones_mesa
+           where reserva_id = '00000000-0000-0000-0000-00000000e5a1') = 1,
+         'T10e: reasignar duplico la fila en vez de reemplazarla';
+end;
+$$;
+reset role;
+
+-- T11 el mismo camino SIN la seccion: la RPC debe rechazar, no escribir.
+--     COMPROBADO CONTRA PRODUCCION el 2026-09-28: corta ANTES de escribir, en
+--     su propia guarda, con SQLSTATE 23514 (check_violation, no
+--     insufficient_privilege) y el mensaje
+--       "RESERVA_INEXISTENTE: la reserva ... no existe (o no es visible con
+--        tus permisos)"
+--     porque el `select ... from reservas` de dentro de la RPC ya no ve la
+--     fila: la RPC es SECURITY INVOKER y `reservas` lleva su propia RLS por
+--     seccion desde 20260918120000. Por eso aqui se acepta CUALQUIER error:
+--     lo que se prueba es que no pasa, no con que codigo falla.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-0000000000fe","role":"authenticated"}';
+do $$
+declare rechazada boolean := false;
+begin
+  begin
+    perform public.asignar_mesas_reserva(
+              '00000000-0000-0000-0000-00000000e5a1',
+              array['00000000-0000-0000-0000-00000000e501']::uuid[]);
+  exception when others then
+    rechazada := true;
+  end;
+  assert rechazada, 'T11a: un usuario sin la seccion reservas pudo asignar mesas';
+end;
+$$;
+reset role;
+
+-- Y que el rechazo no dejo rastro (visto ya sin la RLS de por medio)
+do $$
+begin
+  assert (select count(*) from public.asignaciones_mesa
+           where reserva_id = '00000000-0000-0000-0000-00000000e5a1') = 1,
+         'T11b: el intento sin permiso altero las asignaciones de la reserva';
+end;
+$$;
+
 rollback;
