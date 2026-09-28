@@ -530,6 +530,286 @@ export function rectangulosSolapan(
   );
 }
 
+// ---------------------------------------------------------------------------
+// DIMENSIONES REALES DEL ESPACIO (ancho × alto en metros)
+// ---------------------------------------------------------------------------
+
+/** Lado mínimo admisible para un espacio, en metros. Por debajo de esto no cabe
+ *  ni la mesa más pequeña (`MIN_LADO_MESA_CM` = 30cm) con su margen. */
+export const MIN_LADO_ESPACIO_M = 0.5;
+
+/** Lado máximo admisible, en metros. 200m de lado son 4 hectáreas: cualquier
+ *  cosa por encima es un arrastre accidental con el zoom muy alejado, y a
+ *  50px/m deja un lienzo de 10.000px de lado que solo sirve para colgar el
+ *  navegador. */
+export const MAX_LADO_ESPACIO_M = 200;
+
+export interface DimensionesEspacio {
+  width: number;
+  height: number;
+}
+
+// `motivo?: undefined` / `dimensiones?: undefined` no son decorativos: el
+// proyecto compila con `strict: false` y, sin ellos, TypeScript no estrecha la
+// unión por el discriminante `ok` (mismo apaño que el tipo `Escritura` de
+// `EditorPlanoEspacio.tsx`).
+export type NormalizacionDimensiones =
+  | { ok: true; dimensiones: DimensionesEspacio; motivo?: undefined }
+  | { ok: false; motivo: string; dimensiones?: undefined };
+
+/**
+ * Valida un ancho×alto en metros antes de dejar que se convierta en las
+ * dimensiones del espacio (y, de ahí, en `planos_espacio.ancho_metros/
+ * alto_metros`). Devuelve el motivo en español, listo para un toast.
+ *
+ * Existe porque la herramienta "Sala rectangular" calcula las medidas
+ * dividiendo píxeles arrastrados entre `pixelsPerMeter`: un
+ * `pixelsPerMeter` a 0 (o un rect degenerado) produciría `Infinity`/`NaN` y
+ * eso viaja tal cual hasta la columna numérica de la BD.
+ */
+export function normalizarDimensionesEspacio(
+  width: number,
+  height: number,
+): NormalizacionDimensiones {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return { ok: false, motivo: "las medidas de la sala no son un número válido" };
+  }
+  if (width <= 0 || height <= 0) {
+    return { ok: false, motivo: "una sala no puede medir 0 m (ni menos) de lado" };
+  }
+  if (width < MIN_LADO_ESPACIO_M || height < MIN_LADO_ESPACIO_M) {
+    return {
+      ok: false,
+      motivo: `una sala no puede medir menos de ${MIN_LADO_ESPACIO_M} m de lado`,
+    };
+  }
+  if (width > MAX_LADO_ESPACIO_M || height > MAX_LADO_ESPACIO_M) {
+    return {
+      ok: false,
+      motivo: `una sala no puede medir más de ${MAX_LADO_ESPACIO_M} m de lado`,
+    };
+  }
+  // A centímetros: es la precisión con la que se guardan `pos_x/pos_y` y la
+  // que usa el snap de dibujo (5cm), así que más decimales solo son ruido.
+  return {
+    ok: true,
+    dimensiones: {
+      width: Math.round(width * 100) / 100,
+      height: Math.round(height * 100) / 100,
+    },
+  };
+}
+
+/**
+ * Mesas que se quedarían (total o parcialmente) FUERA del rectángulo del
+ * espacio con las dimensiones dadas. No mueve nada: solo permite avisar de que
+ * redibujar la sala ha dejado mesas colgando fuera, para que el dueño las
+ * recoloque a mano (moverlas por él le cambiaría el plano sin pedirlo).
+ */
+export function mesasFueraDelPlano(
+  mesas: readonly { nombre?: string; posX?: number; posY?: number; ancho?: number; alto?: number }[],
+  dimensiones: DimensionesEspacio,
+): string[] {
+  const ancho = dimensiones?.width ?? 0;
+  const alto = dimensiones?.height ?? 0;
+  const fuera: string[] = [];
+  for (const mesa of mesas ?? []) {
+    if (!mesa) continue;
+    const rect = rectanguloDeMesa({
+      posX: mesa.posX ?? 0,
+      posY: mesa.posY ?? 0,
+      ancho: mesa.ancho ?? 80,
+      alto: mesa.alto ?? 80,
+    });
+    // Tolerancia de 1cm: una mesa pegada justo al borde (x + ancho === ancho
+    // del plano) no debe contarse como "fuera" por un redondeo de coma flotante.
+    const TOLERANCIA_M = 0.01;
+    const seSale =
+      rect.x < -TOLERANCIA_M ||
+      rect.y < -TOLERANCIA_M ||
+      rect.x + rect.width > ancho + TOLERANCIA_M ||
+      rect.y + rect.height > alto + TOLERANCIA_M;
+    if (seSale) fuera.push(mesa.nombre ?? "sin número");
+  }
+  return fuera;
+}
+
+// ---------------------------------------------------------------------------
+// PAREDES COMO OBSTÁCULO (para que la colocación automática no las atraviese)
+// ---------------------------------------------------------------------------
+
+/** Espesor de una pared en METROS. Mismo valor que `WALL_THICKNESS_METERS` de
+ *  `CanvasPlano.tsx` y que `ESPESOR_MURO_DEFAULT_M` de `planoDocV2.ts`: es el
+ *  grosor con el que se PINTA el muro, así que es el que hay que respetar para
+ *  que una mesa no se vea montada encima del trazo. */
+export const ESPESOR_PARED_M = 0.15;
+
+/**
+ * Pared como obstáculo de colocación, en METROS (no en píxeles como los
+ * `ElementoCanvas` del editor). Es un segmento con espesor, no una caja: la
+ * caja envolvente de una pared en diagonal taparía media sala.
+ */
+export interface ParedObstaculo {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** Espesor del muro en metros. Si falta, `ESPESOR_PARED_M`. */
+  espesor?: number;
+}
+
+/** Distancia de un punto al segmento `a`-`b`. */
+function distanciaPuntoSegmento(p: Punto, a: Punto, b: Punto): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const largo2 = dx * dx + dy * dy;
+  if (largo2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / largo2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Signo del producto vectorial (orientación de `c` respecto a la recta `a`-`b`). */
+function orientacion(a: Punto, b: Punto, c: Punto): number {
+  const v = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  if (Math.abs(v) < 1e-12) return 0;
+  return v > 0 ? 1 : -1;
+}
+
+function puntoEnSegmentoColineal(p: Punto, a: Punto, b: Punto): boolean {
+  return (
+    Math.min(a.x, b.x) - 1e-12 <= p.x &&
+    p.x <= Math.max(a.x, b.x) + 1e-12 &&
+    Math.min(a.y, b.y) - 1e-12 <= p.y &&
+    p.y <= Math.max(a.y, b.y) + 1e-12
+  );
+}
+
+/** ¿Se cortan los segmentos `a1`-`a2` y `b1`-`b2`? (incluye los casos colineales). */
+export function segmentosSeCortan(a1: Punto, a2: Punto, b1: Punto, b2: Punto): boolean {
+  const o1 = orientacion(a1, a2, b1);
+  const o2 = orientacion(a1, a2, b2);
+  const o3 = orientacion(b1, b2, a1);
+  const o4 = orientacion(b1, b2, a2);
+
+  if (o1 !== o2 && o3 !== o4) return true;
+  if (o1 === 0 && puntoEnSegmentoColineal(b1, a1, a2)) return true;
+  if (o2 === 0 && puntoEnSegmentoColineal(b2, a1, a2)) return true;
+  if (o3 === 0 && puntoEnSegmentoColineal(a1, b1, b2)) return true;
+  if (o4 === 0 && puntoEnSegmentoColineal(a2, b1, b2)) return true;
+  return false;
+}
+
+/** Distancia mínima entre dos segmentos (0 si se cortan). */
+export function distanciaSegmentoSegmento(
+  a1: Punto,
+  a2: Punto,
+  b1: Punto,
+  b2: Punto,
+): number {
+  if (segmentosSeCortan(a1, a2, b1, b2)) return 0;
+  return Math.min(
+    distanciaPuntoSegmento(a1, b1, b2),
+    distanciaPuntoSegmento(a2, b1, b2),
+    distanciaPuntoSegmento(b1, a1, a2),
+    distanciaPuntoSegmento(b2, a1, a2),
+  );
+}
+
+/**
+ * Distancia mínima entre el EJE de una pared (segmento sin espesor) y un
+ * rectángulo eje-alineado. 0 si la pared lo cruza o queda dentro.
+ */
+export function distanciaSegmentoRectangulo(
+  seg: { x1: number; y1: number; x2: number; y2: number },
+  rect: RectanguloOcupado,
+): number {
+  const a1: Punto = { x: seg.x1, y: seg.y1 };
+  const a2: Punto = { x: seg.x2, y: seg.y2 };
+  const dentro = (p: Punto) =>
+    p.x >= rect.x && p.x <= rect.x + rect.width && p.y >= rect.y && p.y <= rect.y + rect.height;
+  // Segmento entero dentro del rectángulo: no corta ningún lado, pero la
+  // distancia es 0 igualmente.
+  if (dentro(a1) || dentro(a2)) return 0;
+
+  const tl: Punto = { x: rect.x, y: rect.y };
+  const tr: Punto = { x: rect.x + rect.width, y: rect.y };
+  const br: Punto = { x: rect.x + rect.width, y: rect.y + rect.height };
+  const bl: Punto = { x: rect.x, y: rect.y + rect.height };
+
+  return Math.min(
+    distanciaSegmentoSegmento(a1, a2, tl, tr),
+    distanciaSegmentoSegmento(a1, a2, tr, br),
+    distanciaSegmentoSegmento(a1, a2, br, bl),
+    distanciaSegmentoSegmento(a1, a2, bl, tl),
+  );
+}
+
+/**
+ * ¿Una mesa (`rect`, en metros) pisa el trazo de una pared, o se le acerca a
+ * menos de `holgura` metros?
+ *
+ * CRITERIO (ver informe): la pared NO es su caja envolvente —eso taparía media
+ * sala en cuanto hubiera una diagonal— sino una "cápsula": el segmento con
+ * `espesor` metros de grosor repartidos a ambos lados de su eje, que es
+ * exactamente como se PINTA en el lienzo (`WALL_THICKNESS_METERS`). Hay choque
+ * si la distancia del eje al rectángulo es menor que `espesor / 2 + holgura`.
+ *
+ * `holgura` es deliberadamente PEQUEÑA (5cm por defecto): en una sala real las
+ * mesas van pegadas a la pared, así que exigir medio metro de aire dejaría la
+ * colocación automática sin sitios válidos en los locales estrechos.
+ */
+export function rectanguloChocaConPared(
+  rect: RectanguloOcupado,
+  pared: ParedObstaculo,
+  holgura = 0,
+): boolean {
+  if (!rect || !pared) return false;
+  const espesor = Number.isFinite(pared.espesor as number)
+    ? Math.max(0, pared.espesor as number)
+    : ESPESOR_PARED_M;
+  const distancia = distanciaSegmentoRectangulo(pared, rect);
+  return distancia < espesor / 2 + Math.max(0, holgura);
+}
+
+/**
+ * Convierte los `ElementoCanvas` del editor (formato V1, en PÍXELES) en
+ * paredes-obstáculo en METROS.
+ *
+ * Solo se traducen los elementos `wall`. Las `area` (zonas con nombre) NO son
+ * obstáculo a propósito: son justo los trozos de sala donde se QUIEREN las
+ * mesas. Las `door` tampoco: una puerta está dibujada ENCIMA de su muro, así
+ * que el propio muro ya reserva ese hueco.
+ */
+export function paredesDesdeElementos(
+  elementos: readonly { tipo?: string; props?: Record<string, any> }[] | null | undefined,
+  pixelsPerMeter: number = PIXELS_PER_METER,
+): ParedObstaculo[] {
+  const ppm = Number.isFinite(pixelsPerMeter) && pixelsPerMeter > 0 ? pixelsPerMeter : PIXELS_PER_METER;
+  const paredes: ParedObstaculo[] = [];
+  for (const elemento of elementos ?? []) {
+    if (!elemento || elemento.tipo !== "wall") continue;
+    const x1 = pxToM(elemento.props?.x1 ?? 0, ppm);
+    const y1 = pxToM(elemento.props?.y1 ?? 0, ppm);
+    const x2 = pxToM(elemento.props?.x2 ?? 0, ppm);
+    const y2 = pxToM(elemento.props?.y2 ?? 0, ppm);
+    if (![x1, y1, x2, y2].every((v) => Number.isFinite(v))) continue;
+    // Pared de longitud cero: no se ve ni se puede chocar con ella de forma
+    // significativa, y como obstáculo puntual solo serviría para bloquear
+    // huecos sin motivo visible.
+    if (x1 === x2 && y1 === y2) continue;
+    const espesorRaw = elemento.props?.espesor;
+    paredes.push({
+      x1,
+      y1,
+      x2,
+      y2,
+      espesor: Number.isFinite(espesorRaw) ? Math.max(0, espesorRaw as number) : ESPESOR_PARED_M,
+    });
+  }
+  return paredes;
+}
+
 export interface OpcionesRejillaMesas {
   /** Cuántas mesas hay que colocar. */
   cantidad: number;
@@ -548,14 +828,32 @@ export interface OpcionesRejillaMesas {
    * ya ha colocado (`rectanguloDeMesa`). Los huecos de la rejilla que caigan
    * encima se saltan, así un segundo lote no aterriza sobre el primero.
    *
-   * Es deliberadamente una lista de rectángulos y no "las mesas": así el día
-   * que el editor le pase también las paredes y áreas dibujadas (hoy
-   * `PanelLateral` no las recibe como prop) el alta en lote las esquivará sin
-   * tocar esta función.
+   * Es deliberadamente una lista de rectángulos y no "las mesas". Las paredes
+   * NO van aquí: un muro en diagonal tiene una caja envolvente enorme que
+   * taparía media sala, así que van aparte en `paredes` como segmentos con
+   * espesor.
    */
   ocupadas?: readonly RectanguloOcupado[];
   /** Aire mínimo, en metros, entre una mesa nueva y algo ya ocupado. */
   holgura?: number;
+  /**
+   * Paredes dibujadas en el plano, en METROS (`paredesDesdeElementos`). Los
+   * huecos de la rejilla que pisen el trazo de un muro se saltan: antes la
+   * rejilla solo miraba las otras mesas y plantaba mesas ATRAVESANDO las
+   * paredes (una mesa a caballo entre el comedor y la calle).
+   */
+  paredes?: readonly ParedObstaculo[];
+  /** Aire mínimo, en metros, entre una mesa nueva y el trazo de una pared.
+   *  Pequeño a propósito: en una sala real las mesas van pegadas al muro. */
+  holguraParedes?: number;
+  /**
+   * `true`: las mesas que no encuentren un hueco libre NO se colocan —
+   * `posiciones` devuelve menos de `cantidad` y `sinSitio` dice cuántas se han
+   * quedado fuera, para que el llamador lo cuente en su resumen en vez de
+   * apilarlas mal. `false` (por defecto): comportamiento de siempre, se apilan
+   * sobre la rejilla y solo se marca `desborda`.
+   */
+  omitirSinSitio?: boolean;
 }
 
 export interface RejillaMesas {
@@ -569,6 +867,10 @@ export interface RejillaMesas {
   desborda: boolean;
   /** `true` si se ha saltado algún hueco por estar ocupado por otra mesa. */
   esquivoOcupadas: boolean;
+  /** `true` si se ha saltado algún hueco por pisar el trazo de una pared. */
+  esquivoParedes: boolean;
+  /** Cuántas mesas se han quedado SIN colocar (siempre 0 salvo `omitirSinSitio`). */
+  sinSitio: number;
 }
 
 /**
@@ -583,13 +885,24 @@ export interface RejillaMesas {
  *
  * Con `ocupadas` (las mesas que ya están colocadas) la rejilla SALTA los huecos
  * pisados: antes, el segundo lote de una sala empezaba otra vez en (0,3 · 0,3)
- * y caía justo encima del primero. Sin `ocupadas` el resultado es exactamente
- * el de siempre, para no cambiarle el sitio a nadie.
+ * y caía justo encima del primero. Con `paredes` salta además los huecos que
+ * pisan el trazo de un muro (ver `rectanguloChocaConPared`): antes la rejilla
+ * esquivaba las otras mesas pero ATRAVESABA las paredes tan tranquila. Sin
+ * `ocupadas` ni `paredes` el resultado es exactamente el de siempre, para no
+ * cambiarle el sitio a nadie.
  */
 export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
   const cantidad = Math.max(0, Math.floor(opts.cantidad || 0));
   if (cantidad === 0) {
-    return { posiciones: [], columnas: 0, filas: 0, desborda: false, esquivoOcupadas: false };
+    return {
+      posiciones: [],
+      columnas: 0,
+      filas: 0,
+      desborda: false,
+      esquivoOcupadas: false,
+      esquivoParedes: false,
+      sinSitio: 0,
+    };
   }
 
   const anchoM = Math.max(0.1, (opts.anchoCm || 80) / 100);
@@ -644,37 +957,80 @@ export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
       r.height > 0,
   );
 
-  // Sin nada que esquivar: el comportamiento de toda la vida, hueco a hueco.
-  if (ocupadas.length === 0) {
+  const paredes = (opts.paredes ?? []).filter(
+    (p) =>
+      !!p &&
+      Number.isFinite(p.x1) &&
+      Number.isFinite(p.y1) &&
+      Number.isFinite(p.x2) &&
+      Number.isFinite(p.y2),
+  );
+
+  const omitirSinSitio = opts.omitirSinSitio === true;
+
+  // Sin nada que esquivar (y sin que importe la capacidad real del plano): el
+  // comportamiento de toda la vida, hueco a hueco.
+  if (ocupadas.length === 0 && paredes.length === 0 && !omitirSinSitio) {
     const posiciones: Punto[] = [];
     for (let i = 0; i < cantidad; i += 1) posiciones.push(hueco(i));
-    return { posiciones, columnas, filas, desborda: !disposicion.cabe, esquivoOcupadas: false };
+    return {
+      posiciones,
+      columnas,
+      filas,
+      desborda: !disposicion.cabe,
+      esquivoOcupadas: false,
+      esquivoParedes: false,
+      sinSitio: 0,
+    };
   }
 
-  // Con mesas ya colocadas hay que mirar MÁS huecos que mesas por colocar, así
-  // que se recorre la rejilla entera del plano (no solo las `filas` que
-  // ocuparían las mesas nuevas si estuviera vacío).
-  const filasDelPlano = Math.max(
-    filas,
-    Math.floor((utilAlto + separacion) / (altoM + separacion)),
-  );
-  const huecosDelPlano = Math.max(cantidad, columnas * filasDelPlano);
+  // Con mesas ya colocadas (o paredes que esquivar) hay que mirar MÁS huecos
+  // que mesas por colocar, así que se recorre la rejilla entera del plano (no
+  // solo las `filas` que ocuparían las mesas nuevas si estuviera vacío).
+  // Filas que de verdad CABEN en el plano (siempre >= 1, porque `utilAlto`
+  // nunca baja de `altoM`).
+  const filasQueCaben = Math.floor((utilAlto + separacion) / (altoM + separacion));
+  // Con `omitirSinSitio` la capacidad del plano es la que es. En el camino
+  // clásico se infla (hasta `filas`/`cantidad`) para poder seguir devolviendo
+  // una posición por mesa y apilar las que sobran sobre la rejilla; aquí eso
+  // haría que nunca se llegase a declarar "no cabe".
+  const filasDelPlano = omitirSinSitio ? filasQueCaben : Math.max(filas, filasQueCaben);
+  const huecosDelPlano = omitirSinSitio
+    ? columnas * filasDelPlano
+    : Math.max(cantidad, columnas * filasDelPlano);
   const holgura = Math.max(0, opts.holgura ?? 0.05);
+  const holguraParedes = Math.max(0, opts.holguraParedes ?? 0.05);
 
   const posiciones: Punto[] = [];
   let esquivoOcupadas = false;
+  let esquivoParedes = false;
   let desborda = !disposicion.cabe;
+  let sinSitio = 0;
   let indice = 0;
 
   while (posiciones.length < cantidad) {
-    const punto = hueco(indice);
     const esHuecoReal = indice < huecosDelPlano;
+
+    if (!esHuecoReal && omitirSinSitio) {
+      // Se ha recorrido la rejilla entera del plano y no queda ni un hueco
+      // libre: mejor NO colocar (y que el llamador lo diga en su resumen) que
+      // dejar mesas encima de otras o partidas por un muro.
+      sinSitio = cantidad - posiciones.length;
+      desborda = true;
+      break;
+    }
+
+    const punto = hueco(indice);
     indice += 1;
 
     if (esHuecoReal) {
       const rect: RectanguloOcupado = { x: punto.x, y: punto.y, width: anchoM, height: altoM };
       if (ocupadas.some((o) => rectangulosSolapan(rect, o, holgura))) {
         esquivoOcupadas = true;
+        continue;
+      }
+      if (paredes.some((p) => rectanguloChocaConPared(rect, p, holguraParedes))) {
+        esquivoParedes = true;
         continue;
       }
     } else {
@@ -686,5 +1042,5 @@ export function calcularRejillaMesas(opts: OpcionesRejillaMesas): RejillaMesas {
     posiciones.push(punto);
   }
 
-  return { posiciones, columnas, filas, desborda, esquivoOcupadas };
+  return { posiciones, columnas, filas, desborda, esquivoOcupadas, esquivoParedes, sinSitio };
 }

@@ -10,8 +10,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Plus, Square, Circle, Users, Trash2, ChevronDown, ChevronRight, Info, List, Unlink, Tag, X, Check, Hash, Rows3, Ruler } from "lucide-react";
 import { useActualizarMesa, useCrearMesa, useEliminarMesa } from "@/hooks/useMesas";
-import { MesaCanvas } from "./EditorPlanoEspacio";
-import { calcularRejillaMesas, esMesaNoPersistida, rectanguloDeMesa, type RectanguloOcupado } from "./planoUtils";
+import { ElementoCanvas, MesaCanvas } from "./EditorPlanoEspacio";
+import {
+  calcularRejillaMesas,
+  esMesaNoPersistida,
+  paredesDesdeElementos,
+  rectanguloDeMesa,
+  type ParedObstaculo,
+  type RectanguloOcupado,
+} from "./planoUtils";
 import {
   MAX_MESAS_POR_LOTE,
   mensajeChoquesLoteNombresMesa,
@@ -36,6 +43,7 @@ import {
   aplicarPresetAFilas,
   medidasMesaTexto,
   motivoFalloAltaMesa,
+  MOTIVO_SIN_SITIO,
   normalizarCapacidadMesa,
   normalizarLadoMesaCm,
   parsearListaNumerosMesa,
@@ -70,6 +78,13 @@ interface PanelLateralProps {
   pixelsPerMeter: number;
   /** Dimensiones del espacio en metros: las necesita el alta en lote para repartir las mesas sin apilarlas. */
   realDimensions?: { width: number; height: number };
+  /**
+   * Paredes/zonas/puertas dibujadas en el lienzo (formato V1, en PÍXELES).
+   * Las necesita la colocación automática para no plantar mesas ATRAVESANDO
+   * un muro; de ellas solo se miran las de tipo `wall` (ver
+   * `paredesDesdeElementos`).
+   */
+  elementos?: ElementoCanvas[];
   onMesasChange: (mesas: MesaCanvas[]) => void;
   onSelectionChange: (element: any) => void;
   onUnmergeMesa?: (mesaId: string) => void;
@@ -100,6 +115,7 @@ export function PanelLateral({
   mesasCanvas,
   pixelsPerMeter,
   realDimensions,
+  elementos,
   onMesasChange,
   onSelectionChange,
   onUnmergeMesa,
@@ -245,14 +261,21 @@ export function PanelLateral({
   const puedeCrearLote =
     !creandoLote && filasLote.length > 0 && !loteChoques.hayChoques && !hayFilasSinNumero;
 
-  /** Sitio que ya ocupan las mesas dibujadas, para no colocar las nuevas encima.
-   *  (Las paredes y áreas no llegan a este panel: ver `calcularRejillaMesas`.) */
+  /** Sitio que ya ocupan las mesas dibujadas, para no colocar las nuevas encima. */
   const rectangulosMesasCanvas = useMemo<RectanguloOcupado[]>(
     () =>
       mesasCanvas.map((m) =>
         rectanguloDeMesa({ posX: m.posX, posY: m.posY, ancho: m.ancho, alto: m.alto }),
       ),
     [mesasCanvas],
+  );
+
+  /** Paredes dibujadas, en METROS, para que la colocación automática no las
+   *  atraviese. Solo `wall`: las zonas (`area`) son justo donde SÍ se quieren
+   *  mesas, y una puerta ya está dibujada sobre su muro. */
+  const paredesDelPlano = useMemo<ParedObstaculo[]>(
+    () => paredesDesdeElementos(elementos, pixelsPerMeter),
+    [elementos, pixelsPerMeter],
   );
 
   // Sincronizar los campos de capacidad/tamaño con la mesa seleccionada.
@@ -440,15 +463,27 @@ export function PanelLateral({
         const ancho = normalizarLadoMesaCm(fila.anchoCm);
         const alto = fila.forma === "circular" ? ancho : normalizarLadoMesaCm(fila.altoCm);
 
+        // `omitirSinSitio`: si la rejilla no encuentra NI UN hueco libre (todo
+        // ocupado por otras mesas o pisado por una pared) se prefiere NO crear
+        // la mesa y decirlo en el resumen, antes que dejarla encima de otra o
+        // partida por un muro y que el dueño lo descubra mirando el plano.
         const rejilla = calcularRejillaMesas({
           cantidad: 1,
           anchoCm: ancho,
           altoCm: alto,
           espacio: realDimensions ?? { width: 12, height: 8 },
           ocupadas,
+          paredes: paredesDelPlano,
+          omitirSinSitio: true,
         });
-        const posicion = rejilla.posiciones[0] ?? { x: 0.3, y: 0.3 };
-        if (rejilla.desborda) avisoDesborde = true;
+        const posicion = rejilla.posiciones[0];
+        if (!posicion) {
+          resultados.push({ nombre, ok: false, motivo: MOTIVO_SIN_SITIO });
+          clavesFallidas.add(fila.clave);
+          avisoDesborde = true;
+          setProgresoLote(i + 1);
+          continue;
+        }
 
         try {
           const { data, error } = await supabase
@@ -522,7 +557,8 @@ export function PanelLateral({
 
     if (avisoDesborde) {
       toast.warning(
-        "No caben todas en el plano sin solaparse: recolócalas arrastrándolas o agranda el espacio.",
+        "Alguna mesa no cabía en el plano sin pisar una pared u otra mesa: hazle sitio moviendo " +
+          "las que ya hay, agranda el espacio, y vuelve a intentarlo con las que quedaron en la lista.",
       );
     }
   };
@@ -593,14 +629,22 @@ export function PanelLateral({
     // dueño había arrastrado mesas. Ahora se pide el PRIMER hueco libre de
     // verdad, pasando las mesas ya colocadas como ocupadas. La posición
     // definitiva la sigue poniendo él arrastrando.
-    const hueco =
-      calcularRejillaMesas({
-        cantidad: 1,
-        anchoCm: newMesa.ancho,
-        altoCm: altoMesa,
-        espacio: realDimensions ?? { width: 12, height: 8 },
-        ocupadas: rectangulosMesasCanvas,
-      }).posiciones[0] ?? { x: 1, y: 1 };
+    // Además de las otras mesas se esquivan las PAREDES: antes una mesa nueva
+    // podía nacer atravesando un muro y solo se veía mirando el plano.
+    const huecoLibre = calcularRejillaMesas({
+      cantidad: 1,
+      anchoCm: newMesa.ancho,
+      altoCm: altoMesa,
+      espacio: realDimensions ?? { width: 12, height: 8 },
+      ocupadas: rectangulosMesasCanvas,
+      paredes: paredesDelPlano,
+      omitirSinSitio: true,
+    }).posiciones[0];
+    // A diferencia del alta EN LOTE, aquí sí se crea la mesa aunque no haya
+    // hueco limpio: es un alta de una en una y pedida a propósito, así que
+    // negarse sería peor que colocarla en (1, 1) y avisar de que hay que
+    // arrastrarla. Lo que no se hace es colocarla mal EN SILENCIO.
+    const hueco = huecoLibre ?? { x: 1, y: 1 };
 
     try {
       const result = await crearMesa.mutateAsync({
@@ -632,6 +676,12 @@ export function PanelLateral({
         // paso de historial deshacible.
         marcarNoDeshacible?.();
         onMesasChange([...mesasCanvas, nuevaMesa]);
+        if (!huecoLibre) {
+          toast.warning(
+            `No quedaba ningún hueco libre: la mesa ${nuevaMesa.nombre} se ha colocado en (1 m, 1 m) ` +
+              "y puede estar encima de otra o de una pared. Arrástrala a su sitio.",
+          );
+        }
       }
 
       setNewMesa({

@@ -531,6 +531,16 @@ export interface ResultadoAltaMesa {
 
 export const MOTIVO_NUMERO_REPETIDO = "ya hay otra mesa con ese número en este espacio";
 export const MOTIVO_FALLO_GENERICO = "no se ha podido guardar";
+/**
+ * La colocación automática no ha encontrado NI UN hueco libre para esa mesa:
+ * la rejilla ya estaba llena de mesas o el hueco que quedaba pisaba una pared.
+ *
+ * Es un fallo "de sitio", no de base de datos: la mesa NO se llega a insertar.
+ * Antes de esto se colocaba igualmente en el primer hueco de la rejilla, que
+ * podía quedar encima de otra mesa o partido por un muro, y el dueño solo se
+ * enteraba al mirar el plano.
+ */
+export const MOTIVO_SIN_SITIO = "no cabe en el plano sin pisar una pared u otra mesa";
 
 /**
  * ¿Es el choque del índice único de nombres de mesa?

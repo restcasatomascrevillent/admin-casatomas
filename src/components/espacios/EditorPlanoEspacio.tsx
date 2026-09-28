@@ -14,11 +14,14 @@ import { usePlanoHistory, type PlanoSnapshot } from "./store/usePlanoHistory";
 import { decidirModoSnapshot } from "./store/historySnapshotMode";
 import {
   esMesaNoPersistida,
+  mesasFueraDelPlano,
+  normalizarDimensionesEspacio,
   planRepuntarAsignaciones,
   detectarPoligonoCerrado,
   areaShoelace,
   bboxPoligono,
   PIXELS_PER_METER,
+  type DimensionesEspacio,
 } from "./planoUtils";
 import {
   aplicarRenombradosADesagrupes,
@@ -131,7 +134,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   // Centralizada en planoUtils.ts (antes era una constante local aquí).
 
   // Escala: dimensiones reales en metros
-  const [realDimensions, setRealDimensions] = useState({ width: 12, height: 8 });
+  const [realDimensions, setRealDimensions] = useState<DimensionesEspacio>({ width: 12, height: 8 });
 
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
   const { data: mesas = [], isLoading: loadingMesas, refetch: refetchMesas } = useMesas(espacioId);
@@ -154,11 +157,18 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const elementosRef = useRef(elementos);
   const mesasCanvasRef = useRef(mesasCanvas);
   const pendingUnmergesRef = useRef(pendingUnmerges);
+  const realDimensionsRef = useRef(realDimensions);
   useEffect(() => { elementosRef.current = elementos; }, [elementos]);
   useEffect(() => { mesasCanvasRef.current = mesasCanvas; }, [mesasCanvas]);
   useEffect(() => { pendingUnmergesRef.current = pendingUnmerges; }, [pendingUnmerges]);
+  useEffect(() => { realDimensionsRef.current = realDimensions; }, [realDimensions]);
 
-  const history = usePlanoHistory({ elementos: [], mesasCanvas: [], pendingUnmerges: [] });
+  const history = usePlanoHistory({
+    elementos: [],
+    mesasCanvas: [],
+    pendingUnmerges: [],
+    realDimensions: { width: 12, height: 8 },
+  });
 
   // true mientras se hidrata el estado inicial desde BBDD: ningún cambio
   // durante esta ventana debe registrarse en el historial. En cuanto se
@@ -218,6 +228,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         elementos: elementosRef.current,
         mesasCanvas: mesasCanvasRef.current,
         pendingUnmerges: pendingUnmergesRef.current,
+        realDimensions: realDimensionsRef.current,
       };
       history.reset(snapshot);
       lastAppliedPresentRef.current = snapshot;
@@ -244,7 +255,19 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       return;
     }
 
-    const snapshot: PlanoSnapshot = { elementos, mesasCanvas, pendingUnmerges };
+    // `realDimensions` viaja en el snapshot pero NO está en las dependencias
+    // del efecto a propósito: dibujar una sala cambia dimensiones Y elementos
+    // en el mismo manejador (React los agrupa en un render), así que el
+    // snapshot ya recoge las nuevas medidas. Ponerlo en las dependencias, en
+    // cambio, haría que cada refetch de `planos_espacio` —que reconstruye el
+    // objeto `{width, height}` aunque los números sean los mismos— colase un
+    // paso de deshacer fantasma.
+    const snapshot: PlanoSnapshot = {
+      elementos,
+      mesasCanvas,
+      pendingUnmerges,
+      realDimensions: realDimensionsRef.current,
+    };
 
     if (modo === "reset") {
       history.reset(snapshot);
@@ -271,6 +294,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
       elementos: elementosRef.current,
       mesasCanvas: mesasCanvasRef.current,
       pendingUnmerges: pendingUnmergesRef.current,
+      realDimensions: realDimensionsRef.current,
     };
     history.reset(snapshot);
     lastAppliedPresentRef.current = snapshot;
@@ -291,10 +315,15 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     const snapshotMesas = (history.present.mesasCanvas as MesaCanvas[]) ?? [];
     const snapshotPendingUnmerges =
       (history.present.pendingUnmerges as typeof pendingUnmerges) ?? [];
+    const snapshotDimensiones = history.present.realDimensions as DimensionesEspacio | undefined;
 
     setElementos(snapshotElementos);
     setMesasCanvas(snapshotMesas);
     setPendingUnmerges(snapshotPendingUnmerges);
+    // Deshacer un "dibujar sala" tiene que devolver TAMBIÉN el ancho/alto del
+    // espacio: si no, las 4 paredes desaparecen y el lienzo se queda con el
+    // tamaño nuevo, sin nada que lo explique.
+    if (snapshotDimensiones) setRealDimensions(snapshotDimensiones);
     setSelectedElement(null);
     canvasRef.current?.reloadFromSnapshot({ elementos: snapshotElementos, mesasCanvas: snapshotMesas });
   }, [history.present]);
@@ -485,11 +514,58 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     setZoomLevel(fitZoom);
   }, [fitZoom]);
 
-  // Aplicar nuevas dimensiones reales
-  const handleApplyDimensions = useCallback((width: number, height: number) => {
-    setRealDimensions({ width, height });
-    toast.success(`Escala aplicada: ${width}m × ${height}m`);
-  }, []);
+  // Aplicar nuevas dimensiones reales.
+  //
+  // ÚNICO camino para cambiar el ancho/alto del espacio. No persiste por su
+  // cuenta a propósito: `realDimensions` es lo que `handleSave` escribe en
+  // `planos_espacio` (`ancho_metros`/`alto_metros`/`metros_cuadrados` y la
+  // copia dentro de `configuracion`), así que tocar este estado ya mete el
+  // cambio en el flujo de guardado normal — con su paso `guardar-plano` del
+  // plan de `guardadoPlano.ts` — y el dueño sigue viendo "Guardar" pendiente.
+  const handleApplyDimensions = useCallback(
+    (width: number, height: number, origen: "manual" | "sala" = "manual") => {
+      const normalizadas = normalizarDimensionesEspacio(width, height);
+      if (!normalizadas.ok) {
+        toast.error(`No se han podido aplicar las medidas: ${normalizadas.motivo}.`);
+        return false;
+      }
+      const { width: ancho, height: alto } = normalizadas.dimensiones;
+      setRealDimensions({ width: ancho, height: alto });
+
+      // Las mesas NO se mueven solas: redibujar una sala más pequeña puede
+      // dejar mesas fuera del rectángulo nuevo, y recolocarlas por su cuenta
+      // le cambiaría el plano al dueño sin pedirlo. Se avisa y se recolocan
+      // a mano.
+      const fuera = mesasFueraDelPlano(mesasCanvasRef.current, { width: ancho, height: alto });
+      if (fuera.length > 0) {
+        const listado = fuera.slice(0, 8).join(", ");
+        const resto = fuera.length > 8 ? ` y ${fuera.length - 8} más` : "";
+        toast.warning(
+          `${fuera.length === 1 ? "La mesa" : "Las mesas"} ${listado}${resto} ` +
+            `${fuera.length === 1 ? "se queda" : "se quedan"} fuera del espacio de ${ancho}m × ${alto}m. ` +
+            "Arrástra" + (fuera.length === 1 ? "la" : "las") + " dentro antes de guardar.",
+          { duration: 10000 },
+        );
+      }
+
+      if (origen === "manual") {
+        toast.success(`Escala aplicada: ${ancho}m × ${alto}m`);
+      }
+      return true;
+    },
+    [],
+  );
+
+  // La herramienta "Sala rectangular" dibuja 4 paredes Y fija las medidas del
+  // espacio. Antes solo hacía lo primero (`onRoomDrawn` estaba declarado en
+  // CanvasPlano pero nadie se lo pasaba), así que el plano seguía midiendo lo
+  // que midiera antes por mucho que dibujaras una sala de 9 × 5.
+  const handleRoomDrawn = useCallback(
+    (anchoMetros: number, altoMetros: number) => {
+      handleApplyDimensions(anchoMetros, altoMetros, "sala");
+    },
+    [handleApplyDimensions],
+  );
 
   // Área real del local: si las paredes dibujadas forman un polígono cerrado
   // (sus extremos coinciden dentro de una tolerancia de ~5px), se calcula el
@@ -1191,6 +1267,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             onSelectionChange={setSelectedElement}
             onToolChange={setActiveTool}
             onZoomChange={setZoomLevel}
+            onRoomDrawn={handleRoomDrawn}
             onMesaCreada={(mesaId, nombre) => {
               setMesaRecienCreadaId(mesaId);
               toast.info(`Mesa ${nombre} (primer número libre). Escribe el número real de la sala.`);
@@ -1210,6 +1287,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
           mesasCanvas={mesasCanvas}
           pixelsPerMeter={PIXELS_PER_METER}
           realDimensions={realDimensions}
+          elementos={elementos}
           onMesasChange={setMesasCanvas}
           onSelectionChange={setSelectedElement}
           marcarNoDeshacible={marcarNoDeshacible}

@@ -27,6 +27,14 @@ export interface PlanoSnapshot {
    * si el consumidor no la usa, undo/redo simplemente no la toca.
    */
   pendingUnmerges?: unknown[];
+  /**
+   * Dimensiones reales del espacio en metros (`EditorPlanoEspacio.realDimensions`).
+   * Están en el snapshot porque la herramienta "Sala rectangular" las cambia a
+   * la vez que dibuja las 4 paredes: deshacer solo las paredes dejaría el
+   * lienzo con el tamaño nuevo y sin nada que lo justifique. Opcional, igual
+   * que `pendingUnmerges`: si el consumidor no la usa, undo/redo no la toca.
+   */
+  realDimensions?: unknown;
 }
 
 export interface UsePlanoHistoryResult {

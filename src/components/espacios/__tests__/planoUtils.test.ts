@@ -19,7 +19,19 @@ import {
   calcularRejillaMesas,
   rectanguloDeMesa,
   rectangulosSolapan,
+  normalizarDimensionesEspacio,
+  mesasFueraDelPlano,
+  paredesDesdeElementos,
+  rectanguloChocaConPared,
+  distanciaSegmentoRectangulo,
+  distanciaSegmentoSegmento,
+  segmentosSeCortan,
+  ESPESOR_PARED_M,
+  MAX_LADO_ESPACIO_M,
+  MIN_LADO_ESPACIO_M,
+  PIXELS_PER_METER,
   type Matrix2D,
+  type ParedObstaculo,
   type RectanguloOcupado,
 } from "../planoUtils";
 
@@ -590,5 +602,358 @@ describe("calcularRejillaMesas con mesas ya colocadas", () => {
     });
     expect(conBasura.posiciones).toEqual(sinBasura.posiciones);
     expect(conBasura.esquivoOcupadas).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dimensiones del espacio (las que fija la herramienta "Sala rectangular")
+// ---------------------------------------------------------------------------
+
+describe("normalizarDimensionesEspacio", () => {
+  it("acepta medidas normales y las redondea a centímetros", () => {
+    const r = normalizarDimensionesEspacio(9.004, 5.126);
+    expect(r.ok).toBe(true);
+    expect(r.dimensiones).toEqual({ width: 9, height: 5.13 });
+  });
+
+  it("rechaza 0 y negativos (un clic suelto, un arrastre invertido)", () => {
+    expect(normalizarDimensionesEspacio(0, 5).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(5, 0).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(-9, 5).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(0, 0).motivo).toMatch(/0 m/);
+  });
+
+  it("rechaza NaN e Infinity (pixelsPerMeter a 0 al dividir)", () => {
+    expect(normalizarDimensionesEspacio(Number.NaN, 5).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(5, Number.POSITIVE_INFINITY).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(Number.NaN, 5).motivo).toMatch(/número válido/);
+  });
+
+  it("rechaza salas absurdamente pequeñas o gigantes", () => {
+    expect(normalizarDimensionesEspacio(MIN_LADO_ESPACIO_M - 0.01, 5).ok).toBe(false);
+    expect(normalizarDimensionesEspacio(5, MAX_LADO_ESPACIO_M + 1).ok).toBe(false);
+    // Los propios límites sí valen.
+    expect(normalizarDimensionesEspacio(MIN_LADO_ESPACIO_M, MIN_LADO_ESPACIO_M).ok).toBe(true);
+    expect(normalizarDimensionesEspacio(MAX_LADO_ESPACIO_M, MAX_LADO_ESPACIO_M).ok).toBe(true);
+  });
+});
+
+describe("mesasFueraDelPlano", () => {
+  const espacio = { width: 10, height: 6 };
+
+  it("no se queja de las mesas que caben enteras", () => {
+    expect(
+      mesasFueraDelPlano(
+        [
+          { nombre: "1", posX: 0, posY: 0, ancho: 80, alto: 80 },
+          { nombre: "2", posX: 5, posY: 3, ancho: 100, alto: 100 },
+        ],
+        espacio,
+      ),
+    ).toEqual([]);
+  });
+
+  it("una mesa pegada JUSTO al borde no cuenta como fuera", () => {
+    expect(
+      mesasFueraDelPlano([{ nombre: "9", posX: 9, posY: 5, ancho: 100, alto: 100 }], espacio),
+    ).toEqual([]);
+  });
+
+  it("señala las que se salen por la derecha, por abajo o en negativo", () => {
+    const fuera = mesasFueraDelPlano(
+      [
+        { nombre: "derecha", posX: 9.5, posY: 1, ancho: 100, alto: 100 },
+        { nombre: "abajo", posX: 1, posY: 5.5, ancho: 100, alto: 100 },
+        { nombre: "negativa", posX: -0.5, posY: 1, ancho: 100, alto: 100 },
+        { nombre: "dentro", posX: 2, posY: 2, ancho: 100, alto: 100 },
+      ],
+      espacio,
+    );
+    expect(fuera).toEqual(["derecha", "abajo", "negativa"]);
+  });
+
+  it("es justo lo que pasa al redibujar una sala más pequeña", () => {
+    const mesas = [
+      { nombre: "1", posX: 1, posY: 1, ancho: 80, alto: 80 },
+      { nombre: "20", posX: 10, posY: 6, ancho: 80, alto: 80 },
+    ];
+    expect(mesasFueraDelPlano(mesas, { width: 12, height: 8 })).toEqual([]);
+    expect(mesasFueraDelPlano(mesas, { width: 6, height: 4 })).toEqual(["20"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Paredes como obstáculo
+// ---------------------------------------------------------------------------
+
+describe("segmentosSeCortan / distanciaSegmentoSegmento", () => {
+  const P = (x: number, y: number) => ({ x, y });
+
+  it("detecta el cruce en X", () => {
+    expect(segmentosSeCortan(P(0, 0), P(2, 2), P(0, 2), P(2, 0))).toBe(true);
+  });
+
+  it("dos paralelas separadas no se cortan y su distancia es la separación", () => {
+    expect(segmentosSeCortan(P(0, 0), P(2, 0), P(0, 1), P(2, 1))).toBe(false);
+    expect(distanciaSegmentoSegmento(P(0, 0), P(2, 0), P(0, 1), P(2, 1))).toBeCloseTo(1, 6);
+  });
+
+  it("segmentos colineales solapados cuentan como cortados", () => {
+    expect(segmentosSeCortan(P(0, 0), P(2, 0), P(1, 0), P(3, 0))).toBe(true);
+  });
+
+  it("dos segmentos en L que no se tocan miden por sus extremos", () => {
+    expect(distanciaSegmentoSegmento(P(0, 0), P(1, 0), P(2, 0), P(2, 3))).toBeCloseTo(1, 6);
+  });
+});
+
+describe("distanciaSegmentoRectangulo", () => {
+  const rect: RectanguloOcupado = { x: 1, y: 1, width: 1, height: 1 };
+
+  it("es 0 si la pared atraviesa el rectángulo", () => {
+    expect(distanciaSegmentoRectangulo({ x1: 0, y1: 1.5, x2: 3, y2: 1.5 }, rect)).toBe(0);
+  });
+
+  it("es 0 si la pared queda entera dentro del rectángulo", () => {
+    expect(distanciaSegmentoRectangulo({ x1: 1.2, y1: 1.2, x2: 1.8, y2: 1.8 }, rect)).toBe(0);
+  });
+
+  it("mide la separación cuando la pared pasa de largo", () => {
+    expect(distanciaSegmentoRectangulo({ x1: 0, y1: 3, x2: 5, y2: 3 }, rect)).toBeCloseTo(1, 6);
+  });
+
+  it("una diagonal NO bloquea todo su rectángulo envolvente", () => {
+    // La diagonal (0,0)-(4,4) pasa lejos de una mesa arriba a la derecha,
+    // aunque la caja envolvente de la diagonal la contiene de sobra.
+    const arribaDerecha: RectanguloOcupado = { x: 3, y: 0.2, width: 0.8, height: 0.8 };
+    expect(
+      distanciaSegmentoRectangulo({ x1: 0, y1: 0, x2: 4, y2: 4 }, arribaDerecha),
+    ).toBeGreaterThan(1);
+  });
+});
+
+describe("rectanguloChocaConPared", () => {
+  // Mesa de 1x1 con su esquina en (2, 2): ocupa de x=2 a x=3.
+  const mesa: RectanguloOcupado = { x: 2, y: 2, width: 1, height: 1 };
+
+  it("choca si la pared la atraviesa", () => {
+    expect(rectanguloChocaConPared(mesa, { x1: 0, y1: 2.5, x2: 10, y2: 2.5 })).toBe(true);
+  });
+
+  it("choca si solo la roza el trazo (medio espesor a cada lado del eje)", () => {
+    // Eje a 7cm de la mesa: con espesor 15cm el trazo llega a 7,5cm -> pisa.
+    expect(rectanguloChocaConPared(mesa, { x1: 0, y1: 1.93, x2: 10, y2: 1.93 }, 0)).toBe(true);
+    // Eje a 8cm: el trazo se queda a 0,5cm -> sin holgura NO pisa.
+    expect(rectanguloChocaConPared(mesa, { x1: 0, y1: 1.92, x2: 10, y2: 1.92 }, 0)).toBe(false);
+  });
+
+  it("la holgura añade aire por encima del espesor", () => {
+    const pared: ParedObstaculo = { x1: 0, y1: 1.8, x2: 10, y2: 1.8 };
+    // Eje a 20cm: trazo a 12,5cm de la mesa. Sin holgura no choca.
+    expect(rectanguloChocaConPared(mesa, pared, 0)).toBe(false);
+    // Con 15cm de aire obligatorio sí.
+    expect(rectanguloChocaConPared(mesa, pared, 0.15)).toBe(true);
+  });
+
+  it("una mesa PEGADA a la pared sigue valiendo con una holgura pequeña", () => {
+    // Pared vertical en x = 1,9; la mesa empieza en x = 2 (10cm de aire real,
+    // 2,5cm libres tras el trazo). Es la colocación normal de un comedor.
+    expect(rectanguloChocaConPared(mesa, { x1: 1.9, y1: 0, x2: 1.9, y2: 10 }, 0.02)).toBe(false);
+  });
+
+  it("respeta un espesor propio del muro si lo trae", () => {
+    const pared: ParedObstaculo = { x1: 0, y1: 1.5, x2: 10, y2: 1.5, espesor: 1.2 };
+    // Eje a 50cm de la mesa, pero con 1,2m de espesor el trazo llega a 60cm.
+    expect(rectanguloChocaConPared(mesa, pared, 0)).toBe(true);
+    expect(rectanguloChocaConPared(mesa, { ...pared, espesor: ESPESOR_PARED_M }, 0)).toBe(false);
+  });
+});
+
+describe("paredesDesdeElementos", () => {
+  it("pasa de píxeles a metros y se queda solo con los muros", () => {
+    const paredes = paredesDesdeElementos(
+      [
+        { tipo: "wall", props: { x1: 0, y1: 0, x2: 500, y2: 0 } },
+        { tipo: "area", props: { left: 0, top: 0, width: 100, height: 100 } },
+        { tipo: "door", props: { left: 10, top: 0, width: 40, height: 6, angle: 0 } },
+      ],
+      PIXELS_PER_METER,
+    );
+    expect(paredes).toHaveLength(1);
+    expect(paredes[0]).toEqual({ x1: 0, y1: 0, x2: 10, y2: 0, espesor: ESPESOR_PARED_M });
+  });
+
+  it("descarta muros de longitud cero y coordenadas basura", () => {
+    expect(
+      paredesDesdeElementos([
+        { tipo: "wall", props: { x1: 50, y1: 50, x2: 50, y2: 50 } },
+        { tipo: "wall", props: { x1: Number.NaN, y1: 0, x2: 100, y2: 0 } },
+        null as unknown as { tipo: string },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("no revienta sin elementos", () => {
+    expect(paredesDesdeElementos(undefined)).toEqual([]);
+    expect(paredesDesdeElementos(null)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La rejilla del alta en lote ya no atraviesa las paredes
+// ---------------------------------------------------------------------------
+
+describe("calcularRejillaMesas esquivando paredes", () => {
+  const espacio = { width: 12, height: 8 };
+  const opcionesBase = { anchoCm: 100, altoCm: 100, espacio, separacion: 0.5, margen: 0.5 };
+
+  /** Tabique horizontal a lo ancho de la sala, a 1,2m del borde de arriba:
+   *  parte justo la primera fila de la rejilla (que empieza en y = 0,5). */
+  const tabique: ParedObstaculo = { x1: 0, y1: 1.2, x2: 12, y2: 1.2 };
+
+  it("REGRESIÓN: sin paredes la rejilla planta la mesa encima del tabique", () => {
+    const r = calcularRejillaMesas({ ...opcionesBase, cantidad: 1 });
+    expect(r.posiciones[0]).toEqual({ x: 0.5, y: 0.5 });
+    // Ese hueco (0,5 - 0,5) ocupa de y=0,5 a y=1,5: el tabique lo parte.
+    expect(rectanguloChocaConPared({ x: 0.5, y: 0.5, width: 1, height: 1 }, tabique)).toBe(true);
+    expect(r.esquivoParedes).toBe(false);
+  });
+
+  it("con paredes salta esos huecos y baja a la fila siguiente", () => {
+    const r = calcularRejillaMesas({ ...opcionesBase, cantidad: 1, paredes: [tabique] });
+    expect(r.esquivoParedes).toBe(true);
+    expect(r.posiciones[0].y).toBeGreaterThan(1.2);
+  });
+
+  it("NINGUNA mesa del lote acaba pisando una pared", () => {
+    const paredes: ParedObstaculo[] = [
+      tabique,
+      // Tabique vertical que parte la sala por la mitad.
+      { x1: 6.1, y1: 0, x2: 6.1, y2: 8 },
+    ];
+    const r = calcularRejillaMesas({ ...opcionesBase, cantidad: 8, paredes });
+    expect(r.posiciones).toHaveLength(8);
+    expect(r.esquivoParedes).toBe(true);
+    r.posiciones.forEach((p) => {
+      paredes.forEach((pared) => {
+        expect(
+          rectanguloChocaConPared({ x: p.x, y: p.y, width: 1, height: 1 }, pared, 0.05),
+        ).toBe(false);
+      });
+    });
+  });
+
+  it("esquiva paredes Y mesas a la vez", () => {
+    const ocupadas: RectanguloOcupado[] = [{ x: 0.5, y: 2, width: 1, height: 1 }];
+    const r = calcularRejillaMesas({
+      ...opcionesBase,
+      cantidad: 1,
+      ocupadas,
+      paredes: [tabique],
+    });
+    expect(r.esquivoParedes).toBe(true);
+    expect(r.esquivoOcupadas).toBe(true);
+    expect(r.posiciones[0]).not.toEqual({ x: 0.5, y: 2 });
+    expect(
+      rectanguloChocaConPared({ ...r.posiciones[0], width: 1, height: 1 }, tabique),
+    ).toBe(false);
+  });
+
+  it("una pared en diagonal no bloquea la sala entera", () => {
+    const diagonal: ParedObstaculo = { x1: 0, y1: 0, x2: 12, y2: 8 };
+    const r = calcularRejillaMesas({ ...opcionesBase, cantidad: 6, paredes: [diagonal] });
+    // Si se usara la caja envolvente de la diagonal no cabría ni una.
+    expect(r.posiciones).toHaveLength(6);
+    r.posiciones.forEach((p) => {
+      expect(
+        rectanguloChocaConPared({ x: p.x, y: p.y, width: 1, height: 1 }, diagonal, 0.05),
+      ).toBe(false);
+    });
+  });
+
+  it("sin paredes el resultado es EXACTAMENTE el de siempre", () => {
+    const sin = calcularRejillaMesas({ ...opcionesBase, cantidad: 5 });
+    const conVacias = calcularRejillaMesas({ ...opcionesBase, cantidad: 5, paredes: [] });
+    expect(conVacias.posiciones).toEqual(sin.posiciones);
+    expect(sin.esquivoParedes).toBe(false);
+    expect(sin.sinSitio).toBe(0);
+  });
+
+  it("ignora paredes con coordenadas basura en vez de descolocarlo todo", () => {
+    const sinBasura = calcularRejillaMesas({ ...opcionesBase, cantidad: 2 });
+    const conBasura = calcularRejillaMesas({
+      ...opcionesBase,
+      cantidad: 2,
+      paredes: [
+        { x1: Number.NaN, y1: 0, x2: 1, y2: 0 },
+        { x1: 0, y1: 0, x2: Number.POSITIVE_INFINITY, y2: 0 },
+        null as unknown as ParedObstaculo,
+      ],
+    });
+    expect(conBasura.posiciones).toEqual(sinBasura.posiciones);
+    expect(conBasura.esquivoParedes).toBe(false);
+  });
+});
+
+describe("calcularRejillaMesas con omitirSinSitio", () => {
+  const espacio = { width: 4, height: 4 };
+
+  it("prefiere NO colocar antes que apilar mal, y dice cuántas se quedan fuera", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 3,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio,
+      margen: 0.2,
+      // Tapa el plano entero: no queda un solo hueco libre.
+      ocupadas: [{ x: 0, y: 0, width: 5, height: 5 }],
+      omitirSinSitio: true,
+    });
+    expect(r.posiciones).toEqual([]);
+    expect(r.sinSitio).toBe(3);
+    expect(r.desborda).toBe(true);
+  });
+
+  it("una pared gorda que cruza todo el plano también deja el lote sin sitio", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 2,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio: { width: 1.4, height: 4 },
+      margen: 0.2,
+      paredes: [{ x1: 0.7, y1: 0, x2: 0.7, y2: 4, espesor: 4 }],
+      omitirSinSitio: true,
+    });
+    expect(r.posiciones).toEqual([]);
+    expect(r.sinSitio).toBe(2);
+  });
+
+  it("coloca las que sí caben y solo omite el resto", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 5,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio: { width: 3.4, height: 1.4 },
+      margen: 0.2,
+      separacion: 0,
+      omitirSinSitio: true,
+    });
+    expect(r.posiciones.length).toBeGreaterThan(0);
+    expect(r.posiciones.length).toBeLessThan(5);
+    expect(r.sinSitio).toBe(5 - r.posiciones.length);
+  });
+
+  it("sin la bandera se mantiene el comportamiento de siempre (apila y avisa)", () => {
+    const r = calcularRejillaMesas({
+      cantidad: 3,
+      anchoCm: 100,
+      altoCm: 100,
+      espacio,
+      margen: 0.2,
+      ocupadas: [{ x: 0, y: 0, width: 5, height: 5 }],
+    });
+    expect(r.posiciones).toHaveLength(3);
+    expect(r.sinSitio).toBe(0);
+    expect(r.desborda).toBe(true);
   });
 });

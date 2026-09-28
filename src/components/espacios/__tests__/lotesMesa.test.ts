@@ -7,6 +7,7 @@ import {
   MIN_LADO_MESA_CM,
   MOTIVO_FALLO_GENERICO,
   MOTIVO_NUMERO_REPETIDO,
+  MOTIVO_SIN_SITIO,
   PRESETS_MESA,
   PRESET_MESA_POR_DEFECTO,
   actualizarFilaLote,
@@ -609,5 +610,52 @@ describe("resumenAltaLoteMesas", () => {
   it("aguanta null y filas nulas dentro de los resultados", () => {
     const r = resumenAltaLoteMesas([null as never, { nombre: "1", ok: true }]);
     expect(r.creadas).toEqual(["1"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "No cabía en el plano": el alta en lote lo cuenta como fallo en vez de
+// colocar la mesa encima de otra o partida por una pared.
+// ---------------------------------------------------------------------------
+
+describe("resumenAltaLoteMesas con mesas que no caben", () => {
+  it("agrupa las que se quedaron sin sitio con su propio motivo", () => {
+    const r = resumenAltaLoteMesas([
+      { nombre: "1", ok: true },
+      { nombre: "2", ok: true },
+      { nombre: "3", ok: false, motivo: MOTIVO_SIN_SITIO },
+      { nombre: "4", ok: false, motivo: MOTIVO_SIN_SITIO },
+    ]);
+    expect(r.hayFallos).toBe(true);
+    expect(r.creadas).toEqual(["1", "2"]);
+    expect(r.fallidas).toEqual([
+      { nombre: "3", motivo: MOTIVO_SIN_SITIO },
+      { nombre: "4", motivo: MOTIVO_SIN_SITIO },
+    ]);
+    expect(r.mensaje).toContain(`${MOTIVO_SIN_SITIO}: 3, 4`);
+  });
+
+  it("distingue 'no cabe' de 'número repetido' en el mismo lote", () => {
+    const r = resumenAltaLoteMesas([
+      { nombre: "5", ok: false, motivo: MOTIVO_SIN_SITIO },
+      { nombre: "6", ok: false, motivo: MOTIVO_NUMERO_REPETIDO },
+    ]);
+    expect(r.mensaje).toContain(`${MOTIVO_SIN_SITIO}: 5`);
+    expect(r.mensaje).toContain(`${MOTIVO_NUMERO_REPETIDO}: 6`);
+  });
+
+  it("si no cabe ninguna lo dice sin fingir que se creó algo", () => {
+    const r = resumenAltaLoteMesas([
+      { nombre: "1", ok: false, motivo: MOTIVO_SIN_SITIO },
+      { nombre: "2", ok: false, motivo: MOTIVO_SIN_SITIO },
+    ]);
+    expect(r.creadas).toEqual([]);
+    expect(r.mensaje).toContain("No se ha podido crear ninguna mesa");
+    expect(r.mensaje).toContain(MOTIVO_SIN_SITIO);
+  });
+
+  it("el motivo se lee dentro de la frase, en minúsculas", () => {
+    expect(MOTIVO_SIN_SITIO).toBe(MOTIVO_SIN_SITIO.toLowerCase());
+    expect(MOTIVO_SIN_SITIO).not.toBe(MOTIVO_FALLO_GENERICO);
   });
 });
