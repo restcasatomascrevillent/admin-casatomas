@@ -113,7 +113,11 @@ describe("datos del correo", () => {
     const d = datosCorreoPropuestaSolicitud(base(), null, { aceptar: "a", rechazar: "r" });
     expect(d.horaSolicitada).toBe("14:30");
   });
-  it("renderiza con la plantilla 'propuesta' e incluye los dos botones y la sala", () => {
+  // La sala ya NO sale en el correo (decisión del dueño 2026-09-28, punto 7
+  // del contrato en plantillas.ts): `datosCorreoPropuestaSolicitud` la sigue
+  // rellenando —el panel y la huella del token la usan— pero el render la
+  // ignora. Lo que se comprueba aquí es justo eso: los botones sí, la sala no.
+  it("renderiza con la plantilla 'propuesta' e incluye los dos botones, pero NO la sala", () => {
     const plantilla: FilaPlantilla = {
       tipo: "propuesta",
       version: 1,
@@ -137,7 +141,8 @@ describe("datos del correo", () => {
     );
     expect(html).toContain("https://x/propuesta/aceptar?token=a");
     expect(html).toContain("https://x/propuesta/rechazar?token=r");
-    expect(html).toContain("Salón");
+    expect(html).not.toContain("Salón");
+    expect(html).not.toContain("Espacio");
     expect(html).not.toContain("<b>Ana</b>");
   });
 });

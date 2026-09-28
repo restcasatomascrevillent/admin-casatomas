@@ -16,6 +16,9 @@ import {
   formatearFecha,
   formatearHora,
   sustituirTexto,
+  construirTokens,
+  debeEnviarSolicitudRecibida,
+  CANALES_SIN_SOLICITUD_RECIBIDA,
   type FilaPlantilla,
   type DatosReservaParaCorreo,
 } from "../plantillas.ts";
@@ -80,7 +83,7 @@ describe("sustituirTexto", () => {
 });
 
 describe("hayContraoferta", () => {
-  it("es falso cuando hora y espacio ofrecidos coinciden con lo solicitado", () => {
+  it("es falso cuando la hora ofrecida coincide con la solicitada", () => {
     expect(hayContraoferta(datosBase())).toBe(false);
   });
 
@@ -88,8 +91,16 @@ describe("hayContraoferta", () => {
     expect(hayContraoferta(datosBase({ hora: "20:30", horaSolicitada: "21:00" }))).toBe(true);
   });
 
-  it("es verdadero si el espacio ofrecido difiere del solicitado", () => {
-    expect(hayContraoferta(datosBase({ espacio: "Salón", espacioSolicitado: "Terraza" }))).toBe(true);
+  // Cambiado el 2026-09-28 (antes esto daba true): el correo del cliente ya
+  // no nombra la sala, así que un cambio SOLO de sala pintaría el bloque
+  // "Pediste: 21:00 / Te ofrecemos: 21:00", dos veces lo mismo. Ver punto 7
+  // del contrato en plantillas.ts.
+  it("es FALSO si solo cambia el espacio: la sala no se le dice al cliente", () => {
+    expect(hayContraoferta(datosBase({ espacio: "Salón", espacioSolicitado: "Terraza" }))).toBe(false);
+  });
+
+  it("sigue siendo verdadero si cambian la hora Y el espacio (manda la hora)", () => {
+    expect(hayContraoferta(datosBase({ hora: "20:30", horaSolicitada: "21:00", espacio: "Salón", espacioSolicitado: "Terraza" }))).toBe(true);
   });
 
   it("es falso si no hay dato de lo solicitado (reserva sin snapshot, p.ej. anterior a la migración)", () => {
@@ -98,6 +109,82 @@ describe("hayContraoferta", () => {
 
   it("ignora los segundos al comparar horas (21:00 == 21:00:00)", () => {
     expect(hayContraoferta(datosBase({ hora: "21:00:00", horaSolicitada: "21:00" }))).toBe(false);
+  });
+});
+
+// Decisión del dueño 2026-09-28: al cliente no se le dice la sala. Ver el
+// punto 7 del contrato en plantillas.ts.
+describe("la sala no aparece en el correo del cliente", () => {
+  it("la tabla de detalles no lleva fila 'Espacio' aunque la reserva tenga sala asignada", () => {
+    const { html } = renderPlantilla(plantillaBase(), datosBase({ espacio: "Terraza" }));
+    expect(html).toContain("Fecha");
+    expect(html).toContain("Hora");
+    expect(html).toContain("Comensales");
+    expect(html).not.toContain("Espacio");
+    expect(html).not.toContain("Terraza");
+  });
+
+  it("el bloque de contraoferta compara solo horas, sin ' en <sala>'", () => {
+    const { html } = renderPlantilla(
+      plantillaBase(),
+      datosBase({ hora: "20:30", espacio: "Salón", horaSolicitada: "21:00", espacioSolicitado: "Terraza" }),
+    );
+    expect(html).toContain("Pediste:");
+    expect(html).toContain("Te ofrecemos:");
+    expect(html).not.toContain("en Terraza");
+    expect(html).not.toContain("en Salón");
+    expect(html).not.toContain("Terraza");
+    expect(html).not.toContain("Salón");
+  });
+
+  it("{{espacio}} y {{espacio_solicitado}} se sustituyen por cadena vacía, sin dejar {{...}} literal", () => {
+    const tokens = construirTokens(datosBase({ espacio: "Terraza", espacioSolicitado: "Salón" }));
+    expect(tokens.espacio).toBe("");
+    expect(tokens.espacio_solicitado).toBe("");
+
+    const { html } = renderPlantilla(
+      plantillaBase({ cuerpo: "Mesa en [{{espacio}}], pediste [{{espacio_solicitado}}]." }),
+      datosBase({ espacio: "Terraza", espacioSolicitado: "Salón" }),
+    );
+    expect(html).toContain("Mesa en [], pediste [].");
+    expect(html).not.toContain("{{");
+  });
+
+  it("el resto de tokens siguen funcionando igual", () => {
+    const tokens = construirTokens(datosBase());
+    expect(tokens.nombre).toBe("Elena Morales");
+    expect(tokens.hora).toBe("21:00");
+    expect(tokens.comensales).toBe("4 personas");
+    expect(tokens.fecha).toBe("16 de marzo de 2026");
+  });
+});
+
+// Decisión del dueño 2026-09-28: el canal web deja de recibir el correo de
+// "hemos recibido tu solicitud"; su único correo es la 'propuesta'.
+describe("debeEnviarSolicitudRecibida", () => {
+  it("el canal web NO lo recibe", () => {
+    expect(debeEnviarSolicitudRecibida("web")).toBe(false);
+  });
+
+  it("no depende de mayúsculas ni de espacios sobrantes", () => {
+    expect(debeEnviarSolicitudRecibida(" WEB ")).toBe(false);
+    expect(debeEnviarSolicitudRecibida("Web")).toBe(false);
+  });
+
+  it("teléfono y manual lo siguen recibiendo (blacklist telefónica, altas del panel)", () => {
+    expect(debeEnviarSolicitudRecibida("telefono")).toBe(true);
+    expect(debeEnviarSolicitudRecibida("manual")).toBe(true);
+  });
+
+  it("canal desconocido, null o vacío: se manda (fail-open, es un correo informativo)", () => {
+    expect(debeEnviarSolicitudRecibida(null)).toBe(true);
+    expect(debeEnviarSolicitudRecibida(undefined)).toBe(true);
+    expect(debeEnviarSolicitudRecibida("")).toBe(true);
+    expect(debeEnviarSolicitudRecibida("canal_nuevo_de_mañana")).toBe(true);
+  });
+
+  it("solo 'web' está silenciado, para que revertirlo sea vaciar la lista", () => {
+    expect(CANALES_SIN_SOLICITUD_RECIBIDA).toEqual(["web"]);
   });
 });
 
@@ -120,10 +207,10 @@ describe("renderPlantilla", () => {
       plantillaBase(),
       datosBase({ hora: "20:30", espacio: "Salón", horaSolicitada: "21:00", espacioSolicitado: "Terraza" }),
     );
-    expect(html).toContain("Pediste:");
-    expect(html).toContain("21:00 en Terraza");
-    expect(html).toContain("Te ofrecemos:");
-    expect(html).toContain("20:30 en Salón");
+    // Solo horas: la sala salió del correo el 2026-09-28 (punto 7 del
+    // contrato en plantillas.ts).
+    expect(html).toContain("Pediste:</strong> 21:00");
+    expect(html).toContain("Te ofrecemos:</strong> 20:30");
   });
 
   it("NO pinta el bloque de comparación cuando lo ofrecido coincide con lo solicitado", () => {

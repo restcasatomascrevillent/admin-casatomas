@@ -64,11 +64,16 @@ import {
   mensajeDeError,
   debeCrearAvisoEmailFallido,
   escapeHtml,
-  // `tplSolicitudRecibida` ya NO se usa aqui: ese correo lo manda ahora
-  // `emails-reserva` desde `plantillas_email_reserva` (editable y versionada
-  // desde el panel). Se deja exportada y probada en plantillas.ts como
-  // referencia del texto historico; retirarla es una decision aparte.
-  debeAvisarDeEmailsReserva,
+  // `tplSolicitudRecibida` ya NO se usa aqui: ese correo primero paso a
+  // mandarlo `emails-reserva` desde `plantillas_email_reserva` y desde el
+  // 2026-09-28 NO SE MANDA en el canal web (ver `handleCrear`). Se deja
+  // exportada y probada en plantillas.ts como referencia del texto
+  // historico; retirarla es una decision aparte.
+  //
+  // `debeAvisarDeEmailsReserva` / `MOTIVOS_EMAILS_RESERVA_CON_CUSTODIA`
+  // tampoco se importan ya (su unico uso era decidir si avisar cuando fallaba
+  // la delegacion de ESE correo). Siguen exportados y probados en
+  // plantillas.ts: volver a necesitarlos es volver a importarlos.
   tplSolicitudNoProcesada,
   tplConfirmaAsistencia,
   tplSinDisponibilidad,
@@ -90,8 +95,9 @@ const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
 const ALLOWED_ORIGIN = Deno.env.get("RESERVAS_WEB_ALLOWED_ORIGIN") || "*";
 const PUBLIC_BASE_URL = Deno.env.get("RESERVAS_WEB_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/reservas-web`;
 
-// Correo de "solicitud recibida": se delega en `emails-reserva/notificar`
-// (ver el bloque "DELEGACION DEL CORREO..." en plantillas.ts para el porque).
+// Correo de "solicitud recibida": YA NO SE MANDA en el canal web
+// (2026-09-28, ver `handleCrear`). Esta configuracion se queda porque
+// `notificarViaEmailsReserva` sigue en el fichero como punto de reenganche.
 // El secreto es el MISMO que ya usa `notify-reservation-change` y es un
 // secreto del proyecto, asi que no hay que crear ninguno nuevo. Si faltara,
 // `comprobarSecretoCompartido` en emails-reserva falla CERRADO (401) -> aqui
@@ -525,12 +531,19 @@ async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promis
 // ------------------------------------------------------------
 // Mismo contrato que usa `notify-reservation-change`: POST /notificar con
 // `{ reserva_id }`. `emails-reserva` deriva el tipo de plantilla del ESTADO
-// de la reserva (`tipoEmailParaEstado`): 'pendiente' -> 'solicitud_recibida',
-// que es justo el correo que necesita `handleCrear`. No se le puede forzar
-// el tipo ni el destinatario: los lee de la fila de `reservas`.
+// de la reserva (`tipoEmailParaEstado`) y del CANAL: para una reserva web en
+// 'pendiente' devuelve null a proposito y no manda nada (ver
+// `debeEnviarSolicitudRecibida` en emails-reserva/plantillas.ts). No se le
+// puede forzar el tipo ni el destinatario: los lee de la fila de `reservas`.
 //
 // Devuelve SIEMPRE un resultado (nunca lanza): quien lo llama decide si
 // avisar con `debeAvisarDeEmailsReserva` (pura, en plantillas.ts).
+//
+// SIN LLAMADORES desde el 2026-09-28 (el correo de "solicitud recibida" se
+// quito del canal web — ver el bloque del final de `handleCrear`). Se
+// mantiene a proposito, igual que `handleNotificarEstado`: es el contrato de
+// delegacion ya escrito y probado, y el sitio exacto donde volver a
+// engancharse si el dueño cambia de idea.
 async function notificarViaEmailsReserva(reservaId: string): Promise<ResultadoNotificarEmailsReserva> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -1321,15 +1334,18 @@ async function handleCrear(req: Request): Promise<Response> {
   // Segunda (y última) pasada de `resolverMarca`, ahora con la señal del
   // espacio si la hay. `marcaTemprana`/`negocioTemprano` (arriba) ya sirvió
   // para los rechazos anteriores; esta es la que se GUARDA en la fila y la
-  // que ve el email de éxito — la autoritativa para todo lo que venga
-  // después (notificar-estado/confirmar/cancelar leen `reserva.marca`, no
-  // vuelven a derivarla).
+  // autoritativa para todo lo que venga después (el correo de 'propuesta'
+  // que manda emails-reserva, y notificar-estado/confirmar/cancelar, leen
+  // `reserva.marca`; no vuelven a derivarla).
+  //
+  // Ya no se construye aquí un `negocio` a partir de esta marca: lo único
+  // que lo usaba era el correo de "solicitud recibida", que ha dejado de
+  // mandarse desde este alta (ver el bloque de abajo).
   const marca: Marca = resolverMarca({
     marcaExplicita: body?.marca,
     marcaEspacio: (caracteristicasEspacio as Record<string, unknown> | null)?.marca,
     notasCliente: notas,
   });
-  const negocio: DatosNegocio = NEGOCIOS[marca];
 
   const { data: inserted, error: insertError } = await supabase
     .from("reservas")
@@ -1363,40 +1379,43 @@ async function handleCrear(req: Request): Promise<Response> {
     return json({ ok: false, error: "internal_error" }, 500);
   }
 
-  // EL CORREO YA NO SALE DE AQUI. Antes esta rama llamaba a `sendEmail`
-  // (Resend directo) y no dejaba NI UNA FILA en `envios_email_reserva`: si
-  // fallaba, no se enteraba nadie mas que un aviso de campana, y no habia
-  // reintento ni seguimiento de entrega. Ahora se delega en
-  // `emails-reserva/notificar`, que reclama la fila, manda con
-  // `Idempotency-Key`, respeta la lista de supresion y deja que el cron de
-  // reintentos (cada 15 min: 10/20/40/80) y `resend-webhook`
-  // (`estado_entrega`) hagan su trabajo.
+  // AQUI NO SE MANDA NINGUN CORREO (decision del dueño, 2026-09-28).
   //
-  // Y va en SEGUNDO PLANO: el 201 sale sin esperar al correo, asi que el
-  // formulario responde ANTES que antes, no despues.
+  // Historia, para no volver a darle vueltas:
+  //   1. Esta rama llamaba a `sendEmail` (Resend directo) con
+  //      `tplSolicitudRecibida` y no dejaba NI UNA FILA en
+  //      `envios_email_reserva`: si fallaba, no se enteraba nadie mas que un
+  //      aviso de campana, sin reintento ni seguimiento de entrega.
+  //   2. Luego se delego en `emails-reserva/notificar` (que reclama fila,
+  //      manda con `Idempotency-Key`, respeta la lista de supresion y deja
+  //      que el cron de reintentos y `resend-webhook` hagan su trabajo), en
+  //      segundo plano para no retrasar el 201.
+  //   3. AHORA: no se manda. El cliente recibia DOS correos seguidos —este
+  //      ("hemos recibido tu solicitud") y, en cuanto alguien revisaba la
+  //      reserva, la 'propuesta' con los botones de aceptar/rechazar—. El
+  //      primero sobra: la propia web ya le dice EN PANTALLA que se le
+  //      contactara cuando se confirme la reserva. Su unico correo es la
+  //      'propuesta'.
   //
-  // SIN RED DE SEGURIDAD "mando yo el correo si falla la llamada" a
-  // proposito: reintroduciria el envio invisible que esto viene a eliminar y,
-  // si emails-reserva si llego a procesar la peticion pero se perdio la
-  // respuesta, el cliente recibiria DOS correos distintos. Si no se puede
-  // delegar, se avisa al personal y se acabo.
-  if (email) {
-    await enSegundoPlano(
-      notificarViaEmailsReserva(inserted.id).then(async (resultado) => {
-        if (!debeAvisarDeEmailsReserva(resultado)) return;
-        await avisarEmailFallido({
-          contexto: "solicitud recibida",
-          negocio,
-          nombre,
-          fecha,
-          hora,
-          reservaId: inserted.id,
-          error: resultado.motivo ?? "emails_reserva_sin_motivo",
-        });
-      }),
-      "solicitud recibida",
-    );
-  }
+  // COMO SE HA APAGADO: aqui se deja de llamar a `emails-reserva/notificar`,
+  // y ADEMAS `emails-reserva` se niega a mandar 'solicitud_recibida' a una
+  // reserva de canal 'web' venga la peticion de donde venga (ver
+  // `debeEnviarSolicitudRecibida` en emails-reserva/plantillas.ts). Hacen
+  // falta las dos cosas: `/notificar` lo llama tambien
+  // `notify-reservation-change` desde el panel, asi que sin la regla del
+  // canal bastaria con devolver una reserva web a 'pendiente' desde la lista
+  // para que al cliente le llegara el correo que acabamos de quitar.
+  //
+  // `notificarViaEmailsReserva` (mas arriba en este fichero) se queda SIN
+  // LLAMADORES pero NO se borra —mismo criterio que `handleNotificarEstado`,
+  // ver su cabecera—: es el contrato de delegacion documentado y el punto
+  // exacto donde volver a engancharse si algun dia se quiere recuperar este
+  // correo. Recuperarlo = volver a llamarla aqui Y vaciar
+  // `CANALES_SIN_SOLICITUD_RECIBIDA` en emails-reserva/plantillas.ts.
+  //
+  // Los correos de RECHAZO (`avisar(...)`, mas arriba) no cambian: esos se
+  // siguen mandando desde aqui porque en ese punto todavia no hay fila en
+  // `reservas` sobre la que `emails-reserva` pudiera trabajar.
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
 }

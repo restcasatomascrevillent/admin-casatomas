@@ -26,9 +26,9 @@
 //      {{fecha}}               — siempre, "16 de marzo de 2026"
 //      {{hora}}                — siempre, hora VIGENTE ("21:00")
 //      {{comensales}}          — siempre, "4 personas"
-//      {{espacio}}             — espacio VIGENTE, o "" si no hay asignado
+//      {{espacio}}             — SIEMPRE "" (ver punto 7)
 //      {{hora_solicitada}}     — solo relevante en tipo 'propuesta'
-//      {{espacio_solicitado}}  — solo relevante en tipo 'propuesta'
+//      {{espacio_solicitado}}  — SIEMPRE "" (ver punto 7)
 //      {{negocio}}             — siempre, "Casa Tomás" | "Touza"
 //    Disponibles en TODOS los tipos aunque solo tengan sentido en algunos —
 //    usarlos fuera de 'propuesta' es válido pero probablemente no lo que se
@@ -55,6 +55,39 @@
 //    convertidos de uuid a texto por quien llama) y devuelve
 //    `{ asunto, html }`. Quien la llama (index.ts) es responsable de leer
 //    la plantilla vigente de la BD y de resolver nombres de espacio.
+//
+// 7. LA SALA NO SALE EN EL CORREO DEL CLIENTE (decisión del dueño,
+//    2026-09-28). La sala/espacio es información INTERNA del restaurante
+//    "de momento": el cliente no tiene por qué saber si se le sienta en
+//    Comedor, Salón o Terraza, y decírselo solo genera llamadas del tipo
+//    "quiero que me cambiéis de sala". Qué implica, en este fichero:
+//      · la tabla de detalles ya NO pinta la fila "Espacio";
+//      · el bloque "Pediste / Te ofrecemos" ya NO pinta " en <sala>";
+//      · `hayContraoferta()` mira SOLO la hora (ver su docstring: si
+//        siguiera mirando la sala, un cambio de sala a la misma hora
+//        pintaría "Pediste: 21:00 / Te ofrecemos: 21:00", dos veces lo
+//        mismo, que es peor que no pintar nada);
+//      · `{{espacio}}` y `{{espacio_solicitado}}` se sustituyen por cadena
+//        vacía — se dejan en el mapa de tokens a propósito, en vez de
+//        borrarlos, para que este punto sea visible desde el código y
+//        revertirlo sea devolverles su valor (una línea cada uno).
+//    `DatosReservaParaCorreo.espacio` / `.espacioSolicitado` SIGUEN en la
+//    interfaz y los siguen rellenando index.ts y propuesta-solicitud.ts: no
+//    son datos que sobren, son datos que hoy no se enseñan. Quitarlos de la
+//    interfaz obligaría a tocar los cuatro sitios que los construyen para
+//    nada.
+//    PENDIENTE FUERA DE ESTE FICHERO: el panel tiene su propio motor de
+//    previsualización (`src/components/emails/motorPlantilla.ts`, copia de
+//    este render) y su propio catálogo de tokens
+//    (`src/components/emails/catalogoTokens.ts`). Mientras no se les
+//    aplique lo mismo, la vista previa del panel enseñará la sala y el
+//    catálogo ofrecerá `{{espacio}}` aunque el correo real ya no la pinte.
+//
+// 8. 'solicitud_recibida' NO SE MANDA EN EL CANAL WEB (misma decisión). La
+//    regla vive en `debeEnviarSolicitudRecibida()` (abajo, pura y probada)
+//    y la aplica `tipoEmailParaEstado()` en index.ts. Ver el comentario
+//    largo de esa función para el porqué y para qué canales siguen
+//    recibiéndolo.
 // ============================================================================
 
 // Negocio del correo (2026-09-24): las reservas de "El Reservado" son de
@@ -171,19 +204,61 @@ export function formatearHora(hora: string): string {
   return (hora || "").slice(0, 5);
 }
 
-function normalizarComparable(valor: string | null | undefined): string {
-  return (valor ?? "").trim().toLowerCase();
-}
-
-/** Verdadero si la hora u espacio VIGENTE difieren de lo solicitado
- * originalmente. Es la única señal que decide si se pinta el bloque de
- * comparación — no depende de ningún flag editorial (ver contrato arriba). */
+/** Verdadero si la HORA vigente difiere de la solicitada originalmente. Es
+ * la única señal que decide si se pinta el bloque de comparación — no
+ * depende de ningún flag editorial (ver contrato arriba).
+ *
+ * SOLO LA HORA desde 2026-09-28 (punto 7 del contrato): antes también
+ * devolvía true cuando cambiaba la SALA. Ahora que el correo del cliente no
+ * nombra la sala, esa rama pintaba un bloque absurdo — un cambio de sala a
+ * la misma hora daba literalmente "Pediste: 21:00 / Te ofrecemos: 21:00".
+ * El cliente no pierde información: la sala nunca la pidió (ver
+ * `datosCorreoPropuestaSolicitud` en propuesta-solicitud.ts, que ya ponía
+ * `espacio === espacioSolicitado` justamente porque "la sala no se
+ * compara"), y un cambio de hora sí se le sigue enseñando. */
 export function hayContraoferta(datos: DatosReservaParaCorreo): boolean {
   if (datos.horaSolicitada === undefined || datos.horaSolicitada === null) return false;
-  const horaDistinta = formatearHora(datos.hora) !== formatearHora(datos.horaSolicitada);
-  const espacioDistinto =
-    normalizarComparable(datos.espacio) !== normalizarComparable(datos.espacioSolicitado ?? null);
-  return horaDistinta || espacioDistinto;
+  return formatearHora(datos.hora) !== formatearHora(datos.horaSolicitada);
+}
+
+/**
+ * ¿Toca mandar el correo de 'solicitud_recibida' a una reserva de este
+ * canal? (`reservas.canal`: 'web' | 'telefono' | 'manual' | null).
+ *
+ * DECISIÓN DEL DUEÑO (2026-09-28): en el canal WEB el cliente recibía DOS
+ * correos seguidos — 'solicitud_recibida' ("hemos recibido tu solicitud") y,
+ * en cuanto alguien la revisaba, 'propuesta' ("confirma tu reserva", la de
+ * los botones). El primero sobra: el propio formulario ya le dice en
+ * pantalla que se le contactará cuando se confirme, así que el único correo
+ * que recibe es la 'propuesta'.
+ *
+ * SE SILENCIA POR CANAL, NO GLOBALMENTE, porque el tipo sigue vivo para
+ * otros:
+ *   · 'telefono' — `fn_aceptar_propuesta_solicitud` crea la reserva en
+ *     estado 'pendiente' (en vez de 'confirmada') cuando el cliente está en
+ *     la lista negra, e `index.ts::ejecutarPropuesta` manda entonces este
+ *     correo. Ahí el cliente NO ha visto ninguna pantalla que se lo diga:
+ *     pulsó "aceptar" en un correo y necesita saber que su petición quedó
+ *     registrada. La reserva nace con canal='telefono', así que esa rama no
+ *     la toca esta regla.
+ *   · 'manual' — altas del panel. Hoy nacen 'verificada' (correo
+ *     'propuesta'), pero si alguien mueve una reserva a 'pendiente' desde
+ *     la lista, sigue saliendo su correo.
+ *
+ * Y se silencia AQUÍ, en emails-reserva, y no solo dejando de llamar desde
+ * reservas-web, porque `/notificar` deriva el tipo del ESTADO de la reserva
+ * y lo llama también `notify-reservation-change` (panel). Sin esta regla,
+ * devolver una reserva web a 'pendiente' desde la lista le mandaría al
+ * cliente el correo que acabamos de quitar.
+ *
+ * REVERSIBLE: vaciar `CANALES_SIN_SOLICITUD_RECIBIDA` devuelve el correo a
+ * todos los canales. No se ha tocado ni la fila de `plantillas_email_reserva`
+ * ni el CHECK de `envios_email_reserva.tipo_email` (ver informe).
+ */
+export const CANALES_SIN_SOLICITUD_RECIBIDA: readonly string[] = ["web"];
+
+export function debeEnviarSolicitudRecibida(canal: string | null | undefined): boolean {
+  return !CANALES_SIN_SOLICITUD_RECIBIDA.includes((canal ?? "").trim().toLowerCase());
 }
 
 const TOKEN_RE = /\{\{\s*([a-zA-Z_]+)\s*\}\}/g;
@@ -194,9 +269,17 @@ export function construirTokens(datos: DatosReservaParaCorreo): Record<string, s
     fecha: formatearFecha(datos.fecha),
     hora: formatearHora(datos.hora),
     comensales: `${datos.comensales} ${datos.comensales === 1 ? "persona" : "personas"}`,
-    espacio: datos.espacio || "",
+    // La sala no se le dice al cliente (punto 7 del contrato): estos dos
+    // tokens se quedan en el mapa —siguen siendo tokens CONOCIDOS, no
+    // dejan "{{espacio}}" literal en el correo— pero se sustituyen por
+    // cadena vacía. Se dejan aquí en vez de borrarlos para que la decisión
+    // se vea en el código y revertirla sea devolverles `datos.espacio || ""`
+    // y `datos.espacioSolicitado || ""`. Hoy no los usa NINGUNA plantilla de
+    // `plantillas_email_reserva` (comprobado en la BD del proyecto el
+    // 2026-09-28), así que esto no cambia ni un correo existente.
+    espacio: "",
     hora_solicitada: formatearHora(datos.horaSolicitada || datos.hora),
-    espacio_solicitado: datos.espacioSolicitado || "",
+    espacio_solicitado: "",
     negocio: (datos.negocio ?? NEGOCIOS[NEGOCIO_POR_DEFECTO]).nombre,
   };
 }
@@ -423,25 +506,29 @@ export function renderPlantilla(
   const mostrarBotonSecundario = leerBloque(plantilla.bloques, "mostrar_boton_secundario", true);
   const mostrarPie = leerBloque(plantilla.bloques, "mostrar_pie_contacto", true);
 
+  // Tres filas FIJAS. Antes había una cuarta, "Espacio", condicionada a
+  // `datos.espacio` — fuera desde 2026-09-28 (punto 7 del contrato).
+  // El diseño no hay que cuadrarlo: `filaTablaHtml` apila `<tr>` a ancho
+  // completo (etiqueta arriba, valor debajo), sin columnas ni alturas
+  // fijas, y la tabla de 3 filas ya era el caso NORMAL —la cuarta solo
+  // salía si la reserva tenía sala asignada, que en un correo de
+  // 'solicitud_recibida' o de 'propuesta' de la web casi nunca pasaba—.
+  // Lo único que cambia es que la tabla mide una fila menos.
   const filasTabla: FilaTabla[] = mostrarTabla
     ? [
         { etiqueta: "Fecha", valor: formatearFecha(datos.fecha) },
         { etiqueta: "Hora", valor: formatearHora(datos.hora) },
         { etiqueta: "Comensales", valor: `${datos.comensales}` },
-        ...(datos.espacio ? [{ etiqueta: "Espacio", valor: datos.espacio }] : []),
       ]
     : [];
 
+  // Solo horas: ni "Pediste: 20:00 en Terraza" ni "Te ofrecemos: 21:00 en
+  // Comedor" (punto 7). `hayContraoferta` ya garantiza que las dos horas
+  // son distintas, así que el bloque nunca sale diciendo lo mismo dos veces.
   const comparacion = hayContraoferta(datos)
     ? {
-        solicitado: {
-          etiqueta: "Solicitado",
-          valor: `${formatearHora(datos.horaSolicitada || datos.hora)}${datos.espacioSolicitado ? ` en ${datos.espacioSolicitado}` : ""}`,
-        },
-        ofrecido: {
-          etiqueta: "Ofrecido",
-          valor: `${formatearHora(datos.hora)}${datos.espacio ? ` en ${datos.espacio}` : ""}`,
-        },
+        solicitado: { etiqueta: "Solicitado", valor: formatearHora(datos.horaSolicitada || datos.hora) },
+        ofrecido: { etiqueta: "Ofrecido", valor: formatearHora(datos.hora) },
       }
     : null;
 

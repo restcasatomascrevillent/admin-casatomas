@@ -98,6 +98,7 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
 import {
   renderPlantilla,
   negocioParaMarca,
+  debeEnviarSolicitudRecibida,
   TIPOS_PLANTILLA,
   type TipoPlantilla,
   type FilaPlantilla,
@@ -244,12 +245,15 @@ interface ReservaRow {
   /** Negocio (columna NOT NULL DEFAULT 'casa_tomas', migración
    * 20260922180000): 'touza' = El Reservado. Decide la marca del correo. */
   marca?: string | null;
+  /** 'web' | 'telefono' | 'manual'. Decide si el estado 'pendiente' manda
+   * o no el correo de 'solicitud_recibida' — ver `tipoEmailParaEstado`. */
+  canal?: string | null;
 }
 
 async function fetchReserva(id: string): Promise<ReservaRow | null> {
   const { data, error } = await supabase
     .from("reservas")
-    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id, marca")
+    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id, marca, canal")
     .eq("id", id)
     .maybeSingle();
   if (error || !data) return null;
@@ -284,10 +288,27 @@ async function negocioDeSolicitud(s: SolicitudParaPropuesta): Promise<DatosNegoc
 }
 
 
-function tipoEmailParaEstado(estado: string): TipoPlantilla | null {
+/**
+ * Tipo de correo que le toca a una reserva por su ESTADO. El `canal` solo
+ * pinta en 'pendiente': desde 2026-09-28 una reserva de la WEB ya no recibe
+ * 'solicitud_recibida' (decisión del dueño — la web ya le dice en pantalla
+ * que se le contactará, y el primer y único correo que recibe es la
+ * 'propuesta' con los botones). El resto de canales lo siguen recibiendo:
+ * el porqué, entero, en `debeEnviarSolicitudRecibida` (plantillas.ts).
+ *
+ * Devolver null aquí es el camino correcto y ya existía ('completada' /
+ * 'no_show'): `enviarCorreoParaReserva` para en seco (con motivo
+ * "solicitud_recibida_silenciada_canal_web") ANTES de reclamar fila en
+ * `envios_email_reserva`, así que no deja ni fila, ni reintento, ni aviso.
+ *
+ * NO afecta a /enviar-prueba: ese endpoint recibe el tipo del panel y
+ * renderiza la plantilla directamente, sin pasar por aquí. El dueño puede
+ * seguir previsualizando y probando la plantilla 'solicitud_recibida'.
+ */
+function tipoEmailParaEstado(estado: string, canal?: string | null): TipoPlantilla | null {
   switch (estado) {
     case "pendiente":
-      return "solicitud_recibida";
+      return debeEnviarSolicitudRecibida(canal) ? "solicitud_recibida" : null;
     case "verificada":
       return "propuesta";
     case "confirmada":
@@ -738,8 +759,18 @@ async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlan
   if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
   if (!reserva.email) return { enviado: false, motivo: "reserva_sin_email" };
 
-  const tipo = tipoForzado ?? tipoEmailParaEstado(reserva.estado);
-  if (!tipo) return { enviado: false, motivo: `sin_plantilla_para_estado_${reserva.estado}` };
+  const tipo = tipoForzado ?? tipoEmailParaEstado(reserva.estado, reserva.canal);
+  if (!tipo) {
+    // Se distingue el silencio DELIBERADO por canal (web + 'pendiente') del
+    // "este estado no manda correo" de toda la vida ('completada',
+    // 'no_show'). Los dos son un ok:false del que NADIE tiene que avisar,
+    // pero en los logs de `notify-reservation-change` no son lo mismo y
+    // conviene poder leer cuál de los dos fue.
+    const motivo = reserva.estado === "pendiente"
+      ? `solicitud_recibida_silenciada_canal_${reserva.canal ?? "desconocido"}`
+      : `sin_plantilla_para_estado_${reserva.estado}`;
+    return { enviado: false, motivo };
+  }
 
   const plantilla = await obtenerPlantillaActual(tipo);
   if (!plantilla) return { enviado: false, motivo: `plantilla_no_configurada_${tipo}` };
@@ -881,7 +912,11 @@ async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string
     return { estado: "definitivo", perdido: null };
   }
 
-  const tipoActual = tipoEmailParaEstado(reserva.estado);
+  // Con `canal`: una fila 'solicitud_recibida' antigua de una reserva WEB
+  // que quedara 'fallido' da ahora tipoActual=null -> "obsoleto" -> se
+  // abandona sin aviso, que es exactamente lo que se quiere (no reintentar
+  // un correo que ya no se manda). Las de teléfono/manual siguen igual.
+  const tipoActual = tipoEmailParaEstado(reserva.estado, reserva.canal);
   if (!tipoDeEmailSigueVigente(fila.tipo_email, reserva.estado, tipoActual)) {
     // La reserva avanzó a otro estado mientras este correo seguía fallido:
     // reintentarlo mandaría contenido obsoleto (p.ej. una 'propuesta' de una

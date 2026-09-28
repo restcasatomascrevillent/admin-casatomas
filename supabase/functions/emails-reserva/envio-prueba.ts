@@ -20,12 +20,17 @@ import { fechaObjetivoRecordatorio } from "./recordatorios.ts";
 // ----------------------------------------------------------------------------
 // Deliberadamente NO "Cliente de Ejemplo" ni huecos vacíos: el punto de la
 // prueba es ver cómo queda el correo con datos que se parecen a los de un
-// cliente real (punto 2 del encargo). Para 'propuesta' la hora y el espacio
-// VIGENTES se apartan a propósito de los SOLICITADOS, para que
-// hayContraoferta() (plantillas.ts) dé true y la prueba enseñe también el
-// bloque "Pediste / Te ofrecemos" — el único tipo donde ese bloque puede
-// aparecer; en el resto no se rellena horaSolicitada, así que
-// hayContraoferta() es false (mismo criterio que un correo real de ese tipo).
+// cliente real (punto 2 del encargo). Para 'propuesta' la HORA vigente se
+// aparta a propósito de la solicitada, para que hayContraoferta()
+// (plantillas.ts) dé true y la prueba enseñe también el bloque "Pediste / Te
+// ofrecemos" — el único tipo donde ese bloque puede aparecer; en el resto no
+// se rellena horaSolicitada, así que hayContraoferta() es false (mismo
+// criterio que un correo real de ese tipo).
+//
+// `espacio`/`espacioSolicitado` se siguen rellenando por realismo, pero
+// desde el 2026-09-28 NO se pintan en el correo (punto 7 del contrato en
+// plantillas.ts) ni cuentan para hayContraoferta(): la prueba enseña
+// exactamente lo mismo que vería el cliente.
 //
 // `fechaObjetivoRecordatorio` (recordatorios.ts) es solo aritmética de
 // fechas genérica ("hoyIso + N días" en UTC, sin líos de zona horaria); se

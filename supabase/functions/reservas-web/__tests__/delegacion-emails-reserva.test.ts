@@ -8,6 +8,18 @@
  * que registra el envío, lo reintenta con espera creciente y sigue su
  * entrega. A partir de ahora lo manda `emails-reserva/notificar`.
  *
+ * ESTADO A 2026-09-28 — LEER ANTES DE TOCAR NADA AQUÍ. El correo de
+ * "solicitud recibida" YA NO SE MANDA en el canal web (decisión del dueño:
+ * el cliente recibía dos correos y la web ya le avisa en pantalla), así que
+ * `handleCrear` ha dejado de llamar a `notificarViaEmailsReserva` y estos
+ * tests ya no cubren un camino vivo de ESE correo concreto. NO se borran, a
+ * propósito, por dos razones: (1) `debeAvisarDeEmailsReserva` y
+ * `construirAvisoEmailFallido` siguen exportados y son el contrato de
+ * delegación al que habría que volver si se recupera el correo; (2) la regla
+ * "se avisa si y solo si emails-reserva NO se ha hecho cargo" es la que
+ * evita el agujero de origen, y perder su cobertura al reengancharla sería
+ * repetir el mismo fallo. Ver el bloque del final de `handleCrear`.
+ *
  * QUÉ SE PRUEBA AQUÍ. La pieza que decide si hay que molestar al personal
  * con un aviso en `notificaciones_dashboard` — `debeAvisarDeEmailsReserva`,
  * pura y sin I/O, igual que el resto de la lógica de decisión de este
