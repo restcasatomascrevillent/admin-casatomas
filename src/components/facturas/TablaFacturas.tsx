@@ -249,8 +249,10 @@ const FilaFacturaDesktop = ({
           ) : null}
         </TableCell>
         {visibles.numero && (
-          <TableCell className={`${CELDA} ${ANCHO_NUMERO} whitespace-nowrap text-[13px] font-semibold text-foreground xl:text-sm`}>
-            {factura.numero_documento}
+          <TableCell className={`${CELDA} ${ANCHO_NUMERO} text-[13px] font-semibold text-foreground xl:text-sm`}>
+            <span className="block truncate" title={factura.numero_documento}>
+              {factura.numero_documento}
+            </span>
           </TableCell>
         )}
         {visibles.proveedor && (

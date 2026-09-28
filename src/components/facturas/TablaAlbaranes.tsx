@@ -256,8 +256,10 @@ const FilaAlbaranDesktop = ({
           ) : null}
         </TableCell>
         {visibles.numero && (
-          <TableCell className={`${CELDA} ${ANCHO_NUMERO} whitespace-nowrap text-[13px] font-semibold text-foreground xl:text-sm`}>
-            {albaran.numero_documento}
+          <TableCell className={`${CELDA} ${ANCHO_NUMERO} text-[13px] font-semibold text-foreground xl:text-sm`}>
+            <span className="block truncate" title={albaran.numero_documento}>
+              {albaran.numero_documento}
+            </span>
           </TableCell>
         )}
         {visibles.proveedor && (

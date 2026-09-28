@@ -76,7 +76,14 @@ export const INSIGNIA =
 // Proveedor y Observaciones: sin ellos "MR FRIOSAT DISTRIBUCIONES
 // ALIMENTARIAS S.L." reclama ~330 px el solo y tumba el reparto entero.
 export const ANCHO_CHEVRON = "w-[24px] xl:w-[32px]";
-export const ANCHO_NUMERO = "w-[96px] xl:w-[128px]";
+// El numero de documento NO lleva `w-` a secas sino un `max-w`: va con
+// `whitespace-nowrap` (es el identificador, no puede partirse) y sin tope
+// bastaria un numero de proveedor largo para recuperar el desbordamiento.
+// Medido, la holgura a 1024 px es de 27 px, o sea unos 4 caracteres mas que
+// "ALB-2026-00231". Con el tope, un numero kilometrico se recorta con el
+// completo en el `title` — feo, pero nunca vuelve el scroll ni un total
+// cortado. Los cinco documentos reales entran de sobra sin recortarse.
+export const ANCHO_NUMERO = "min-w-[80px] max-w-[112px] xl:max-w-[148px]";
 export const ANCHO_PROVEEDOR = "min-w-[88px] max-w-[112px] xl:max-w-[200px] min-[1400px]:max-w-[300px]";
 export const ANCHO_ESTADO = "w-[100px] xl:w-[124px]";
 export const ANCHO_FECHA = "w-[54px] xl:w-[92px]";
@@ -109,7 +116,7 @@ export const ANCHO_ACCIONES = "w-[92px] xl:w-[132px] 2xl:w-[176px]";
 // columna medido en el navegador a 1024 px con los cinco documentos de
 // produccion (el peor caso manda: "ALB-2026-00231", "Precio extremo" y
 // "120.580,00 €" son mas anchos que sus equivalentes en facturas). El juego
-// por defecto suma 538 de 546, o sea que a 1024 px no se puede añadir una
+// por defecto suma 542 de 546, o sea que a 1024 px no se puede añadir una
 // columna sin quitar otra. Eso es lo que se quiere: medido, la tabla entera
 // pide 642 px de los 668 utiles (albaranes, que es el caso peor), y la mas
 // estrecha de las columnas apagadas son 88 px — no cabe ninguna.
@@ -122,7 +129,7 @@ export const PRESUPUESTO_LG = 546;
 
 /** Lo que pide cada columna opcional en la franja estrecha (`lg`). */
 export const PESOS: Record<string, number> = {
-  numero: 108,
+  numero: 112,
   proveedor: 112,
   estado: 112,
   fecha: 62,
