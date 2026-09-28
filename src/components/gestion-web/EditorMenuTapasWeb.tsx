@@ -21,6 +21,23 @@ import {
 import { AlertCircle, CalendarDays, Edit2, Loader2, RefreshCw, Trash2, UtensilsCrossed } from "lucide-react";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import { EditorSeccionesMenu } from "@/components/gestion-web/EditorSeccionesMenu";
+import { VistaPreviaMenu } from "@/components/gestion-web/VistaPreviaMenu";
+import { indexarPlatos, usePlatosParaMenu } from "@/hooks/usePlatosParaMenu";
+import {
+  ETIQUETA_SECCION,
+  SECCIONES_MENU,
+  emparejarTraduccion,
+  menuEnIdioma,
+  menuTieneContenido,
+  parseMenuDia,
+  serializarMenuDia,
+  textoDeSeccion,
+  type ItemMenu,
+  type MenuEstructurado,
+  type SeccionMenu,
+  type VarianteIdioma,
+} from "@/lib/menu-dia";
 
 // ---------------------------------------------------------------------------
 // Menús diarios y tapas (tablas `menus_diarios` y `tapas`)
@@ -59,18 +76,36 @@ const SECCION_CONFIG: Record<
   },
 };
 
-interface MenuJson {
-  primero: string;
-  segundo: string;
-  postre: string;
-}
-
 interface Registro {
   /** Clave real: es/en/fr comparten fecha, no id. */
   fecha: string;
-  menu?: MenuJson;
+  menu?: MenuEstructurado;
   tapas?: string[];
 }
+
+/** Secciones vacías: el estado inicial del formulario de menú. */
+const seccionesVacias = (): Record<SeccionMenu, ItemMenu[]> => ({
+  primero: [],
+  segundo: [],
+  postre: [],
+});
+
+/**
+ * Quita las líneas que se quedaron sin nombre (se añade «A mano» con el campo
+ * en blanco y puede no llegar a rellenarse) y los alérgenos huérfanos que
+ * colgaban de ellas.
+ */
+const limpiarSecciones = (
+  secciones: Record<SeccionMenu, ItemMenu[]>,
+): Record<SeccionMenu, ItemMenu[]> => {
+  const limpias = seccionesVacias();
+  for (const seccion of SECCIONES_MENU) {
+    limpias[seccion] = secciones[seccion]
+      .map((item) => ({ ...item, nombre: item.nombre.trim() }))
+      .filter((item) => item.nombre !== "");
+  }
+  return limpias;
+};
 
 const hoyLocal = () => new Date().toLocaleDateString("sv-SE");
 
@@ -78,19 +113,6 @@ const formatearFechaLarga = (iso: string) => {
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-};
-
-const parseMenuJson = (value: unknown): MenuJson => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { primero: "", segundo: "", postre: "" };
-  }
-  const obj = value as Record<string, unknown>;
-  const texto = (v: unknown) => (typeof v === "string" ? v : Array.isArray(v) ? v.filter((x) => typeof x === "string").join("\n") : "");
-  return {
-    primero: texto(obj.primero ?? obj.primeros),
-    segundo: texto(obj.segundo ?? obj.segundos),
-    postre: texto(obj.postre ?? obj.postres),
-  };
 };
 
 const parseTapasJson = (value: unknown): string[] => {
@@ -125,11 +147,15 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   /** Fecha del registro que se está editando (null = nuevo). */
   const [editandoFecha, setEditandoFecha] = useState<string | null>(null);
   const [fecha, setFecha] = useState(hoyLocal);
-  const [primero, setPrimero] = useState("");
-  const [segundo, setSegundo] = useState("");
-  const [postre, setPostre] = useState("");
+  const [secciones, setSecciones] = useState<Record<SeccionMenu, ItemMenu[]>>(seccionesVacias);
   const [tapasTexto, setTapasTexto] = useState("");
   const formRef = useRef<HTMLDivElement>(null);
+
+  // La carta solo hace falta en el editor de menú (para elegir platos y para
+  // reutilizar sus traducciones al guardar): en la pestaña de tapas la consulta
+  // ni se lanza.
+  const { platos, isLoading: cargandoPlatos } = usePlatosParaMenu(esMenu);
+  const platosPorId = useMemo(() => indexarPlatos(platos), [platos]);
 
   const cargarDatos = useCallback(async () => {
     setIsLoading(true);
@@ -145,7 +171,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         // Una entrada por fecha (si hubiera duplicados antiguos, gana la primera).
         const porFecha = new Map<string, Registro>();
         (data ?? []).forEach((row) => {
-          if (!porFecha.has(row.fecha)) porFecha.set(row.fecha, { fecha: row.fecha, menu: parseMenuJson(row.menu) });
+          if (!porFecha.has(row.fecha)) porFecha.set(row.fecha, { fecha: row.fecha, menu: parseMenuDia(row.menu) });
         });
         setRegistros(Array.from(porFecha.values()));
       } else {
@@ -176,20 +202,17 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const resetForm = () => {
     setEditandoFecha(null);
     setFecha(hoyLocal());
-    setPrimero("");
-    setSegundo("");
-    setPostre("");
+    setSecciones(seccionesVacias());
     setTapasTexto("");
   };
 
   const editar = (registro: Registro) => {
     setEditandoFecha(registro.fecha);
     setFecha(registro.fecha);
-    if (registro.menu) {
-      setPrimero(registro.menu.primero);
-      setSegundo(registro.menu.segundo);
-      setPostre(registro.menu.postre);
-    }
+    // Solo se carga el español: las versiones en/fr se vuelven a derivar al
+    // guardar (de la carta para los platos enlazados, del traductor para el
+    // texto libre), así que no hay que leerlas ni mantenerlas a mano.
+    setSecciones(registro.menu ? registro.menu.secciones : seccionesVacias());
     setTapasTexto((registro.tapas ?? []).join("\n"));
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -197,17 +220,25 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   /** Otro registro (no el que edito) que ya ocupa esa fecha: se sustituirá. */
   const choqueFecha = registros.find((r) => r.fecha === fecha && r.fecha !== editandoFecha);
   const hoy = hoyLocal();
-  const hayContenido = esMenu ? !!(primero.trim() || segundo.trim() || postre.trim()) : lineas(tapasTexto).length > 0;
+  const seccionesLimpias = useMemo(() => limpiarSecciones(secciones), [secciones]);
+  const hayContenido = esMenu ? menuTieneContenido(seccionesLimpias) : lineas(tapasTexto).length > 0;
+  /** Secciones sin ningún plato. No bloquea: solo se avisa. */
+  const seccionesVaciasAviso = SECCIONES_MENU.filter((s) => seccionesLimpias[s].length === 0);
 
   const guardar = async () => {
     if (!fecha) {
       toast.error("Elige la fecha.");
       return;
     }
-    const menu = { primero: primero.trim(), segundo: segundo.trim(), postre: postre.trim() };
     const tapas = lineas(tapasTexto);
-    if (esMenu && (!menu.primero || !menu.segundo || !menu.postre)) {
-      toast.error("Completa primero, segundo y postre.");
+    if (esMenu && !menuTieneContenido(seccionesLimpias)) {
+      toast.error("Añade al menos un plato.");
+      return;
+    }
+    // Sin la carta cargada no se distingue un plato retirado de uno que sí está,
+    // y se mandarían a traducir platos cuya traducción ya existe.
+    if (esMenu && cargandoPlatos) {
+      toast.info("Un momento: todavía se está cargando la carta.");
       return;
     }
     if (!esMenu && tapas.length === 0) {
@@ -217,60 +248,128 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
 
     setIsSaving(true);
     try {
-      // 1) Traducir (no bloqueante: si falla se guarda solo en español).
-      const { data: tradRes, error: tradError } = await supabase.functions.invoke("traducir-contenido", {
-        body: esMenu ? { tipo: "menu", datos: menu } : { tipo: "tapas", datos: { tapas } },
-      });
-      const t = !tradError && tradRes?.ok ? tradRes.translations : null;
+      // 1) TRADUCIR. Al traductor solo va el TEXTO LIBRE: los platos elegidos
+      //    de la carta ya tienen `nombre_en` / `nombre_fr`, y volver a
+      //    traducirlos solo crearía una segunda versión del mismo plato (y
+      //    gastaría llamadas). Si no hay texto libre, no se llama siquiera.
+      // Cuenta como texto libre lo escrito a mano Y el plato cuyo `platoId` ya
+      // no existe en la carta: su copia sigue siendo válida, pero su traducción
+      // se fue con él, así que hay que pedirla. Si no, un plato retirado de la
+      // carta se quedaría en español para siempre en las filas en/fr.
+      const necesitaTraduccion = (item: ItemMenu) =>
+        item.origen === "libre" || !item.platoId || !platosPorId.has(item.platoId);
 
-      // 2) Filas que había para las fechas afectadas (la editada y, si se ha
-      //    movido a un día ocupado, también la de ese día). Se borran DESPUÉS
-      //    de insertar las nuevas, para no dejar el día vacío si el insert falla.
-      //    Antes, guardar dos veces el mismo día creaba filas duplicadas y la
-      //    web enseñaba una cualquiera de ellas.
-      const fechasAfectadas = Array.from(new Set([fecha, editandoFecha].filter(Boolean) as string[]));
-      const { data: previas, error: previasError } = await supabase
-        .from(config.table)
-        .select("id")
-        .in("fecha", fechasAfectadas);
-      if (previasError) throw previasError;
-      const idsPrevios = (previas ?? []).map((r) => r.id);
+      const libresPorSeccion = esMenu
+        ? (Object.fromEntries(
+            SECCIONES_MENU.map((s) => [s, seccionesLimpias[s].filter(necesitaTraduccion)]),
+          ) as Record<SeccionMenu, ItemMenu[]>)
+        : seccionesVacias();
+      const hayTextoLibre = SECCIONES_MENU.some((s) => libresPorSeccion[s].length > 0);
+
+      let traducciones: Record<string, unknown> | null = null;
+      let falloTraduccion = false;
+      if (!esMenu || hayTextoLibre) {
+        const { data: tradRes, error: tradError } = await supabase.functions.invoke("traducir-contenido", {
+          body: esMenu
+            ? {
+                tipo: "menu",
+                datos: {
+                  primero: textoDeSeccion(libresPorSeccion.primero),
+                  segundo: textoDeSeccion(libresPorSeccion.segundo),
+                  postre: textoDeSeccion(libresPorSeccion.postre),
+                },
+              }
+            : { tipo: "tapas", datos: { tapas } },
+        });
+        traducciones = !tradError && tradRes?.ok ? tradRes.translations : null;
+        falloTraduccion = traducciones === null;
+      }
 
       if (esMenu) {
-        const filas = [{ id: crypto.randomUUID(), fecha, idiom: "es", menu }];
-        if (t?.menu_en && t?.menu_fr) {
-          filas.push({ id: crypto.randomUUID(), fecha, idiom: "en", menu: t.menu_en });
-          filas.push({ id: crypto.randomUUID(), fecha, idiom: "fr", menu: t.menu_fr });
-        }
-        const { error } = await supabase.from("menus_diarios").insert(filas);
+        /**
+         * Variantes de un idioma: primero lo que YA sabe la carta (gratis y
+         * exacto), después lo que haya devuelto el traductor para el texto
+         * libre. Lo que no tenga variante se queda en español, que se lee, en
+         * vez de quedarse en blanco.
+         */
+        const variantesDe = (idioma: "en" | "fr"): Map<string, VarianteIdioma> => {
+          const variantes = new Map<string, VarianteIdioma>();
+
+          for (const seccion of SECCIONES_MENU) {
+            for (const item of seccionesLimpias[seccion]) {
+              if (item.origen !== "carta" || !item.platoId) continue;
+              const plato = platosPorId.get(item.platoId);
+              if (!plato) continue;
+              const nombre = (idioma === "en" ? plato.nombre_en : plato.nombre_fr)?.trim();
+              if (!nombre) continue;
+              const descripcion = (idioma === "en" ? plato.descripcion_en : plato.descripcion_fr)?.trim();
+              variantes.set(item.id, { nombre, descripcion: descripcion || null });
+            }
+          }
+
+          const bloque = traducciones?.[idioma === "en" ? "menu_en" : "menu_fr"];
+          if (bloque && typeof bloque === "object") {
+            const mapa = bloque as Record<string, unknown>;
+            for (const seccion of SECCIONES_MENU) {
+              const texto = typeof mapa[seccion] === "string" ? (mapa[seccion] as string) : "";
+              for (const [id, variante] of emparejarTraduccion(libresPorSeccion[seccion], texto)) {
+                variantes.set(id, variante);
+              }
+            }
+          }
+
+          return variantes;
+        };
+
+        // 2) Se escriben SIEMPRE las tres filas con `upsert` sobre
+        //    (fecha, idiom), que es justo la clave única de la tabla. El código
+        //    anterior insertaba antes de borrar y chocaba con esa restricción al
+        //    volver a guardar el mismo día; además, si una fila no se escribía,
+        //    quedaba la versión vieja de ese idioma junto a la nueva.
+        const filas = [
+          { fecha, idiom: "es", menu: serializarMenuDia(seccionesLimpias) },
+          { fecha, idiom: "en", menu: serializarMenuDia(menuEnIdioma(seccionesLimpias, variantesDe("en"))) },
+          { fecha, idiom: "fr", menu: serializarMenuDia(menuEnIdioma(seccionesLimpias, variantesDe("fr"))) },
+        ];
+        const { error } = await supabase
+          .from("menus_diarios")
+          .upsert(filas as never, { onConflict: "fecha,idiom" });
         if (error) throw error;
       } else {
-        const filas = [{ id: crypto.randomUUID(), fecha, idiom: "es", tapas }];
-        if (t?.tapas_en && t?.tapas_fr) {
-          filas.push({ id: crypto.randomUUID(), fecha, idiom: "en", tapas: t.tapas_en });
-          filas.push({ id: crypto.randomUUID(), fecha, idiom: "fr", tapas: t.tapas_fr });
-        }
-        const { error } = await supabase.from("tapas").insert(filas);
+        // Las tres filas siempre: si el traductor falla, en/fr se quedan con el
+        // español. Antes solo se escribía `es` y las filas en/fr del día seguían
+        // publicando el contenido ANTERIOR.
+        const t = traducciones;
+        const filas = [
+          { fecha, idiom: "es", tapas },
+          { fecha, idiom: "en", tapas: t?.tapas_en ?? tapas },
+          { fecha, idiom: "fr", tapas: t?.tapas_fr ?? tapas },
+        ];
+        const { error } = await supabase.from("tapas").upsert(filas as never, { onConflict: "fecha,idiom" });
         if (error) throw error;
       }
 
-      if (idsPrevios.length > 0) {
-        const { error: borrarError } = await supabase.from(config.table).delete().in("id", idsPrevios);
+      // 3) Si el día se ha movido, el día viejo se queda sin contenido.
+      if (editandoFecha && editandoFecha !== fecha) {
+        const { error: borrarError } = await supabase.from(config.table).delete().eq("fecha", editandoFecha);
         if (borrarError) {
-          console.error("No se pudieron borrar las filas anteriores:", borrarError);
-          toast.warning("Guardado, pero no se pudo borrar la versión anterior de ese día. Recarga y revisa la lista.");
+          console.error("No se pudo borrar el día anterior:", borrarError);
+          toast.warning("Guardado, pero el día anterior sigue publicado. Recarga y bórralo a mano.");
         }
       }
 
-      if (!t) {
-        toast.warning("Guardado solo en español: la traducción automática no está disponible ahora mismo.", {
-          duration: 10000,
-        });
+      if (falloTraduccion) {
+        toast.warning(
+          esMenu
+            ? "Los platos de la carta sí llevan su traducción, pero el texto escrito a mano se ha guardado en español: el traductor automático no responde."
+            : "Guardado solo en español: la traducción automática no está disponible ahora mismo.",
+          { duration: 10000 },
+        );
       }
 
       notificarGuardadoYPublicacion(
         config.origenRebuild,
-        editandoFecha || idsPrevios.length > 0 ? "Cambios guardados" : "Guardado",
+        editandoFecha || choqueFecha ? "Cambios guardados" : "Guardado",
       );
 
       resetForm();
@@ -303,17 +402,6 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       setIsDeleting(false);
     }
   };
-
-  const vistaPrevia = useMemo(() => {
-    if (esMenu) {
-      return [
-        { etiqueta: "Primero", valor: primero },
-        { etiqueta: "Segundo", valor: segundo },
-        { etiqueta: "Postre o café", valor: postre },
-      ];
-    }
-    return null;
-  }, [esMenu, primero, segundo, postre]);
 
   return (
     <div className="space-y-4">
@@ -359,7 +447,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                 <ul className="space-y-2">
                   {registros.map((registro) => {
                     const detalle = registro.menu
-                      ? [registro.menu.primero, registro.menu.segundo, registro.menu.postre].filter(Boolean).join(" · ")
+                      ? SECCIONES_MENU.flatMap((s) => registro.menu!.secciones[s].map((i) => i.nombre)).join(" · ")
                       : (registro.tapas ?? []).join(" · ");
                     const esEditado = registro.fecha === editandoFecha;
                     const esHoy = registro.fecha === hoy;
@@ -448,37 +536,24 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
               )}
 
               {esMenu ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="menu-primero">Primero</Label>
-                    <Textarea
-                      id="menu-primero"
-                      value={primero}
-                      onChange={(e) => setPrimero(e.target.value)}
-                      placeholder="Ej: Ensalada templada de queso de cabra"
-                      className="min-h-20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="menu-segundo">Segundo</Label>
-                    <Textarea
-                      id="menu-segundo"
-                      value={segundo}
-                      onChange={(e) => setSegundo(e.target.value)}
-                      placeholder="Ej: Carrillera con puré de patata"
-                      className="min-h-20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="menu-postre">Postre o café</Label>
-                    <Textarea
-                      id="menu-postre"
-                      value={postre}
-                      onChange={(e) => setPostre(e.target.value)}
-                      placeholder="Ej: Tarta de queso o café"
-                      className="min-h-20"
-                    />
-                  </div>
+                <div className="space-y-3">
+                  <EditorSeccionesMenu
+                    secciones={secciones}
+                    onChange={setSecciones}
+                    platos={platos}
+                    platosPorId={platosPorId}
+                    cargandoPlatos={cargandoPlatos}
+                  />
+                  {hayContenido && seccionesVaciasAviso.length > 0 && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Sin platos en{" "}
+                        {seccionesVaciasAviso.map((s) => ETIQUETA_SECCION[s].toLowerCase()).join(" ni ")}. Se puede
+                        guardar igual: esa parte no saldrá en la web.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -526,17 +601,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
               <CardTitle className="text-lg text-primary">{esMenu ? "Menú del día" : "Tapas del día"}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              {vistaPrevia ? (
-                vistaPrevia.map((p) => (
-                  <div key={p.etiqueta}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{p.etiqueta}</p>
-                    {lineas(p.valor).length > 0 ? (
-                      lineas(p.valor).map((l, i) => <p key={i}>{l}</p>)
-                    ) : (
-                      <p className="text-muted-foreground italic">—</p>
-                    )}
-                  </div>
-                ))
+              {esMenu ? (
+                <VistaPreviaMenu secciones={seccionesLimpias} />
               ) : lineas(tapasTexto).length > 0 ? (
                 <ul className="space-y-1">
                   {lineas(tapasTexto).map((t, i) => (
