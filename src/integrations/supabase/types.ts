@@ -1205,6 +1205,51 @@ export type Database = {
         }
         Relationships: []
       }
+      costes_fijos: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          categoria: string
+          concepto: string
+          creado_en: string
+          eur_mes: number | null
+          id: string
+          naturaleza: string
+          notas: string | null
+          orden: number
+          proveedor: string
+          verificado_en: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          categoria: string
+          concepto: string
+          creado_en?: string
+          eur_mes?: number | null
+          id?: string
+          naturaleza: string
+          notas?: string | null
+          orden?: number
+          proveedor: string
+          verificado_en?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          categoria?: string
+          concepto?: string
+          creado_en?: string
+          eur_mes?: number | null
+          id?: string
+          naturaleza?: string
+          notas?: string | null
+          orden?: number
+          proveedor?: string
+          verificado_en?: string | null
+        }
+        Relationships: []
+      }
       dashboard_config: {
         Row: {
           created_at: string | null
@@ -1661,6 +1706,156 @@ export type Database = {
           tamano_bytes?: number | null
           tipo_mime?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      ia_coste_estimado: {
+        Row: {
+          funcion: string
+          medido_en: string | null
+          modelo: string | null
+          nota: string | null
+          unidad: string
+          unidades_mes_estimadas: number
+          usd_por_unidad: number
+        }
+        Insert: {
+          funcion: string
+          medido_en?: string | null
+          modelo?: string | null
+          nota?: string | null
+          unidad?: string
+          unidades_mes_estimadas: number
+          usd_por_unidad: number
+        }
+        Update: {
+          funcion?: string
+          medido_en?: string | null
+          modelo?: string | null
+          nota?: string | null
+          unidad?: string
+          unidades_mes_estimadas?: number
+          usd_por_unidad?: number
+        }
+        Relationships: []
+      }
+      ia_funciones: {
+        Row: {
+          activo: boolean
+          descripcion: string
+          funcion: string
+          instrumentada: boolean
+          orden: number
+          unidad: string
+        }
+        Insert: {
+          activo?: boolean
+          descripcion: string
+          funcion: string
+          instrumentada?: boolean
+          orden?: number
+          unidad?: string
+        }
+        Update: {
+          activo?: boolean
+          descripcion?: string
+          funcion?: string
+          instrumentada?: boolean
+          orden?: number
+          unidad?: string
+        }
+        Relationships: []
+      }
+      ia_precios: {
+        Row: {
+          actualizado_en: string
+          fuente: string | null
+          modelo: string
+          notas: string | null
+          razonamiento_como_output: boolean
+          usd_por_m_cache_write: number | null
+          usd_por_m_cached: number | null
+          usd_por_m_input: number
+          usd_por_m_output: number
+          verificado_en: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          fuente?: string | null
+          modelo: string
+          notas?: string | null
+          razonamiento_como_output?: boolean
+          usd_por_m_cache_write?: number | null
+          usd_por_m_cached?: number | null
+          usd_por_m_input: number
+          usd_por_m_output: number
+          verificado_en?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          fuente?: string | null
+          modelo?: string
+          notas?: string | null
+          razonamiento_como_output?: boolean
+          usd_por_m_cache_write?: number | null
+          usd_por_m_cached?: number | null
+          usd_por_m_input?: number
+          usd_por_m_output?: number
+          verificado_en?: string | null
+        }
+        Relationships: []
+      }
+      ia_uso: {
+        Row: {
+          cache_write_tokens: number
+          cached_tokens: number
+          completion_tokens: number
+          coste_usd: number | null
+          created_at: string
+          disparador: string | null
+          duracion_ms: number | null
+          estado: string
+          funcion: string
+          id: number
+          llamadas: number
+          modelo: string
+          operacion: string
+          prompt_tokens: number
+          razonamiento_tokens: number
+        }
+        Insert: {
+          cache_write_tokens?: number
+          cached_tokens?: number
+          completion_tokens?: number
+          coste_usd?: number | null
+          created_at?: string
+          disparador?: string | null
+          duracion_ms?: number | null
+          estado?: string
+          funcion: string
+          id?: never
+          llamadas?: number
+          modelo: string
+          operacion?: string
+          prompt_tokens?: number
+          razonamiento_tokens?: number
+        }
+        Update: {
+          cache_write_tokens?: number
+          cached_tokens?: number
+          completion_tokens?: number
+          coste_usd?: number | null
+          created_at?: string
+          disparador?: string | null
+          duracion_ms?: number | null
+          estado?: string
+          funcion?: string
+          id?: never
+          llamadas?: number
+          modelo?: string
+          operacion?: string
+          prompt_tokens?: number
+          razonamiento_tokens?: number
         }
         Relationships: []
       }
@@ -3719,6 +3914,22 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_uso_diario: {
+        Row: {
+          cached_tokens: number | null
+          completion_tokens: number | null
+          coste_usd: number | null
+          dia: string | null
+          errores: number | null
+          funcion: string | null
+          llamadas: number | null
+          modelo: string | null
+          peticiones: number | null
+          prompt_tokens: number | null
+          razonamiento_tokens: number | null
+        }
+        Relationships: []
+      }
       vista_asignacion_dia: {
         Row: {
           espacio_id: string | null
@@ -4286,6 +4497,98 @@ export type Database = {
       http_set_curlopt: {
         Args: { curlopt: string; value: string }
         Returns: boolean
+      }
+      ia_coste_alternativa: {
+        Args: { p_desde?: string; p_hasta?: string; p_modelo_alternativo: string }
+        Returns: {
+          coste_alternativo_usd: number | null
+          coste_real_usd: number | null
+          diferencia_pct: number | null
+          diferencia_usd: number | null
+          modelo_alternativo: string
+          modelo_real: string
+          peticiones: number
+        }[]
+      }
+      ia_coste_mes: {
+        Args: never
+        Returns: {
+          coste_acumulado_usd: number | null
+          dias_con_dato: number
+          dias_mes: number
+          dias_restantes: number
+          estimado_ia_usd_mes: number | null
+          fijos_eur_mes: number | null
+          fijos_sin_verificar: number
+          mes: string
+          peticiones: number | null
+          proy_lineal_usd: number | null
+          proy_media7_usd: number | null
+          usd_medio_dia: number | null
+        }[]
+      }
+      ia_coste_por_funcion: {
+        Args: { p_desde?: string; p_hasta?: string }
+        Returns: {
+          completion_tokens: number
+          coste_usd: number | null
+          descripcion: string | null
+          errores: number
+          funcion: string
+          instrumentada: boolean
+          llamadas: number
+          pct: number | null
+          peticiones: number
+          prompt_tokens: number
+          razonamiento_tokens: number
+          usd_por_peticion: number | null
+        }[]
+      }
+      ia_coste_por_modelo: {
+        Args: { p_desde?: string; p_hasta?: string }
+        Returns: {
+          cached_tokens: number
+          completion_tokens: number
+          coste_usd: number | null
+          llamadas: number
+          modelo: string
+          pct: number | null
+          pct_razonamiento: number | null
+          peticiones: number
+          prompt_tokens: number
+          razonamiento_tokens: number
+          tarifado: boolean
+          usd_por_peticion: number | null
+        }[]
+      }
+      ia_coste_serie: {
+        Args: { p_desde?: string; p_funcion?: string | null; p_hasta?: string }
+        Returns: {
+          completion_tokens: number | null
+          coste_usd: number | null
+          desv_30: number | null
+          desviacion_pct: number | null
+          dia: string
+          errores: number | null
+          es_anomalia: boolean | null
+          llamadas: number | null
+          media_30: number | null
+          media_7: number | null
+          peticiones: number | null
+          prompt_tokens: number | null
+          razonamiento_tokens: number | null
+          z_30: number | null
+        }[]
+      }
+      ia_funciones_sin_registro: {
+        Args: { p_dias?: number }
+        Returns: {
+          descripcion: string | null
+          dias_sin_registro: number | null
+          funcion: string
+          instrumentada: boolean
+          ultima_fila: string | null
+        }[]
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
