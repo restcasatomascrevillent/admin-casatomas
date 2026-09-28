@@ -64,13 +64,18 @@ import {
   mensajeDeError,
   debeCrearAvisoEmailFallido,
   escapeHtml,
-  tplSolicitudRecibida,
+  // `tplSolicitudRecibida` ya NO se usa aqui: ese correo lo manda ahora
+  // `emails-reserva` desde `plantillas_email_reserva` (editable y versionada
+  // desde el panel). Se deja exportada y probada en plantillas.ts como
+  // referencia del texto historico; retirarla es una decision aparte.
+  debeAvisarDeEmailsReserva,
   tplSolicitudNoProcesada,
   tplConfirmaAsistencia,
   tplSinDisponibilidad,
   type Marca,
   type DatosNegocio,
   type AvisoEmailFallidoInput,
+  type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 
 // ------------------------------------------------------------
@@ -84,6 +89,21 @@ const TOKEN_SECRET = Deno.env.get("RESERVAS_WEB_TOKEN_SECRET") ?? "";
 const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
 const ALLOWED_ORIGIN = Deno.env.get("RESERVAS_WEB_ALLOWED_ORIGIN") || "*";
 const PUBLIC_BASE_URL = Deno.env.get("RESERVAS_WEB_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/reservas-web`;
+
+// Correo de "solicitud recibida": se delega en `emails-reserva/notificar`
+// (ver el bloque "DELEGACION DEL CORREO..." en plantillas.ts para el porque).
+// El secreto es el MISMO que ya usa `notify-reservation-change` y es un
+// secreto del proyecto, asi que no hay que crear ninguno nuevo. Si faltara,
+// `comprobarSecretoCompartido` en emails-reserva falla CERRADO (401) -> aqui
+// sale `contactado:false` -> aviso interno; nunca silencio.
+const EMAILS_RESERVA_SHARED_SECRET = Deno.env.get("EMAILS_RESERVA_SHARED_SECRET") ?? "";
+const EMAILS_RESERVA_URL = `${SUPABASE_URL}/functions/v1/emails-reserva/notificar`;
+// Mas largo que los 5 s de `notify-reservation-change`, a proposito: esta
+// llamada va FUERA del camino critico de la respuesta (ver `enSegundoPlano`),
+// asi que no corre ninguna prisa, y abortarla antes de tiempo mientras
+// emails-reserva si esta completando el envio (su propio timeout contra
+// Resend es de 15 s) produciria un aviso interno falso.
+const EMAILS_RESERVA_TIMEOUT_MS = 20_000;
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const resend = new Resend(RESEND_API_KEY);
@@ -468,6 +488,85 @@ async function sendEmail(to: string, subject: string, htmlBody: string): Promise
   } catch (err) {
     console.error("[EMAIL] Excepción enviando email:", (err as Error)?.message || err);
     return { ok: false, error: mensajeDeError(err, "excepcion_desconocida") };
+  }
+}
+
+// ------------------------------------------------------------
+// TAREAS FUERA DEL CAMINO CRITICO DE LA RESPUESTA
+// ------------------------------------------------------------
+// El cuerpo de la respuesta de `/crear` no depende en nada del correo: el
+// cliente ya sabe por el propio 201 que su solicitud entro. Mandarlo ANTES
+// de responder solo suma latencia al boton "Reservando..." del formulario.
+// `EdgeRuntime.waitUntil` es la API de tareas en segundo plano del runtime
+// de Supabase: mantiene vivo el worker hasta que la promesa termina, aunque
+// la respuesta ya se haya devuelto.
+//
+// FALLBACK DELIBERADO: si `EdgeRuntime.waitUntil` no existe (dev local con
+// otro runtime, tests, o un cambio futuro de plataforma) se ESPERA la tarea
+// antes de responder. Peor latencia -la de hoy, ni un ms mas- pero jamas un
+// correo perdido: un `void promesa` suelto moriria con el isolate.
+declare const EdgeRuntime: { waitUntil?: (p: Promise<unknown>) => void } | undefined;
+
+async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promise<void> {
+  const protegida = tarea.catch((err) => {
+    console.error(`[SEGUNDO_PLANO] ${etiqueta}:`, (err as Error)?.message || err);
+  });
+  const runtime = typeof EdgeRuntime !== "undefined" ? EdgeRuntime : undefined;
+  if (runtime && typeof runtime.waitUntil === "function") {
+    runtime.waitUntil(protegida);
+    return;
+  }
+  console.warn(`[SEGUNDO_PLANO] EdgeRuntime.waitUntil no disponible — se espera a "${etiqueta}" antes de responder.`);
+  await protegida;
+}
+
+// ------------------------------------------------------------
+// DELEGACION EN `emails-reserva` (registro + reintentos + seguimiento)
+// ------------------------------------------------------------
+// Mismo contrato que usa `notify-reservation-change`: POST /notificar con
+// `{ reserva_id }`. `emails-reserva` deriva el tipo de plantilla del ESTADO
+// de la reserva (`tipoEmailParaEstado`): 'pendiente' -> 'solicitud_recibida',
+// que es justo el correo que necesita `handleCrear`. No se le puede forzar
+// el tipo ni el destinatario: los lee de la fila de `reservas`.
+//
+// Devuelve SIEMPRE un resultado (nunca lanza): quien lo llama decide si
+// avisar con `debeAvisarDeEmailsReserva` (pura, en plantillas.ts).
+async function notificarViaEmailsReserva(reservaId: string): Promise<ResultadoNotificarEmailsReserva> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    // emails-reserva tiene verify_jwt = false, pero se manda igual por si
+    // algun dia cambia — mismo criterio que notify-reservation-change.
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  };
+  if (EMAILS_RESERVA_SHARED_SECRET) headers["x-webhook-secret"] = EMAILS_RESERVA_SHARED_SECRET;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), EMAILS_RESERVA_TIMEOUT_MS);
+  try {
+    const respuesta = await fetch(EMAILS_RESERVA_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ reserva_id: reservaId }),
+      signal: controller.signal,
+    });
+    if (!respuesta.ok) {
+      const texto = await respuesta.text().catch(() => "");
+      console.error(`[EMAILS_RESERVA] HTTP ${respuesta.status}: ${texto.slice(0, 300)}`);
+      return { contactado: false, ok: false, motivo: `http_${respuesta.status}` };
+    }
+    const cuerpo = (await respuesta.json().catch(() => null)) as { ok?: boolean; motivo?: string } | null;
+    if (!cuerpo || typeof cuerpo.ok !== "boolean") {
+      console.error("[EMAILS_RESERVA] Respuesta 2xx sin cuerpo JSON reconocible");
+      return { contactado: false, ok: false, motivo: "respuesta_ilegible" };
+    }
+    if (!cuerpo.ok) console.warn(`[EMAILS_RESERVA] No enviado: ${cuerpo.motivo ?? "sin_motivo"}`);
+    return { contactado: true, ok: cuerpo.ok, motivo: cuerpo.motivo ?? null };
+  } catch (err) {
+    const esTimeout = (err as Error)?.name === "AbortError";
+    console.error("[EMAILS_RESERVA] Fallo de transporte:", (err as Error)?.message || err);
+    return { contactado: false, ok: false, motivo: esTimeout ? "timeout" : "error_de_red" };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -980,23 +1079,42 @@ async function handleCrear(req: Request): Promise<Response> {
   // el envío de email y el registro de solicitud pendiente son idénticos.
   const avisar = async (motivo: string, descripcion: string, mensajeCliente: string, status: number, log = true) => {
     if (log) await registrarSolicitudPendiente({ ...datosSolicitud, motivo, descripcion });
+    // ESTE correo NO se puede delegar en `emails-reserva` ni registrar en
+    // `envios_email_reserva`: aqui todavia NO existe fila en `reservas` (el
+    // rechazo ocurre antes del INSERT, y en blacklist no llega a haberla
+    // nunca), y `envios_email_reserva.reserva_id` es NOT NULL con FK a
+    // `reservas`. Hacerlo nullable tampoco valdria: el indice unico
+    // `uq_envio_email_reserva_activo (reserva_id, tipo_email)` dejaria de
+    // deduplicar en cuanto `reserva_id` fuese NULL (en Postgres los NULL son
+    // distintos entre si en un indice unico). Y `/notificar` deriva el tipo
+    // del ESTADO de una reserva que aqui no hay.
+    // Es exactamente el mismo caso —y la misma decision— que
+    // `emails-reserva/propuesta-solicitud.ts` ya documenta para la propuesta
+    // de una solicitud: sin fila, sin reintento automatico; la visibilidad la
+    // da el aviso de `notificaciones_dashboard` de aqui debajo.
+    // Lo unico que cambia es que el envio deja de bloquear la respuesta.
     if (email) {
-      const resultadoEmail = await sendEmail(
-        email,
-        `Estado de reserva ${negocioTemprano.nombre}`,
-        tplSolicitudNoProcesada(negocioTemprano, nombre, fecha, hora, partySize),
+      await enSegundoPlano(
+        (async () => {
+          const resultadoEmail = await sendEmail(
+            email,
+            `Estado de reserva ${negocioTemprano.nombre}`,
+            tplSolicitudNoProcesada(negocioTemprano, nombre, fecha, hora, partySize),
+          );
+          if (!resultadoEmail.ok) {
+            await avisarEmailFallido({
+              contexto: "solicitud no procesada",
+              negocio: negocioTemprano,
+              nombre,
+              fecha,
+              hora,
+              reservaId: null,
+              error: resultadoEmail.error,
+            });
+          }
+        })(),
+        "solicitud no procesada",
       );
-      if (!resultadoEmail.ok) {
-        await avisarEmailFallido({
-          contexto: "solicitud no procesada",
-          negocio: negocioTemprano,
-          nombre,
-          fecha,
-          hora,
-          reservaId: null,
-          error: resultadoEmail.error,
-        });
-      }
     }
     return json({ ok: false, motivo, mensaje: mensajeCliente }, status);
   };
@@ -1245,23 +1363,39 @@ async function handleCrear(req: Request): Promise<Response> {
     return json({ ok: false, error: "internal_error" }, 500);
   }
 
+  // EL CORREO YA NO SALE DE AQUI. Antes esta rama llamaba a `sendEmail`
+  // (Resend directo) y no dejaba NI UNA FILA en `envios_email_reserva`: si
+  // fallaba, no se enteraba nadie mas que un aviso de campana, y no habia
+  // reintento ni seguimiento de entrega. Ahora se delega en
+  // `emails-reserva/notificar`, que reclama la fila, manda con
+  // `Idempotency-Key`, respeta la lista de supresion y deja que el cron de
+  // reintentos (cada 15 min: 10/20/40/80) y `resend-webhook`
+  // (`estado_entrega`) hagan su trabajo.
+  //
+  // Y va en SEGUNDO PLANO: el 201 sale sin esperar al correo, asi que el
+  // formulario responde ANTES que antes, no despues.
+  //
+  // SIN RED DE SEGURIDAD "mando yo el correo si falla la llamada" a
+  // proposito: reintroduciria el envio invisible que esto viene a eliminar y,
+  // si emails-reserva si llego a procesar la peticion pero se perdio la
+  // respuesta, el cliente recibiria DOS correos distintos. Si no se puede
+  // delegar, se avisa al personal y se acabo.
   if (email) {
-    const resultadoEmail = await sendEmail(
-      email,
-      `Estado de reserva ${negocio.nombre}`,
-      tplSolicitudRecibida(negocio, nombre, fecha, hora, partySize),
+    await enSegundoPlano(
+      notificarViaEmailsReserva(inserted.id).then(async (resultado) => {
+        if (!debeAvisarDeEmailsReserva(resultado)) return;
+        await avisarEmailFallido({
+          contexto: "solicitud recibida",
+          negocio,
+          nombre,
+          fecha,
+          hora,
+          reservaId: inserted.id,
+          error: resultado.motivo ?? "emails_reserva_sin_motivo",
+        });
+      }),
+      "solicitud recibida",
     );
-    if (!resultadoEmail.ok) {
-      await avisarEmailFallido({
-        contexto: "solicitud recibida",
-        negocio,
-        nombre,
-        fecha,
-        hora,
-        reservaId: inserted.id,
-        error: resultadoEmail.error,
-      });
-    }
   }
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);

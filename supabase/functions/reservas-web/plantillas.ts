@@ -420,6 +420,78 @@ export function construirAvisoEmailFallido(input: AvisoEmailFallidoInput): FilaN
 }
 
 // ----------------------------------------------------------------------------
+// DELEGACIÓN DEL CORREO DE "SOLICITUD RECIBIDA" EN `emails-reserva`
+// ----------------------------------------------------------------------------
+// El correo de recibo de una reserva web ya NO se manda desde aquí: se
+// delega en `emails-reserva/notificar`, que es la única tubería que registra
+// fila en `envios_email_reserva` (y con ella: reintentos con espera creciente
+// vía pg_cron, `Idempotency-Key` estable, lista de supresión y seguimiento de
+// entrega/rebote a través de `resend-webhook`.estado_entrega).
+//
+// POR QUÉ NO SE REGISTRA LA FILA DESDE AQUÍ Y SE SIGUE ENVIANDO (la otra
+// opción que se estudió): el reintento de `emails-reserva`
+// (`procesarReintentoDeFila`) vuelve a RENDERIZAR el correo desde
+// `plantillas_email_reserva` usando el MISMO `Idempotency-Key`
+// (`envio-email-reserva/<id>`). Si el primer intento hubiese salido de aquí
+// con el HTML de `tplSolicitudRecibida`, el reintento mandaría a Resend la
+// misma clave con un cuerpo distinto -> 409 `invalid_idempotent_request`,
+// que `clasificarErrorEnvio` trata como PERMANENTE -> `fallido_definitivo`.
+// Y con `plantilla_id` a null el reintento muere antes aún
+// (`plantilla_no_encontrada`). Es decir: registrar aquí daría la fila pero un
+// mecanismo de reintento roto por construcción, salvo duplicando el
+// renderizado de `emails-reserva`, que es justo lo que se quería evitar.
+
+/** Motivos de `emails-reserva/notificar` en los que ESA función ya se ha
+ * hecho cargo del correo — o porque dejó fila en `envios_email_reserva` (y
+ * el cron lo reintentará), o porque ella misma ya creó el aviso interno
+ * (`avisarEnviosDefinitivamentePerdidos`), o porque no hay nada que avisar:
+ *
+ *   - `ya_enviado_o_en_curso`: el índice único `(reserva_id, tipo_email)`
+ *     rechazó un duplicado. El cliente ya tiene (o va a tener) su correo.
+ *   - `fallido_reintentable`: hay fila en 'fallido' con
+ *     `proximo_reintento_en`. Avisar aquí sería ruido: en 10 minutos lo más
+ *     probable es que haya salido, y si se agotan los 5 intentos avisa
+ *     `emails-reserva`.
+ *   - `fallido_definitivo`, `resend_no_configurado`, `destinatario_suprimido`:
+ *     `enviarCorreoParaReserva` YA llamó a `avisarEnviosDefinitivamentePerdidos`
+ *     antes de devolverlos. Avisar otra vez duplicaría la campana.
+ *
+ * Todo lo demás (incluido no poder contactar con `emails-reserva`) significa
+ * que NADIE registró el correo ni avisó: ahí sí avisa esta función. */
+export const MOTIVOS_EMAILS_RESERVA_CON_CUSTODIA: readonly string[] = [
+  "ya_enviado_o_en_curso",
+  "fallido_reintentable",
+  "fallido_definitivo",
+  "resend_no_configurado",
+  "destinatario_suprimido",
+];
+
+/** Lo que `notificarViaEmailsReserva` (index.ts) sabe tras intentar delegar. */
+export interface ResultadoNotificarEmailsReserva {
+  /** ¿Se pudo hablar con `emails-reserva` Y respondió 2xx con cuerpo JSON?
+   * `false` cubre red caída, timeout, 401 por secreto mal puesto, 404, 5xx
+   * y cuerpo ilegible: en todos esos casos NO hay fila en
+   * `envios_email_reserva`, así que el correo se ha perdido en silencio —
+   * exactamente el fallo que esta sesión viene a cerrar. */
+  contactado: boolean;
+  /** El `ok` del cuerpo. Solo significativo si `contactado`. */
+  ok: boolean;
+  /** El `motivo` del cuerpo, o el error de transporte si no hubo cuerpo. */
+  motivo: string | null;
+}
+
+/** Pura: ¿hay que crear aviso interno (`notificaciones_dashboard`) por este
+ * resultado? Ver `MOTIVOS_EMAILS_RESERVA_CON_CUSTODIA` para el criterio.
+ * Regla en una línea: se avisa SI Y SOLO SI `emails-reserva` no se ha hecho
+ * cargo del correo. */
+export function debeAvisarDeEmailsReserva(resultado: ResultadoNotificarEmailsReserva): boolean {
+  if (!resultado.contactado) return true;
+  if (resultado.ok) return false;
+  const motivo = resultado.motivo ?? "";
+  return !MOTIVOS_EMAILS_RESERVA_CON_CUSTODIA.includes(motivo);
+}
+
+// ----------------------------------------------------------------------------
 // Las 4 plantillas de correo — mismo HTML/CSS que antes, con el nombre,
 // localidad, dirección y teléfono ahora parametrizados por `negocio` en vez
 // de escritos a fuego. Ningún cambio de estructura ni de estilo (regla del
