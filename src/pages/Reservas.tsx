@@ -20,6 +20,8 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
+import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
+import { toast } from "sonner";
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,6 +33,13 @@ export default function Reservas() {
   // para no dejar a alguien en modo servicio de la sala anterior sin darse
   // cuenta.
   const [vistaEspacio, setVistaEspacio] = useState<"plano" | "servicio">("plano");
+  // Salto "ir a darle mesa a ESTA reserva" (2026-09-28, petición del dueño).
+  // Hasta ahora el plano solo se abría POR SALA —Hoy, Ocupación y calendario
+  // pasan un `espacioId` y nada más—, así que para sentar una reserva concreta
+  // había que deducir su sala, abrirla y buscarla dentro. Esto guarda el día y
+  // la reserva del salto para pasárselos al plano; `null` = se entró por sala,
+  // como siempre. Ver `src/lib/reservas/saltoAsignacion.ts`.
+  const [saltoAsignacion, setSaltoAsignacion] = useState<Omit<DestinoAsignacion, "espacioId"> | null>(null);
   const [activeTab, setActiveTab] = useState<string>("hoy");
   const [tabsOverflow, setTabsOverflow] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement | null>(null);
@@ -131,8 +140,44 @@ export default function Reservas() {
     const espacio = espacios?.find((e) => e.id === espacioId);
     if (espacio) {
       setVistaEspacio("plano");
+      // Entrada POR SALA: se limpia el salto por si se venía de uno, para no
+      // arrastrar una reserva señalada que aquí no viene a cuento.
+      setSaltoAsignacion(null);
       setSelectedEspacio({ id: espacio.id, nombre: espacio.nombre });
     }
+  };
+
+  /**
+   * Entrada POR RESERVA: abre el plano de SU sala, en SU día y con ella ya
+   * señalada, lista para sentarla. Lo usan la pestaña "Lista"
+   * (`ListaReservasAvanzada`) y la franja de pendientes de "Hoy" (`VistaHoy`).
+   *
+   * El destino lo decide `resolverSaltoAsignacion`, que ya ha descartado las
+   * reservas sin sala (su botón llega aquí deshabilitado y explicando por qué),
+   * así que aquí solo queda traducir el `espacioId` a la sala y montar la
+   * pantalla. Se fuerza la vista "plano": el modo servicio es para mirar el
+   * estado en vivo, no para repartir mesas.
+   */
+  const handleAsignarMesa = ({ espacioId, fecha, reservaId, turno }: DestinoAsignacion) => {
+    const espacio = espacios?.find((e) => e.id === espacioId);
+    if (!espacio) {
+      // La sala existía cuando se pintó la fila y ya no está (borrada o
+      // desactivada desde otra pantalla). Mejor decirlo que no hacer nada al
+      // pulsar, que es lo que parecería un botón roto.
+      toast.info("Esa sala ya no está disponible", {
+        description: "Puede que la hayan borrado o desactivado. Recarga la pantalla para ver las salas al día.",
+      });
+      return;
+    }
+    setVistaEspacio("plano");
+    setSaltoAsignacion({ fecha, reservaId, turno });
+    setSelectedEspacio({ id: espacio.id, nombre: espacio.nombre });
+  };
+
+  /** Cierra el plano/modo servicio y deshace el salto, si lo hubo. */
+  const volverDeEspacio = () => {
+    setSelectedEspacio(null);
+    setSaltoAsignacion(null);
   };
 
   // Si hay un espacio seleccionado, mostrar el plano 2D o el modo servicio
@@ -162,13 +207,26 @@ export default function Reservas() {
           <ModoServicioPlano
             espacioId={selectedEspacio.id}
             espacioNombre={selectedEspacio.nombre}
-            onBack={() => setSelectedEspacio(null)}
+            onBack={volverDeEspacio}
           />
         ) : (
+          /* `fecha`, `turno` y `reservaId` solo llegan cuando se ha entrado POR
+             RESERVA. Sin salto van `undefined` y el plano se comporta igual que
+             siempre: lee `?fecha=` de la URL (por donde entra el calendario) o
+             abre en hoy, con el turno del reloj.
+
+             Los tres se pasan AL MONTAR a propósito: el plano los lee en su
+             primer render. Dejar que el turno lo dedujera él después de cargar
+             las reservas no funcionaba (medido en el navegador el 2026-09-28:
+             la URL se quedaba en `turno=cena` pero el panel seguía en comida y
+             la reserva a sentar no salía). Ver `saltoAsignacion.ts`. */
           <PlanoEspacio2D
             espacioId={selectedEspacio.id}
             espacioNombre={selectedEspacio.nombre}
-            onBack={() => setSelectedEspacio(null)}
+            onBack={volverDeEspacio}
+            fecha={saltoAsignacion?.fecha}
+            turno={saltoAsignacion?.turno}
+            reservaId={saltoAsignacion?.reservaId}
           />
         )}
       </DashboardLayout>
@@ -266,7 +324,7 @@ export default function Reservas() {
             /reservas. Sin lista/tabla aquí a propósito: con el kanban
             delante, una tabla debajo solo duplicaba las mismas reservas. */}
         <TabsContent value="hoy" className="mt-6">
-          <VistaHoy onEspacioClick={handleEspacioClick} />
+          <VistaHoy onEspacioClick={handleEspacioClick} onAsignarMesa={handleAsignarMesa} />
         </TabsContent>
 
         {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):
@@ -289,6 +347,7 @@ export default function Reservas() {
               // (p. ej. desde la campana), la lista se reinicia con él.
               key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
               onEspacioClick={handleEspacioClick}
+              onAsignarMesa={handleAsignarMesa}
               initialStatusFilter={statusFromUrl || undefined}
               initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
               solicitudesState={solicitudesState}
