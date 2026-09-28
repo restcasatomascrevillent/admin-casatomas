@@ -88,8 +88,35 @@ Cada documento es de un proveedor distinto: los nombres de las columnas cambian 
 ════════════════════════════════════════════
 1. CLASIFICACIÓN
 ════════════════════════════════════════════
-Si dice "Albarán", "Nota de entrega" o "Delivery Note" → albaran, AUNQUE lleve precios e IVA.
-Si dice "Factura" o "Invoice" → factura.
+Mira el TÍTULO del documento: la palabra grande de la cabecera, o la que va en
+el recuadro destacado. Eso es lo que decide.
+  "Factura" o "Invoice" en el título → factura
+  "Albarán", "Nota de entrega" o "Delivery Note" en el título → albaran,
+  aunque lleve precios e IVA.
+
+CUIDADO: muchas facturas traen una CASILLA llamada "Albarán" o "Nº albarán"
+con el número del albarán al que corresponden. Eso es una referencia cruzada,
+no el tipo del documento. Si el título dice FACTURA, es una factura aunque
+aparezca la palabra "albarán" tres veces dentro.
+Regla práctica: si hay total a pagar, vencimiento, forma de pago o desglose de
+IVA, casi siempre es una factura.
+
+════════════════════════════════════════════
+1b. QUIÉN ES EL PROVEEDOR (se confunde muy a menudo)
+════════════════════════════════════════════
+El proveedor es QUIEN EMITE y cobra. Suele estar en el LOGO, arriba a la
+izquierda, o en el texto legal del margen o del pie ("Reg. Mercantil...",
+"GRUPO X, S.A.").
+
+El bloque que pone "Dirección de envío", "Cliente", "Facturar a", "Destinatario"
+o "Enviar a" es el DESTINATARIO. NO es el proveedor, y su CIF tampoco.
+
+El destinatario SIEMPRE es el restaurante: verás "MASIDE 2011, S.L.",
+"RESTAURANTE CASA TOMAS", "CASA TOMAS", "BARRA CASA TOMAS" o "TOUZA", en
+Crevillente (Alicante). Si el nombre que ibas a poner como proveedor es uno de
+esos, te has equivocado de bloque: el proveedor es el otro.
+Y el cif que se pide es el DEL PROVEEDOR. Si el único CIF que ves está dentro
+del bloque del destinatario, devuelve cif = null antes que el del cliente.
 
 ════════════════════════════════════════════
 2. NÚMEROS: FORMATO ESPAÑOL (lo más delicado)
@@ -97,11 +124,25 @@ Si dice "Factura" o "Invoice" → factura.
 En España el punto separa los MILES y la coma separa los DECIMALES. Al revés que en inglés. Confundirlos mueve la coma de sitio y multiplica o divide el importe por mil.
 
   "1.200,50"  → 1200.50     (mil doscientos con cincuenta)
-  "9.316,67"  → 9316.67     (nueve mil trescientos dieciséis con sesenta y siete)
+  "12.513,50" → 12513.50    (doce mil quinientos trece con cincuenta)
   "931,67"    → 931.67      (novecientos treinta y uno con sesenta y siete)
   "120.580"   → 120580      (ciento veinte mil quinientos ochenta)
   "120,58"    → 120.58      (ciento veinte con cincuenta y ocho)
   "1.234.567,89" → 1234567.89
+
+CUIDADO con la coma seguida de TRES decimales. En columnas de cantidad y de
+peso es lo normal, porque los kilos se dan al gramo:
+
+  "111,800"   → 111.8   kg   (ciento once kilos ochocientos gramos)
+  "12,000"    → 12           (doce unidades justas)
+  "1,000"     → 1            (una unidad)
+  "-1,000"    → -1           (una unidad en negativo: un abono o un rappel)
+  "7,350"     → 7.35    kg
+
+Leer "111,800" como ciento once mil ochocientos es el error más caro que
+puedes cometer aquí: convierte 111 kilos de jamón en 111.800 €.
+Un mismo documento puede mezclar las dos convenciones: tres decimales en las
+columnas de cantidad y peso, dos decimales en las de dinero.
 
 Devuelve SIEMPRE números JSON con punto decimal y SIN separador de miles.
 NUNCA devuelvas 1234,56 ni "1.234,56" ni 1.234 para un valor que vale mil doscientos treinta y cuatro con cincuenta y seis.
@@ -117,10 +158,36 @@ Devuelve siempre AAAA-MM-DD. Usa la fecha DEL DOCUMENTO (emisión o entrega), nu
 ════════════════════════════════════════════
 4. TABLA DE LÍNEAS
 ════════════════════════════════════════════
-A. Identificar las columnas por aritmética, no por el nombre de la cabecera.
-   Localiza la CANTIDAD y dos importes en la línea, y comprueba cuál cumple:
+A0. ANTES DE NADA: ¿ESTE DOCUMENTO LLEVA PRECIOS?
+   Muchos albaranes de entrega NO llevan ningún importe: solo traen qué se
+   entrega, cuántas unidades y cuánto pesa. Es lo normal, no un documento
+   incompleto ni mal escaneado.
+   Búscalo de forma explícita: ¿hay una columna con el símbolo €, o cabeceras
+   tipo "Precio", "Importe", "P.V.P.", "Base", "Total €"? ¿Hay un total a pagar
+   al pie?
+   Si NO lo hay: sin_importes = true, y precio_unitario, total, subtotal, iva y
+   total del documento van todos a null.
+   PROHIBIDO deducir un precio. Nada de dividir un número entre la cantidad,
+   nada de multiplicar, nada de estimar por lo que suele costar el producto.
+   Si el precio no está impreso, NO EXISTE. Un hueco vacío es un dato correcto;
+   un número inventado es un error que nadie detectará después.
+
+A. Si el documento SÍ lleva precios, identifica las columnas por aritmética y
+   no por el nombre de la cabecera:
      cantidad × precio_unitario = total_línea
    El que multiplica es el PRECIO UNITARIO; el resultado es el TOTAL DE LÍNEA.
+   Si la aritmética no encaja con ninguna pareja de columnas, NO fuerces la
+   interpretación: es señal de que esa columna no es dinero (ver A1).
+
+A1. UNA COLUMNA DE NÚMEROS NO ES AUTOMÁTICAMENTE DINERO.
+   En alimentación es muy frecuente que la tabla traiga CANTIDAD y PESO:
+     "JAMON G.R. (2)     12,000     111,800"
+   Eso son 12 piezas que pesan 111,8 kg. NO son 111.800 €, y el precio
+   unitario NO es 111800/12. Van en cantidad = 12 y peso_kg = 111.8.
+   Señales de que una columna es PESO y no importe: hay tres decimales
+   (los kilos se dan al gramo), la cabecera dice Kg/Peso/Neto/Bruto, el
+   producto se vende al peso (jamón, carne, pescado, queso), o no hay ningún
+   símbolo de euro ni total a pagar en toda la página.
 
 B. PRECIO UNITARIO vs PRECIO POR KILO. Muchos proveedores de alimentación
    facturan al peso. Si la columna de precio dice €/kg, EUR/Kg, "precio kilo"
@@ -153,7 +220,11 @@ F. Si el documento no declara subtotal, IVA o total (habitual en albaranes),
 ════════════════════════════════════════════
 5. COMPROBACIÓN OBLIGATORIA ANTES DE RESPONDER
 ════════════════════════════════════════════
-Repasa estas tres igualdades. Son la forma de cazar tus propios errores de lectura:
+Primero: si has marcado sin_importes = true, comprueba que no queda ni un solo
+número en precio_unitario, total, subtotal o iva. Si queda alguno, o el
+documento sí tenía precios, o te lo has inventado.
+
+Si el documento lleva precios, repasa estas tres igualdades. Son la forma de cazar tus propios errores de lectura:
 
   (1) para cada línea:   cantidad × precio_unitario = total_línea
   (2) suma de todas las líneas = subtotal (o el total, si no hay subtotal)

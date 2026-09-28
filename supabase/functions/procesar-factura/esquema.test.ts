@@ -37,6 +37,7 @@ function doc(over: Partial<DocumentoExtraido> = {}): DocumentoExtraido {
     cif: "B12345678",
     numero_documento: "F-001",
     fecha: "2026-09-03",
+    sin_importes: false,
     productos: [linea()],
     subtotal: 100,
     iva: 10,
@@ -52,6 +53,7 @@ function linea(over: Partial<LineaExtraida> = {}): LineaExtraida {
     nombre: "Producto",
     cantidad: 10,
     unidad: "ud",
+    peso_kg: null,
     base_precio: "por_unidad",
     precio_unitario: 10,
     total: 100,
@@ -228,7 +230,99 @@ describe("validarEstructura — formas que hoy se cuelan", () => {
 //  3. comprobarCuadre — los DOS errores reales de produccion
 // ============================================================================
 
-describe("comprobarCuadre — caso real: Joselito, albaran 2509134", () => {
+// ============================================================================
+//  EL CASO JOSELITO, BIEN ENTENDIDO
+// ----------------------------------------------------------------------------
+//  Durante meses se creyo que era "un x10 de OCR" (asi lo dejo escrito la
+//  migracion 20260922120000). Al mirar el papel (albaran 2509134, foto 25.jpg)
+//  resulta que no era eso en absoluto. El documento dice:
+//
+//    JAMON JOSELITO G.R. (2)           12,000      111,800
+//    JAMON JOSELITO G.R. (1)            1,000        9,780
+//    RAPPEL POR MARKETING Y ESCAPARATE -1,000
+//
+//  Son 12 piezas que pesan 111,800 kg y 1 pieza de 9,780 kg. Las columnas son
+//  UNIDADES y KILOS. El albaran NO LLEVA NI UN PRECIO: ni euros por linea, ni
+//  base, ni IVA, ni total.
+//
+//  Lo que se guardo: total 111.800,00 EUR y precio_unitario 9.316,67 EUR, que
+//  es 111800/12 — un numero que no esta impreso en ninguna parte.
+//
+//  O sea, tres fallos encadenados:
+//    1. la coma decimal leida como separador de miles (111,8 -> 111.800)
+//    2. una columna de PESO interpretada como EUROS
+//    3. un precio INVENTADO por division en un documento sin precios
+//
+//  Ninguno de los tres es un digito mal leido, asi que ninguno se arregla con
+//  mas resolucion. Son de formato y de columnas: esquema y prompt.
+// ============================================================================
+
+describe("Joselito 2509134 — un albaran SIN PRECIOS leido como 111.800 EUR", () => {
+  /** Lo que de verdad pone el papel. */
+  const correcto = doc({
+    tipo: "albaran",
+    proveedor: "JOSELITO",
+    numero_documento: "2509134",
+    fecha: "2025-12-15",
+    sin_importes: true,
+    productos: [
+      { nombre: "JAMON JOSELITO G.R. (2)", cantidad: 12, unidad: "ud", peso_kg: 111.8, base_precio: "desconocida", precio_unitario: null, total: null, bonificada: false },
+      { nombre: "JAMON JOSELITO G.R. (1)", cantidad: 1, unidad: "ud", peso_kg: 9.78, base_precio: "desconocida", precio_unitario: null, total: null, bonificada: false },
+      { nombre: "RAPPEL POR MARKETING Y ESCAPARATE", cantidad: -1, unidad: "ud", peso_kg: null, base_precio: "desconocida", precio_unitario: null, total: null, bonificada: false },
+    ],
+    subtotal: null, iva: null, total: null,
+  });
+
+  /** Lo que el sistema guardo de verdad en produccion. */
+  const guardadoMal = doc({
+    tipo: "albaran",
+    proveedor: "JOSELITO",
+    numero_documento: "2509134",
+    sin_importes: true, // dice que no hay precios...
+    productos: [
+      { nombre: "JAMON JOSELITO G.R. (2)", cantidad: 12, unidad: "ud", peso_kg: null, base_precio: "por_unidad", precio_unitario: 9316.67, total: 111800, bonificada: false },
+    ],
+    subtotal: null, iva: null, total: 111800, // ...pero trae importes
+  });
+
+  it("la lectura CORRECTA se acepta: un albaran sin precios es valido", () => {
+    const v = validarEstructura(correcto);
+    expect(v.ok, describirProblemas(v.problemas)).toBe(true);
+  });
+
+  it("y no genera ni un solo aviso: no hay nada que cuadrar", () => {
+    // Importante que sea cero. Un validador que protesta ante documentos
+    // correctos se acaba ignorando.
+    expect(comprobarCuadre(correcto)).toEqual([]);
+  });
+
+  it("el peso va a peso_kg y NUNCA a total", () => {
+    expect(correcto.productos[0].peso_kg).toBe(111.8);
+    expect(correcto.productos[0].total).toBeNull();
+  });
+
+  it("RECHAZA lo que se guardo: importes en un documento sin importes", () => {
+    // Esta es la comprobacion que no existia. Un precio que no esta impreso
+    // solo puede salir de un calculo inventado.
+    const v = validarEstructura(guardadoMal);
+    expect(v.ok).toBe(false);
+    const texto = describirProblemas(v.problemas);
+    expect(texto).toContain("sin_importes");
+    expect(texto).toMatch(/inventado/i);
+  });
+
+  it("si ademas miente y dice que SI lleva precios, el cuadre lo caza igual", () => {
+    // Cinturon y tirantes: aunque marcase sin_importes=false para colar los
+    // numeros, 9.316,67 EUR/ud sigue siendo inverosimil y 111.800 EUR de
+    // total tambien.
+    const mintiendo = { ...guardadoMal, sin_importes: false };
+    const codigos = comprobarCuadre(mintiendo).map((d) => d.codigo);
+    expect(codigos).toContain("precio_unitario_extremo");
+    expect(codigos).toContain("total_documento_extremo");
+  });
+});
+
+describe("comprobarCuadre — Joselito interpretado como factura con precios", () => {
   // 12 jamones a 9.316,67 EUR/ud = 111.800,04 EUR de linea, con el albaran
   // declarando 120.580 EUR. La linea es internamente consistente
   // (cantidad x precio = total), que es justo por lo que el modelo la dio por

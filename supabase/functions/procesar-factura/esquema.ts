@@ -59,7 +59,7 @@ export const DOCUMENTO_JSON_SCHEMA = {
     type: "object",
     additionalProperties: false,
     required: [
-      "tipo", "proveedor", "cif", "numero_documento", "fecha",
+      "tipo", "proveedor", "cif", "numero_documento", "fecha", "sin_importes",
       "productos", "subtotal", "iva", "total", "observaciones", "resumen",
     ],
     properties: {
@@ -86,22 +86,32 @@ export const DOCUMENTO_JSON_SCHEMA = {
         description:
           "Fecha del documento en formato YYYY-MM-DD. OJO: en Espana se escribe DD/MM/AAAA, asi que 03/09/2026 es 2026-09-03, NO 2026-03-09.",
       },
+      sin_importes: {
+        type: "boolean",
+        description:
+          "true si el documento NO LLEVA NINGUN PRECIO EN EUROS. Es el caso normal de muchos albaranes de entrega: solo traen cantidades y pesos. Si es true, todos los precio_unitario, total, subtotal, iva y total del documento deben ser null. NUNCA calcules un precio dividiendo ni multiplicando: si no esta impreso, no existe.",
+      },
       productos: {
         type: "array",
         description: "Una entrada por LINEA de la tabla de conceptos, en el orden del documento.",
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["nombre", "cantidad", "unidad", "base_precio", "precio_unitario", "total", "bonificada"],
+          required: ["nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "bonificada"],
           properties: {
             nombre: { type: "string", description: "Descripcion del producto, sin codigos internos ni lote." },
             cantidad: {
               type: "number",
-              description: "Cantidad facturada. Si la unidad es kg puede llevar decimales (p.ej. 7.35).",
+              description: "Cuantas unidades de venta se entregan (piezas, cajas, botellas). Si la linea se factura al peso, aqui van los kilos y puede llevar decimales.",
             },
             unidad: {
               type: "string",
-              description: "Unidad tal como la expresa el documento: ud, kg, l, caja, docena... Si no consta, 'ud'.",
+              description: "Unidad de 'cantidad' tal como la expresa el documento: ud, kg, l, caja, docena... Si no consta, 'ud'.",
+            },
+            peso_kg: {
+              type: ["number", "null"],
+              description:
+                "Peso en kilos, SOLO si el documento trae una columna de peso APARTE de la cantidad. Muchos albaranes de carne y pescado traen las dos: 12 piezas que pesan 111,8 kg. Ese numero es un PESO, no euros: no lo pongas nunca en 'total'. null si no hay columna de peso.",
             },
             base_precio: {
               type: "string",
@@ -159,6 +169,7 @@ export interface LineaExtraida {
   nombre: string;
   cantidad: number;
   unidad: string;
+  peso_kg: number | null;
   base_precio: BasePrecio;
   precio_unitario: number | null;
   total: number | null;
@@ -171,6 +182,8 @@ export interface DocumentoExtraido {
   cif: string | null;
   numero_documento: string;
   fecha: string;
+  /** El documento no lleva ningun importe en euros (albaran de entrega). */
+  sin_importes: boolean;
   productos: LineaExtraida[];
   subtotal: number | null;
   iva: number | null;
@@ -252,6 +265,37 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
     }
   }
 
+  if (typeof d.sin_importes !== "boolean") {
+    push("sin_importes", `debe ser true o false, llego ${JSON.stringify(d.sin_importes)}`);
+  }
+
+  // Un documento declarado SIN IMPORTES no puede traer importes. Si los trae,
+  // o la marca esta mal o los numeros estan inventados — y el caso real es el
+  // segundo: el albaran 2509134 de Joselito no lleva ni un precio y el
+  // sistema guardo 111.800 EUR de total y 9.316,67 EUR/ud, que salio de
+  // dividir. Esto lo corta de raiz.
+  if (d.sin_importes === true) {
+    const conImporte: string[] = [];
+    for (const campo of ["subtotal", "iva", "total"] as const) {
+      if (esNumeroFinito(d[campo])) conImporte.push(campo);
+    }
+    if (Array.isArray(d.productos)) {
+      d.productos.forEach((p: unknown, i: number) => {
+        const l = (p ?? {}) as Record<string, unknown>;
+        if (esNumeroFinito(l.precio_unitario)) conImporte.push(`productos[${i}].precio_unitario`);
+        if (esNumeroFinito(l.total)) conImporte.push(`productos[${i}].total`);
+      });
+    }
+    if (conImporte.length > 0) {
+      push(
+        "sin_importes",
+        `el documento se declara sin importes pero trae ${conImporte.length} valor(es) en euros ` +
+        `(${conImporte.slice(0, 5).join(", ")}${conImporte.length > 5 ? "..." : ""}). ` +
+        `Si el papel no lleva precios, no pueden salir de ningun sitio que no sea un calculo inventado`,
+      );
+    }
+  }
+
   // ── Lineas ──
   if (!Array.isArray(d.productos)) {
     push("productos", "debe ser un array (vacio si el documento no lleva lineas)");
@@ -270,6 +314,9 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
         push(en("cantidad"), `debe ser un numero, llego ${JSON.stringify(l.cantidad)}`);
       }
       if (typeof l.unidad !== "string") push(en("unidad"), "debe ser texto");
+      if (!esNumeroONull(l.peso_kg)) {
+        push(en("peso_kg"), `debe ser un numero o null, llego ${JSON.stringify(l.peso_kg)}`);
+      }
       if (typeof l.base_precio !== "string" || !BASES_PRECIO.includes(l.base_precio)) {
         push(en("base_precio"), `debe ser uno de ${BASES_PRECIO.join(" | ")}, llego ${JSON.stringify(l.base_precio)}`);
       }
@@ -346,6 +393,12 @@ const eur = (n: number) => `${n.toFixed(2)} EUR`;
 export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
   const out: Descuadre[] = [];
   const lineas = datos.productos ?? [];
+
+  // Un albaran de entrega sin precios es CORRECTO, no un documento a medias:
+  // Joselito y Guillen son asi. No hay nada que cuadrar y no debe salir ni un
+  // aviso, o se acabaria ignorando el resto. Que los importes esten de verdad
+  // vacios ya lo ha exigido `validarEstructura`.
+  if (datos.sin_importes) return out;
 
   // ── a) cantidad x precio_unitario = total de linea ──
   //    Se compara por RATIO, no por diferencia: un descuento de linea del 15%

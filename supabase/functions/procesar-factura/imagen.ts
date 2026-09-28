@@ -172,20 +172,35 @@ const LADO_CORTO_MAX = 768;
 const PARCHE = 32;
 const LADO_MAX_PARCHES = 2048;
 
-// OJO: este numero es el unico de aqui que NO esta confirmado del todo.
-// La documentacion vigente de OpenAI da 2.500 parches y lado maximo 2.048 px
-// para gpt-5-mini con `detail: "high"`, y con esos valores esta funcion
-// reproduce exactamente la cifra publicada de ejemplo (un A4 a 300 DPI ->
-// 1333x1888 y 2.974 tokens de imagen), lo que es una comprobacion cruzada
-// decente. Pero circula tambien un presupuesto de 1.536 de una version
-// anterior de la documentacion, que daria ~124 DPI en vez de ~161.
+// CONFIRMADO CONTRA LA API, no solo contra la documentacion.
 //
-// Se resuelve en una sola llamada real: leer `usage.prompt_tokens` de la
-// respuesta y compararlo con `tokens` de aqui. Si no cuadra, el presupuesto
-// es otro y basta cambiar esta constante. Mientras no se haga, tratar el DPI
-// que sale de aqui como el escenario OPTIMISTA.
+// Se midio con 7 documentos reales y el mismo prompt, leyendo
+// `usage.prompt_tokens` de cada respuesta de gpt-5-mini con `detail: "high"`:
+//
+//   imagenes de 2000x1125 (2.268 parches) -> 5.821 tokens de prompt
+//   imagenes de 1600x900  (1.450 parches) -> 4.840 tokens de prompt
+//
+//   diferencia: 981 tokens por 818 parches = 1,199 tokens/parche  -> x1.2 EXACTO
+//   y el texto del prompt sale por resta: 5821 - 2268*1.2 = 3.099
+//                                         4840 - 1450*1.2 = 3.100  (cuadra)
+//
+// Esa medicion tambien DESCARTA el presupuesto de 1.536 que circulaba de una
+// version anterior de la documentacion: con 1.536, una imagen de 2000x1125 se
+// habria encogido a 1649x928 (1.508 parches) y el prompt habria salido por
+// 4.910 tokens, no 5.821. Con 2.500 no se encoge, y es lo que se observa.
 const PRESUPUESTO_PARCHES = 2500;
 const MULTIPLICADOR_GPT5_MINI = 1.2;
+
+// CONSECUENCIA IMPORTANTE, y va en contra de lo que parecia:
+// los documentos reales que se estan subiendo miden 2000 px o menos en el lado
+// largo, asi que CABEN en el presupuesto y OpenAI NO LOS ENCOGE. El modelo ve
+// exactamente los pixeles que se le mandan. Es decir: en estos ficheros el
+// reescalado de OpenAI no es el cuello de botella — el cuello de botella es
+// que lo que se sube ya viene a baja resolucion (capturas de pantalla, fotos
+// recomprimidas). Recortar no anade resolucion que no exista; subir el
+// original sin recomprimir si.
+// El reescalado SI entraria en juego con una foto de movil a tamano completo
+// (3024x4032 -> 1368x1824), que es el caso que cubre `resolucionEfectiva`.
 
 /** Modelo de vision que usa `procesar-factura`. Si se cambia, hay que revisar
  *  cual de los dos esquemas le toca: no todos los modelos usan el mismo. */
