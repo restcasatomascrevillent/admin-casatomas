@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,6 +137,7 @@ interface EditorMenuTapasWebProps {
 export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const config = SECCION_CONFIG[seccionActiva];
   const esMenu = seccionActiva === "menus_diarios";
+  const queryClient = useQueryClient();
 
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,7 +156,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   // La carta solo hace falta en el editor de menú (para elegir platos y para
   // reutilizar sus traducciones al guardar): en la pestaña de tapas la consulta
   // ni se lanza.
-  const { platos, isLoading: cargandoPlatos } = usePlatosParaMenu(esMenu);
+  const { platos, isLoading: cargandoPlatos, error: errorPlatos } = usePlatosParaMenu(esMenu);
   const platosPorId = useMemo(() => indexarPlatos(platos), [platos]);
 
   const cargarDatos = useCallback(async () => {
@@ -537,6 +539,30 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
 
               {esMenu ? (
                 <div className="space-y-3">
+                  {/* Sin la carta el menú SE PUEDE escribir igual (a mano), pero se
+                      pierden las dos cosas por las que existe esto: elegir un plato
+                      con sus alérgenos y su foto, y reaprovechar su traducción. Se
+                      avisa en vez de bloquear: publicar el menú del día es urgente y
+                      el texto libre sigue funcionando. */}
+                  {errorPlatos && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="space-y-2">
+                        <p>
+                          No se ha podido cargar la carta, así que ahora mismo no se puede elegir «De la carta»:
+                          los platos habrá que escribirlos a mano y se traducirán de cero.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-background"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ["platos-para-menu"] })}
+                        >
+                          Reintentar
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <EditorSeccionesMenu
                     secciones={secciones}
                     onChange={setSecciones}
