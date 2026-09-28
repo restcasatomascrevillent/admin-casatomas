@@ -22,19 +22,30 @@ Se ejecutan **a mano** (psql / SQL editor) y solo para deshacer un despliegue qu
 | `20260926150000_modo_servicio_config_y_salida_ROLLBACK.sql` | `migrations/20260926150000_modo_servicio_config_y_salida.sql` | Devuelve `fn_reservas_limpiar_llegada()` y su trigger a la versión de `20260923180000_reservas_llegada.sql` (solo limpian `llegada_at`, no `salida_at`), borra las tres columnas de umbral de `configuracion_reservas` (`estancia_comida_minutos`, `estancia_cena_minutos`, `retraso_gracia_minutos`) y borra `reservas.salida_at`. Se pierde cualquier `salida_at` guardado y cualquier ajuste de esos tres umbrales. **No toca `asignaciones_mesa`** (la migración tampoco la tocó): el historial de mesas por reserva se conserva. |
 | `20260927100000_mesas_numero_fiable_ROLLBACK.sql` | `migrations/20260927100000_mesas_numero_fiable.sql` | **Reabre los números de mesa duplicados.** Borra el índice único parcial `uq_mesas_espacio_nombre_real`, que es la única garantía de que dos mesas de la misma sala no lleven el mismo número (el aviso de `src/components/espacios/nombresMesa.ts` vive en el navegador: cualquier escritura que no pase por ese formulario puede volver a dejar dos mesas «9» en el Salón, que es justo el bug que el dueño quiso cerrar). Devuelve además `vista_capacidad_espacios`, `fn_capacidad_efectiva_espacio(uuid)` y `fn_capacidad_efectiva_marca(text)` a la versión de `20260926120000`, es decir a **volver a sumar las mesas fusionadas junto con las originales que el editor de plano no consiguió borrar**: el Salón vuelve a declarar 64 plazas en vez de 36. La vista se recrea con DROP + CREATE (`create or replace view` no puede quitar columnas), así que **pierde las seis columnas nuevas**, entre ellas `plazas_mesas_sin_duplicar` y `mesas_originales_huerfanas`, que son las que miden las fusiones a medias. **Los renombrados de datos NO se revierten**: las mesas marcadas con el sufijo ` (revisar)` se quedan con ese nombre, y la que se desactivó se queda desactivada — el nombre original no está guardado en ninguna parte (solo salió por el `raise notice` al aplicar la migración) y hay que reponerlo a mano desde el editor de plano; el fichero lleva dentro las consultas para localizar esas filas. Ninguna fila se borra ni hay que recuperar ninguna: la migración no hace ningún DELETE, a propósito. **AVISO: si alguien encendió la regla de aforo por mesas**, esto no rompe nada de golpe (al contrario que el rollback de `20260926120000`, aquí las funciones no se borran, solo vuelven al cuerpo viejo) pero **infla el aforo en silencio**: el trigger vuelve a contar plazas duplicadas y el sistema acepta reservas para sillas que no existen, sin ningún error. Ver el «AVISO 2» dentro del fichero. No toca el trigger de aforo ni `EditorPlanoEspacio.tsx`. |
 
-Todos menos el último revierten migraciones **ya aplicadas en producción**. El bloqueo de
+Todos revierten migraciones **ya aplicadas en producción**. El bloqueo de
 `supabase db push` que tenía pendientes a `20260926120000`, `20260926140000` y
 `20260926150000` (el historial local y el remoto no coincidían porque `20260925150523` y
 `20260925154109` se habían aplicado sin commitear los ficheros) se resolvió recuperando y
-commiteando esas cinco migraciones sin fichero, en el commit `e0796e3`; la última migración
-aplicada es `20260926150000`.
+commiteando esas cinco migraciones sin fichero, en el commit `e0796e3`.
 
-El único **todavía pendiente** es `20260927100000_mesas_numero_fiable_ROLLBACK.sql`: si esa
-migración nunca se aplica, no hay nada que revertir y ejecutarlo es inofensivo (recrea la
-vista y las dos funciones con la definición de `20260926120000`, que es la que ya habría, y
-el `drop index if exists` no encuentra nada).
+**Todos los rollbacks de esta tabla revierten migraciones ya aplicadas en producción**,
+incluido `20260927100000_mesas_numero_fiable_ROLLBACK.sql`. Corregido el 2026-09-28: la
+versión anterior de este párrafo decía que `20260927100000` estaba pendiente y que la última
+aplicada era `20260926150000`, y lo advertía porque se escribió sin acceso de lectura a
+Supabase. Ya se comprobó contra `supabase_migrations.schema_migrations`, y las cinco últimas
+versiones aplicadas son `20260927100000`, `20260926150000`, `20260926140000`,
+`20260926130000` y `20260926121000`.
 
-Aviso sobre esta última frase: al añadir esa fila (2026-09-27) **no se pudo comprobar el
-estado real de producción** (sin acceso de lectura a Supabase en esa sesión). Que
-`20260926150000` sea la última aplicada se apoya en el historial de `supabase/migrations/`
-y en lo que reportó el dueño, no en una consulta a `supabase_migrations.schema_migrations`.
+Consecuencia práctica: el índice `uq_mesas_espacio_nombre_real` **existe hoy en producción**,
+con esta definición (verificada, no deducida):
+
+```sql
+CREATE UNIQUE INDEX uq_mesas_espacio_nombre_real ON public.mesas
+USING btree (espacio_id, lower(btrim(regexp_replace((nombre)::text, '\s+'::text, ' '::text, 'g'::text))))
+WHERE ((COALESCE(is_merged, false) = false) AND (COALESCE(activa, true) = true));
+```
+
+Por ser **parcial sobre `coalesce(activa,true) = true`**, desactivar una mesa (`activa =
+false`) libera su número para otra mesa de la misma sala. De eso depende que el editor de
+plano pueda fusionar sin borrar filas; ver `EditorPlanoEspacio.tsx`. Ejecutar ese rollback
+ya NO es inofensivo: borra un índice que está en uso.
