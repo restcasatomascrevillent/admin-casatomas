@@ -2,12 +2,21 @@
 // CATÁLOGO DE TOKENS + DATOS DE EJEMPLO — para la ayuda de variables y la
 // vista previa en vivo del editor de plantillas.
 // ----------------------------------------------------------------------------
-// Los 7 tokens y su significado están fijados por el contrato en
+// Los tokens y su significado están fijados por el contrato en
 // supabase/functions/emails-reserva/plantillas.ts (cabecera, punto 3). Están
-// disponibles en los 5 tipos de plantilla aunque `hora_solicitada` y
-// `espacio_solicitado` solo tengan sentido real en 'propuesta' (el propio
-// contrato lo advierte: usarlos fuera de 'propuesta' es válido pero
-// probablemente no lo que se quiere).
+// disponibles en los 5 tipos de plantilla aunque `hora_solicitada` solo tenga
+// sentido real en 'propuesta' (el propio contrato lo advierte: usarlo fuera de
+// 'propuesta' es válido pero probablemente no lo que se quiere).
+//
+// {{espacio}} y {{espacio_solicitado}} YA NO SE OFRECEN en este catálogo
+// (2026-09-29). Siguen siendo tokens válidos —`construirTokens` los conoce en
+// los dos motores— pero desde el punto 7 del contrato se sustituyen SIEMPRE
+// por cadena vacía: la sala es información interna y no sale en el correo del
+// cliente. Ofrecerlos en el selector era una trampa: el dueño insertaba una
+// variable que no pinta nada. Comprobado en la BD del proyecto el 2026-09-29
+// que ninguna de las 5 plantillas vigentes los usa, así que quitarlos del
+// selector no cambia ningún correo. Revertir la decisión = devolverles su
+// valor en los dos `construirTokens` y volver a listarlos aquí.
 // ============================================================================
 
 import type { DatosReservaParaCorreo, TipoPlantilla } from "./motorPlantilla";
@@ -26,7 +35,6 @@ export const TOKENS_DISPONIBLES: TokenInfo[] = [
   { clave: "fecha", etiqueta: "Fecha", descripcion: 'Fecha de la reserva, ya formateada. Ejemplo: "16 de marzo de 2026".' },
   { clave: "hora", etiqueta: "Hora", descripcion: 'Hora VIGENTE de la reserva (la ofrecida, si hubo contraoferta). Ejemplo: "21:00".' },
   { clave: "comensales", etiqueta: "Comensales", descripcion: 'Número de comensales, ya formateado. Ejemplo: "4 personas".' },
-  { clave: "espacio", etiqueta: "Espacio", descripcion: "Espacio VIGENTE asignado (Comedor, Terraza...). Vacío si todavía no hay ninguno asignado." },
   {
     clave: "hora_solicitada",
     etiqueta: "Hora solicitada",
@@ -34,10 +42,10 @@ export const TOKENS_DISPONIBLES: TokenInfo[] = [
     soloRelevanteEn: ["propuesta"],
   },
   {
-    clave: "espacio_solicitado",
-    etiqueta: "Espacio solicitado",
-    descripcion: "Espacio tal y como lo pidió el cliente al crear la reserva. Solo aporta algo en «Propuesta».",
-    soloRelevanteEn: ["propuesta"],
+    clave: "negocio",
+    etiqueta: "Negocio",
+    descripcion:
+      'Nombre del negocio de la reserva: "Casa Tomás" o "Touza". Úsalo en vez de escribir el nombre a mano y el mismo texto servirá para los dos.',
   },
 ];
 
@@ -49,9 +57,19 @@ export const ETIQUETA_TIPO: Record<TipoPlantilla, string> = {
   recordatorio: "Recordatorio",
 };
 
+// OJO al editar estos textos: son lo único que le dice al dueño CUÁNDO sale
+// cada correo. Si describen un envío que ya no ocurre, el panel miente.
+// `solicitud_recibida` es el caso vivo: desde el 2026-09-28
+// (`CANALES_SIN_SOLICITUD_RECIBIDA = ["web"]` en plantillas.ts) el canal web
+// ya no lo manda — el cliente web recibía dos correos seguidos y el primero
+// sobraba, porque el propio formulario ya le dice en pantalla que se le
+// contactará. El tipo NO está muerto: sigue saliendo por teléfono y en altas
+// manuales, así que la plantilla se sigue pudiendo editar.
 export const DESCRIPCION_TIPO: Record<TipoPlantilla, string> = {
-  solicitud_recibida: "Se envía en cuanto llega una reserva nueva, antes de que nadie la revise.",
-  propuesta: "Se envía cuando el restaurante ofrece una hora o espacio distinto al pedido y el cliente tiene que confirmar o rechazar.",
+  solicitud_recibida:
+    "El canal WEB ya no envía este correo: quien reserva por la web recibe directamente «Propuesta» y nada más. Sigue enviándose cuando la reserva nace pendiente por otra vía — sobre todo por teléfono, cuando un cliente acepta una propuesta desde el correo y su reserva queda pendiente de revisión — y en altas manuales que se pasen a pendiente.",
+  propuesta:
+    "Se envía en cuanto alguien revisa la reserva y la deja lista para que el cliente la confirme o la rechace. Es el PRIMER y ÚNICO correo que recibe quien reserva por la web. Si la hora ofrecida no es la que pidió, el correo añade solo él un bloque «Pediste / Te ofrecemos» con las dos horas.",
   confirmada: "Se envía en cuanto la reserva queda confirmada (directamente o tras aceptar una propuesta).",
   rechazada: "Se envía cuando la solicitud no se puede atender.",
   recordatorio: "Se envía automáticamente 2 días antes de la reserva confirmada.",
@@ -69,7 +87,8 @@ export const BLOQUES_DISPONIBLES: FlagBloque[] = [
   {
     clave: "mostrar_tabla_detalles",
     etiqueta: "Tabla de detalles",
-    descripcion: "Fecha, hora, comensales y espacio en una tabla destacada.",
+    // Tres filas, no cuatro: la fila "Espacio" salió del correo el 2026-09-28.
+    descripcion: "Fecha, hora y comensales en una tabla destacada.",
     porDefecto: true,
   },
   {
@@ -94,9 +113,14 @@ export function leerBloque(bloques: Record<string, unknown> | null | undefined, 
 
 /**
  * Datos de ejemplo realistas para la vista previa. Para 'propuesta' se fuerza
- * una diferencia entre lo solicitado y lo ofrecido para que se vea también el
- * bloque de comparación automático (hayContraoferta) — es el único tipo donde
- * ese bloque puede aparecer en un caso real.
+ * una diferencia de HORA entre lo solicitado y lo ofrecido para que se vea
+ * también el bloque de comparación automático (hayContraoferta) — es el único
+ * tipo donde ese bloque puede aparecer en un caso real.
+ *
+ * `espacio` / `espacioSolicitado` se siguen rellenando A PROPÓSITO aunque el
+ * correo ya no los pinte: así la vista previa demuestra justo lo que hay que
+ * demostrar — que una reserva CON sala asignada, e incluso con cambio de sala
+ * (Comedor -> Terraza en 'propuesta'), no enseña la sala por ningún lado.
  */
 export function datosEjemploPara(tipo: TipoPlantilla): DatosReservaParaCorreo {
   const base = {

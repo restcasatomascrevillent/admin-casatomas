@@ -353,7 +353,8 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
               ))}
               <p className="text-xs text-muted-foreground">
                 El aviso de "pediste X, te ofrecemos Y" no es uno de estos interruptores: aparece solo (y siempre)
-                cuando de verdad hay una contraoferta de hora o espacio.
+                cuando de verdad se le ofrece al cliente una HORA distinta de la que pidió. Un cambio de sala no
+                lo dispara: la sala no sale en el correo del cliente.
               </p>
             </CardContent>
           </Card>
