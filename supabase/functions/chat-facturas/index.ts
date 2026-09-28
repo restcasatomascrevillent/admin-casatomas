@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 
 // ============================================================================
 //  chat-facturas  ·  Asistente de gestion de compras del restaurante
@@ -63,6 +64,19 @@ const LIMITES: Record<string, number> = {
 interface Ctx {
   deadline: number;
   embeddings: Map<string, string>;
+  /**
+   * Contabilidad de consumo (migracion 20260928193000). Dos acumuladores
+   * porque son DOS modelos con tarifas muy distintas y la pantalla de costes
+   * los desglosa por separado: el chat es ~20x mas caro por token que el
+   * embedding. Van en el Ctx porque `embedConsulta` se llama desde dentro de
+   * `ejecutarTool`, muy lejos del handler, y pasarlos por parametro obligaria
+   * a cambiar la firma de media docena de funciones.
+   *
+   * Que esto no este aqui NO puede romper el chat: ver la cabecera de
+   * _shared/registrar-uso-ia.ts.
+   */
+  usoChat: AcumuladorUso;
+  usoEmbed: AcumuladorUso;
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
@@ -392,6 +406,10 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
   }, msRestantes(ctx));
   if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}`);
   const json = await res.json();
+  // Se contabiliza AQUI y no en el memo: una consulta repetida no vuelve a
+  // pagar (sale por el `return memo` de arriba), asi que registrar aqui cuenta
+  // exactamente las llamadas facturadas.
+  ctx.usoEmbed.sumar(json.usage);
   const vector = "[" + json.data[0].embedding.join(",") + "]";
   ctx.embeddings.set(clave, vector);
   return vector;
@@ -687,6 +705,13 @@ serve(async (req) => {
     return json({ success: false, respuesta: "No tienes acceso a la seccion de facturas.", error: "forbidden" }, 403);
   }
 
+  // ── Contabilidad de consumo (migracion 20260928193000) ──
+  // Se declaran ANTES del try para que el `finally` los vea. Una peticion que
+  // acaba en error tambien ha gastado tokens: OpenAI ya los facturo.
+  const usoChat = new AcumuladorUso("chat-facturas", MODELO, "chat");
+  const usoEmbed = new AcumuladorUso("chat-facturas", "text-embedding-3-small", "embedding");
+  const inicioMs = Date.now();
+
   try {
     const { mensaje, session_id } = await req.json();
     if (!mensaje || !String(mensaje).trim()) {
@@ -732,7 +757,12 @@ serve(async (req) => {
     //  el prompt fomenta el fan-out (llamar a dos herramientas a la vez, o a
     //  resumen_periodo dos veces) y nada impedia que un solo mensaje del usuario
     //  encadenase ~6 chat completions mas una decena de embeddings de pago.
-    const ctx: Ctx = { deadline: Date.now() + PRESUPUESTO_MS, embeddings: new Map() };
+    const ctx: Ctx = {
+      deadline: Date.now() + PRESUPUESTO_MS,
+      embeddings: new Map(),
+      usoChat,
+      usoEmbed,
+    };
     let respuesta = "";
     let huboFalloDeHerramienta = false;
 
@@ -756,7 +786,12 @@ serve(async (req) => {
       }, msRestantes(ctx));
 
       if (!res.ok) throw new Error(`OpenAI chat ${res.status}: ${await res.text()}`);
-      const msg = (await res.json()).choices[0].message;
+      // Antes esto era `const msg = (await res.json()).choices[0].message;`. Se
+      // parte en dos para poder leer `usage`, que en la version de una linea se
+      // tiraba con el objeto temporal. El comportamiento es identico.
+      const respuestaJson = await res.json();
+      ctx.usoChat.sumar(respuestaJson.usage);
+      const msg = respuestaJson.choices[0].message;
       messages.push(msg);
 
       if (!esUltimo && msg.tool_calls?.length > 0) {
@@ -799,6 +834,8 @@ serve(async (req) => {
     return json({ success: true, respuesta }, 200);
   } catch (error) {
     console.error("[chat-facturas] Error:", error);
+    usoChat.marcarError();
+    usoEmbed.marcarError();
     const msg = error instanceof Error ? error.message : "Error desconocido";
 
     // Mensaje util para el usuario segun el tipo de fallo, en vez de un
@@ -815,5 +852,15 @@ serve(async (req) => {
     }
 
     return json({ success: false, respuesta: visible, error: msg }, 200);
+  } finally {
+    // Pasa por aqui TODO: exito, error y las salidas tempranas del try. Nunca
+    // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una
+    // respuesta buena en un 500. Se reutiliza el cliente de service role que
+    // ya existe en lugar de crear otro.
+    await registrarUso([usoChat, usoEmbed], {
+      disparador: `usuario:${user.id}`,
+      duracionMs: Date.now() - inicioMs,
+      cliente: supabase,
+    });
   }
 });

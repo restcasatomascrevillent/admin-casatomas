@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,6 +169,15 @@ serve(async (req) => {
   const auth = await autenticar(req);
   if (!auth.ok) return auth.response;
 
+  // ── Contabilidad de consumo (migracion 20260928193000) ──
+  // Fuera del try para que el `finally` lo vea. Esta funcion tiene CINCO
+  // salidas que devuelven HTTP 200 con un fallback (sin clave, OpenAI !ok, sin
+  // contenido, JSON invalido, catch): de esas cinco, las tres ultimas ocurren
+  // DESPUES de que OpenAI haya facturado la llamada. Registrar en el camino
+  // feliz dejaria ese gasto invisible, que es justo el que interesa ver.
+  const uso = new AcumuladorUso("format-novedad", MODEL, "chat");
+  const inicioMs = Date.now();
+
   let texto = "";
   try {
     const { tipo, idioma, tono, texto: textoIn } = await req.json();
@@ -223,6 +233,11 @@ serve(async (req) => {
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("Error de OpenAI:", openaiRes.status, errText);
+      // Una respuesta !ok no trae `usage`, pero la llamada se hizo: se cuenta
+      // como llamada con 0 tokens para que el recuento de intentos cuadre. Un
+      // 429 repetido se ve asi en la pantalla aunque no haya coste.
+      uso.sumar(null);
+      uso.marcarError();
       return new Response(
         JSON.stringify(buildFallback(texto, `El generador de contenido falló (${openaiRes.status}). Se ha usado el texto original.`, {
           openai_status: openaiRes.status,
@@ -232,8 +247,10 @@ serve(async (req) => {
     }
 
     const body = await openaiRes.json();
+    uso.sumar(body?.usage);
     const content = body?.choices?.[0]?.message?.content;
     if (!content || typeof content !== "string") {
+      uso.marcarError();
       return new Response(
         JSON.stringify(buildFallback(texto, "El generador de contenido no devolvió resultado. Se ha usado el texto original.")),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -246,6 +263,7 @@ serve(async (req) => {
       parsed = JSON.parse(cleaned);
     } catch (e) {
       console.error("JSON inválido del modelo:", cleaned);
+      uso.marcarError();
       return new Response(
         JSON.stringify(buildFallback(texto, "El generador de contenido devolvió un formato inesperado. Se ha usado el texto original.")),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -262,6 +280,7 @@ serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error("Error en format-novedad:", error);
+    uso.marcarError();
     const message =
       error instanceof Error && error.name === "AbortError"
         ? "Timeout: el generador de contenido tardó demasiado en responder. Se ha usado el texto original."
@@ -271,6 +290,15 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(buildFallback(texto, message)), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } finally {
+    // Sin `cliente`: esta funcion no tiene ninguno de service role en el
+    // handler (los dos de `autenticar` son locales a esa funcion y no se
+    // devuelven), asi que registrarUso crea el suyo con SUPABASE_URL y
+    // SUPABASE_SERVICE_ROLE_KEY, que si estan a nivel de modulo. Nunca lanza.
+    await registrarUso(uso, {
+      disparador: `usuario:${auth.userId}`,
+      duracionMs: Date.now() - inicioMs,
     });
   }
 });
