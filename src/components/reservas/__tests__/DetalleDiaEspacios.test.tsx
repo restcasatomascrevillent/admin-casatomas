@@ -11,9 +11,17 @@
  * de los tres grados corren de verdad, así que estos tests también cubren que
  * el panel lee bien las cifras.
  *
- * La vista `vista_asignacion_dia` NO EXISTE todavía en la base de datos
- * (2026-09-26), de ahí el escenario "la vista no responde", que es el que se
- * verá en producción hasta que se aplique la migración.
+ * ---------------------------------------------------------------------------
+ * UNA SOLA FUENTE: `vista_asignacion_dia`
+ * ---------------------------------------------------------------------------
+ * La vista existe en producción (migración `20260926140000`, aplicada el
+ * 2026-09-26) y es LA fuente del panel. El respaldo que hubo hasta entonces
+ * -las reservas del mes del calendario- se ha quitado, así que aquí se prueban
+ * los tres estados honestos de la consulta: CARGANDO (esqueleto y ni una
+ * cifra), ERROR (mensaje + reintentar, sin ceros inventados) y VACÍO DE VERDAD.
+ *
+ * La tabla `reservas` sigue mockeada porque la CUADRÍCULA del mes la usa para
+ * sus casillas (total, comensales, sin sala). Ya no alimenta el panel.
  *
  * Escenario: estado real de producción resumido a cuatro salas.
  *
@@ -30,8 +38,10 @@ import { format, startOfMonth } from "date-fns";
 
 // ─── Doble en memoria del cliente de Supabase ────────────────────────────────
 //
-// Una entrada por tabla/vista. `error` permite simular que la vista no existe.
-const tablas: Record<string, { data?: unknown[] | null; error?: unknown }> = {};
+// Una entrada por tabla/vista. `error` simula un fallo de la consulta y
+// `pendiente` la deja en vuelo para siempre, que es la única forma de ver el
+// estado de CARGA del panel ahora que no hay respaldo que pintar mientras.
+const tablas: Record<string, { data?: unknown[] | null; error?: unknown; pendiente?: boolean }> = {};
 
 // Los filtros se aplican DE VERDAD (`eq`, `neq`, `gte`, `lte`, `in`): si no, el
 // doble devolvería las reservas de hoy para cualquier día y no se podría probar
@@ -52,6 +62,8 @@ vi.mock("@/integrations/supabase/client", () => {
     // El cliente real es "thenable": se espera con await sin llamar a nada más.
     q.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
       const r = tablas[tabla] ?? { data: [], error: null };
+      // Nunca se resuelve: la consulta se queda cargando.
+      if (r.pendiente) return new Promise<never>(() => {});
       if (r.error) return Promise.resolve({ data: null, error: r.error }).then(ok, ko);
       const filas = ((r.data ?? []) as Fila[]).filter((f) => filtros.every((p) => p(f)));
       return Promise.resolve({ data: filas, error: null }).then(ok, ko);
@@ -96,8 +108,8 @@ const MESAS = [
 ];
 
 /**
- * Las cinco reservas de HOY, tal y como salen de la tabla `reservas` (lo que
- * consulta el calendario y lo que se usa de respaldo).
+ * Las cinco reservas de HOY tal y como salen de la tabla `reservas`. Esto es lo
+ * que consulta la CUADRÍCULA del mes; el panel del día lee la vista.
  *
  *   Ana    13:00 · 2 pax · Comedor    · 1 mesa  → con_mesa  (comida)
  *   Bruno  14:00 · 4 pax · Comedor    · 0 mesas → sin_mesa  (comida)
@@ -113,7 +125,10 @@ const RESERVAS_TABLA = [
   { id: "r-diego", fecha: HOY_ISO, hora: "21:30:00", numero_comensales: 3, estado: "pendiente", nombre: "Diego", marca: "casa_tomas", espacio_id: null },
 ];
 
-/** Las mismas cinco, como las devuelve `vista_asignacion_dia`. */
+/**
+ * Las mismas cinco, como las devuelve `vista_asignacion_dia`: con el turno ya
+ * partido en SQL por el corte de las 17:00 y el grado ya calculado.
+ */
 const filaVista = (
   reserva_id: string,
   hora: string,
@@ -147,6 +162,9 @@ const VISTA_HOY = [
   filaVista("r-carla", "21:00:00", "Carla", 6, "e-salon", "Salón", 1, "con_mesa"),
   filaVista("r-diego", "21:30:00", "Diego", 3, null, null, 0, "sin_sala"),
 ];
+
+/** Un fallo cualquiera de la consulta (aquí, un timeout de Postgres). */
+const ERROR_VISTA = { code: "57014", message: "canceling statement due to statement timeout" };
 
 // ─── Montaje ─────────────────────────────────────────────────────────────────
 
@@ -200,13 +218,15 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
 
   it("al abrir, HOY ya está seleccionado y se ve el reparto sin pulsar nada", async () => {
     montar();
-    // La cabecera del panel lleva la fecha de hoy escrita.
+    // Las salas del día se pintan solas, sin pulsar ninguna casilla. Se espera
+    // a la tarjeta y no a la cabecera: la cabecera lleva la fecha desde el
+    // primer render (aún cargando), así que esperarla no probaría nada.
     expect(
-      await screen.findByText(new RegExp(`${HOY.getDate()} de `, "i")),
+      await screen.findByRole("button", { name: "Abrir el plano de Comedor" }),
     ).toBeInTheDocument();
-    // Y las salas del día ya están pintadas.
-    expect(tarjetaSala("Comedor")).toBeInTheDocument();
     expect(tarjetaSala("Salón")).toBeInTheDocument();
+    // Y la cabecera del panel lleva escrito el día que se está mirando.
+    expect(screen.getByText(new RegExp(`${HOY.getDate()} de `, "i"))).toBeInTheDocument();
   });
 
   it("marca la casilla de hoy como seleccionada en la cuadrícula", async () => {
@@ -245,9 +265,7 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
 
   it("cuenta los tres grados y los etiqueta sin tratar sin_mesa como fallo", async () => {
     montar();
-    // El grado de MESA llega con la vista, un instante después del grado 1.
     const comedor = await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
-    await waitFor(() => expect(comedor).not.toHaveTextContent(/Comprobando las mesas/));
 
     // Comedor: Ana con mesa, Bruno pendiente.
     expect(comedor).toHaveTextContent(/1 con mesa/);
@@ -261,6 +279,34 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
 
     // Y el resumen del día: 2 de 5 con mesa.
     expect(screen.getByText(/2 de 5 con mesa/)).toBeInTheDocument();
+  });
+
+  // ── Grado 2: con sala y sin mesa ──────────────────────────────────────────
+
+  it("una sala entera pendiente de mesa se cuenta como trabajo, no como fallo", async () => {
+    // Ana y Bruno en el Comedor, los dos todavía sin mesa concreta.
+    tablas.vista_asignacion_dia = {
+      data: [
+        filaVista("r-ana", "13:00:00", "Ana", 2, "e-comedor", "Comedor", 0, "sin_mesa"),
+        filaVista("r-bruno", "14:00:00", "Bruno", 4, "e-comedor", "Comedor", 0, "sin_mesa"),
+      ],
+    };
+    montar();
+    const comedor = await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
+
+    // El dato es real y se escribe tal cual: dos pendientes y 0% cerrado. Ese
+    // 0% ya NO es "no se sabe", es "todavía no se ha bajado al plano".
+    expect(comedor).toHaveTextContent(/2 pendientes de mesa/);
+    expect(comedor).toHaveTextContent(/0%/);
+    expect(comedor).not.toHaveTextContent(/con mesa/);
+    // Ni lenguaje de error ni el viejo "no está disponible" del respaldo.
+    expect(comedor).not.toHaveTextContent(/falta|error|incompleta|no está disponible|no disponible/i);
+    // Ni tono de alarma: el ámbar y el rojo se reservan para otras cosas.
+    expect(comedor.className).not.toMatch(/amber|destructive|red-/);
+    expect(comedor.querySelector('[class*="amber"], [class*="destructive"], [class*="red-"]')).toBeNull();
+
+    // Y el resumen del día lo dice sin esconderlo.
+    expect(screen.getByText(/0 de 2 con mesa/)).toBeInTheDocument();
   });
 
   it("saca las reservas sin sala a un bloque aparte y bien visible", async () => {
@@ -385,12 +431,15 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
   });
 
   it("escribe la fecha del día que está seleccionado, no la de hoy", async () => {
-    // El otro día sí tiene una reserva, para que haya sala que pulsar.
+    // El otro día sí tiene una reserva, para que haya sala que pulsar. Va en
+    // las DOS fuentes: la tabla la pinta en la cuadrícula, la vista en el panel.
     const otroISO = format(OTRO_DIA, "yyyy-MM-dd");
     tablas.reservas = {
       data: [...RESERVAS_TABLA, { ...RESERVAS_TABLA[0], id: "r-otro", fecha: otroISO }],
     };
-    tablas.vista_asignacion_dia = { data: VISTA_HOY };
+    tablas.vista_asignacion_dia = {
+      data: [...VISTA_HOY, { ...VISTA_HOY[0], reserva_id: "r-otro", fecha: otroISO }],
+    };
     const { onEspacioClick } = montar();
     await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
 
@@ -424,44 +473,72 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     expect(onEspacioClick).toHaveBeenCalledWith("e-reservado");
   });
 
-  // ── La vista todavía no existe en la base de datos ────────────────────────
+  // ── Los tres estados de la consulta ──────────────────────────────────────
 
-  it("si la vista no responde sigue enseñando el reparto por sala y lo dice", async () => {
-    tablas.vista_asignacion_dia = {
-      data: null,
-      error: { code: "42P01", message: 'relation "vista_asignacion_dia" does not exist' },
-    };
+  it("mientras la vista viaja enseña un esqueleto y ni una cifra", async () => {
+    tablas.vista_asignacion_dia = { pendiente: true };
     montar();
 
-    // El grado 1 se mide igual con las reservas que ya tiene el calendario.
-    const comedor = await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
-    expect(comedor).toHaveTextContent(/2 reservas/);
-    expect(comedor).toHaveTextContent(/6 comensales/);
-    expect(screen.getByText("Sin sala")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("status", { name: /Cargando el reparto del día/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Leyendo el reparto del día/i)).toBeInTheDocument();
 
-    // Pero no se afirma nada del grado 2: se dice que no se sabe.
-    await waitFor(() =>
-      expect(comedor).toHaveTextContent(/El detalle de mesa no está disponible/i),
-    );
-    expect(comedor).not.toHaveTextContent(/con mesa/);
-    expect(screen.queryByText(/de 5 con mesa/)).not.toBeInTheDocument();
-
-    // Y el salto al plano sigue funcionando.
-    fireEvent.click(comedor);
-    expect(url()).toContain(`fecha=${HOY_ISO}`);
+    // Ni salas, ni "no hay reservas" (que sería mentira), ni ceros, ni una
+    // barra a 0% que dentro de un instante salte a otra cifra.
+    expect(screen.queryByRole("button", { name: /^Abrir el plano de / })).not.toBeInTheDocument();
+    expect(screen.queryByText("No hay reservas para este día")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 reservas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 comensales/)).not.toBeInTheDocument();
+    expect(document.body.textContent ?? "").not.toMatch(/\d\s?%/);
   });
 
-  it("sin vista, el filtro de turno sigue funcionando", async () => {
-    tablas.vista_asignacion_dia = {
-      data: null,
-      error: { code: "42P01", message: 'relation "vista_asignacion_dia" does not exist' },
-    };
+  it("si la vista falla lo dice, no inventa ceros y ofrece reintentar", async () => {
+    tablas.vista_asignacion_dia = { data: null, error: ERROR_VISTA };
     montar();
-    await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Cena" }));
-    expect(tarjetaSala("Salón")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Abrir el plano de Comedor/ })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/No se ha podido leer el reparto de este día/i),
+    ).toBeInTheDocument();
+    // El detalle del error va escrito: sin él no hay forma de reportar el fallo.
+    expect(screen.getByText(/statement timeout/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reintentar/ })).toBeInTheDocument();
+
+    // Nada de pintar el día a medias: ni salas, ni bloque "sin sala", ni el
+    // "no hay reservas" que haría creer que el día está vacío.
+    expect(screen.queryByRole("button", { name: /^Abrir el plano de / })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin sala")).not.toBeInTheDocument();
+    expect(screen.queryByText("No hay reservas para este día")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 reservas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/con mesa/)).not.toBeInTheDocument();
+  });
+
+  it("al reintentar vuelve a preguntar y pinta el reparto de verdad", async () => {
+    tablas.vista_asignacion_dia = { data: null, error: ERROR_VISTA };
+    montar();
+    const boton = await screen.findByRole("button", { name: /Reintentar/ });
+
+    // La vista ya responde: el botón tiene que volver a preguntar.
+    tablas.vista_asignacion_dia = { data: VISTA_HOY };
+    fireEvent.click(boton);
+
+    expect(
+      await screen.findByRole("button", { name: "Abrir el plano de Comedor" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No se ha podido leer el reparto/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/2 de 5 con mesa/)).toBeInTheDocument();
+  });
+
+  it("el fallo de la vista no se lleva por delante la cuadrícula del mes", async () => {
+    tablas.vista_asignacion_dia = { data: null, error: ERROR_VISTA };
+    montar();
+    await screen.findByText(/No se ha podido leer el reparto de este día/i);
+
+    // La cuadrícula come de `reservas`, que sigue respondiendo.
+    expect(casillaDia(HOY.getDate())).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("5 reservas, 35 comensales, 1 sin sala"),
+    );
   });
 });
 

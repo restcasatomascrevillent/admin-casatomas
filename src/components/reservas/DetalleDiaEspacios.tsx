@@ -38,20 +38,39 @@
 // y chocarían.
 //
 // ---------------------------------------------------------------------------
-// DE DÓNDE SALEN LOS DATOS (y por qué hay respaldo)
+// DE DÓNDE SALEN LOS DATOS — una sola fuente, sin respaldo
 // ---------------------------------------------------------------------------
-// La fuente buena es `useResumenAsignacionDia`, que lee la vista
-// `vista_asignacion_dia` y trae los tres grados ya contados en SQL. Pero esa
-// vista TODAVÍA NO ESTÁ CREADA en la base de datos (2026-09-26), así que hoy
-// la consulta falla con 42P01.
+// `useResumenAsignacionDia(fechaISO)` → vista `public.vista_asignacion_dia`
+// (migración `20260926140000_asignaciones_mesa_sin_solapes.sql`, ya aplicada).
+// La vista da UNA FILA POR RESERVA VIVA del día y ya trae los dos grados
+// contados en SQL. Conviene saber qué filtra y qué decide ella, porque el panel
+// se fía de eso y no lo recalcula:
 //
-// Para que el panel no se quede en blanco mientras eso no llegue, acepta un
-// RESPALDO (`filasRespaldo`) con las reservas del día que el calendario ya ha
-// traído para pintar la cuadrícula. Con el respaldo se puede medir el GRADO 1
-// entero (qué hay en cada sala y qué sigue sin sala), que es justo lo que pidió
-// el dueño; lo único que no se puede saber es el grado 2, y eso se dice en
-// pantalla en vez de pintar "0 con mesa" y hacer creer que nadie tiene mesa.
-// Cuando la vista exista, el respaldo deja de usarse solo, sin tocar código.
+//   · `estado in ('pendiente','verificada','confirmada')`. Las `completada` y
+//     `no_show` quedan FUERA aunque conserven su mesa: esta pantalla es "a
+//     quién me falta sentar", no un histórico. Las canceladas tampoco están.
+//   · `turno`: corte a las 17:00 (`hora < '17:00:00'` → comida, si no cena).
+//     Es el mismo corte del trigger de aforo, no una regla de la interfaz.
+//   · `marca`: la de la SALA cuando la reserva ya tiene sala (es donde se
+//     sienta la gente); solo cuando aún no hay sala se usa `reservas.marca`.
+//     Nunca llega vacía: por defecto 'casa_tomas'.
+//   · `grado`: `sin_sala` → `sin_mesa` → `con_mesa`, calculado en SQL a partir
+//     de `espacio_id` y del recuento de `asignaciones_mesa`.
+//
+// Columnas que usa este panel: `espacio_id` y `espacio_nombre` (grado 1),
+// `mesas_asignadas` a través de `grado` (grado 2), `numero_comensales` (el peso
+// real de cada sala), `turno` (el filtro de arriba) y `reserva_id` (identidad).
+// `fecha`, `nombre`, `estado`, `marca`, `plazas_asignadas` y `mesas_nombres`
+// son de la misma vista pero se leen en el plano, no aquí.
+//
+// HASTA EL 2026-09-26 ESTE PANEL TENÍA RESPALDO y ya no lo tiene. Aceptaba las
+// reservas del mes que traía el calendario y, si la vista fallaba o venía
+// vacía, pintaba solo el grado 1 y escribía "el detalle de mesa no está
+// disponible". Eso mentía en lo más importante: una reserva CON SALA Y SIN MESA
+// salía como dato desconocido en vez de como lo que es, trabajo pendiente. Con
+// la vista aplicada la fuente es única, y a cambio hay que ser honestos con los
+// tres estados de la consulta: CARGANDO (esqueleto, ni una cifra), ERROR
+// (mensaje + reintentar, nada de ceros) y VACÍO DE VERDAD ("no hay reservas").
 //
 // ---------------------------------------------------------------------------
 // SALAS SIN MESAS EN EL PLANO
@@ -67,9 +86,20 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Armchair, CalendarIcon, ChevronRight, Info, LayoutGrid, Loader2, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  Armchair,
+  CalendarIcon,
+  ChevronRight,
+  Info,
+  LayoutGrid,
+  RefreshCw,
+  Users,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { useMesas } from "@/hooks/useMesas";
@@ -77,44 +107,17 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useResumenAsignacionDia } from "@/hooks/useResumenAsignacionDia";
 import { marcaDeEspacio } from "@/lib/reservas/negocios";
 import {
-  esTurno,
-  gradoDeReserva,
   resumenDia,
   resumenPorEspacio,
-  turnoDeHora,
   type FilaResumenEspacio,
   type ResumenEspacio,
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
 import { NegocioBadge } from "./NegocioBadge";
 
-// ── Contrato de entrada ──────────────────────────────────────────────────────
-//
-// Una fila por reserva no cancelada del día. Los nombres son los de
-// `vista_asignacion_dia` / `FilaAsignacionDia`, así que las filas del hook
-// encajan aquí tal cual; todo lo que el respaldo no puede saber es opcional.
-export type FilaDiaEspacios = {
-  reserva_id: string;
-  hora: string;
-  numero_comensales?: number | null;
-  espacio_id: string | null;
-  espacio_nombre?: string | null;
-  /** Cuántas mesas tiene asignadas. 0 = pendiente de mesa (estado normal). */
-  mesas_asignadas?: number | null;
-  /** Lo trae la vista; si falta se deriva de `hora` con el corte de las 17:00. */
-  turno?: string | null;
-};
-
 export interface DetalleDiaEspaciosProps {
   /** Día que se está mirando. */
   fecha: Date;
-  /**
-   * Reservas no canceladas de ese día que ya tiene el calendario. Se usan
-   * cuando `vista_asignacion_dia` no responde (ver cabecera).
-   */
-  filasRespaldo?: readonly FilaDiaEspacios[];
-  /** El calendario todavía está trayendo sus reservas. */
-  cargandoRespaldo?: boolean;
   /** Salta al plano de esa sala. La pasa `Reservas.tsx`. */
   onEspacioClick?: (espacioId: string) => void;
 }
@@ -128,11 +131,19 @@ const ETIQUETA_TURNO: Record<FiltroTurno, string> = {
   cena: "Cena",
 };
 
-/** En qué situación está el conocimiento del GRADO 2 (mesa) en este render. */
-type EstadoDetalleMesa = "cargando" | "disponible" | "no_disponible";
-
 function plural(n: number, singular: string, plural_: string) {
   return `${n} ${n === 1 ? singular : plural_}`;
+}
+
+/** Lo legible de un error de PostgREST/red, para poder reportarlo sin mirar logs. */
+function mensajeDeError(error: unknown): string {
+  if (!error) return "";
+  if (typeof error === "string") return error.trim();
+  if (error instanceof Error) return error.message.trim();
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message: unknown }).message).trim();
+  }
+  return "";
 }
 
 // ── Barra de cierre ──────────────────────────────────────────────────────────
@@ -154,6 +165,74 @@ function BarraCierre({ porcentaje }: { porcentaje: number }) {
   );
 }
 
+// ── Esqueleto de carga ───────────────────────────────────────────────────────
+//
+// Sin respaldo, mientras la vista viaja NO SE SABE NADA del día. Se pintan
+// siluetas y ni una cifra: un "0 reservas · 0 %" que un instante después salta
+// a "5 reservas · 80 %" es peor que no enseñar nada, porque el encargado ya ha
+// leído el cero y se lo ha creído.
+function EsqueletoDia() {
+  return (
+    <div className="space-y-2" role="status" aria-label="Cargando el reparto del día">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="rounded-lg border p-3">
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="mt-2 h-3 w-2/3" />
+          <Skeleton className="mt-3 h-1.5 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Error de la consulta ─────────────────────────────────────────────────────
+//
+// No se reutiliza `EstadoErrorCarga` (el bloque de error compartido) por tres
+// motivos concretos, no por gusto: aquí no hay ningún dato pintado debajo -así
+// que su "los datos que ves pueden estar incompletos" no describe esta
+// pantalla-, el panel vive en una columna estrecha junto al calendario, y hace
+// falta que el botón diga que está reintentando (`isFetching`), cosa que aquel
+// no hace. El lenguaje visual sí es el mismo a propósito.
+function BloqueErrorDia({
+  error,
+  reintentando,
+  onReintentar,
+}: {
+  error: unknown;
+  /** La consulta ya está en vuelo otra vez: el botón no debe repetirla. */
+  reintentando: boolean;
+  onReintentar: () => void;
+}) {
+  const detalle = mensajeDeError(error);
+
+  return (
+    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+      <div className="flex min-w-0 items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm font-medium">No se ha podido leer el reparto de este día</p>
+          <p className="text-xs text-muted-foreground">
+            No se enseña ninguna cifra para no dar por buenos unos datos que no se han
+            llegado a leer. Vuelve a intentarlo.
+          </p>
+          {detalle && <p className="break-words text-xs text-muted-foreground/80">{detalle}</p>}
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-3 gap-2"
+        onClick={onReintentar}
+        disabled={reintentando}
+      >
+        <RefreshCw className={cn("h-3.5 w-3.5", reintentando && "animate-spin")} aria-hidden="true" />
+        {reintentando ? "Reintentando…" : "Reintentar"}
+      </Button>
+    </div>
+  );
+}
+
 // ── Tarjeta de una sala ──────────────────────────────────────────────────────
 //
 // Toda la tarjeta es el botón que salta al plano: así la acción está SIEMPRE en
@@ -165,21 +244,17 @@ function TarjetaSala({
   grupo,
   marca,
   tieneMesas,
-  estadoMesa,
   onIr,
 }: {
   grupo: ResumenEspacio;
   marca: string | null;
   /** ¿La sala tiene alguna mesa activa en el plano? Si no, el grado 2 es imposible. */
   tieneMesas: boolean;
-  estadoMesa: EstadoDetalleMesa;
   onIr: (espacioId: string) => void;
 }) {
   const espacioId = grupo.espacio_id as string;
-  // Solo se puede hablar de cierre a nivel de mesa si la sala tiene mesas Y se
-  // han podido leer las asignaciones.
-  const mideCierre = tieneMesas && estadoMesa === "disponible";
-  const cerrada = mideCierre && grupo.conMesa === grupo.total;
+  // Solo se puede hablar de "cerrada" si la sala tiene mesas que asignar.
+  const cerrada = tieneMesas && grupo.conMesa === grupo.total;
 
   return (
     <button
@@ -221,14 +296,6 @@ function TarjetaSala({
           <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
           <span>Esta sala no tiene mesas en el plano: entra para crearlas.</span>
         </p>
-      ) : estadoMesa === "no_disponible" ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          El detalle de mesa no está disponible: solo se ve el reparto por sala.
-        </p>
-      ) : estadoMesa === "cargando" ? (
-        // Ni cifras ni barra mientras no se sepa: una barra a 0 % que luego
-        // salta a 80 % es peor que no pintar nada durante un instante.
-        <p className="mt-2 text-xs text-muted-foreground">Comprobando las mesas…</p>
       ) : (
         <>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -243,7 +310,8 @@ function TarjetaSala({
             )}
             {grupo.sinMesa > 0 && (
               // Tono neutro a propósito: "pendiente de mesa" es el estado
-              // normal de una reserva, no algo que avisar en ámbar.
+              // normal de una reserva, no algo que avisar en ámbar. El dato es
+              // real (lo cuenta la vista), así que se escribe tal cual.
               <Badge
                 variant="outline"
                 className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground"
@@ -274,12 +342,7 @@ function TarjetaSala({
 
 // ── Panel ────────────────────────────────────────────────────────────────────
 
-export function DetalleDiaEspacios({
-  fecha,
-  filasRespaldo = [],
-  cargandoRespaldo = false,
-  onEspacioClick,
-}: DetalleDiaEspaciosProps) {
+export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspaciosProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [turno, setTurno] = useState<FiltroTurno>("todos");
 
@@ -289,34 +352,13 @@ export function DetalleDiaEspacios({
   // botón responde al instante (sin ir al servidor por cada cambio) y además se
   // puede saber si el otro turno tiene reservas, que es lo que evita el
   // "no hay reservas" engañoso cuando el filtro está puesto.
-  const vista = useResumenAsignacionDia(fechaISO);
+  const { filas, isLoading, isError, error, isFetching, refetch } = useResumenAsignacionDia(fechaISO);
 
   // Solo lectura y compartidas con media app: react-query las sirve de caché.
   const { data: espacios } = useEspaciosReserva();
   // Mesas ACTIVAS de todas las salas: una sala cuyas mesas están todas
   // desactivadas está, para asignar, igual que una sala sin mesas.
   const { data: mesas } = useMesas();
-
-  // ── Qué filas se usan y qué se sabe del grado 2 ────────────────────────────
-  const { filas, estadoMesa, cargando } = useMemo(() => {
-    const respaldo = filasRespaldo ?? [];
-    if (vista.isError) {
-      return { filas: respaldo as readonly FilaDiaEspacios[], estadoMesa: "no_disponible" as const, cargando: cargandoRespaldo };
-    }
-    if (vista.isLoading) {
-      // Se pinta ya el grado 1 con el respaldo en vez de un spinner: las
-      // cifras de reservas y comensales son las mismas por las dos vías, así
-      // que lo único que cambia al llegar la vista es que aparecen las mesas.
-      return { filas: respaldo as readonly FilaDiaEspacios[], estadoMesa: "cargando" as const, cargando: cargandoRespaldo };
-    }
-    // Guarda contra dejar el panel en blanco: si la vista responde vacía pero
-    // el calendario sí tiene reservas de ese día, manda el calendario (la vista
-    // puede ir por detrás o filtrar de otra forma) y se dice que no hay mesa.
-    if (vista.filas.length === 0 && respaldo.length > 0) {
-      return { filas: respaldo as readonly FilaDiaEspacios[], estadoMesa: "no_disponible" as const, cargando: false };
-    }
-    return { filas: vista.filas as readonly FilaDiaEspacios[], estadoMesa: "disponible" as const, cargando: false };
-  }, [vista.isError, vista.isLoading, vista.filas, filasRespaldo, cargandoRespaldo]);
 
   const espaciosPorId = useMemo(() => {
     const mapa = new Map<string, { nombre: string; marca: string }>();
@@ -338,21 +380,22 @@ export function DetalleDiaEspacios({
     return set;
   }, [mesas]);
 
-  /** Reservas del turno elegido, ya con grado y nombre de sala resueltos. */
+  /**
+   * Reservas del turno elegido, con lo justo para agrupar por sala.
+   *
+   * `turno` y `grado` se cogen TAL CUAL de la fila: los calcula la vista en SQL
+   * y el hook ya los ha saneado. Volver a derivarlos aquí sería una segunda
+   * regla que podría discrepar de la base de datos.
+   *
+   * El nombre de la sala sí tiene respaldo local (`espaciosPorId`) porque es
+   * solo una etiqueta: si la vista lo trae vacío, enseñar "Sala sin nombre"
+   * teniendo el nombre a mano en caché no ayuda a nadie.
+   */
   const filasFiltradas = useMemo<FilaResumenEspacio[]>(() => {
     return filas
-      .filter((f) => {
-        if (turno === "todos") return true;
-        const suyo = esTurno(f.turno) ? f.turno : turnoDeHora(f.hora);
-        return suyo === turno;
-      })
+      .filter((f) => turno === "todos" || f.turno === turno)
       .map((f) => ({
-        grado: gradoDeReserva({
-          espacio_id: f.espacio_id,
-          // Sin detalle de mesa fiable no se puede afirmar "con_mesa": cuenta
-          // como `sin_mesa` y el aviso de la tarjeta explica por qué.
-          mesas_asignadas: estadoMesa === "disponible" ? Number(f.mesas_asignadas ?? 0) : 0,
-        }),
+        grado: f.grado,
         espacio_id: f.espacio_id,
         espacio_nombre:
           f.espacio_nombre ??
@@ -360,7 +403,7 @@ export function DetalleDiaEspacios({
           null,
         numero_comensales: f.numero_comensales,
       }));
-  }, [filas, turno, estadoMesa, espaciosPorId]);
+  }, [filas, turno, espaciosPorId]);
 
   const resumen = useMemo(() => resumenDia(filasFiltradas), [filasFiltradas]);
   const { porEspacio, sinSala } = useMemo(() => resumenPorEspacio(filasFiltradas), [filasFiltradas]);
@@ -419,20 +462,30 @@ export function DetalleDiaEspacios({
           ))}
         </ToggleGroup>
 
+        {/* Ni cifras ni porcentajes mientras no se sepa: cargando y error tienen
+            su propia frase, y el recuento solo aparece cuando es de verdad. */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="whitespace-nowrap tabular-nums">
-            {plural(resumen.total, "reserva", "reservas")}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span className="whitespace-nowrap tabular-nums">
-            {plural(comensales, "comensal", "comensales")}
-          </span>
-          {estadoMesa === "disponible" && resumen.total > 0 && (
+          {isError ? (
+            <span>El reparto de este día no se ha podido leer.</span>
+          ) : isLoading ? (
+            <span>Leyendo el reparto del día…</span>
+          ) : (
             <>
+              <span className="whitespace-nowrap tabular-nums">
+                {plural(resumen.total, "reserva", "reservas")}
+              </span>
               <span aria-hidden="true">·</span>
               <span className="whitespace-nowrap tabular-nums">
-                {resumen.conMesa} de {resumen.total} con mesa
+                {plural(comensales, "comensal", "comensales")}
               </span>
+              {resumen.total > 0 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="whitespace-nowrap tabular-nums">
+                    {resumen.conMesa} de {resumen.total} con mesa
+                  </span>
+                </>
+              )}
             </>
           )}
         </div>
@@ -441,13 +494,16 @@ export function DetalleDiaEspacios({
       {/* Cuerpo desplazable. `min-h-0` es lo que impide que el contenido empuje
           la tarjeta y se salga: sin él `overflow-y-auto` no recorta nada. */}
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {cargando ? (
-          <div className="flex justify-center py-8">
-            <Loader2
-              className="h-6 w-6 animate-spin text-muted-foreground"
-              aria-label="Cargando el reparto del día"
-            />
-          </div>
+        {isError ? (
+          <BloqueErrorDia
+            error={error}
+            reintentando={isFetching}
+            onReintentar={() => {
+              void refetch();
+            }}
+          />
+        ) : isLoading ? (
+          <EsqueletoDia />
         ) : resumen.total === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {hayEnOtroTurno
@@ -493,7 +549,6 @@ export function DetalleDiaEspacios({
                   grupo={grupo}
                   marca={espaciosPorId.get(id)?.marca ?? null}
                   tieneMesas={salasConMesas.has(id)}
-                  estadoMesa={estadoMesa}
                   onIr={irAlPlano}
                 />
               );

@@ -34,6 +34,23 @@
 // normal de un día que aún está lejos, no una alarma.
 //
 // ---------------------------------------------------------------------------
+// DOS CONSULTAS, DOS DUEÑOS (y ya no se prestan datos)
+// ---------------------------------------------------------------------------
+// · La CUADRÍCULA lee la tabla `reservas` del mes entero (`reservas_mes`), que
+//   es lo único que cabe en una consulta: cuenta reservas, comensales y las que
+//   siguen sin sala de cada día.
+// · El PANEL DEL DÍA lee la vista `vista_asignacion_dia` por su cuenta, desde
+//   `useResumenAsignacionDia`, y de ahí saca también las mesas.
+//
+// Hasta el 2026-09-26 este componente le pasaba además las reservas del día
+// seleccionado como RESPALDO, porque la vista aún no estaba aplicada. Ya lo
+// está (migración `20260926140000_asignaciones_mesa_sin_solapes.sql`), así que
+// el respaldo se ha quitado: solo servía para tapar la vista y, de paso, hacía
+// que una reserva con sala y sin mesa saliera como "no disponible" en vez de
+// como trabajo pendiente. `reservas_mes` se queda porque la cuadrícula la
+// necesita, no porque el panel dependa de ella.
+//
+// ---------------------------------------------------------------------------
 // TODOS LOS NEGOCIOS JUNTOS
 // ---------------------------------------------------------------------------
 // Casa Tomás + Touza · El Reservado (decisión del dueño 2026-09-24): la
@@ -58,7 +75,7 @@ import {
 import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DetalleDiaEspacios, type FilaDiaEspacios } from "./DetalleDiaEspacios";
+import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
 
 // `onDayClick` ya no existe. Estaba declarada y desestructurada, pero NUNCA se
 // llamaba ni nadie la pasaba (el único consumidor es `Reservas.tsx`, que pasa
@@ -94,9 +111,9 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
-  // Reservas del mes. Trae `espacio_id` porque de ahí sale el grado 1 (con sala
-  // / sin sala) de toda la cuadrícula, y sirve de respaldo al panel del día
-  // mientras `vista_asignacion_dia` no exista (ver `DetalleDiaEspacios`).
+  // Reservas del mes: la consulta de la CUADRÍCULA y de nadie más. Trae
+  // `espacio_id` porque de ahí sale el grado 1 (con sala / sin sala) de cada
+  // casilla. El panel del día NO come de aquí: lee `vista_asignacion_dia`.
   //
   // `as any` + cast final: `marca` no está en los tipos generados para
   // `reservas`. Mismo recurso que `useDisponibilidad.ts`.
@@ -144,21 +161,6 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
 
     return stats;
   }, [reservasMes]);
-
-  // Reservas del día seleccionado, en el formato que espera el panel. Es el
-  // RESPALDO: el panel prefiere la vista si responde.
-  const filasDelDia = useMemo<FilaDiaEspacios[]>(() => {
-    if (!reservasMes) return [];
-    const dateKey = format(selectedDate, "yyyy-MM-dd");
-    return reservasMes
-      .filter((r: any) => r.fecha === dateKey)
-      .map((r: any) => ({
-        reserva_id: String(r.id),
-        hora: String(r.hora ?? ""),
-        numero_comensales: Number(r.numero_comensales) || 0,
-        espacio_id: r.espacio_id ? String(r.espacio_id) : null,
-      }));
-  }, [selectedDate, reservasMes]);
 
   /**
    * Cambia de mes. Si el día seleccionado se queda fuera del mes nuevo hay que
@@ -321,12 +323,7 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
             `lg`) crece libre, que es lo que evita que se corte nada. */}
         <Card className="flex flex-col lg:max-h-[620px]">
           <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-            <DetalleDiaEspacios
-              fecha={selectedDate}
-              filasRespaldo={filasDelDia}
-              cargandoRespaldo={isLoading}
-              onEspacioClick={onEspacioClick}
-            />
+            <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
           </CardContent>
         </Card>
       </div>
