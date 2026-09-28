@@ -1,11 +1,14 @@
 // Prompts especializados por tipo de contenido, portados desde los workflows de n8n
 // "TraducirIA" y "DescripciónIA" (scratchpad/n8n-workflows/*.json). Cada uno se
 // afinó para su dominio (sommelier para vinos, marketing para novedades...) y
-// se conserva tal cual el original salvo dos correcciones deliberadas y
+// se conserva tal cual el original salvo las correcciones deliberadas y
 // documentadas junto a su constante: PLATO_SYSTEM (categorías cerradas
-// incompletas) y MENU_TAPAS_SYSTEM (el nodo n8n "Menú y tapas" reutilizaba por
-// error el prompt de Bebidas). COCTEL_SYSTEM es nuevo: el switch de n8n nunca
-// tuvo una rama "coctel" (por eso hoy hay 0/13 cócteles traducidos).
+// incompletas), MENU_TAPAS_SYSTEM (el nodo n8n "Menú y tapas" reutilizaba por
+// error el prompt de Bebidas) y GLOSARIO_COCINA (términos de cocina española
+// que el modelo traducía mal de forma determinista; se añade a los dos prompts
+// por los que pasan nombres de plato: PLATO_SYSTEM y MENU_TAPAS_SYSTEM).
+// COCTEL_SYSTEM es nuevo: el switch de n8n nunca tuvo una rama "coctel" (por
+// eso hoy hay 0/13 cócteles traducidos).
 
 export type TipoContenido =
   | "plato"
@@ -63,14 +66,54 @@ Estructura JSON:
 }`;
 
 // ---------------------------------------------------------------------------
-// Platos — nodo "Platos". Verbatim, con UNA corrección: la lista cerrada de
+// Glosario de cocina española — LISTA CERRADA compartida por PLATO_SYSTEM y
+// MENU_TAPAS_SYSTEM.
+//
+// Motivo (medido sobre 264 llamadas reales con gpt-4.1-mini): el modelo falla
+// de forma DETERMINISTA con estos términos. "Buey de la ría" salió como "Ox of
+// the Estuary" / "Bœuf de l'estuaire" 8 de 8 veces (es un cangrejo, no un
+// bovino) y "Arroz a banda" como "Rice a banda" 8 de 8. En el prompt de
+// menú/tapas se reprodujo además una sustitución de especie: "Cocochas al
+// pil-pil" -> "Monkfish cheeks" / "Joues de lotte" (rape en vez de merluza).
+//
+// Se arregla con glosario, NO cambiando de modelo: la lista cerrada de
+// categorías de PLATO_SYSTEM demuestra que este patrón se respeta en todos los
+// modelos probados, y los modelos que puntuaban mejor en la primera pasada
+// inventaban ingredientes (incluida mantequilla, un alérgeno lácteo que no
+// estaba en el plato), lo que en una carta con alérgenos es inaceptable.
+//
+// Las traducciones de aquí son las que YA están publicadas y son correctas
+// ("Local Brown Crab (Buey)", "Couteaux", "Hake Cheeks in Garlic Sauce"): no se
+// inventa nada, se fija lo que el modelo rompía al volver a traducir.
+//
+// La excepción de "buey" NO es decorativa: con la regla sin matizar, "Solomillo
+// de buey con foie" salió como "Sirloin of Brown Crab" / "Filet de Tourteau"
+// (medido). En español "buey" es cangrejo cuando es el plato y bovino cuando va
+// detrás de un corte, así que el glosario tiene que decir las dos cosas.
+// ---------------------------------------------------------------------------
+export const GLOSARIO_COCINA = `GLOSARIO OBLIGATORIO de cocina española. Es una lista CERRADA: si el texto de entrada contiene uno de estos términos, se traduce EXACTAMENTE como se indica aquí y no se interpreta de ninguna otra forma.
+- "buey de la ría", "buey de mar" o "buey" cuando es el plato entero: es un CANGREJO (Cancer pagurus), no un bovino. en: "Brown Crab". fr: "Tourteau". Nunca "ox", "beef", "estuary ox", "bœuf" ni "boeuf". Única excepción: si "buey" va detrás de un corte de carne ("chuletón de buey", "solomillo de buey", "entrecot de buey", "lomo de buey", "rabo de buey", "carrillera de buey") o la categoría de entrada es de carnes, ahí sí es el bovino y se traduce como "beef" / "bœuf" (el corte manda: "solomillo de buey" es "Beef Sirloin" / "Filet de bœuf", jamás un cangrejo).
+- "arroz a banda": es el nombre propio del plato y NO se traduce. Se deja literalmente "Arroz a banda" en inglés y en francés. Nunca "Rice a banda", "Riz à banda" ni una descripción inventada del plato.
+- "cocochas" o "kokotxas": las cocochas (barbillas) son de MERLUZA salvo que el texto de entrada nombre otro pescado. en: "Hake Cheeks". fr: "Joues de merlu". Nunca rape, "monkfish" ni "lotte".
+- "navajas": es un molusco. en: "Razor Clams". fr: "Couteaux". Nunca "razors", "pocket knives" ni "navettes".
+- "centollo": en: "Spider Crab". fr: "Araignée de mer".
+- "bonito" y "bonito del norte": es un pescado de la familia del atún, nunca un adjetivo. "bonito del norte" es atún blanco: en: "Albacore Tuna", fr: "Thon blanc". Nunca "pretty", "joli", "Northern bonito" ni "bonite du nord".
+
+Fuera de este glosario, traduce el resto de los términos de cocina de forma profesional, pero NUNCA cambies la especie ni el ingrediente por otro (no conviertas merluza en rape, ni marisco en carne). Si no reconoces con seguridad un término, deja el nombre español tal cual en vez de inventar una descripción.`;
+
+// ---------------------------------------------------------------------------
+// Platos — nodo "Platos". Verbatim, con DOS correcciones. (1) La lista cerrada de
 // categorías del prompt original solo cubría 9 de las 11 categorías reales en
 // producción (faltaban SALAZONES y SNACK, verificado contra la tabla Platos).
 // Se añaden con la MISMA traducción que ya existe en esas filas — no se
 // inventa nada nuevo, solo se cierra el hueco para que un plato nuevo en esas
 // categorías no se fuerce a la categoría equivocada.
+// (2) Se engancha GLOSARIO_COCINA al final (ver esa constante): mismo patrón de
+// lista cerrada que ya funciona con las categorías.
 // ---------------------------------------------------------------------------
-export const PLATO_SYSTEM = `Eres un experto en traducción gastronómica profesional. Devuelve únicamente JSON válido, sin markdown, sin \`\`\`json, sin texto adicional. Con los datos de entrada (nombre, descripcion, categoria, alergenos) genera exactamente este objeto con este esquema y estas claves: {"nombre": string, "descripcion": string|null, "traducciones": {"en": {"name": string, "description": string|null, "category": string, "allergens": string[]}, "fr": {"name": string, "description": string|null, "category": string, "allergens": string[]}}}. Debes traducir SIEMPRE el nombre a inglés y francés en traducciones.en.name y traducciones.fr.name, y si descripcion no es null también traducirla en traducciones.en.description y traducciones.fr.description. La categoría debe ser exactamente una de estas en inglés: Rice Dishes, Meats, Salads, Hot Starters, Cold Starters, Shellfish, Today's Specials, Fish, Desserts, Salt-cured Fish, Snacks, y en francés la correspondiente exacta: Plats de riz, Viandes, Salades, Entrées chaudes, Entrées froides, Fruits de mer, Suggestions du jour, Poissons, Desserts, Salaisons, Snacks. No inventes ingredientes ni alérgenos; usa los alérgenos de entrada y tradúcelos solo si ya vienen traducidos en el input, y si el alérgeno Gluten aparece en cualquier idioma debe escribirse exactamente como gluten tanto en inglés como en francés sin traducirlo ni cambiar mayúsculas.`;
+export const PLATO_SYSTEM = `Eres un experto en traducción gastronómica profesional. Devuelve únicamente JSON válido, sin markdown, sin \`\`\`json, sin texto adicional. Con los datos de entrada (nombre, descripcion, categoria, alergenos) genera exactamente este objeto con este esquema y estas claves: {"nombre": string, "descripcion": string|null, "traducciones": {"en": {"name": string, "description": string|null, "category": string, "allergens": string[]}, "fr": {"name": string, "description": string|null, "category": string, "allergens": string[]}}}. Debes traducir SIEMPRE el nombre a inglés y francés en traducciones.en.name y traducciones.fr.name, y si descripcion no es null también traducirla en traducciones.en.description y traducciones.fr.description. La categoría debe ser exactamente una de estas en inglés: Rice Dishes, Meats, Salads, Hot Starters, Cold Starters, Shellfish, Today's Specials, Fish, Desserts, Salt-cured Fish, Snacks, y en francés la correspondiente exacta: Plats de riz, Viandes, Salades, Entrées chaudes, Entrées froides, Fruits de mer, Suggestions du jour, Poissons, Desserts, Salaisons, Snacks. No inventes ingredientes ni alérgenos; usa los alérgenos de entrada y tradúcelos solo si ya vienen traducidos en el input, y si el alérgeno Gluten aparece en cualquier idioma debe escribirse exactamente como gluten tanto en inglés como en francés sin traducirlo ni cambiar mayúsculas.
+
+${GLOSARIO_COCINA}`;
 
 // ---------------------------------------------------------------------------
 // Novedades — nodo "Novedades". Verbatim.
@@ -105,7 +148,11 @@ Devuelve únicamente un objeto JSON válido, sin markdown, sin explicaciones y s
 // (insertaba en menus_diarios incluso para tapas) y la rama de tapas ni
 // siquiera respondía al webhook (nodo Vuelta6 sin conexión de entrada). Aquí
 // se sustituye por un prompt propio para el dominio real: menú del día y
-// listas de tapas.
+// listas de tapas. Lleva también GLOSARIO_COCINA al final: por aquí pasan
+// nombres de plato escritos a mano Y, si la consulta de la carta falla en el
+// editor del menú del día, los platos enlazados que ya tenían traducción buena
+// (EditorMenuTapasWeb.tsx: `necesitaTraduccion` se cumple para todos cuando
+// `platosPorId` viene vacío, y la fila en/fr se sobrescribe con lo que salga).
 // ---------------------------------------------------------------------------
 export const MENU_TAPAS_SYSTEM = `Eres un traductor gastronómico profesional para la carta de un restaurante español. Traduces al inglés (en) y al francés (fr) el contenido del menú del día o de la lista de tapas, con un lenguaje natural y apetitoso propio de una carta de restaurante, no literal.
 
@@ -119,7 +166,9 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin markdown ni texto adicional, qu
 - Si la entrada trae primero/segundo/postre: {"en": {"primero": "...", "segundo": "...", "postre": "..."}, "fr": {"primero": "...", "segundo": "...", "postre": "..."}}
 - Si la entrada es una lista de tapas: {"en": ["...", "..."], "fr": ["...", "..."]}
 
-No añadas platos ni elimines ninguno. Mantén el mismo número de elementos que la entrada.`;
+No añadas platos ni elimines ninguno. Mantén el mismo número de elementos que la entrada.
+
+${GLOSARIO_COCINA}`;
 
 // ---------------------------------------------------------------------------
 // Cóctel — NUEVO. El switch de "Elección Tipo" en TraducirIA.json solo tenía
