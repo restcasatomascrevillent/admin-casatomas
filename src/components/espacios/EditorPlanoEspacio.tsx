@@ -659,15 +659,21 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
               adoptarIdReal(operacion.idCanvas, operacion.mesaId);
               resultado = { estado: "ok" };
             } else if (escritura.filas === 0) {
-              // CERO FILAS es aquí un resultado ESPERADO, no un fallo: significa
-              // que la fila original ya no existe (el caso de la Terraza, donde
-              // los borrados sí funcionaron y solo sobrevive el JSON de
-              // `original_mesas`). La crea el INSERT de plan B que va detrás.
-              // Es la ÚNICA escritura del guardado cuyo "0 filas" no es un
-              // fallo, y lo es porque tiene una alternativa declarada en el
-              // plan. Si el 0 viniera en realidad de RLS, ese INSERT chocará
-              // con el nombre de la fila que sigue viva y el 23505 se reporta.
-              resultado = { estado: "omitida" };
+              // Cero filas aquí puede ser lo ESPERADO —la fila original ya no
+              // existe (Terraza) y la crea el INSERT de plan B que va detrás—
+              // o un rechazo de RLS sobre una fila que sí está. Se distingue
+              // leyéndola: reactivar no escribe solo `activa`, también el
+              // nombre y la geometría, así que si la fila está ahí ese UPDATE
+              // debería haberla tocado. Antes se asumía siempre lo primero y
+              // el INSERT acababa chocando con un 23505 confuso.
+              const lectura = interpretarCeroFilas(
+                "reactivar",
+                await leerEstadoFilaMesa(operacion.mesaId),
+              );
+              resultado =
+                lectura === "fila-ausente"
+                  ? { estado: "omitida" }
+                  : { estado: "fallo", fallo: FALLO_PERMISOS };
             } else {
               resultado = { estado: "fallo", fallo: escritura.fallo };
             }
@@ -774,6 +780,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     pendingUnmerges,
     repuntarAsignacionesMesa,
     escribirFilaMesa,
+    leerEstadoFilaMesa,
     queryClient,
   ]);
 

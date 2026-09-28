@@ -16,6 +16,7 @@ import {
   construirMensajeGuardado,
   construirMensajeLimpieza,
   clasificarFallo,
+  interpretarCeroFilas,
   resolverIdFinalMesa,
   FALLO_PERMISOS,
   type DesagrupePlan,
@@ -602,5 +603,76 @@ describe("construirMensajeLimpieza", () => {
       "Se eliminaron 3 de 4 mesas, pero 1 mesa sigue en el espacio (permisos). " +
         "El plano ha quedado a medio limpiar: recarga la página antes de volver a intentarlo.",
     );
+  });
+});
+
+// ─── "Cero filas" no es "sin permisos" ───────────────────────────────────────
+
+describe("interpretarCeroFilas", () => {
+  describe("desactivar", () => {
+    it("la fila ya no existe -> la desactivación ya está cumplida (caso Terraza)", () => {
+      expect(interpretarCeroFilas("desactivar", { existe: false })).toBe("fila-ausente");
+    });
+
+    it("la fila existe y ya estaba inactiva -> nada que hacer", () => {
+      expect(interpretarCeroFilas("desactivar", { existe: true, activa: false })).toBe("ya-cumplida");
+    });
+
+    it("la fila existe, está activa y aun así no se deja tocar -> eso sí es RLS", () => {
+      expect(interpretarCeroFilas("desactivar", { existe: true, activa: true })).toBe("denegada");
+    });
+  });
+
+  describe("reactivar", () => {
+    it("la fila no está -> toca INSERTAR (el plan B del plan)", () => {
+      expect(interpretarCeroFilas("reactivar", { existe: false })).toBe("fila-ausente");
+    });
+
+    it("la fila está: reactivar escribe nombre y geometría, así que 0 filas es un rechazo", () => {
+      expect(interpretarCeroFilas("reactivar", { existe: true, activa: false })).toBe("denegada");
+      expect(interpretarCeroFilas("reactivar", { existe: true, activa: true })).toBe("denegada");
+    });
+  });
+
+  it("si no se puede confirmar, se lee de la forma pesimista", () => {
+    expect(interpretarCeroFilas("desactivar", null)).toBe("sin-confirmar");
+    expect(interpretarCeroFilas("reactivar", null)).toBe("sin-confirmar");
+  });
+});
+
+describe("construirMensajeGuardado — una mesa que ya no existe no se culpa a los permisos", () => {
+  it("dice 'ya no existe' y que el lienzo está desfasado", () => {
+    const geometria: OperacionGuardado = {
+      tipo: "actualizar-geometria",
+      mesas: [
+        {
+          id: "m-7",
+          nombre: "7",
+          valores: {
+            pos_x: 0,
+            pos_y: 0,
+            ancho: 80,
+            alto: 80,
+            rotacion: 0,
+            is_merged: false,
+            original_mesas: null,
+            etiqueta: null,
+          },
+        },
+      ],
+    };
+    const { exito, mensaje } = construirMensajeGuardado([
+      { operacion: { tipo: "guardar-plano" }, estado: "ok" },
+      {
+        operacion: geometria,
+        estado: "fallo",
+        fallo: { clase: "desaparecida" },
+        mesasFallidas: ["7"],
+      },
+    ]);
+    expect(exito).toBe(false);
+    expect(mensaje).toContain("no se pudo mover la mesa 7 (ya no existe)");
+    expect(mensaje).toContain("Otra sesión las ha borrado");
+    expect(mensaje).not.toContain("permisos");
   });
 });

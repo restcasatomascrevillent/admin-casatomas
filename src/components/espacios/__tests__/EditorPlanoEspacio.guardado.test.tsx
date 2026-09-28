@@ -36,6 +36,11 @@ interface PropsCanvasMock {
   onSelectionChange: (elemento: unknown) => void;
 }
 
+/** Lo único que este test necesita de las props de PanelLateral. */
+interface PropsPanelMock {
+  onUnmergeMesa: (mesaId: string) => void;
+}
+
 interface CadenaSupabase {
   tabla: string;
   llamadas: Array<{ metodo: string; args: unknown[] }>;
@@ -44,6 +49,10 @@ interface CadenaSupabase {
 const h = vi.hoisted(() => ({
   /** Props con las que se renderizó por última vez el CanvasPlano mockeado. */
   canvasProps: { current: null as PropsCanvasMock | null },
+  /** Props con las que se renderizó por última vez el PanelLateral mockeado. */
+  panelProps: { current: null as PropsPanelMock | null },
+  /** Lo que devuelve `canvasRef.current.unmergeMesa(...)` en el próximo desagrupe. */
+  unmergeResultado: { current: null as unknown[] | null },
   /** Devuelve la respuesta (resuelta) de cada cadena de supabase. */
   responder: { current: null as null | ((cadena: CadenaSupabase) => unknown) },
   /** Todas las cadenas ejecutadas, en orden. */
@@ -108,7 +117,7 @@ vi.mock("../CanvasPlano", async () => {
         exportImage: vi.fn(),
         setZoom: vi.fn(),
         centerOnContent: vi.fn(),
-        unmergeMesa: vi.fn(),
+        unmergeMesa: vi.fn(() => h.unmergeResultado.current),
         updateMesaNombre: vi.fn(),
         updateMesaBocadillo: vi.fn(),
       }));
@@ -119,7 +128,12 @@ vi.mock("../CanvasPlano", async () => {
 
 vi.mock("../PanelLateral", async () => {
   const React = await import("react");
-  return { PanelLateral: () => React.createElement("div", { "data-testid": "panel-mock" }) };
+  return {
+    PanelLateral: (props: PropsPanelMock) => {
+      h.panelProps.current = props;
+      return React.createElement("div", { "data-testid": "panel-mock" });
+    },
+  };
 });
 
 vi.mock("../ToolbarDibujo", async () => {
@@ -232,12 +246,64 @@ function responderTodoOk(c: CadenaSupabase): unknown {
       return { data: { id: `m-nueva-${contadorInsert}` }, error: null };
     }
     const idObjetivo = c.llamadas.find((l) => l.metodo === "eq" && l.args[0] === "id")?.args[1];
+    // Lectura de confirmación (`select('id, activa').eq('id', …).maybeSingle()`):
+    // por defecto la fila existe y está activa.
+    if (tieneMetodo(c, "maybeSingle")) {
+      return { data: idObjetivo ? { id: idObjetivo, activa: true } : null, error: null };
+    }
     return { data: idObjetivo ? [{ id: idObjetivo }] : [], error: null };
   }
   return { data: [], error: null };
 }
 
-function montar() {
+/**
+ * Responder con estado: una tablita `mesas` de verdad, para poder distinguir
+ * las tres lecturas de "cero filas" (fila ausente / ya cumplida / denegada).
+ * `denegadas` son los ids sobre los que el UPDATE se rechaza en silencio —
+ * devuelve 0 filas SIN error, como hace RLS.
+ */
+function responderConFilas(
+  filas: Map<string, { activa: boolean }>,
+  denegadas: Set<string> = new Set(),
+) {
+  return (c: CadenaSupabase): unknown => {
+    if (c.tabla === "asignaciones_mesa") return { data: [], error: null, count: 0 };
+    if (c.tabla !== "mesas") return { data: [], error: null };
+
+    const idObjetivo = c.llamadas.find((l) => l.metodo === "eq" && l.args[0] === "id")?.args[1] as
+      | string
+      | undefined;
+
+    if (tieneMetodo(c, "insert")) {
+      contadorInsert += 1;
+      const id = `m-nueva-${contadorInsert}`;
+      filas.set(id, { activa: true });
+      return { data: { id }, error: null };
+    }
+
+    if (tieneMetodo(c, "update")) {
+      if (!idObjetivo || !filas.has(idObjetivo) || denegadas.has(idObjetivo)) {
+        return { data: [], error: null };
+      }
+      const cuerpo = c.llamadas.find((l) => l.metodo === "update")?.args[0] as
+        | Record<string, unknown>
+        | undefined;
+      if (cuerpo && typeof cuerpo.activa === "boolean") {
+        filas.set(idObjetivo, { activa: cuerpo.activa });
+      }
+      return { data: [{ id: idObjetivo }], error: null };
+    }
+
+    if (tieneMetodo(c, "maybeSingle")) {
+      const fila = idObjetivo ? filas.get(idObjetivo) : undefined;
+      return { data: fila ? { id: idObjetivo, activa: fila.activa } : null, error: null };
+    }
+
+    return { data: [...filas.keys()].map((id) => ({ id })), error: null };
+  };
+}
+
+function montar(mesasDB: unknown[] = MESAS_DB) {
   vi.mocked(usePlanoEspacio).mockReturnValue({
     data: { configuracion: {}, ancho_metros: 12, alto_metros: 8 },
     isLoading: false,
@@ -247,7 +313,7 @@ function montar() {
     isPending: false,
   } as never);
   vi.mocked(useMesas).mockReturnValue({
-    data: MESAS_DB,
+    data: mesasDB,
     isLoading: false,
     refetch: refetchMesasMock,
   } as never);
@@ -581,5 +647,197 @@ describe("EditorPlanoEspacio — el diálogo de borrar mesa no miente con un 0",
 
     expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * LA FORMA TERRAZA — el espacio que la primera versión de este arreglo dejó
+ * INSALVABLE.
+ *
+ * En la Terraza los borrados silenciosos SÍ funcionaron: las mesas originales
+ * ya no existen y sus ids solo sobreviven dentro del JSON `original_mesas` de
+ * las uniones. El plan emite una desactivación por cada una de esas filas
+ * fantasma; el UPDATE devuelve 0 filas porque no hay nada que casar, y leer ese
+ * 0 como "sin permisos" abortaba el guardado con un mensaje que culpaba a RLS
+ * de algo que en realidad ya estaba cumplido de sobra.
+ */
+describe("EditorPlanoEspacio — forma Terraza (originales ya borradas de verdad)", () => {
+  const ORIGINALES_TZ = [
+    { id: "m-tz-o1", nombre: "T1", capacidad: 4, forma: "rectangular" as const, ancho: 80, alto: 80 },
+    { id: "m-tz-o2", nombre: "T2", capacidad: 4, forma: "rectangular" as const, ancho: 80, alto: 80 },
+  ];
+
+  const UNION_TZ = {
+    id: "m-tz-u1",
+    nombre: "T1+T2",
+    capacidad: 8,
+    forma: "rectangular" as const,
+    ancho: 160,
+    alto: 80,
+    posX: 1,
+    posY: 1,
+    rotacion: 0,
+    isMerged: true,
+    originalMesas: ORIGINALES_TZ,
+    etiqueta: null,
+  };
+
+  // En la BBDD SOLO está la unión: las dos originales se borraron de verdad.
+  const DB_TZ = [
+    filaDB("m-tz-u1", "T1+T2", 8, { is_merged: true, original_mesas: ORIGINALES_TZ, ancho: 160 }),
+  ];
+
+  const filasVivas = () => new Map([["m-tz-u1", { activa: true }]]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.cadenas.length = 0;
+    h.canvasProps.current = null;
+    h.panelProps.current = null;
+    h.unmergeResultado.current = null;
+    contadorInsert = 0;
+    guardarPlanoMock.mockResolvedValue({ id: "plano-1" });
+  });
+
+  it("guarda LIMPIAMENTE aunque las originales del JSON ya no existan", async () => {
+    h.responder.current = responderConFilas(filasVivas());
+
+    montar(DB_TZ);
+    await act(async () => {
+      h.canvasProps.current?.onMesasChange([UNION_TZ]);
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Guardar" }).click();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Plano guardado correctamente");
+  });
+
+  it("una fila fantasma no se culpa a los permisos ni corta el guardado", async () => {
+    h.responder.current = responderConFilas(filasVivas());
+
+    montar(DB_TZ);
+    await act(async () => {
+      h.canvasProps.current?.onMesasChange([UNION_TZ]);
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Guardar" }).click();
+    });
+
+    // Se INTENTÓ desactivarlas (el plan no cambia)…
+    const intentos = h.cadenas.filter(
+      (c) =>
+        c.tabla === "mesas" &&
+        tieneMetodo(c, "update") &&
+        c.llamadas.some(
+          (l) => l.metodo === "eq" && l.args[0] === "id" && String(l.args[1]).startsWith("m-tz-o"),
+        ),
+    );
+    expect(intentos).toHaveLength(2);
+    // …y al devolver 0 filas se LEYÓ la fila para desempatar.
+    const confirmaciones = h.cadenas.filter(
+      (c) => c.tabla === "mesas" && tieneMetodo(c, "maybeSingle"),
+    );
+    expect(confirmaciones.length).toBeGreaterThanOrEqual(2);
+    expect(mensajesDeError()).toEqual([]);
+  });
+
+  it("Desagrupar recupera los NÚMEROS reales: inserta T1 y T2 y desactiva la unión", async () => {
+    const filas = filasVivas();
+    h.responder.current = responderConFilas(filas);
+    h.unmergeResultado.current = [
+      { id: "mesa-temp-1", nombre: "T1", capacidad: 4, forma: "rectangular", ancho: 80, alto: 80, posX: 1, posY: 1 },
+      { id: "mesa-temp-2", nombre: "T2", capacidad: 4, forma: "rectangular", ancho: 80, alto: 80, posX: 3, posY: 1 },
+    ];
+
+    montar(DB_TZ);
+    await act(async () => {
+      h.canvasProps.current?.onMesasChange([UNION_TZ]);
+    });
+    await act(async () => {
+      h.panelProps.current?.onUnmergeMesa("m-tz-u1");
+    });
+    // CanvasPlano real sustituye la unión por sus hijas; aquí a mano.
+    await act(async () => {
+      h.canvasProps.current?.onMesasChange(h.unmergeResultado.current!);
+    });
+    await act(async () => {
+      screen.getByRole("button", { name: "Guardar" }).click();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Plano guardado correctamente");
+
+    const insertados = h.cadenas
+      .filter((c) => c.tabla === "mesas" && tieneMetodo(c, "insert"))
+      .map((c) => (c.llamadas.find((l) => l.metodo === "insert")?.args[0] as { nombre: string }).nombre);
+    expect(insertados).toEqual(["T1", "T2"]);
+
+    // La unión queda desactivada, no borrada.
+    expect(filas.get("m-tz-u1")).toEqual({ activa: false });
+    expect(h.cadenas.filter((c) => c.tabla === "mesas" && tieneMetodo(c, "delete"))).toHaveLength(0);
+  });
+});
+
+/**
+ * Las otras dos lecturas de "cero filas": la fila que ya estaba inactiva (no
+ * hay nada que hacer) y la fila que está, sigue activa y aun así no se deja
+ * tocar (ese sí es un rechazo de permisos de verdad).
+ */
+describe("EditorPlanoEspacio — las otras dos lecturas de 'cero filas'", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.cadenas.length = 0;
+    h.canvasProps.current = null;
+    h.panelProps.current = null;
+    contadorInsert = 0;
+    guardarPlanoMock.mockResolvedValue({ id: "plano-1" });
+  });
+
+  const filasSalon = (activaM12: boolean) =>
+    new Map([
+      ["m-union", { activa: true }],
+      ["m-12", { activa: activaM12 }],
+      ["m-13", { activa: true }],
+      ["m-14", { activa: true }],
+    ]);
+
+  it("la fila existe, sigue ACTIVA y no se deja tocar -> sigue siendo un fallo de permisos", async () => {
+    h.responder.current = responderConFilas(filasSalon(true), new Set(["m-12"]));
+
+    montar();
+    await sembrarYGuardar();
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(mensajesDeError().join(" | ")).toContain("no se pudo desactivar la mesa 12 (permisos)");
+  });
+
+  it("la fila existe y YA estaba inactiva -> la desactivación está cumplida, se guarda", async () => {
+    h.responder.current = responderConFilas(filasSalon(false), new Set(["m-12"]));
+
+    montar();
+    await sembrarYGuardar();
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Plano guardado correctamente");
+  });
+
+  it("una mesa que otra sesión borró se reporta como 'ya no existe', no como permisos", async () => {
+    // `m-14` está en el lienzo pero ya no en la BBDD.
+    const filas = new Map([
+      ["m-union", { activa: true }],
+      ["m-12", { activa: true }],
+      ["m-13", { activa: true }],
+    ]);
+    h.responder.current = responderConFilas(filas);
+
+    montar();
+    await sembrarYGuardar();
+
+    expect(toast.success).not.toHaveBeenCalled();
+    const mensaje = mensajesDeError().join(" | ");
+    expect(mensaje).toContain("no se pudo mover la mesa 14 (ya no existe)");
+    expect(mensaje).toContain("Otra sesión las ha borrado");
   });
 });
