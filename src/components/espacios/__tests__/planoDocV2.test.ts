@@ -5,7 +5,39 @@ import {
   ESPESOR_MURO_DEFAULT_M,
   type ElementoV1,
 } from "../planoDocV2";
-import { PIXELS_PER_METER } from "../planoUtils";
+import { PIXELS_PER_METER, type Punto, type SegmentoPared } from "../planoUtils";
+import { centroRectFabric, proyectarPuntoEnSegmento } from "../puertaGeometria";
+
+/**
+ * INVARIANTE GEOMÉTRICA de una puerta anclada: su centro REAL (el que sale de
+ * la transformación de Fabric, que gira el Rect alrededor de su esquina
+ * left/top) cae sobre la línea del muro.
+ *
+ * Se comprueba esto y no un round-trip literal de `{left, top}` a propósito:
+ * el round-trip literal pasaba también con la conversión MAL hecha, porque
+ * los dos sentidos compartían exactamente el mismo error (centro = left +
+ * width/2). Lo que de verdad importa —y lo que estaba roto— es que la puerta
+ * acabe encima de su muro.
+ */
+function esperarPuertaSobreMuro(
+  puerta: ElementoV1,
+  muro: SegmentoPared,
+  toleranciaPx = 1
+) {
+  const centro: Punto = centroRectFabric({
+    left: puerta.props.left,
+    top: puerta.props.top,
+    width: puerta.props.width,
+    height: puerta.props.height,
+    angle: puerta.props.angle,
+  });
+  const sobreElMuro = proyectarPuntoEnSegmento(centro, muro);
+  const distancia = Math.hypot(sobreElMuro.x - centro.x, sobreElMuro.y - centro.y);
+  expect(
+    distancia,
+    `la puerta ${puerta.id} está a ${distancia.toFixed(2)}px de su muro`
+  ).toBeLessThanOrEqual(toleranciaPx);
+}
 
 /** Compara dos arrays de ElementoV1 sin importar el orden, con tolerancia de
  *  coma flotante en los campos numéricos de `props`. */
@@ -176,18 +208,63 @@ describe("round-trip V1 -> V2 -> V1", () => {
     esperarElementosEquivalentes(reconstruido, original);
   });
 
-  it("reproduce un plano con puerta rotada 90 grados sobre un muro vertical", () => {
+  it("deja la puerta rotada 90 grados sobre la línea de su muro vertical", () => {
+    const muro: SegmentoPared = { x1: 300, y1: 0, x2: 300, y2: 500 };
+    // Puerta de 70x12 con angle 90 cuyo centro real cae justo en (300, 250):
+    // left/top salen de la inversa de la transformación de Fabric, no de
+    // `centro - tamaño/2`.
     const original: ElementoV1[] = [
       { id: "wall-v", tipo: "wall", props: { x1: 300, y1: 0, x2: 300, y2: 500 } },
       {
         id: "door-v",
         tipo: "door",
-        props: { left: 294, top: 215, width: 70, height: 12, angle: 90 },
+        props: { left: 306, top: 215, width: 70, height: 12, angle: 90 },
       },
     ];
+    esperarPuertaSobreMuro(original[1], muro);
+
     const doc = migrarPlanoV1aV2(original);
+    expect(doc.aberturas).toHaveLength(1);
+    expect(doc.aberturas[0].muroId).toBe("wall-v");
+
     const reconstruido = planoV2aElementosV1(doc);
-    esperarElementosEquivalentes(reconstruido, original);
+    const puerta = reconstruido.find((e) => e.id === "door-v")!;
+    // La invariante que de verdad importa: sigue encima del muro.
+    esperarPuertaSobreMuro(puerta, muro);
+    expect(puerta.props.angle).toBeCloseTo(90, 6);
+    expect(puerta.props.width).toBeCloseTo(70, 6);
+    expect(puerta.props.height).toBeCloseTo(12, 6);
+  });
+
+  it("una puerta con el left/top de la convención ANTIGUA se recoloca sobre el muro", () => {
+    // Estos son los valores que generaba el código con el fallo (centro =
+    // left + width/2): con angle 90 el centro real se va 12px fuera del muro.
+    const muro: SegmentoPared = { x1: 300, y1: 0, x2: 300, y2: 500 };
+    const puertaVieja: ElementoV1 = {
+      id: "door-v",
+      tipo: "door",
+      props: { left: 294, top: 215, width: 70, height: 12, angle: 90 },
+    };
+    const centroViejo = centroRectFabric({
+      left: 294,
+      top: 215,
+      width: 70,
+      height: 12,
+      angle: 90,
+    });
+    // Prueba de que el plano guardado está mal: el centro NO está en el muro.
+    expect(Math.abs(centroViejo.x - 300)).toBeCloseTo(12, 6);
+
+    const original: ElementoV1[] = [
+      { id: "wall-v", tipo: "wall", props: { x1: 300, y1: 0, x2: 300, y2: 500 } },
+      puertaVieja,
+    ];
+    const doc = migrarPlanoV1aV2(original);
+    expect(doc.aberturas).toHaveLength(1);
+
+    const reconstruido = planoV2aElementosV1(doc);
+    const puerta = reconstruido.find((e) => e.id === "door-v")!;
+    esperarPuertaSobreMuro(puerta, muro);
   });
 
   it("preserva un elemento de tipo desconocido y una puerta huerfana intactos", () => {

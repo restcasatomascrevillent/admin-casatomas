@@ -38,6 +38,7 @@
  */
 
 import { PIXELS_PER_METER, mToPx, pxToM, type Punto } from "./planoUtils";
+import { centroRectFabric, topLeftRectFabric } from "./puertaGeometria";
 
 // ---------------------------------------------------------------------------
 // Tipos V1 (formato actual, tal cual lo define EditorPlanoEspacio.tsx). Se
@@ -263,8 +264,12 @@ export function migrarPlanoV1aV2(
     const width = puerta.props?.width ?? 0;
     const height = puerta.props?.height ?? 0;
     const angle = puerta.props?.angle ?? 0;
-    const cx = left + width / 2;
-    const cy = top + height / 2;
+    // Centro REAL de la hoja: el Rect de Fabric tiene origen left/top y gira
+    // alrededor de esa esquina, así que `left + width/2` solo acierta con
+    // angle = 0 (ver `puertaGeometria.ts`). Con la fórmula ingenua, una
+    // puerta sobre un muro vertical se "medía" a 12 px de su muro y podía
+    // quedarse fuera de la tolerancia — o anclarse con un offset erróneo.
+    const { x: cx, y: cy } = centroRectFabric({ left, top, width, height, angle });
 
     let mejorMuro: MuroV2 | null = null;
     let mejorOffsetPx = 0;
@@ -371,16 +376,21 @@ export function planoV2aElementosV1(
     const cy = p1.y + offsetPx * uy;
     const widthPx = mToPx(abertura.ancho, ppm);
     const heightPx = mToPx(abertura.alto, ppm);
+    const anguloPuerta = anguloMuroDeg + abertura.anguloRelativoDeg;
+
+    // Inversa exacta de la transformación de Fabric (origen left/top, giro
+    // alrededor de esa esquina): `cx - width/2` solo vale con angle = 0.
+    const { left, top } = topLeftRectFabric({ x: cx, y: cy }, widthPx, heightPx, anguloPuerta);
 
     elementos.push({
       id: abertura.id,
       tipo: "door",
       props: {
-        left: cx - widthPx / 2,
-        top: cy - heightPx / 2,
+        left,
+        top,
         width: widthPx,
         height: heightPx,
-        angle: anguloMuroDeg + abertura.anguloRelativoDeg,
+        angle: anguloPuerta,
       },
     });
   }
