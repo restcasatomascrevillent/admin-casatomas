@@ -78,6 +78,97 @@ export function topLeftRectFabric(
   };
 }
 
+/**
+ * Forma en que `planos_espacio.configuracion.elementos` guarda un elemento
+ * rectangular. Hay DOS formas en circulación y las dos siguen vivas: la plana
+ * (`{left, top, ...}`) y la anidada (`{props: {left, top, ...}}`).
+ */
+export interface ElementoRectPersistido {
+  left?: number;
+  top?: number;
+  width?: number;
+  height?: number;
+  angle?: number;
+  props?: Record<string, any> | null;
+}
+
+/**
+ * Lee la geometría de un elemento persistido y la devuelve en la convención
+ * de Fabric (`left`/`top` = esquina, giro alrededor de ella).
+ *
+ * `??` y NO `||`: un elemento en `x = 0` es una posición válida, no "sin
+ * valor". Con `||`, un `props.left` de 0 se salta y se acaba leyendo
+ * `elem.left`, que puede ser un valor completamente distinto; y un `width` de
+ * 0 guardado se convierte en el de por defecto. Mismo criterio que
+ * `CanvasPlano.tsx` ("OJO: usar ?? y no ||").
+ */
+export function rectFabricDesdeElemento(
+  elem: ElementoRectPersistido,
+  anchoPorDefecto: number,
+  altoPorDefecto: number
+): RectFabric {
+  const props = elem.props ?? elem;
+  return {
+    left: props.left ?? elem.left ?? 0,
+    top: props.top ?? elem.top ?? 0,
+    width: props.width ?? elem.width ?? anchoPorDefecto,
+    height: props.height ?? elem.height ?? altoPorDefecto,
+    angle: props.angle ?? elem.angle ?? 0,
+  };
+}
+
+/**
+ * Los 4 vértices del rectángulo en orden TL, TR, BR, BL, con la MISMA
+ * convención que `centroRectFabric`: `(left, top)` es la esquina TL y el
+ * rectángulo gira alrededor de ella.
+ *
+ * OJO: `planoDocV2.ts` tiene un `verticesRectRotado` privado que parece lo
+ * mismo pero NO lo es — gira alrededor del centro (`cx = left + width/2`),
+ * que es justo la convención equivocada que arregló el commit 1e77baf. Allí
+ * se compensa porque su inversa arrastra el mismo error; aquí no se puede
+ * reusar.
+ */
+export function verticesRectFabric(rect: RectFabric): [Punto, Punto, Punto, Punto] {
+  const rad = rect.angle * GRADOS_A_RAD;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const locales: Array<[number, number]> = [
+    [0, 0], // TL — es el pivote
+    [rect.width, 0], // TR
+    [rect.width, rect.height], // BR
+    [0, rect.height], // BL
+  ];
+  return locales.map(([lx, ly]) => ({
+    x: rect.left + lx * cos - ly * sin,
+    y: rect.top + lx * sin + ly * cos,
+  })) as [Punto, Punto, Punto, Punto];
+}
+
+/**
+ * Caja alineada a los ejes que contiene al rectángulo YA ROTADO.
+ *
+ * Con `angle = 0` devuelve exactamente `left..left+width` / `top..top+height`,
+ * así que sustituir la caja ingenua por esta no cambia nada de lo que no
+ * estuviera girado. Con ángulo sí: una puerta de 70x12 a 90° ocupa 12 de ancho
+ * y 70 de alto, y su esquina queda a la IZQUIERDA de `left`.
+ */
+export function aabbRectFabric(rect: RectFabric): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  const vertices = verticesRectFabric(rect);
+  const xs = vertices.map((v) => v.x);
+  const ys = vertices.map((v) => v.y);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+}
+
 /** Punto más cercano a `punto` sobre el segmento (clampado a sus extremos). */
 export function proyectarPuntoEnSegmento(punto: Punto, seg: SegmentoPared): Punto {
   const dx = seg.x2 - seg.x1;

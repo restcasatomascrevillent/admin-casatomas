@@ -157,6 +157,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  aabbRectFabric,
+  rectFabricDesdeElemento,
+  type RectFabric,
+} from "@/components/espacios/puertaGeometria";
 
 interface PlanoEspacio2DProps {
   espacioId: string;
@@ -208,6 +213,7 @@ interface ElementoPlano {
   width?: number;
   height?: number;
   radius?: number;
+  angle?: number;
   x1?: number;
   y1?: number;
   x2?: number;
@@ -215,6 +221,72 @@ interface ElementoPlano {
   points?: Array<{ x: number; y: number }>;
   fill?: string;
   props?: Record<string, any>;
+}
+
+// ── Geometría de los elementos del plano ─────────────────────────────────────
+//
+// DOS CONVENCIONES DE ROTACIÓN CONVIVEN EN ESTA PANTALLA. No es un descuido,
+// es lo que persiste cada cosa, y confundirlas descoloca el dibujo:
+//
+//   · ELEMENTOS del plano (`planos_espacio.configuracion.elementos`: paredes,
+//     áreas, puertas) se guardan en la convención de Fabric v6: `left`/`top`
+//     es la ESQUINA y el objeto gira ALREDEDOR DE ESA ESQUINA. El equivalente
+//     exacto en CSS es `transform-origin: 0 0`. Ver `puertaGeometria.ts` y el
+//     commit 1e77baf, que arregló lo mismo en el editor.
+//
+//   · MESAS (`mesas.pos_x` / `pos_y` / `rotacion`) van al revés A PROPÓSITO:
+//     el editor persiste la esquina de la caja SIN rotar (`centro - ancho/2`)
+//     porque esta pantalla las gira por CSS alrededor del CENTRO. Por eso las
+//     mesas llevan `transform-origin: center center` y los elementos no.
+//
+// Hasta ahora esta vista NO rotaba ningún elemento, así que toda puerta salía
+// horizontal aunque su `angle` estuviera bien guardado.
+const ORIGEN_ROTACION_ELEMENTO = "0 0";
+
+/**
+ * Grosor con el que se pinta una pared, en unidades de escena.
+ *
+ * La pared se dibuja como una BANDA que tiene que quedar CENTRADA en la línea
+ * `(x1,y1)-(x2,y2)`, igual que el trazo de la `Line` de Fabric en el editor.
+ * Como el div se coloca por su borde superior, hay que subirlo medio grosor:
+ * sin eso la banda salía entera por debajo de su propia línea y la puerta
+ * —que sí cae sobre la línea— parecía despegada de la pared.
+ *
+ * Medido en el navegador el 2026-09-28 con el harness: 3,97 px de separación
+ * en las paredes horizontales (≈8 cm a 50 px/m) y 0 en las verticales, porque
+ * en esas el giro alrededor de `0 50%` ya recentraba la banda por casualidad.
+ */
+const GROSOR_PARED_ESCENA = 6;
+
+/**
+ * Lectura ÚNICA de la geometría de un elemento rectangular (área, puerta,
+ * ventana, "elemento"). La usan las TRES ramas que dibujan el plano: la vista,
+ * el PDF y el cálculo de `contentBounds`.
+ *
+ * Vive en `puertaGeometria.ts` (compartido con el editor) porque lo que
+ * codifica es la CONVENCIÓN DE PERSISTENCIA, no una decisión de esta pantalla:
+ * así la vista y el editor no pueden volver a divergir.
+ */
+const rectDeElemento = (
+  elem: ElementoPlano,
+  anchoPorDefecto: number,
+  altoPorDefecto: number,
+): RectFabric => rectFabricDesdeElemento(elem, anchoPorDefecto, altoPorDefecto);
+
+/**
+ * CSS que reproduce el giro de un Rect de Fabric con origen `left`/`top`.
+ *
+ * Es exacto también con zoom: la escala es uniforme, así que escalar y girar
+ * conmutan, y el centro cae donde `centroRectFabric` dice que cae.
+ */
+function estiloRotacionElemento(angle: number): {
+  transform: string;
+  transformOrigin: string;
+} {
+  return {
+    transform: `rotate(${angle}deg)`,
+    transformOrigin: ORIGEN_ROTACION_ELEMENTO,
+  };
 }
 
 /** "14:00:00" → "14:00". */
@@ -1268,12 +1340,17 @@ export function PlanoEspacio2D({
         maxX = Math.max(maxX, props.x1, props.x2);
         maxY = Math.max(maxY, props.y1, props.y2);
       } else if (props.left !== undefined && props.top !== undefined) {
-        const w = props.width || props.radius * 2 || 100;
-        const h = props.height || props.radius * 2 || 100;
-        minX = Math.min(minX, props.left);
-        minY = Math.min(minY, props.top);
-        maxX = Math.max(maxX, props.left + w);
-        maxY = Math.max(maxY, props.top + h);
+        // Un círculo no guarda width/height, solo `radius`: su caja es 2r.
+        const diametro = props.radius !== undefined ? props.radius * 2 : 100;
+        // La caja tiene que ser la del elemento YA GIRADO. Con `angle = 0` sale
+        // exactamente la de antes; con ángulo, la puerta de 70x12 tumbada a 90°
+        // ocupa 12 de ancho y 70 de alto y sobresale a la izquierda de `left`.
+        // Con la caja ingenua se quedaba fuera del encuadre y el PDF la cortaba.
+        const caja = aabbRectFabric(rectDeElemento(elem, diametro, diametro));
+        minX = Math.min(minX, caja.minX);
+        minY = Math.min(minY, caja.minY);
+        maxX = Math.max(maxX, caja.maxX);
+        maxY = Math.max(maxY, caja.maxY);
       }
     });
 
@@ -1559,6 +1636,19 @@ export function PlanoEspacio2D({
         contentDiv.appendChild(line);
       }
 
+      // Misma geometría que `renderElementoPlano`, en imperativo: esta rama
+      // construye el plano con nodos sueltos del DOM porque html2canvas
+      // necesita un árbol fuera de pantalla. Aquí no hay zoom (escala 1).
+      const colocarRect = (div: HTMLDivElement, rect: RectFabric) => {
+        div.style.left = `${rect.left - offsetX}px`;
+        div.style.top = `${rect.top - offsetY}px`;
+        div.style.width = `${rect.width}px`;
+        div.style.height = `${rect.height}px`;
+        const rotacion = estiloRotacionElemento(rect.angle);
+        div.style.transform = rotacion.transform;
+        div.style.transformOrigin = rotacion.transformOrigin;
+      };
+
       elementosPlano.forEach((elem) => {
         const props = elem.props || elem;
         const elemDiv = document.createElement("div");
@@ -1573,28 +1663,30 @@ export function PlanoEspacio2D({
             const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
             const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
             elemDiv.style.left = `${x1 - offsetX}px`;
-            elemDiv.style.top = `${y1 - offsetY}px`;
+            // Medio grosor arriba, igual que en la vista (ver `case "wall"`).
+            elemDiv.style.top = `${y1 - offsetY - GROSOR_PARED_ESCENA / 2}px`;
             elemDiv.style.width = `${length}px`;
-            elemDiv.style.height = "6px";
+            elemDiv.style.height = `${GROSOR_PARED_ESCENA}px`;
             elemDiv.style.backgroundColor = "#374151";
             elemDiv.style.transform = `rotate(${angle}deg)`;
             elemDiv.style.transformOrigin = "0 50%";
             break;
           }
           case "rectangle":
-          case "area":
-            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
-            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
-            elemDiv.style.width = `${props.width || elem.width || 100}px`;
-            elemDiv.style.height = `${props.height || elem.height || 100}px`;
+          case "area": {
+            colocarRect(elemDiv, rectDeElemento(elem, 100, 100));
+            // `||` a propósito, igual que en la vista: un `fill` vacío no es un
+            // color válido y debe caer al de por defecto.
             elemDiv.style.backgroundColor = props.fill || elem.fill || "rgba(226, 232, 240, 0.5)";
             elemDiv.style.border = "2px solid #64748b";
             elemDiv.style.borderRadius = "4px";
             break;
+          }
           case "circle": {
-            const radius = props.radius || elem.radius || 30;
-            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
-            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
+            // Sin rotar, por lo mismo que en la vista (ver `case "circle"`).
+            const radius = props.radius ?? elem.radius ?? 30;
+            elemDiv.style.left = `${(props.left ?? elem.left ?? 0) - offsetX}px`;
+            elemDiv.style.top = `${(props.top ?? elem.top ?? 0) - offsetY}px`;
             elemDiv.style.width = `${radius * 2}px`;
             elemDiv.style.height = `${radius * 2}px`;
             elemDiv.style.backgroundColor = props.fill || elem.fill || "#e2e8f0";
@@ -1602,23 +1694,19 @@ export function PlanoEspacio2D({
             elemDiv.style.borderRadius = "50%";
             break;
           }
-          case "door":
-            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
-            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
-            elemDiv.style.width = `${props.width || elem.width || 70}px`;
-            elemDiv.style.height = `${props.height || elem.height || 12}px`;
+          case "door": {
+            colocarRect(elemDiv, rectDeElemento(elem, 70, 12));
             elemDiv.style.backgroundColor = "#fef3c7";
             elemDiv.style.border = "2px solid #d97706";
             elemDiv.style.borderRadius = "2px";
             break;
-          case "window":
-            elemDiv.style.left = `${(props.left || elem.left || 0) - offsetX}px`;
-            elemDiv.style.top = `${(props.top || elem.top || 0) - offsetY}px`;
-            elemDiv.style.width = `${props.width || elem.width || 60}px`;
-            elemDiv.style.height = `${props.height || elem.height || 8}px`;
+          }
+          case "window": {
+            colocarRect(elemDiv, rectDeElemento(elem, 60, 8));
             elemDiv.style.backgroundColor = "#bfdbfe";
             elemDiv.style.border = "2px solid #3b82f6";
             break;
+          }
           default:
             return;
         }
@@ -1641,6 +1729,11 @@ export function PlanoEspacio2D({
         mesaDiv.style.backgroundColor = asignacion ? "#bbf7d0" : "#e5e7eb";
         mesaDiv.style.border = "2px solid #6b7280";
         mesaDiv.style.borderRadius = mesa.forma === "circular" ? "50%" : "8px";
+        // La mesa gira alrededor de su CENTRO (ojo, al revés que los elementos
+        // del plano: ver el comentario de `ORIGEN_ROTACION_ELEMENTO`). El PDF
+        // se dejaba la rotación sin aplicar y sacaba todas las mesas rectas.
+        mesaDiv.style.transform = `rotate(${mesa.rotacion ?? 0}deg)`;
+        mesaDiv.style.transformOrigin = "center center";
         mesaDiv.style.display = "flex";
         mesaDiv.style.alignItems = "center";
         mesaDiv.style.justifyContent = "center";
@@ -1909,9 +2002,12 @@ export function PlanoEspacio2D({
             style={{
               ...baseStyle,
               left: (x1 - offsetX) * scale,
-              top: (y1 - offsetY) * scale,
+              // Medio grosor arriba: así el punto de giro (`0 50%`) cae JUSTO
+              // en (x1, y1) y la banda queda centrada en la línea de la pared,
+              // como el trazo de la `Line` de Fabric en el editor.
+              top: ((y1 - offsetY) - GROSOR_PARED_ESCENA / 2) * scale,
               width: length * scale,
-              height: 6 * scale,
+              height: GROSOR_PARED_ESCENA * scale,
               backgroundColor: "#374151",
               transform: `rotate(${angle}deg)`,
               transformOrigin: "0 50%",
@@ -1921,32 +2017,40 @@ export function PlanoEspacio2D({
       }
 
       case "rectangle":
-      case "area":
+      case "area": {
+        const rect = rectDeElemento(elem, 100, 100);
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
-              width: (props.width || elem.width || 100) * scale,
-              height: (props.height || elem.height || 100) * scale,
+              left: (rect.left - offsetX) * scale,
+              top: (rect.top - offsetY) * scale,
+              width: rect.width * scale,
+              height: rect.height * scale,
+              // `||` a propósito: un `fill` vacío NO es un color válido, así que
+              // sí debe caer al de por defecto (con `??` se pintaría transparente).
               backgroundColor: props.fill || elem.fill || "rgba(226, 232, 240, 0.5)",
               border: `${2 * scale}px solid #64748b`,
               borderRadius: 4 * scale,
+              ...estiloRotacionElemento(rect.angle),
             }}
           />
         );
+      }
 
       case "circle": {
-        const radius = (props.radius || elem.radius || 30) * scale;
+        // Un círculo es invariante al giro, pero el punto que se guarda es la
+        // esquina de su caja: girar movería el círculo entero. El editor nunca
+        // les pone ángulo, así que aquí se dibujan sin rotar.
+        const radius = (props.radius ?? elem.radius ?? 30) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              left: ((props.left ?? elem.left ?? 0) - offsetX) * scale,
+              top: ((props.top ?? elem.top ?? 0) - offsetY) * scale,
               width: radius * 2,
               height: radius * 2,
               backgroundColor: props.fill || elem.fill || "#e2e8f0",
@@ -1957,32 +2061,35 @@ export function PlanoEspacio2D({
         );
       }
 
-      case "door":
+      case "door": {
+        const rect = rectDeElemento(elem, 70, 12);
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
-              width: (props.width || elem.width || 70) * scale,
-              height: (props.height || elem.height || 12) * scale,
+              left: (rect.left - offsetX) * scale,
+              top: (rect.top - offsetY) * scale,
+              width: rect.width * scale,
+              height: rect.height * scale,
               backgroundColor: "#fef3c7",
               border: `${2 * scale}px solid #d97706`,
               borderRadius: 2 * scale,
+              ...estiloRotacionElemento(rect.angle),
             }}
           />
         );
+      }
 
       case "silla": {
-        const sillaRadius = (props.radius || elem.radius || 15) * scale;
+        const sillaRadius = (props.radius ?? elem.radius ?? 15) * scale;
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              left: ((props.left ?? elem.left ?? 0) - offsetX) * scale,
+              top: ((props.top ?? elem.top ?? 0) - offsetY) * scale,
               width: sillaRadius * 2,
               height: sillaRadius * 2,
               backgroundColor: "#fde68a",
@@ -1993,38 +2100,46 @@ export function PlanoEspacio2D({
         );
       }
 
-      case "elemento":
+      case "elemento": {
+        const rect = rectDeElemento(elem, 40, 40);
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
-              width: (props.width || elem.width || 40) * scale,
-              height: (props.height || elem.height || 40) * scale,
+              left: (rect.left - offsetX) * scale,
+              top: (rect.top - offsetY) * scale,
+              width: rect.width * scale,
+              height: rect.height * scale,
               backgroundColor: "#94a3b8",
               border: `${1 * scale}px solid #475569`,
               borderRadius: 4 * scale,
+              ...estiloRotacionElemento(rect.angle),
             }}
           />
         );
+      }
 
-      case "polygon":
+      case "polygon": {
+        const rect = rectDeElemento(elem, 60, 60);
         return (
           <div
             key={elem.id}
             style={{
               ...baseStyle,
-              left: ((props.left || elem.left || 0) - offsetX) * scale,
-              top: ((props.top || elem.top || 0) - offsetY) * scale,
+              left: (rect.left - offsetX) * scale,
+              top: (rect.top - offsetY) * scale,
+              // El tamaño sigue siendo fijo: el polígono no guarda width/height,
+              // es un triángulo recortado de una caja de 60x60.
               width: 60 * scale,
               height: 60 * scale,
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               backgroundColor: props.fill || elem.fill || "#e2e8f0",
+              ...estiloRotacionElemento(rect.angle),
             }}
           />
         );
+      }
 
       default:
         return null;

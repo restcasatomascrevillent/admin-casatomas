@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { Line, Rect } from "fabric";
 import {
+  aabbRectFabric,
   anguloSegmentoDeg,
   calcularPuertaEnMuro,
   centroRectFabric,
   proyectarPuntoEnSegmento,
+  rectFabricDesdeElemento,
   topLeftRectFabric,
+  verticesRectFabric,
 } from "../puertaGeometria";
 import {
   PIXELS_PER_METER,
@@ -447,5 +450,133 @@ describe("coordenadas de una pared movida (el imán apuntaba a la posición viej
     );
     expect(conCoordsBuenas.anclada).toBe(true);
     expect(distanciaAlMuro(centroSegunFabric(conCoordsBuenas), nuevo)).toBeLessThanOrEqual(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Caja del rectángulo girado y lectura del elemento persistido.
+//
+// Lo añadió el arreglo de la VISTA DE RESERVAS (`PlanoEspacio2D.tsx`), que
+// nunca rotaba los elementos y sacaba todas las puertas horizontales.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("verticesRectFabric", () => {
+  it("coincide con las esquinas que calcula Fabric, para cualquier ángulo", () => {
+    for (const angle of [0, 15, 45, 90, 135, 180, -90, -37.5]) {
+      const rect = { left: 123.5, top: -44.25, width: DOOR_WIDTH_PX, height: 30, angle };
+      const obj = new Rect({ ...rect, strokeWidth: 0, originX: "left", originY: "top" });
+      obj.setCoords();
+      // Fabric los da como {tl, tr, br, bl}; mismo orden que devolvemos.
+      const deFabric = obj.getCoords();
+      const mios = verticesRectFabric(rect);
+      mios.forEach((v, i) => {
+        expect(v.x, `x vértice ${i} @ ${angle}°`).toBeCloseTo(deFabric[i].x, 6);
+        expect(v.y, `y vértice ${i} @ ${angle}°`).toBeCloseTo(deFabric[i].y, 6);
+      });
+    }
+  });
+
+  it("el primer vértice ES el pivote: no se mueve al girar", () => {
+    const base = { left: 100, top: 200, width: DOOR_WIDTH_PX, height: 12 };
+    for (const angle of [0, 45, 90, 180, -90]) {
+      const [tl] = verticesRectFabric({ ...base, angle });
+      expect(tl.x, `x @ ${angle}°`).toBeCloseTo(base.left, 9);
+      expect(tl.y, `y @ ${angle}°`).toBeCloseTo(base.top, 9);
+    }
+  });
+
+  it("su punto medio es exactamente `centroRectFabric`", () => {
+    for (const angle of [0, 33, 90, 180, -90]) {
+      const rect = { left: 10, top: -5, width: 70, height: 12, angle };
+      const vs = verticesRectFabric(rect);
+      const medio = {
+        x: (vs[0].x + vs[2].x) / 2,
+        y: (vs[0].y + vs[2].y) / 2,
+      };
+      const centro = centroRectFabric(rect);
+      expect(medio.x, `x @ ${angle}°`).toBeCloseTo(centro.x, 9);
+      expect(medio.y, `y @ ${angle}°`).toBeCloseTo(centro.y, 9);
+    }
+  });
+});
+
+describe("aabbRectFabric", () => {
+  it("con ángulo 0 es la caja de toda la vida (left..left+width)", () => {
+    const caja = aabbRectFabric({ left: 40, top: 90, width: 70, height: 12, angle: 0 });
+    expect(caja).toEqual({ minX: 40, minY: 90, maxX: 110, maxY: 102 });
+  });
+
+  it("una puerta tumbada a 90° ocupa 12 de ancho y 70 de alto, no al revés", () => {
+    const caja = aabbRectFabric({ left: 40, top: 90, width: 70, height: 12, angle: 90 });
+    expect(caja.maxX - caja.minX).toBeCloseTo(12, 9);
+    expect(caja.maxY - caja.minY).toBeCloseTo(70, 9);
+  });
+
+  it("a 90° la puerta sobresale a la IZQUIERDA de `left` (la caja ingenua la dejaba fuera)", () => {
+    // Este es el caso que recortaba el PDF: con la caja ingenua el encuadre
+    // empezaba en left=40 y los 12px reales de puerta a su izquierda se
+    // quedaban fuera del papel.
+    const caja = aabbRectFabric({ left: 40, top: 90, width: 70, height: 12, angle: 90 });
+    expect(caja.minX).toBeCloseTo(28, 9);
+    expect(caja.minX).toBeLessThan(40);
+  });
+
+  it("contiene siempre al centro real de la puerta", () => {
+    for (const angle of [0, 27, 45, 90, 133, 180, -90]) {
+      const rect = { left: 300, top: 150, width: 70, height: 12, angle };
+      const caja = aabbRectFabric(rect);
+      const centro = centroRectFabric(rect);
+      expect(centro.x, `x @ ${angle}°`).toBeGreaterThanOrEqual(caja.minX - 1e-9);
+      expect(centro.x, `x @ ${angle}°`).toBeLessThanOrEqual(caja.maxX + 1e-9);
+      expect(centro.y, `y @ ${angle}°`).toBeGreaterThanOrEqual(caja.minY - 1e-9);
+      expect(centro.y, `y @ ${angle}°`).toBeLessThanOrEqual(caja.maxY + 1e-9);
+    }
+  });
+});
+
+describe("rectFabricDesdeElemento", () => {
+  it("lee la forma anidada (`props`) y la plana", () => {
+    const anidado = { props: { left: 10, top: 20, width: 70, height: 12, angle: 90 } };
+    const plano = { left: 10, top: 20, width: 70, height: 12, angle: 90 };
+    expect(rectFabricDesdeElemento(anidado, 70, 12)).toEqual(plano);
+    expect(rectFabricDesdeElemento(plano, 70, 12)).toEqual(plano);
+  });
+
+  it("un 0 guardado se respeta: `??` y no `||`", () => {
+    // Un área pegada al borde izquierdo del plano está en x = 0. Con `||` ese
+    // 0 se descartaba por falsy y se caía al valor por defecto o, peor, al
+    // campo del otro nivel (que puede valer otra cosa).
+    const pegadoAlBorde = { props: { left: 0, top: 0, width: 0, height: 0, angle: 0 } };
+    expect(rectFabricDesdeElemento(pegadoAlBorde, 100, 100)).toEqual({
+      left: 0,
+      top: 0,
+      width: 0,
+      height: 0,
+      angle: 0,
+    });
+  });
+
+  it("con `||` un `props.left` de 0 leía el campo plano, que es otro sitio", () => {
+    // Caso exacto que rompía: el elemento trae las dos formas y la anidada
+    // manda. `props.left || elem.left` devolvía 300 en vez de 0.
+    const conLasDosFormas = { left: 300, top: 400, props: { left: 0, top: 0 } };
+    const leidoConOr = conLasDosFormas.props.left || conLasDosFormas.left || 0;
+    expect(leidoConOr).toBe(300); // lo viejo: 300px fuera de sitio
+    expect(rectFabricDesdeElemento(conLasDosFormas, 70, 12).left).toBe(0);
+    expect(rectFabricDesdeElemento(conLasDosFormas, 70, 12).top).toBe(0);
+  });
+
+  it("los valores por defecto solo entran si el campo falta de verdad", () => {
+    expect(rectFabricDesdeElemento({ left: 5, top: 6 }, 70, 12)).toEqual({
+      left: 5,
+      top: 6,
+      width: 70,
+      height: 12,
+      angle: 0,
+    });
+  });
+
+  it("aguanta `props: null` sin reventar (elementos viejos)", () => {
+    expect(rectFabricDesdeElemento({ left: 5, top: 6, props: null }, 70, 12).left).toBe(5);
   });
 });
