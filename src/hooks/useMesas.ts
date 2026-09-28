@@ -2,6 +2,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
+// El "cero filas no es un fallo de permisos" ya está razonado y extraído en
+// `guardadoPlano.ts` (commits 2c3f9ea y 1f1d06d): se reutiliza tal cual en vez
+// de inventar otro vocabulario para lo mismo. Es un módulo de lógica pura —no
+// importa React ni ningún componente, solo `planoUtils`, que no importa nada—,
+// así que traerlo desde un hook no arrastra nada al bundle.
+// PENDIENTE (fuera de este encargo): vive en `src/components/espacios/` por
+// historia, no por diseño; su sitio natural es `src/lib/reservas/`.
+import {
+  clasificarFallo,
+  type EstadoFilaMesa,
+  type LecturaCeroFilas,
+  type MotivoFallo,
+} from "@/components/espacios/guardadoPlano";
 
 export interface OriginalMesaData {
   id: string;
@@ -70,15 +83,18 @@ export interface OpcionesMesas {
  * trae también `is_merged` y `activa`, que hacen falta para el aforo.
  *
  * OJO con sumar `capacidad` para calcular aforo: HAY QUE EXCLUIR LAS FILAS
- * FUSIONADAS (`is_merged = true`). Al fusionar, el editor de plano intenta
- * borrar las filas originales pero lo hace sin comprobar el error del DELETE
- * (`EditorPlanoEspacio.tsx`, líneas ~551 y ~583), y supabase-js RESUELVE en vez
- * de rechazar cuando RLS o una clave ajena lo impiden: el borrado puede fallar
- * en silencio y dejar vivas la unión Y sus originales. Sumarlas todas cuenta
- * las mismas sillas dos veces (en producción, 2026-09-27: el Salón decía 64
- * plazas cuando tiene 36; la Terraza decía 12 sin tener ni una mesa real).
- * La cuenta buena vive en `src/lib/reservas/aforoMesas.ts` — no la repitas a
- * mano.
+ * FUSIONADAS (`is_merged = true`). Sumarlas todas cuenta las mismas sillas dos
+ * veces (en producción, 2026-09-27: el Salón decía 64 plazas cuando tiene 36;
+ * la Terraza decía 12 sin tener ni una mesa real). La cuenta buena vive en
+ * `src/lib/reservas/aforoMesas.ts` — no la repitas a mano.
+ *
+ * DE DÓNDE SALIERON ESAS FILAS: al fusionar, el editor de plano borraba las
+ * originales sin leer el `{ error }` del DELETE, y supabase-js RESUELVE en vez
+ * de rechazar cuando RLS o una clave ajena lo impiden — el borrado fallaba en
+ * silencio y dejaba vivas la unión Y sus originales. Arreglado en 2c3f9ea:
+ * fusionar y desagrupar ya no borran, DESACTIVAN (`activa = false`), y toda
+ * escritura se verifica. Las filas duplicadas de producción siguen ahí, así
+ * que el aviso de arriba sigue vigente.
  */
 export function useMesas(espacioId?: string, opciones?: OpcionesMesas) {
   const incluirInactivas = opciones?.incluirInactivas === true;
@@ -242,20 +258,142 @@ export function useActualizarMesasSilent() {
   });
 }
 
+// ─── Borrado de una mesa: qué significa "cero filas" ─────────────────────────
+
+/**
+ * Lo que devuelve el borrado verificado. No es decorativo: hasta hoy el hook
+ * decía "Mesa eliminada correctamente" sin comprobar NADA, y desde la
+ * migración `20260928120000_mesas_asignaciones_rls_por_seccion.sql` (aplicada
+ * en producción) escribir en `mesas` exige `can_write_section('reservas')` —
+ * así que ese mensaje pasó de inexacto a directamente falso para quien no
+ * tenga la sección.
+ */
+export type ResultadoEliminarMesa =
+  /** El DELETE devolvió la fila: se borró de verdad. */
+  | "eliminada"
+  /** Cero filas Y la fila ya no está: otra sesión se adelantó. No es un fallo. */
+  | "ya-no-estaba";
+
+/**
+ * "CERO FILAS" TAMPOCO ES "SIN PERMISOS" EN UN BORRADO.
+ *
+ * Mismo criterio que `interpretarCeroFilas` (`guardadoPlano.ts`), que es donde
+ * está razonado a fondo: un `delete … .eq('id', X).select('id')` que devuelve
+ * `[]` NO trae error —supabase-js resuelve, no rechaza— y puede significar
+ * tres cosas. Para un borrado solo importa si la fila sigue estando:
+ *
+ *                           borrar
+ *   la fila no está         ya cumplido (otra sesión la borró antes)
+ *   existe, activa=false    DENEGADA (desactivada no es borrada)
+ *   existe, activa=true     DENEGADA de verdad
+ *   no se puede leer        pesimista: denegada
+ *
+ * No se llama a `interpretarCeroFilas` directamente porque su unión de
+ * operaciones es `"desactivar" | "reactivar"` y no tiene caso `"borrar"`. La
+ * tabla de arriba coincide con la de `"reactivar"`, pero pasar ese literal
+ * desde un DELETE se leería como un error. Cuando `guardadoPlano.ts` no esté
+ * ocupado, lo limpio es añadir ahí `"borrar"` y retirar esta función.
+ *
+ * MISMO LÍMITE CONOCIDO que allí: si una política ocultara la fila también al
+ * SELECT, "borrada" e "invisible" son indistinguibles desde el cliente y esto
+ * lo leería como cumplido. Hoy no pasa —`useMesas` acaba de leer esa misma
+ * fila para pintar el plano— y la RLS de `mesas` usa `can_read_section` para
+ * el SELECT y `can_write_section` para el DELETE, que hoy miran lo mismo.
+ */
+function interpretarCeroFilasBorrado(fila: EstadoFilaMesa | null): LecturaCeroFilas {
+  if (fila === null) return "sin-confirmar";
+  return fila.existe ? "denegada" : "fila-ausente";
+}
+
+/**
+ * Desempata el "cero filas" leyendo la fila. Copia deliberada de
+ * `leerEstadoFilaMesa` en `EditorPlanoEspacio.tsx` (mismo nombre a propósito):
+ * está dentro del componente y no se puede importar.
+ * `null` = ni siquiera se pudo leer, así que toca ser pesimista.
+ */
+async function leerEstadoFilaMesa(mesaId: string): Promise<EstadoFilaMesa | null> {
+  const { data, error } = await supabase
+    .from("mesas")
+    .select("id, activa")
+    .eq("id", mesaId)
+    .maybeSingle();
+  if (error) return null;
+  if (!data) return { existe: false };
+  // `coalesce(activa, true)`: la columna es nullable y null cuenta como activa
+  // (es lo que hacen el índice único parcial y las funciones de aforo).
+  return { existe: true, activa: data.activa !== false };
+}
+
+/**
+ * Fallo del borrado, con el motivo ya clasificado. Se lanza (no se devuelve)
+ * a propósito: los tres llamantes —`PanelLateral.handleDeleteMesa`,
+ * `EditorPlanoEspacio.handleDeleteSelected` y
+ * `PlanoEspacio2D.confirmarBorrarMesa`— hacen `await mutateAsync(id)` y, si no
+ * salta, quitan la mesa del lienzo. Si un borrado denegado resolviera, la mesa
+ * desaparecería de la pantalla y seguiría viva en la BBDD.
+ */
+export class ErrorEliminarMesa extends Error {
+  readonly fallo: MotivoFallo;
+
+  constructor(fallo: MotivoFallo) {
+    super(motivoLegibleEliminarMesa(fallo));
+    this.name = "ErrorEliminarMesa";
+    this.fallo = fallo;
+  }
+}
+
+/** Mismo vocabulario que `motivoLegible` en `guardadoPlano.ts`. */
+function motivoLegibleEliminarMesa(fallo: MotivoFallo): string {
+  if (fallo.clase === "permisos") return "permisos";
+  if (fallo.clase === "desaparecida") return "ya no existe";
+  return fallo.mensaje;
+}
+
 export function useEliminarMesa() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("mesas").delete().eq("id", id);
-      if (error) throw error;
+    mutationFn: async (id: string): Promise<ResultadoEliminarMesa> => {
+      // COMPROBAR `{ error }` NO BASTA. Un DELETE denegado por RLS se resuelve
+      // con `{ data: [], error: null }`: sin excepción, sin error y sin filas.
+      // La única forma de enterarse es pedir `.select('id')` y mirar si vuelve
+      // la fila que se quería borrar. Ese agujero es el que dejó la BBDD de
+      // producción rota el 2026-09-27 por el lado del editor de plano.
+      const { data, error } = await supabase
+        .from("mesas")
+        .delete()
+        .eq("id", id)
+        .select("id");
+      if (error) throw new ErrorEliminarMesa(clasificarFallo(error));
+      if ((data?.length ?? 0) > 0) return "eliminada";
+
+      const lectura = interpretarCeroFilasBorrado(await leerEstadoFilaMesa(id));
+      if (lectura === "fila-ausente") return "ya-no-estaba";
+      // `denegada` y `sin-confirmar` se juntan en "permisos", igual que en el
+      // guardado del plano: ante la duda, pesimista. Nada que no se pueda
+      // confirmar se da por bueno.
+      throw new ErrorEliminarMesa({ clase: "permisos" });
     },
-    onSuccess: () => {
+    onSuccess: (resultado) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      toast.success("Mesa eliminada correctamente");
+      if (resultado === "eliminada") {
+        toast.success("Mesa eliminada correctamente");
+        return;
+      }
+      // La mesa ya no estaba: el objetivo se cumple igual y los llamantes
+      // hacen bien en quitarla del lienzo, pero decir "eliminada correctamente"
+      // sería atribuirse un borrado ajeno.
+      toast.warning(
+        "Esa mesa ya no existía: otra sesión la había borrado antes. " +
+          "Se ha quitado del plano igualmente.",
+      );
     },
     onError: (error) => {
-      toast.error("Error al eliminar mesa");
+      const fallo = error instanceof ErrorEliminarMesa ? error.fallo : clasificarFallo(error);
+      toast.error(
+        `No se ha podido eliminar la mesa (${motivoLegibleEliminarMesa(fallo)}). ` +
+          "Sigue ahí: recarga la página antes de volver a intentarlo.",
+      );
       console.error(error);
     },
   });
