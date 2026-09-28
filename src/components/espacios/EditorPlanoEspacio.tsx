@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
-import { useMesas, useActualizarMesasSilent, useEliminarMesa } from "@/hooks/useMesas";
+import { useMesas, useEliminarMesa } from "@/hooks/useMesas";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { ToolbarDibujo, ToolType } from "./ToolbarDibujo";
 import { CanvasPlano, CanvasPlanoRef } from "./CanvasPlano";
@@ -11,8 +13,6 @@ import { PanelLateral } from "./PanelLateral";
 import { usePlanoHistory, type PlanoSnapshot } from "./store/usePlanoHistory";
 import { decidirModoSnapshot } from "./store/historySnapshotMode";
 import {
-  esMesaTemporal,
-  esMesaGrupoNueva,
   esMesaNoPersistida,
   planRepuntarAsignaciones,
   detectarPoligonoCerrado,
@@ -20,6 +20,21 @@ import {
   bboxPoligono,
   PIXELS_PER_METER,
 } from "./planoUtils";
+import {
+  aplicarRenombradosADesagrupes,
+  clasificarFallo,
+  construirMensajeGuardado,
+  construirMensajeLimpieza,
+  construirPlanGuardado,
+  interpretarCeroFilas,
+  resolverIdFinalMesa,
+  FALLO_DESAPARECIDA,
+  FALLO_PERMISOS,
+  type DesagrupePlan,
+  type EstadoFilaMesa,
+  type MotivoFallo,
+  type ResultadoOperacion,
+} from "./guardadoPlano";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +83,16 @@ export interface ElementoCanvas {
   props: Record<string, any>;
 }
 
+/**
+ * Puente de tipos entre el plan de guardado y los tipos generados de Supabase:
+ * `mesas.original_mesas` es `Json` en `types.ts` y el plan lo tipa como array
+ * de mesas originales (que es lo que de verdad guarda esa columna). Mismo cast
+ * que ya hacía el guardado anterior al insertar un grupo.
+ */
+function aFilaSupabase<T extends { original_mesas: unknown }>(valores: T) {
+  return { ...valores, original_mesas: valores.original_mesas as Json };
+}
+
 export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorPlanoEspacioProps) {
   const [activeTool, setActiveTool] = useState<ToolType>("select");
   const [selectedElement, setSelectedElement] = useState<any>(null);
@@ -89,11 +114,13 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   // sesión de edición: hay que repuntar sus asignaciones_mesa a la primera mesa
   // resultante y borrar la fila de la mesa fusionada al pulsar "Guardar"
   // (mientras tanto solo viven en el canvas/estado local).
-  const [pendingUnmerges, setPendingUnmerges] = useState<Array<{ mesaId: string; nuevosMesaIds: string[] }>>([]);
+  const [pendingUnmerges, setPendingUnmerges] = useState<DesagrupePlan[]>([]);
 
   // Recuento de asignaciones_mesa afectadas, para mostrar en los diálogos de
   // confirmación de "Limpiar" y "Eliminar mesa" antes de borrar nada.
-  const [clearCounts, setClearCounts] = useState<{ total: number; futuras: number } | null>(null);
+  // `mesas` es el recuento de filas que HABÍA al abrir el diálogo: es la cifra
+  // contra la que `handleClear` comprueba cuántas ha borrado de verdad.
+  const [clearCounts, setClearCounts] = useState<{ total: number; futuras: number; mesas: number } | null>(null);
   const [clearConfirmChecked, setClearConfirmChecked] = useState(false);
   const [asignacionesSeleccionada, setAsignacionesSeleccionada] = useState(0);
 
@@ -109,8 +136,13 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const { data: plano, isLoading: loadingPlano } = usePlanoEspacio(espacioId);
   const { data: mesas = [], isLoading: loadingMesas, refetch: refetchMesas } = useMesas(espacioId);
   const guardarPlano = useCrearOActualizarPlano();
-  const actualizarMesas = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
+  // El guardado ya no pasa por `useActualizarMesasSilent`: ese hook lanza SOLO
+  // el primer error de su `Promise.all` y nunca dice QUÉ filas fallaron, que es
+  // justo lo que hace falta para redactar "esto se aplicó, esto no". Aquí se
+  // escriben las filas una a una con `.select('id')` y se cuenta lo que vuelve,
+  // así que la invalidación de caché que hacía el hook se hace a mano.
+  const queryClient = useQueryClient();
 
   // --- Historial undo/redo -------------------------------------------------
   // Mantenemos elementos/mesasCanvas/pendingUnmerges como los únicos estados
@@ -288,39 +320,129 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     history.redo();
   }, [history, isSaving]);
 
+  /** Resultado uniforme de una escritura verificada. */
+  // `fallo?: undefined` en la rama de éxito no es decorativo: el proyecto
+  // compila con `strict: false`, y sin él TypeScript no estrecha la unión por
+  // el discriminante `ok` y `escritura.fallo` ni siquiera existe como propiedad.
+  type Escritura =
+    | { ok: true; filas: number; fallo?: undefined }
+    | { ok: false; filas?: number; fallo: MotivoFallo };
+
+  /**
+   * UPDATE sobre UNA fila concreta de `mesas`, verificado.
+   *
+   * Comprobar `{ error }` NO basta: cuando RLS deniega un UPDATE (o un DELETE),
+   * supabase-js responde `{ data: [], error: null }` — sin excepción, sin error
+   * y sin filas afectadas. La única forma de enterarse es pedir `.select('id')`
+   * y comprobar que la fila que querías tocar ha vuelto. Ese agujero es el que
+   * dejó la BBDD de producción rota el 2026-09-27.
+   */
+  const escribirFilaMesa = useCallback(
+    async (mesaId: string, valores: TablesUpdate<"mesas">): Promise<Escritura> => {
+      const { data, error } = await supabase
+        .from("mesas")
+        .update(valores)
+        .eq("id", mesaId)
+        .select("id");
+      if (error) return { ok: false, fallo: clasificarFallo(error) };
+      const filas = data?.length ?? 0;
+      if (filas === 0) return { ok: false, filas: 0, fallo: FALLO_PERMISOS };
+      return { ok: true, filas };
+    },
+    [],
+  );
+
+  /**
+   * Desempata el "cero filas" de una escritura leyendo la fila: ¿no está, está
+   * ya como la queríamos, o está y no se deja tocar? (ver `interpretarCeroFilas`).
+   * `null` = ni siquiera se pudo leer, así que toca ser pesimista.
+   */
+  const leerEstadoFilaMesa = useCallback(async (mesaId: string): Promise<EstadoFilaMesa | null> => {
+    const { data, error } = await supabase
+      .from("mesas")
+      .select("id, activa")
+      .eq("id", mesaId)
+      .maybeSingle();
+    if (error) return null;
+    if (!data) return { existe: false };
+    // `coalesce(activa, true)`: la columna es nullable y null cuenta como
+    // activa (es lo que hacen el índice único y las funciones de aforo).
+    return { existe: true, activa: data.activa !== false };
+  }, []);
+
   // Repunta las asignaciones_mesa de `mesaOrigenId` hacia `mesaDestinoId` (fusión:
-  // originales -> mesa fusionada; desagrupar: mesa fusionada eliminada -> primera
+  // originales -> mesa fusionada; desagrupar: mesa fusionada retirada -> primera
   // mesa resultante). Si la reserva ya está asignada en destino, la de origen se
   // elimina en vez de actualizarse para no violar el UNIQUE(reserva_id, mesa_id).
-  const repuntarAsignacionesMesa = useCallback(async (mesaOrigenId: string, mesaDestinoId: string) => {
-    const { data: asignacionesOrigen, error: errOrigen } = await supabase
-      .from("asignaciones_mesa")
-      .select("id, reserva_id, mesa_id")
-      .eq("mesa_id", mesaOrigenId);
-    if (errOrigen) throw errOrigen;
-    if (!asignacionesOrigen || asignacionesOrigen.length === 0) return;
-
-    const { data: asignacionesDestino, error: errDestino } = await supabase
-      .from("asignaciones_mesa")
-      .select("reserva_id")
-      .eq("mesa_id", mesaDestinoId);
-    if (errDestino) throw errDestino;
-
-    const reservaIdsDestino = new Set((asignacionesDestino || []).map((a) => a.reserva_id));
-    const { aActualizar, aEliminar } = planRepuntarAsignaciones(asignacionesOrigen, reservaIdsDestino);
-
-    if (aEliminar.length > 0) {
-      const { error } = await supabase.from("asignaciones_mesa").delete().in("id", aEliminar);
-      if (error) throw error;
-    }
-    if (aActualizar.length > 0) {
-      const { error } = await supabase
+  //
+  // Devuelve el fallo en vez de lanzarlo: el guardado necesita saber en qué paso
+  // se quedó para poder contarlo, no solo que "algo" falló.
+  const repuntarAsignacionesMesa = useCallback(
+    async (mesaOrigenId: string, mesaDestinoId: string): Promise<{ ok: boolean; fallo?: MotivoFallo }> => {
+      const { data: asignacionesOrigen, error: errOrigen } = await supabase
         .from("asignaciones_mesa")
-        .update({ mesa_id: mesaDestinoId })
-        .in("id", aActualizar);
-      if (error) throw error;
-    }
-  }, []);
+        .select("id, reserva_id, mesa_id")
+        .eq("mesa_id", mesaOrigenId);
+      if (errOrigen) return { ok: false, fallo: clasificarFallo(errOrigen) };
+      if (!asignacionesOrigen || asignacionesOrigen.length === 0) return { ok: true };
+
+      const { data: asignacionesDestino, error: errDestino } = await supabase
+        .from("asignaciones_mesa")
+        .select("reserva_id")
+        .eq("mesa_id", mesaDestinoId);
+      if (errDestino) return { ok: false, fallo: clasificarFallo(errDestino) };
+
+      const reservaIdsDestino = new Set((asignacionesDestino || []).map((a) => a.reserva_id));
+      const { aActualizar, aEliminar } = planRepuntarAsignaciones(asignacionesOrigen, reservaIdsDestino);
+
+      // Mismo criterio que en `mesas`: se pide `.select('id')` y se comprueba
+      // que han vuelto TODAS las filas que se querían tocar. Y con el mismo
+      // matiz: que falte una fila NO es automáticamente un problema de
+      // permisos. Entre el SELECT de arriba y esta escritura, otra sesión pudo
+      // cancelar la reserva y llevarse su asignación por delante — eso no deja
+      // nada a medias, simplemente ya no hay nada que mover ahí.
+      const faltanDeVerdad = async (pedidas: string[], devueltas: string[]) => {
+        const vuelven = new Set(devueltas);
+        const ausentes = pedidas.filter((id) => !vuelven.has(id));
+        if (ausentes.length === 0) return false;
+        const { data, error } = await supabase
+          .from("asignaciones_mesa")
+          .select("id")
+          .in("id", ausentes);
+        // Si no se puede comprobar, se lee de la forma pesimista.
+        if (error) return true;
+        // Si alguna sigue ahí, es que no se ha dejado tocar: eso sí es RLS.
+        return (data?.length ?? 0) > 0;
+      };
+
+      if (aEliminar.length > 0) {
+        const { data, error } = await supabase
+          .from("asignaciones_mesa")
+          .delete()
+          .in("id", aEliminar)
+          .select("id");
+        if (error) return { ok: false, fallo: clasificarFallo(error) };
+        const devueltas = (data ?? []).map((f) => f.id);
+        if (devueltas.length !== aEliminar.length && (await faltanDeVerdad(aEliminar, devueltas))) {
+          return { ok: false, fallo: FALLO_PERMISOS };
+        }
+      }
+      if (aActualizar.length > 0) {
+        const { data, error } = await supabase
+          .from("asignaciones_mesa")
+          .update({ mesa_id: mesaDestinoId })
+          .in("id", aActualizar)
+          .select("id");
+        if (error) return { ok: false, fallo: clasificarFallo(error) };
+        const devueltas = (data ?? []).map((f) => f.id);
+        if (devueltas.length !== aActualizar.length && (await faltanDeVerdad(aActualizar, devueltas))) {
+          return { ok: false, fallo: FALLO_PERMISOS };
+        }
+      }
+      return { ok: true };
+    },
+    [],
+  );
 
   // Medir el contenedor
   useEffect(() => {
@@ -398,7 +520,21 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     };
   }, [elementos]);
 
-  // Guardar plano
+  // GUARDAR PLANO — contrato (el porqué de cada regla está en `guardadoPlano.ts`)
+  //
+  //  - NADA se borra. Lo que sale de circulación se DESACTIVA (`activa = false`):
+  //    para el aforo (`fn_capacidad_efectiva_*`, `vista_capacidad_espacios`),
+  //    para `useMesas` y para el índice único es equivalente a una fila
+  //    borrada, pero es REVERSIBLE y no dispara el ON DELETE CASCADE de
+  //    `asignaciones_mesa`, que se llevaba por delante el historial de reservas.
+  //  - NINGUNA escritura se da por buena porque la promesa se resuelva:
+  //    supabase-js RESUELVE cuando RLS deniega. Se comprueba `{ error }` Y se
+  //    cuentan las filas que devuelve `.select('id')`.
+  //  - El plan se ejecuta EN ORDEN y se para en el PRIMER fallo. Parar es
+  //    deliberado: seguir adelante insertaría un nombre que la desactivación
+  //    recién fallada no ha liberado, y eso encadena un 23505 contra
+  //    `uq_mesas_espacio_nombre_real` al fallo original. Lo que sí se aplicó se
+  //    enumera en el mensaje de error.
   const handleSave = useCallback(async () => {
     setIsSaving(true);
     // Guardar renombra ids temporales -> reales en varios pasos (uno por
@@ -406,225 +542,240 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     // pendingUnmerges: nada de eso debe registrarse como pasos de historial
     // deshacibles. Se ignoran todos hasta el reset final (ver saveGeneration).
     suppressHistoryRef.current = true;
-    try {
-      // Calcular tamaño del canvas en píxeles
-      const canvasWidth = realDimensions.width * PIXELS_PER_METER;
-      const canvasHeight = realDimensions.height * PIXELS_PER_METER;
-      
-      // Guardar configuración del plano con dimensiones reales en metros
-      await guardarPlano.mutateAsync({
-        espacio_id: espacioId,
-        ancho: canvasWidth,
-        alto: canvasHeight,
-        ancho_metros: realDimensions.width,
-        alto_metros: realDimensions.height,
-        pixels_per_meter: PIXELS_PER_METER,
-        metros_cuadrados: realDimensions.width * realDimensions.height,
-        configuracion: {
-          elementos,
-          realDimensions,
-        },
-      });
 
-      // Recopilar IDs de mesas originales que forman parte de mesas fusionadas
-      // (id de la mesa fusionada -> ids de sus originales ya persistidos)
-      const idsOriginalesFusionadasPorGrupo = new Map<string, string[]>();
-      mesasCanvas.forEach(m => {
-        if (m.isMerged && m.originalMesas) {
-          const originalesPersistidos = m.originalMesas
-            .map(orig => orig.id)
-            .filter(id => !esMesaNoPersistida(id));
-          if (originalesPersistidos.length > 0) {
-            idsOriginalesFusionadasPorGrupo.set(m.id, originalesPersistidos);
+    const plan = construirPlanGuardado({ espacioId, mesasCanvas, pendingUnmerges });
+    const resultados: ResultadoOperacion[] = plan.map((operacion) => ({
+      operacion,
+      estado: "pendiente",
+    }));
+
+    /** Id temporal del lienzo -> id real en BBDD (insertado o reactivado). */
+    const idTemporalAReal = new Map<string, string>();
+    /** Reactivaciones que SÍ encontraron su fila: su INSERT de plan B sobra. */
+    const filasReactivadas = new Set<string>();
+    let hayFallo = false;
+
+    // Pasa el id temporal del lienzo al id real: estado de React + objeto del
+    // canvas. Sin lo segundo, el objeto se queda con el id temporal y en el
+    // siguiente ciclo de carga no se reconoce como "ya en canvas" y se duplica.
+    const adoptarIdReal = (idCanvas: string, idReal: string) => {
+      idTemporalAReal.set(idCanvas, idReal);
+      setMesasCanvas((prev) => prev.map((m) => (m.id === idCanvas ? { ...m, id: idReal } : m)));
+      canvasRef.current?.renameMesaId(idCanvas, idReal);
+    };
+
+    try {
+      for (let i = 0; i < plan.length; i++) {
+        const operacion = plan[i];
+        let resultado: Omit<ResultadoOperacion, "operacion">;
+
+        switch (operacion.tipo) {
+          case "guardar-plano": {
+            // El hook lanza si Supabase devuelve error (mutationFn -> throw),
+            // así que aquí no cabe un fallo silencioso: lo recoge el catch.
+            await guardarPlano.mutateAsync({
+              espacio_id: espacioId,
+              ancho: realDimensions.width * PIXELS_PER_METER,
+              alto: realDimensions.height * PIXELS_PER_METER,
+              ancho_metros: realDimensions.width,
+              alto_metros: realDimensions.height,
+              pixels_per_meter: PIXELS_PER_METER,
+              metros_cuadrados: realDimensions.width * realDimensions.height,
+              configuracion: {
+                elementos,
+                realDimensions,
+              },
+            });
+            resultado = { estado: "ok" };
+            break;
+          }
+
+          case "actualizar-geometria": {
+            // En paralelo (como hacía `useActualizarMesasSilent`), pero
+            // guardando el resultado de CADA fila para poder nombrarlas.
+            const porFila = await Promise.all(
+              operacion.mesas.map(async (m) => {
+                const escritura = await escribirFilaMesa(m.id, aFilaSupabase(m.valores));
+                // Cero filas aquí tampoco significa "sin permisos": la mesa
+                // puede haberla borrado otra sesión mientras editábamos. En ese
+                // caso el guardado sigue parándose (el lienzo está desfasado y
+                // hay que recargar), pero al menos dice la verdad.
+                if (!escritura.ok && escritura.filas === 0) {
+                  const fila = await leerEstadoFilaMesa(m.id);
+                  if (fila && !fila.existe) {
+                    return { nombre: m.nombre, ok: false, fallo: FALLO_DESAPARECIDA };
+                  }
+                }
+                return { nombre: m.nombre, ok: escritura.ok, fallo: escritura.fallo };
+              }),
+            );
+            const fallidas = porFila.filter((f) => !f.ok);
+            resultado =
+              fallidas.length === 0
+                ? { estado: "ok" }
+                : {
+                    estado: "fallo",
+                    // Un rechazo de permisos manda sobre un "ya no existe": es
+                    // el que el dueño tiene que ir a mirar.
+                    fallo:
+                      fallidas.find((f) => f.fallo?.clase !== "desaparecida")?.fallo ??
+                      fallidas[0].fallo,
+                    mesasFallidas: fallidas.map((f) => f.nombre),
+                  };
+            break;
+          }
+
+          case "desactivar": {
+            const escritura = await escribirFilaMesa(operacion.mesaId, { activa: false });
+            if (escritura.ok) {
+              resultado = { estado: "ok" };
+            } else if (escritura.filas === 0) {
+              // "Cero filas" NO es "sin permisos" (ver `interpretarCeroFilas`).
+              // Si la fila ya no existe, o ya estaba inactiva, la desactivación
+              // ESTÁ CUMPLIDA y no hay nada que hacer. Dar esto por fallo hacía
+              // imposible guardar la Terraza, cuyas originales se borraron de
+              // verdad y solo viven dentro del JSON `original_mesas`.
+              const lectura = interpretarCeroFilas(
+                "desactivar",
+                await leerEstadoFilaMesa(operacion.mesaId),
+              );
+              resultado =
+                lectura === "denegada" || lectura === "sin-confirmar"
+                  ? { estado: "fallo", fallo: FALLO_PERMISOS }
+                  : { estado: "omitida" };
+            } else {
+              resultado = { estado: "fallo", fallo: escritura.fallo };
+            }
+            break;
+          }
+
+          case "reactivar": {
+            const escritura = await escribirFilaMesa(
+              operacion.mesaId,
+              aFilaSupabase(operacion.valores),
+            );
+            if (escritura.ok) {
+              filasReactivadas.add(operacion.mesaId);
+              adoptarIdReal(operacion.idCanvas, operacion.mesaId);
+              resultado = { estado: "ok" };
+            } else if (escritura.filas === 0) {
+              // CERO FILAS es aquí un resultado ESPERADO, no un fallo: significa
+              // que la fila original ya no existe (el caso de la Terraza, donde
+              // los borrados sí funcionaron y solo sobrevive el JSON de
+              // `original_mesas`). La crea el INSERT de plan B que va detrás.
+              // Es la ÚNICA escritura del guardado cuyo "0 filas" no es un
+              // fallo, y lo es porque tiene una alternativa declarada en el
+              // plan. Si el 0 viniera en realidad de RLS, ese INSERT chocará
+              // con el nombre de la fila que sigue viva y el 23505 se reporta.
+              resultado = { estado: "omitida" };
+            } else {
+              resultado = { estado: "fallo", fallo: escritura.fallo };
+            }
+            break;
+          }
+
+          case "insertar": {
+            if (
+              operacion.soloSiNoSeReactivo &&
+              filasReactivadas.has(operacion.soloSiNoSeReactivo)
+            ) {
+              resultado = { estado: "omitida" };
+              break;
+            }
+            const { data, error } = await supabase
+              .from("mesas")
+              .insert(aFilaSupabase(operacion.valores))
+              .select("id")
+              .single();
+            if (error || !data) {
+              resultado = {
+                estado: "fallo",
+                fallo: error ? clasificarFallo(error) : FALLO_PERMISOS,
+              };
+            } else {
+              adoptarIdReal(operacion.idCanvas, data.id);
+              resultado = { estado: "ok" };
+            }
+            break;
+          }
+
+          case "repuntar": {
+            const destino = resolverIdFinalMesa(
+              operacion.destinoIdCanvas,
+              mesasCanvas,
+              idTemporalAReal,
+            );
+            const repunte = await repuntarAsignacionesMesa(operacion.origenId, destino);
+            resultado = repunte.ok
+              ? { estado: "ok" }
+              : { estado: "fallo", fallo: repunte.fallo };
+            break;
           }
         }
-      });
-      const idsOriginalesFusionadas = new Set<string>(
-        Array.from(idsOriginalesFusionadasPorGrupo.values()).flat()
-      );
 
-      // Actualizar posiciones de mesas (solo las que no son temporales, no agrupadas nuevas, y no son originales de fusiones)
-      const mesasToUpdate = mesasCanvas.filter(m =>
-        !esMesaNoPersistida(m.id) &&
-        !idsOriginalesFusionadas.has(m.id)
-      );
-      if (mesasToUpdate.length > 0) {
-        const updates = mesasToUpdate.map((mesa) => ({
-          id: mesa.id,
-          pos_x: mesa.posX,
-          pos_y: mesa.posY,
-          ancho: mesa.ancho,
-          alto: mesa.alto,
-          rotacion: mesa.rotacion ?? 0,
-          is_merged: mesa.isMerged || false,
-          original_mesas: mesa.originalMesas || null,
-          etiqueta: mesa.etiqueta || null,
-        }));
-        await actualizarMesas.mutateAsync(updates);
-      }
-
-      // Mapa de ids temporales (mesa-temp-.../mesa-grupo-...) -> id real de BBDD,
-      // para poder resolver los pendingUnmerges y renombrar en canvas/estado.
-      const idTemporalAReal = new Map<string, string>();
-
-      // Insertar mesas sueltas nuevas: creadas con la herramienta del lienzo
-      // ("mesa-temp-...") o resultantes de desagrupar una mesa fusionada.
-      // Antes se descartaban al guardar y la mesa desaparecía en el próximo
-      // recargado del plano.
-      const mesasTempNuevas = mesasCanvas.filter(m => esMesaTemporal(m.id));
-      for (const mesaTemp of mesasTempNuevas) {
-        const { data: nuevaMesa, error } = await supabase
-          .from('mesas')
-          .insert({
-            espacio_id: espacioId,
-            nombre: mesaTemp.nombre,
-            capacidad: mesaTemp.capacidad,
-            forma: mesaTemp.forma,
-            ancho: mesaTemp.ancho,
-            alto: mesaTemp.alto,
-            pos_x: mesaTemp.posX,
-            pos_y: mesaTemp.posY,
-            rotacion: mesaTemp.rotacion ?? 0,
-            is_merged: false,
-            etiqueta: mesaTemp.etiqueta || null,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        if (nuevaMesa) {
-          idTemporalAReal.set(mesaTemp.id, nuevaMesa.id);
-          setMesasCanvas(prev => prev.map(m => (m.id === mesaTemp.id ? { ...m, id: nuevaMesa.id } : m)));
-          // Sin esto, el objeto en el lienzo se queda con el id temporal: en el
-          // siguiente ciclo de carga no se reconoce como "ya en canvas" y se
-          // duplicaría la mesa al re-renderizar desde el estado ya actualizado.
-          canvasRef.current?.renameMesaId(mesaTemp.id, nuevaMesa.id);
+        resultados[i] = { operacion, ...resultado };
+        if (resultado.estado === "fallo") {
+          hayFallo = true;
+          break;
         }
       }
 
-      // Crear mesas agrupadas nuevas (las que empiezan con mesa-grupo-)
-      const mesasGrupoNuevas = mesasCanvas.filter(m => esMesaGrupoNueva(m.id));
-      for (const mesaGrupo of mesasGrupoNuevas) {
-        // Crear la nueva mesa agrupada
-        const { data: nuevaMesa, error } = await supabase
-          .from('mesas')
-          .insert({
-            espacio_id: espacioId,
-            nombre: mesaGrupo.nombre,
-            capacidad: mesaGrupo.capacidad,
-            forma: mesaGrupo.forma,
-            ancho: mesaGrupo.ancho,
-            alto: mesaGrupo.alto,
-            pos_x: mesaGrupo.posX,
-            pos_y: mesaGrupo.posY,
-            rotacion: mesaGrupo.rotacion ?? 0,
-            is_merged: true,
-            original_mesas: mesaGrupo.originalMesas as any,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        if (nuevaMesa) {
-          idTemporalAReal.set(mesaGrupo.id, nuevaMesa.id);
-          // Actualizar el ID en el estado local
-          setMesasCanvas(prev => prev.map(m =>
-            m.id === mesaGrupo.id
-              ? { ...m, id: nuevaMesa.id }
-              : m
-          ));
-          // Igual que con las mesas sueltas: el objeto en el lienzo debe
-          // pasar a usar el id real para no duplicarse en el próximo render.
-          canvasRef.current?.renameMesaId(mesaGrupo.id, nuevaMesa.id);
-        }
-      }
-
-      // Repuntar las asignaciones_mesa de cada mesa original hacia su mesa
-      // fusionada (resolviendo el id real si la fusión se creó en esta misma
-      // sesión) ANTES de borrar la fila original — si no, el ON DELETE CASCADE
-      // de asignaciones_mesa.mesa_id se llevaba por delante las reservas.
-      for (const [grupoId, originalesIds] of idsOriginalesFusionadasPorGrupo) {
-        const grupoIdReal = idTemporalAReal.get(grupoId) ?? grupoId;
-        for (const originalId of originalesIds) {
-          await repuntarAsignacionesMesa(originalId, grupoIdReal);
-        }
-      }
-      // Eliminar mesas originales que ahora forman parte de mesas fusionadas
-      // ⚠️ ESTE DELETE NO COMPROBADO ES EL ORIGEN DEL ESTADO ROTO EN PRODUCCIÓN
-      // (2026-09-27). No se lee el `{ error }` que devuelve supabase-js, y
-      // supabase-js RESUELVE (no rechaza) cuando RLS o una FK rechazan el
-      // borrado: el fallo pasa desapercibido y el usuario ve "Plano guardado
-      // correctamente" (más abajo) igual. Las dos consecuencias, ambas vivas
-      // hoy en la BBDD:
-      //   - si el borrado FALLA: la fusionada y sus originales conviven, y
-      //     sumar capacidades duplica el aforo (Salón: 15 filas, 64 plazas
-      //     sumadas contra 36 reales);
-      //   - si el borrado FUNCIONA: las mesas reales y SUS NÚMEROS desaparecen
-      //     y solo quedan fusiones (Terraza: 3 filas, las 3 fusionadas, ni una
-      //     mesa real) — recuperables únicamente leyendo el JSON de
-      //     `original_mesas`.
-      // Los dos INSERT de arriba (líneas ~489 y ~523) SÍ comprueban el error,
-      // así que esto es una omisión, no un criterio. NO se arregla aquí a
-      // propósito: cambiar el comportamiento del guardado es su propia tarea.
-      for (const originalId of idsOriginalesFusionadas) {
-        await supabase.from('mesas').delete().eq('id', originalId);
-      }
-
-      // Resuelve el id final (ya real en BBDD) de una mesa resultante de un
-      // desagrupe. Puede no estar ni en `idTemporalAReal` ni sobrevivir tal
-      // cual en `mesasCanvas` si el usuario la volvió a fusionar con otra
-      // ANTES de guardar (desagrupar -> re-fusionar en el mismo editado): en
-      // ese caso quedó absorbida como "original" dentro de otro grupo nuevo,
-      // así que seguimos la cadena hasta el grupo que sí sobrevive.
-      const resolverMesaFinal = (id: string, visitados = new Set<string>()): string => {
-        if (visitados.has(id)) return id; // corta si hubiera un ciclo
-        visitados.add(id);
-        const real = idTemporalAReal.get(id);
-        if (real) return real;
-        if (mesasCanvas.some(m => m.id === id)) return id; // sigue viva tal cual
-        const grupoQueLaAbsorbio = mesasCanvas.find(
-          m => m.isMerged && m.originalMesas?.some(o => o.id === id)
-        );
-        if (grupoQueLaAbsorbio) return resolverMesaFinal(grupoQueLaAbsorbio.id, visitados);
-        return id;
-      };
-
-      // Resolver los desagrupes pendientes de mesas fusionadas que YA estaban
-      // en BBDD: repuntar sus asignaciones a la primera mesa resultante y
-      // borrar la fila de la mesa fusionada (si no, quedaba como fila huérfana
-      // y sus reservas asignadas se perdían al no repuntarlas antes de borrar).
-      if (pendingUnmerges.length > 0) {
-        for (const pending of pendingUnmerges) {
-          const primerNuevoId = pending.nuevosMesaIds[0];
-          if (!primerNuevoId) continue;
-          const primerNuevoIdReal = resolverMesaFinal(primerNuevoId);
-          await repuntarAsignacionesMesa(pending.mesaId, primerNuevoIdReal);
-          // ⚠️ MISMO AGUJERO que el borrado de originales de arriba: tampoco se
-          // comprueba el `{ error }`, y supabase-js resuelve si RLS o una FK lo
-          // rechazan. Si falla, la fila de la mesa fusionada sobrevive junto a
-          // las mesas recién desagrupadas (aforo duplicado otra vez) y el
-          // usuario ve "Plano guardado correctamente". Sin arreglar a propósito.
-          await supabase.from('mesas').delete().eq('id', pending.mesaId);
-        }
+      // Los desagrupes solo se dan por resueltos si el plan entero se aplicó.
+      // Si no, se conservan —con los ids ya renombrados a los reales— para que
+      // un segundo "Guardar" converja en vez de repuntar hacia ids fantasma.
+      if (hayFallo) {
+        setPendingUnmerges((prev) => aplicarRenombradosADesagrupes(prev, idTemporalAReal));
+      } else {
         setPendingUnmerges([]);
       }
 
-      toast.success("Plano guardado correctamente");
-      refetchMesas();
+      const { exito, mensaje } = construirMensajeGuardado(resultados);
+      if (exito) {
+        toast.success(mensaje);
+      } else {
+        console.error("Guardado aplicado a medias:", resultados);
+        toast.error(mensaje, { duration: 20000 });
+      }
     } catch (error) {
       console.error("Error al guardar:", error);
-      toast.error("Error al guardar el plano");
+      // Una excepción (red, o el hook del plano) deja el paso en curso como
+      // fallido: el mensaje sigue enumerando lo que sí se había aplicado.
+      const enCurso = resultados.findIndex((r) => r.estado === "pendiente");
+      if (enCurso >= 0) {
+        resultados[enCurso] = {
+          ...resultados[enCurso],
+          estado: "fallo",
+          fallo: clasificarFallo(error),
+        };
+      }
+      setPendingUnmerges((prev) => aplicarRenombradosADesagrupes(prev, idTemporalAReal));
+      const { mensaje } = construirMensajeGuardado(resultados);
+      toast.error(mensaje, { duration: 20000 });
     } finally {
       setIsSaving(false);
+      // Resincronizar SIEMPRE, también tras un fallo: si no, la pantalla se
+      // queda mostrando un estado de fantasía (mesas que el usuario cree
+      // guardadas y no lo están, o uniones que creen haber absorbido).
+      refetchMesas();
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
       // Siempre (éxito o error): asienta el estado actual como nueva base no
       // deshacible y reactiva el registro de historial. Si se hiciera solo en
       // el camino de éxito, un error a mitad de guardado dejaría
       // suppressHistoryRef atascado en `true` para siempre.
       setSaveGeneration((v) => v + 1);
     }
-  }, [espacioId, elementos, mesasCanvas, realDimensions, guardarPlano, actualizarMesas, refetchMesas, pendingUnmerges, repuntarAsignacionesMesa]);
+  }, [
+    espacioId,
+    elementos,
+    mesasCanvas,
+    realDimensions,
+    guardarPlano,
+    refetchMesas,
+    pendingUnmerges,
+    repuntarAsignacionesMesa,
+    escribirFilaMesa,
+    queryClient,
+  ]);
 
   // Exportar imagen: PNG del contenido del plano (no del viewport con zoom/pan
   // ni del grid) a 2x, resuelto en CanvasPlano.exportImage().
@@ -654,7 +805,7 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       const mesaIds = (mesasEspacio || []).map((m) => m.id);
       if (mesaIds.length === 0) {
-        setClearCounts({ total: 0, futuras: 0 });
+        setClearCounts({ total: 0, futuras: 0, mesas: 0 });
         setClearConfirmChecked(false);
         setShowClearDialog(true);
         return;
@@ -679,25 +830,64 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         return !!fecha && fecha >= hoy;
       }).length;
 
-      setClearCounts({ total, futuras });
+      setClearCounts({ total, futuras, mesas: mesaIds.length });
       setClearConfirmChecked(false);
       setShowClearDialog(true);
     } catch (error) {
       console.error("Error al comprobar asignaciones antes de limpiar:", error);
-      toast.error("No se pudieron comprobar las reservas asociadas a las mesas");
+      // El diálogo NO se abre: enseñarlo sin las cifras reales invitaría a
+      // confirmar un borrado en cascada a ciegas.
+      toast.error(
+        "No se han podido comprobar las mesas ni las reservas de este espacio, así que no se abre el diálogo de limpiar. Recarga la página e inténtalo otra vez.",
+      );
     }
   }, [espacioId]);
 
   // Limpiar canvas (incluyendo mesas de la BBDD)
+  //
+  // Es la acción MÁS destructiva del editor: borra todas las filas de `mesas`
+  // del espacio y, por el ON DELETE CASCADE de `asignaciones_mesa.mesa_id`, se
+  // lleva por delante el historial de reservas. Comprobar `{ error }` NO basta
+  // (un DELETE denegado por RLS se resuelve con `{ data: [], error: null }`),
+  // así que se pide `.select('id')` y se compara con las mesas que se contaron
+  // al abrir el diálogo. Un borrado parcial NUNCA se anuncia como éxito.
   const handleClear = useCallback(async () => {
+    const mesasEsperadas = clearCounts?.mesas ?? 0;
+
+    const cerrarDialogo = () => {
+      setShowClearDialog(false);
+      setClearCounts(null);
+      setClearConfirmChecked(false);
+    };
+
     try {
-      // Eliminar todas las mesas del espacio de la BBDD
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("mesas")
         .delete()
-        .eq("espacio_id", espacioId);
+        .eq("espacio_id", espacioId)
+        .select("id");
 
-      if (error) throw error;
+      const resultado = construirMensajeLimpieza({
+        mesasEsperadas,
+        mesasEliminadas: error ? undefined : data?.length ?? 0,
+        fallo: error ? clasificarFallo(error) : undefined,
+      });
+
+      if (!resultado.exito) {
+        console.error("Limpieza aplicada a medias:", {
+          error,
+          mesasEsperadas,
+          mesasEliminadas: data?.length ?? 0,
+        });
+        // El estado local NO se toca: el lienzo tiene que seguir enseñando lo
+        // que de verdad queda, no un plano vacío de mentira. Se resincroniza y
+        // se cierra el diálogo para que el usuario pueda recargar.
+        cerrarDialogo();
+        refetchMesas();
+        queryClient.invalidateQueries({ queryKey: ["mesas"] });
+        toast.error(resultado.mensaje, { duration: 20000 });
+        return;
+      }
 
       // El DELETE de arriba ya se ejecutó en BBDD: este cambio de estado no
       // puede ser un paso de historial deshacible (deshacerlo no resucitaría
@@ -713,16 +903,21 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
       // Refrescar datos
       refetchMesas();
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
 
-      setShowClearDialog(false);
-      setClearCounts(null);
-      setClearConfirmChecked(false);
-      toast.success("Plano y mesas eliminados correctamente");
+      cerrarDialogo();
+      toast.success(resultado.mensaje);
     } catch (error) {
       console.error("Error al limpiar:", error);
-      toast.error("Error al eliminar las mesas");
+      cerrarDialogo();
+      refetchMesas();
+      const { mensaje } = construirMensajeLimpieza({
+        mesasEsperadas,
+        fallo: clasificarFallo(error),
+      });
+      toast.error(mensaje, { duration: 20000 });
     }
-  }, [espacioId, refetchMesas, marcarNoDeshacible]);
+  }, [espacioId, refetchMesas, marcarNoDeshacible, clearCounts, queryClient]);
 
   // Antes de abrir el diálogo de eliminar un elemento, si es una mesa ya
   // persistida en BBDD, contar sus asignaciones_mesa para avisar al usuario.
@@ -738,7 +933,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         setAsignacionesSeleccionada(count || 0);
       } catch (error) {
         console.error("Error al comprobar asignaciones de la mesa:", error);
-        setAsignacionesSeleccionada(0);
+        // NO se abre el diálogo con un tranquilizador "0 reservas afectadas":
+        // ese cero sería precisamente la cifra falsa en el momento en el que el
+        // usuario más necesita la de verdad, porque borrar la mesa arrastra sus
+        // asignaciones en cascada.
+        toast.error(
+          "No se ha podido comprobar cuántas reservas tiene asignadas esta mesa, así que no se abre el diálogo de borrado. Recarga la página e inténtalo otra vez.",
+        );
+        return;
       }
     } else {
       setAsignacionesSeleccionada(0);
@@ -1010,14 +1212,32 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             canvasRef.current?.updateMesaNombre(mesaId, nombre);
           }}
           onUnmergeMesa={(mesaId) => {
+            const union = mesasCanvas.find((m) => m.id === mesaId);
             const nuevasMesas = canvasRef.current?.unmergeMesa(mesaId);
             if (nuevasMesas && nuevasMesas.length > 0 && !esMesaNoPersistida(mesaId)) {
               // La mesa fusionada ya estaba guardada en BBDD: al pulsar
-              // "Guardar" hay que repuntar sus asignaciones y borrar su fila
+              // "Guardar" hay que repuntar sus asignaciones y retirar su fila
               // (antes se perdía sin más al no rastrearse este caso).
+              //
+              // Además se anota DE QUÉ FILA ORIGINAL sale cada mesa nueva.
+              // `unmergeMesa` recrea las mesas recorriendo `originalMesas` en
+              // orden y les da ids temporales nuevos, así que el emparejamiento
+              // es por posición — y es el único hilo que queda para poder
+              // REACTIVAR la fila original en vez de insertar un duplicado.
+              const originalesPorNuevoId: Record<string, string> = {};
+              union?.originalMesas?.forEach((original, indice) => {
+                const nueva = nuevasMesas[indice];
+                if (nueva && original?.id) originalesPorNuevoId[nueva.id] = original.id;
+              });
+
               setPendingUnmerges(prev => [
                 ...prev,
-                { mesaId, nuevosMesaIds: nuevasMesas.map(m => m.id) },
+                {
+                  mesaId,
+                  nombreUnion: union?.nombre,
+                  nuevosMesaIds: nuevasMesas.map(m => m.id),
+                  originalesPorNuevoId,
+                },
               ]);
             }
             setSelectedElement(null);
