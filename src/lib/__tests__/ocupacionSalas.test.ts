@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularOcupacionSalas,
+  clasificarOrigenFranjas,
   construirFranjas,
   evaluarUbicacion,
   horaCorta,
+  horasBaseDeNegocio,
   nivelOcupacion,
   recomendarUbicacion,
   type EspacioSala,
@@ -175,5 +177,111 @@ describe("recomendarUbicacion", () => {
   it("sin salas configuradas", () => {
     const o = calcularOcupacionSalas({ espacios: [], reservas: [], horasBase: HORAS, comensales: 2 });
     expect(recomendarUbicacion(o, { espacioId: null, hora: "14:00" }).tipo).toBe("sin_hueco");
+  });
+});
+
+// ----------------------------------------------------------------------------
+// POR QUÉ ESTÁ CADA COLUMNA (`origenFranja`)
+// ----------------------------------------------------------------------------
+// El dueño, 2026-09-28, mirando la rejilla: "no sé por qué salen 15:30 y no a
+// las y media". Las columnas NO son arbitrarias: unas las ofrece el motor
+// (escalera de `configuracion_turnos`) y otras salen porque ya hay una reserva
+// a esa hora, o porque es la hora que se está proponiendo. Estos tests fijan
+// ese criterio y su precedencia: turno > reserva > propuesta.
+
+describe("clasificarOrigenFranjas", () => {
+  it("turno > reserva > propuesta", () => {
+    const franjas = construirFranjas(["13:00", "14:00"], ["13:30", "14:45"]);
+    const origen = clasificarOrigenFranjas(franjas, ["13:00", "14:00"], ["13:30", "14:00"]);
+    expect(origen["14:00"]).toBe("turno"); // la ofrece el motor, aunque tenga reserva
+    expect(origen["13:30"]).toBe("reserva");
+    expect(origen["14:45"]).toBe("propuesta");
+  });
+
+  it("normaliza las horas antes de comparar ('15:30:00' es '15:30')", () => {
+    const franjas = construirFranjas(["13:00"], ["15:30"]);
+    expect(clasificarOrigenFranjas(franjas, ["13:00:00"], ["15:30:00"])["15:30"]).toBe("reserva");
+  });
+});
+
+describe("calcularOcupacionSalas: origen de cada franja", () => {
+  it("(a) hora que ofrece el motor -> 'turno', aunque ya tenga reservas", () => {
+    const o = calcular([r({ hora: "14:00", numero_comensales: 8 })], 2);
+    expect(o.franjas.comida).toContain("14:00");
+    expect(o.origenFranja["14:00"]).toBe("turno");
+  });
+
+  it("(b) hora con reserva que el motor NO ofrece -> 'reserva'", () => {
+    const o = calcular([r({ hora: "13:30" })], 2);
+    expect(o.origenFranja["13:30"]).toBe("reserva");
+    // Y sigue mandando sobre la propuesta si además se está proponiendo esa hora.
+    expect(calcular([r({ hora: "13:30" })], 2, ["13:30"]).origenFranja["13:30"]).toBe("reserva");
+  });
+
+  it("(c) hora propuesta que ni ofrece el motor ni tiene reservas -> 'propuesta'", () => {
+    const o = calcular([], 2, ["22:45"]);
+    expect(o.origenFranja["22:45"]).toBe("propuesta");
+    // Si el motor sí la ofrece, es del turno aunque se esté proponiendo.
+    expect(calcular([], 2, ["22:00"]).origenFranja["22:00"]).toBe("turno");
+  });
+
+  it("hay origen para TODAS las franjas y para ninguna más", () => {
+    const o = calcular([r({ hora: "13:30" })], 2, ["22:45"]);
+    expect(Object.keys(o.origenFranja).sort()).toEqual([...o.franjas.comida, ...o.franjas.cena].sort());
+  });
+
+  it("una reserva cancelada no crea columna (ni origen)", () => {
+    const o = calcular([r({ hora: "13:30", estado: "cancelada" })], 2);
+    expect(o.franjas.comida).not.toContain("13:30");
+    expect(o.origenFranja["13:30"]).toBeUndefined();
+  });
+});
+
+describe("el caso del dueño: 15:30 y 21:30 con el día casi vacío", () => {
+  // Escalera real de `configuracion_turnos`: horas en punto siempre, la media
+  // se abre al 70 % de SU hora y el cuarto al 85 %. Con la ocupación tan baja
+  // no se abre ningún escalón, así que el motor solo ofrece horas enteras.
+  const ESCALERA = [
+    { minutos: 60, umbral: 0 },
+    { minutos: 30, umbral: 70 },
+    { minutos: 15, umbral: 85 },
+  ];
+  const CONFIG = [
+    { hora_inicio: "13:00", hora_fin: "16:00", niveles_escalera: ESCALERA, espacio_id: null, activo: true },
+    { hora_inicio: "20:00", hora_fin: "23:00", niveles_escalera: ESCALERA, espacio_id: null, activo: true },
+  ];
+  const SALAS: EspacioSala[] = [
+    { id: "comedor", nombre: "Comedor", capacidad_maxima: 50 },
+    { id: "salon", nombre: "Salón", capacidad_maxima: 50 },
+    { id: "terraza", nombre: "Terraza", capacidad_maxima: 50 },
+  ];
+  // 2 reservas a las 15:30 y 10 a las 21:30, como en la captura.
+  const RESERVAS: ReservaOcupacionSala[] = [
+    r({ hora: "15:30", espacio_id: "comedor", numero_comensales: 2 }),
+    r({ hora: "15:30", espacio_id: "salon", numero_comensales: 4 }),
+    ...Array.from({ length: 10 }, () => r({ hora: "21:30", espacio_id: "salon", numero_comensales: 2 })),
+  ];
+
+  it("el motor solo ofrece horas en punto; 15:30 y 21:30 salen marcadas como 'reserva'", () => {
+    const { horasBase, cerrado } = horasBaseDeNegocio(
+      "2026-09-28",
+      { marca: "casa_tomas", espacios: SALAS, reservas: RESERVAS },
+      CONFIG,
+    );
+    expect(cerrado).toBe(false);
+    expect([...horasBase].sort()).toEqual(["13:00", "14:00", "15:00", "20:00", "21:00", "22:00"]);
+
+    const o = calcularOcupacionSalas({ espacios: SALAS, reservas: RESERVAS, horasBase, comensales: 4 });
+    // Exactamente la rejilla de la captura.
+    expect(o.franjas.comida).toEqual(["13:00", "14:00", "15:00", "15:30"]);
+    expect(o.franjas.cena).toEqual(["20:00", "21:00", "21:30", "22:00"]);
+    expect(o.origenFranja["15:30"]).toBe("reserva");
+    expect(o.origenFranja["21:30"]).toBe("reserva");
+    expect(o.origenFranja["15:00"]).toBe("turno");
+    expect(o.origenFranja["22:00"]).toBe("turno");
+    // Ocupación baja: es lo que mantiene la escalera en el escalón de 60 min.
+    expect(o.aforo.comida.capacidad).toBe(150);
+    expect(o.aforo.comida.ocupados).toBe(6);
+    expect(o.aforo.cena.ocupados).toBe(20);
   });
 });

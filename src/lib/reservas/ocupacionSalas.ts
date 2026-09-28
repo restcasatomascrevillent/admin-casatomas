@@ -21,6 +21,22 @@
 //     criterio del Gestor de reservas (Kanban) al mover de espacio, así que el
 //     aviso "excede la capacidad de la sala" dice lo mismo en los dos sitios.
 //     Para días futuros ambas cuentas coinciden (aún no hay 'completada').
+//   · DE DÓNDE SALE CADA COLUMNA (`origenFranja`): una misma rejilla mezcla
+//     horas de TRES procedencias distintas, y hay que poder distinguirlas —
+//     si no, parece arbitrario que unas horas lleven "y media" y otras no:
+//       - "turno": la ofrece el motor para ese día (`horasBase`). Cuántas
+//         ofrece lo decide la ESCALERA de `configuracion_turnos`
+//         (`calcularDisponibilidad`): con poca ocupación solo las horas en
+//         punto; cuando una hora llega a su umbral se abre la "y media", y
+//         luego el cuarto. Por eso un día tranquilo solo enseña horas enteras.
+//       - "reserva": el motor NO la ofrece ese día, pero YA hay una reserva a
+//         esa hora. Se enseña a propósito (ver `calcularOcupacionSalas`):
+//         esos comensales cuentan en el aforo del turno, así que esconder la
+//         columna dejaría al encargado sin ver dónde están sentados.
+//       - "propuesta": ni la ofrece el motor ni tiene reservas; es la hora
+//         personalizada que se está proponiendo ahora (`horasExtra`).
+//     Precedencia turno > reserva > propuesta: si el motor la ofrece es
+//     "turno" aunque además tenga reservas.
 //   · AFORO POR NEGOCIO: `calcularOcupacionSalas` mide UN negocio; los
 //     espacios y reservas deben llegar ya repartidos por negocio (marca).
 //     `repartirPorNegocio` hace ese reparto (espacio: `caracteristicas.marca`;
@@ -78,6 +94,30 @@ export interface FranjasDia {
   cena: string[];
 }
 
+/**
+ * Por qué está una columna en la rejilla (ver la cabecera de este fichero):
+ *  · "turno"     — la ofrece el motor ese día (está en `horasBase`).
+ *  · "reserva"   — el motor no la ofrece, pero ya hay una reserva a esa hora.
+ *  · "propuesta" — ni la ofrece el motor ni tiene reservas: es la hora que se
+ *                  está proponiendo ahora mismo (`horasExtra`).
+ */
+export type OrigenFranja = "turno" | "reserva" | "propuesta";
+
+/** Nombre corto de cada procedencia (cabeceras, leyenda, lector de pantalla). */
+export const ETIQUETA_ORIGEN_FRANJA: Record<OrigenFranja, string> = {
+  turno: "Hora del turno",
+  reserva: "Hora con reserva",
+  propuesta: "Hora que estás proponiendo",
+};
+
+/** La misma idea en una frase, en el lenguaje del dueño (para `title`/aria). */
+export const MOTIVO_ORIGEN_FRANJA: Record<OrigenFranja, string> = {
+  turno: "El sistema ofrece esta hora para ese día.",
+  reserva:
+    "El sistema no ofrece esta hora ese día: sale porque ya hay una reserva a esa hora y sus comensales cuentan en el aforo del turno.",
+  propuesta: "El sistema no ofrece esta hora ese día: sale porque es la hora que estás proponiendo.",
+};
+
 export interface CeldaTurno {
   /** Comensales que ya ocupan la sala en el turno. */
   ocupados: number;
@@ -118,6 +158,12 @@ export interface AforoTurnoDia {
 export interface OcupacionSalasDia {
   comensales: number;
   franjas: FranjasDia;
+  /**
+   * Procedencia de cada columna ("HH:MM" -> origen). Tiene una entrada por
+   * cada hora de `franjas` (los dos turnos juntos: las horas no se repiten
+   * entre comida y cena). Campo aparte para no cambiar la forma de `franjas`.
+   */
+  origenFranja: Record<string, OrigenFranja>;
   salas: FilaSala[];
   /** Solo existe si hay reservas que ocupan sin espacio asignado. */
   sinAsignar: FilaSala | null;
@@ -151,16 +197,43 @@ export function construirFranjas(
   horasBase: readonly (string | null | undefined)[],
   extras: readonly (string | null | undefined)[] = [],
 ): FranjasDia {
-  const todas = new Set<string>();
-  for (const h of [...horasBase, ...extras]) {
-    const corta = horaCorta(h);
-    if (corta) todas.add(corta);
-  }
+  const todas = conjuntoDeHoras([...horasBase, ...extras]);
   const ordenadas = Array.from(todas).sort((a, b) => a.localeCompare(b));
   return {
     comida: ordenadas.filter((h) => turnoDeHora(h) === "comida"),
     cena: ordenadas.filter((h) => turnoDeHora(h) === "cena"),
   };
+}
+
+/** Horas normalizadas a "HH:MM", sin duplicados ni valores ilegibles. */
+function conjuntoDeHoras(horas: readonly (string | null | undefined)[]): Set<string> {
+  const salida = new Set<string>();
+  for (const h of horas) {
+    const corta = horaCorta(h);
+    if (corta) salida.add(corta);
+  }
+  return salida;
+}
+
+/**
+ * Etiqueta cada franja con SU procedencia, para que la rejilla pueda enseñar
+ * por qué está cada columna (ver `OrigenFranja`). Precedencia deliberada
+ * turno > reserva > propuesta: si el motor ofrece la hora es "turno" aunque
+ * además tenga reservas o sea la que se está proponiendo — lo que importa
+ * marcar es lo contrario, la hora que el sistema NO ofrece ese día.
+ */
+export function clasificarOrigenFranjas(
+  franjas: FranjasDia,
+  horasBase: readonly (string | null | undefined)[],
+  horasConReserva: readonly (string | null | undefined)[] = [],
+): Record<string, OrigenFranja> {
+  const deTurno = conjuntoDeHoras(horasBase);
+  const conReserva = conjuntoDeHoras(horasConReserva);
+  const origen: Record<string, OrigenFranja> = {};
+  for (const h of [...franjas.comida, ...franjas.cena]) {
+    origen[h] = deTurno.has(h) ? "turno" : conReserva.has(h) ? "reserva" : "propuesta";
+  }
+  return origen;
 }
 
 const ocupaAforo = (estado: string) => (ESTADOS_QUE_OCUPAN as readonly string[]).includes(estado);
@@ -224,8 +297,11 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
 
   // Reservas a horas fuera de franja también se enseñan como columna: si no,
   // sus comensales contarían en el turno sin que se viera dónde están.
+  // `origenFranja` guarda de cuál de los tres sitios viene cada columna para
+  // que la rejilla pueda marcar las que el motor NO ofrece ese día.
   const horasConReservas = reservas.filter((r) => ocupaEspacio(r.estado)).map((r) => r.hora);
   const franjas = construirFranjas(entrada.horasBase, [...(entrada.horasExtra ?? []), ...horasConReservas]);
+  const origenFranja = clasificarOrigenFranjas(franjas, entrada.horasBase, horasConReservas);
 
   const espacios = [...entrada.espacios].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   const salas = espacios.map((e) =>
@@ -258,7 +334,7 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
     };
   }
 
-  return { comensales, franjas, salas, sinAsignar: haySinAsignar ? filaSinAsignar : null, aforo };
+  return { comensales, franjas, origenFranja, salas, sinAsignar: haySinAsignar ? filaSinAsignar : null, aforo };
 }
 
 // ----------------------------------------------------------------------------

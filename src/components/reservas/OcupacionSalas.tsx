@@ -7,8 +7,10 @@ import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import {
   calcularOcupacionPorNegocio,
   ETIQUETA_NIVEL,
+  ETIQUETA_ORIGEN_FRANJA,
   ETIQUETA_TURNO,
   horaCorta,
+  MOTIVO_ORIGEN_FRANJA,
   recomendarUbicacion,
   TURNOS,
   type CeldaTurno,
@@ -16,6 +18,7 @@ import {
   type NivelOcupacion,
   type OcupacionNegocio,
   type OcupacionSalasDia,
+  type OrigenFranja,
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
@@ -33,7 +36,30 @@ import { NegocioBadge } from "./NegocioBadge";
 // se prueba en el negocio "en juego" (el de la sala elegida); la
 // recomendación también se limita a ese negocio: no se propone mover a un
 // cliente del restaurante al Reservado de Touza ni al revés.
+//
+// POR QUÉ ESTÁ CADA COLUMNA (2026-09-28). El dueño preguntó "no sé por qué
+// salen 15:30 y no a las y media": unas horas llevan media y otras no, y eso
+// parecía arbitrario. No lo es, pero la rejilla no lo enseñaba. Una columna
+// puede venir de tres sitios (`origenFranja` en `lib/reservas/ocupacionSalas`):
+// la ofrece el motor ese día ("turno", según la escalera de
+// `configuracion_turnos`), ya hay una reserva a esa hora aunque el motor no la
+// ofrezca ("reserva"), o es la hora que se está proponiendo ("propuesta").
+// Las dos últimas se marcan en cursiva, con subrayado a trazos y un asterisco
+// —nunca solo con color—, con su motivo en el `title`, en la leyenda, en el
+// `<caption>` y en el `aria-label` de cada celda. Las columnas son las MISMAS
+// de siempre: lo único que cambia es que ahora se ve de dónde sale cada una.
 // ============================================================================
+
+/**
+ * Marca sobria de una columna que el motor NO ofrece ese día (origen
+ * "reserva" o "propuesta"). Cursiva + subrayado a trazos + asterisco: tres
+ * pistas que no dependen del color.
+ */
+const CLASES_FRANJA_FUERA = "italic border-b border-dashed border-muted-foreground/60";
+
+/** Coletilla corta para `title`/`aria-label` de las celdas de esa columna. */
+const notaOrigen = (origen: OrigenFranja) =>
+  origen === "turno" ? "" : ` ${ETIQUETA_ORIGEN_FRANJA[origen]}: el sistema no ofrece esa hora ese día.`;
 
 const CLASES_NIVEL: Record<NivelOcupacion, string> = {
   libre: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
@@ -102,6 +128,13 @@ export function OcupacionSalas({
     [ocupacion, espacioId, hora],
   );
 
+  // ¿Hay alguna columna que el motor no ofrezca ese día? Solo entonces tiene
+  // sentido explicar el asterisco (leyenda y nota de abajo).
+  const hayFueraDeRejilla = useMemo(
+    () => (bloques ?? []).some((b) => Object.values(b.ocupacion.origenFranja).some((o) => o !== "turno")),
+    [bloques],
+  );
+
   const horaSel = horaCorta(hora);
   const idTitulo = useId();
 
@@ -118,7 +151,7 @@ export function OcupacionSalas({
             {isFetching && !isLoading && <span className="ml-1">· actualizando…</span>}
           </p>
         </div>
-        <Leyenda />
+        <Leyenda marcaFueraDeRejilla={hayFueraDeRejilla} />
       </div>
 
       {!fecha ? (
@@ -187,6 +220,19 @@ export function OcupacionSalas({
               onSeleccionar={onSeleccionar}
             />
           ))}
+          <p className="text-[11px] text-muted-foreground">
+            Las columnas son las horas que el sistema ofrece ese día —con el turno vacío, solo las horas en punto; a
+            medida que se llena, se abren las y media y después los cuartos—, más las horas que ya tienen alguna
+            reserva y la hora que estés proponiendo.
+            {hayFueraDeRejilla && (
+              <>
+                {" "}
+                Estas dos últimas se marcan con <span className={cn(CLASES_FRANJA_FUERA)}>hora*</span>: no las ofrece
+                el sistema ese día, salen porque ya hay una reserva a esa hora (sus comensales cuentan en el aforo del
+                turno, así que tienes que ver dónde están sentados) o porque es la hora que estás proponiendo.
+              </>
+            )}
+          </p>
           {onSeleccionar && (
             <p className="text-[11px] text-muted-foreground">
               Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00) y por
@@ -218,6 +264,10 @@ function BloqueNegocio({
   const idCabecera = useId();
   const sinFranjas = ocupacion.franjas.comida.length + ocupacion.franjas.cena.length === 0;
   const vacio = ocupacion.salas.length === 0 && !ocupacion.sinAsignar;
+  // ¿Este negocio tiene alguna columna que el motor no ofrece ese día?
+  const hayFueraDeRejilla = [...ocupacion.franjas.comida, ...ocupacion.franjas.cena].some(
+    (h) => (ocupacion.origenFranja[h] ?? "turno") !== "turno",
+  );
 
   return (
     <div
@@ -248,6 +298,8 @@ function BloqueNegocio({
               {etiquetaNegocio(bloque.marca)}: comensales por sala y franja horaria. Cada turno muestra ocupadas sobre
               capacidad; cada hora, los comensales ya reservados a esa hora
               {ocupacion.comensales > 0 ? ` y si caben ${ocupacion.comensales} más` : ""}.
+              {hayFueraDeRejilla &&
+                " Las horas marcadas con asterisco no las ofrece el sistema ese día: salen porque ya hay una reserva a esa hora o porque es la hora que estás proponiendo."}
             </caption>
             <thead>
               <tr className="bg-muted/50">
@@ -271,18 +323,28 @@ function BloqueNegocio({
                   <th key={`${t}-turno`} scope="col" className="border-l px-2 py-1 text-left font-normal">
                     Turno
                   </th>,
-                  ...ocupacion.franjas[t].map((h) => (
-                    <th
-                      key={`${t}-${h}`}
-                      scope="col"
-                      className={cn(
-                        "px-1 py-1 text-center font-normal",
-                        enJuego && h === horaSel && "font-semibold text-foreground",
-                      )}
-                    >
-                      {h}
-                    </th>
-                  )),
+                  ...ocupacion.franjas[t].map((h) => {
+                    const origen = ocupacion.origenFranja[h] ?? "turno";
+                    const fuera = origen !== "turno";
+                    return (
+                      <th
+                        key={`${t}-${h}`}
+                        scope="col"
+                        className={cn(
+                          "px-1 py-1 text-center font-normal",
+                          enJuego && h === horaSel && "font-semibold text-foreground",
+                        )}
+                        title={fuera ? `${h} · ${ETIQUETA_ORIGEN_FRANJA[origen]}. ${MOTIVO_ORIGEN_FRANJA[origen]}` : undefined}
+                      >
+                        <span className={cn("inline-block", fuera && CLASES_FRANJA_FUERA)}>
+                          {h}
+                          {fuera && <span aria-hidden>*</span>}
+                        </span>
+                        {/* Corto a propósito: el lector de pantalla repite la cabecera en cada celda. */}
+                        {fuera && <span className="sr-only"> ({ETIQUETA_ORIGEN_FRANJA[origen]})</span>}
+                      </th>
+                    );
+                  }),
                 ])}
               </tr>
             </thead>
@@ -309,7 +371,7 @@ function EstadoVacio({ children }: { children: ReactNode }) {
   return <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
-function Leyenda() {
+function Leyenda({ marcaFueraDeRejilla }: { marcaFueraDeRejilla: boolean }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground" aria-label="Leyenda">
       {(Object.keys(ETIQUETA_NIVEL) as NivelOcupacion[]).map((n) => (
@@ -324,6 +386,14 @@ function Leyenda() {
       <li className="flex items-center gap-1">
         <X className="h-3 w-3 text-red-600" aria-hidden /> no cabe
       </li>
+      {marcaFueraDeRejilla && (
+        <li className="flex items-center gap-1">
+          <span className={cn(CLASES_FRANJA_FUERA)} aria-hidden>
+            hora*
+          </span>
+          hora que el sistema no ofrece ese día (ya hay una reserva a esa hora, o es la que estás proponiendo)
+        </li>
+      )}
     </ul>
   );
 }
@@ -396,7 +466,8 @@ function FilaRejilla({
           ...ocupacion.franjas[t].map((h) => {
             const enHora = sala.porHora[h];
             const seleccionada = h === horaSel && (espacioSel ?? null) === sala.espacioId;
-            const descripcion = `${sala.nombre}, ${h}: ${enHora?.pax ?? 0} comensales reservados a esa hora; turno de ${t} ${celda.ocupados}${celda.capacidad != null ? `/${celda.capacidad}` : ""}. ${cabe ? `Caben ${ocupacion.comensales} más.` : `No caben ${ocupacion.comensales} más.`}`;
+            const origen = ocupacion.origenFranja[h] ?? "turno";
+            const descripcion = `${sala.nombre}, ${h}: ${enHora?.pax ?? 0} comensales reservados a esa hora; turno de ${t} ${celda.ocupados}${celda.capacidad != null ? `/${celda.capacidad}` : ""}. ${cabe ? `Caben ${ocupacion.comensales} más.` : `No caben ${ocupacion.comensales} más.`}${notaOrigen(origen)}`;
             const contenido = (
               <>
                 <span>{enHora?.pax ? enHora.pax : "·"}</span>
