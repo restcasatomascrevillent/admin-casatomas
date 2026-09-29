@@ -56,24 +56,39 @@ export function __resetColumnaLlegadaParaTests() {
 
 type CambiosReserva = Partial<Pick<ReservaServicio, "estado" | "espacio_id" | "llegada_at">>;
 
+/**
+ * Escritura sin filas afectadas: RLS la ha filtrado en silencio (o la reserva
+ * ya no existe). Mismo criterio que `useCambiarSalaReserva`.
+ */
+export class ErrorSinFilasReserva extends Error {
+  constructor() {
+    super("no tienes permiso para cambiar esta reserva, o ya no existe.");
+    this.name = "ErrorSinFilasReserva";
+  }
+}
+
 async function escribirReserva(id: string, cambios: CambiosReserva) {
   const payload: Record<string, unknown> = { ...cambios };
   if ("llegada_at" in payload && columnaLlegadaDisponible === false) {
     delete payload.llegada_at;
   }
 
+  // `.select("id")`: con RLS, una escritura denegada NO da error, devuelve 0
+  // filas. Sin comprobarlo, la pantalla diría "hecho" sin haberlo guardado.
   // `as any`: `llegada_at` no está (todavía) en los tipos generados.
-  let { error } = await supabase.from("reservas" as any).update(payload).eq("id", id);
+  const actualizar = () => supabase.from("reservas" as any).update(payload).eq("id", id).select("id");
+  let { data, error } = await actualizar();
 
   if (error && "llegada_at" in payload && esErrorColumnaLlegadaInexistente(error)) {
     columnaLlegadaDisponible = false;
     delete payload.llegada_at;
-    ({ error } = await supabase.from("reservas" as any).update(payload).eq("id", id));
+    ({ data, error } = await actualizar());
   } else if (!error && "llegada_at" in payload) {
     columnaLlegadaDisponible = true;
   }
 
   if (error) throw error;
+  if (!data || (data as unknown[]).length === 0) throw new ErrorSinFilasReserva();
 }
 
 export function useAccionesServicioReserva() {
