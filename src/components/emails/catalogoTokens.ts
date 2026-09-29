@@ -33,7 +33,7 @@ export interface TokenInfo {
 export const TOKENS_DISPONIBLES: TokenInfo[] = [
   { clave: "nombre", etiqueta: "Nombre", descripcion: "Nombre del cliente que hizo la reserva." },
   { clave: "fecha", etiqueta: "Fecha", descripcion: 'Fecha de la reserva, ya formateada. Ejemplo: "16 de marzo de 2026".' },
-  { clave: "hora", etiqueta: "Hora", descripcion: 'Hora VIGENTE de la reserva (la ofrecida, si hubo contraoferta). Ejemplo: "21:00".' },
+  { clave: "hora", etiqueta: "Hora", descripcion: 'Hora VIGENTE de la reserva: la que se le confirma al cliente, que puede no ser la que pidió. Ejemplo: "21:00".' },
   { clave: "comensales", etiqueta: "Comensales", descripcion: 'Número de comensales, ya formateado. Ejemplo: "4 personas".' },
   {
     clave: "hora_solicitada",
@@ -51,7 +51,7 @@ export const TOKENS_DISPONIBLES: TokenInfo[] = [
 
 export const ETIQUETA_TIPO: Record<TipoPlantilla, string> = {
   solicitud_recibida: "Solicitud recibida",
-  propuesta: "Propuesta / contraoferta",
+  propuesta: "Propuesta",
   confirmada: "Confirmada",
   rechazada: "Rechazada",
   recordatorio: "Recordatorio",

@@ -1191,7 +1191,7 @@ export function ListaReservasAvanzada({
               </Button>
               <Button size="sm" onClick={() => setConfirmarBloque(true)} disabled={aceptandoBloque}>
                 {aceptandoBloque ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCheck className="h-4 w-4 mr-1" />}
-                Aceptar seleccionadas tal cual
+                Verificar con la hora que pidieron
               </Button>
             </div>
           </CardContent>
@@ -1587,11 +1587,12 @@ export function ListaReservasAvanzada({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿Aceptar {seleccionadas.size} reserva{seleccionadas.size === 1 ? "" : "s"} tal y como las pidió el cliente?
+              ¿Verificar {seleccionadas.size} reserva{seleccionadas.size === 1 ? "" : "s"} con la hora que pidieron?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Se aceptarán sin abrir ninguna ficha, con el día, la hora y la sala que pidió cada cliente, y se
-              enviará a cada uno su aviso. Para echarse atrás habría que cambiarlas una a una.
+              Se verificarán sin abrir ninguna ficha, con el día y la hora que pidió cada cliente, y se le
+              enviará a cada uno el correo para que confirme. La sala no se toca: se asigna por dentro y el
+              cliente no la ve. Para echarse atrás habría que cambiarlas una a una.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
