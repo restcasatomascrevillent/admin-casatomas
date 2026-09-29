@@ -319,7 +319,7 @@ export function ModalVerificacionReserva({
                   <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
                   Asignación interna (opcional)
                   <span className="text-muted-foreground">
-                    · {opcionesEspacio.find((e: any) => e.id === salaAsignada)?.nombre ?? "sin sala"}
+                    · {opcionesEspacio.find((e) => e.id === salaAsignada)?.nombre ?? "sin sala"}
                   </span>
                 </span>
                 <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
