@@ -24,7 +24,7 @@
 // ============================================================================
 
 import { NEGOCIOS, NEGOCIO_POR_DEFECTO, esMarcaValida, type Marca } from "../reservas-web/plantillas.ts";
-import { verificarToken, calcularHuella, type AccionToken, type CargaToken } from "./tokens.ts";
+import { verificarToken, huellaReservaCoincide, type AccionToken, type CargaToken } from "./tokens.ts";
 
 /** Ruta de la página de respuesta en AMBAS webs (mismo componente). */
 export const RUTA_RESPUESTA_WEB = "/reserva/respuesta";
@@ -204,7 +204,8 @@ export function respuestaInvalida(bases: Record<Marca, string>, marca: unknown =
 export interface ReservaParaEnlace {
   estado: string;
   hora: string;
-  espacio_id: string | null;
+  /** Ya no entra en la huella (reservas-sin-salas); se admite por compatibilidad. */
+  espacio_id?: string | null;
 }
 
 /**
@@ -214,12 +215,15 @@ export interface ReservaParaEnlace {
  *    ya está 'confirmada' -> ya_hecho.
  *  - rechazar: 'cancelada' -> ya_hecho (antes de mirar la huella, que ya no
  *    casaría); 'verificada' + huella -> pendiente.
+ * La huella es estado + hora: asignar o cambiar la sala no invalida el enlace,
+ * tampoco el de formato antiguo (ver huellaReservaCoincide en tokens.ts).
  */
 export function estadoContraoferta(accion: AccionWeb, reserva: ReservaParaEnlace, huellaToken: string): EstadoEnlace {
   if (accion === "aceptar" && reserva.estado === "confirmada") return "ya_hecho";
   if (accion === "rechazar" && reserva.estado === "cancelada") return "ya_hecho";
-  const huella = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
-  return reserva.estado === "verificada" && huella === huellaToken ? "pendiente" : "invalido";
+  return reserva.estado === "verificada" && huellaReservaCoincide(huellaToken, reserva.estado, reserva.hora)
+    ? "pendiente"
+    : "invalido";
 }
 
 // ----------------------------------------------------------------------------

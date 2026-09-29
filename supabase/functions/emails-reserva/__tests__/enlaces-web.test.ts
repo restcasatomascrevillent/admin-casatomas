@@ -113,16 +113,27 @@ describe("verificarTokenCualquierAccion + describirAccion", () => {
 
 describe("estadoContraoferta", () => {
   const reserva = { estado: "verificada", hora: "21:00:00", espacio_id: "esp-1" };
-  const huella = calcularHuella("verificada", "21:00", "esp-1");
+  const huella = calcularHuella("verificada", "21:00");
 
   it("pendiente si sigue verificada con la misma huella", () => {
     expect(estadoContraoferta("aceptar", reserva, huella)).toBe("pendiente");
     expect(estadoContraoferta("rechazar", reserva, huella)).toBe("pendiente");
   });
 
-  it("inválido si el restaurante cambió la oferta", () => {
+  it("inválido si el restaurante cambió la hora", () => {
     expect(estadoContraoferta("aceptar", { ...reserva, hora: "21:30" }, huella)).toBe("invalido");
-    expect(estadoContraoferta("aceptar", { ...reserva, espacio_id: "esp-2" }, huella)).toBe("invalido");
+  });
+
+  it("asignar o cambiar la sala NO invalida el enlace (la sala es interna)", () => {
+    expect(estadoContraoferta("aceptar", { ...reserva, espacio_id: "esp-2" }, huella)).toBe("pendiente");
+    expect(estadoContraoferta("aceptar", { estado: "verificada", hora: "21:00" }, huella)).toBe("pendiente");
+  });
+
+  it("enlace antiguo (estado|hora|sala) sigue valiendo tras cambiar la sala, no tras cambiar la hora", () => {
+    const legado = "verificada|21:00|esp-1";
+    expect(estadoContraoferta("aceptar", { ...reserva, espacio_id: "esp-2" }, legado)).toBe("pendiente");
+    expect(estadoContraoferta("rechazar", { ...reserva, espacio_id: null }, legado)).toBe("pendiente");
+    expect(estadoContraoferta("aceptar", { ...reserva, hora: "22:00" }, legado)).toBe("invalido");
   });
 
   it("ya_hecho: aceptar sobre confirmada, rechazar sobre cancelada", () => {

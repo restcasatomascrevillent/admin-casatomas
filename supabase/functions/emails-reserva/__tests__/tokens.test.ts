@@ -11,35 +11,69 @@
  * - Round-trip firmar/verificar funciona con la huella correcta.
  * - Un token manipulado (firma, carga o acción) se rechaza.
  * - Un token caducado se rechaza.
- * - La huella cambia si cambia estado, hora o espacio -> invalida enlaces
- *   viejos si el restaurante revisa la oferta antes de que el cliente
- *   responda (motivo documentado en tokens.ts).
+ * - La huella (v2) cambia si cambia estado u hora -> invalida enlaces viejos
+ *   si el restaurante revisa la oferta antes de que el cliente responda. La
+ *   sala NO entra: es asignación interna (reservas-sin-salas) y asignarla no
+ *   debe romper un enlace ya enviado.
+ * - Las huellas antiguas (estado|hora|sala) siguen valiendo, ignorando la
+ *   sala, durante el periodo de gracia (TTL de 14 días).
  */
 import { describe, it, expect } from "vitest";
-import { firmarToken, verificarToken, calcularHuella } from "../tokens.ts";
+import { firmarToken, verificarToken, calcularHuella, huellaReservaCoincide } from "../tokens.ts";
 
 const SECRETO = "secreto-de-test-no-usar-en-produccion";
 
-describe("calcularHuella", () => {
-  it("combina estado, hora (recortada a HH:MM) y espacio", () => {
-    expect(calcularHuella("verificada", "21:00:00", "esp-1")).toBe("verificada|21:00|esp-1");
+describe("calcularHuella (v2, sin sala)", () => {
+  it("es v2|estado|HH:MM (hora recortada)", () => {
+    expect(calcularHuella("verificada", "21:00:00")).toBe("v2|verificada|21:00");
   });
 
-  it("usa cadena vacía cuando no hay espacio", () => {
-    expect(calcularHuella("verificada", "21:00", null)).toBe("verificada|21:00|");
+  it("cambia si cambia el estado o la hora", () => {
+    const base = calcularHuella("verificada", "21:00");
+    expect(calcularHuella("confirmada", "21:00")).not.toBe(base);
+    expect(calcularHuella("verificada", "20:30")).not.toBe(base);
+  });
+});
+
+describe("huellaReservaCoincide", () => {
+  it("v2: round-trip firmar -> verificar -> coincide con la fila", async () => {
+    const huella = calcularHuella("verificada", "21:00:00");
+    const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
+    const carga = await verificarToken(SECRETO, token, "aceptar");
+    expect(carga).not.toBeNull();
+    expect(huellaReservaCoincide(carga!.fp, "verificada", "21:00:00")).toBe(true);
   });
 
-  it("cambia si cambia cualquiera de los tres componentes", () => {
-    const base = calcularHuella("verificada", "21:00", "esp-1");
-    expect(calcularHuella("confirmada", "21:00", "esp-1")).not.toBe(base);
-    expect(calcularHuella("verificada", "20:30", "esp-1")).not.toBe(base);
-    expect(calcularHuella("verificada", "21:00", "esp-2")).not.toBe(base);
+  it("v2: no coincide si cambió la hora o el estado", () => {
+    const fp = calcularHuella("verificada", "21:00");
+    expect(huellaReservaCoincide(fp, "verificada", "21:30")).toBe(false);
+    expect(huellaReservaCoincide(fp, "confirmada", "21:00")).toBe(false);
+  });
+
+  it("legado (estado|hora|sala): sigue valiendo aunque la sala cambie o se asigne", () => {
+    expect(huellaReservaCoincide("verificada|21:00|esp-1", "verificada", "21:00:00")).toBe(true);
+    expect(huellaReservaCoincide("verificada|21:00|", "verificada", "21:00")).toBe(true);
+  });
+
+  it("legado: se rechaza si cambió la hora o el estado", () => {
+    expect(huellaReservaCoincide("verificada|21:00|esp-1", "verificada", "21:30")).toBe(false);
+    expect(huellaReservaCoincide("verificada|21:00|esp-1", "confirmada", "21:00")).toBe(false);
+  });
+
+  it("legado mal formado (no 3 partes) o vacío => no coincide", () => {
+    expect(huellaReservaCoincide("verificada|21:00", "verificada", "21:00")).toBe(false);
+    expect(huellaReservaCoincide("verificada|21:00|a|b", "verificada", "21:00")).toBe(false);
+    expect(huellaReservaCoincide("", "verificada", "21:00")).toBe(false);
+  });
+
+  it("una v2 no se interpreta como legado", () => {
+    expect(huellaReservaCoincide("v2|verificada|21:00|esp-1", "verificada", "21:00")).toBe(false);
   });
 });
 
 describe("firmarToken / verificarToken", () => {
   it("un token recién firmado se verifica correctamente con la misma huella y acción", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     const carga = await verificarToken(SECRETO, token, "aceptar");
     expect(carga).not.toBeNull();
@@ -48,19 +82,19 @@ describe("firmarToken / verificarToken", () => {
   });
 
   it("se rechaza si se verifica con la acción equivocada", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     expect(await verificarToken(SECRETO, token, "rechazar")).toBeNull();
   });
 
   it("se rechaza si se firma con un secreto y se verifica con otro", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     expect(await verificarToken("otro-secreto-distinto", token, "aceptar")).toBeNull();
   });
 
   it("se rechaza si se manipula la carga (payload) sin volver a firmar", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     const [cargaB64, firmaB64] = token.split(".");
     const cargaManipulada = JSON.parse(atob(cargaB64.replace(/-/g, "+").replace(/_/g, "/")));
@@ -71,7 +105,7 @@ describe("firmarToken / verificarToken", () => {
   });
 
   it("se rechaza un token caducado", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const hace20dias = Math.floor(Date.now() / 1000) - 20 * 24 * 60 * 60;
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, hace20dias);
     expect(await verificarToken(SECRETO, token, "aceptar")).toBeNull();
@@ -83,7 +117,7 @@ describe("firmarToken / verificarToken", () => {
   });
 
   it("se rechaza cualquier token si no hay secreto configurado (falla cerrado)", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token = await firmarToken(SECRETO, "reserva-123", "aceptar", huella);
     expect(await verificarToken("", token, "aceptar")).toBeNull();
   });
@@ -105,7 +139,7 @@ describe("firmarToken / verificarToken", () => {
    * propiedad para que no se rompa por accidente en el futuro.
    */
   it("dos llamadas con el MISMO ahoraEpochSegundos producen el MISMO token (estabilidad entre reintentos)", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const epochFijo = Math.floor(new Date("2026-09-20T10:00:00Z").getTime() / 1000);
     const token1 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, epochFijo);
     const token2 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, epochFijo);
@@ -113,7 +147,7 @@ describe("firmarToken / verificarToken", () => {
   });
 
   it("dos llamadas SIN ahoraEpochSegundos explícito (el bug original) pueden producir tokens distintos", async () => {
-    const huella = calcularHuella("verificada", "21:00", "esp-1");
+    const huella = calcularHuella("verificada", "21:00");
     const token1 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, 1_000_000_000);
     const token2 = await firmarToken(SECRETO, "reserva-123", "aceptar", huella, 1_000_000_001);
     expect(token1).not.toBe(token2);

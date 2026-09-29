@@ -19,10 +19,25 @@
 // depender de esa duda, aquí el fingerprint usa solo columnas que la propia
 // acción de aceptar/rechazar cambia, o que invalidan el enlace si el
 // restaurante revisa la oferta antes de que el cliente responda:
-// `estado + '|' + hora + '|' + espacio_id`. Cualquier cambio de cualquiera
-// de las tres invalida el token — un efecto secundario correcto: si el
-// restaurante propone otra hora distinta tras mandar el primer correo, el
-// enlace viejo dejará de servir en vez de aceptar condiciones ya obsoletas.
+// `v2|estado|hora`. Cualquier cambio de estado u hora invalida el token — un
+// efecto secundario correcto: si el restaurante propone otra hora distinta
+// tras mandar el primer correo, el enlace viejo dejará de servir en vez de
+// aceptar condiciones ya obsoletas.
+//
+// LA SALA YA NO ENTRA (reservas-sin-salas, 2026-09-29): en Casa Tomás la sala
+// es una decisión interna que se toma después de mandar el correo (hasta 48 h
+// antes del servicio). Si formara parte de la huella, asignar la sala mataría
+// el enlace que el cliente tiene en su bandeja.
+//
+// Periodo de gracia: los enlaces firmados ANTES del despliegue llevan la
+// huella antigua `estado|hora|espacio_id` (sin prefijo). `huellaReservaCoincide`
+// los sigue aceptando comparando estado y hora e IGNORANDO la sala. La firma
+// HMAC hace la carga infalsificable, así que el prefijo "v2|" distingue los
+// dos formatos con seguridad (una huella antigua empieza siempre por un
+// estado de reserva). El periodo se acaba solo: `verificarToken` rechaza un
+// `exp` pasado y el TTL es de 14 días.
+// TODO(reservas-sin-salas): quitar la rama de legado a partir de
+// despliegue + 15 días.
 // ============================================================================
 
 const TOKEN_TTL_SEGUNDOS = 60 * 60 * 24 * 14; // 14 días, igual que reservas-web
@@ -65,10 +80,28 @@ async function claveHmac(secreto: string): Promise<CryptoKey> {
   );
 }
 
-/** `estado + '|' + hora (HH:MM) + '|' + espacio_id`. Pura: no lee reloj ni BD. */
-export function calcularHuella(estado: string, hora: string, espacioId: string | null): string {
+/** Prefijo de las huellas nuevas (sin sala). */
+export const PREFIJO_HUELLA_V2 = "v2|";
+
+/** `v2|estado|HH:MM`. Pura: no lee reloj ni BD. La sala NO entra (ver cabecera). */
+export function calcularHuella(estado: string, hora: string): string {
   const horaCorta = (hora || "").slice(0, 5);
-  return `${estado}|${horaCorta}|${espacioId ?? ""}`;
+  return `${PREFIJO_HUELLA_V2}${estado}|${horaCorta}`;
+}
+
+/**
+ * ¿La huella de un token sigue casando con la fila actual de `reservas`?
+ *  - v2 (`v2|estado|HH:MM`): igualdad estricta con `calcularHuella`.
+ *  - legado (`estado|HH:MM|espacio_id`, enlaces firmados antes de
+ *    reservas-sin-salas): exactamente 3 partes, mismo estado y misma hora; la
+ *    sala se ignora. Ver "Periodo de gracia" en la cabecera.
+ */
+export function huellaReservaCoincide(fpToken: string, estado: string, hora: string): boolean {
+  const fp = fpToken ?? "";
+  if (fp.startsWith(PREFIJO_HUELLA_V2)) return fp === calcularHuella(estado, hora);
+  const partes = fp.split("|");
+  if (partes.length !== 3) return false;
+  return partes[0] === estado && partes[1] === (hora || "").slice(0, 5);
 }
 
 export async function firmarToken(
