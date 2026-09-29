@@ -119,6 +119,9 @@ describe("resolverDeepLinkReservas", () => {
   it("respeta las pestañas vigentes y descarta las desconocidas", () => {
     expect(resolverDeepLinkReservas({ tab: "blacklist" }).tab).toBe("blacklist");
     expect(resolverDeepLinkReservas({ tab: "configuracion" }).tab).toBe("configuracion");
+    // El enlace de la campana para `reserva_sin_asignar` (CentroNotificaciones)
+    // es /reservas?tab=asignacion: tiene que abrir esa pestaña, no Lista.
+    expect(resolverDeepLinkReservas({ tab: "asignacion" }).tab).toBe("asignacion");
     expect(resolverDeepLinkReservas({ tab: "inventada" }).tab).toBe("reservas");
     expect(resolverDeepLinkReservas({}).tab).toBe("reservas");
   });

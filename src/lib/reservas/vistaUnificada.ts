@@ -172,7 +172,9 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
 // ----------------------------------------------------------------------------
 // Deep links: /reservas?tab=...&status=...&date=today
 // ----------------------------------------------------------------------------
-export const TABS_RESERVAS = ["reservas", "calendario", "blacklist", "configuracion"] as const;
+// "asignacion": panel de salas y mesas (reservas-sin-salas, Fase B); la
+// campana enlaza ahí las notificaciones `reserva_sin_asignar`.
+export const TABS_RESERVAS = ["reservas", "calendario", "asignacion", "blacklist", "configuracion"] as const;
 export type TabReservas = (typeof TABS_RESERVAS)[number];
 
 export interface DestinoDeepLink {

@@ -24,14 +24,6 @@ import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUni
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { toast } from "sonner";
 
-/**
- * Pestaña "Asignación" (reservas-sin-salas, Fase B): salas y mesas por dentro.
- * No está en `TABS_RESERVAS` (vistaUnificada.ts), así que su enlace
- * `?tab=asignacion` —el de la campana para `reserva_sin_asignar`— se atiende
- * aquí antes de pasar por `resolverDeepLinkReservas`, que lo mandaría a Lista.
- */
-const TAB_ASIGNACION = "asignacion";
-
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
@@ -76,7 +68,6 @@ export default function Reservas() {
   // pestaña por defecto. No hacía falta enlazar la nueva "Hoy" por URL: es lo
   // primero que se ve al entrar en /reservas sin parámetros.
   const tabFromUrl = searchParams.get("tab");
-  const esTabAsignacion = tabFromUrl === TAB_ASIGNACION;
   const destino = resolverDeepLinkReservas({
     tab: tabFromUrl,
     status: searchParams.get("status"),
@@ -88,10 +79,6 @@ export default function Reservas() {
 
   useEffect(() => {
     if (!tabFromUrl) return;
-    if (esTabAsignacion) {
-      setActiveTab(TAB_ASIGNACION);
-      return;
-    }
     setActiveTab(destino.tab);
     // Normalizar la URL de una pestaña antigua sin perder los filtros.
     if (!(TABS_RESERVAS as readonly string[]).includes(tabFromUrl)) {
@@ -101,7 +88,7 @@ export default function Reservas() {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFromUrl, esTabAsignacion, destino.tab, destino.status, destino.date]);
+  }, [tabFromUrl, destino.tab, destino.status, destino.date]);
 
   // Si se llega con un filtro preestablecido (campana, widget del dashboard),
   // lo que interesa es la lista, que está debajo de "Reservas de hoy".
@@ -274,7 +261,7 @@ export default function Reservas() {
                     Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                   </SelectItem>
                   <SelectItem value="calendario">Calendario</SelectItem>
-                  <SelectItem value={TAB_ASIGNACION}>Asignación</SelectItem>
+                  <SelectItem value="asignacion">Asignación</SelectItem>
                   <SelectItem value="blacklist">Blacklist</SelectItem>
                   {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
                 </SelectContent>
@@ -303,7 +290,7 @@ export default function Reservas() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
-                <TabsTrigger value={TAB_ASIGNACION} className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Asignación</TabsTrigger>
+                <TabsTrigger value="asignacion" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Asignación</TabsTrigger>
                 <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
                 {isAdmin && (
                   <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
@@ -378,7 +365,7 @@ export default function Reservas() {
         {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva
             una hora; aquí se reparten salas y mesas, con las próximas N horas
             arriba. "Mesas" usa el mismo salto al plano que Lista y Hoy. */}
-        <TabsContent value={TAB_ASIGNACION} className="mt-6">
+        <TabsContent value="asignacion" className="mt-6">
           <PanelAsignacion onAsignarMesa={handleAsignarMesa} />
         </TabsContent>
 
