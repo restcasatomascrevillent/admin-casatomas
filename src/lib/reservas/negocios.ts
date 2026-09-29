@@ -17,10 +17,12 @@
 //     migración 20260922180000). Es la que usa el trigger de aforo.
 //   · Espacio: `espacios_reserva.caracteristicas->>'marca'`; sin etiqueta =
 //     Casa Tomás (igual que el trigger `validar_capacidad_reserva`).
-//   · Solicitud del bot/web (`solicitudes_pendientes` no tiene columna marca):
-//     la sala propuesta si la hay; si no, el marcador que escribe el
-//     formulario de El Reservado en `notas_cliente`; si no, Casa Tomás. Mismo
-//     orden que `fn_aceptar_propuesta_solicitud` (migración 20260924090000).
+//   · Solicitud del bot/web: columna `solicitudes_pendientes.marca`
+//     (migración 20260930100000, reservas-sin-salas: la sala pasa a ser
+//     interna y ya no puede decidir el negocio). Si la columna no viene
+//     (migración sin aplicar), como antes: la sala propuesta si la hay; si
+//     no, el marcador que escribe el formulario de El Reservado en
+//     `notas_cliente`; si no, Casa Tomás.
 // ============================================================================
 
 import { MARCA_POR_DEFECTO } from "../../../supabase/functions/_shared/disponibilidad";
@@ -98,11 +100,12 @@ export function espacioUnicoDeNegocio(
   return propios.length === 1 ? propios[0].id : null;
 }
 
-/** Negocio de una solicitud (no tiene columna `marca`, ver cabecera). */
+/** Negocio de una solicitud: su columna `marca`; sin ella, derivado (ver cabecera). */
 export function marcaDeSolicitud(
-  solicitud: { espacio_propuesto_id?: string | null; notas_cliente?: string | null },
+  solicitud: { marca?: string | null; espacio_propuesto_id?: string | null; notas_cliente?: string | null },
   espacios: readonly { id: string; caracteristicas?: unknown; marca?: string | null }[] | null | undefined,
 ): string {
+  if (solicitud.marca && String(solicitud.marca).trim()) return normalizarMarca(solicitud.marca);
   if (solicitud.espacio_propuesto_id) {
     const espacio = (espacios ?? []).find((e) => e.id === solicitud.espacio_propuesto_id);
     if (espacio) return marcaDeEspacio(espacio);
