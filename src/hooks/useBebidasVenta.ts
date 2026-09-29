@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export interface BebidaVenta {
   id: string;
@@ -30,7 +30,6 @@ export interface BebidaVenta {
 export type BebidaVentaInsert = Omit<BebidaVenta, "id" | "created_at" | "updated_at">;
 
 export function useBebidasVenta() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: bebidas = [], isLoading } = useQuery({
@@ -62,10 +61,10 @@ export function useBebidasVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas-venta"] });
-      toast({ title: "Bebida añadida correctamente" });
+      toast.success("Bebida añadida");
     },
     onError: (error) => {
-      toast({ title: "Error al añadir bebida", description: error.message, variant: "destructive" });
+      toast.error("No se pudo añadir la bebida", { description: error.message });
     },
   });
 
@@ -79,10 +78,10 @@ export function useBebidasVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas-venta"] });
-      toast({ title: "Bebida actualizada" });
+      toast.success("Bebida actualizada");
     },
     onError: (error) => {
-      toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo actualizar la bebida", { description: error.message });
     },
   });
 
@@ -93,10 +92,10 @@ export function useBebidasVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bebidas-venta"] });
-      toast({ title: "Bebida eliminada" });
+      toast.success("Bebida eliminada");
     },
     onError: (error) => {
-      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo eliminar la bebida", { description: error.message });
     },
   });
 

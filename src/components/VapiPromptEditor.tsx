@@ -4,12 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Save, RefreshCw, Settings, BrainCircuit } from "lucide-react";
 
 export function VapiPromptEditor({ config }: { config: any }) {
-    const { toast } = useToast();
     const [webhookUrl, setWebhookUrl] = useState("");
     const [systemPrompt, setSystemPrompt] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -36,10 +35,8 @@ export function VapiPromptEditor({ config }: { config: any }) {
             if (data.prompt) setSystemPrompt(data.prompt);
         } catch (e) {
             console.error(e);
-            toast({
-                title: "Error de lectura",
+            toast.error("Error de lectura", {
                 description: "No se pudo conectar con el proxy para leer el prompt de VAPI.",
-                variant: "destructive"
             });
         }
         setIsLoading(false);
@@ -47,10 +44,8 @@ export function VapiPromptEditor({ config }: { config: any }) {
 
     const savePrompt = async () => {
         if (!webhookUrl || !config?.vapi_assistant_id) {
-            toast({
-                title: "Configuración incompleta",
+            toast.error("Configuración incompleta", {
                 description: "Asegúrate de configurar la URL del proxy primero.",
-                variant: "destructive"
             });
             setIsConfigOpen(true);
             return;
@@ -72,17 +67,17 @@ export function VapiPromptEditor({ config }: { config: any }) {
             });
 
             if (res.ok) {
-                toast({ title: "Cerebro Actualizado", description: "Las instrucciones del asistente se han guardado en VAPI." });
+                toast.success("Instrucciones guardadas en VAPI", {
+                    description: "El asistente atenderá con este texto a partir de la próxima llamada.",
+                });
                 setIsConfigOpen(false);
             } else {
                 throw new Error("Respuesta no OK");
             }
         } catch (e) {
             console.error(e);
-            toast({
-                title: "Error al guardar",
-                description: "Hubo un fallo al intentar actualizar el prompt en la IA.",
-                variant: "destructive"
+            toast.error("No se pudo guardar el prompt en VAPI", {
+                description: "El asistente sigue con las instrucciones anteriores.",
             });
         }
         setIsSaving(false);

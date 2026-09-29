@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy } from "lucide-react";
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,7 +51,6 @@ export function SubidaFacturas() {
     nombreActual: string;
   }>({ total: 0, actual: 0, nombreActual: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,20 +63,16 @@ export function SubidaFacturas() {
       // Validar tipo de archivo
       const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
       if (!tiposPermitidos.includes(file.type)) {
-        toast({
-          title: "Tipo de archivo no permitido",
+        toast.error("Tipo de archivo no permitido", {
           description: `El archivo ${file.name} no es un PDF o imagen válida`,
-          variant: "destructive",
         });
         return;
       }
 
       // Validar tamaño (máximo 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "Archivo demasiado grande",
+        toast.error("Archivo demasiado grande", {
           description: `El archivo ${file.name} supera los 10MB`,
-          variant: "destructive",
         });
         return;
       }
@@ -124,10 +119,8 @@ export function SubidaFacturas() {
 
   const enviarFacturas = async () => {
     if (archivos.length === 0) {
-      toast({
-        title: "Sin archivos",
-        description: "Por favor, selecciona al menos un documento para enviar",
-        variant: "destructive",
+      toast.error("Sin archivos", {
+        description: "Selecciona al menos un documento para enviar.",
       });
       return;
     }
@@ -147,10 +140,8 @@ export function SubidaFacturas() {
       );
     } catch (err) {
       console.error("Error convirtiendo archivos a base64:", err);
-      toast({
-        title: "Error de lectura",
+      toast.error("Error de lectura", {
         description: "No se pudieron leer algunos archivos. Inténtelo de nuevo.",
-        variant: "destructive",
       });
       setIsSubmitting(false);
       setProgreso({ total: 0, actual: 0, nombreActual: '' });
@@ -228,16 +219,12 @@ export function SubidaFacturas() {
     }
 
     if (fallidos.length > 0 && exitosos.length > 0) {
-      toast({
-        title: `${exitosos.length} procesados, ${fallidos.length} fallidos`,
+      toast.error(`${exitosos.length} procesados, ${fallidos.length} fallidos`, {
         description: `Fallidos: ${fallidos.map(f => f.nombre).join(', ')}`,
-        variant: "destructive",
       });
     } else if (fallidos.length > 0) {
-      toast({
-        title: `${fallidos.length} documento(s) fallaron`,
+      toast.error(`${fallidos.length} documento(s) fallaron`, {
         description: fallidos.map(f => f.nombre).join(', '),
-        variant: "destructive",
       });
     } else {
       const conAlertas = exitosos.filter(r => (r.alertas?.length ?? 0) > 0).length;
@@ -250,21 +237,20 @@ export function SubidaFacturas() {
       if (nuevos > 0) partes.push(`${nuevos} documento(s) nuevo(s) procesado(s)`);
       if (duplicados > 0) partes.push(`${duplicados} ya existian (no se han duplicado)`);
       if (conAlertas > 0) partes.push(`${conAlertas} con importes que conviene revisar`);
-      toast({
-        title: duplicados > 0 && nuevos === 0
-          ? "Documento(s) ya existente(s)"
-          : "Todos los documentos procesados",
-        description: partes.join('. ') + '.',
-      });
+      // Si todo lo subido ya existia no se ha creado nada: eso no es un
+      // exito que celebrar, es un aviso neutro.
+      if (duplicados > 0 && nuevos === 0) {
+        toast("Documento(s) ya existente(s)", { description: partes.join('. ') + '.' });
+      } else {
+        toast.success("Todos los documentos procesados", { description: partes.join('. ') + '.' });
+      }
     }
 
     // El original perdido es un fallo serio aunque los datos se hayan guardado.
     const sinArchivo = exitosos.filter(r => r.archivoGuardado === false);
     if (sinArchivo.length > 0) {
-      toast({
-        title: `No se ha podido archivar ${sinArchivo.length} original(es)`,
+      toast.error(`No se ha podido archivar ${sinArchivo.length} original(es)`, {
         description: "Los datos estan guardados, pero el fichero original no. Guarda una copia a mano y avisa al administrador.",
-        variant: "destructive",
       });
     }
 

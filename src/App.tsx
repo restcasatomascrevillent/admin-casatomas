@@ -1,5 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -65,7 +64,6 @@ const App = () => (
           <TooltipProvider>
             {/* Los toasts viven fuera de la barrera para seguir funcionando si el router falla. */}
             <Toaster />
-            <Sonner />
             <BrowserRouter>
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export type IdiomaBotWeb = "es" | "en" | "fr";
 
@@ -93,7 +93,6 @@ async function fetchTodasLasFilas(): Promise<ConfigBotWeb[]> {
 }
 
 export function useConfigBotWeb() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -126,14 +125,12 @@ export function useConfigBotWeb() {
     },
     onSuccess: (idioma) => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-      toast({ title: idioma === "es" ? "Español guardado" : `Configuración en ${idioma.toUpperCase()} guardada` });
+      toast.success(idioma === "es" ? "Español guardado" : `Configuración ${idioma.toUpperCase()} guardada`, {
+        description: "El asistente de la web ya responde con estos textos.",
+      });
     },
     onError: (error: Error, variables) => {
-      toast({
-        title: `No se pudo guardar (${variables.idioma.toUpperCase()})`,
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`No se pudo guardar (${variables.idioma.toUpperCase()})`, { description: error.message });
     },
   });
 

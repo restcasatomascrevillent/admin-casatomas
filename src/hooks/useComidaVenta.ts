@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export interface ComidaVenta {
   id: string;
@@ -29,7 +29,6 @@ export interface ComidaVenta {
 export type ComidaVentaInsert = Omit<ComidaVenta, "id" | "created_at" | "updated_at">;
 
 export function useComidaVenta() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: comidas = [], isLoading } = useQuery({
@@ -59,10 +58,10 @@ export function useComidaVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comida-venta"] });
-      toast({ title: "Producto añadido correctamente" });
+      toast.success("Producto añadido");
     },
     onError: (error) => {
-      toast({ title: "Error al añadir producto", description: error.message, variant: "destructive" });
+      toast.error("No se pudo añadir el producto", { description: error.message });
     },
   });
 
@@ -76,10 +75,10 @@ export function useComidaVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comida-venta"] });
-      toast({ title: "Producto actualizado" });
+      toast.success("Producto actualizado");
     },
     onError: (error) => {
-      toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo actualizar el producto", { description: error.message });
     },
   });
 
@@ -90,10 +89,10 @@ export function useComidaVenta() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comida-venta"] });
-      toast({ title: "Producto eliminado" });
+      toast.success("Producto eliminado");
     },
     onError: (error) => {
-      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo eliminar el producto", { description: error.message });
     },
   });
 

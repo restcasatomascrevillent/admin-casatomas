@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export interface PedidoEcommerce {
   id: string;
@@ -70,7 +70,6 @@ export function usePedidosEcommerce(filtros?: {
   fechaHasta?: string;
   tipoVenta?: 'online' | 'presencial' | 'todos';
 }) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: pedidos = [], isLoading } = useQuery({
@@ -138,10 +137,10 @@ export function usePedidosEcommerce(filtros?: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos-ecommerce"] });
-      toast({ title: "Pedido creado correctamente" });
+      toast.success("Pedido creado");
     },
     onError: (error) => {
-      toast({ title: "Error al crear pedido", description: error.message, variant: "destructive" });
+      toast.error("No se pudo crear el pedido", { description: error.message });
     },
   });
 
@@ -155,10 +154,10 @@ export function usePedidosEcommerce(filtros?: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos-ecommerce"] });
-      toast({ title: "Pedido actualizado" });
+      toast.success("Pedido actualizado");
     },
     onError: (error) => {
-      toast({ title: "Error al actualizar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo actualizar el pedido", { description: error.message });
     },
   });
 
@@ -178,12 +177,12 @@ export function usePedidosEcommerce(filtros?: {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, { estado }) => {
       queryClient.invalidateQueries({ queryKey: ["pedidos-ecommerce"] });
-      toast({ title: "Estado actualizado" });
+      toast.success(`Pedido marcado como «${estado}»`);
     },
     onError: (error) => {
-      toast({ title: "Error al cambiar estado", description: error.message, variant: "destructive" });
+      toast.error("No se pudo cambiar el estado del pedido", { description: error.message });
     },
   });
 
@@ -197,10 +196,10 @@ export function usePedidosEcommerce(filtros?: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidos-ecommerce"] });
-      toast({ title: "Pedido eliminado" });
+      toast.success("Pedido eliminado");
     },
     onError: (error) => {
-      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+      toast.error("No se pudo eliminar el pedido", { description: error.message });
     },
   });
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { desglosarIvaIncluido, redondearCentimos } from "@/config/fiscal";
 
@@ -36,7 +36,6 @@ interface DatosPago {
 }
 
 export function useTPV() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const [lineas, setLineas] = useState<LineaTPV[]>([]);
@@ -272,15 +271,15 @@ export function useTPV() {
       queryClient.invalidateQueries({ queryKey: ["comida-venta"] });
       queryClient.invalidateQueries({ queryKey: ["movimientos-stock"] });
       queryClient.invalidateQueries({ queryKey: ["ecommerce-stock-consolidado"] });
-      toast({ title: `Venta completada - ${data.numeroTicket}` });
+      toast.success("Venta completada", {
+        description:
+          `Ticket ${data.numeroTicket} · ${data.totales.total.toFixed(2)}€` +
+          (data.cambio > 0 ? ` · Cambio ${data.cambio.toFixed(2)}€` : ""),
+      });
       cancelar();
     },
     onError: (error) => {
-      toast({ 
-        title: "Error al procesar venta", 
-        description: error.message, 
-        variant: "destructive" 
-      });
+      toast.error("No se pudo completar la venta", { description: error.message });
     },
   });
 

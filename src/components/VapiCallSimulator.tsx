@@ -4,13 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Phone, PhoneOff, Mic, MicOff, Volume2, Loader2, Play } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 
 // Inicializar el SDK fuera o dentro con useRef
 const vapi = new Vapi("69894e66-681b-4395-9494-df0a196191c9"); // Public Key genérica o la que encontremos
 
 export function VapiCallSimulator({ assistantId }: { assistantId: string }) {
-    const { toast } = useToast();
     const [isCalling, setIsCalling] = useState(false);
     const [callStatus, setCallStatus] = useState<"idle" | "connecting" | "active">("idle");
     const [isMuted, setIsMuted] = useState(false);
@@ -28,10 +27,8 @@ export function VapiCallSimulator({ assistantId }: { assistantId: string }) {
         const onVolumeLevel = (level: number) => setVolume(level);
         const onError = (error: any) => {
             console.error("Vapi Error:", error);
-            toast({
-                title: "Error de conexión",
+            toast.error("Error de conexión", {
                 description: "No se pudo iniciar la llamada de prueba. Revisa los permisos del micrófono.",
-                variant: "destructive"
             });
             setCallStatus("idle");
             setIsCalling(false);
@@ -55,10 +52,8 @@ export function VapiCallSimulator({ assistantId }: { assistantId: string }) {
             vapi.stop();
         } else {
             if (!assistantId) {
-                toast({
-                    title: "Configuración requerida",
+                toast.error("Configuración requerida", {
                     description: "No se ha encontrado un ID de asistente para llamar.",
-                    variant: "destructive"
                 });
                 return;
             }

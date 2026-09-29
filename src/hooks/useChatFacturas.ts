@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -33,7 +33,6 @@ export function useChatFacturas() {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
 
   // ─── Cargar lista de conversaciones ──────────────────────────────────────────
   const cargarConversaciones = useCallback(async () => {
@@ -95,11 +94,7 @@ export function useChatFacturas() {
 
     if (error) {
       console.error("Error creando conversación:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo crear la conversación",
-        variant: "destructive",
-      });
+      toast.error("No se pudo crear la conversación");
       return null;
     }
 
@@ -108,7 +103,7 @@ export function useChatFacturas() {
     setMensajes([]);
     await cargarConversaciones();
     return conv;
-  }, [cargarConversaciones, toast]);
+  }, [cargarConversaciones]);
 
   // ─── Guardar mensaje en Supabase ──────────────────────────────────────────────
   // `chat_facturas_mensajes` es una VISTA sobre la tabla `mensajes_chat`, cuya
@@ -137,17 +132,15 @@ export function useChatFacturas() {
       // Fallo VISIBLE: sin persistencia no hay memoria conversacional, asi que
       // el usuario tiene que enterarse en vez de descubrirlo al recargar.
       console.error("[chat-facturas] Error guardando mensaje:", error);
-      toast({
-        title: "El mensaje no se ha guardado",
+      toast.error("El mensaje no se ha guardado", {
         description:
           "La respuesta se muestra aqui, pero no quedara en el historial ni el asistente la recordara. " +
           (error.message || "Error desconocido"),
-        variant: "destructive",
       });
       return null;
     }
     return data;
-  }, [toast]);
+  }, []);
 
   // ─── Actualizar título de conversación ────────────────────────────────────────
   const actualizarTitulo = useCallback(async (convId: string, primerMensaje: string) => {
@@ -234,11 +227,7 @@ export function useChatFacturas() {
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
       console.error("Error en chat:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo enviar el mensaje.",
-        variant: "destructive",
-      });
+      toast.error("No se pudo enviar el mensaje");
 
       const msgError: MensajeChat = {
         id: crypto.randomUUID(),
@@ -251,7 +240,7 @@ export function useChatFacturas() {
     } finally {
       setIsSending(false);
     }
-  }, [conversacionActiva, isSending, mensajes.length, nuevaConversacion, guardarMensaje, actualizarTitulo, toast]);
+  }, [conversacionActiva, isSending, mensajes.length, nuevaConversacion, guardarMensaje, actualizarTitulo]);
 
   // ─── Eliminar conversación ────────────────────────────────────────────────────
   const eliminarConversacion = useCallback(async (convId: string) => {
@@ -259,13 +248,13 @@ export function useChatFacturas() {
     const { error: msgErr } = await supabase.from("chat_facturas_mensajes").delete().eq("conversacion_id", convId);
     if (msgErr) {
       console.error("Error borrando mensajes:", msgErr);
-      toast({ title: "Error", description: "No se pudieron borrar los mensajes", variant: "destructive" });
+      toast.error("No se pudieron borrar los mensajes");
       return;
     }
     const { error: convErr } = await supabase.from("chat_facturas_conversaciones").delete().eq("id", convId);
     if (convErr) {
       console.error("Error borrando conversación:", convErr);
-      toast({ title: "Error", description: "No se pudo borrar la conversación", variant: "destructive" });
+      toast.error("No se pudo borrar la conversación");
       return;
     }
 
@@ -275,7 +264,7 @@ export function useChatFacturas() {
     }
 
     await cargarConversaciones();
-  }, [conversacionActiva, cargarConversaciones, toast]);
+  }, [conversacionActiva, cargarConversaciones]);
 
   // ─── Regenerar última respuesta del asistente ─────────────────────────────
   const regenerarRespuesta = useCallback(async () => {
@@ -326,11 +315,11 @@ export function useChatFacturas() {
         },
       ]);
     } catch {
-      toast({ title: "Error", description: "No se pudo regenerar la respuesta.", variant: "destructive" });
+      toast.error("No se pudo regenerar la respuesta");
     } finally {
       setIsSending(false);
     }
-  }, [isSending, mensajes, conversacionActiva, guardarMensaje, toast]);
+  }, [isSending, mensajes, conversacionActiva, guardarMensaje]);
 
   // ─── Cargar conversaciones al montar ─────────────────────────────────────
   useEffect(() => {

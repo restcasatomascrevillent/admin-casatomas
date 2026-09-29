@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesUpdate } from "@/integrations/supabase/types";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export type ChatWebConfig = Tables<"chat_web_config">;
 export type ChatWebConfigUpdate = Omit<TablesUpdate<"chat_web_config">, "id" | "updated_at">;
@@ -68,7 +68,6 @@ async function fetchProteccion(): Promise<DatosProteccion> {
 }
 
 export function useProteccionBotWeb() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -110,14 +109,14 @@ export function useProteccionBotWeb() {
     },
     onError: (error: Error, _updates, contexto) => {
       if (contexto?.previo) queryClient.setQueryData(QUERY_KEY, contexto.previo);
-      toast({
-        title: "No se pudo guardar la protección del bot",
+      toast.error("No se pudo guardar la protección del bot", {
         description: esErrorTablaFaltante(error) ? "Falta aplicar la migración en la base de datos." : error.message,
-        variant: "destructive",
       });
     },
     onSuccess: () => {
-      toast({ title: "Protección del bot guardada" });
+      toast.success("Protección del bot guardada", {
+        description: "Los nuevos límites ya se aplican al chat de la web.",
+      });
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });

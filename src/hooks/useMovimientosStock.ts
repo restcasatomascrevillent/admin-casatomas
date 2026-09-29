@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export interface MovimientoStock {
   id: string;
@@ -19,7 +19,6 @@ export interface MovimientoStock {
 export type TipoMovimiento = 'entrada' | 'salida' | 'ajuste' | 'venta' | 'devolucion';
 
 export function useMovimientosStock(productoId?: string, productoTipo?: string) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: movimientos = [], isLoading } = useQuery({
@@ -110,15 +109,17 @@ export function useMovimientosStock(productoId?: string, productoTipo?: string) 
 
       return { stockAnterior, stockNuevo };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["movimientos-stock"] });
       queryClient.invalidateQueries({ queryKey: ["bebidas-venta"] });
       queryClient.invalidateQueries({ queryKey: ["comida-venta"] });
       queryClient.invalidateQueries({ queryKey: ["ecommerce-stock-consolidado"] });
-      toast({ title: "Stock actualizado correctamente" });
+      toast.success("Stock actualizado", {
+        description: `De ${data.stockAnterior} a ${data.stockNuevo} unidades.`,
+      });
     },
     onError: (error) => {
-      toast({ title: "Error al actualizar stock", description: error.message, variant: "destructive" });
+      toast.error("No se pudo actualizar el stock", { description: error.message });
     },
   });
 

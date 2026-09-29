@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { VapiPromptEditor } from "@/components/VapiPromptEditor";
 import { VapiCallSimulator } from "@/components/VapiCallSimulator";
 
@@ -158,7 +158,6 @@ function defaultRange(): DateRange {
 }
 
 export default function AsistenteTelefonico() {
-    const { toast } = useToast();
     const queryClient = useQueryClient();
 
     // ── Estado del dashboard ────────────────────────────────────────────────
@@ -264,11 +263,15 @@ export default function AsistenteTelefonico() {
                 .eq("restaurant_id", "default");
             if (error) throw error;
         },
-        onSuccess: () => {
+        onSuccess: (_data, newMode) => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
-            toast({ title: "Modo actualizado", description: "El modo se ha guardado correctamente." });
+            toast.success("Modo de llamadas actualizado", {
+                description: newMode === "bot"
+                    ? "Las llamadas que entren a partir de ahora las atiende el bot."
+                    : "Las llamadas que entren a partir de ahora las atiende una persona.",
+            });
         },
-        onError: () => toast({ title: "Error", description: "No se pudo actualizar el modo.", variant: "destructive" }),
+        onError: () => toast.error("No se pudo cambiar el modo de llamadas"),
     });
 
     const updateScheduleMutation = useMutation({
@@ -279,12 +282,16 @@ export default function AsistenteTelefonico() {
                 .eq("restaurant_id", "default");
             if (error) throw error;
         },
-        onSuccess: () => {
+        onSuccess: (_data, { enabled }) => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
             setScheduleDirty(false);
-            toast({ title: "Horario guardado", description: "Los horarios se han actualizado." });
+            toast.success("Horario guardado", {
+                description: enabled
+                    ? "El bot y las personas se turnan según estas franjas."
+                    : "El cambio automático sigue desactivado: manda el interruptor de modo.",
+            });
         },
-        onError: () => toast({ title: "Error", description: "No se pudo guardar el horario.", variant: "destructive" }),
+        onError: () => toast.error("No se pudo guardar el horario"),
     });
 
     const updateBotResponsesMutation = useMutation({
@@ -298,9 +305,11 @@ export default function AsistenteTelefonico() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["phoneConfig"] });
             setBotResponsesDirty(false);
-            toast({ title: "Respuestas guardadas", description: "Los textos se han actualizado." });
+            toast.success("Respuestas guardadas", {
+                description: "El bot usará estos textos en la próxima llamada.",
+            });
         },
-        onError: () => toast({ title: "Error", description: "No se pudieron guardar los textos.", variant: "destructive" }),
+        onError: () => toast.error("No se pudieron guardar los textos"),
     });
 
     const addRange = (dayIndex: number) => {

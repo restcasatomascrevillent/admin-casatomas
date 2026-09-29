@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { CONFIG_BOT_WEB_QUERY_KEY, type DraftBotWeb } from "@/hooks/useConfigBotWeb";
 import {
   IDIOMAS_TRADUCIDOS,
@@ -53,20 +53,19 @@ async function traducirYGuardar(draftEs: DraftBotWeb, catalogos: CatalogosCarta)
 }
 
 export function useTraduccionBotWeb() {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ draftEs, catalogos }: { draftEs: DraftBotWeb; catalogos: CatalogosCarta }) =>
       traducirYGuardar(draftEs, catalogos),
     onSuccess: () => {
-      toast({ title: "Traducido a inglés y francés" });
+      toast.success("Traducido a inglés y francés", {
+        description: "El asistente de la web ya responde en los tres idiomas.",
+      });
     },
     onError: (error: Error) => {
-      toast({
-        title: "El español está guardado, pero la traducción falló",
-        description: `${error.message}. Inglés y francés siguen con la versión anterior; pulsa "Reintentar traducción".`,
-        variant: "destructive",
+      toast.error("La traducción falló", {
+        description: `El español sí se ha guardado. Inglés y francés siguen con la versión anterior; pulsa "Reintentar traducción". ${error.message}`,
       });
     },
     onSettled: () => {
