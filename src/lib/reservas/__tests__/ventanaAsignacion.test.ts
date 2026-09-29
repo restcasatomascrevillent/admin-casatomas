@@ -13,6 +13,7 @@ import {
   VENTANA_HORAS_POR_DEFECTO,
   agruparPorTurnoYGrado,
   configAsignacionDesde,
+  crearEsquemaConfigAsignacion,
   enVentana,
   excluirSala,
   fechaMadrid,
@@ -221,5 +222,52 @@ describe("fechas de Madrid", () => {
 
   it("sumarDias cruza meses", () => {
     expect(sumarDias("2026-10-30", 3)).toBe("2026-11-02");
+  });
+});
+
+describe("crearEsquemaConfigAsignacion (zod del formulario)", () => {
+  const MESAS = [
+    { id: "m1", espacio_id: "terraza" },
+    { id: "m2", espacio_id: "comedor" },
+  ];
+  const esquema = crearEsquemaConfigAsignacion(MESAS);
+  const valido = {
+    asignacion_ventana_horas: 48,
+    asignacion_aviso_activo: true,
+    asignacion_espacios_excluidos: [] as string[],
+    asignacion_mesas_excluidas: [] as string[],
+  };
+
+  it("acepta una configuración válida", () => {
+    expect(esquema.safeParse(valido).success).toBe(true);
+  });
+
+  it.each([
+    ["0", 0],
+    ["169", 169],
+    ["200", 200],
+    ["vacío", Number.NaN],
+  ])("rechaza una ventana de %s horas", (_nombre, horas) => {
+    const r = esquema.safeParse({ ...valido, asignacion_ventana_horas: horas });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0].path).toEqual(["asignacion_ventana_horas"]);
+  });
+
+  it("rechaza una mesa usable cuya sala no es usable", () => {
+    const r = esquema.safeParse({ ...valido, asignacion_espacios_excluidos: ["terraza"] });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues[0].path).toEqual(["asignacion_mesas_excluidas"]);
+      expect(r.error.issues[0].message).toMatch(/sala/i);
+    }
+  });
+
+  it("acepta la sala no usable si sus mesas tampoco lo son", () => {
+    const r = esquema.safeParse({
+      ...valido,
+      asignacion_espacios_excluidos: ["terraza"],
+      asignacion_mesas_excluidas: ["m1"],
+    });
+    expect(r.success).toBe(true);
   });
 });

@@ -16,6 +16,7 @@
 // el resultado no depende de la zona del navegador ni del equipo de tests.
 // ============================================================================
 
+import { z } from "zod";
 import { turnoDeHora, type GradoAsignacion, type Turno } from "@/lib/reservas/asignacionMesas";
 
 export const VENTANA_HORAS_POR_DEFECTO = 48;
@@ -97,6 +98,44 @@ export function mesasIncoherentes(exclusiones: Exclusiones, mesas: readonly Mesa
   const salas = new Set(exclusiones.espaciosExcluidos);
   const mesasFuera = new Set(exclusiones.mesasExcluidas);
   return mesas.filter((m) => salas.has(m.espacio_id) && !mesasFuera.has(m.id)).map((m) => m.id);
+}
+
+/** Mensajes del formulario (visibles para el personal). */
+const MENSAJE_VENTANA = `Indica entre ${VENTANA_HORAS_MIN} y ${VENTANA_HORAS_MAX} horas (una semana como máximo)`;
+
+/**
+ * Validación de los cuatro campos de asignación del formulario de
+ * Configuración. Recibe las mesas (con su sala) porque una regla cruza las dos
+ * listas: una mesa usable de una sala no usable se rechaza.
+ */
+export function crearEsquemaConfigAsignacion(mesas: readonly MesaDeSala[]) {
+  return z
+    .object({
+      asignacion_ventana_horas: z
+        .number({ required_error: MENSAJE_VENTANA, invalid_type_error: MENSAJE_VENTANA })
+        .int(MENSAJE_VENTANA)
+        .min(VENTANA_HORAS_MIN, MENSAJE_VENTANA)
+        .max(VENTANA_HORAS_MAX, MENSAJE_VENTANA),
+      asignacion_aviso_activo: z.boolean(),
+      asignacion_espacios_excluidos: z.array(z.string()),
+      asignacion_mesas_excluidas: z.array(z.string()),
+    })
+    .superRefine((valores, ctx) => {
+      const sueltas = mesasIncoherentes(
+        { espaciosExcluidos: valores.asignacion_espacios_excluidos, mesasExcluidas: valores.asignacion_mesas_excluidas },
+        mesas,
+      );
+      if (sueltas.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["asignacion_mesas_excluidas"],
+          message:
+            sueltas.length === 1
+              ? "Hay una mesa marcada como usable en una sala que no lo es"
+              : `Hay ${sueltas.length} mesas marcadas como usables en salas que no lo son`,
+        });
+      }
+    });
 }
 
 /** Marca una sala como no usable y, con ella, todas sus mesas. */
