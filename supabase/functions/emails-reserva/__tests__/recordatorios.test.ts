@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import {
   fechaObjetivoRecordatorio,
   seleccionarReservasParaRecordatorio,
+  esReservaDePrueba,
   enLotes,
   type ReservaParaRecordatorio,
 } from "../recordatorios.ts";
@@ -34,7 +35,17 @@ describe("fechaObjetivoRecordatorio", () => {
 });
 
 function reserva(overrides: Partial<ReservaParaRecordatorio>): ReservaParaRecordatorio {
-  return { id: "r1", estado: "confirmada", fecha: "2026-03-16", email: "cliente@example.com", ...overrides };
+  // Email de un dominio real a propósito: @example.com es dato de prueba y
+  // el recordatorio lo excluye (ver esReservaDePrueba).
+  return {
+    id: "r1",
+    estado: "confirmada",
+    fecha: "2026-03-16",
+    email: "cliente@correo.es",
+    nombre: "Ana López",
+    notas_cliente: null,
+    ...overrides,
+  };
 }
 
 describe("seleccionarReservasParaRecordatorio", () => {
@@ -60,10 +71,41 @@ describe("seleccionarReservasParaRecordatorio", () => {
     expect(seleccionarReservasParaRecordatorio(candidatas, fechaObjetivo, new Set())).toHaveLength(0);
   });
 
+  it("excluye los datos de prueba: [DEMO-SEED] en notas o nombre, email @example.com (sin distinguir mayúsculas)", () => {
+    const candidatas = [
+      reserva({ id: "demo-notas", notas_cliente: "[DEMO-SEED] Alergia a frutos secos" }),
+      reserva({ id: "demo-nombre", nombre: "[DEMO-SEED] Guillermo" }),
+      reserva({ id: "example", email: "guillermo.santos99@EXAMPLE.com" }),
+      reserva({ id: "real" }),
+    ];
+    expect(seleccionarReservasParaRecordatorio(candidatas, fechaObjetivo, new Set()).map((r) => r.id)).toEqual(["real"]);
+  });
+
+  it("una reserva normal con notas y un dominio que solo contiene «example» SÍ recibe el recordatorio", () => {
+    const candidatas = [
+      reserva({ id: "a", notas_cliente: "Cumpleaños, trae tarta" }),
+      reserva({ id: "b", email: "ana@example.com.es" }),
+      reserva({ id: "c", email: "ana@myexample.com" }),
+    ];
+    expect(seleccionarReservasParaRecordatorio(candidatas, fechaObjetivo, new Set()).map((r) => r.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("NUNCA repite un envío ya marcado como enviado (idempotencia)", () => {
     const candidatas = [reserva({ id: "a" }), reserva({ id: "b" })];
     const seleccionadas = seleccionarReservasParaRecordatorio(candidatas, fechaObjetivo, new Set(["a"]));
     expect(seleccionadas.map((r) => r.id)).toEqual(["b"]);
+  });
+});
+
+describe("esReservaDePrueba", () => {
+  it("detecta el marcador del seed y los emails @example.com", () => {
+    expect(esReservaDePrueba({ nombre: null, notas_cliente: "[DEMO-SEED]", email: null })).toBe(true);
+    expect(esReservaDePrueba({ nombre: "x [DEMO-SEED]", notas_cliente: null, email: null })).toBe(true);
+    expect(esReservaDePrueba({ nombre: null, notas_cliente: null, email: "  A@Example.COM " })).toBe(true);
+  });
+  it("no marca como prueba una reserva real ni campos ausentes", () => {
+    expect(esReservaDePrueba({ nombre: "Ana", notas_cliente: "demo-seed sin corchetes", email: "ana@gmail.com" })).toBe(false);
+    expect(esReservaDePrueba({})).toBe(false);
   });
 });
 

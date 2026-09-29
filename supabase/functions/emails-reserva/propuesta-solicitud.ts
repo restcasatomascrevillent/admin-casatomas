@@ -14,8 +14,11 @@
 //   · El sujeto del token es la SOLICITUD (acciones propias
 //     'aceptar_solicitud'/'rechazar_solicitud': un token de solicitud nunca
 //     vale en /aceptar de reservas ni al revés).
-//   · Huella = fecha|hora|pax|sala|enviada_at (segundos): cualquier cambio de
-//     la propuesta o un reenvío invalida el enlace anterior.
+//   · Huella = v2|fecha|hora|pax|enviada_at (segundos): cualquier cambio de
+//     la propuesta o un reenvío invalida el enlace anterior. La sala NO entra
+//     (reservas-sin-salas): es interna y asignarla no rompe el enlace. Los
+//     enlaces antiguos (fecha|hora|pax|sala|enviada_at) siguen valiendo
+//     ignorando la sala hasta que caducan (ver huellaSolicitudCoincide).
 //   · Sin fila en envios_email_reserva (su reserva_id es NOT NULL y la reserva
 //     aún no existe): no hay reintento automático; el panel ve el error al
 //     momento y el personal reintenta.
@@ -41,19 +44,23 @@ export interface SolicitudParaPropuesta {
   /** Texto del cliente; el formulario de El Reservado (web de Touza) lo
    * empieza con "Solicitud de El Reservado". */
   notas_cliente?: string | null;
+  /** Negocio guardado (migración 20260930100000). Ausente si la migración
+   * aún no está aplicada: entonces se deduce como antes. */
+  marca?: string | null;
 }
 
 /**
- * Negocio de una solicitud (la tabla no tiene columna `marca`): el de la sala
- * propuesta si la hay (`marcaEspacioPropuesto` = su `caracteristicas.marca`);
- * si no, el marcador de El Reservado en las notas; si no, Casa Tomás. Mismo
- * orden que `fn_aceptar_propuesta_solicitud` (migración 20260924090000) y
- * que el panel (`src/lib/reservas/negocios.ts`, `marcaDeSolicitud`).
+ * Negocio de una solicitud: la columna `marca` si viene y es válida
+ * (20260930100000, la misma que lee `fn_aceptar_propuesta_solicitud`). Si no
+ * (migración sin aplicar), la regla antigua: el de la sala propuesta
+ * (`marcaEspacioPropuesto` = su `caracteristicas.marca`); si no, el marcador
+ * de El Reservado en las notas; si no, Casa Tomás.
  */
 export function marcaDeSolicitudParaCorreo(
-  s: Pick<SolicitudParaPropuesta, "espacio_propuesto_id" | "notas_cliente">,
+  s: Pick<SolicitudParaPropuesta, "espacio_propuesto_id" | "notas_cliente" | "marca">,
   marcaEspacioPropuesto: unknown,
 ): Marca {
+  if (esMarcaValida(s.marca)) return s.marca;
   if (s.espacio_propuesto_id) return esMarcaValida(marcaEspacioPropuesto) ? marcaEspacioPropuesto : NEGOCIO_POR_DEFECTO;
   return resolverMarcaPorNotas(s.notas_cliente ?? null) ?? NEGOCIO_POR_DEFECTO;
 }
@@ -115,21 +122,45 @@ export function validarSolicitudParaEnvio(s: SolicitudParaPropuesta, hoy: string
   return null;
 }
 
-/** fecha|HH:MM|pax|sala|enviada(epoch s). Pura. */
-export function huellaPropuestaSolicitud(s: {
+interface DatosHuellaSolicitud {
   fecha_solicitada: string | null;
   hora_solicitada: string | null;
   numero_comensales: number | null;
   espacio_propuesto_id?: string | null;
   propuesta_enviada_at?: string | null;
-}): string {
+}
+
+/** Las cuatro partes que SÍ identifican la propuesta: fecha, HH:MM, pax y
+ * envío (epoch s). La sala no (reservas-sin-salas). */
+function partesHuellaSolicitud(s: DatosHuellaSolicitud): [string, string, string, string] {
   return [
     fechaIso(s.fecha_solicitada) ?? "",
     horaCorta(s.hora_solicitada) ?? "",
     String(Number(s.numero_comensales) || 0),
-    s.espacio_propuesto_id ?? "",
     String(epochSegundos(s.propuesta_enviada_at) ?? ""),
-  ].join("|");
+  ];
+}
+
+/** v2|fecha|HH:MM|pax|enviada(epoch s). Pura. La sala propuesta NO entra. */
+export function huellaPropuestaSolicitud(s: DatosHuellaSolicitud): string {
+  return ["v2", ...partesHuellaSolicitud(s)].join("|");
+}
+
+/**
+ * ¿La huella del token sigue casando con la solicitud actual?
+ *  - v2: igualdad estricta con `huellaPropuestaSolicitud`.
+ *  - legado (`fecha|HH:MM|pax|sala|enviada`, enlaces firmados antes de
+ *    reservas-sin-salas): exactamente 5 partes; se comparan la 0, 1, 2 y 4 y
+ *    se ignora la sala (parte 3). Deja de aplicarse sola cuando caducan (TTL
+ *    14 días, tokens.ts). TODO(reservas-sin-salas): quitar a despliegue + 15 d.
+ */
+export function huellaSolicitudCoincide(fpToken: string, s: DatosHuellaSolicitud): boolean {
+  const fp = fpToken ?? "";
+  if (fp.startsWith("v2|")) return fp === huellaPropuestaSolicitud(s);
+  const legado = fp.split("|");
+  if (legado.length !== 5) return false;
+  const [fecha, hora, pax, enviada] = partesHuellaSolicitud(s);
+  return legado[0] === fecha && legado[1] === hora && legado[2] === pax && legado[4] === enviada;
 }
 
 const RE_PETICION_ORIGINAL = /\[Petición original del cliente: (\S+) (\S+), (\S+) pax\]/;
