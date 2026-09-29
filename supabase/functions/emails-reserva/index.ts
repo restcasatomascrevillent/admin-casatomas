@@ -1652,7 +1652,7 @@ async function handleRecordatorios(req: Request): Promise<Response> {
 
   const { data: candidatas, error: errCand } = await supabase
     .from("reservas")
-    .select("id, estado, fecha, email")
+    .select("id, estado, fecha, email, nombre, notas_cliente") // nombre y notas: excluir datos de prueba (esReservaDePrueba)
     .eq("fecha", fechaObjetivo)
     .eq("estado", "confirmada");
   if (errCand) {
