@@ -43,6 +43,8 @@ const h = vi.hoisted(() => {
     llamadasRpc: [] as Array<{ nombre: string; args: any }>,
     llamadasEq: [] as Array<{ tabla: string; columna: string; valor: unknown }>,
     contador: 0,
+    /** Fila de `configuracion_reservas` (mesas que no se ofrecen al asignar). */
+    config: { asignacion_mesas_excluidas: [] as string[] } as Record<string, unknown>,
   };
 
   // Mismo corte que el SQL: `hora < '17:00:00'` → comida.
@@ -74,6 +76,7 @@ const h = vi.hoisted(() => {
   const datosDe = (tabla: string) => {
     if (tabla === "reservas") return store.reservas.filter((r) => r.estado !== "cancelada");
     if (tabla === "asignaciones_mesa") return store.asignaciones.map(conDetalles);
+    if (tabla === "configuracion_reservas") return store.config;
     return [];
   };
 
@@ -86,6 +89,7 @@ const h = vi.hoisted(() => {
     b.in = seguir;
     b.is = seguir;
     b.limit = seguir;
+    b.single = seguir;
     b.eq = (columna: string, valor: unknown) => {
       store.llamadasEq.push({ tabla, columna, valor });
       return b;
@@ -327,6 +331,7 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     h.store.llamadasEq = [];
     h.store.errorRpc = null;
     h.store.contador = 0;
+    h.store.config = { asignacion_mesas_excluidas: [] };
   });
 
   // ── Lectura: día, turno y sala ───────────────────────────────────────────
@@ -1003,5 +1008,70 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     const caja = ficha.closest("div")!;
     expect(within(caja).getByText("Ana López")).toBeInTheDocument();
     expect(caja).toHaveTextContent("13:30");
+  });
+
+  // ── Mesas que no se ofrecen al asignar (Configuración) ──────────────────────
+  // `configuracion_reservas.asignacion_mesas_excluidas` (reservas-sin-salas,
+  // Fase B): no cambian el aforo, pero no se ofrecen al sentar a nadie.
+
+  it("una mesa excluida se ve como no ofrecida y no se asigna: avisa sin ir al servidor", async () => {
+    h.store.config = { asignacion_mesas_excluidas: ["m5"] };
+    montar();
+    await esperarReserva("Ana López");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sentar a Ana López" }));
+    await waitFor(() => expect(botonMesa("Mesa 5")).toHaveAccessibleName(/no se ofrece al asignar/));
+    expect(botonMesa("Mesa 4")).not.toHaveAccessibleName(/no se ofrece/);
+
+    fireEvent.click(botonMesa("Mesa 5"));
+    await waitFor(() => expect(avisos("error").join(" ")).toMatch(/Mesa 5 no se ofrece al asignar/));
+    expect(rpcDeAsignacion()).toHaveLength(0);
+  });
+
+  it("juntar una excluida a la mesa que ya tiene también se bloquea", async () => {
+    h.store.config = { asignacion_mesas_excluidas: ["m6"] };
+    montar();
+    await esperarReserva("Familia Pérez");
+
+    // Una mesa usable sí se sigue asignando con normalidad.
+    fireEvent.click(screen.getByRole("button", { name: "Sentar a Familia Pérez" }));
+    fireEvent.click(botonMesa("Mesa 4"));
+    await waitFor(() => expect(rpcDeAsignacion()).toHaveLength(1));
+    expect(ultimoRpc()!.args).toEqual({ p_reserva_id: "r-perez", p_mesa_ids: ["m4"] });
+
+    // Añadir la excluida a la que ya tiene: bloqueado, sin segunda llamada.
+    fireEvent.click(botonMesa("Mesa 6"));
+    await waitFor(() => expect(avisos("error").join(" ")).toMatch(/Mesa 6 no se ofrece al asignar/));
+    expect(rpcDeAsignacion()).toHaveLength(1);
+  });
+
+  it("una mesa excluida que la reserva YA tenía no bloquea soltar las demás", async () => {
+    h.store.config = { asignacion_mesas_excluidas: ["m5"] };
+    montar({
+      asignaciones: [
+        { id: "a1", reserva_id: "r-perez", mesa_id: "m4" },
+        { id: "a2", reserva_id: "r-perez", mesa_id: "m5" },
+      ],
+    });
+    await esperarReserva("Familia Pérez");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar mesas de Familia Pérez" }));
+    fireEvent.click(botonMesa("Mesa 4"));
+
+    await waitFor(() => expect(rpcDeAsignacion()).toHaveLength(1));
+    expect(ultimoRpc()!.args).toEqual({ p_reserva_id: "r-perez", p_mesa_ids: ["m5"] });
+  });
+
+  it("Repartir no usa las mesas excluidas", async () => {
+    // Sin exclusiones, los 6 de Pérez irían a la Mesa 6 (la justa).
+    h.store.config = { asignacion_mesas_excluidas: ["m6"] };
+    montar();
+    await esperarReserva("Familia Pérez");
+
+    fireEvent.click(screen.getByRole("button", { name: /Repartir/ }));
+
+    await waitFor(() => expect(rpcDeAsignacion().length).toBeGreaterThan(0));
+    const usadas = rpcDeAsignacion().flatMap((l) => l.args.p_mesa_ids as string[]);
+    expect(usadas).not.toContain("m6");
   });
 });

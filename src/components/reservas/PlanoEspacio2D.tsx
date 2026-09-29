@@ -89,6 +89,8 @@ import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMesas, useCrearMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
+import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import {
   useAsignacionesMesa,
   useAsignarMesasReserva,
@@ -485,6 +487,7 @@ function MesaPlano({
   esPrimeraDelGrupo,
   mesasDelGrupo,
   elegida,
+  noSeOfrece = false,
   modoAsignacion,
   reservaActivaNombre,
   comensalesActivos,
@@ -504,6 +507,11 @@ function MesaPlano({
   esPrimeraDelGrupo: boolean;
   mesasDelGrupo: number;
   elegida: boolean;
+  /**
+   * Mesa excluida en Configuración (`asignacion_mesas_excluidas`): se pinta
+   * atenuada y `guardarMesas` rechaza añadirla. No cambia el aforo.
+   */
+  noSeOfrece?: boolean;
   modoAsignacion: boolean;
   reservaActivaNombre?: string | null;
   comensalesActivos?: number | null;
@@ -547,11 +555,12 @@ function MesaPlano({
   const hoverScale = isOver ? baseScale : 1;
   const hoverZIndex = isOver ? 100 : isDragging ? 60 : elegida || isSelected ? 30 : 10;
 
-  const estadoTexto = elegida
-    ? `elegida para ${reservaActivaNombre ?? "la reserva"}`
-    : asignacion
-      ? `ocupada por ${asignacion.reservas.nombre} a las ${horaCorta(asignacion.reservas.hora)}`
-      : "libre";
+  const estadoTexto =
+    (elegida
+      ? `elegida para ${reservaActivaNombre ?? "la reserva"}`
+      : asignacion
+        ? `ocupada por ${asignacion.reservas.nombre} a las ${horaCorta(asignacion.reservas.hora)}`
+        : "libre") + (noSeOfrece ? " · no se ofrece al asignar" : "");
 
   const manejarClic = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -611,6 +620,7 @@ function MesaPlano({
                 isDragging && "border-primary opacity-90 shadow-2xl ring-4 ring-primary/40",
                 // En modo asignación el resto se atenúa para que salten las opciones
                 modoAsignacion && ocupadaPorOtra && "opacity-50",
+                modoAsignacion && noSeOfrece && !elegida && "border-dashed opacity-40",
                 modoAsignacion && !ocupada && encaje === "justa" && "ring-2 ring-emerald-400",
                 modoAsignacion && !ocupada && encaje === "corta" && "ring-2 ring-amber-300",
                 isOver && "ring-4 ring-primary shadow-2xl",
@@ -651,6 +661,9 @@ function MesaPlano({
             <div className="space-y-1">
               <p className="font-semibold">{mesaOriginal.nombre}</p>
               <p className="text-xs">{mesaOriginal.capacidad} plazas</p>
+              {noSeOfrece && (
+                <p className="text-xs text-muted-foreground">No se ofrece al asignar (Configuración)</p>
+              )}
               {asignacion ? (
                 <div className="mt-1 border-t border-border pt-1">
                   <p className="text-xs font-medium">{asignacion.reservas.nombre}</p>
@@ -948,6 +961,14 @@ export function PlanoEspacio2D({
   const actualizarMesasSilent = useActualizarMesasSilent();
   const eliminarMesa = useEliminarMesa();
   const asignarMesas = useAsignarMesasReserva();
+  // Mesas que Configuración no ofrece al asignar (reservas-sin-salas, Fase B).
+  // No se quitan del plano —pueden tener ya una reserva y hay que verla—: se
+  // atenúan y no se dejan AÑADIR a ninguna reserva.
+  const { data: configReservas } = useConfiguracionReservas();
+  const mesasNoOfrecidas = useMemo(
+    () => new Set(configAsignacionDesde(configReservas).mesasExcluidas),
+    [configReservas],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1120,6 +1141,16 @@ export function PlanoEspacio2D({
       const antes = mesaIdsDe(reserva.id);
       const nombresNuevos = mesaIds.map((id) => mesasPorId.get(id)?.nombre ?? "Mesa");
 
+      // Solo se bloquea AÑADIR una mesa no ofrecida: si la reserva ya la tenía
+      // se le deja conservar (y soltar las demás).
+      const noOfrecida = mesaIds.find((id) => !antes.includes(id) && mesasNoOfrecidas.has(id));
+      if (noOfrecida) {
+        toast.error(
+          `${mesasPorId.get(noOfrecida)?.nombre ?? "Esa mesa"} no se ofrece al asignar (está desmarcada en Configuración). Elige otra.`,
+        );
+        return false;
+      }
+
       try {
         // `silencioso`: el mensaje de éxito lo pone esta pantalla, que sabe
         // nombrar las mesas ("María → Mesa 4 + Mesa 5"). El de ERROR lo pone el
@@ -1172,7 +1203,7 @@ export function PlanoEspacio2D({
 
       return true;
     },
-    [asignarMesas, mesaIdsDe, mesasPorId, refetchAsignaciones],
+    [asignarMesas, mesaIdsDe, mesasPorId, mesasNoOfrecidas, refetchAsignaciones],
   );
 
   const deshacer = useCallback(async () => {
@@ -1919,7 +1950,7 @@ export function PlanoEspacio2D({
     if (repartiendo) return;
 
     const mesasLibres = localMesas
-      .filter((m) => m.activa !== false && !asignacionDeMesa(m.id))
+      .filter((m) => m.activa !== false && !asignacionDeMesa(m.id) && !mesasNoOfrecidas.has(m.id))
       .map((m) => ({ id: m.id, nombre: m.nombre, capacidad: m.capacidad }));
 
     const { propuestas, sinHueco } = calcularDistribucionMesas({
@@ -2497,6 +2528,7 @@ export function PlanoEspacio2D({
                         esPrimeraDelGrupo={esPrimeraDelGrupo}
                         mesasDelGrupo={mesasDelGrupo}
                         elegida={mesaIdsActivos.includes(mesa.id)}
+                        noSeOfrece={mesasNoOfrecidas.has(mesa.id)}
                         modoAsignacion={!!reservaActiva}
                         reservaActivaNombre={reservaActiva?.nombre}
                         comensalesActivos={reservaActiva?.numero_comensales ?? null}
