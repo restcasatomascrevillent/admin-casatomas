@@ -983,7 +983,16 @@ El pie de una factura o albarán español suele traer, de arriba abajo:
 
 Es MUY frecuente que la foto corte el papel por abajo y que la fila del TOTAL quede fuera aunque sí se vean la base y la cuota. También pasa que una sombra, un dedo o la barra de un visor de PDF la tapen.
 
-Mira el borde inferior de la imagen y di la verdad sobre lo que llega a verse. NO completes el documento: si la fila del total no está en los píxeles, no está. Y al revés: si está, cítala.`;
+LO QUE DECIDE ES SI VES LOS DÍGITOS, NO CÓMO SE LLAME LA FILA.
+El importe final no siempre viene etiquetado "TOTAL". Según la plantilla lo verás como TOTAL FACTURA, TOTAL ALBARÁN, IMPORTE A PAGAR, TOTAL A PAGAR, SUMA TOTAL, LÍQUIDO, SUBTOTAL, o sin etiqueta ninguna: sólo una cifra recuadrada, en negrita o al final de la línea de bases. Si en los píxeles hay una cifra que es el importe final del documento y puedes leer sus dígitos, ESO ES EL TOTAL y la respuesta es SÍ, se llame como se llame y esté donde esté.
+
+No confundas las dos cosas que te pueden hacer fallar:
+  · Decir NO porque la etiqueta no dice literalmente "TOTAL", aunque la cifra esté ahí y la estés leyendo. Eso es un error: si la has leído, está impresa.
+  · Decir SÍ porque ves la base y la cuota de IVA y sabes sumarlas. Eso es el error contrario y es peor: la base y la cuota NO son el total, y si el importe final no aparece en los píxeles la respuesta es NO aunque sepas cuánto daría.
+
+La prueba es siempre la misma: ¿puedes COPIAR los dígitos del importe final mirando la imagen? Si sí, es que está impreso. Si tendrías que calcularlo, no lo está.
+
+Mira el borde inferior de la imagen y di la verdad sobre lo que llega a verse. NO completes el documento.`;
 
 /**
  * Segunda lectura, estrecha, del pie del documento. Devuelve null si algo

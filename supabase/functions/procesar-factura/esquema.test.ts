@@ -1559,3 +1559,21 @@ describe("retirarImportesNoImpresos + confirmacion del verificador", () => {
     expect(retiradas).toHaveLength(0);
   });
 });
+
+describe("VERIFICACION_PIE_SCHEMA: lo que decide es ver los digitos, no la etiqueta", () => {
+  const d = VERIFICACION_PIE_SCHEMA.schema.properties.fila_total_impresa as { description: string };
+
+  it("dice explicitamente que el importe final puede llevar otra etiqueta o ninguna", () => {
+    // Medido: en la factura M-2508464 de Joselito el verificador contestaba false
+    // porque la cifra final (3.126,57) estaba rotulada SUBTOTAL, y el propio
+    // verificador la citaba en `ultimo_texto_visible`. Ver la cifra es verla.
+    expect(d.description).toMatch(/SUBTOTAL/);
+    expect(d.description).toMatch(/sin\s+etiqueta/i);
+    expect(d.description).toMatch(/aunque su etiqueta no diga la palabra TOTAL/i);
+  });
+
+  it("mantiene la regla contraria: base + cuota de IVA NO es ver el total", () => {
+    expect(d.description).toMatch(/cuota de IVA NO es ver el total/i);
+    expect(d.description).toMatch(/si tendrias que calcularlos, es false/i);
+  });
+});

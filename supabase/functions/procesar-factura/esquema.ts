@@ -1252,11 +1252,15 @@ export const VERIFICACION_PIE_SCHEMA = {
       fila_total_impresa: {
         type: "boolean",
         description:
-          "true SOLO si ves, CON SUS DIGITOS, la fila del total a pagar (TOTAL, TOTAL FACTURA, TOTAL " +
-          "ALBARAN, IMPORTE A PAGAR). false si la foto corta el documento antes de esa fila, si la tapa " +
-          "una sombra, un dedo o la barra de un visor, o si el documento no lleva total. Ver la base " +
-          "imponible y la cuota de IVA NO es ver el total: en los documentos recortados es justo lo que " +
-          "se ve, y el total va debajo, fuera del encuadre.",
+          "true si ves, CON SUS DIGITOS, el IMPORTE FINAL del documento. Lo que decide es si puedes " +
+          "LEER la cifra, no como se llame la fila: segun la plantilla aparece como TOTAL, TOTAL " +
+          "FACTURA, TOTAL ALBARAN, IMPORTE A PAGAR, SUMA TOTAL, LIQUIDO, SUBTOTAL, o recuadrada sin " +
+          "etiqueta ninguna. Si la cifra esta en los pixeles y la estas leyendo, es true aunque su " +
+          "etiqueta no diga la palabra TOTAL. false si la foto corta el documento antes de esa cifra, " +
+          "si la tapa una sombra, un dedo o la barra de un visor, o si el documento no lleva total. Ver " +
+          "la base imponible y la cuota de IVA NO es ver el total: en los documentos recortados es justo " +
+          "lo que se ve, y el importe final va debajo, fuera del encuadre. La prueba es poder COPIAR los " +
+          "digitos; si tendrias que calcularlos, es false.",
       },
       total_citado: {
         type: ["string", "null"],
