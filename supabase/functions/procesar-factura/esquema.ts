@@ -1024,6 +1024,18 @@ export function leerImporteLiteral(texto: string): number | null {
 /** Diferencia maxima entre el numero y su cita antes de avisar. Un centimo. */
 const TOL_LITERAL = 0.011;
 
+/** La cita que la segunda lectura del pie da para cada importe. */
+function citaDelVerificador(
+  v: VerificacionPie,
+  campo: "subtotal" | "iva" | "total",
+): string | null {
+  // Si el verificador dice que la fila del total NO esta impresa, su propia
+  // cita del total no vale como confirmacion de nada.
+  if (campo === "total") return v.fila_total_impresa === false ? null : (v.total_citado ?? null);
+  if (campo === "subtotal") return v.base_imponible_citada ?? null;
+  return v.cuota_iva_citada ?? null;
+}
+
 export interface Retirada {
   campo: "subtotal" | "iva" | "total";
   valor: number;
@@ -1068,6 +1080,21 @@ export function retirarImportesNoImpresos(
     if (!esNumeroFinito(valor)) continue;      // no hay nada que comprobar
 
     if (lit === null || lit.trim() === "") {
+      //  ...salvo que la SEGUNDA lectura del pie cite ese mismo importe. Si dos
+      //  lecturas independientes coinciden en los caracteres, el numero SI
+      //  estaba impreso: lo que ha fallado es la cita del extractor, no el
+      //  dato. Retirarlo aqui degradaba a 'deducido' totales bien leidos —
+      //  medido en la factura M-2508464 de Joselito, cuyo total 3.126,57 esta
+      //  impreso y se retiraba para volver a calcularlo identico.
+      //  Esto NO puede fabricar nada: exige que otra llamada, que no ha visto
+      //  la respuesta del extractor, escriba los mismos caracteres.
+      const citaAparte = verificacion && !datos.sin_importes
+        ? citaDelVerificador(verificacion, campo)
+        : null;
+      const confirmado = citaAparte !== null ? leerImporteLiteral(citaAparte) : null;
+      if (confirmado !== null && Math.abs(confirmado - valor) <= TOL_LITERAL) {
+        continue;
+      }
       salida[campo] = null;
       retiradas.push({
         campo,
@@ -1250,6 +1277,138 @@ export const VERIFICACION_PIE_SCHEMA = {
     },
   },
 } as const;
+
+// ─── 3d. El contador de filas: la segunda mirada, pero a la tabla ───────────
+//
+//  POR QUE HACE FALTA
+//  ------------------
+//  `filas_tabla` lo cuenta el mismo modelo que luego escribe las filas, y en la
+//  factura mensual ML/101511 de Luga (54 filas impresas) se midio que no sirve:
+//  en tres ejecuciones devolvio 10 filas diciendo `filas_tabla: 10`, 5 filas
+//  diciendo `filas_tabla: null`, y 6 filas. Cuando el recuento COINCIDE con las
+//  filas que ha escrito, ninguna de las tres senales de `deducirImportes` salta
+//  y la suma parcial se guarda como total deducido: 1.801,54 EUR de 3.787,53 en
+//  una ejecucion, 101,23 EUR en otra. Es el fallo del 47 % otra vez.
+//
+//  LO QUE SI FUNCIONA, Y ESTA MEDIDO
+//  ---------------------------------
+//  Lo mismo que con el pie: la pregunta estrecha se acierta. Preguntando SOLO
+//  "cuantas filas de concepto tiene esta tabla", sin extraer nada, el mismo
+//  modelo contesta 54, 55 y 54 sobre el mismo 31.jpg (el papel tiene 54), y da
+//  3, 3, 19 y 23 exactos en los documentos de 3, 3, 19 y 23 filas.
+//
+//  POR QUE SOLO SE PREGUNTA A VECES
+//  --------------------------------
+//  El contador no es infalible: en el albaran 22 (9 filas repartidas en cuatro
+//  bloques) conto 13, y en el 24 (14 filas) conto 15. Si su recuento mandara
+//  siempre, esos dos documentos —que hoy salen BIEN— se llenarian de avisos
+//  falsos de `lineas_incompletas`, y un aviso falso se acaba ignorando.
+//
+//  Asi que se pregunta SOLO donde un recuento equivocado se convierte en
+//  dinero equivocado: cuando el documento no imprime NI base, NI IVA, NI total
+//  y el unico total posible es la SUMA DE LAS LINEAS (la regla B de
+//  `deducirImportes`). Ahi, y solo ahi, una linea que falta es un total que
+//  miente. En los demas documentos el pie impreso ya es la comprobacion: si
+//  faltan lineas, la suma no llega al subtotal y salta `descuadre_cabecera`.
+
+/** Respuesta del contador de filas. */
+export interface RecuentoFilas {
+  primera_fila?: string;
+  ultima_fila?: string;
+  filas_por_bloque?: number[];
+  filas_tabla: number | null;
+  motivo?: string;
+}
+
+/** Esquema estricto del contador. Mismas reglas que los otros dos. */
+export const RECUENTO_FILAS_SCHEMA = {
+  name: "recuento_filas",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["primera_fila", "ultima_fila", "filas_por_bloque", "filas_tabla", "motivo"],
+    properties: {
+      primera_fila: {
+        type: "string",
+        description:
+          "Texto de la PRIMERA fila de concepto, copiado tal cual. Escribelo antes de contar: obliga a " +
+          "localizar donde empieza la tabla de verdad.",
+      },
+      ultima_fila: {
+        type: "string",
+        description:
+          "Texto de la ULTIMA fila de concepto, copiado tal cual. Obliga a localizar donde acaba.",
+      },
+      filas_por_bloque: {
+        type: "array",
+        items: { type: "integer" },
+        description:
+          "Filas de cada bloque, pagina o albaran que veas, en orden. Si es una sola tabla seguida, un " +
+          "solo numero. Contar por bloques es lo que evita perderse en una factura mensual.",
+      },
+      filas_tabla: {
+        type: ["integer", "null"],
+        description:
+          "TOTAL de filas de concepto impresas, la suma de 'filas_por_bloque'. null solo si es " +
+          "materialmente imposible contarlas.",
+      },
+      motivo: {
+        type: "string",
+        description: "Como has contado y por que sale ese numero.",
+      },
+    },
+  },
+} as const;
+
+/**
+ * Sube `filas_tabla` al recuento del contador cuando este ve MAS filas que el
+ * extractor. Nunca lo baja, por lo mismo que `conservarRecuentoFilas`: bajar
+ * el recuento hasta las lineas escritas es la forma barata de callar el aviso.
+ *
+ * Devuelve el documento (nuevo si cambia algo) y, cuando el contador ve mas
+ * filas de las que se han extraido, la alerta que lo explica. Fail-open: sin
+ * recuento util no toca nada.
+ */
+export function aplicarRecuentoVerificado(
+  datos: DocumentoExtraido,
+  recuento: RecuentoFilas | null | undefined,
+): { datos: DocumentoExtraido; alerta: AlertaValidacion | null } {
+  const contadas = recuento && esNumeroFinito(recuento.filas_tabla)
+    ? Math.round(recuento.filas_tabla)
+    : null;
+  if (contadas === null || contadas <= 0) return { datos, alerta: null };
+
+  const propias = esNumeroFinito(datos.filas_tabla) ? Math.round(datos.filas_tabla) : null;
+  const mayor = propias === null ? contadas : Math.max(propias, contadas);
+  const salida = mayor === propias ? datos : { ...datos, filas_tabla: mayor };
+
+  const emitidas = salida.productos?.length ?? 0;
+  if (contadas <= emitidas) return { datos: salida, alerta: null };
+
+  return {
+    datos: salida,
+    alerta: {
+      codigo: "recuento_filas_discordante",
+      severidad: "alta",
+      mensaje:
+        `Una segunda lectura, hecha SOLO para contar, dice que la tabla tiene ${contadas} filas de ` +
+        `concepto impresas, pero la extraccion ha devuelto ${emitidas}. Como este documento no imprime ` +
+        `ni base, ni IVA, ni total, su total tendria que salir de sumar las lineas, y una suma a la que ` +
+        `le faltan filas no es el total del documento. Contrasta con el papel.`,
+      detalle: {
+        filas_contadas: contadas,
+        lineas_extraidas: emitidas,
+        filas_tabla_extractor: propias,
+        filas_por_bloque: recuento?.filas_por_bloque ?? null,
+        primera_fila: recuento?.primera_fila ?? null,
+        ultima_fila: recuento?.ultima_fila ?? null,
+        origen: "contador_filas",
+      },
+    },
+  };
+}
+
 
 // ─── 4. Deduccion aritmetica de un total que el documento NO imprime ────────
 //

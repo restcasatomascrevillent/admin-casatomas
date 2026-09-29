@@ -12,6 +12,9 @@ import {
   MAX_CAMBIOS_RELECTURA,
   mensajeCorrectivo,
   retirarImportesNoImpresos,
+  aplicarRecuentoVerificado,
+  RECUENTO_FILAS_SCHEMA,
+  type RecuentoFilas,
   toleranciaCabecera,
   validarEstructura,
   VERIFICACION_PIE_SCHEMA,
@@ -1418,5 +1421,141 @@ describe("DOCUMENTO_JSON_SCHEMA — ninguna descripcion pide calcular", () => {
     const p = DOCUMENTO_JSON_SCHEMA.schema.properties.productos as { description: string };
     expect(p.description).toMatch(/no las agrupes/i);
     expect(p.description).toMatch(/CADA FILA IMPRESA/i);
+  });
+});
+
+// ============================================================================
+//  El contador de filas (bloque 3d). Los numeros son los MEDIDOS sobre
+//  31.jpg (factura mensual ML/101511 de Luga, 54 filas impresas): el extractor
+//  devolvio 10 filas diciendo `filas_tabla: 10`, y el contador estrecho conto
+//  54, 55 y 54 en tres pasadas.
+// ============================================================================
+describe("aplicarRecuentoVerificado", () => {
+  const lineas = (n: number) =>
+    Array.from({ length: n }, (_, i) => linea({ nombre: `Articulo ${i}`, total: 10 }));
+
+  it("sube filas_tabla cuando el contador ve mas filas y avisa (caso Luga 54 vs 10)", () => {
+    const d = doc({
+      subtotal: null, iva: null, total: null,
+      productos: lineas(10), filas_tabla: 10,
+    });
+    const { datos, alerta } = aplicarRecuentoVerificado(d, { filas_tabla: 54, filas_por_bloque: [36, 18] });
+    expect(datos.filas_tabla).toBe(54);
+    expect(alerta?.codigo).toBe("recuento_filas_discordante");
+    expect(alerta?.severidad).toBe("alta");
+    expect(alerta?.detalle.filas_contadas).toBe(54);
+    expect(alerta?.detalle.lineas_extraidas).toBe(10);
+  });
+
+  it("ese recuento hace que NO se deduzca ningun total de la suma de lineas", () => {
+    const d = doc({ subtotal: null, iva: null, total: null, productos: lineas(10), filas_tabla: 10 });
+    // sin contador: la suma parcial se guarda como total deducido
+    const sinContador = deducirImportes(d);
+    expect(sinContador.deduccion?.metodo).toBe("suma_lineas");
+    expect(sinContador.datos.total).toBe(100);
+    // con contador: se retira la deduccion entera
+    const { datos } = aplicarRecuentoVerificado(d, { filas_tabla: 54 });
+    const conContador = deducirImportes(datos);
+    expect(conContador.deduccion?.metodo).toBe("no_deducible");
+    expect(conContador.datos.total).toBeNull();
+    expect(conContador.deduccion?.alerta.codigo).toBe("total_no_deducible");
+  });
+
+  it("no avisa cuando el contador confirma las filas extraidas (caso Salazones, 3 de 3)", () => {
+    const d = doc({ subtotal: null, iva: null, total: null, productos: lineas(3), filas_tabla: 3 });
+    const { datos, alerta } = aplicarRecuentoVerificado(d, { filas_tabla: 3 });
+    expect(alerta).toBeNull();
+    expect(datos.filas_tabla).toBe(3);
+    expect(deducirImportes(datos).deduccion?.metodo).toBe("suma_lineas");
+  });
+
+  it("NUNCA baja el recuento: si el contador ve menos, manda el mas alto", () => {
+    const d = doc({ productos: lineas(5), filas_tabla: 54 });
+    const { datos, alerta } = aplicarRecuentoVerificado(d, { filas_tabla: 5 });
+    expect(datos.filas_tabla).toBe(54);
+    expect(alerta).toBeNull();   // 5 <= 5 emitidas: el contador no aporta nada
+  });
+
+  it("rellena filas_tabla cuando el extractor dice que no ha podido contar", () => {
+    const d = doc({ subtotal: null, iva: null, total: null, productos: lineas(8), filas_tabla: null });
+    const { datos, alerta } = aplicarRecuentoVerificado(d, { filas_tabla: 54 });
+    expect(datos.filas_tabla).toBe(54);
+    expect(alerta?.codigo).toBe("recuento_filas_discordante");
+  });
+
+  it("fail-open: sin recuento util no toca nada (el contador es una mejora, no un requisito)", () => {
+    const d = doc({ filas_tabla: 7, productos: lineas(7) });
+    for (const r of [null, undefined, { filas_tabla: null } as RecuentoFilas, { filas_tabla: 0 }]) {
+      const { datos, alerta } = aplicarRecuentoVerificado(d, r);
+      expect(datos.filas_tabla).toBe(7);
+      expect(alerta).toBeNull();
+    }
+  });
+
+  it("el esquema del contador es estricto y pide contar por bloques", () => {
+    expect(RECUENTO_FILAS_SCHEMA.strict).toBe(true);
+    expect(RECUENTO_FILAS_SCHEMA.schema.additionalProperties).toBe(false);
+    expect([...RECUENTO_FILAS_SCHEMA.schema.required]).toEqual(
+      Object.keys(RECUENTO_FILAS_SCHEMA.schema.properties),
+    );
+    const b = RECUENTO_FILAS_SCHEMA.schema.properties.filas_por_bloque as { description: string };
+    expect(b.description).toMatch(/bloque|albaran|pagina/i);
+  });
+});
+
+// ============================================================================
+//  La cita del extractor puede fallar sobre un importe que SI esta impreso.
+//  Medido en la factura M-2508464 de Joselito: total 3.126,57 impreso en el
+//  papel, `total_literal` a null, y el sistema lo retiraba para volver a
+//  calcularlo identico y marcarlo 'deducido'. Si la segunda lectura del pie
+//  cita ese mismo importe, hay dos lecturas independientes de acuerdo.
+// ============================================================================
+describe("retirarImportesNoImpresos + confirmacion del verificador", () => {
+  const pie = (over: Partial<VerificacionPie> = {}): VerificacionPie => ({
+    fila_total_impresa: true,
+    total_citado: "3.126,57",
+    base_imponible_citada: "2.842,34",
+    cuota_iva_citada: "284,23",
+    ...over,
+  });
+
+  it("NO retira un total sin cita si la segunda lectura del pie cita el mismo numero", () => {
+    const d = doc({ subtotal: 2842.34, iva: 284.23, total: 3126.57, total_literal: null,
+                    subtotal_literal: "2.842,34", iva_literal: "284,23" });
+    const { datos, retiradas } = retirarImportesNoImpresos(d, pie());
+    expect(datos.total).toBe(3126.57);
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("SI lo retira si la segunda lectura cita OTRO numero", () => {
+    const d = doc({ subtotal: 2842.34, iva: 284.23, total: 3126.57, total_literal: null });
+    const { datos, retiradas } = retirarImportesNoImpresos(d, pie({ total_citado: "3.000,00" }));
+    expect(datos.total).toBeNull();
+    expect(retiradas.map((r) => r.campo)).toEqual(["total"]);
+  });
+
+  it("SI lo retira si el verificador dice que la fila del total no esta impresa (caso Osborne)", () => {
+    const d = doc({ subtotal: 342.1, iva: 34.21, total: 376.31, total_literal: null });
+    const { datos, retiradas } = retirarImportesNoImpresos(
+      d, pie({ fila_total_impresa: false, total_citado: "376,31" }),
+    );
+    expect(datos.total).toBeNull();
+    expect(retiradas.map((r) => r.campo)).toEqual(["total"]);
+  });
+
+  it("SI lo retira cuando no hay segunda lectura: una sola lectura sin cita no prueba nada", () => {
+    const d = doc({ subtotal: 2842.34, iva: 284.23, total: 3126.57, total_literal: null });
+    const { datos, retiradas } = retirarImportesNoImpresos(d, null);
+    expect(datos.total).toBeNull();
+    expect(retiradas.map((r) => r.campo)).toEqual(["total"]);
+  });
+
+  it("la confirmacion vale igual para la base y para la cuota de IVA", () => {
+    const d = doc({ subtotal: 2842.34, iva: 284.23, total: 3126.57,
+                    subtotal_literal: null, iva_literal: null, total_literal: "3.126,57" });
+    const { datos, retiradas } = retirarImportesNoImpresos(d, pie());
+    expect(datos.subtotal).toBe(2842.34);
+    expect(datos.iva).toBe(284.23);
+    expect(retiradas).toHaveLength(0);
   });
 });

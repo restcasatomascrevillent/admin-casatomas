@@ -8,6 +8,9 @@ import {
   contarCambiosNumericos,
   deducirImportes,
   retirarImportesNoImpresos,
+  aplicarRecuentoVerificado,
+  RECUENTO_FILAS_SCHEMA,
+  type RecuentoFilas,
   VERIFICACION_PIE_SCHEMA,
   type VerificacionPie,
   DOCUMENTO_JSON_SCHEMA,
@@ -1037,6 +1040,80 @@ async function verificarPie(
   }
 }
 
+const CONTADOR_SYSTEM_PROMPT = `Eres un contador de filas de tablas de documentos comerciales españoles.
+
+No extraes datos. No lees importes. Sólo cuentas.
+
+Tu única tarea: contar cuántas FILAS DE CONCEPTO tiene la tabla de productos del documento de la imagen.
+
+Cuenta TODAS las filas, una a una, de arriba abajo:
+  · las repetidas (el mismo producto puede salir muchas veces con importes distintos: es lo normal en una factura mensual que agrupa varios albaranes),
+  · las bonificadas y las de importe 0,
+  · las que tienen la descripción partida en dos renglones cuentan como UNA fila.
+
+NO cuentes: la fila de cabecera de la tabla, los subtotales por albarán, ni el pie de totales.
+
+Si el documento tiene varias páginas o secciones dentro de la misma imagen, suma las filas de todas.
+
+Cuenta mirando los PÍXELES, despacio. Es lo único que se te pide.`;
+
+/**
+ * Segunda lectura, estrecha, que SOLO cuenta las filas de la tabla. Devuelve
+ * null si algo falla: contar es una mejora, no un requisito, y no puede tumbar
+ * una subida que por lo demas ha ido bien. Ver el bloque 3d de esquema.ts para
+ * por que esto es una llamada aparte y por que no se hace en todos los
+ * documentos.
+ */
+async function contarFilas(
+  // deno-lint-ignore no-explicit-any
+  contentBlock: any,
+): Promise<RecuentoFilas | null> {
+  try {
+    const resp = await fetch(`${OPENAI}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODELO_VISION,
+        max_completion_tokens: 6000,
+        response_format: { type: "json_schema", json_schema: RECUENTO_FILAS_SCHEMA },
+        messages: [
+          { role: "system", content: CONTADOR_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [contentBlock, { type: "text", text: "Cuenta las filas de concepto de la tabla de este documento." }],
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) {
+      console.warn(`[contador-filas] HTTP ${resp.status}: se sigue sin contar.`);
+      return null;
+    }
+    const json = await resp.json();
+    const choice = json?.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      console.warn("[contador-filas] respuesta cortada: se sigue sin contar.");
+      return null;
+    }
+    const r = JSON.parse(choice?.message?.content ?? "null") as RecuentoFilas | null;
+    if (!r || (r.filas_tabla !== null && typeof r.filas_tabla !== "number")) {
+      console.warn("[contador-filas] respuesta sin forma util: se sigue sin contar.");
+      return null;
+    }
+    console.log(
+      `[contador-filas] filas impresas: ${r.filas_tabla} (bloques: ${JSON.stringify(r.filas_por_bloque ?? [])}). ` +
+      `${r.motivo ?? ""}`,
+    );
+    return r;
+  } catch (e) {
+    console.warn("[contador-filas] fallo, se sigue sin contar:", e);
+    return null;
+  }
+}
+
 /** Parsea + valida la forma. Lanza con la RUTA de los campos que fallan. */
 function validarOLanzar(parsed: unknown, contexto: string): DocumentoExtraido {
   const v = validarEstructura(parsed);
@@ -1246,7 +1323,25 @@ serve(async (req) => {
       );
     }
 
-    const { datos: documento, deduccion } = deducirImportes(citado);
+    // Si el documento no imprime NI base, NI IVA, NI total, su total solo puede
+    // salir de sumar las lineas — y entonces una linea que falta es un total
+    // que miente. Ese es el UNICO sitio donde se paga una segunda lectura para
+    // contar las filas: ver el bloque 3d de esquema.ts (caso Luga ML/101511,
+    // 54 filas impresas y 10 extraidas diciendo que la tabla tenia 10).
+    const totalSaldriaDeLasLineas = !citado.sin_importes &&
+      citado.subtotal === null && citado.iva === null && citado.total === null &&
+      (citado.productos?.length ?? 0) > 0;
+    const recuento = totalSaldriaDeLasLineas ? await contarFilas(contentBlock) : null;
+    const { datos: contado, alerta: alertaRecuento } = aplicarRecuentoVerificado(citado, recuento);
+    if (alertaRecuento) {
+      console.warn(
+        `[contador-filas] ${contado.tipo} ${contado.numero_documento}: el contador ve ` +
+        `${alertaRecuento.detalle.filas_contadas} filas y la extraccion trae ` +
+        `${alertaRecuento.detalle.lineas_extraidas}. NO se deducira ningun total de la suma.`,
+      );
+    }
+
+    const { datos: documento, deduccion } = deducirImportes(contado);
     const datos = normalizarDatos(documento);
 
     // Procedencia del importe que se va a guardar en `facturas.total`:
@@ -1260,6 +1355,7 @@ serve(async (req) => {
       ...descuadresComoAlertas(extraccion.descuadres, "pre-guardado"),
       ...retiradas.map((r) => r.alerta),
       ...discordancias,
+      ...(alertaRecuento ? [alertaRecuento] : []),
       // El aviso de la deducción ya viene con `detalle.origen = "deduccion"`.
       ...(deduccion ? [deduccion.alerta] : []),
     ];
