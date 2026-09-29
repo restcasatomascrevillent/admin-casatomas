@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, CalendarIcon, CheckCircle, Info, ShieldBan } from "lucide-react";
+import { AlertTriangle, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, ShieldBan } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,15 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { verificarAforoTurno } from "@/hooks/useDisponibilidad";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,21 +31,20 @@ import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useOcupacionSalasDia, CLAVE_OCUPACION_SALAS_DIA, datosDeNegocio } from "@/hooks/useOcupacionSalasDia";
 import {
-  agruparPorNegocio,
+  espacioUnicoDeNegocio,
   etiquetaNegocio,
-  marcaParaAlta,
   MARCA_POR_DEFECTO,
+  NEGOCIOS_PANEL,
   normalizarMarca,
 } from "@/lib/reservas/negocios";
-import { NegocioBadge } from "./NegocioBadge";
 import {
   calcularOcupacionSalas,
-  construirFranjas,
   ETIQUETA_TURNO,
   evaluarUbicacion,
   horaCorta,
 } from "@/lib/reservas/ocupacionSalas";
 import { OcupacionSalas } from "./OcupacionSalas";
+import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
   debeNotificarAltaPanel,
@@ -87,17 +79,25 @@ const formSchema = z.object({
     .int("El número de comensales debe ser entero")
     .min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
-  /** Sala asignada (null = sin asignar). */
+  /**
+   * Negocio de la reserva, OBLIGATORIO y elegido a mano (reservas-sin-salas,
+   * 2026-09-29). Antes lo decidía la sala; ahora la sala es interna y
+   * opcional, así que no puede decidir de qué negocio es la reserva.
+   */
+  marca: z
+    .string({ required_error: "Elige el negocio" })
+    .refine((m) => NEGOCIOS_PANEL.some((n) => n.marca === m), "Elige el negocio"),
+  /** Sala asignada (null = sin asignar). Interna y opcional. */
   espacio_id: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-// Las horas del desplegable salen del motor compartido de disponibilidad
-// (`calcularDisponibilidad` sobre `configuracion_turnos`, vía
-// useOcupacionSalasDia): la MISMA fuente que la web y el bot. Antes había
-// aquí una copia propia (`generarHorarios`) con una lista fija de respaldo.
-// El personal puede además escribir una hora fuera de franja ("Otra hora...").
+// Las horas del desplegable son TODOS los cuartos de hora de los turnos del
+// negocio (`configuracion_turnos`, sin escalera: rejilla interna de
+// `lib/reservas/rejillaCuartos.ts`, reservas-sin-salas). El personal puede
+// además escribir una hora fuera de franja ("Otra hora..."). El aforo lo
+// sigue validando el trigger por turno.
 const SIN_ASIGNAR = "__sin_asignar__";
 const OTRA_HORA = "__otra__";
 
@@ -183,8 +183,8 @@ interface FormularioReservaProps {
     canal?: "telefono" | "manual";
     /** Solicitud del bot de la que sale (reservas.solicitud_id). */
     solicitud_id?: string | null;
-    /** Negocio si no hay sala elegida (p. ej. solicitud de El Reservado sin
-     * sala). Con sala, manda siempre la marca de la sala. */
+    /** Negocio de la reserva (valor inicial del selector "Negocio"). Sin
+     * valor, Casa Tomás. */
     marca?: string | null;
   } | null;
 }
@@ -211,6 +211,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       numero_comensales: 2,
       fecha: datosPreseleccionados?.fecha,
       hora: datosPreseleccionados?.hora ?? "",
+      marca: datosPreseleccionados?.marca ?? MARCA_POR_DEFECTO,
       espacio_id: datosPreseleccionados?.espacio_id ?? null,
     },
   });
@@ -232,6 +233,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     if (datosPreseleccionados?.notas_cliente) {
       form.setValue("notas_cliente", datosPreseleccionados.notas_cliente);
     }
+    if (datosPreseleccionados?.marca != null) form.setValue("marca", datosPreseleccionados.marca);
     if (datosPreseleccionados?.espacio_id !== undefined) {
       form.setValue("espacio_id", datosPreseleccionados.espacio_id);
     }
@@ -243,29 +245,46 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const watchedEmail = form.watch("email");
   const watchedTelefono = form.watch("telefono");
   const watchedEspacio = form.watch("espacio_id") ?? null;
+  const watchedMarca = form.watch("marca");
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
 
-  // Franjas + reservas + salas del día (una sola consulta, compartida con la
-  // rejilla "Ocupación de salas" por la clave de React Query), de TODOS los
-  // negocios. El negocio de la reserva lo decide la sala elegida: "El
-  // Reservado" => Touza; cualquier otra o sin sala => Casa Tomás. Las horas
-  // del desplegable, el aforo del turno y la evaluación de la sala son las de
-  // ESE negocio (turnos propios del espacio si los tiene, si no los generales).
+  // Reservas + salas del día (una sola consulta, compartida con las rejillas
+  // por la clave de React Query), de TODOS los negocios. El negocio de la
+  // reserva lo elige el personal en "Negocio" (obligatorio): la sala es
+  // asignación interna y ya no lo decide. El aforo del turno, las horas y la
+  // evaluación de la sala son las de ESE negocio.
   const { data: datosDia } = useOcupacionSalasDia(fechaStr);
   const todosLosEspacios = useMemo(() => (datosDia?.negocios ?? []).flatMap((n) => n.espacios), [datosDia]);
-  const marcaDeAlta = (espacioId: string | null | undefined) =>
-    espacioId ? marcaParaAlta(espacioId, todosLosEspacios) : normalizarMarca(datosPreseleccionados?.marca);
-  const marcaAlta = marcaDeAlta(watchedEspacio);
+  const marcaAlta = normalizarMarca(watchedMarca);
   const datosNegocio = useMemo(() => datosDeNegocio(datosDia, marcaAlta), [datosDia, marcaAlta]);
-  const horasBase = useMemo(() => datosNegocio?.horasBase ?? [], [datosNegocio]);
-  const horariosDisponibles = useMemo(() => {
-    const f = construirFranjas(horasBase);
-    return [...f.comida, ...f.cena];
-  }, [horasBase]);
+  const salasDelNegocio = datosNegocio?.espacios ?? [];
+  const { rejilla } = useRejillaCuartos({
+    fecha: fechaStr,
+    marca: marcaAlta,
+    comensales: Number(watchedComensales) || 0,
+    hora: watchedHora || null,
+    enabled: !isPublic,
+  });
+  const horariosDisponibles = useMemo(
+    () => (rejilla?.franjas ?? []).filter((f) => f.origen === "turno").map((f) => f.hora),
+    [rejilla],
+  );
   // Una hora fuera de las franjas (p. ej. propuesta a mano desde una
   // solicitud) ya NO se borra al cambiar de día: el personal puede reservar
   // a cualquier hora; el aforo lo sigue validando el trigger.
-  const horaFueraDeFranja = !!datosDia && !!watchedHora && !horariosDisponibles.includes(watchedHora);
+  const horaFueraDeFranja = !!rejilla && !!watchedHora && !horariosDisponibles.includes(watchedHora);
+
+  /** Cambiar de negocio: la sala de otro negocio no vale; la única sala de
+   * un negocio que solo tiene una (Touza: El Reservado) se preselecciona. */
+  const cambiarMarca = (marca: string) => {
+    form.setValue("marca", marca, { shouldValidate: true });
+    const actual = form.getValues("espacio_id") ?? null;
+    const actualEsDeOtro = !!actual && !todosLosEspacios.some((e) => e.id === actual && normalizarMarca(e.marca) === marca);
+    if (actualEsDeOtro || !actual) form.setValue("espacio_id", espacioUnicoDeNegocio(marca, todosLosEspacios));
+  };
+  const nombreSalaElegida = watchedEspacio
+    ? todosLosEspacios.find((e) => e.id === watchedEspacio)?.nombre ?? "Sala"
+    : "sin sala";
   const mostrarInputHora = modoOtraHora || horaFueraDeFranja;
 
   // Aviso (no bloqueo) si la sala elegida se pasa de su capacidad en el
@@ -495,10 +514,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente?.trim() || null,
         espacio_id: values.espacio_id || null,
-        // Negocio: el de la sala elegida (El Reservado => 'touza'). Sin sala,
-        // el que traiga la solicitud de origen o, si no, Casa Tomás (mismo
-        // valor que el DEFAULT de la columna).
-        marca: marcaDeAlta(values.espacio_id),
+        // Negocio: el elegido en el formulario (obligatorio). Ya no sale de
+        // la sala: una reserva de Touza sin sala sigue siendo de Touza.
+        marca: values.marca,
         estado: estadoInicial,
         // 'telefono' al convertir una solicitud del bot (el cliente llamó);
         // 'manual' para un alta del personal.
@@ -542,7 +560,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         numero_comensales: values.numero_comensales,
         espacio_id: values.espacio_id || null,
       };
-      form.reset({ numero_comensales: 2, hora: "", espacio_id: null });
+      form.reset({ numero_comensales: 2, hora: "", marca: values.marca, espacio_id: null });
       setModoOtraHora(false);
       setLimiteAlcanzado(null);
       setDisponibilidadInfo(null);
@@ -758,40 +776,26 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           {!isPublic && (
             <FormField
               control={form.control}
-              name="espacio_id"
+              name="marca"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    Sala
-                    <NegocioBadge marca={marcaAlta} />
-                  </FormLabel>
-                  <Select
-                    value={field.value ?? SIN_ASIGNAR}
-                    onValueChange={(v) => field.onChange(v === SIN_ASIGNAR ? null : v)}
-                  >
+                  <FormLabel>Negocio</FormLabel>
+                  <Select value={field.value || undefined} onValueChange={cambiarMarca}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder="Elige el negocio" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={SIN_ASIGNAR}>Sin asignar ({etiquetaNegocio(marcaDeAlta(null))})</SelectItem>
-                      {agruparPorNegocio(todosLosEspacios, (e) => e.marca ?? MARCA_POR_DEFECTO).map(
-                        ({ negocio, items }) => (
-                          <SelectGroup key={negocio.marca}>
-                            <SelectLabel>{negocio.etiqueta}</SelectLabel>
-                            {items.map((e) => (
-                              <SelectItem key={e.id} value={e.id}>
-                                {e.nombre} ({e.capacidad_maxima} plazas)
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ),
-                      )}
+                      {NEGOCIOS_PANEL.map((n) => (
+                        <SelectItem key={n.marca} value={n.marca}>
+                          {n.etiqueta}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-muted-foreground">
-                    El negocio lo marca la sala: «El Reservado» es de Touza y tiene su propio aforo.
+                    Cada negocio tiene su propio aforo. La sala no lo decide.
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -812,19 +816,80 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
         {!isPublic && (
           <div className="rounded-lg border p-3">
-            <OcupacionSalas
+            <DisponibilidadCuartos
               fecha={fechaStr}
+              marca={marcaAlta}
               comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
-              espacioId={watchedEspacio}
-              marca={marcaAlta}
-              onSeleccionar={(espacioId, hora) => {
+              onSeleccionarHora={(hora) => {
                 setModoOtraHora(false);
-                form.setValue("espacio_id", espacioId);
                 form.setValue("hora", hora, { shouldValidate: true });
               }}
             />
           </div>
+        )}
+
+        {/* La sala es asignación INTERNA y opcional (reservas-sin-salas):
+            plegada, con la rejilla de salas para decidir. Solo las salas del
+            negocio elegido. */}
+        {!isPublic && (
+          <Collapsible className="space-y-3 rounded-lg border p-3">
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="group h-8 w-full justify-between px-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  Asignación interna (opcional)
+                  <span className="text-muted-foreground">· {nombreSalaElegida}</span>
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3">
+              <FormField
+                control={form.control}
+                name="espacio_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sala</FormLabel>
+                    <Select
+                      value={field.value ?? SIN_ASIGNAR}
+                      onValueChange={(v) => field.onChange(v === SIN_ASIGNAR ? null : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
+                        {salasDelNegocio.map((e) => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.nombre} ({e.capacidad_maxima} plazas)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      No se le dice al cliente ni limita la hora. Se puede dejar sin asignar y ponerla más tarde.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <OcupacionSalas
+                fecha={fechaStr}
+                comensales={Number(watchedComensales) || 0}
+                hora={watchedHora || null}
+                espacioId={watchedEspacio}
+                marca={marcaAlta}
+                onSeleccionar={(espacioId, hora) => {
+                  setModoOtraHora(false);
+                  form.setValue("espacio_id", espacioId);
+                  form.setValue("hora", hora, { shouldValidate: true });
+                }}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         <FormField
