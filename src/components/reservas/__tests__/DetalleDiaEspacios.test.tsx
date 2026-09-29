@@ -75,6 +75,13 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
+// La rejilla por cuartos (reservas-sin-salas) se prueba aparte; aquí solo se
+// comprueba que el panel del día la monta, para ese día y por negocio.
+vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
+  DisponibilidadCuartos: ({ marca, fecha }: { marca: string; fecha: string }) => (
+    <div data-testid="rejilla-cuartos" data-marca={marca} data-fecha={fecha} />
+  ),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { useMesas } from "@/hooks/useMesas";
@@ -399,6 +406,25 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     expect(await screen.findByText("No hay reservas para este día")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Abrir el plano de / })).not.toBeInTheDocument();
     expect(screen.queryByText("Sin sala")).not.toBeInTheDocument();
+  });
+
+  // ── Rejilla por cuartos de hora (reservas-sin-salas) ──────────────────────
+
+  it("monta la rejilla por cuartos del día elegido, una por negocio, también en un día vacío", async () => {
+    montar();
+    await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
+    const deHoy = screen.getAllByTestId("rejilla-cuartos");
+    expect(deHoy.map((r) => r.getAttribute("data-marca"))).toEqual(["casa_tomas", "touza"]);
+    expect(deHoy.every((r) => r.getAttribute("data-fecha") === HOY_ISO)).toBe(true);
+
+    fireEvent.click(casillaDia(OTRO_DIA.getDate()));
+    expect(await screen.findByText("No hay reservas para este día")).toBeInTheDocument();
+    const otroDia = format(OTRO_DIA, "yyyy-MM-dd");
+    await waitFor(() =>
+      expect(screen.getAllByTestId("rejilla-cuartos").every((r) => r.getAttribute("data-fecha") === otroDia)).toBe(
+        true,
+      ),
+    );
   });
 
   it("distingue un día vacío de un turno vacío", async () => {
