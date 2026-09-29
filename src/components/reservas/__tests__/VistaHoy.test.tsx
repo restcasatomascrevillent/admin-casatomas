@@ -50,6 +50,14 @@ vi.mock("@/components/reservas/GestorReservasKanban", () => ({
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
+// La rejilla por cuartos se prueba aparte; aquí solo cuántas se montan y de qué negocio.
+vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
+  DisponibilidadCuartos: ({ marca, fecha }: { marca: string; fecha: string }) => (
+    <div data-testid="rejilla-cuartos">
+      {marca} {fecha}
+    </div>
+  ),
+}));
 
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -278,5 +286,39 @@ describe("VistaHoy — franja «Pendientes de mesa»", () => {
     for (const el of Array.from(franja.querySelectorAll("*"))) {
       expect(el.className.toString()).not.toMatch(/destructive|red-/);
     }
+  });
+});
+
+describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
+      data: RESUMEN,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
+      typeof useEspaciosReserva
+    >);
+    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
+      typeof useAsignacionesMesa
+    >);
+  });
+
+  it("va plegada: no monta ninguna rejilla hasta que se despliega", () => {
+    montar();
+    expect(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("rejilla-cuartos")).not.toBeInTheDocument();
+  });
+
+  it("al desplegarla enseña una rejilla de hoy por negocio", () => {
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
+    const rejillas = screen.getAllByTestId("rejilla-cuartos").map((r) => r.textContent);
+    expect(rejillas).toEqual([`casa_tomas ${HOY}`, `touza ${HOY}`]);
   });
 });
