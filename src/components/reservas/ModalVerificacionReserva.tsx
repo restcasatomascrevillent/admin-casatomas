@@ -21,7 +21,6 @@ import {
   Users,
   Phone,
   Mail,
-  ArrowRight,
   MessageSquare,
   Lock,
   AlertTriangle,
@@ -34,10 +33,8 @@ import { NegocioBadge } from "./NegocioBadge";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   type ReservaParaVerificar,
-  objetivoAceptarComoSolicitado,
   difiereSolicitudDeOferta,
-  aceptarComoSolicitado,
-  verificarConContraoferta,
+  verificarConHoraYSala,
   rechazarReserva,
 } from "@/hooks/useVerificacionReservas";
 
@@ -56,18 +53,31 @@ function horaCorta(hora: string | null | undefined): string {
 }
 
 /**
- * Verificar una solicitud pendiente con posible contraoferta de hora/zona.
- * Ver `useVerificacionReservas.ts` para el contrato completo con el backend
- * (columnas hora_solicitada/espacio_solicitado_id, migración 20260920010000).
+ * Verificar una solicitud pendiente: el cliente pidió una hora y aquí se
+ * decide QUÉ HORA SE LE DA. Ver `useVerificacionReservas.ts` para el contrato
+ * completo con el backend (columnas hora_solicitada/espacio_solicitado_id,
+ * migración 20260920010000).
+ *
+ * DOS COSAS DISTINTAS, DOS SITIOS DISTINTOS (2026-09-29). Hasta ahora la hora
+ * y la sala compartían el recuadro "Se le ofrece", como si las dos fueran
+ * parte de lo que se le comunica al cliente. Desde que la sala no sale en
+ * ningún correo (punto 7 del contrato de `emails-reserva/plantillas.ts`) eso
+ * era mentira: la hora se le dice, la sala es organización interna del
+ * comedor. Por eso arriba va la comparación de HORA (lo único que el cliente
+ * verá) y abajo, separada, la sala.
+ *
+ * NO SE BORRA NADA para volver atrás: `espacio_solicitado_id` se sigue
+ * leyendo y escribiendo, y devolver la sala al bloque de arriba es mover el
+ * `<Select>` de sitio. El "de momento" del dueño sigue siendo un "de momento".
  *
  * Ámbito deliberadamente MÁS ESTRECHO que la versión anterior de este modal:
  * antes se podían editar nombre/teléfono/email/fecha/comensales aquí. La
  * migración congela SOLO hora/espacio como "lo solicitado" — nombre, fecha y
- * comensales no forman parte de la contraoferta ni del correo de comparación
- * que arma `emails-reserva` a partir de esas columnas. Se muestran como
- * contexto de solo-lectura; corregir un dato de contacto ya no es cosa de
- * esta pantalla (se sigue pudiendo editar la reserva desde otro sitio si
- * hiciera falta).
+ * comensales no forman parte de lo que se responde ni del correo de
+ * comparación que arma `emails-reserva` a partir de esas columnas. Se
+ * muestran como contexto de solo-lectura; corregir un dato de contacto ya no
+ * es cosa de esta pantalla (se sigue pudiendo editar la reserva desde otro
+ * sitio si hiciera falta).
  */
 export function ModalVerificacionReserva({
   reserva,
@@ -78,18 +88,21 @@ export function ModalVerificacionReserva({
   const { canAccess: canEdit, loading: permisosLoading } = useCanAccessSection("reservas", "edit");
   const { data: espacios } = useEspaciosReserva();
 
-  const [horaOferta, setHoraOferta] = useState("");
-  const [espacioOferta, setEspacioOferta] = useState<string | null>(null);
-  const [accionEnCurso, setAccionEnCurso] = useState<"aceptar" | "contraoferta" | "rechazar" | null>(null);
+  const [horaDecidida, setHoraDecidida] = useState("");
+  const [salaAsignada, setSalaAsignada] = useState<string | null>(null);
+  const [accionEnCurso, setAccionEnCurso] = useState<"verificar" | "rechazar" | null>(null);
 
-  // Al abrir (o cambiar de reserva), el formulario arranca en "lo pedido":
-  // no tocar nada + "Aceptar tal cual" equivale a aceptar la solicitud
-  // exactamente como llegó. Cambiar hora o zona es la excepción deliberada.
   useEffect(() => {
     if (open && reserva) {
-      const objetivo = objetivoAceptarComoSolicitado(reserva);
-      setHoraOferta(horaCorta(objetivo.hora));
-      setEspacioOferta(objetivo.espacio_id);
+      // La HORA arranca en la que pidió el cliente: no tocar nada y pulsar
+      // "Verificar con esta hora" es darle exactamente lo que pidió.
+      setHoraDecidida(horaCorta(reserva.hora_solicitada ?? reserva.hora));
+      // La SALA arranca en la que la reserva tenga asignada AHORA MISMO, no
+      // en `espacio_solicitado_id`. Es un dato interno y el cliente no lo
+      // pide nunca (ver `lib/reservas/solicitudPropuesta.ts`: "la sala nunca
+      // la pidió el cliente"). Arrancar en "lo solicitado" borraba sin avisar
+      // la sala de una reserva a la que ya se le había puesto una.
+      setSalaAsignada(reserva.espacio_id ?? null);
     }
   }, [open, reserva]);
 
@@ -104,7 +117,7 @@ export function ModalVerificacionReserva({
   // ahora mismo en el formulario: cambiar de zona recalcula qué horas caben.
   const { data: disponibilidad, isLoading: cargandoHoras, isError: errorHoras } = useDisponibilidadCalculada(
     fecha,
-    { comensales, espacioId: espacioOferta, marca },
+    { comensales, espacioId: salaAsignada, marca },
   );
 
   const opcionesHora = useMemo(() => {
@@ -114,31 +127,29 @@ export function ModalVerificacionReserva({
     // no la ofrezca de fábrica (p.ej. se llenó mientras tanto): así el Select
     // nunca queda en un valor sin opción visible. Elegir una hora DISTINTA
     // sigue limitado a lo que el motor permite — nada de texto libre.
-    if (horaOferta) set.add(horaOferta);
+    if (horaDecidida) set.add(horaDecidida);
     return Array.from(set).sort();
-  }, [disponibilidad, horaOferta]);
+  }, [disponibilidad, horaDecidida]);
 
   const opcionesEspacio = useMemo(() => {
     const activos = (espacios ?? []).filter((e: any) => e.activa && marcaDeEspacio(e) === marca);
-    if (espacioOferta && !activos.some((e: any) => e.id === espacioOferta)) {
-      const actual = (espacios ?? []).find((e: any) => e.id === espacioOferta);
+    if (salaAsignada && !activos.some((e: any) => e.id === salaAsignada)) {
+      const actual = (espacios ?? []).find((e: any) => e.id === salaAsignada);
       if (actual) return [...activos, actual];
     }
     return activos;
-  }, [espacios, espacioOferta, marca]);
+  }, [espacios, salaAsignada, marca]);
 
   if (!reserva) return null;
 
   const pedidoHora = horaCorta(reserva.hora_solicitada ?? reserva.hora);
-  const pedidoEspacioId =
-    reserva.espacio_solicitado_id !== undefined ? reserva.espacio_solicitado_id : reserva.espacio_id ?? null;
 
-  const nombreZona = (id: string | null) => {
-    if (!id) return "Sin zona asignada";
-    return (espacios ?? []).find((e: any) => e.id === id)?.nombre || "Zona eliminada";
-  };
-
-  const hayContraoferta = horaCorta(horaOferta) !== pedidoHora || espacioOferta !== pedidoEspacioId;
+  // SOLO LA HORA. La sala no entra en esta comparación porque no sale en
+  // ningún correo del cliente: avisar de que "difiere" por un cambio de sala
+  // era alarmar al personal por algo que el cliente jamás va a ver. Mismo
+  // criterio, literalmente la misma función, que el correo real (ver
+  // `difiereSolicitudDeOferta` en useVerificacionReservas.ts).
+  const cambiaLaHora = horaCorta(horaDecidida) !== pedidoHora;
   const yaDiferiaAlAbrir = difiereSolicitudDeOferta(reserva);
   const puedeEditar = canEdit && !permisosLoading;
 
@@ -148,7 +159,7 @@ export function ModalVerificacionReserva({
   };
 
   const ejecutar = async (
-    accion: "aceptar" | "contraoferta" | "rechazar",
+    accion: "verificar" | "rechazar",
     fn: () => Promise<{ ok: boolean }>,
   ) => {
     setAccionEnCurso(accion);
@@ -165,7 +176,11 @@ export function ModalVerificacionReserva({
 
   return (
     <Dialog open={open} onOpenChange={cerrar}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      {/* `max-w-xl` (576 px) y no el `max-w-lg` (512) de antes: con 512 el pie
+          se quedaba a 1 px de no caber, que no es margen, es suerte. Con 576
+          sobran ~64 px para que una etiqueta o una tipografía distinta no
+          vuelvan a sacar barra horizontal. */}
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Verificar solicitud
@@ -178,7 +193,7 @@ export function ModalVerificacionReserva({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Contexto del cliente — solo lectura, no forma parte de la contraoferta */}
+          {/* Contexto del cliente — solo lectura, no es parte de lo que se decide aquí */}
           <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5 text-sm">
             {reserva.telefono && (
               <p className="flex items-center gap-1.5 text-muted-foreground">
@@ -208,21 +223,20 @@ export function ModalVerificacionReserva({
           {yaDiferiaAlAbrir && (
             <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-2.5 text-xs text-amber-800 dark:text-amber-300">
               <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              Esta reserva ya se había ofrecido con una hora o zona distinta a la solicitada originalmente.
+              Esta reserva ya tenía guardada una hora distinta a la que pidió el cliente.
             </div>
           )}
 
-          {/* Comparación: lo pedido vs. lo que se va a ofrecer. A simple vista si difieren —
-              es exactamente lo que verá el cliente en el correo ("pediste X, te ofrecemos Y"). */}
+          {/* LA HORA: lo único que se le dice al cliente. Lo pedido a la
+              izquierda, lo que se le va a decir a la derecha, y a simple
+              vista si no coinciden — es tal cual lo que leerá en el correo
+              ("pediste X, te damos Y"). */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pidió el cliente</p>
-              <div className="rounded-lg border p-3 space-y-1.5 bg-background h-[72px] flex flex-col justify-center">
+              <div className="rounded-lg border bg-background p-3 h-[58px] flex items-center">
                 <p className="flex items-center gap-1.5 text-sm font-medium">
                   <Clock className="h-4 w-4 text-muted-foreground shrink-0" /> {pedidoHora || "—"}
-                </p>
-                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0" /> {nombreZona(pedidoEspacioId)}
                 </p>
               </div>
             </div>
@@ -231,21 +245,25 @@ export function ModalVerificacionReserva({
               <p
                 className={cn(
                   "text-xs font-medium uppercase tracking-wide",
-                  hayContraoferta ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
+                  cambiaLaHora ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground",
                 )}
               >
-                Se le ofrece{hayContraoferta ? " (contraoferta)" : ""}
+                Se le confirma
               </p>
               <div
                 className={cn(
-                  "rounded-lg border p-3 space-y-1.5",
-                  hayContraoferta
+                  "rounded-lg border p-3 h-[58px] flex items-center",
+                  cambiaLaHora
                     ? "border-amber-300 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800"
                     : "bg-background",
                 )}
               >
-                <Select value={horaOferta} onValueChange={setHoraOferta} disabled={!puedeEditar || !!accionEnCurso}>
-                  <SelectTrigger className="h-8 text-sm">
+                <Select
+                  value={horaDecidida}
+                  onValueChange={setHoraDecidida}
+                  disabled={!puedeEditar || !!accionEnCurso}
+                >
+                  <SelectTrigger className="h-8 text-sm" aria-label="Hora que se le confirma al cliente">
                     <SelectValue placeholder={cargandoHoras ? "Cargando…" : "Hora"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -256,31 +274,52 @@ export function ModalVerificacionReserva({
                     ))}
                   </SelectContent>
                 </Select>
-                <Select
-                  value={espacioOferta ?? SIN_ZONA}
-                  onValueChange={(v) => setEspacioOferta(v === SIN_ZONA ? null : v)}
-                  disabled={!puedeEditar || !!accionEnCurso}
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SIN_ZONA}>Sin zona asignada</SelectItem>
-                    {opcionesEspacio.map((e: any) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </div>
 
+          {cambiaLaHora && (
+            <p className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Hora distinta a la que pidió: en el correo verá que pidió las {pedidoHora || "—"} y que se le dan las{" "}
+              {horaCorta(horaDecidida) || "—"}.
+            </p>
+          )}
+
+          {/* LA SALA: no sale en ningún correo del cliente, así que no puede
+              estar en el recuadro de arriba junto a la hora. Es reparto de
+              comedor. Ver el comentario de cabecera del componente. */}
+          <div className="space-y-1.5 border-t pt-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solo para el restaurante</p>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select
+                value={salaAsignada ?? SIN_ZONA}
+                onValueChange={(v) => setSalaAsignada(v === SIN_ZONA ? null : v)}
+                disabled={!puedeEditar || !!accionEnCurso}
+              >
+                <SelectTrigger className="h-8 text-sm" aria-label="Sala que se le asigna por dentro">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_ZONA}>Sin sala asignada</SelectItem>
+                  {opcionesEspacio.map((e: any) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              La sala no se le dice al cliente: sirve para repartir el comedor.
+            </p>
+          </div>
+
           {errorHoras && (
             <p className="text-xs text-destructive">
-              No se pudieron calcular las horas disponibles ahora mismo. Puedes aceptar tal cual o rechazar; para
-              ofrecer otra hora, inténtalo de nuevo en un momento.
+              No se pudieron calcular las horas disponibles ahora mismo. Puedes verificar con la hora que pidió o
+              rechazar; para darle otra hora, inténtalo de nuevo en un momento.
             </p>
           )}
 
@@ -292,7 +331,17 @@ export function ModalVerificacionReserva({
           )}
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        {/* TRES botones, no cuatro. Antes había "Aceptar tal cual" y "Enviar
+            propuesta" como si fueran dos caminos; no lo son: se le da una
+            hora y ya está. Un solo botón de guardar manda SIEMPRE lo que se
+            ve en pantalla (coincida o no con lo pedido), que además arregla
+            el que "Aceptar tal cual" tiraba a la basura la sala recién
+            asignada. Y con tres botones cabe todo: los cuatro se salían por
+            la derecha a 1024 px y el modal sacaba barra horizontal
+            (`overflow-y-auto` obliga a `overflow-x: auto`, así que lo que no
+            cabe genera scroll en vez de verse). `flex-wrap` es el cinturón
+            por si algún día crece una etiqueta. */}
+        <DialogFooter className="flex-col sm:flex-row sm:flex-wrap gap-2">
           {puedeEditar && (
             <Button
               variant="destructive"
@@ -311,34 +360,21 @@ export function ModalVerificacionReserva({
           <Button variant="outline" onClick={cerrar} disabled={!!accionEnCurso}>
             Cerrar
           </Button>
-          {puedeEditar && hayContraoferta && (
-            <Button
-              onClick={() =>
-                ejecutar("contraoferta", () =>
-                  verificarConContraoferta(reserva, { hora: horaOferta, espacio_id: espacioOferta }),
-                )
-              }
-              disabled={!!accionEnCurso || !horaOferta}
-            >
-              {accionEnCurso === "contraoferta" ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowRight className="mr-2 h-4 w-4" />
-              )}
-              Enviar propuesta
-            </Button>
-          )}
           {puedeEditar && (
             <Button
-              onClick={() => ejecutar("aceptar", () => aceptarComoSolicitado(reserva))}
-              disabled={!!accionEnCurso}
+              onClick={() =>
+                ejecutar("verificar", () =>
+                  verificarConHoraYSala(reserva, { hora: horaDecidida, espacio_id: salaAsignada }),
+                )
+              }
+              disabled={!!accionEnCurso || !horaDecidida}
             >
-              {accionEnCurso === "aceptar" ? (
+              {accionEnCurso === "verificar" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <CheckCircle className="mr-2 h-4 w-4" />
               )}
-              Aceptar tal cual
+              Verificar con esta hora
             </Button>
           )}
         </DialogFooter>
