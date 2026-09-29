@@ -3,8 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import {
   CalendarCheck,
+  ChevronDown,
   ChevronRight,
   CircleDashed,
+  Clock,
   MapPin,
   TrendingUp,
   Users,
@@ -26,6 +28,9 @@ import {
 } from "@/lib/reservas/pendientesDeMesa";
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { GestorReservasKanban } from "./GestorReservasKanban";
+import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
 import { cn } from "@/lib/utils";
 
 interface VistaHoyProps {
@@ -212,8 +217,35 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa }: VistaHoyProps) {
         onAsignarMesa={onAsignarMesa}
       />
 
+      <CuartosDeHoy fecha={hoy} />
+
       <GestorReservasKanban />
     </div>
+  );
+}
+
+/**
+ * Rejilla interna por cuartos de hora del día (reservas-sin-salas,
+ * 2026-09-29), PLEGADA: el kanban sigue siendo el protagonista de Hoy. Un
+ * bloque por negocio, cada uno con su aforo. Mientras está plegada no se
+ * monta nada (Radix desmonta el contenido), así que no cuesta consultas.
+ */
+function CuartosDeHoy({ fecha }: { fecha: string }) {
+  return (
+    <Collapsible className="rounded-xl border bg-card/50 px-3 py-2">
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-md py-1 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Disponibilidad por cuartos de hora
+        </span>
+        <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4 pt-2">
+        {NEGOCIOS_PANEL.map((n) => (
+          <DisponibilidadCuartos key={n.marca} fecha={fecha} marca={n.marca} compacto />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
