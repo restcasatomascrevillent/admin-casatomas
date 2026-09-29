@@ -59,10 +59,46 @@ export const DOCUMENTO_JSON_SCHEMA = {
     type: "object",
     additionalProperties: false,
     required: [
+      "total_literal", "subtotal_literal", "iva_literal",
       "tipo", "proveedor", "cif", "numero_documento", "fecha", "sin_importes",
-      "productos", "subtotal", "iva", "total", "observaciones", "resumen",
+      "continua_en_otra_pagina", "filas_tabla", "productos",
+      "subtotal", "iva", "total", "observaciones", "resumen",
     ],
     properties: {
+      // ── LAS CITAS VAN LAS PRIMERAS, Y ESO NO ES COSMETICA ──
+      //  El modelo escribe los campos en el orden de este objeto. Con el
+      //  literal del total al final, cuando llega a el ya ha escrito la base
+      //  y la cuota de IVA: la suma esta en su contexto y la copia como si
+      //  la hubiera leido (factura 40295280 de Osborne, con la fila del TOTAL
+      //  cortada fuera del encuadre). Poniendolo el PRIMERO, para escribir
+      //  algo aqui tiene que ir a buscarlo a la imagen: todavia no hay ningun
+      //  numero que sumar.
+      total_literal: {
+        type: ["string", "null"],
+        description:
+          "ESTO ES LO PRIMERO QUE ESCRIBES, y se contesta MIRANDO EL PIE DE LA IMAGEN, antes de extraer " +
+          "nada mas. Baja hasta el borde inferior de la foto y busca la fila del TOTAL A PAGAR (TOTAL, " +
+          "TOTAL FACTURA, TOTAL ALBARAN, IMPORTE A PAGAR). Si esa fila esta ahi, copia sus caracteres " +
+          "tal cual ('3.010,61EUR', '376,31'). Si NO esta —porque la foto corta el documento por abajo, " +
+          "porque la tapa una sombra o un dedo, o porque el papel simplemente no lleva total— escribe " +
+          "null. Muchos documentos acaban en la fila de la BASE IMPONIBLE y la CUOTA DE IVA sin que el " +
+          "TOTAL llegue a verse: en ese caso esto es null, y no vale poner la suma de los dos.",
+      },
+      subtotal_literal: {
+        type: ["string", "null"],
+        description:
+          "LA CITA de la base imponible: copia los caracteres tal como estan impresos en la imagen, con " +
+          "su coma, sus puntos y su moneda si la lleva ('2.488,11', '342,10 EUR'). Si no ves ese importe " +
+          "impreso, va null. NO transcribas aqui un numero que hayas calculado.",
+      },
+      iva_literal: {
+        type: ["string", "null"],
+        description:
+          "LA CITA de la cuota de IVA EN EUROS: copia los caracteres impresos ('34,21 EUR', '522,50'). " +
+          "NO el porcentaje: '10,00 %' no es una cita valida de la cuota. Si el documento solo imprime el " +
+          "porcentaje y en ninguna parte el importe en euros, va null. Si hay varias cuotas impresas, " +
+          "copialas todas separadas por ' + ' ('12,30 + 45,10').",
+      },
       tipo: {
         type: "string",
         enum: ["factura", "albaran"],
@@ -91,15 +127,46 @@ export const DOCUMENTO_JSON_SCHEMA = {
         description:
           "true si el documento NO LLEVA NINGUN PRECIO EN EUROS. Es el caso normal de muchos albaranes de entrega: solo traen cantidades y pesos. Si es true, todos los precio_unitario, total, subtotal, iva y total del documento deben ser null. NUNCA calcules un precio dividiendo ni multiplicando: si no esta impreso, no existe.",
       },
+      continua_en_otra_pagina: {
+        type: "boolean",
+        description:
+          "true si el documento tiene mas contenido del que se ve: lo dice el propio papel ('Pag. 1 de 2', " +
+          "'Hoja 1/2', 'continua', 'sigue'), o la tabla de conceptos llega al borde de la imagen sin " +
+          "cerrarse, o falta el pie de totales que la plantilla deberia traer. false si se ve el " +
+          "documento entero de principio a fin.",
+      },
+      filas_tabla: {
+        type: ["integer", "null"],
+        description:
+          "Cuantas FILAS DE CONCEPTO hay impresas en la tabla: cuentalas UNA A UNA sobre la imagen antes " +
+          "de extraerlas, incluidas las repetidas, las bonificadas y las de importe 0. Es un recuento de " +
+          "lo que se ve en el PAPEL, no de lo que vas a escribir en 'productos': si el papel trae 54 " +
+          "filas, aqui va 54 aunque te parezcan muchas. null solo si la tabla se corta y no puedes " +
+          "contarlas con seguridad — y ojo, poner null aqui NO te exime de extraer las filas: extrae " +
+          "TODAS las que consigas leer. Una lista incompleta con su aviso sirve; una lista vacia no " +
+          "sirve para nada.",
+      },
       productos: {
         type: "array",
-        description: "Una entrada por LINEA de la tabla de conceptos, en el orden del documento.",
+        description:
+          "Una entrada por CADA FILA IMPRESA de la tabla de conceptos, en el orden del documento, " +
+          "incluidas las filas repetidas y las de importe 0. Si el mismo producto aparece en varias " +
+          "filas, emite UNA ENTRADA POR CADA FILA: no las agrupes, no sumes sus cantidades y no " +
+          "descartes ninguna por parecer duplicada. Una factura mensual que junta varios albaranes " +
+          "repite los mismos productos muchas veces, con importes distintos, y todas esas filas cuentan. " +
+          "Si la imagen es mala, extrae LO QUE CONSIGAS LEER: una lista incompleta es util y queda " +
+          "avisada; una lista vacia no vale para nada y tambien queda avisada.",
         items: {
           type: "object",
           additionalProperties: false,
           required: ["nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "bonificada"],
           properties: {
-            nombre: { type: "string", description: "Descripcion del producto, sin codigos internos ni lote." },
+            nombre: {
+              type: "string",
+              description:
+                "Descripcion del producto, sin codigos internos ni lote. PUEDE REPETIRSE: dos filas " +
+                "con el mismo nombre son dos lineas distintas del documento, no la misma linea.",
+            },
             cantidad: {
               type: "number",
               description: "Cuantas unidades de venta se entregan (piezas, cajas, botellas). Si la linea se factura al peso, aqui van los kilos y puede llevar decimales.",
@@ -117,16 +184,24 @@ export const DOCUMENTO_JSON_SCHEMA = {
               type: "string",
               enum: ["por_unidad", "por_kg", "por_litro", "desconocida"],
               description:
-                "A que se refiere precio_unitario. Es lo que evita confundir un precio POR KILO con el precio de una PIEZA: si la columna dice EUR/kg, es 'por_kg'. Debe cumplirse cantidad x precio_unitario = total.",
+                "A que se refiere precio_unitario. Es lo que evita confundir un precio POR KILO con el " +
+                "precio de una PIEZA: si la columna dice EUR/kg, es 'por_kg'. Describe la columna que trae " +
+                "el documento; no ajustes ningun numero para que la multiplicacion cuadre.",
             },
             precio_unitario: {
               type: ["number", "null"],
               description:
-                "Precio de UNA unidad de las indicadas en 'base_precio', NO el total de la linea. null si el documento no lo muestra.",
+                "Precio de UNA unidad de las indicadas en 'base_precio' TAL COMO ESTA IMPRESO, NO el total " +
+                "de la linea. null si el documento no lo imprime: no lo calcules dividiendo el total entre " +
+                "la cantidad.",
             },
             total: {
               type: ["number", "null"],
-              description: "Importe total de esta linea, ya con su descuento aplicado. null si no se muestra.",
+              description:
+                "Importe total de esta linea TAL COMO ESTA IMPRESO, ya con su descuento aplicado. COPIALO " +
+                "del papel: no lo recalcules como cantidad x precio_unitario, ni siquiera si la " +
+                "multiplicacion no cuadra — muchos proveedores imprimen el precio unitario redondeado y " +
+                "el importe impreso es el bueno. null si el documento no lo muestra.",
             },
             bonificada: {
               type: "boolean",
@@ -138,15 +213,24 @@ export const DOCUMENTO_JSON_SCHEMA = {
       },
       subtotal: {
         type: ["number", "null"],
-        description: "Base imponible, antes de IVA. null si el documento no la declara (habitual en albaranes).",
+        description:
+          "El mismo importe de 'subtotal_literal', ya en numero (punto decimal, sin separador de miles). " +
+          "Si 'subtotal_literal' es null, esto tambien es null: no la calcules sumando las lineas.",
       },
       iva: {
         type: ["number", "null"],
-        description: "Importe TOTAL de IVA en euros, no el porcentaje. Si ves '10%', pon el importe que corresponde, no 10.",
+        description:
+          "El importe de IVA en euros que corresponde a 'iva_literal', en numero. Si hay varias cuotas " +
+          "impresas, la suma de las que has citado. Si 'iva_literal' es null, esto tambien es null: no lo " +
+          "calcules aplicando el porcentaje a la base.",
       },
       total: {
         type: ["number", "null"],
-        description: "Total a pagar, IVA incluido. Debe cumplirse subtotal + iva = total.",
+        description:
+          "El mismo importe de 'total_literal', ya en numero. Si 'total_literal' es null, esto es null " +
+          "OBLIGATORIAMENTE: NO lo calcules como subtotal + iva ni sumando las lineas. Que falte el total " +
+          "es un dato correcto y se completa despues dejando constancia; un total calculado se guarda " +
+          "como si lo hubieras leido y ya nadie lo cuestiona.",
       },
       observaciones: {
         type: ["string", "null"],
@@ -184,9 +268,26 @@ export interface DocumentoExtraido {
   fecha: string | null;
   /** El documento no lleva ningun importe en euros (albaran de entrega). */
   sin_importes: boolean;
+  // Los tres que siguen son OBSERVACIONES SOBRE LA IMAGEN, no datos del
+  // documento: sirven para saber si la lectura esta completa. Son opcionales
+  // en el tipo a proposito — el esquema estricto obliga al modelo a mandarlos,
+  // pero el codigo tiene que seguir funcionando con una respuesta que no los
+  // traiga (esquema desactivado, modelo distinto, payload antiguo de un test).
+  /** El documento tiene mas contenido del que se ve (varias paginas, tabla cortada). */
+  continua_en_otra_pagina?: boolean;
+  /** Filas de concepto CONTADAS SOBRE EL PAPEL. Es la referencia contra la que
+   *  se compara `productos.length` para detectar lineas colapsadas. */
+  filas_tabla?: number | null;
   productos: LineaExtraida[];
+  // Cada importe del pie viaja con su CITA: los caracteres tal como estan
+  // impresos. Un numero sin cita no se ha leido, se ha calculado. Opcionales
+  // en el tipo por lo mismo que los de arriba: el codigo tiene que seguir
+  // funcionando con una respuesta que no los traiga.
+  subtotal_literal?: string | null;
   subtotal: number | null;
+  iva_literal?: string | null;
   iva: number | null;
+  total_literal?: string | null;
   total: number | null;
   observaciones: string | null;
   resumen: string | null;
@@ -272,6 +373,21 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
 
   if (typeof d.sin_importes !== "boolean") {
     push("sin_importes", `debe ser true o false, llego ${JSON.stringify(d.sin_importes)}`);
+  }
+
+  // Las tres observaciones sobre la imagen. Se validan SI VIENEN: el esquema
+  // estricto las exige, pero esta funcion es la red de debajo y tiene que
+  // tragar una respuesta sin ellas en vez de tirar el documento entero.
+  if (d.continua_en_otra_pagina !== undefined && typeof d.continua_en_otra_pagina !== "boolean") {
+    push("continua_en_otra_pagina", `debe ser true o false, llego ${JSON.stringify(d.continua_en_otra_pagina)}`);
+  }
+  for (const campo of ["subtotal_literal", "iva_literal", "total_literal"] as const) {
+    if (d[campo] !== undefined && !esStringONull(d[campo])) {
+      push(campo, `debe ser texto o null, llego ${JSON.stringify(d[campo])}`);
+    }
+  }
+  if (d.filas_tabla !== undefined && !esNumeroONull(d.filas_tabla)) {
+    push("filas_tabla", `debe ser un numero o null, llego ${JSON.stringify(d.filas_tabla)}`);
   }
 
   // Un documento declarado SIN IMPORTES no puede traer importes. Si los trae,
@@ -365,8 +481,41 @@ export interface Descuadre {
 const RATIO_LINEA_MAX = 1.02;   // total/(precio x cantidad) por encima => descuadre
 const RATIO_LINEA_MIN = 0.40;   // por debajo => descuadre (un dto del 15% es normal)
 const ABS_LINEA_MIN = 0.05;     // por debajo de 5 centimos de diferencia, da igual
-const TOL_CABECERA_REL = 0.02;  // 2% ...
-const TOL_CABECERA_ABS = 1.00;  // ... con suelo de 1 EUR
+// Tolerancia de `suma de lineas = subtotal`. El 2 % relativo que habia aqui
+// fallaba justo donde mas duele: el 2 % de 2.488,11 EUR son 49,76 EUR, asi que
+// en el albaran AL2025/0009781 de Campoluz se colo una botella entera de BRUGAL
+// (2 x 34,05 leidas como 1 x 34,05) sin un solo aviso. Una tolerancia
+// puramente relativa crece con el documento, y los documentos grandes son
+// precisamente los que mas caro salen.
+//
+// LOS NUMEROS DE ABAJO ESTAN MEDIDOS sobre los 19 documentos reales de la base,
+// comparando la suma de lineas del GROUND TRUTH humano (lectura perfecta)
+// contra el subtotal impreso:
+//
+//   · 17 de 19 cuadran EXACTO: diferencia 0,00 EUR.
+//   · Campoluz AL2025/0009781: 6,00 EUR de diferencia legitima (2.482,11 de
+//     lineas frente a 2.488,11 de base imponible). No es un error de lectura:
+//     es el canon de PUNTO VERDE, que entra en la base imponible pero no es
+//     una fila de la tabla de productos. 0,241 % de la base.
+//   · Campoluz AL2025/0009780: 0,72 EUR por lo mismo. 0,274 % de la base.
+//
+// Asi que hay que absorber un canon del orden del 0,25 % y cazar el agujero de
+// 37,68 EUR de la botella. De ahi los tres numeros:
+//
+//   REL 0,5 %  -> el doble del canon medido. En Campoluz da 12,44 EUR:
+//                 tolera los 6,00 legitimos y caza los 37,68 de la botella.
+//   ABS 2 EUR  -> suelo, para que en documentos pequenos el canon (0,72 EUR en
+//                 el 0009780) no dispare un aviso falso.
+//   MAX 15 EUR -> TECHO, y es la pieza que faltaba. A partir de 3.000 EUR de
+//                 base el porcentaje deja de crecer. En la factura mas grande
+//                 del lote (12.513,50 EUR) la tolerancia pasa de 49,76 EUR
+//                 (con el 2 % antiguo) a 15,00 EUR fijos.
+//
+// Con estos tres valores NINGUNO de los 19 documentos da aviso falso y el
+// agujero de Campoluz salta.
+const TOL_CABECERA_REL = 0.005;  // 0,5 % ...
+const TOL_CABECERA_ABS = 2.00;   // ... con suelo de 2 EUR ...
+const TOL_CABECERA_MAX = 15.00;  // ... y TECHO de 15 EUR, para que no crezca
 const PRECIO_UNITARIO_EXTREMO = 1000;
 const TOTAL_DOCUMENTO_EXTREMO = 25000;
 
@@ -384,7 +533,30 @@ const TOTAL_DOCUMENTO_EXTREMO = 25000;
 const TOL_IVA_ABS = 0.05;
 const TOL_IVA_POR_LINEA = 0.01;
 
+/** Tolerancia de `suma de lineas = subtotal`: relativa con SUELO y TECHO.
+ *  El techo es lo que la diferencia de la de antes: una tolerancia relativa
+ *  pura convierte cada documento grande en un sitio donde caben botellas. */
+export function toleranciaCabecera(referencia: number): number {
+  return Math.min(
+    TOL_CABECERA_MAX,
+    Math.max(TOL_CABECERA_ABS, Math.abs(referencia) * TOL_CABECERA_REL),
+  );
+}
+
 const eur = (n: number) => `${n.toFixed(2)} EUR`;
+
+/** Redondeo a centimos. `208.32 + 105 + 123.6` da 436.92000000000004 en coma
+ *  flotante, y eso llegaria tal cual a una columna NUMERIC(10,2). */
+const redondear2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Fila de `facturas.alertas_validacion`: mismo formato que devuelve
+ *  `validar_cordura_factura` en SQL. */
+export interface AlertaValidacion {
+  codigo: string;
+  severidad: Severidad;
+  mensaje: string;
+  detalle: Record<string, unknown>;
+}
 
 /**
  * Comprueba que los numeros del documento cuadran entre si, ANTES de guardar.
@@ -411,6 +583,75 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
         "confirmala contra el original antes de darla por buena.",
       detalle: { numero_documento: datos.numero_documento },
     });
+  }
+
+  // ── LECTURA COMPLETA ──
+  //
+  //  El fallo mas caro que se ha medido en este sistema no es un digito mal
+  //  leido: es el modelo COLAPSANDO las filas repetidas. La factura mensual
+  //  ML/101511 de Luga Sabores junta 6 albaranes, tiene 54 filas impresas y el
+  //  modelo devolvia 11 — exactamente el numero de productos DISTINTOS, con
+  //  cero nombres repetidos en la salida. Aritmeticamente no se nota: las 11
+  //  lineas que devuelve cuadran entre si. Lo unico que lo delata es contar.
+  //
+  //  Por eso el modelo cuenta ahora las filas SOBRE EL PAPEL (`filas_tabla`),
+  //  antes de escribirlas, y aqui se compara ese recuento con lo que ha
+  //  emitido. Es la misma idea que el resto del fichero: el modelo lee,
+  //  nosotros comprobamos.
+  const nEmitidas = lineas.length;
+
+  //  Ni una sola linea. Pasa cuando la foto es mala y el modelo se rinde en
+  //  vez de extraer lo que se lee: una lista vacia con un aviso no vale menos
+  //  que una lista vacia sin el, pero la factura sin lineas no sirve para
+  //  nada y eso hay que decirlo alto.
+  if (nEmitidas === 0) {
+    out.push({
+      codigo: "sin_lineas",
+      severidad: "alta",
+      mensaje:
+        `No se ha extraido ninguna linea de concepto. Un documento comercial sin lineas no es utilizable: ` +
+        `o la imagen no permite leer la tabla, o la lectura se ha rendido. Vuelve a subir el documento ` +
+        `con mejor resolucion, o en dos fotos si son dos paginas.`,
+      detalle: {
+        filas_tabla: datos.filas_tabla ?? null,
+        continua_en_otra_pagina: datos.continua_en_otra_pagina ?? null,
+      },
+    });
+  }
+
+  //  El recuento no se ha podido hacer: se pierde la unica senal que detecta
+  //  las filas colapsadas, asi que la lectura queda sin red.
+  if (datos.filas_tabla === null && nEmitidas > 0) {
+    out.push({
+      codigo: "recuento_filas_ausente",
+      severidad: "media",
+      mensaje:
+        `No se han podido contar las filas impresas de la tabla, asi que no hay forma de saber si las ` +
+        `${nEmitidas} lineas extraidas son todas las del documento. Contrastalo con el papel, sobre todo ` +
+        `si es una factura mensual que agrupa varios albaranes.`,
+      detalle: { lineas_extraidas: nEmitidas },
+    });
+  }
+
+  if (esNumeroFinito(datos.filas_tabla) && datos.filas_tabla > 0 && nEmitidas > 0) {
+    const impresas = Math.round(datos.filas_tabla);
+    if (impresas !== nEmitidas) {
+      const faltan = impresas - nEmitidas;
+      out.push({
+        codigo: "lineas_incompletas",
+        severidad: faltan > 0 ? "alta" : "media",
+        mensaje: faltan > 0
+          ? `El documento tiene ${impresas} filas de concepto impresas, pero solo se han extraido ` +
+            `${nEmitidas}: faltan ${faltan}. Cuando un mismo producto aparece en varias filas (una ` +
+            `factura mensual que agrupa albaranes), hay que emitir una linea por CADA fila impresa.`
+          : `Se han extraido ${nEmitidas} lineas pero el documento solo tiene ${impresas} filas ` +
+            `impresas: hay ${-faltan} de mas (una fila partida en dos, o una cabecera leida como linea).`,
+        detalle: {
+          filas_impresas: impresas, lineas_extraidas: nEmitidas, diferencia: faltan,
+          continua_en_otra_pagina: datos.continua_en_otra_pagina ?? null,
+        },
+      });
+    }
   }
 
   // Un albaran de entrega sin precios es CORRECTO, no un documento a medias:
@@ -454,7 +695,7 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
     : (esNumeroFinito(datos.total) ? datos.total : null);
   if (totalesLinea.length > 0 && referencia !== null && referencia !== 0) {
     const suma = totalesLinea.reduce((a, b) => a + b, 0);
-    const tol = Math.max(TOL_CABECERA_ABS, Math.abs(referencia) * TOL_CABECERA_REL);
+    const tol = toleranciaCabecera(referencia);
     if (Math.abs(suma - referencia) > tol) {
       out.push({
         codigo: "descuadre_cabecera",
@@ -618,6 +859,92 @@ export function contarCambiosNumericos(
  *  total de su linea y el subtotal. */
 export const MAX_CAMBIOS_RELECTURA = 3;
 
+/** Resultado de comparar dos lecturas cuando la segunda trae MAS lineas. */
+export interface Expansion {
+  /** La segunda lectura solo ANADE: conserva todos los importes de linea de la
+   *  primera, no toca los importes del pie, y trae mas filas. */
+  esExpansion: boolean;
+  lineasAntes: number;
+  lineasDespues: number;
+  /** Importes de linea de la primera lectura que ya no aparecen en la segunda. */
+  importesPerdidos: number;
+  /** Campos del pie (subtotal/iva/total) que han cambiado de valor. */
+  cambiosCabecera: string[];
+}
+
+/**
+ * Distingue ANADIR LINEAS QUE FALTABAN de REESCRIBIR EL DOCUMENTO.
+ *
+ * `contarCambiosNumericos` + `MAX_CAMBIOS_RELECTURA` existen para que el modelo
+ * no altere valores ya leidos y fuerce el cuadre. Pero cuentan cualquier
+ * cambio, incluido el desplazamiento de indices que produce insertar una fila:
+ * si la primera lectura colapso 54 filas en 11 y la segunda las devuelve
+ * completas, eso son decenas de "cambios" y la relectura BUENA se descartaba.
+ *
+ * Una expansion es otra cosa, y se reconoce sin ambiguedad: todos los importes
+ * de linea de la primera lectura siguen ahi (en el multiset, no por posicion),
+ * ninguno de los tres importes del pie ha cambiado, y hay mas lineas que
+ * antes. No se ha corregido nada: se ha completado. Eso se acepta.
+ */
+export function compararExpansion(
+  antes: DocumentoExtraido,
+  despues: DocumentoExtraido,
+): Expansion {
+  const clave = (l: LineaExtraida) => (esNumeroFinito(l.total) ? l.total.toFixed(2) : "sin_importe");
+  const bolsa = new Map<string, number>();
+  for (const l of despues.productos ?? []) {
+    const k = clave(l);
+    bolsa.set(k, (bolsa.get(k) ?? 0) + 1);
+  }
+  let importesPerdidos = 0;
+  for (const l of antes.productos ?? []) {
+    const k = clave(l);
+    const n = bolsa.get(k) ?? 0;
+    if (n > 0) bolsa.set(k, n - 1);
+    else importesPerdidos++;
+  }
+
+  const cambiosCabecera: string[] = [];
+  for (const c of ["subtotal", "iva", "total"] as const) {
+    const a = esNumeroFinito(antes[c]) ? antes[c] : null;
+    const b = esNumeroFinito(despues[c]) ? despues[c] : null;
+    if (a === null && b === null) continue;
+    if (a === null || b === null || Math.abs(a - b) > 0.005) cambiosCabecera.push(c);
+  }
+
+  const lineasAntes = antes.productos?.length ?? 0;
+  const lineasDespues = despues.productos?.length ?? 0;
+  return {
+    esExpansion: lineasDespues > lineasAntes && importesPerdidos === 0 && cambiosCabecera.length === 0,
+    lineasAntes,
+    lineasDespues,
+    importesPerdidos,
+    cambiosCabecera,
+  };
+}
+
+/**
+ * `filas_tabla` es el recuento de filas que el modelo hace SOBRE EL PAPEL, y
+ * es lo unico que delata que ha colapsado lineas repetidas. Eso lo convierte
+ * en un objetivo: bajar el recuento hasta el numero de lineas que ha escrito
+ * hace callar el aviso sin extraer ni una fila mas.
+ *
+ * Asi que el recuento NO PUEDE BAJAR entre lecturas del mismo documento: se
+ * queda el mas alto de los dos. Subirlo si: eso significa que al mirar otra
+ * vez ha visto filas que antes no habia contado, y entonces el aviso tiene que
+ * seguir saltando.
+ */
+export function conservarRecuentoFilas(
+  primera: DocumentoExtraido,
+  elegida: DocumentoExtraido,
+): DocumentoExtraido {
+  const a = esNumeroFinito(primera.filas_tabla) ? primera.filas_tabla : null;
+  const b = esNumeroFinito(elegida.filas_tabla) ? elegida.filas_tabla : null;
+  if (a === null) return elegida;
+  if (b !== null && b >= a) return elegida;
+  return { ...elegida, filas_tabla: a };
+}
+
 /** Descuadres -> filas para `facturas.alertas_validacion`, mismo formato que
  *  devuelve `validar_cordura_factura` en SQL para que la UI y el chatbot no
  *  tengan que distinguir de donde vino cada alerta. */
@@ -629,6 +956,300 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
     detalle: { ...d.detalle, origen },
   }));
 }
+
+
+// ─── 3b. La cita: un importe del pie que no se puede citar, no se ha leido ──
+//
+//  EL CASO QUE LO MOTIVA. Factura 40295280 de Osborne (foto de la pantalla de
+//  un PDF, cortada por abajo). El papel imprime BASE I.V.A. 342,10 y cuota
+//  34,21; la fila del TOTAL queda por debajo del borde de la imagen. El
+//  sistema guardaba total = 376,31 (= 342,10 + 34,21) marcado como LEIDO y sin
+//  una sola alerta. Determinista: 5 de 5 ejecuciones.
+//
+//  QUE NO FUNCIONO, Y POR QUE
+//  --------------------------
+//  Primero se intento por instruccion: quitar del esquema la frase "debe
+//  cumplirse subtotal + iva = total" y escribir en el prompt, con todas las
+//  letras, que un total cortado va a null. El modelo siguio devolviendo
+//  376,31. Tampoco basto preguntarle si veia el bloque de totales: contesto
+//  que SI, y tenia razon — la fila de la BASE se ve, la del TOTAL no. La
+//  pregunta era demasiado gruesa para el recorte real.
+//
+//  LO QUE SI SE PUEDE COMPROBAR
+//  ----------------------------
+//  Un modelo puede rellenar un hueco numerico sin darse cuenta de que lo esta
+//  calculando. Lo que no puede es CITAR unos caracteres que no estan en la
+//  imagen y que ademas encajen con el numero que ha puesto. Asi que cada
+//  importe del pie viaja con su literal —los caracteres tal como estan
+//  impresos— y aqui se comprueban dos cosas que NO requieren ver la imagen:
+//
+//    1. Hay numero pero no hay cita  -> el numero no salio del papel. Se
+//       RETIRA (se pone a null) y se deja constancia.
+//    2. Hay numero y hay cita, pero al leer la cita sale otro numero -> uno de
+//       los dos esta mal. No se retira nada (la cita puede traer texto que
+//       este parser no entienda), pero se avisa.
+//
+//  Retirar no es perder el dato: despues corre `deducirImportes`, que con la
+//  base y el IVA impresos vuelve a poner 376,31 — pero marcado `deducido` y
+//  con su aviso. La diferencia entre las dos cosas es justo la que el dueno
+//  tiene que poder ver.
+
+/** Lee un importe escrito como lo imprime un documento espanol (o anglosajon).
+ *  Devuelve null si no hay nada reconocible. Deliberadamente tolerante: su
+ *  trabajo es confirmar una cita, no rechazarla por llevar "EUR" detras. */
+export function leerImporteLiteral(texto: string): number | null {
+  // Varias cuotas de IVA citadas como "12,30 + 45,10": se suman.
+  if (texto.includes("+")) {
+    const partes = texto.split("+").map((t) => leerImporteLiteral(t));
+    if (partes.some((p) => p === null)) return null;
+    return redondear2((partes as number[]).reduce((a, b) => a + b, 0));
+  }
+  const limpio = texto.replace(/[^0-9.,-]/g, "");
+  if (!/[0-9]/.test(limpio)) return null;
+  const ultimaComa = limpio.lastIndexOf(",");
+  const ultimoPunto = limpio.lastIndexOf(".");
+  let normal: string;
+  if (ultimaComa === -1 && ultimoPunto === -1) {
+    normal = limpio;
+  } else if (ultimaComa > ultimoPunto) {
+    // La coma esta mas a la derecha: es el decimal (formato espanol).
+    normal = limpio.replace(/\./g, "").replace(",", ".");
+  } else {
+    normal = limpio.replace(/,/g, "");
+  }
+  const n = Number(normal);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Diferencia maxima entre el numero y su cita antes de avisar. Un centimo. */
+const TOL_LITERAL = 0.011;
+
+export interface Retirada {
+  campo: "subtotal" | "iva" | "total";
+  valor: number;
+  alerta: AlertaValidacion;
+}
+
+/**
+ * Comprueba las citas de subtotal, iva y total, y RETIRA los importes que el
+ * modelo no ha podido citar.
+ *
+ * Devuelve siempre un documento nuevo. Si el modelo no manda los literales
+ * (esquema desactivado, modelo distinto, payload antiguo) no retira nada: la
+ * ausencia de la cita solo cuenta como prueba cuando el campo viene, y por eso
+ * se distingue `undefined` de `null`.
+ */
+export function retirarImportesNoImpresos(
+  datos: DocumentoExtraido,
+  verificacion?: VerificacionPie | null,
+): {
+  datos: DocumentoExtraido;
+  retiradas: Retirada[];
+  discordancias: AlertaValidacion[];
+} {
+  const retiradas: Retirada[] = [];
+  const discordancias: AlertaValidacion[] = [];
+  const salida: DocumentoExtraido = { ...datos };
+  const literales = {
+    subtotal: datos.subtotal_literal,
+    iva: datos.iva_literal,
+    total: datos.total_literal,
+  } as const;
+  const nombre = {
+    subtotal: "la base imponible",
+    iva: "la cuota de IVA",
+    total: "el total a pagar",
+  } as const;
+
+  for (const campo of ["subtotal", "iva", "total"] as const) {
+    const valor = datos[campo];
+    const lit = literales[campo];
+    if (lit === undefined) continue;           // el modelo no manda citas
+    if (!esNumeroFinito(valor)) continue;      // no hay nada que comprobar
+
+    if (lit === null || lit.trim() === "") {
+      salida[campo] = null;
+      retiradas.push({
+        campo,
+        valor,
+        alerta: {
+          codigo: "importe_no_impreso",
+          severidad: "alta",
+          mensaje:
+            `Se ha retirado ${nombre[campo]} (${eur(valor)}): la extraccion trae el numero pero NO puede ` +
+            `citar los caracteres impresos en la imagen, asi que no se ha leido del papel — se ha ` +
+            `calculado. El campo se guarda vacio; si es deducible a partir de importes que SI estan ` +
+            `impresos, se rellenara aparte y quedara marcado como deducido.`,
+          detalle: { campo, valor_retirado: valor, literal: lit, origen: "cita" },
+        },
+      });
+      continue;
+    }
+
+    const leido = leerImporteLiteral(lit);
+    if (leido !== null && Math.abs(leido - valor) > TOL_LITERAL) {
+      discordancias.push({
+        codigo: "importe_literal_discordante",
+        severidad: "media",
+        mensaje:
+          `En ${nombre[campo]} el numero (${eur(valor)}) no coincide con lo que dice su propia cita ` +
+          `("${lit}" = ${eur(leido)}). Uno de los dos esta mal leido: el sospechoso habitual es el punto ` +
+          `de miles confundido con la coma decimal.`,
+        detalle: { campo, valor, literal: lit, literal_leido: leido, origen: "cita" },
+      });
+    }
+  }
+
+  // ── La segunda mirada (ver bloque 3c) ──
+  if (verificacion && !datos.sin_importes) {
+    // (1) El verificador dice que la fila del total NO esta impresa. Manda el
+    //     verificador: es la unica de las dos lecturas que ha mirado esa fila
+    //     a proposito, sin un documento entero que completar alrededor.
+    if (verificacion.fila_total_impresa === false && esNumeroFinito(salida.total)) {
+      const valor = salida.total;
+      salida.total = null;
+      retiradas.push({
+        campo: "total",
+        valor,
+        alerta: {
+          codigo: "importe_no_impreso",
+          severidad: "alta",
+          mensaje:
+            `Se ha retirado el total a pagar (${eur(valor)}): una segunda lectura, hecha mirando SOLO el ` +
+            `pie del documento, dice que esa fila NO esta impresa en la imagen` +
+            (verificacion.ultimo_texto_visible
+              ? ` (lo ultimo que se ve es "${verificacion.ultimo_texto_visible}")`
+              : "") +
+            `. El numero no se ha leido del papel. Si es deducible a partir de importes que SI estan ` +
+            `impresos, se rellenara aparte y quedara marcado como deducido.`,
+          detalle: {
+            campo: "total",
+            valor_retirado: valor,
+            origen: "verificacion_pie",
+            ultimo_texto_visible: verificacion.ultimo_texto_visible ?? null,
+            motivo: verificacion.motivo ?? null,
+          },
+        },
+      });
+    }
+
+    // (2) Las dos lecturas citan el mismo importe y no dicen lo mismo. No se
+    //     retira nada: ninguna de las dos es autoridad sobre la otra, pero que
+    //     discrepen es exactamente lo que hay que mirar a mano.
+    const pares = [
+      ["total", verificacion.total_citado, "el total a pagar"],
+      ["subtotal", verificacion.base_imponible_citada, "la base imponible"],
+      ["iva", verificacion.cuota_iva_citada, "la cuota de IVA"],
+    ] as const;
+    for (const [campo, citado, nombreCampo] of pares) {
+      const valor = salida[campo];
+      if (!esNumeroFinito(valor) || !citado) continue;
+      const leido = leerImporteLiteral(citado);
+      if (leido === null || Math.abs(leido - valor) <= TOL_LITERAL) continue;
+      discordancias.push({
+        codigo: "importe_discordante_verificador",
+        severidad: "media",
+        mensaje:
+          `Dos lecturas independientes de la misma imagen no coinciden en ${nombreCampo}: la extraccion ` +
+          `dice ${eur(valor)} y la segunda lectura del pie cita "${citado}" (${eur(leido)}). Una de las ` +
+          `dos ha leido mal un digito o ha confundido el punto de miles con la coma decimal.`,
+        detalle: { campo, valor_extraccion: valor, citado, citado_leido: leido, origen: "verificacion_pie" },
+      });
+    }
+  }
+
+  return { datos: salida, retiradas, discordancias };
+}
+
+
+// ─── 3c. La segunda mirada: un verificador que SOLO mira el pie ─────────────
+//
+//  POR QUE HACE FALTA UNA SEGUNDA LLAMADA
+//  --------------------------------------
+//  Con la cita del total puesta la primera del esquema, la factura 40295280 de
+//  Osborne pasa de fabricar el total SIEMPRE a fabricarlo 1 de cada 3 veces.
+//  Mejor, pero 1 de cada 3 sigue siendo un numero inventado entrando en la
+//  contabilidad, y ninguna comprobacion aritmetica puede cazarlo: 376,31 es
+//  exactamente 342,10 + 34,21, igual que en cualquier factura correcta.
+//
+//  Lo que se midio es que la MISMA pregunta, hecha SOLA, se acierta siempre.
+//  Un modelo que esta extrayendo diecisiete campos de un documento entero
+//  completa el pie que le falta casi sin darse cuenta; un modelo al que solo
+//  se le pregunta "¿esta impresa la fila del TOTAL?" va a mirar los pixeles y
+//  contesta que no. Medido: 3 de 3 aciertos en el documento recortado (27) y
+//  4 de 4 en documentos completos (21 x2, 24, 30), con las citas correctas.
+//
+//  Cuesta unos 0,003 USD y unos diez segundos por documento. Es la comprobacion
+//  mas barata del sistema y es la unica que separa "lo he leido" de "me lo he
+//  encontrado sumando".
+//
+//  QUE PUEDE Y QUE NO PUEDE DECIDIR EL VERIFICADOR
+//  ----------------------------------------------
+//   · El TOTAL lo decide: trae un booleano explicito sobre esa fila, y si dice
+//     que no esta impresa, el total se retira. Lo que quede deducible se
+//     deducira despues, marcado como deducido, que es lo honesto.
+//   · La BASE y la CUOTA no las decide: solo las cita. Si su cita y el numero
+//     extraido no coinciden, se avisa, pero no se retira nada — son dos
+//     lecturas independientes y ninguna de las dos es autoridad sobre la otra.
+
+/** Respuesta del verificador de pie. Todos los campos pueden faltar: si la
+ *  llamada falla, el documento sigue su camino sin verificar. */
+export interface VerificacionPie {
+  ultimo_texto_visible?: string;
+  fila_total_impresa: boolean;
+  total_citado: string | null;
+  base_imponible_citada: string | null;
+  cuota_iva_citada: string | null;
+  motivo?: string;
+}
+
+/** Esquema estricto del verificador. Mismas reglas que el grande. */
+export const VERIFICACION_PIE_SCHEMA = {
+  name: "verificacion_pie",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "ultimo_texto_visible", "fila_total_impresa", "total_citado",
+      "base_imponible_citada", "cuota_iva_citada", "motivo",
+    ],
+    properties: {
+      ultimo_texto_visible: {
+        type: "string",
+        description:
+          "Copia literal del ULTIMO texto legible de la parte inferior de la imagen, sea el que sea: " +
+          "una fila de la tabla, un texto legal, la barra de un visor de PDF. Escribelo antes de " +
+          "contestar lo demas: obliga a mirar donde acaba de verdad la foto.",
+      },
+      fila_total_impresa: {
+        type: "boolean",
+        description:
+          "true SOLO si ves, CON SUS DIGITOS, la fila del total a pagar (TOTAL, TOTAL FACTURA, TOTAL " +
+          "ALBARAN, IMPORTE A PAGAR). false si la foto corta el documento antes de esa fila, si la tapa " +
+          "una sombra, un dedo o la barra de un visor, o si el documento no lleva total. Ver la base " +
+          "imponible y la cuota de IVA NO es ver el total: en los documentos recortados es justo lo que " +
+          "se ve, y el total va debajo, fuera del encuadre.",
+      },
+      total_citado: {
+        type: ["string", "null"],
+        description: "Los caracteres del total tal como estan impresos ('3.010,61EUR'). null si no esta impreso.",
+      },
+      base_imponible_citada: {
+        type: ["string", "null"],
+        description: "Los caracteres de la base imponible tal como estan impresos. null si no se ve.",
+      },
+      cuota_iva_citada: {
+        type: ["string", "null"],
+        description: "Los caracteres de la CUOTA de IVA en euros. null si solo se ve el porcentaje o no se ve nada.",
+      },
+      motivo: {
+        type: "string",
+        description: "Una frase diciendo que se ve y que no en el pie, y por que has contestado eso.",
+      },
+    },
+  },
+} as const;
 
 // ─── 4. Deduccion aritmetica de un total que el documento NO imprime ────────
 //
@@ -670,6 +1291,8 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
 //       total = suma de lineas. Unico supuesto: que el papel no tenga un
 //       bloque de IVA que no hemos llegado a ver. Por eso este caso ademas
 //       deja aviso en `alertas_validacion` pidiendo contrastar con el papel.
+//       Y ADEMAS exige que la lectura este COMPLETA (ver mas abajo, caso
+//       Luga): si faltan filas, esa suma no es la del documento.
 //    C. Cualquier otra combinacion -> NO SE DEDUCE NADA. Si el documento
 //       imprime PARTE del bloque de totales (solo la base, o solo el IVA) es
 //       que ese bloque existe y solo hemos leido un trozo de el; completarlo
@@ -685,6 +1308,28 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
 //        detectar nada. La redundancia aritmetica del documento es la unica
 //        senal que hay: no se gasta rellenando huecos.
 //
+//  POR QUE LA REGLA B EXIGE ADEMAS QUE LA LECTURA ESTE COMPLETA
+//  ------------------------------------------------------------
+//  La regla B suponia que el unico riesgo era un bloque de IVA no visto. Hay
+//  otro peor, y se midio en la factura ML/101511 de Luga Sabores: el modelo
+//  habia extraido 11 de las 54 filas impresas, asi que la "suma de lineas" era
+//  1.772,82 EUR cuando el documento vale 3.787,53. Se guardo ese 1.772,82
+//  marcado como `deducido`, con su aviso. Antes ese campo estaba a NULL.
+//
+//  Un numero con pinta de calculado y con el 47 % del valor real es PEOR que
+//  el hueco: el hueco se ve, y el 47 % entra en la contabilidad cuadrando lo
+//  suficiente para que nadie lo mire. La suma de lineas solo vale como total
+//  si las lineas son TODAS las del papel, y para saberlo hay tres senales que
+//  el modelo observa sobre la imagen:
+//
+//    · `filas_tabla` != `productos.length` -> faltan (o sobran) filas.
+//    · `continua_en_otra_pagina` -> hay documento que no se ha visto.
+//    · `filas_tabla` a null -> el propio modelo dice que no pudo contarlas.
+//
+//  Con cualquiera de las tres NO se deduce nada: el total se queda a null y se
+//  deja el aviso `total_no_deducible` diciendo por que. La deduccion A
+//  (`subtotal + iva`, los dos impresos) NO se toca: no depende de las lineas.
+//
 //  Un albaran SIN PRECIOS (el caso Joselito) sale por el primer `return`:
 //  `sin_importes` significa que en el papel no hay ni un euro, asi que no hay
 //  nada que sumar y el documento se queda —correctamente— SIN TOTAL.
@@ -694,30 +1339,20 @@ export function descuadresComoAlertas(descuadres: Descuadre[], origen: string) {
 export type OrigenImporte = "leido" | "deducido";
 
 /** Como se ha llegado al total deducido. Va en `detalle.metodo` del aviso. */
-export type MetodoDeduccion = "subtotal_mas_iva" | "suma_lineas";
-
-/** Fila de `facturas.alertas_validacion`: mismo formato que devuelve
- *  `validar_cordura_factura` en SQL. */
-export interface AlertaValidacion {
-  codigo: string;
-  severidad: Severidad;
-  mensaje: string;
-  detalle: Record<string, unknown>;
-}
+export type MetodoDeduccion = "subtotal_mas_iva" | "suma_lineas" | "no_deducible";
 
 export interface Deduccion {
   /** Hoy solo se deduce el total. `subtotal` e `iva` no son derivables. */
   campo: "total";
+  /** Con `metodo: "no_deducible"` este valor NO se escribe en ningun sitio: la
+   *  `Deduccion` viaja solo para llevar su `alerta`, y `datos.total` sigue a
+   *  null. Quien la consume tiene que mirar `metodo`, no `valor`. */
   valor: number;
   metodo: MetodoDeduccion;
   /** Aviso para `alertas_validacion`: que el total no se leyo tiene que
    *  verse tambien donde se miran los avisos, no solo en la columna. */
   alerta: AlertaValidacion;
 }
-
-/** Redondeo a centimos. `208.32 + 105 + 123.6` da 436.92000000000004 en coma
- *  flotante, y eso llegaria tal cual a una columna NUMERIC(10,2). */
-const redondear2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /**
  * Rellena `total` cuando el documento no lo imprime pero SI se puede calcular
@@ -731,7 +1366,11 @@ const redondear2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
  *  - nunca escribe en `subtotal` ni en `iva`;
  *  - nunca deduce sobre un documento `sin_importes` (albaran sin precios);
  *  - nunca deduce si alguna linea se quedo sin importe (la suma no seria la
- *    del documento, sino la de lo que se pudo leer).
+ *    del documento, sino la de lo que se pudo leer);
+ *  - nunca deduce por suma de lineas si hay indicios de que faltan filas
+ *    (`filas_tabla`, `continua_en_otra_pagina`): en ese caso devuelve una
+ *    `Deduccion` con `metodo: "no_deducible"`, que NO trae total y solo
+ *    sirve para llevar el aviso.
  */
 export function deducirImportes(datos: DocumentoExtraido): {
   datos: DocumentoExtraido;
@@ -782,6 +1421,51 @@ export function deducirImportes(datos: DocumentoExtraido): {
   // ── B) Lo unico que hay son lineas: su suma es lo unico deducible ──
   const lineas = datos.productos ?? [];
   if (lineas.length === 0) return sinDeducir;
+
+  //    ...pero SOLO si estan TODAS. Ver la explicacion de arriba (caso Luga):
+  //    sumar una lectura incompleta da un total con pinta de calculado y con
+  //    una fraccion del valor real, que es peor que no tener total.
+  const motivos: string[] = [];
+  if (datos.continua_en_otra_pagina === true) {
+    motivos.push("el documento continua en otra pagina o la tabla se corta en el borde de la imagen");
+  }
+  if (datos.filas_tabla === null) {
+    motivos.push("el modelo no ha podido contar las filas impresas de la tabla");
+  } else if (esNumeroFinito(datos.filas_tabla) && Math.round(datos.filas_tabla) !== lineas.length) {
+    motivos.push(
+      `el papel tiene ${Math.round(datos.filas_tabla)} filas impresas y se han extraido ${lineas.length}`,
+    );
+  }
+  if (motivos.length > 0) {
+    const parcial = redondear2(lineas.reduce((a, l) => a + ((l.total as number) ?? 0), 0));
+    return {
+      datos,
+      deduccion: {
+        campo: "total",
+        valor: 0,
+        metodo: "no_deducible",
+        alerta: {
+          codigo: "total_no_deducible",
+          severidad: "alta",
+          mensaje:
+            `El documento no declara ni base imponible, ni IVA, ni total, y la lectura de las lineas no ` +
+            `parece completa (${motivos.join("; ")}). NO se deduce ningun total: la suma de las ` +
+            `${lineas.length} linea(s) leidas seria ${eur(parcial)}, pero es la suma de lo que se pudo ` +
+            `leer, no la del documento. El total se queda vacio a proposito: un importe parcial con ` +
+            `pinta de calculado es peor que un hueco.`,
+          detalle: {
+            metodo: "no_deducible",
+            motivos,
+            num_lineas_extraidas: lineas.length,
+            filas_tabla: datos.filas_tabla ?? null,
+            continua_en_otra_pagina: datos.continua_en_otra_pagina ?? null,
+            suma_lineas_parcial: parcial,
+            origen: "deduccion",
+          },
+        },
+      },
+    };
+  }
   // TODAS las lineas tienen que traer importe. Si falta el de una, la suma no
   // es la del documento: es la de lo que se pudo leer, y pasarla por total
   // seria dar por completo un numero incompleto.

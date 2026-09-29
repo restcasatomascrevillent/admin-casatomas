@@ -1,16 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  compararExpansion,
   comprobarCuadre,
+  conservarRecuentoFilas,
   contarCambiosNumericos,
   deducirImportes,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
+  leerImporteLiteral,
   MAX_CAMBIOS_RELECTURA,
   mensajeCorrectivo,
+  retirarImportesNoImpresos,
+  toleranciaCabecera,
   validarEstructura,
+  VERIFICACION_PIE_SCHEMA,
   type DocumentoExtraido,
   type LineaExtraida,
+  type VerificacionPie,
 } from "./esquema.ts";
 
 // ============================================================================
@@ -874,5 +881,542 @@ describe("deducirImportes — no puede silenciar ninguna comprobacion", () => {
     const { deduccion } = deducirImportes(garre());
     expect(Object.keys(deduccion!.alerta).sort()).toEqual(["codigo", "detalle", "mensaje", "severidad"]);
     expect(["alta", "media"]).toContain(deduccion!.alerta.severidad);
+  });
+});
+
+
+// ============================================================================
+//  9. La tolerancia de cabecera, medida sobre los 19 documentos reales
+// ----------------------------------------------------------------------------
+//  Los numeros de estos tests NO son inventados. Salen de comparar la suma de
+//  lineas del GROUND TRUTH humano (una lectura perfecta, hecha a mano) contra
+//  el subtotal impreso, documento por documento:
+//
+//    · 17 de 19 cuadran EXACTO (diferencia 0,00 EUR).
+//    · Campoluz AL2025/0009781: 6,00 EUR de diferencia LEGITIMA (canon de
+//      punto verde, que esta en la base imponible pero no es una fila de la
+//      tabla). Base 2.488,11 -> 0,241 %.
+//    · Campoluz AL2025/0009780: 0,72 EUR por lo mismo. Base 262,78 -> 0,274 %.
+//
+//  Y el error que hay que cazar: en ese mismo 0009781 el sistema leyo una sola
+//  botella de BRUGAL 1888 donde el papel pone dos, y la suma de lineas quedo
+//  en 2.450,43 frente a 2.488,11 -> 37,68 EUR de agujero. Con el 2 % de antes
+//  la tolerancia era 49,76 EUR y no saltaba NADA.
+// ============================================================================
+
+describe("toleranciaCabecera — suelo, porcentaje y TECHO", () => {
+  it("tolera el canon de punto verde de Campoluz (6,00 EUR sobre 2.488,11)", () => {
+    expect(toleranciaCabecera(2488.11)).toBeGreaterThan(6.0);
+  });
+
+  it("caza la botella de BRUGAL que faltaba (37,68 EUR sobre 2.488,11)", () => {
+    expect(toleranciaCabecera(2488.11)).toBeLessThan(37.68);
+  });
+
+  it("el 2 % de antes SI dejaba pasar esa botella", () => {
+    // La prueba de que el cambio hacia falta, no de que el numero nuevo sea magico.
+    expect(2488.11 * 0.02).toBeGreaterThan(37.68);
+  });
+
+  it("tolera el canon del albaran pequeno (0,72 EUR sobre 262,78)", () => {
+    expect(toleranciaCabecera(262.78)).toBeGreaterThan(0.72);
+  });
+
+  it("el TECHO impide que la tolerancia crezca con el documento", () => {
+    // Es la pieza que faltaba: una tolerancia relativa pura convierte cada
+    // factura grande en un sitio donde caben botellas enteras.
+    expect(toleranciaCabecera(12513.5)).toBe(15);
+    expect(toleranciaCabecera(1e6)).toBe(15);
+    expect(12513.5 * 0.02).toBeGreaterThan(200); // lo que toleraba antes
+  });
+
+  it("nunca baja del suelo, ni en documentos de dos euros", () => {
+    expect(toleranciaCabecera(1)).toBe(2);
+    expect(toleranciaCabecera(0)).toBe(2);
+  });
+
+  it("es monotona: mas documento, nunca menos tolerancia", () => {
+    let previa = 0;
+    for (const ref of [0, 10, 100, 262.78, 1000, 2488.11, 5000, 12513.5, 1e6]) {
+      const t = toleranciaCabecera(ref);
+      expect(t).toBeGreaterThanOrEqual(previa);
+      previa = t;
+    }
+  });
+
+  it("sobre el documento real: 19 lineas que suman 2.450,43 frente a 2.488,11 -> descuadre", () => {
+    const campoluz = doc({
+      tipo: "albaran",
+      proveedor: "BODEGA CAMPOLUZ, S.L.",
+      numero_documento: "AL2025/0009781",
+      productos: [linea({ cantidad: 1, precio_unitario: 2450.43, total: 2450.43 })],
+      subtotal: 2488.11, iva: 522.5, total: 3010.61,
+    });
+    const d = comprobarCuadre(campoluz).find((x) => x.codigo === "descuadre_cabecera");
+    expect(d).toBeDefined();
+    expect(d!.detalle.tolerancia).toBeLessThan(37.68);
+  });
+
+  it("y con la lectura buena (2.482,11) NO hay descuadre", () => {
+    const campoluz = doc({
+      tipo: "albaran",
+      productos: [linea({ cantidad: 1, precio_unitario: 2482.11, total: 2482.11 })],
+      subtotal: 2488.11, iva: 522.5, total: 3010.61,
+    });
+    expect(codigos(campoluz)).not.toContain("descuadre_cabecera");
+  });
+});
+
+// ============================================================================
+//  10. Lectura incompleta: contar las filas es lo unico que delata el colapso
+// ----------------------------------------------------------------------------
+//  Factura ML/101511 de Luga Sabores: 54 filas impresas (una factura mensual
+//  que agrupa 6 albaranes, con NATOP, MAYONESA o ESPINAS repetidos tres y
+//  cuatro veces), y la extraccion devolvia 11 — exactamente el numero de
+//  productos DISTINTOS, con CERO nombres repetidos. Aritmeticamente no se
+//  nota: las 11 lineas cuadran entre si.
+// ============================================================================
+
+describe("comprobarCuadre — lectura incompleta", () => {
+  const luga = (over: Partial<DocumentoExtraido> = {}) => doc({
+    proveedor: "LUGA SABORES S.L.",
+    numero_documento: "ML/101511",
+    productos: [linea({ nombre: "NATOP", cantidad: 1, precio_unitario: 10, total: 10 })],
+    subtotal: null, iva: null, total: null,
+    filas_tabla: 54,
+    continua_en_otra_pagina: false,
+    ...over,
+  });
+
+  it("salta si el papel tiene 54 filas y se han extraido 11", () => {
+    const d = comprobarCuadre(luga({
+      productos: Array.from({ length: 11 }, () => linea({ total: 10, precio_unitario: 10, cantidad: 1 })),
+    })).find((x) => x.codigo === "lineas_incompletas");
+    expect(d).toBeDefined();
+    expect(d!.severidad).toBe("alta");
+    expect(d!.detalle.filas_impresas).toBe(54);
+    expect(d!.detalle.lineas_extraidas).toBe(11);
+    expect(d!.detalle.diferencia).toBe(43);
+  });
+
+  it("no salta cuando el recuento cuadra", () => {
+    expect(codigos(luga({
+      filas_tabla: 1,
+    }))).not.toContain("lineas_incompletas");
+  });
+
+  it("tambien salta si SOBRAN lineas (una fila partida en dos)", () => {
+    const d = comprobarCuadre(luga({
+      filas_tabla: 1,
+      productos: [linea({ total: 10 }), linea({ total: 10 })],
+      subtotal: 20,
+    })).find((x) => x.codigo === "lineas_incompletas");
+    expect(d).toBeDefined();
+    expect(d!.severidad).toBe("media"); // sobrar es menos grave que faltar
+  });
+
+  it("un albaran SIN PRECIOS tambien se cuenta: no llevar euros no es no llevar filas", () => {
+    const sinPrecios = doc({
+      sin_importes: true,
+      filas_tabla: 12,
+      productos: [linea({ precio_unitario: null, total: null })],
+      subtotal: null, iva: null, total: null,
+    });
+    expect(codigos(sinPrecios)).toContain("lineas_incompletas");
+  });
+
+  it("una tabla vacia salta siempre, aunque no haya recuento", () => {
+    const d = comprobarCuadre(luga({ productos: [], filas_tabla: null, subtotal: null }))
+      .find((x) => x.codigo === "sin_lineas");
+    expect(d).toBeDefined();
+    expect(d!.severidad).toBe("alta");
+  });
+
+  it("si el modelo no ha podido contar, se dice: la lectura se queda sin red", () => {
+    expect(codigos(luga({ filas_tabla: null }))).toContain("recuento_filas_ausente");
+  });
+
+  it("un documento sin el campo (respuesta antigua) no genera ruido", () => {
+    const antiguo = doc({ subtotal: 100, iva: 10, total: 110 });
+    delete (antiguo as Record<string, unknown>).filas_tabla;
+    const c = codigos(antiguo);
+    expect(c).not.toContain("lineas_incompletas");
+    expect(c).not.toContain("recuento_filas_ausente");
+  });
+});
+
+// ============================================================================
+//  11. La cita: un importe que no se puede citar no se ha leido
+// ----------------------------------------------------------------------------
+//  Factura 40295280 de Osborne, foto cortada por abajo: el papel imprime BASE
+//  342,10 y cuota 34,21, y la fila del TOTAL queda fuera del encuadre. Se
+//  guardaba total = 376,31 marcado como LEIDO y sin una sola alerta.
+// ============================================================================
+
+describe("leerImporteLiteral — leer la cita sin volverse loco con el formato", () => {
+  it("formato espanol", () => {
+    expect(leerImporteLiteral("2.488,11")).toBe(2488.11);
+    expect(leerImporteLiteral("342,10 EUR")).toBe(342.1);
+    expect(leerImporteLiteral("3.010,61EUR")).toBe(3010.61);
+  });
+  it("formato anglosajon", () => {
+    expect(leerImporteLiteral("1,130.47")).toBe(1130.47);
+  });
+  it("varias cuotas de IVA citadas juntas se suman", () => {
+    expect(leerImporteLiteral("12,30 + 45,10")).toBe(57.4);
+  });
+  it("lo que no es un importe devuelve null", () => {
+    expect(leerImporteLiteral("")).toBeNull();
+    expect(leerImporteLiteral("TOTAL")).toBeNull();
+  });
+});
+
+describe("retirarImportesNoImpresos — el numero sin cita se retira", () => {
+  const osborne = (over: Partial<DocumentoExtraido> = {}) => doc({
+    proveedor: "Osborne",
+    numero_documento: "40295280",
+    productos: [linea({ cantidad: 2, precio_unitario: 171.05, total: 342.1 })],
+    subtotal: 342.1, subtotal_literal: "342,10 EUR",
+    iva: 34.21, iva_literal: "34,21 EUR",
+    total: 376.31, total_literal: null,
+    filas_tabla: 1,
+    ...over,
+  });
+
+  it("retira el total que el modelo no puede citar", () => {
+    const { datos, retiradas } = retirarImportesNoImpresos(osborne());
+    expect(datos.total).toBeNull();
+    expect(retiradas).toHaveLength(1);
+    expect(retiradas[0].campo).toBe("total");
+    expect(retiradas[0].valor).toBe(376.31);
+    expect(retiradas[0].alerta.codigo).toBe("importe_no_impreso");
+    expect(retiradas[0].alerta.severidad).toBe("alta");
+  });
+
+  it("y despues la deduccion lo repone CALCULADO, que es lo honesto", () => {
+    // Retirar no pierde el dato: lo cambia de sitio. 376,31 vuelve, pero como
+    // `deducido` y con su aviso, que es justo la diferencia que el dueno tiene
+    // que poder ver de un vistazo.
+    const { datos } = retirarImportesNoImpresos(osborne());
+    const { datos: final, deduccion } = deducirImportes(datos);
+    expect(final.total).toBe(376.31);
+    expect(deduccion?.metodo).toBe("subtotal_mas_iva");
+    expect(deduccion?.alerta.codigo).toBe("total_deducido");
+  });
+
+  it("no toca lo que SI esta citado", () => {
+    const { datos, retiradas } = retirarImportesNoImpresos(osborne({ total_literal: "376,31 EUR" }));
+    expect(datos.total).toBe(376.31);
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("avisa si el numero y su propia cita no dicen lo mismo", () => {
+    const { datos, discordancias } = retirarImportesNoImpresos(
+      osborne({ total: 37631, total_literal: "376,31 EUR" }),
+    );
+    expect(datos.total).toBe(37631); // no se retira: no se sabe cual esta mal
+    expect(discordancias).toHaveLength(1);
+    expect(discordancias[0].codigo).toBe("importe_literal_discordante");
+  });
+
+  it("una respuesta SIN citas (modelo distinto, payload antiguo) no retira nada", () => {
+    const antiguo = doc({ subtotal: 100, iva: 10, total: 110 });
+    delete (antiguo as Record<string, unknown>).total_literal;
+    delete (antiguo as Record<string, unknown>).subtotal_literal;
+    delete (antiguo as Record<string, unknown>).iva_literal;
+    const { datos, retiradas } = retirarImportesNoImpresos(antiguo);
+    expect(datos.total).toBe(110);
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("no muta el documento de entrada", () => {
+    const entrada = osborne();
+    retirarImportesNoImpresos(entrada);
+    expect(entrada.total).toBe(376.31);
+  });
+});
+
+describe("retirarImportesNoImpresos — la segunda mirada al pie", () => {
+  const verif = (over: Partial<VerificacionPie> = {}): VerificacionPie => ({
+    ultimo_texto_visible: "34,21 EUR",
+    fila_total_impresa: false,
+    total_citado: null,
+    base_imponible_citada: "342,10 EUR",
+    cuota_iva_citada: "34,21 EUR",
+    motivo: "la fila del TOTAL queda por debajo del borde de la imagen",
+    ...over,
+  });
+  const osborne = (over: Partial<DocumentoExtraido> = {}) => doc({
+    productos: [linea({ cantidad: 2, precio_unitario: 171.05, total: 342.1 })],
+    subtotal: 342.1, subtotal_literal: "342,10 EUR",
+    iva: 34.21, iva_literal: "34,21 EUR",
+    total: 376.31, total_literal: "376,31 EUR",
+    filas_tabla: 1,
+    ...over,
+  });
+
+  it("retira el total aunque el modelo se haya inventado tambien la cita", () => {
+    // Es el caso medido: 1 de cada 3 lecturas fabricaba numero Y cita. La
+    // segunda mirada, que solo mira el pie, acierta 3 de 3.
+    const { datos, retiradas } = retirarImportesNoImpresos(osborne(), verif());
+    expect(datos.total).toBeNull();
+    expect(retiradas[0].alerta.detalle.origen).toBe("verificacion_pie");
+    expect(retiradas[0].alerta.mensaje).toMatch(/34,21 EUR/); // lo ultimo que se ve
+  });
+
+  it("si el verificador SI ve la fila del total, no se retira nada", () => {
+    const { datos, retiradas } = retirarImportesNoImpresos(
+      osborne(), verif({ fila_total_impresa: true, total_citado: "376,31 EUR" }),
+    );
+    expect(datos.total).toBe(376.31);
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("dos lecturas que discrepan se avisan, pero no se pisan", () => {
+    const { datos, discordancias } = retirarImportesNoImpresos(
+      osborne(), verif({ fila_total_impresa: true, total_citado: "376,37 EUR" }),
+    );
+    expect(datos.total).toBe(376.31);
+    expect(discordancias.map((d) => d.codigo)).toContain("importe_discordante_verificador");
+  });
+
+  it("sin verificacion (la llamada fallo) el documento sigue su camino", () => {
+    const { datos, retiradas } = retirarImportesNoImpresos(osborne(), null);
+    expect(datos.total).toBe(376.31);
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("un albaran sin precios no se verifica ni se toca", () => {
+    const joselito = doc({
+      sin_importes: true,
+      productos: [linea({ precio_unitario: null, total: null })],
+      subtotal: null, iva: null, total: null,
+    });
+    const { datos, retiradas } = retirarImportesNoImpresos(joselito, verif());
+    expect(datos.total).toBeNull();
+    expect(retiradas).toHaveLength(0);
+  });
+
+  it("el esquema del verificador cumple las reglas de strict", () => {
+    const e = VERIFICACION_PIE_SCHEMA.schema;
+    expect(e.additionalProperties).toBe(false);
+    expect([...e.required].sort()).toEqual(Object.keys(e.properties).sort());
+  });
+});
+
+// ============================================================================
+//  12. No deducir sobre una lectura incompleta
+// ----------------------------------------------------------------------------
+//  En la ML/101511 de Luga se guardo total = 1.772,82 EUR marcado como
+//  `deducido` cuando el documento vale 3.787,53: la suma de las 11 lineas que
+//  se habian leido de las 54 impresas. Un numero con pinta de calculado y con
+//  el 47 % del valor real es PEOR que el NULL que habia antes.
+// ============================================================================
+
+describe("deducirImportes — no se deduce sobre una lectura incompleta", () => {
+  const luga = (over: Partial<DocumentoExtraido> = {}) => doc({
+    proveedor: "LUGA SABORES S.L.",
+    numero_documento: "ML/101511",
+    productos: [
+      linea({ nombre: "NATOP", cantidad: 1, precio_unitario: 1000, total: 1000 }),
+      linea({ nombre: "MAYONESA", cantidad: 1, precio_unitario: 772.82, total: 772.82 }),
+    ],
+    subtotal: null, iva: null, total: null,
+    filas_tabla: 2,
+    continua_en_otra_pagina: false,
+    ...over,
+  });
+
+  it("con el recuento cuadrado, la suma de lineas SIGUE deduciendose", () => {
+    const { datos, deduccion } = deducirImportes(luga());
+    expect(datos.total).toBe(1772.82);
+    expect(deduccion?.metodo).toBe("suma_lineas");
+  });
+
+  it("si faltan filas, NO se deduce: el total se queda vacio", () => {
+    const { datos, deduccion } = deducirImportes(luga({ filas_tabla: 54 }));
+    expect(datos.total).toBeNull();
+    expect(deduccion?.metodo).toBe("no_deducible");
+    expect(deduccion?.alerta.codigo).toBe("total_no_deducible");
+    expect(deduccion?.alerta.severidad).toBe("alta");
+    expect(deduccion?.alerta.detalle.suma_lineas_parcial).toBe(1772.82);
+  });
+
+  it("si el documento continua en otra pagina, tampoco", () => {
+    const { datos, deduccion } = deducirImportes(luga({ continua_en_otra_pagina: true }));
+    expect(datos.total).toBeNull();
+    expect(deduccion?.metodo).toBe("no_deducible");
+  });
+
+  it("si no se han podido contar las filas, tampoco", () => {
+    const { datos, deduccion } = deducirImportes(luga({ filas_tabla: null }));
+    expect(datos.total).toBeNull();
+    expect(deduccion?.metodo).toBe("no_deducible");
+  });
+
+  it("el aviso dice CUANTO seria la suma parcial, para poder contrastarla", () => {
+    const { deduccion } = deducirImportes(luga({ filas_tabla: 54 }));
+    expect(deduccion?.alerta.mensaje).toMatch(/1772\.82|1\.772,82|1772,82/);
+    expect(deduccion?.alerta.detalle.filas_tabla).toBe(54);
+  });
+
+  it("la deduccion base + IVA NO se toca: no depende de las lineas", () => {
+    // Es el caso Osborne, y es aritmetica exacta sobre dos importes impresos.
+    const osborne = luga({ subtotal: 342.1, iva: 34.21, filas_tabla: 54 });
+    const { datos, deduccion } = deducirImportes(osborne);
+    expect(datos.total).toBe(376.31);
+    expect(deduccion?.metodo).toBe("subtotal_mas_iva");
+  });
+
+  it("una respuesta sin los campos nuevos deduce como siempre", () => {
+    const antiguo = luga();
+    delete (antiguo as Record<string, unknown>).filas_tabla;
+    delete (antiguo as Record<string, unknown>).continua_en_otra_pagina;
+    expect(deducirImportes(antiguo).datos.total).toBe(1772.82);
+  });
+});
+
+// ============================================================================
+//  13. Anadir filas que faltaban NO es reescribir el documento
+// ----------------------------------------------------------------------------
+//  `contarCambiosNumericos` cuenta cualquier cambio, y meter 43 filas en medio
+//  desplaza todos los indices: la relectura BUENA se descartaba por el mismo
+//  umbral que defiende de las malas.
+// ============================================================================
+
+describe("compararExpansion — completar frente a recomponer", () => {
+  // Las filas repetidas van INTERCALADAS, como en el papel: la segunda NATOP
+  // no va al final, va justo debajo de la primera. Eso es lo que desplaza
+  // todos los indices de golpe y lo que hacia que el umbral de tres cambios
+  // descartase la relectura buena.
+  const l = (nombre: string, importe: number) =>
+    linea({ nombre, total: importe, precio_unitario: importe, cantidad: 1 });
+  const corta = doc({
+    productos: [l("NATOP", 100), l("MAYONESA", 30), l("ESPINAS", 50)],
+    subtotal: null, iva: null, total: null,
+  });
+  const larga = doc({
+    productos: [
+      l("NATOP", 100), l("NATOP", 250),
+      l("MAYONESA", 30), l("MAYONESA", 45),
+      l("ESPINAS", 50), l("ESPINAS", 70),
+    ],
+    subtotal: null, iva: null, total: null,
+  });
+
+  it("anadir lineas conservando las de antes es una EXPANSION", () => {
+    const e = compararExpansion(corta, larga);
+    expect(e.esExpansion).toBe(true);
+    expect(e.lineasAntes).toBe(3);
+    expect(e.lineasDespues).toBe(6);
+    expect(e.importesPerdidos).toBe(0);
+  });
+
+  it("y el umbral de tres cambios la habria descartado", () => {
+    expect(contarCambiosNumericos(corta, larga).total).toBeGreaterThan(MAX_CAMBIOS_RELECTURA);
+  });
+
+  it("si se pierde un importe que ya estaba leido, NO es expansion", () => {
+    const cambiada = doc({
+      productos: [
+        l("NATOP", 120), l("NATOP", 250),        // 100 -> 120: importe tocado
+        l("MAYONESA", 30), l("MAYONESA", 45),
+        l("ESPINAS", 50), l("ESPINAS", 70),
+      ],
+      subtotal: null, iva: null, total: null,
+    });
+    const e = compararExpansion(corta, cambiada);
+    expect(e.esExpansion).toBe(false);
+    expect(e.importesPerdidos).toBe(1);
+  });
+
+  it("si de paso cambia un importe del pie, NO es expansion", () => {
+    const e = compararExpansion(corta, doc({ ...larga, subtotal: 380 }));
+    expect(e.esExpansion).toBe(false);
+    expect(e.cambiosCabecera).toEqual(["subtotal"]);
+  });
+
+  it("quitar lineas nunca es una expansion", () => {
+    expect(compararExpansion(larga, corta).esExpansion).toBe(false);
+  });
+});
+
+describe("conservarRecuentoFilas — el recuento no se puede bajar", () => {
+  it("una relectura que baja el recuento para callar el aviso no lo consigue", () => {
+    // Si bajar `filas_tabla` hasta el numero de lineas escritas hiciese callar
+    // `lineas_incompletas`, el recuento dejaria de ser una comprobacion y
+    // pasaria a ser un objetivo.
+    const primera = doc({ filas_tabla: 54, productos: [linea()] });
+    const segunda = doc({ filas_tabla: 1, productos: [linea()] });
+    expect(conservarRecuentoFilas(primera, segunda).filas_tabla).toBe(54);
+    expect(codigos(conservarRecuentoFilas(primera, segunda))).toContain("lineas_incompletas");
+  });
+
+  it("subirlo si: son filas que antes no se habian contado", () => {
+    const primera = doc({ filas_tabla: 10, productos: [linea()] });
+    const segunda = doc({ filas_tabla: 54, productos: [linea()] });
+    expect(conservarRecuentoFilas(primera, segunda).filas_tabla).toBe(54);
+  });
+
+  it("sin recuento en la primera, manda la segunda", () => {
+    const primera = doc({ filas_tabla: null, productos: [linea()] });
+    const segunda = doc({ filas_tabla: 3, productos: [linea()] });
+    expect(conservarRecuentoFilas(primera, segunda).filas_tabla).toBe(3);
+  });
+});
+
+// ============================================================================
+//  14. El esquema NO le pide al modelo que calcule nada
+// ----------------------------------------------------------------------------
+//  El fallo de raiz: la descripcion del campo `total` decia "Debe cumplirse
+//  subtotal + iva = total" — pegada al campo que el modelo tiene que rellenar,
+//  y ganaba sobre el prompt, que decia lo contrario. Cada vez que se le pide
+//  un cuadre, se le esta pidiendo que invente el numero que falta.
+// ============================================================================
+
+describe("DOCUMENTO_JSON_SCHEMA — ninguna descripcion pide calcular", () => {
+  const descripciones = (nodo: unknown, ruta = "schema"): [string, string][] => {
+    if (nodo === null || typeof nodo !== "object") return [];
+    const o = nodo as Record<string, unknown>;
+    const out: [string, string][] = [];
+    if (typeof o.description === "string") out.push([ruta, o.description]);
+    for (const [k, v] of Object.entries(o)) {
+      if (k === "description") continue;
+      out.push(...descripciones(v, `${ruta}.${k}`));
+    }
+    return out;
+  };
+
+  it("ninguna dice 'debe cumplirse'", () => {
+    const malas = descripciones(DOCUMENTO_JSON_SCHEMA.schema)
+      .filter(([, d]) => /debe cumplirse/i.test(d));
+    expect(malas).toEqual([]);
+  });
+
+  it("los tres importes del pie exigen que el numero venga del papel", () => {
+    const props = DOCUMENTO_JSON_SCHEMA.schema.properties as Record<string, { description?: string }>;
+    for (const campo of ["subtotal", "iva", "total"]) {
+      expect(props[campo].description ?? "").toMatch(/null|IMPRES/i);
+    }
+  });
+
+  it("las CITAS se generan antes que sus numeros", () => {
+    // No es cosmetica: el modelo escribe en el orden del esquema, y con el
+    // literal del total al final ya tiene la suma en su contexto.
+    const req = [...DOCUMENTO_JSON_SCHEMA.schema.required] as string[];
+    expect(req.indexOf("total_literal")).toBeLessThan(req.indexOf("total"));
+    expect(req.indexOf("subtotal_literal")).toBeLessThan(req.indexOf("subtotal"));
+    expect(req.indexOf("iva_literal")).toBeLessThan(req.indexOf("iva"));
+  });
+
+  it("el recuento de filas se pide ANTES de la tabla", () => {
+    const req = [...DOCUMENTO_JSON_SCHEMA.schema.required] as string[];
+    expect(req.indexOf("filas_tabla")).toBeLessThan(req.indexOf("productos"));
+  });
+
+  it("la tabla prohibe agrupar filas repetidas", () => {
+    const p = DOCUMENTO_JSON_SCHEMA.schema.properties.productos as { description: string };
+    expect(p.description).toMatch(/no las agrupes/i);
+    expect(p.description).toMatch(/CADA FILA IMPRESA/i);
   });
 });

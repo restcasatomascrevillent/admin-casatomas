@@ -3,8 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { toNumber } from "./normalizacion.ts";
 import {
   comprobarCuadre,
+  compararExpansion,
+  conservarRecuentoFilas,
   contarCambiosNumericos,
   deducirImportes,
+  retirarImportesNoImpresos,
+  VERIFICACION_PIE_SCHEMA,
+  type VerificacionPie,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
@@ -224,31 +229,119 @@ C. Bonificaciones y descuentos del 100%: líneas con cantidad > 0 e importe 0
    precio_unitario real si aparece.
    Para el resto de líneas, bonificada = false.
 
+C1. UNA LÍNEA POR CADA FILA IMPRESA. ESTO ES LO QUE MÁS SE FALLA.
+   El mismo producto PUEDE APARECER VARIAS VECES en el mismo documento, con
+   cantidades e importes distintos. Eso NO es un duplicado: son filas
+   distintas del papel, y cada una hay que devolverla.
+   Es lo normal en una FACTURA MENSUAL que agrupa varios albaranes del mes:
+   ahí el mismo artículo sale una vez por cada entrega, a veces con el número
+   de albarán y la fecha en su propia fila. Un documento así puede traer 54
+   filas de sólo 21 productos distintos.
+   PROHIBIDO:
+     - agrupar dos filas del mismo producto en una,
+     - sumar sus cantidades o sus importes,
+     - quedarte con una fila y descartar las demás,
+     - saltarte una fila porque su nombre ya lo habías escrito antes.
+   Si al terminar la lista NO HAY NINGÚN NOMBRE REPETIDO y el documento sí
+   repetía productos, te has dejado filas: vuelve a la tabla y recórrela fila
+   por fila, de arriba abajo, sin mirar lo que ya has escrito.
+   El recuento va aparte, en "filas_tabla": cuenta las filas SOBRE LA IMAGEN
+   antes de extraerlas y pon ahí ese número. Tiene que coincidir con el número
+   de entradas de "productos". Si no coincide, falta trabajo por hacer.
+   Y si la foto es mala, está torcida o junta dos páginas: EXTRAE LO QUE
+   CONSIGAS LEER. Nunca devuelvas la lista vacía ni te rindas pidiendo una
+   foto mejor. Una lectura parcial se guarda con su aviso y sirve; una lista
+   vacía no sirve para nada. Si no has podido contar las filas, pon
+   "filas_tabla": null y extrae igualmente todas las que veas.
+
+C2. "continua_en_otra_pagina": ¿EL DOCUMENTO SIGUE MÁS ALLÁ DE LA FOTO?
+   ¿El papel dice "Pág. 1 de 2", "Hoja 1/2", "continúa", "sigue"? ¿La tabla
+   llega al borde de la imagen sin cerrarse? ¿Falta el pie de totales que esta
+   plantilla debería traer? Entonces true.
+   Describe LA IMAGEN que te han dado, no el documento ideal. Es la única
+   forma de que después se sepa que la lectura está incompleta, así que
+   contéstalo mirando la foto.
+
 D. Descripción: el nombre del producto, quitando códigos internos y lotes.
 
-E. IVA: el campo "iva" es el IMPORTE en euros, no el porcentaje. Si el
-   documento dice "IVA 10%" y abajo "48,97 €", el valor es 48.97, no 10.
-   Si hay varios tipos de IVA, suma los importes.
+E. IVA: el campo "iva" es el IMPORTE EN EUROS IMPRESO, no el porcentaje. Si
+   el documento dice "IVA 10%" y abajo "48,97 €", el valor es 48.97, no 10.
+   Si hay varios tipos de IVA, suma los importes IMPRESOS.
+   Si sólo ves el porcentaje y el importe en euros no aparece, o queda fuera
+   del encuadre, iva = null. NO lo calcules aplicando el porcentaje a la base:
+   un IVA calculado es indistinguible de uno leído.
 
-F. Si el documento no declara subtotal, IVA o total (habitual en albaranes),
-   devuelve null en ese campo. No los inventes ni los calcules tú.
+F. IMPORTES DEL PIE: SE COPIAN, NO SE CALCULAN. Y SE CITAN.
+   subtotal, iva y total son TRES LECTURAS INDEPENDIENTES del pie del
+   documento. Cada uno vale null si no está impreso o no se ve en la imagen.
+   Esto pasa mucho con fotos recortadas por abajo:
+     · si ves la BASE y la CUOTA DE IVA pero la fila del TOTAL está cortada,
+       entonces total = null. NO pongas base + iva.
+     · si ves el TOTAL pero no la base, subtotal = null.
+     · si no ves nada del pie, los tres a null.
+   NO tiene que cumplirse subtotal + iva = total en tu respuesta: esa
+   comprobación NO es tu trabajo. La hace un programa después, y sólo puede
+   hacerla si los tres números vienen del papel. Si rellenas el que falta, lo
+   único que consigues es que la comprobación no detecte nada.
+
+   LA CITA. Cada uno de los tres va acompañado de su literal:
+   "subtotal_literal", "iva_literal" y "total_literal". Ahí copias LOS
+   CARACTERES tal como están impresos en la imagen, con su coma, sus puntos y
+   su moneda: "2.488,11", "376,31 EUR", "34,21".
+   La regla es de una pieza:
+     SI NO PUEDES CITARLO, NO LO PONGAS. Y SI NO LO PONES, EL NÚMERO VA null.
+   Escribe primero la cita, mirando la imagen, y sólo después el número.
+   No inventes una cita para justificar un número que has calculado: el
+   literal y el número se comparan después, y un total sin cita se retira
+   entero. Dejarlo a null no pierde nada —si el dato es deducible a partir de
+   importes que sí están impresos, se calcula aparte y queda marcado como
+   calculado— mientras que una cita falsa sí destruye la única prueba de que
+   el número venía del papel.
+   Para el IVA, ojo: "10,00 %" es un porcentaje, no es la cita de la cuota.
+   La cita de la cuota es el importe en euros. Si sólo está el porcentaje,
+   iva_literal = null e iva = null.
 
 ════════════════════════════════════════════
-5. COMPROBACIÓN OBLIGATORIA ANTES DE RESPONDER
+5. REPASO ANTES DE RESPONDER
 ════════════════════════════════════════════
-Primero: si has marcado sin_importes = true, comprueba que no queda ni un solo
-número en precio_unitario, total, subtotal o iva. Si queda alguno, o el
-documento sí tenía precios, o te lo has inventado.
+TU TRABAJO ES LEER. COMPROBAR QUE LAS CUENTAS CUADRAN ES TRABAJO DE OTRO.
+Detrás de ti hay un programa que comprueba la aritmética del documento, y sólo
+puede hacerlo si cada número que le llega es el que está impreso en el papel.
+En cuanto tú "arreglas" un número para que una suma salga, ese programa se
+queda ciego y el error entra en la contabilidad del restaurante. Ya pasó:
+121.016,92 € de importes fabricados por intentar que cuadrase precio ×
+cantidad.
 
-Si el documento lleva precios, repasa estas tres igualdades. Son la forma de cazar tus propios errores de lectura:
+Así que el repaso NO es "consigue que cuadre". Es esto, en este orden:
 
-  (1) para cada línea:   cantidad × precio_unitario = total_línea
-  (2) suma de todas las líneas = subtotal (o el total, si no hay subtotal)
-  (3) subtotal + iva = total
+  (1) sin_importes = true → que no quede ni un número en precio_unitario,
+      total, subtotal ni iva. Si queda alguno, o el documento sí tenía
+      precios, o te lo has inventado.
 
-Si alguna no cuadra, VUELVE A MIRAR LA IMAGEN en esa zona concreta y corrige el dígito mal leído. Los que más se confunden a baja resolución son 3/8, 5/6, 1/7, 0/9 y 6/0, además del punto y la coma.
+  (2) RECUENTO: ¿"filas_tabla" coincide con el número de entradas de
+      "productos"? Si no coincide, vuelve a la tabla y recórrela fila por
+      fila. Es el error más frecuente y el más caro: faltan filas repetidas.
 
-No inventes ni ajustes valores para forzar el cuadre. Si tras revisarlo el documento sigue sin cuadrar porque así está impreso (un descuento no desglosado, portes, un redondeo), devuelve lo que pone realmente: hay una validación posterior que lo revisará.
+  (3) PROCEDENCIA: recorre precio_unitario y total de cada línea, y luego
+      subtotal, iva y total, y para cada uno pregúntate "¿VEO este número
+      impreso en la imagen?". Si la respuesta es no, va null: aunque lo puedas
+      calcular, aunque el hueco quede feo, aunque sólo falte él.
+
+  (4) Sólo ahora, y sólo como LUPA para encontrar dígitos mal leídos: mira si
+      cantidad × precio_unitario se parece al total de la línea, si las líneas
+      suman algo parecido al subtotal y si base + iva se parece al total.
+      Cuando algo se desvíe, VUELVE A MIRAR ESA ZONA DE LA IMAGEN: casi
+      siempre hay un dígito confundido (3/8, 5/6, 1/7, 0/9, 6/0) o una coma y
+      un punto cambiados.
+      Y si tras mirarlo otra vez el papel dice lo que dice, DEVUELVE LO
+      IMPRESO. Los documentos reales no cuadran a menudo: cánones de punto
+      verde, descuentos no desglosados, portes, precios unitarios redondeados
+      que no dan el importe exacto de la línea. Un descuadre real es
+      información útil; un descuadre tapado es un error contable que nadie
+      volverá a encontrar.
+
+Nunca cambies un número que has leído bien para que una suma salga. Nunca
+rellenes un hueco con el resultado de una operación.
 
 ════════════════════════════════════════════
 6. RESUMEN
@@ -835,7 +928,11 @@ async function llamarVision(mensajes: any[]): Promise<unknown> {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
     body: JSON.stringify({
       model: MODELO_VISION,
-      max_completion_tokens: 16000,
+      // 54 filas de concepto (la factura mensual ML/101511 de Luga Sabores)
+      // mas el razonamiento no caben en 16k: la respuesta se cortaba por el
+      // limite y el documento se perdia entero. El coste no sube por subir el
+      // techo, solo por los tokens que de verdad se generen.
+      max_completion_tokens: 32000,
       // El modo fuerte. `gpt-5-mini` declara `structured_outputs` entre sus
       // capacidades y admite `v1/chat/completions`, así que esto es válido
       // para el modelo que ya se venía usando: no hay cambio de modelo.
@@ -870,6 +967,76 @@ async function llamarVision(mensajes: any[]): Promise<unknown> {
   return JSON.parse(raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
 }
 
+
+// ─── Verificador de pie: la segunda mirada ───────────────────────────────────
+//  Ver el bloque 3c de esquema.ts para por que esto es una llamada aparte y no
+//  un campo mas del esquema grande.
+const PIE_SYSTEM_PROMPT = `Eres un verificador de encuadre de fotos de documentos comerciales españoles.
+
+No extraes datos. Sólo respondes a UNA pregunta: ¿qué se ve, y hasta dónde, en el PIE del documento de la imagen?
+
+El pie de una factura o albarán español suele traer, de arriba abajo:
+  BASE IMPONIBLE / BASE I.V.A.  →  % I.V.A.  →  CUOTA DE IVA  →  TOTAL / TOTAL FACTURA / TOTAL ALBARÁN / IMPORTE A PAGAR
+
+Es MUY frecuente que la foto corte el papel por abajo y que la fila del TOTAL quede fuera aunque sí se vean la base y la cuota. También pasa que una sombra, un dedo o la barra de un visor de PDF la tapen.
+
+Mira el borde inferior de la imagen y di la verdad sobre lo que llega a verse. NO completes el documento: si la fila del total no está en los píxeles, no está. Y al revés: si está, cítala.`;
+
+/**
+ * Segunda lectura, estrecha, del pie del documento. Devuelve null si algo
+ * falla: verificar es una mejora, no un requisito, y no puede tumbar una
+ * subida que por lo demas ha ido bien.
+ */
+async function verificarPie(
+  // deno-lint-ignore no-explicit-any
+  contentBlock: any,
+): Promise<VerificacionPie | null> {
+  try {
+    const resp = await fetch(`${OPENAI}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODELO_VISION,
+        max_completion_tokens: 4000,
+        response_format: { type: "json_schema", json_schema: VERIFICACION_PIE_SCHEMA },
+        messages: [
+          { role: "system", content: PIE_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: [contentBlock, { type: "text", text: "Mira el pie de este documento y contesta." }],
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) {
+      console.warn(`[verificador-pie] HTTP ${resp.status}: se sigue sin verificar.`);
+      return null;
+    }
+    const json = await resp.json();
+    const choice = json?.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      console.warn("[verificador-pie] respuesta cortada: se sigue sin verificar.");
+      return null;
+    }
+    const v = JSON.parse(choice?.message?.content ?? "null") as VerificacionPie | null;
+    if (!v || typeof v.fila_total_impresa !== "boolean") {
+      console.warn("[verificador-pie] respuesta sin forma util: se sigue sin verificar.");
+      return null;
+    }
+    console.log(
+      `[verificador-pie] fila del total impresa: ${v.fila_total_impresa}. ` +
+      `Ultimo texto visible: "${v.ultimo_texto_visible ?? ""}". ${v.motivo ?? ""}`,
+    );
+    return v;
+  } catch (e) {
+    console.warn("[verificador-pie] fallo, se sigue sin verificar:", e);
+    return null;
+  }
+}
+
 /** Parsea + valida la forma. Lanza con la RUTA de los campos que fallan. */
 function validarOLanzar(parsed: unknown, contexto: string): DocumentoExtraido {
   const v = validarEstructura(parsed);
@@ -901,7 +1068,9 @@ async function extraerConCuadre(
           type: "text",
           text:
             "Analiza visualmente este documento comercial español (factura o albarán) y extrae sus datos. " +
-            "Antes de responder, comprueba las tres igualdades de la sección 5.",
+            "Copia los importes tal como están impresos y deja a null los que no veas en la imagen. " +
+            "Antes de responder haz el repaso de la sección 5: cuenta las filas de la tabla y comprueba " +
+            "que cada número que devuelves lo has VISTO impreso.",
         },
       ],
     },
@@ -939,6 +1108,25 @@ async function extraerConCuadre(
   // propio criterio con el que se detecta el error es el que aprenden a
   // satisfacer. Una corrección real toca uno o dos números; una
   // recomposición toca medio documento. Ver `contarCambiosNumericos`.
+  // Antes del veto por numero de cambios: si la relectura se ha limitado a
+  // ANADIR las filas que faltaban (mismos importes de linea, mismo pie, mas
+  // lineas), no es una recomposicion y no se le puede aplicar el umbral de
+  // tres cambios — insertar filas desplaza todos los indices de golpe. Es
+  // justo el caso de la factura mensual que agrupa albaranes.
+  const expansion = compararExpansion(primera, segunda);
+  if (expansion.esExpansion) {
+    console.log(
+      `[extraccion] Relectura aceptada como EXPANSION: ${expansion.lineasAntes} -> ` +
+      `${expansion.lineasDespues} linea(s), sin perder ningun importe de linea ni tocar el pie. ` +
+      `Descuadres ${descuadres1.length} -> ${descuadres2.length}.`,
+    );
+    return {
+      documento: conservarRecuentoFilas(primera, segunda),
+      descuadres: descuadres2,
+      intentos: 2,
+    };
+  }
+
   const cambios = contarCambiosNumericos(primera, segunda);
   if (cambios.total > MAX_CAMBIOS_RELECTURA) {
     console.warn(
@@ -957,7 +1145,11 @@ async function extraerConCuadre(
       `[extraccion] Relectura aceptada: ${descuadres1.length} -> ${descuadres2.length} descuadre(s), ` +
       `${cambios.total} valor(es) corregido(s): ${cambios.campos.join(", ") || "ninguno"}.`,
     );
-    return { documento: segunda, descuadres: descuadres2, intentos: 2 };
+    return {
+      documento: conservarRecuentoFilas(primera, segunda),
+      descuadres: descuadres2,
+      intentos: 2,
+    };
   }
   console.warn("[extraccion] La relectura salió peor que el primer intento; se conserva el primero.");
   return { documento: primera, descuadres: descuadres1, intentos: 2 };
@@ -1032,7 +1224,29 @@ serve(async (req) => {
     //
     //     Qué es deducible y qué no (subtotal e IVA NUNCA lo son): ver el
     //     bloque 4 de esquema.ts.
-    const { datos: documento, deduccion } = deducirImportes(extraccion.documento);
+    //     Antes de deducir nada hay que quitar lo que no se ha leido: si el
+    //     modelo trae un importe del pie que no puede CITAR de la imagen, ese
+    //     importe lo ha calculado el, y se retira. Ver el bloque 3b de
+    //     esquema.ts (caso Osborne 40295280).
+    //     La segunda lectura del pie solo tiene sentido si hay algun importe
+    //     que verificar: un albaran sin precios no tiene pie que mirar.
+    const hayImportes = !extraccion.documento.sin_importes && (
+      extraccion.documento.total !== null ||
+      extraccion.documento.subtotal !== null ||
+      extraccion.documento.iva !== null
+    );
+    const verificacion = hayImportes ? await verificarPie(contentBlock) : null;
+
+    const { datos: citado, retiradas, discordancias } =
+      retirarImportesNoImpresos(extraccion.documento, verificacion);
+    for (const r of retiradas) {
+      console.warn(
+        `[cita] ${extraccion.documento.tipo} ${extraccion.documento.numero_documento}: se retira ` +
+        `${r.campo} = ${r.valor}; el modelo no cita los caracteres impresos.`,
+      );
+    }
+
+    const { datos: documento, deduccion } = deducirImportes(citado);
     const datos = normalizarDatos(documento);
 
     // Procedencia del importe que se va a guardar en `facturas.total`:
@@ -1044,10 +1258,17 @@ serve(async (req) => {
 
     const alertasPrevias = [
       ...descuadresComoAlertas(extraccion.descuadres, "pre-guardado"),
+      ...retiradas.map((r) => r.alerta),
+      ...discordancias,
       // El aviso de la deducción ya viene con `detalle.origen = "deduccion"`.
       ...(deduccion ? [deduccion.alerta] : []),
     ];
-    if (deduccion) {
+    if (deduccion && deduccion.metodo === "no_deducible") {
+      console.warn(
+        `[deduccion] ${datos.tipo} ${datos.numero_documento}: el documento no trae total y la lectura ` +
+        `no parece completa. NO se deduce nada: el total se queda vacio con aviso 'total_no_deducible'.`,
+      );
+    } else if (deduccion) {
       console.warn(
         `[deduccion] ${datos.tipo} ${datos.numero_documento}: el documento no trae total. ` +
         `Calculado ${deduccion.valor} por "${deduccion.metodo}". Se guarda con total_origen='deducido'.`,
