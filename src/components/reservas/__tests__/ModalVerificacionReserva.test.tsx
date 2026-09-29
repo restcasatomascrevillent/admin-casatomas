@@ -10,6 +10,9 @@
  *      pidió.
  *   4. Un solo botón de guardar, y guarda LO QUE SE VE (incluida la sala
  *      recién asignada, que el antiguo "Aceptar tal cual" tiraba).
+ *   5. reservas-sin-salas (2026-09-29): las horas son TODOS los cuartos del
+ *      turno (rejilla interna), la sala es opcional y va plegada, y plegada
+ *      no se pierde: la que ya tenía la reserva se guarda tal cual.
  *
  * Estrategia: hooks de datos mockeados (espacios, disponibilidad, permisos) y
  * `supabase`/`sonner` mockeados; `useVerificacionReservas` corre DE VERDAD,
@@ -23,9 +26,15 @@ vi.mock("sonner");
 vi.mock("@/hooks/useEspaciosReserva", () => ({
   useEspaciosReserva: () => ({ data: ESPACIOS }),
 }));
-vi.mock("@/hooks/useDisponibilidad", () => ({
-  useDisponibilidadCalculada: () => ({
-    data: { huecos: [{ hora: "14:00", ofrecido: true }, { hora: "21:00", ofrecido: true }] },
+// La rejilla en cuartos se prueba aparte (DisponibilidadCuartos.test.tsx y
+// lib/reservas/__tests__/rejillaCuartos.test.ts). Aquí solo interesan sus horas.
+vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
+  DisponibilidadCuartos: () => null,
+  useRejillaCuartos: () => ({
+    rejilla: {
+      franjas: ["13:00", "13:15", "14:00", "21:00"].map((hora) => ({ hora })),
+      aforo: {},
+    },
     isLoading: false,
     isError: false,
   }),
@@ -119,7 +128,12 @@ describe("ModalVerificacionReserva", () => {
 
     expect(screen.getByText("Solo para el restaurante")).toBeInTheDocument();
     expect(screen.getByText(/la sala no se le dice al cliente/i)).toBeInTheDocument();
-    // La sala tiene su propio selector, separado del de la hora.
+    // Plegada: se ve la sala actual en el resumen, pero no el selector.
+    const plegable = screen.getByRole("button", { name: /asignación interna \(opcional\)/i });
+    expect(plegable).toHaveTextContent("Salón");
+    expect(screen.queryByRole("combobox", { name: /sala/i })).not.toBeInTheDocument();
+    // Al desplegar, la sala tiene su propio selector, separado del de la hora.
+    fireEvent.click(plegable);
     expect(screen.getByRole("combobox", { name: /sala/i })).toHaveTextContent("Salón");
   });
 
@@ -165,6 +179,24 @@ describe("ModalVerificacionReserva", () => {
     // `espacio_solicitado_id` (null) y se cargaba la asignación.
     await waitFor(() =>
       expect(update).toHaveBeenCalledWith({ hora: "14:00", espacio_id: "e-salon", estado: "verificada" }),
+    );
+  });
+
+  it("las horas son los cuartos del turno, no solo las que ofrece la escalera", async () => {
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00" }));
+
+    fireEvent.click(screen.getByRole("combobox", { name: /hora/i }));
+    expect(await screen.findByRole("option", { name: "13:15" })).toBeInTheDocument();
+  });
+
+  it("sin tocar la sala plegada, se guarda la que ya tenía (nunca null)", async () => {
+    const update = espiarUpdate();
+    abrir(reserva({ hora: "21:00:00", hora_solicitada: "21:00:00", espacio_id: "e-terraza" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith({ hora: "21:00", espacio_id: "e-terraza", estado: "verificada" }),
     );
   });
 
