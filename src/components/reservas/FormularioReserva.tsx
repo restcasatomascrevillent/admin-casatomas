@@ -48,7 +48,8 @@ import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuarto
 import { formatearTelefonoReserva, variantesTelefono } from "@/lib/reservas/telefono";
 import {
   debeNotificarAltaPanel,
-  errorEmail,
+  emailParaGuardar,
+  errorEmailOpcional,
   errorTelefono,
   estadoInicialAltaPanel,
   RE_EMAIL,
@@ -56,8 +57,10 @@ import {
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
 
-// Teléfono Y email obligatorios (decisión del dueño, 2026-09-23): el cliente
-// recibe un correo para confirmar la reserva. Reglas en src/lib/reservas/altaPanel.ts.
+// Teléfono obligatorio. El email es OPCIONAL (cambio 2026-09-30; antes era
+// obligatorio por decisión del dueño de 2026-09-23): con email, el cliente recibe
+// un correo para confirmar la reserva; sin él no se manda nada y se guarda
+// `null`. Reglas en src/lib/reservas/altaPanel.ts.
 const formSchema = z.object({
   nombre: z.string({ required_error: "El nombre es obligatorio" }).trim().min(2, "El nombre es obligatorio"),
   telefono: z
@@ -66,10 +69,13 @@ const formSchema = z.object({
       const mensaje = errorTelefono(v);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
+  // No se usa `.email()` de zod: rechaza la cadena vacía, que es justo lo que
+  // queda en el campo al borrar lo escrito. Vacío / solo espacios = sin email.
   email: z
-    .string({ required_error: "El email es obligatorio" })
+    .string()
+    .optional()
     .superRefine((v, ctx) => {
-      const mensaje = errorEmail(v);
+      const mensaje = errorEmailOpcional(v);
       if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
     }),
   fecha: z.date({ required_error: "Selecciona una fecha" }),
@@ -243,6 +249,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const watchedHora = form.watch("hora");
   const watchedComensales = form.watch("numero_comensales");
   const watchedEmail = form.watch("email");
+  // Vacío o solo espacios = sin email: no hay a quién mandarle el correo.
+  const sinEmail = !emailParaGuardar(watchedEmail);
   const watchedTelefono = form.watch("telefono");
   const watchedEspacio = form.watch("espacio_id") ?? null;
   const watchedMarca = form.watch("marca");
@@ -397,7 +405,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   // Verificar límites de reservas por teléfono/email. El teléfono se busca
   // en todas sus formas (+34..., 0034..., con espacios): las reservas del bot
   // se guardan como "+34XXXXXXXXX" y las antiguas del panel tal cual.
-  const verificarLimites = async (telefono: string | undefined, email: string | undefined, fecha: string) => {
+  const verificarLimites = async (
+    telefono: string | undefined,
+    email: string | null | undefined,
+    fecha: string,
+  ) => {
     if (!configReservas) return null;
 
     const variantes = variantesTelefono(telefono);
@@ -437,9 +449,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
   const onSubmit = async (values: FormValues) => {
     try {
-      // Teléfono y email ya los exige el esquema (siempre obligatorios en el
-      // panel; los flags telefono_obligatorio/email_obligatorio de
-      // configuracion_reservas solo aplican a los canales automáticos).
+      // El esquema exige el teléfono; el email es opcional (los flags
+      // telefono_obligatorio/email_obligatorio de configuracion_reservas solo
+      // aplican a los canales automáticos).
 
       // Validate comensales limits
       if (configReservas) {
@@ -475,9 +487,10 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       // Mismo formato que el bot ("+34XXXXXXXXX") para que la búsqueda, los
       // límites y la lista negra casen entre canales.
       const telefonoGuardar = formatearTelefonoReserva(values.telefono);
-      const emailGuardar = values.email.trim();
+      // Email recortado, o null si se dejó vacío o en blanco (nunca '').
+      const emailGuardar = emailParaGuardar(values.email);
 
-      // Check limits per phone/email
+      // Check limits per phone/email (sin email solo cuenta el teléfono)
       const limiteMsg = await verificarLimites(values.telefono, emailGuardar, fechaStr);
       if (limiteMsg) {
         setLimiteAlcanzado(limiteMsg);
@@ -487,7 +500,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       // Verificar blacklist antes de crear
       const blacklisted = await verificarBlacklist.mutateAsync({
-        email: emailGuardar,
+        email: emailGuardar ?? undefined,
         telefono: values.telefono,
       });
 
@@ -503,6 +516,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       // pasar una reserva a 'verificada' desde la lista: emails-reserva manda
       // la plantilla 'propuesta' ("Confirma tu reserva") y el cliente la
       // confirma desde el enlace (-> 'confirmada' + correo de confirmación).
+      // Sin email (opcional desde 2026-09-30) el estado inicial es el mismo,
+      // pero no hay correo ni enlace: queda 'verificada' hasta que el personal
+      // la confirme a mano ("Confirmar" en la lista).
       const estadoInicial = estadoInicialAltaPanel(!!blacklisted);
 
       const fila: Record<string, unknown> = {
@@ -539,8 +555,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       const idCreada = (insertada as { id?: string } | null)?.id ?? null;
       // Correo "Confirma tu reserva" (mismo camino que un cambio de estado en
       // la lista). En lista negra no se escribe al cliente: queda pendiente
-      // de revisión.
-      if (idCreada && debeNotificarAltaPanel(estadoInicial)) notificarCambioReserva(idCreada, { estado: estadoInicial });
+      // de revisión. Sin email tampoco: emails-reserva no tendría a dónde
+      // enviarlo (devolvería `reserva_sin_email`), así que ni se le llama.
+      if (idCreada && emailGuardar && debeNotificarAltaPanel(estadoInicial)) {
+        notificarCambioReserva(idCreada, { estado: estadoInicial });
+      }
 
       // Refrescar todo lo que muestra reservas del día, ocupación y disponibilidad:
       // sin esto la reserva se crea pero no aparece en ninguna pantalla y el hueco
@@ -549,6 +568,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
       if (blacklisted) {
         toast.info("Reserva registrada como pendiente de revisión (cliente en lista negra)");
+      } else if (!emailGuardar) {
+        // Mismo estilo que el aviso de "Verificar" (avisoAlCliente): decir qué
+        // NO ha pasado, para que nadie dé por hecho que el cliente ya recibió algo.
+        toast.success("Reserva creada sin email", {
+          description: "No se ha enviado ningún correo al cliente. Queda como verificada hasta que la confirmes tú.",
+        });
       } else {
         toast.success("Reserva creada. Se ha enviado al cliente un correo para que la confirme.");
       }
@@ -634,7 +659,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Email (opcional)</FormLabel>
               <FormControl>
                 <Input type="email" placeholder="juan@email.com" {...field} />
               </FormControl>
@@ -984,13 +1009,15 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         )}
 
         {!isPublic && (
-          // La reserva nace 'verificada' y se invoca notify-reservation-change
-          // (ver onSubmit): el cliente recibe "Confirma tu reserva".
+          // La reserva nace 'verificada' y, si hay email, se invoca
+          // notify-reservation-change (ver onSubmit): el cliente recibe
+          // "Confirma tu reserva". Sin email no se manda nada.
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>
-              Se enviará al cliente un correo para que confirme su reserva. Queda como verificada hasta que la
-              confirme desde el enlace.
+              {sinEmail
+                ? "Sin email: no se puede enviar el correo para que el cliente confirme. La reserva queda como verificada hasta que la confirmes tú desde la lista."
+                : "Se enviará al cliente un correo para que confirme su reserva. Queda como verificada hasta que la confirme desde el enlace."}
             </span>
           </p>
         )}

@@ -792,7 +792,15 @@ export function ListaReservasAvanzada({
         return;
       }
 
-      toast.success("Estado actualizado correctamente");
+      // Sin email (el alta manual ya no lo exige) el cambio de estado no manda
+      // ningún correo: se dice, para no dar por hecho que el cliente ya lo sabe.
+      if (currentReservation && !(currentReservation.email ?? "").trim()) {
+        toast.success("Estado actualizado correctamente", {
+          description: "Sin email: no se envía ningún correo al cliente.",
+        });
+      } else {
+        toast.success("Estado actualizado correctamente");
+      }
 
       // Enviar datos al webhook
       supabase.functions.invoke('notify-reservation-change', {

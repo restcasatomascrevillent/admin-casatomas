@@ -9,6 +9,14 @@
 //     'propuesta' ("Confirma tu reserva"); el cliente confirma desde el enlace.
 //   · Teléfono Y email obligatorios (sin email no hay a quién pedírselo).
 //   · Cliente en lista negra: 'pendiente' + en_blacklist, sin correo.
+//
+// Cambio (2026-09-30): en el FORMULARIO del alta manual (FormularioReserva, que
+// también sirve a "Convertir en reserva") el email pasa a ser OPCIONAL:
+// `errorEmailOpcional` no lo exige y `emailParaGuardar` lo deja en null si no
+// hay. El estado inicial NO cambia (sigue naciendo 'verificada') y sin email no
+// se manda el correo "Confirma tu reserva". Sigue siendo obligatorio al
+// "Registrar que aceptó por teléfono" (SolicitudGestionPanel y la RPC
+// fn_aceptar_propuesta_solicitud): ahí siguen `errorEmail`/`validarContactoReserva`.
 // ============================================================================
 import { formatearTelefonoReserva, telefonoValido } from "./telefono";
 
@@ -47,6 +55,21 @@ export function errorEmail(email: string | null | undefined): string | null {
   if (!(email ?? "").trim()) return MENSAJES_CONTACTO.emailObligatorio;
   if (!emailValido(email)) return MENSAJES_CONTACTO.emailInvalido;
   return null;
+}
+
+/**
+ * Mensaje de error del email en el alta manual, donde es OPCIONAL: vacío o
+ * solo espacios no es un error; si se rellena, tiene que ser un email.
+ * (`errorEmail` es la versión obligatoria, la de los flujos de solicitud.)
+ */
+export function errorEmailOpcional(email: string | null | undefined): string | null {
+  if (!(email ?? "").trim()) return null;
+  return emailValido(email) ? null : MENSAJES_CONTACTO.emailInvalido;
+}
+
+/** Valor para `reservas.email`: el email recortado, o null si no hay (nunca ''). */
+export function emailParaGuardar(email: string | null | undefined): string | null {
+  return (email ?? "").trim() || null;
 }
 
 export interface ContactoReserva {

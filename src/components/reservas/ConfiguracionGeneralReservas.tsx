@@ -379,7 +379,7 @@ export function ConfiguracionGeneralReservas() {
                       <div className="space-y-0.5">
                         <FormLabel>Email obligatorio</FormLabel>
                         <FormDescription>
-                          Requerir email en la web de reservas (en el panel siempre es obligatorio)
+                          Requerir email en la web de reservas (en el panel es opcional)
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -396,7 +396,7 @@ export function ConfiguracionGeneralReservas() {
                       <div className="space-y-0.5">
                         <FormLabel>Auto-confirmar reservas</FormLabel>
                         <FormDescription>
-                          No afecta a las reservas creadas desde el panel: el cliente siempre recibe un correo para confirmarlas
+                          No afecta a las reservas creadas desde el panel: si tienen email, el cliente recibe un correo para confirmarlas
                         </FormDescription>
                       </div>
                       <FormControl>

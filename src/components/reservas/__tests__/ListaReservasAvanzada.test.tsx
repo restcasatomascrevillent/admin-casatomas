@@ -22,6 +22,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 
 const supa = vi.hoisted(() => ({
@@ -366,6 +368,56 @@ describe("ListaReservasAvanzada · cancelar pide confirmación", () => {
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "cancelada" }));
     expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
     expect(supa.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+// El alta manual ya no exige email (2026-09-30): una reserva 'verificada' sin
+// email solo llega a 'confirmada' con el botón «Confirmar» de la lista, y ese
+// cambio no manda ningún correo. El aviso tiene que decirlo.
+describe("ListaReservasAvanzada · reservas sin email", () => {
+  /** El principal de la fila de "Berta Verificada" es «Confirmar». */
+  const confirmarVerificada = async () => {
+    const { tabla } = await montar();
+    const [confirmar] = botonesDeFila(filaDe(tabla, "Berta Verificada"));
+    expect(confirmar.textContent).toMatch(/Confirmar/);
+    fireEvent.click(confirmar);
+  };
+
+  it("«Confirmar» una verificada sin email cambia el estado y avisa de que no sale ningún correo", async () => {
+    await confirmarVerificada();
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "confirmada" }));
+    expect(supa.eq).toHaveBeenCalledWith("id", "res-verificada");
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Estado actualizado correctamente", {
+        description: "Sin email: no se envía ningún correo al cliente.",
+      }),
+    );
+  });
+
+  it("con email el aviso es el de siempre (sin la advertencia)", async () => {
+    supa.filas = [{ ...reserva("res-verificada", "verificada", "Berta Verificada"), email: "berta@ejemplo.com" }];
+    await confirmarVerificada();
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "confirmada" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(vi.mocked(toast.success).mock.calls.at(-1)).toEqual(["Estado actualizado correctamente"]);
+    // Y se sigue avisando a notify-reservation-change, que es quien manda el correo.
+    expect(supabase.functions.invoke).toHaveBeenCalledWith(
+      "notify-reservation-change",
+      expect.objectContaining({ body: expect.objectContaining({ id: "res-verificada", estado: "confirmada" }) }),
+    );
+  });
+
+  it("email en blanco cuenta como sin email", async () => {
+    supa.filas = [{ ...reserva("res-verificada", "verificada", "Berta Verificada"), email: "   " }];
+    await confirmarVerificada();
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Estado actualizado correctamente", {
+        description: "Sin email: no se envía ningún correo al cliente.",
+      }),
+    );
   });
 });
 
