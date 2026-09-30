@@ -34,7 +34,7 @@ project_id = "jeamoczmbfsnwkfjxcyo"
 # La autenticación real es un token HMAC-SHA256 de un solo uso por reserva
 # (RESERVAS_WEB_TOKEN_SECRET, firma sobre id+acción+huella de la fila; el
 # primer uso mueve `updated_at` e invalida el token). Ver index.ts:275-345.
-# Las 3 rutas POST (/disponibilidad, /crear, /notificar-estado) sí reciben
+# Las 2 rutas POST (/disponibilidad, /crear) sí reciben
 # `apikey` + `Authorization` desde casa-tomas-story, así que no pierden nada.
 [functions.reservas-web]
 verify_jwt = false

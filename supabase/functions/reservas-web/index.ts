@@ -14,20 +14,24 @@
 // Rutas (todas bajo /functions/v1/reservas-web/...):
 //   POST /disponibilidad        JSON  -> aforo por turno y por hora
 //   POST /crear                 JSON  -> crea una reserva 'pendiente'
-//   POST /notificar-estado      JSON  -> envía el email según estado
 //   GET  /confirmar?token=...   HTML  -> confirma la reserva (1 uso)
 //   GET  /cancelar?token=...    HTML  -> pantalla "¿seguro?" (no muta)
 //   GET  /cancelar/ejecutar?token=...  HTML -> cancela de verdad
+//   (tabla de rutas en ./rutas.ts. `POST /notificar-estado` se RETIRÓ el
+//   2026-09-30: estaba abierta sin secreto y mandaba correos "Estado de
+//   reserva" a cualquier reserva — ver la cabecera de rutas.ts.)
 //
 // Secrets requeridos (Deno.env — nunca hardcodeados en el código):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (ya los inyecta la plataforma)
 //   RESEND_API_KEY                            (ya existe en el proyecto)
-//   RESERVAS_WEB_TOKEN_SECRET                 (NUEVO — firma HMAC de los tokens)
+//   RESERVAS_WEB_TOKEN_SECRET                 (verifica la firma HMAC de los tokens)
 // Opcionales:
 //   RESEND_FROM_EMAIL            (por defecto: sandbox de Resend, ver informe)
 //   RESERVAS_WEB_SHARED_SECRET   (si se define, exige header x-webhook-secret
-//                                 en las 3 acciones POST — el frontend YA
-//                                 envía ese header hoy, ver ReservationForm.tsx)
+//                                 en las 2 acciones POST. OJO: los frontends
+//                                 NO mandan ese header, así que definirlo
+//                                 rompe las reservas web; ver
+//                                 `secretoCompartidoValido` en rutas.ts)
 //   RESERVAS_WEB_ALLOWED_ORIGIN  (CORS; por defecto '*', igual que el resto
 //                                 de funciones de este proyecto)
 //   RESERVAS_WEB_PUBLIC_URL      (base para los enlaces de los emails; por
@@ -52,7 +56,7 @@ import {
   type ReservaOcupante,
 } from "../_shared/disponibilidad.ts";
 
-// Datos de negocio (Casa Tomás / Touza), resolución de marca y las 4
+// Datos de negocio (Casa Tomás / Touza), resolución de marca y las
 // plantillas de correo: ver `plantillas.ts` — módulo puro, sin imports de
 // Deno, separado a propósito para poder testearlo con vitest.
 import {
@@ -75,13 +79,12 @@ import {
   // la delegacion de ESE correo). Siguen exportados y probados en
   // plantillas.ts: volver a necesitarlos es volver a importarlos.
   tplSolicitudNoProcesada,
-  tplConfirmaAsistencia,
-  tplSinDisponibilidad,
   type Marca,
   type DatosNegocio,
   type AvisoEmailFallidoInput,
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
+import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -145,9 +148,12 @@ function html(body: string, status = 200): Response {
 // podía inyectar HTML/JS (XSS reflejado). Toda interpolación de datos que
 // vienen de fuera se pasa por `escapeHtml`.
 
+// Guarda OPCIONAL de las dos rutas POST públicas (/disponibilidad, /crear).
+// Falla ABIERTO a propósito: el navegador no manda `x-webhook-secret`. NO
+// usarla para proteger nada que no deba ser público — ver
+// `secretoCompartidoValido` en rutas.ts y la retirada de /notificar-estado.
 function checkSharedSecret(req: Request): boolean {
-  if (!SHARED_SECRET) return true; // no configurado -> no bloquea (ver informe)
-  return req.headers.get("x-webhook-secret") === SHARED_SECRET;
+  return secretoCompartidoValido(SHARED_SECRET, req.headers.get("x-webhook-secret"));
 }
 
 // ============================================================
@@ -368,6 +374,12 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
 //     de "confirma tu asistencia" y la fecha de la reserva).
 //   - `fp` ("fingerprint"): `estado + '|' + updated_at` de la reserva EN
 //     EL MOMENTO de generar el token (justo cuando se manda el email).
+//
+// 2026-09-30: la FIRMA (`signReservaToken`) se retiró junto con
+// `/notificar-estado`, que era el único sitio que generaba tokens. Aquí
+// solo queda la VERIFICACIÓN, para que los enlaces ya enviados (caducan a
+// los 14 días) sigan funcionando. Los correos de estado nuevos los manda
+// `emails-reserva`, con sus propios tokens (EMAILS_RESERVA_TOKEN_SECRET).
 //     Al verificar se recalcula `fp` desde el estado ACTUAL en BD; si no
 //     coincide, el token se rechaza. Como confirmar/cancelar siempre
 //     cambian `estado` (y el trigger `update_reservas_updated_at` cambia
@@ -375,13 +387,6 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
 //     para cualquier reintento — de un solo uso sin tabla de tokens.
 // La firma se verifica con `crypto.subtle.verify` (comparación segura
 // frente a timing attacks; no se compara con `===` a mano).
-const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 14; // 14 días
-
-function b64urlEncode(bytes: Uint8Array): string {
-  let str = "";
-  for (const b of bytes) str += String.fromCharCode(b);
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
 function b64urlDecode(str: string): Uint8Array {
   const padded = str + "=".repeat((4 - (str.length % 4)) % 4);
   const bin = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
@@ -390,7 +395,7 @@ function b64urlDecode(str: string): Uint8Array {
   return bytes;
 }
 async function hmacKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
 }
 
 type TokenAction = "confirmar" | "cancelar";
@@ -399,14 +404,6 @@ interface ReservaTokenPayload {
   action: TokenAction;
   exp: number;
   fp: string;
-}
-
-async function signReservaToken(id: string, action: TokenAction, fp: string): Promise<string> {
-  const payload: ReservaTokenPayload = { id, action, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS, fp };
-  const payloadB64 = b64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
-  const key = await hmacKey(TOKEN_SECRET);
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payloadB64));
-  return `${payloadB64}.${b64urlEncode(new Uint8Array(sig))}`;
 }
 
 async function verifyReservaToken(token: string, action: TokenAction): Promise<ReservaTokenPayload | null> {
@@ -541,7 +538,7 @@ async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promis
 //
 // SIN LLAMADORES desde el 2026-09-28 (el correo de "solicitud recibida" se
 // quito del canal web — ver el bloque del final de `handleCrear`). Se
-// mantiene a proposito, igual que `handleNotificarEstado`: es el contrato de
+// mantiene a proposito: es el contrato de
 // delegacion ya escrito y probado, y el sitio exacto donde volver a
 // engancharse si el dueño cambia de idea.
 async function notificarViaEmailsReserva(reservaId: string): Promise<ResultadoNotificarEmailsReserva> {
@@ -632,14 +629,12 @@ async function avisarEmailFallido(params: AvisoEmailFallidoInput): Promise<boole
   }
 }
 
-// Las 4 plantillas de correo (tplSolicitudRecibida, tplSolicitudNoProcesada,
-// tplConfirmaAsistencia, tplSinDisponibilidad) y `escapeHtml` viven ahora en
-// `./plantillas.ts` (importado arriba), parametrizadas por `DatosNegocio` en
-// vez de tener "Casa Tomás" escrito a fuego — ver la cabecera de ese fichero
-// para el porqué (una reserva puede ser de Casa Tomás o de Touza).
-
-// tplConfirmaAsistencia y tplSinDisponibilidad: movidas a ./plantillas.ts
-// (ver comentario arriba, junto a las otras dos plantillas).
+// Las plantillas de correo (tplSolicitudRecibida, tplSolicitudNoProcesada)
+// y `escapeHtml` viven en `./plantillas.ts` (importado arriba),
+// parametrizadas por `DatosNegocio` en vez de tener "Casa Tomás" escrito a
+// fuego — ver la cabecera de ese fichero para el porqué (una reserva puede
+// ser de Casa Tomás o de Touza). tplConfirmaAsistencia y
+// tplSinDisponibilidad se retiraron el 2026-09-30 con `/notificar-estado`.
 
 // ------------------------------------------------------------
 // PÁGINAS HTML (respuesta directa al navegador, no emails)
@@ -1335,7 +1330,7 @@ async function handleCrear(req: Request): Promise<Response> {
   // espacio si la hay. `marcaTemprana`/`negocioTemprano` (arriba) ya sirvió
   // para los rechazos anteriores; esta es la que se GUARDA en la fila y la
   // autoritativa para todo lo que venga después (el correo de 'propuesta'
-  // que manda emails-reserva, y notificar-estado/confirmar/cancelar, leen
+  // que manda emails-reserva, y confirmar/cancelar, leen
   // `reserva.marca`; no vuelven a derivarla).
   //
   // Ya no se construye aquí un `negocio` a partir de esta marca: lo único
@@ -1407,8 +1402,7 @@ async function handleCrear(req: Request): Promise<Response> {
   // para que al cliente le llegara el correo que acabamos de quitar.
   //
   // `notificarViaEmailsReserva` (mas arriba en este fichero) se queda SIN
-  // LLAMADORES pero NO se borra —mismo criterio que `handleNotificarEstado`,
-  // ver su cabecera—: es el contrato de delegacion documentado y el punto
+  // LLAMADORES pero NO se borra: es el contrato de delegacion documentado y el punto
   // exacto donde volver a engancharse si algun dia se quiere recuperar este
   // correo. Recuperarlo = volver a llamarla aqui Y vaciar
   // `CANALES_SIN_SOLICITUD_RECIBIDA` en emails-reserva/plantillas.ts.
@@ -1418,56 +1412,6 @@ async function handleCrear(req: Request): Promise<Response> {
   // `reservas` sobre la que `emails-reserva` pudiera trabajar.
 
   return json({ ok: true, reserva_id: inserted.id, estado: "pendiente" }, 201);
-}
-
-// ============================================================
-// ACCIÓN: notificar-estado
-// ============================================================
-// Sustituye al webhook n8n 79fc330e. Hoy lo dispara `notify-reservation-
-// change` (sin auth, solo al CAMBIAR estado desde el panel) reenviando a
-// ese webhook n8n — habrá que repuntarlo a esta acción (ver informe; no
-// se toca ese fichero desde aquí, es de otro dominio).
-async function handleNotificarEstado(req: Request): Promise<Response> {
-  if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
-  }
-  const reservaId = typeof body?.reserva_id === "string" ? body.reserva_id : null;
-  if (!reservaId) return json({ ok: false, error: "reserva_id_requerido" }, 400);
-
-  const reserva = await fetchReserva(reservaId);
-  if (!reserva) return json({ ok: false, error: "reserva_no_encontrada" }, 404);
-  if (!reserva.email) return json({ ok: false, error: "reserva_sin_email" });
-
-  // `marca` ya quedó fijada al crear la reserva (ver handleCrear) — se lee
-  // tal cual de la fila, sin volver a derivarla de `notas_cliente` ni de
-  // nada más, para que un cambio posterior en Reservado.tsx no pueda
-  // desincronizar los correos de una reserva ya existente.
-  const negocio = negocioDeReserva(reserva);
-
-  if (reserva.estado === "verificada") {
-    const fp = fingerprint(reserva.estado, reserva.updated_at);
-    const confirmToken = await signReservaToken(reserva.id, "confirmar", fp);
-    const cancelToken = await signReservaToken(reserva.id, "cancelar", fp);
-    const confirmUrl = `${PUBLIC_BASE_URL}/confirmar?token=${encodeURIComponent(confirmToken)}`;
-    const cancelUrl = `${PUBLIC_BASE_URL}/cancelar?token=${encodeURIComponent(cancelToken)}`;
-    const result = await sendEmail(
-      reserva.email,
-      `Estado de reserva ${negocio.nombre}`,
-      tplConfirmaAsistencia(negocio, reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales, confirmUrl, cancelUrl)
-    );
-    return json({ ok: result.ok, email_enviado: "confirma_asistencia" });
-  }
-
-  const result = await sendEmail(
-    reserva.email,
-    `Estado de reserva ${negocio.nombre}`,
-    tplSinDisponibilidad(negocio, reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales)
-  );
-  return json({ ok: result.ok, email_enviado: "sin_disponibilidad" });
 }
 
 // ============================================================
@@ -1535,19 +1479,19 @@ async function handleCancelarEjecutar(req: Request): Promise<Response> {
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const url = new URL(req.url);
-  const segments = url.pathname.split("/").filter(Boolean);
-  const idx = segments.indexOf("reservas-web");
-  const route = (idx === -1 ? segments : segments.slice(idx + 1)).join("/");
+  const pathname = new URL(req.url).pathname;
 
   try {
-    if (req.method === "POST" && route === "disponibilidad") return await handleDisponibilidad(req);
-    if (req.method === "POST" && route === "crear") return await handleCrear(req);
-    if (req.method === "POST" && route === "notificar-estado") return await handleNotificarEstado(req);
-    if (req.method === "GET" && route === "confirmar") return await handleConfirmar(req);
-    if (req.method === "GET" && route === "cancelar") return await handleCancelarPreview(req);
-    if (req.method === "GET" && route === "cancelar/ejecutar") return await handleCancelarEjecutar(req);
-    return json({ ok: false, error: "not_found", route }, 404);
+    // Tabla de rutas en ./rutas.ts. Cualquier otra (incluida la retirada
+    // POST /notificar-estado) -> 404.
+    switch (resolverRuta(req.method, pathname)) {
+      case "disponibilidad": return await handleDisponibilidad(req);
+      case "crear": return await handleCrear(req);
+      case "confirmar": return await handleConfirmar(req);
+      case "cancelar": return await handleCancelarPreview(req);
+      case "cancelar/ejecutar": return await handleCancelarEjecutar(req);
+      default: return json({ ok: false, error: "not_found", route: rutaDelPath(pathname) }, 404);
+    }
   } catch (err) {
     console.error("[RESERVAS-WEB] Error no controlado:", (err as Error)?.message, (err as Error)?.stack);
     return json({ ok: false, error: "internal_error" }, 500);
