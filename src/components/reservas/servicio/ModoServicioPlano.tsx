@@ -65,6 +65,7 @@ import {
   LogOut,
   MoveRight,
   CalendarIcon,
+  SquarePen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
@@ -73,6 +74,9 @@ import { useReservasServicioDia } from "@/hooks/useReservasServicioDia";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { ConMotivo } from "@/components/reservas/ConMotivo";
 import {
   configServicioSalaDesde,
   estadoMesaServicio,
@@ -166,6 +170,9 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   const { marcarLlegada, estaEnCurso: estaEnCursoLlegada } = useAccionesServicioReserva();
   const { liberarMesa, deshacerLiberarMesa, estaEnCurso: estaEnCursoServicio } = useAccionesModoServicio();
   const asignarMesas = useAsignarMesasReserva();
+  // Editar la reserva de una mesa (2026-09-30): p. ej. «en realidad son 6, no 4».
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   const config = useMemo(() => configServicioSalaDesde(configQuery.data), [configQuery.data]);
 
@@ -212,6 +219,14 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   const cerrarSheet = () => {
     setMesaSel(null);
     setMoviendoA("");
+  };
+
+  /** Cierra la hoja y abre el editor: dos capas modales encima una de otra serían un lío. */
+  const handleEditar = () => {
+    const reservaId = mesaActiva?.resultado.reserva?.id;
+    if (!reservaId) return;
+    cerrarSheet();
+    editarReserva(reservaId);
   };
 
   const handleSentar = async () => {
@@ -433,6 +448,24 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
                   <p className="text-sm text-muted-foreground">Sin reserva asignada este turno.</p>
                 )}
 
+                {/* Editar datos, día, hora, comensales, sala o notas de esta
+                    reserva. Sin mirar el estado: solo el permiso lo apaga. El
+                    botón deshabilitado no recibe el ratón: el motivo se ve en
+                    el envoltorio. */}
+                {mesaActiva.resultado.reserva && (
+                  <ConMotivo className="flex" motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                    <Button
+                      className="w-full h-11"
+                      variant="outline"
+                      disabled={!puedeEditar}
+                      title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
+                      onClick={handleEditar}
+                    >
+                      <SquarePen className="mr-2 h-4 w-4" /> Editar reserva
+                    </Button>
+                  </ConMotivo>
+                )}
+
                 {mesaActiva.resultado.reserva && esperandoLlegada(mesaActiva.resultado.reserva.estado) && (
                   <Button className="w-full h-11" onClick={handleSentar}>
                     <Utensils className="mr-2 h-4 w-4" /> Sentar
@@ -499,6 +532,9 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
         Estimaciones configurables en Configuración de reservas → "Modo servicio". Estancia comida: {config.estanciaComidaMinutos} min ·
         cena: {config.estanciaCenaMinutos} min · margen de retraso: {config.retrasoGraciaMinutos} min.
       </p>
+
+      {/* Editor de la reserva elegida en la hoja de una mesa. `null` hasta que se pide. */}
+      {dialogoEdicion}
     </div>
   );
 }

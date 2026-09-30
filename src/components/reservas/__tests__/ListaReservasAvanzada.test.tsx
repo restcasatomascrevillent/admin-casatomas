@@ -15,6 +15,11 @@
  * aplica (reserva sin sala, solicitud del bot) se queda deshabilitada con el
  * porqué en el `title`, nunca desaparece.
  *
+ * Y lo que pidió el 2026-09-30: toda reserva se puede EDITAR, en cualquier
+ * estado, fecha y canal. No hay una séptima ranura: la cuarta —«Gestionar», que
+ * en una reserva estaba siempre deshabilitada— es el editor de las reservas (en
+ * las solicitudes sigue siendo «Gestionar»). Se comprueba al final del fichero.
+ *
  * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
  * diseño): eso se mide en el navegador con datos reales.
  */
@@ -32,6 +37,9 @@ const supa = vi.hoisted(() => ({
   filas: [] as Record<string, unknown>[],
   // Props con las que se monta el alta al convertir una solicitud.
   formulario: vi.fn(),
+  // Permiso de edición de la sección «reservas» y el editor que abre la ranura de editar.
+  canEdit: true,
+  editarReserva: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -57,7 +65,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 vi.mock("@/hooks/useUserRole", () => ({
-  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+  useCanAccessSection: () => ({ canAccess: supa.canEdit, loading: false }),
 }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
 vi.mock("@/hooks/useVerificacionReservas", () => ({
@@ -66,6 +74,9 @@ vi.mock("@/hooks/useVerificacionReservas", () => ({
 }));
 
 // Hijos pesados: aquí solo estorban.
+vi.mock("@/hooks/useEdicionReserva", () => ({
+  useEdicionReserva: () => ({ editarReserva: supa.editarReserva, dialogoEdicion: null }),
+}));
 vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerificacionReserva: () => null }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
 vi.mock("@/components/reservas/SolicitudGestionPanel", () => ({ SolicitudGestionPanel: () => null }));
@@ -179,6 +190,7 @@ const filaDe = (tabla: HTMLElement, texto: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  supa.canEdit = true;
   supa.filas = [
     reserva("res-pendiente", "pendiente", "Ana Pendiente"),
     reserva("res-verificada", "verificada", "Berta Verificada"),
@@ -209,7 +221,7 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
     expect(cuantas[0]).toBe(6);
 
     // El orden es siempre el mismo: principal, "dar mesa", "Verificar",
-    // "Gestionar", "Cancelar" y "lista negra".
+    // "Gestionar" (en una reserva, el editor), "Cancelar" y "lista negra".
     for (const fila of filas) {
       const acciones = accionesDeFila(fila);
       expect(acciones[1].etiqueta).toMatch(/mesa/i);
@@ -224,14 +236,14 @@ describe("ListaReservasAvanzada · columna de acciones", () => {
     const { tabla } = await montar({ onAsignarMesa: vi.fn() });
     const porNombre = (texto: string) => filaDe(tabla, texto);
 
-    // Reserva pendiente: puede aceptarse y verificarse; no se gestiona, y sin
-    // sala tampoco se le puede dar mesa todavía.
+    // Reserva pendiente: puede aceptarse, verificarse y editarse; sin sala
+    // tampoco se le puede dar mesa todavía.
     const pendiente = accionesDeFila(porNombre("Ana Pendiente"));
     expect(pendiente[0].etiqueta).toBe("Aceptar");
     expect(pendiente[0].deshabilitado).toBe(false);
     expect(pendiente[1].deshabilitado).toBe(true); // dar mesa (todavía sin sala)
     expect(pendiente[2].deshabilitado).toBe(false); // verificar
-    expect(pendiente[3].deshabilitado).toBe(true); // gestionar (solo solicitudes)
+    expect(pendiente[3].deshabilitado).toBe(false); // editar (siempre, en cualquier estado)
 
     // Verificada: la principal pasa a "Confirmar" y ya no se verifica.
     const verificada = accionesDeFila(porNombre("Berta Verificada"));
@@ -435,5 +447,118 @@ describe("ListaReservasAvanzada · convertir una solicitud respeta su marca", ()
     await waitFor(() => expect(supa.formulario).toHaveBeenCalled());
     const props = supa.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: { marca: string } };
     expect(props.datosPreseleccionados.marca).toBe("touza");
+  });
+});
+
+// Toda reserva se puede EDITAR (2026-09-30): en cualquier estado, con cualquier
+// fecha y de cualquier canal. La ranura es la cuarta: principal · dar mesa ·
+// verificar · EDITAR · cancelar · lista negra. En una reserva antes era
+// «Gestionar», siempre deshabilitada; ahora es el editor (con lápiz), y su texto
+// sigue empezando por «Gestionar». En una solicitud sigue siendo «Gestionar».
+describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
+  const botonEditar = (tabla: HTMLElement, cliente: string) => botonesDeFila(filaDe(tabla, cliente))[3];
+
+  it("la ranura de editar existe y está activa en las reservas de CUALQUIER estado", async () => {
+    supa.filas = [
+      reserva("res-pendiente", "pendiente", "Ana Pendiente"),
+      reserva("res-verificada", "verificada", "Berta Verificada"),
+      reserva("res-confirmada", "confirmada", "Carlos Confirmado"),
+      reserva("res-cancelada", "cancelada", "Diana Cancelada"),
+      reserva("res-llego", "completada", "Elena Llegó"),
+      reserva("res-no-vino", "no_show", "Fede NoVino"),
+    ];
+    const { tabla } = await montar();
+
+    for (const [cliente, id] of [
+      ["Ana Pendiente", "res-pendiente"],
+      ["Berta Verificada", "res-verificada"],
+      ["Carlos Confirmado", "res-confirmada"],
+      ["Diana Cancelada", "res-cancelada"],
+      ["Elena Llegó", "res-llego"],
+      ["Fede NoVino", "res-no-vino"],
+    ]) {
+      const boton = botonEditar(tabla, cliente);
+      expect(boton.getAttribute("aria-label")).toMatch(new RegExp(`^Gestionar: editar la reserva de ${cliente}`));
+      expect(boton.hasAttribute("disabled")).toBe(false);
+      // Es un botón normal, no uno destructivo, y lleva el lápiz (no el engranaje de «Gestionar» de las solicitudes).
+      expect(boton.className).not.toMatch(/destructive/);
+      expect(boton.querySelector("svg")?.getAttribute("class")).toMatch(/square-pen/);
+
+      supa.editarReserva.mockClear();
+      fireEvent.click(boton);
+      expect(supa.editarReserva).toHaveBeenCalledTimes(1);
+      expect(supa.editarReserva).toHaveBeenCalledWith(id);
+    }
+  });
+
+  it("también las de un día que ya pasó y las de cualquier canal", async () => {
+    supa.filas = [
+      { ...reserva("res-vieja-web", "completada", "Gema Antigua"), fecha: "2020-01-15", canal: "web" },
+      { ...reserva("res-vieja-manual", "no_show", "Hugo Antiguo"), fecha: "2021-06-01", canal: "manual" },
+      { ...reserva("res-sin-canal", "confirmada", "Inés SinCanal"), canal: null },
+    ];
+    const { tabla } = await montar();
+
+    for (const [cliente, id] of [
+      ["Gema Antigua", "res-vieja-web"],
+      ["Hugo Antiguo", "res-vieja-manual"],
+      ["Inés SinCanal", "res-sin-canal"],
+    ]) {
+      const boton = botonEditar(tabla, cliente);
+      expect(boton.hasAttribute("disabled")).toBe(false);
+      fireEvent.click(boton);
+      expect(supa.editarReserva).toHaveBeenLastCalledWith(id);
+    }
+  });
+
+  it("una reserva sin nombre (la BD lo permite) se puede editar igual", async () => {
+    supa.filas = [{ ...reserva("res-anonima", "confirmada", ""), nombre: null }];
+    const { tabla } = await montar();
+
+    // (Las solicitudes abiertas van primero: la fila de la reserva se busca por su texto.)
+    const boton = botonEditar(tabla, "Sin nombre");
+    expect(boton.getAttribute("aria-label")).toMatch(/^Gestionar: editar la reserva de este cliente/);
+    expect(boton.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("la ranura sigue en su sitio: cada fila (reservas y solicitud) mantiene sus seis botones", async () => {
+    const { tabla } = await montar();
+    const filas = [...tabla.querySelectorAll("tbody tr")] as HTMLElement[];
+
+    expect(filas.length).toBe(6);
+    for (const fila of filas) expect(botonesDeFila(fila).length).toBe(6);
+  });
+
+  it("en una solicitud del bot la cuarta ranura sigue siendo «Gestionar» y no abre el editor de reservas", async () => {
+    const { tabla } = await montar();
+    const gestionar = botonEditar(tabla, "Familia Ballester");
+
+    expect(gestionar.getAttribute("aria-label")).toMatch(/^Gestionar/);
+    fireEvent.click(gestionar);
+    expect(supa.editarReserva).not.toHaveBeenCalled();
+  });
+
+  it("en las tarjetas de móvil también está: mismo botón, mismo editor", async () => {
+    await montar();
+
+    // jsdom monta a la vez la tabla y las tarjetas: el mismo nombre sale dos veces.
+    const botones = screen.getAllByRole("button", { name: /^Gestionar: editar la reserva de Diana Cancelada/ });
+    expect(botones).toHaveLength(2);
+    const enTarjeta = botones.find((b) => !b.closest("table"))!;
+    expect(enTarjeta.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(enTarjeta);
+    expect(supa.editarReserva).toHaveBeenCalledWith("res-cancelada");
+  });
+
+  it("sin permiso de edición sobre «reservas» el botón se queda, deshabilitado y explicándolo", async () => {
+    supa.canEdit = false;
+    const { tabla } = await montar();
+    const boton = botonEditar(tabla, "Ana Pendiente");
+
+    expect(boton).toBeInTheDocument();
+    expect(boton.hasAttribute("disabled")).toBe(true);
+    expect(boton.getAttribute("aria-label")).toMatch(/No tienes permiso para editar reservas/);
+    fireEvent.click(boton);
+    expect(supa.editarReserva).not.toHaveBeenCalled();
   });
 });

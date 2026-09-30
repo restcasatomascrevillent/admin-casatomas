@@ -90,6 +90,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useMesas, useCrearMesa, useActualizarMesasSilent, useEliminarMesa, Mesa } from "@/hooks/useMesas";
 import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import {
   useAsignacionesMesa,
@@ -156,6 +158,7 @@ import {
   CircleDashed,
   AlertTriangle,
   Armchair,
+  SquarePen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -344,6 +347,8 @@ function TarjetaReserva({
   mostrarTurno,
   onActivar,
   onQuitarMesas,
+  onEditar,
+  puedeEditar = true,
 }: {
   reserva: ReservaSala;
   mesasAsignadas: string[];
@@ -357,6 +362,10 @@ function TarjetaReserva({
   mostrarTurno: boolean;
   onActivar: (reserva: ReservaSala) => void;
   onQuitarMesas?: (reserva: ReservaSala) => void;
+  /** Abre el editor de la reserva (2026-09-30): el lápiz junto al nombre, en toda fila. */
+  onEditar?: (reserva: ReservaSala) => void;
+  /** Permiso de edición sobre «reservas»: sin él, el lápiz sale deshabilitado. */
+  puedeEditar?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `reserva-${reserva.id}`,
@@ -404,6 +413,22 @@ function TarjetaReserva({
             <Badge variant="outline" className="h-4 shrink-0 whitespace-nowrap px-1 py-0 text-[10px] font-medium">
               {turnoDeHora(reserva.hora) === "comida" ? "Comida" : "Cena"}
             </Badge>
+          )}
+          {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Va
+              junto al nombre y no en la botonera de la derecha: esa tiene ancho
+              fijo (72 + 28 px) y el panel mide 320. Sin mirar el estado: solo el
+              permiso lo apaga. */}
+          {onEditar && (
+            <button
+              type="button"
+              disabled={!puedeEditar}
+              onClick={() => onEditar(reserva)}
+              aria-label={`Editar la reserva de ${reserva.nombre}`}
+              title={puedeEditar ? "Editar la reserva" : "No tienes permiso para editar reservas"}
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <SquarePen className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
           )}
         </div>
         <div className="mt-0.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
@@ -759,6 +784,9 @@ export function PlanoEspacio2D({
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  // Editar una reserva desde su fila del panel (2026-09-30).
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   // ── Día y turno ───────────────────────────────────────────────────────────
   // Prioridad: prop `fecha` > `?fecha=` de la URL > hoy. El parámetro se llama
@@ -2745,6 +2773,8 @@ export function PlanoEspacio2D({
                                 activa={reservaActivaId === r.id}
                                 mostrarTurno={filtroTurno === "dia"}
                                 onActivar={activarReserva}
+                                onEditar={(reservaAEditar) => editarReserva(reservaAEditar.id)}
+                                puedeEditar={puedeEditar}
                               />
                             ))}
                           </div>
@@ -2776,6 +2806,8 @@ export function PlanoEspacio2D({
                                 mostrarTurno={filtroTurno === "dia"}
                                 onActivar={activarReserva}
                                 onQuitarMesas={pedirQuitarMesas}
+                                onEditar={(reservaAEditar) => editarReserva(reservaAEditar.id)}
+                                puedeEditar={puedeEditar}
                               />
                             ))}
                           </div>
@@ -2926,6 +2958,9 @@ export function PlanoEspacio2D({
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* ── Editor de la reserva elegida con el lápiz de su fila ─────────── */}
+        {dialogoEdicion}
       </div>
     </DndContext>
   );

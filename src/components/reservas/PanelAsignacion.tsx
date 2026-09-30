@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarClock, Check, ChevronDown, LayoutGrid, Loader2, MapPin, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ChevronDown, LayoutGrid, Loader2, MapPin, SquarePen, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { NegocioBadge } from "./NegocioBadge";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { ConMotivo } from "./ConMotivo";
 import { cn } from "@/lib/utils";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
 import { datosDeNegocio, useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import {
@@ -99,6 +102,10 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const { data: config } = useConfiguracionReservas();
   const { data: espaciosData } = useEspaciosReserva();
   const cambiarSala = useCambiarSalaReserva();
+  // Editar una reserva desde su fila (2026-09-30): datos, día, hora, comensales,
+  // sala y notas, sea cual sea su estado.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   const [dias, setDias] = useState<number>(14);
   const [negocio, setNegocio] = useState<string>(FILTRO_NEGOCIO_TODOS);
@@ -169,6 +176,8 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
     salasDe,
     onElegirSala: elegirSala,
     onAsignarMesa,
+    onEditar: editarReserva,
+    puedeEditar,
     salaEnCurso: cambiarSala.isPending ? cambiarSala.variables?.reservaId ?? null : null,
   };
 
@@ -309,6 +318,9 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Editor de la reserva elegida en «Editar». `null` hasta que se pide. */}
+      {dialogoEdicion}
     </div>
   );
 }
@@ -321,6 +333,10 @@ interface PropsFila {
   salasDe: (marca: string) => EspacioReserva[];
   onElegirSala: (fila: FilaAsignacionDia, espacioId: string) => void;
   onAsignarMesa: (destino: DestinoAsignacion) => void;
+  /** Abre el editor de la reserva (por id). */
+  onEditar: (reservaId: string) => void;
+  /** Permiso de edición sobre «reservas»: sin él, «Editar» sale deshabilitado. */
+  puedeEditar: boolean;
   /** Reserva cuya sala se está guardando ahora mismo. */
   salaEnCurso: string | null;
 }
@@ -382,6 +398,8 @@ function FilaReserva({
   salasDe,
   onElegirSala,
   onAsignarMesa,
+  onEditar,
+  puedeEditar,
   salaEnCurso,
 }: PropsFila & { fila: FilaAsignacionDia }) {
   const salaNoUsable = !!fila.espacio_id && excluidas.has(fila.espacio_id);
@@ -429,6 +447,23 @@ function FilaReserva({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Sin
+            mirar el estado: solo el permiso lo apaga. El botón deshabilitado no
+            recibe el ratón: el motivo se ve en el envoltorio. */}
+        <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5"
+            disabled={!puedeEditar}
+            title={puedeEditar ? "Editar datos, día, hora, comensales, sala y notas" : "No tienes permiso para editar reservas"}
+            aria-label={`Editar la reserva de ${fila.nombre || "este cliente"}`}
+            onClick={() => onEditar(fila.reserva_id)}
+          >
+            <SquarePen className="h-4 w-4" aria-hidden="true" />
+            Editar
+          </Button>
+        </ConMotivo>
         <SelectorSala fila={fila} salas={salasDe(fila.marca)} guardando={guardando} onElegir={onElegirSala} />
         <Button
           variant="outline"

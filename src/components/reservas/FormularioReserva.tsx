@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, ShieldBan } from "lucide-react";
+import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, ShieldBan } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -56,6 +57,28 @@ import {
 } from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
+import { CLAVE_RESUMEN_ASIGNACION_DIA } from "@/hooks/useResumenAsignacionDia";
+import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
+import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
+import {
+  avisoAlClienteTrasEdicion,
+  calcularCambiosEdicion,
+  debeNotificarEdicion,
+  efectoEnMesas,
+  errorEmailEdicion,
+  errorNombreEdicion,
+  errorTelefonoEdicion,
+  ErrorSinFilasEdicion,
+  esReservaViva,
+  interpretarRespuestaNotificacion,
+  invalidaEnlaceConfirmacion,
+  mensajeErrorEdicion,
+  TEXTO_ENLACE_INVALIDADO,
+  textoCamposCambiados,
+  valoresFormularioDesdeReserva,
+  type EnvioCorreoEdicion,
+  type ReservaEditable,
+} from "@/lib/reservas/edicionReserva";
 
 // Teléfono obligatorio. El email es OPCIONAL (cambio 2026-09-30; antes era
 // obligatorio por decisión del dueño de 2026-09-23): con email, el cliente recibe
@@ -95,9 +118,61 @@ const formSchema = z.object({
     .refine((m) => NEGOCIOS_PANEL.some((n) => n.marca === m), "Elige el negocio"),
   /** Sala asignada (null = sin asignar). Interna y opcional. */
   espacio_id: z.string().nullable().optional(),
+  /** Solo al EDITAR: marca de «importante» (en el alta no existe). */
+  importante: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+/**
+ * Esquema del modo EDICIÓN: el del alta, salvo que el nombre, el teléfono y el
+ * email solo se validan si se TOCAN. Una reserva antigua con un teléfono raro (o
+ * sin él: la BD lo permite) o un email que hoy no pasaría ("josé@gmail.com",
+ * del bot) tiene que poder corregirse de hora o de notas sin que el formulario
+ * exija arreglar primero lo que no se ha tocado.
+ */
+function esquemaEdicion(original: ReservaEditable) {
+  return formSchema.extend({
+    nombre: z.string().superRefine((v, ctx) => {
+      const mensaje = errorNombreEdicion(v, original.nombre);
+      if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
+    }),
+    telefono: z.string().superRefine((v, ctx) => {
+      const mensaje = errorTelefonoEdicion(v, original.telefono);
+      if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
+    }),
+    email: z
+      .string()
+      .optional()
+      .superRefine((v, ctx) => {
+        const mensaje = errorEmailEdicion(v, original.email);
+        if (mensaje) ctx.addIssue({ code: z.ZodIssueCode.custom, message: mensaje });
+      }),
+  });
+}
+
+/** Cuánto se queda en pantalla un aviso que el personal TIENE que leer (los avisos normales duran 4 s). */
+const DURACION_AVISO_LARGO_MS = 10_000;
+/** El del enlace «Confirma tu reserva» roto: nadie más se va a enterar, así que dura más. */
+const DURACION_AVISO_ENLACE_MS = 20_000;
+
+/**
+ * Pide a `notify-reservation-change` que escriba al cliente y ESPERA la
+ * respuesta (a diferencia de `notificarCambioReserva`, que es fire-and-forget):
+ * lo que se le dice al personal depende de si el correo salió de verdad. Nunca
+ * lanza: una llamada caída es un `fallo`, y lo que ya se guardó sigue guardado.
+ */
+async function pedirCorreoConfirmacion(reservaId: string, estado: string): Promise<EnvioCorreoEdicion> {
+  try {
+    const respuesta = await supabase.functions.invoke("notify-reservation-change", {
+      body: { id: reservaId, estado },
+    });
+    return interpretarRespuestaNotificacion(respuesta);
+  } catch (err) {
+    console.error("Error notificando cambio de reserva:", err);
+    return { resultado: "fallo" };
+  }
+}
 
 // Las horas del desplegable son TODOS los cuartos de hora de los turnos del
 // negocio (`configuracion_turnos`, sin escalera: rejilla interna de
@@ -127,17 +202,42 @@ export const CLAVES_REFRESCO_RESERVAS = [
   CLAVE_OCUPACION_SALAS_DIA,
 ];
 
+/**
+ * Además de las de arriba, al EDITAR hay que refrescar lo que depende de la
+ * sala, la mesa y el día de una reserva que ya existía: el panel «Asignación» y
+ * el detalle del calendario (`vista_asignacion_dia`), las mesas asignadas, el
+ * modo servicio, las reservas de una sala en el plano y el resumen de Hoy.
+ *
+ * Es una FUNCIÓN y no una constante a propósito: así las claves de esos hooks se
+ * leen al guardar y no al importar este módulo. Un test que monte cualquier
+ * pantalla con un mock parcial de uno de ellos (p. ej. `useAsignacionesMesa`
+ * sin su constante) no revienta solo por importar el formulario.
+ */
+const clavesRefrescoEdicion = () => [
+  ...CLAVES_REFRESCO_RESERVAS,
+  CLAVE_RESUMEN_ASIGNACION_DIA,
+  CLAVE_ASIGNACIONES_MESA,
+  CLAVE_RESERVAS_SERVICIO_DIA,
+  "reservas_sala_dia",
+  "reservas_hoy_resumen",
+  "reserva-edicion",
+];
+
 interface ReservaMismoDia {
   hora: string;
   estado: string;
   nombre: string | null;
 }
 
-/** Reservas vivas ese día con el mismo teléfono (en cualquier formato) o email. */
+/**
+ * Reservas vivas ese día con el mismo teléfono (en cualquier formato) o email.
+ * `excluirId`: al EDITAR una reserva, que no salga ella misma como «duplicado».
+ */
 async function buscarReservasMismoDia(
   telefono: string | undefined,
   email: string | undefined,
   fecha: string,
+  excluirId?: string,
 ): Promise<ReservaMismoDia[]> {
   const filtros: string[] = [];
   const variantes = variantesTelefono(telefono);
@@ -150,12 +250,13 @@ async function buscarReservasMismoDia(
     filtros.push(`email.in.(${lista(Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])))})`);
   }
   if (filtros.length === 0) return [];
-  const { data, error } = await (supabase.from("reservas" as any) as any)
+  let consulta = (supabase.from("reservas" as any) as any)
     .select("hora, estado, nombre")
     .eq("fecha", fecha)
     .not("estado", "in", "(cancelada,no_show)")
-    .or(filtros.join(","))
-    .order("hora");
+    .or(filtros.join(","));
+  if (excluirId) consulta = consulta.neq("id", excluirId);
+  const { data, error } = await consulta.order("hora");
   if (error) throw error;
   return ((data ?? []) as ReservaMismoDia[]).map((r) => ({ ...r, hora: String(r.hora) }));
 }
@@ -193,9 +294,34 @@ interface FormularioReservaProps {
      * valor, Casa Tomás. */
     marca?: string | null;
   } | null;
+  /**
+   * MODO EDICIÓN: la fila de `reservas` a modificar. Sin ella el formulario es
+   * el alta de siempre. Al editar: se guarda con UPDATE y solo las columnas que
+   * cambian, sirve para cualquier estado, canal y fecha (también pasada), el
+   * estado y el negocio no se tocan, y `onSuccess` se llama sin argumentos.
+   * Ver `src/lib/reservas/edicionReserva.ts`.
+   */
+  reservaAEditar?: ReservaEditable | null;
+  /** Solo en edición: nombres de las mesas que ya tiene asignadas (para avisar de qué pasa con ellas). */
+  mesasAsignadas?: string[];
+  /**
+   * Solo en edición: avisa a quien lo aloja (el diálogo) de si ahora mismo hay
+   * cambios SIN guardar, para que pida confirmación antes de cerrar y no se
+   * pierda lo escrito. Se mide contra lo guardado (no con `isDirty`, que no ve
+   * lo que se cambia con `setValue` desde el calendario o las rejillas).
+   */
+  onCambiosSinGuardar?: (hayCambios: boolean) => void;
 }
 
-export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreseleccionados }: FormularioReservaProps) => {
+export const FormularioReserva = ({
+  onSuccess,
+  isPublic = false,
+  datosPreseleccionados,
+  reservaAEditar,
+  mesasAsignadas = [],
+  onCambiosSinGuardar,
+}: FormularioReservaProps) => {
+  const editando = !!reservaAEditar;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [disponibilidadInfo, setDisponibilidadInfo] = useState<{
@@ -211,15 +337,18 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
   const { data: configReservas } = useConfiguracionReservas();
   const [modoOtraHora, setModoOtraHora] = useState(false);
 
+  const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      numero_comensales: 2,
-      fecha: datosPreseleccionados?.fecha,
-      hora: datosPreseleccionados?.hora ?? "",
-      marca: datosPreseleccionados?.marca ?? MARCA_POR_DEFECTO,
-      espacio_id: datosPreseleccionados?.espacio_id ?? null,
-    },
+    resolver: zodResolver(esquema),
+    defaultValues: reservaAEditar
+      ? valoresFormularioDesdeReserva(reservaAEditar)
+      : {
+          numero_comensales: 2,
+          fecha: datosPreseleccionados?.fecha,
+          hora: datosPreseleccionados?.hora ?? "",
+          marca: datosPreseleccionados?.marca ?? MARCA_POR_DEFECTO,
+          espacio_id: datosPreseleccionados?.espacio_id ?? null,
+        },
   });
 
   // Actualizar formulario cuando cambien los datos preseleccionados
@@ -271,6 +400,8 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     marca: marcaAlta,
     comensales: Number(watchedComensales) || 0,
     hora: watchedHora || null,
+    // Al editar, la reserva no cuenta contra sí misma en la rejilla.
+    excluirReservaId: reservaAEditar?.id,
     enabled: !isPublic,
   });
   const horariosDisponibles = useMemo(
@@ -304,19 +435,32 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       reservas: datosNegocio.reservas,
       horasBase: datosNegocio.horasBase,
       comensales: Number(watchedComensales) || 0,
+      excluirReservaId: reservaAEditar?.id,
     });
     return evaluarUbicacion(ocupacion, watchedEspacio, watchedHora);
-  }, [datosNegocio, watchedHora, watchedComensales, watchedEspacio]);
+  }, [datosNegocio, watchedHora, watchedComensales, watchedEspacio, reservaAEditar?.id]);
 
   const superaMaximoAutomatico =
     !!configReservas && Number(watchedComensales) > configReservas.max_comensales_por_reserva;
 
+  // EDICIÓN: la comprobación previa solo tiene sentido si la reserva cuenta en
+  // el aforo (pendiente, verificada o confirmada) y se ha cambiado el día, la
+  // hora o los comensales. Con lo demás (nombre, notas, sala…) no hay nada que
+  // comprobar, y avisar de un turno lleno por arreglar una errata solo asustaría.
+  const aforoCambiado =
+    !!reservaAEditar &&
+    (fechaStr !== String(reservaAEditar.fecha).slice(0, 10) ||
+      horaCorta(watchedHora) !== horaCorta(reservaAEditar.hora) ||
+      Number(watchedComensales) !== Number(reservaAEditar.numero_comensales));
+  const comprobarAforo = !reservaAEditar || (aforoCambiado && esReservaViva(reservaAEditar.estado));
+
   // Verificar el aforo del turno cuando hay fecha, hora y comensales.
   // Es solo una comprobación previa: la validación real la hace el trigger
-  // `trg_validar_capacidad` en la base de datos al insertar.
+  // `trg_validar_capacidad` en la base de datos al insertar (o al editar).
   useEffect(() => {
-    if (!watchedFecha || !watchedHora || !watchedComensales) {
+    if (!watchedFecha || !watchedHora || !watchedComensales || !comprobarAforo) {
       setDisponibilidadInfo(null);
+      setVerificando(false);
       return;
     }
 
@@ -324,13 +468,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     const comprobar = async () => {
       setVerificando(true);
       try {
-        // Aforo del turno DEL NEGOCIO de la reserva (igual que el trigger).
-        const resultado = await verificarAforoTurno(
-          format(watchedFecha, "yyyy-MM-dd"),
-          watchedHora,
-          watchedComensales,
-          marcaAlta,
-        );
+        // Aforo del turno DEL NEGOCIO de la reserva (igual que el trigger). Al
+        // editar, sin contar la propia reserva (el trigger tampoco la cuenta).
+        const fechaAforo = format(watchedFecha, "yyyy-MM-dd");
+        const resultado = reservaAEditar
+          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta, reservaAEditar.id)
+          : await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta);
         if (!cancelado) {
           setDisponibilidadInfo({ disponible: resultado.disponible, mensaje: resultado.mensaje });
         }
@@ -353,7 +496,9 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       cancelado = true;
       clearTimeout(timeout);
     };
-  }, [watchedFecha, watchedHora, watchedComensales, marcaAlta]);
+    // `reservaAEditar` entra por su id: es lo único de ella que cambia la consulta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedFecha, watchedHora, watchedComensales, marcaAlta, comprobarAforo, reservaAEditar?.id]);
 
   useEffect(() => {
     const checkBlacklist = async () => {
@@ -389,7 +534,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     let cancelado = false;
     const timeout = setTimeout(async () => {
       try {
-        const encontradas = await buscarReservasMismoDia(watchedTelefono, watchedEmail, fechaStr);
+        const encontradas = await buscarReservasMismoDia(watchedTelefono, watchedEmail, fechaStr, reservaAEditar?.id);
         if (!cancelado) setDuplicadas(encontradas);
       } catch (error) {
         console.error("Error buscando reservas duplicadas:", error);
@@ -400,26 +545,30 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
       cancelado = true;
       clearTimeout(timeout);
     };
-  }, [isPublic, fechaStr, watchedTelefono, watchedEmail]);
+  }, [isPublic, fechaStr, watchedTelefono, watchedEmail, reservaAEditar?.id]);
 
   // Verificar límites de reservas por teléfono/email. El teléfono se busca
   // en todas sus formas (+34..., 0034..., con espacios): las reservas del bot
   // se guardan como "+34XXXXXXXXX" y las antiguas del panel tal cual.
+  // `excluirId`: al EDITAR, la propia reserva no cuenta contra sí misma.
   const verificarLimites = async (
     telefono: string | undefined,
     email: string | null | undefined,
     fecha: string,
+    excluirId?: string,
   ) => {
     if (!configReservas) return null;
 
     const variantes = variantesTelefono(telefono);
     if (variantes.length > 0 && configReservas.max_reservas_por_telefono_dia > 0) {
-      const { count, error } = await supabase
+      let consulta = supabase
         .from("reservas" as any)
         .select("id", { count: "exact", head: true })
         .in("telefono", variantes)
         .eq("fecha", fecha)
         .not("estado", "in", "(cancelada,no_show)");
+      if (excluirId) consulta = consulta.neq("id", excluirId);
+      const { count, error } = await consulta;
 
       if (error) throw error;
 
@@ -430,12 +579,14 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
 
     const emailLimpio = email?.trim();
     if (emailLimpio && configReservas.max_reservas_por_email_dia > 0) {
-      const { count, error } = await supabase
+      let consulta = supabase
         .from("reservas" as any)
         .select("id", { count: "exact", head: true })
         .in("email", Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])))
         .eq("fecha", fecha)
         .not("estado", "in", "(cancelada,no_show)");
+      if (excluirId) consulta = consulta.neq("id", excluirId);
+      const { count, error } = await consulta;
 
       if (error) throw error;
 
@@ -447,7 +598,169 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     return null;
   };
 
+  // EDICIÓN: lo que se guardaría AHORA MISMO (el diff contra lo guardado), para
+  // avisar ANTES de pulsar «Guardar» de qué pasa con la mesa y con el correo.
+  // `form.watch()` sin argumentos solo se pide al editar.
+  const valoresActuales = reservaAEditar ? form.watch() : null;
+  const hoyISO = format(new Date(), "yyyy-MM-dd");
+  const cambiosActuales =
+    reservaAEditar && valoresActuales && watchedFecha instanceof Date && !Number.isNaN(watchedFecha.getTime())
+      ? calcularCambiosEdicion(reservaAEditar, {
+          nombre: valoresActuales.nombre ?? "",
+          telefono: valoresActuales.telefono ?? "",
+          email: valoresActuales.email,
+          fecha: watchedFecha,
+          hora: watchedHora ?? "",
+          numero_comensales: Number(watchedComensales),
+          notas_cliente: valoresActuales.notas_cliente,
+          espacio_id: watchedEspacio,
+          importante: valoresActuales.importante,
+        })
+      : null;
+  const efectoMesas =
+    reservaAEditar && cambiosActuales && mesasAsignadas.length > 0 ? efectoEnMesas(reservaAEditar, cambiosActuales) : null;
+  const pediraCorreo =
+    !!reservaAEditar &&
+    !!cambiosActuales &&
+    debeNotificarEdicion(reservaAEditar, cambiosActuales, { hoy: hoyISO, enListaNegra: !!blacklistEntry });
+  // La hora de una reserva VERIFICADA con email forma parte de la huella de su
+  // enlace «Confirma tu reserva»: cambiarla lo deja en «enlace no válido» y nada
+  // se reenvía. Se avisa ANTES de guardar y otra vez después.
+  const enlaceSeRompe =
+    !!reservaAEditar && !!cambiosActuales && invalidaEnlaceConfirmacion(reservaAEditar, cambiosActuales, { hoy: hoyISO });
+
+  // ¿Hay algo escrito sin guardar? Se mide con el mismo diff que se guardaría (no
+  // con `isDirty`, que no ve los `setValue` del calendario y las rejillas). Mientras
+  // se guarda ya no cuenta: el aviso de resultado llega por su cuenta.
+  const hayCambiosSinGuardar =
+    !!cambiosActuales && Object.keys(cambiosActuales).length > 0 && !form.formState.isSubmitting;
+  const avisarCambios = useRef(onCambiosSinGuardar);
+  avisarCambios.current = onCambiosSinGuardar;
+  useEffect(() => {
+    if (reservaAEditar) avisarCambios.current?.(hayCambiosSinGuardar);
+  }, [reservaAEditar, hayCambiosSinGuardar]);
+
+  /**
+   * Guardar una reserva que YA EXISTE. Solo se escriben las columnas que
+   * cambian (ver la cabecera de `edicionReserva.ts`: el trigger de aforo se
+   * dispara por columna) y nunca `estado`, `canal`, `marca` ni `llegada_at`.
+   * Conserva lo del alta: límites por teléfono/email (si la reserva cuenta en
+   * el aforo y cambia algo que los afecta), lista negra, errores legibles y el
+   * aviso a notify-reservation-change.
+   */
+  const guardarEdicion = async (values: FormValues) => {
+    const original = reservaAEditar as ReservaEditable;
+    try {
+      const editado = {
+        nombre: values.nombre,
+        telefono: values.telefono,
+        email: values.email,
+        fecha: values.fecha,
+        hora: values.hora,
+        numero_comensales: values.numero_comensales,
+        notas_cliente: values.notas_cliente,
+        espacio_id: values.espacio_id,
+        importante: values.importante,
+      };
+      let cambios = calcularCambiosEdicion(original, editado);
+
+      if (Object.keys(cambios).length === 0) {
+        toast.info("No hay cambios que guardar");
+        onSuccess?.();
+        return;
+      }
+
+      // El mínimo de comensales configurado solo se exige si se toca el número:
+      // una reserva antigua con menos no debe bloquear el cambio de otra cosa.
+      if (
+        configReservas &&
+        "numero_comensales" in cambios &&
+        values.numero_comensales < configReservas.min_comensales_por_reserva
+      ) {
+        form.setError("numero_comensales", {
+          message: `Mínimo ${configReservas.min_comensales_por_reserva} comensal(es)`,
+        });
+        toast.error(`Mínimo ${configReservas.min_comensales_por_reserva} comensal(es)`);
+        return;
+      }
+
+      const cambiaContacto = "telefono" in cambios || "email" in cambios;
+      const emailFinal = "email" in cambios ? cambios.email : emailParaGuardar(original.email);
+      const fechaFinal = cambios.fecha ?? String(original.fecha).slice(0, 10);
+
+      // Los límites por teléfono/email/día cuentan reservas vivas: una reserva
+      // cancelada, terminada o ausente no los gasta, y si no cambia el
+      // contacto ni el día tampoco hay nada nuevo que limitar.
+      if (esReservaViva(original.estado) && (cambiaContacto || "fecha" in cambios)) {
+        const limiteMsg = await verificarLimites(values.telefono, emailFinal, fechaFinal, original.id);
+        if (limiteMsg) {
+          setLimiteAlcanzado(limiteMsg);
+          toast.error(limiteMsg);
+          return;
+        }
+      }
+      setLimiteAlcanzado(null);
+
+      // Lista negra: solo si cambia el contacto (mismo criterio que el alta: el
+      // resultado marca `en_blacklist`; el ESTADO no se toca).
+      let enListaNegra = !!original.en_blacklist;
+      if (cambiaContacto) {
+        const blacklisted = await verificarBlacklist.mutateAsync({
+          email: emailFinal ?? undefined,
+          telefono: values.telefono,
+        });
+        enListaNegra = !!blacklisted;
+        cambios = calcularCambiosEdicion(original, editado, { enListaNegra });
+      }
+
+      // `.select("id")`: con RLS, una escritura denegada NO da error, devuelve 0
+      // filas. Sin comprobarlo se diría «guardado» sin haberlo guardado.
+      const { data, error } = await supabase.from("reservas").update(cambios).eq("id", original.id).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new ErrorSinFilasEdicion();
+
+      clavesRefrescoEdicion().forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+
+      // Correo «Confirma tu reserva»: la MISMA regla que el alta, aplicada al
+      // único caso en que una edición la activa (ver `debeNotificarEdicion`). Aquí
+      // SÍ se espera la respuesta: si `emails-reserva` contesta que ya se envió uno
+      // antes (un rebote también ocupa ese hueco) o que el email está bloqueado, el
+      // aviso no puede prometer que «se le manda».
+      const notificar = debeNotificarEdicion(original, cambios, { hoy: hoyISO, enListaNegra });
+      const envio = notificar ? await pedirCorreoConfirmacion(original.id, original.estado) : null;
+
+      const partes = [`Cambios guardados: ${textoCamposCambiados(cambios)}.`];
+      if ("en_blacklist" in cambios) {
+        partes.push(
+          cambios.en_blacklist
+            ? "El cliente está en la lista negra: la reserva queda marcada (su estado no cambia)."
+            : "El cliente ya no está en la lista negra: se le quita la marca.",
+        );
+      }
+      const aviso = avisoAlClienteTrasEdicion(original, cambios, { hoy: hoyISO, envio });
+      if (aviso) partes.push(aviso);
+      // Un aviso sobre el cliente lo tiene que leer el personal: no se va a los 4 s de siempre.
+      toast.success("Reserva actualizada", {
+        description: partes.join(" "),
+        ...(aviso ? { duration: DURACION_AVISO_LARGO_MS } : {}),
+      });
+      // El enlace que el cliente ya tiene deja de valer y nadie más se va a enterar.
+      if (invalidaEnlaceConfirmacion(original, cambios, { hoy: hoyISO })) {
+        toast.warning(TEXTO_ENLACE_INVALIDADO, { duration: DURACION_AVISO_ENLACE_MS });
+      }
+
+      onSuccess?.();
+    } catch (error) {
+      console.error("Error guardando los cambios de la reserva:", error);
+      toast.error(mensajeErrorEdicion(error));
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
+    if (reservaAEditar) {
+      await guardarEdicion(values);
+      return;
+    }
     try {
       // El esquema exige el teléfono; el email es opcional (los flags
       // telefono_obligatorio/email_obligatorio de configuracion_reservas solo
@@ -621,9 +934,14 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
     ? addDays(new Date(), configReservas.dias_max_antelacion)
     : undefined;
 
+  // Al EDITAR decide la validación de arriba (zod, que solo exige lo que se toca):
+  // sin `noValidate` el navegador bloquearía el envío por datos heredados que nadie
+  // ha tocado — `type="email"` rechaza "josé@gmail.com", `type="time" step={300}`
+  // rechaza las 21:07 — y una reserva del bot no podría ni cambiar de nombre. El
+  // alta conserva la validación nativa.
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} noValidate={editando} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -698,8 +1016,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      // Al editar, el calendario abre en el mes de la reserva y
+                      // no tapa los días pasados: una reserva de ayer (o de
+                      // hace un año) se puede corregir igual que una futura.
+                      defaultMonth={editando ? field.value : undefined}
                       disabled={(date) =>
-                        date < startOfDay(new Date()) || (!!maxFecha && date > maxFecha)
+                        (!editando && date < startOfDay(new Date())) || (!!maxFecha && date > maxFecha)
                       }
                       initialFocus
                       locale={es}
@@ -785,7 +1107,11 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
                 <FormControl>
                   <Input
                     type="number"
-                    min={configReservas?.min_comensales_por_reserva || 1}
+                    // Al editar, el navegador no debe bloquear el envío por el mínimo
+                    // configurado: una reserva antigua con menos comensales tiene que
+                    // poder cambiar de nombre. El mínimo se exige en `guardarEdicion`,
+                    // y solo si se cambia este número.
+                    min={editando ? 1 : configReservas?.min_comensales_por_reserva || 1}
                     // Solo la web pública se limita al máximo automático; el
                     // personal puede dar de alta grupos grandes (ver onSubmit).
                     max={isPublic ? configReservas?.max_comensales_por_reserva || 100 : undefined}
@@ -805,22 +1131,33 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Negocio</FormLabel>
-                  <Select value={field.value || undefined} onValueChange={cambiarMarca}>
+                  {editando ? (
+                    // Una reserva no salta de negocio (cambiaría de aforo): igual
+                    // que en el Kanban, que no deja moverla a una sala del otro.
+                    // Además el trigger de aforo no mira `marca` al actualizar.
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Elige el negocio" />
-                      </SelectTrigger>
+                      <Input value={etiquetaNegocio(field.value)} disabled readOnly />
                     </FormControl>
-                    <SelectContent>
-                      {NEGOCIOS_PANEL.map((n) => (
-                        <SelectItem key={n.marca} value={n.marca}>
-                          {n.etiqueta}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  ) : (
+                    <Select value={field.value || undefined} onValueChange={cambiarMarca}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Elige el negocio" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {NEGOCIOS_PANEL.map((n) => (
+                          <SelectItem key={n.marca} value={n.marca}>
+                            {n.etiqueta}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <p className="text-[11px] text-muted-foreground">
-                    Cada negocio tiene su propio aforo. La sala no lo decide.
+                    {editando
+                      ? "El negocio no se puede cambiar: cancela la reserva y crea otra."
+                      : "Cada negocio tiene su propio aforo. La sala no lo decide."}
                   </p>
                   <FormMessage />
                 </FormItem>
@@ -834,7 +1171,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             <Info className="h-4 w-4" />
             <AlertDescription>
               Grupo de {watchedComensales} personas: supera el máximo automático ({configReservas.max_comensales_por_reserva}).
-              Como alta manual se permite.
+              {editando ? "Al editar se permite." : "Como alta manual se permite."}
             </AlertDescription>
           </Alert>
         )}
@@ -846,6 +1183,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
               marca={marcaAlta}
               comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
+              excluirReservaId={reservaAEditar?.id}
               onSeleccionarHora={(hora) => {
                 setModoOtraHora(false);
                 form.setValue("hora", hora, { shouldValidate: true });
@@ -892,6 +1230,12 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
                             {e.nombre} ({e.capacidad_maxima} plazas)
                           </SelectItem>
                         ))}
+                        {/* Al editar, la sala que ya tenía puede estar desactivada
+                            o fuera de esta lista: se sigue mostrando (y se conserva
+                            si no se toca), no queda el desplegable en blanco. */}
+                        {editando && field.value && !salasDelNegocio.some((e) => e.id === field.value) && (
+                          <SelectItem value={field.value}>Sala actual (no disponible)</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-[11px] text-muted-foreground">
@@ -907,6 +1251,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
                 hora={watchedHora || null}
                 espacioId={watchedEspacio}
                 marca={marcaAlta}
+                excluirReservaId={reservaAEditar?.id}
                 onSeleccionar={(espacioId, hora) => {
                   setModoOtraHora(false);
                   form.setValue("espacio_id", espacioId);
@@ -934,11 +1279,28 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           )}
         />
 
+        {/* Solo al EDITAR: en el alta la estrella no existe (se marca después,
+            desde la lista o el Kanban); aquí se puede hacer en el mismo paso. */}
+        {editando && (
+          <FormField
+            control={form.control}
+            name="importante"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                <FormControl>
+                  <Checkbox checked={!!field.value} onCheckedChange={(valor) => field.onChange(valor === true)} />
+                </FormControl>
+                <FormLabel className="font-normal">Marcar como importante</FormLabel>
+              </FormItem>
+            )}
+          />
+        )}
+
         {erroresValidacion.length > 0 && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Faltan datos para crear la reserva:</strong>
+              <strong>{editando ? "Faltan datos para guardar los cambios:" : "Faltan datos para crear la reserva:"}</strong>
               <ul className="list-disc pl-4 mt-1">
                 {erroresValidacion.map((mensaje) => (
                   <li key={mensaje}>{mensaje}</li>
@@ -952,7 +1314,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Ese día no tiene turnos configurados ({etiquetaNegocio(marcaAlta)} cierra). Se puede crear con "Otra hora…", pero
+              Ese día no tiene turnos configurados ({etiquetaNegocio(marcaAlta)} cierra). Se puede {editando ? "guardar" : "crear"} con "Otra hora…", pero
               revisa que sea correcto.
             </AlertDescription>
           </Alert>
@@ -991,7 +1353,7 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               {evaluacionSala.sala.nombre} quedaría en {evaluacionSala.celda.tras}/{evaluacionSala.celda.capacidad} en
-              el turno de {ETIQUETA_TURNO[evaluacionSala.turno].toLowerCase()} (supera su capacidad). Puedes crearla
+              el turno de {ETIQUETA_TURNO[evaluacionSala.turno].toLowerCase()} (supera su capacidad). Puedes {editando ? "guardarla" : "crearla"}
               igualmente o elegir otra sala.
             </AlertDescription>
           </Alert>
@@ -1008,7 +1370,43 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
           </Alert>
         )}
 
-        {!isPublic && (
+        {/* Qué hace la BD con las mesas de esta reserva al guardar (trigger
+            `trg_reservas_sincronizar_asignaciones`). Solo si ya tiene mesa y el
+            cambio la afecta. */}
+        {efectoMesas && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <Armchair className="h-4 w-4" />
+            <AlertDescription>
+              {`Esta reserva tiene mesa asignada (${mesasAsignadas.join(", ")}). ${
+                efectoMesas === "quita"
+                  ? "Al cambiar de sala se quitan las mesas asignadas y habrá que sentarla de nuevo."
+                  : "Al cambiar el día o el turno, la mesa se mantiene si está libre; si no, la reserva queda pendiente de mesa."
+              }`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Cambiar la hora de una reserva verificada con email deja sin valor el
+            enlace «Confirma tu reserva» que el cliente ya recibió. */}
+        {enlaceSeRompe && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{TEXTO_ENLACE_INVALIDADO}</AlertDescription>
+          </Alert>
+        )}
+
+        {editando && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              {pediraCorreo
+                ? "Al guardar se pedirá el envío del correo «Confirma tu reserva» al nuevo email (si ya se le envió uno antes, aunque rebotara, no se repite)."
+                : "Guardar solo cambia los datos: el estado de la reserva se queda como está (se cambia con las acciones de la lista)."}
+            </span>
+          </p>
+        )}
+
+        {!isPublic && !editando && (
           // La reserva nace 'verificada' y, si hay email, se invoca
           // notify-reservation-change (ver onSubmit): el cliente recibe
           // "Confirma tu reserva". Sin email no se manda nada.
@@ -1025,17 +1423,24 @@ export const FormularioReserva = ({ onSuccess, isPublic = false, datosPreselecci
         <Button
           type="submit"
           className="w-full"
+          // Al editar, el aviso previo de aforo NO bloquea el botón: la BD tiene
+          // la última palabra (y un cambio que no toca día/hora/comensales ni
+          // pasa por el trigger de aforo).
           disabled={
             verificando ||
             form.formState.isSubmitting ||
-            (disponibilidadInfo !== null && !disponibilidadInfo.disponible)
+            (!editando && disponibilidadInfo !== null && !disponibilidadInfo.disponible)
           }
         >
           {verificando
             ? "Verificando..."
             : form.formState.isSubmitting
-              ? "Creando..."
-              : "Crear Reserva"}
+              ? editando
+                ? "Guardando..."
+                : "Creando..."
+              : editando
+                ? "Guardar cambios"
+                : "Crear Reserva"}
         </Button>
       </form>
     </Form>

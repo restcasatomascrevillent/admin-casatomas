@@ -158,14 +158,21 @@ interface DatosDelDia {
  * `espacios_reserva` (por `caracteristicas->>'marca'`) como `reservas`
  * (columna `marca`, `NOT NULL DEFAULT 'casa_tomas'`) al negocio pedido —
  * ver la nota "Aforo por negocio" de la cabecera de este fichero.
+ *
+ * `excluirReservaId`: al EDITAR una reserva viva, que no cuente contra sí
+ * misma (igual que hace el trigger: `id != NEW.id` en un UPDATE).
  */
-async function leerDatosDelDia(fecha: string, marca: string = MARCA_POR_DEFECTO): Promise<DatosDelDia> {
+async function leerDatosDelDia(
+  fecha: string,
+  marca: string = MARCA_POR_DEFECTO,
+  excluirReservaId?: string | null,
+): Promise<DatosDelDia> {
   const [turnosRes, espaciosRes, reservasRes] = await Promise.all([
     supabase.from("configuracion_turnos").select("*").eq("activo", true),
     supabase.from("espacios_reserva" as any).select("id, nombre, capacidad_maxima, caracteristicas").eq("activa", true),
     supabase
       .from("reservas" as any)
-      .select("hora, numero_comensales, espacio_id")
+      .select("id, hora, numero_comensales, espacio_id")
       .eq("fecha", fecha)
       .eq("marca", marca)
       .in("estado", ESTADOS_QUE_OCUPAN),
@@ -191,9 +198,13 @@ async function leerDatosDelDia(fecha: string, marca: string = MARCA_POR_DEFECTO)
     capacidad_maxima,
   }));
 
+  const reservasVivas = ((reservasRes.data ?? []) as unknown as Array<ReservaOcupante & { id?: string }>).filter(
+    (r) => !excluirReservaId || r.id !== excluirReservaId,
+  );
+
   return {
     configuraciones: (turnosRes.data ?? []) as unknown as ConfiguracionTurnoInput[],
-    reservas: (reservasRes.data ?? []) as unknown as ReservaOcupante[],
+    reservas: reservasVivas,
     capacidadTotal: espacios.reduce((s, e) => s + e.capacidad_maxima, 0),
     espacios,
   };
@@ -436,14 +447,19 @@ export interface AforoTurno {
  * Sigue siendo una comprobación PREVIA para dar feedback en el formulario:
  * la autoridad es la base de datos, que además usa un advisory lock. El
  * INSERT puede fallar aunque esto diga que hay hueco, y es correcto.
+ *
+ * `excluirReservaId` (opcional): al editar una reserva, no contarla contra sí
+ * misma — sin esto, cambiar la hora de una reserva de un turno casi lleno
+ * avisaría de un «aforo superado» que la BD no va a dar.
  */
 export const verificarAforoTurno = async (
   fecha: string,
   hora: string,
   comensales: number,
   marca: string = MARCA_POR_DEFECTO,
+  excluirReservaId?: string | null,
 ): Promise<AforoTurno> => {
-  const datos = await leerDatosDelDia(fecha, marca);
+  const datos = await leerDatosDelDia(fecha, marca, excluirReservaId);
   const resultado = calcularDisponibilidad({
     fecha,
     comensales,

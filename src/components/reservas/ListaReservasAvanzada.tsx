@@ -46,6 +46,7 @@ import {
   Settings2,
   ClipboardCheck,
   Armchair,
+  SquarePen,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -76,6 +77,7 @@ import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSo
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
 import { CLAVES_REFRESCO_RESERVAS, FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
 import {
   estadoPropuestaVista,
@@ -408,7 +410,12 @@ function AccionesUnificadas({
   /** Salto al plano de SU sala, en SU día, con la reserva señalada. */
   darMesa: Accion;
   verificar: Accion;
-  gestionar: Accion;
+  /**
+   * Cuarta ranura. En una SOLICITUD es «Gestionar» (engranaje); en una RESERVA es
+   * «Editar» (lápiz, vía `icono`): antes la ranura estaba siempre deshabilitada
+   * en las reservas, y ahora es su editor, disponible en cualquier estado.
+   */
+  gestionar: Accion & { icono?: ReactNode };
   cancelar: Accion;
   listaNegra: Accion;
 }) {
@@ -436,7 +443,7 @@ function AccionesUnificadas({
         <ClipboardCheck />
       </AccionIcono>
       <AccionIcono etiqueta={gestionar.titulo} onClick={gestionar.onClick}>
-        <Settings2 />
+        {gestionar.icono ?? <Settings2 />}
       </AccionIcono>
       <AccionIcono destructiva etiqueta={cancelar.titulo} onClick={cancelar.onClick}>
         {cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />}
@@ -599,6 +606,8 @@ export function ListaReservasAvanzada({
   const [confirmarBloque, setConfirmarBloque] = useState(false);
 
   const { canAccess: canEdit } = useCanAccessSection("reservas", "edit");
+  // Editor de reservas (2026-09-30): lo abre la cuarta ranura de cada fila.
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   const queryClient = useQueryClient();
   const refrescarReservas = () =>
@@ -659,6 +668,23 @@ export function ListaReservasAvanzada({
       onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
     };
   };
+
+  /**
+   * Cuarta ranura de una fila de RESERVA: el EDITOR (2026-09-30, «las reservas
+   * se editan siempre»). Antes era «Gestionar» y en las reservas estaba
+   * deshabilitada para siempre. Se abre en CUALQUIER estado, con cualquier fecha
+   * y de cualquier canal: no mira ni `estado`, ni `fecha`, ni `canal`; solo el
+   * permiso de edición de la sección (la política RLS de UPDATE pide lo mismo).
+   * El texto sigue empezando por «Gestionar» porque «Dar mesa» sin sala manda a
+   * ese nombre para asignar la sala, y aquí se puede.
+   */
+  const accionEditar = (reserva: Reservation): Accion & { icono: ReactNode } => ({
+    titulo: canEdit
+      ? `Gestionar: editar la reserva de ${reserva.nombre || "este cliente"} — datos, día, hora, comensales y sala`
+      : "No tienes permiso para editar reservas",
+    onClick: canEdit ? () => editarReserva(reserva.id) : undefined,
+    icono: <SquarePen />,
+  });
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -1299,7 +1325,7 @@ export function ListaReservasAvanzada({
                             }
                           : undefined,
                     }}
-                    gestionar={{ titulo: "Gestionar propuesta: solo para solicitudes del bot" }}
+                    gestionar={accionEditar(reservation)}
                     cancelar={{
                       titulo: tituloCancelar(reservation.estado, canEdit, reservation.nombre || "este cliente"),
                       onClick:
@@ -1435,7 +1461,7 @@ export function ListaReservasAvanzada({
                                 }
                               : undefined,
                         }}
-                        gestionar={{ titulo: "Gestionar propuesta: solo para solicitudes del bot" }}
+                        gestionar={accionEditar(reservation)}
                         cancelar={{
                           titulo: tituloCancelar(reservation.estado, canEdit, nombre),
                           onClick:
@@ -1534,6 +1560,11 @@ export function ListaReservasAvanzada({
         onOpenChange={setVerificacionModalOpen}
         onSuccess={fetchReservations}
       />
+
+      {/* Editor de una reserva (cuarta ranura de cada fila): al guardar refresca
+          por sí solo la lista y el resto de pantallas (ver
+          `clavesRefrescoEdicion` de `FormularioReserva`). Es `null` hasta que se pide editar. */}
+      {dialogoEdicion}
 
       {/* Lista negra: NO necesita AlertDialog propio. `BlacklistModal` ya es
           en sí mismo una confirmación —enseña de quién se trata, pide el

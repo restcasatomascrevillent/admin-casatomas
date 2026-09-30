@@ -8,6 +8,7 @@ import {
   CircleDashed,
   Clock,
   MapPin,
+  SquarePen,
   TrendingUp,
   Users,
   type LucideIcon,
@@ -38,6 +39,16 @@ interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
   /** Salto al plano de la sala de una reserva, para darle mesa. */
   onAsignarMesa: (destino: DestinoAsignacion) => void;
+  /**
+   * Abre el editor de una reserva (2026-09-30: las reservas se editan siempre).
+   * OPCIONAL, como en el resto de callbacks de esta pestaña los pone
+   * `Reservas.tsx` (que tiene el diálogo y el permiso): sin él, las pastillas de
+   * «Pendientes de mesa» salen sin lápiz y esta vista no necesita ni el
+   * proveedor de permisos ni el diálogo para montarse.
+   */
+  onEditarReserva?: (reservaId: string) => void;
+  /** Permiso de edición sobre «reservas»: sin él, el lápiz de cada pastilla sale deshabilitado. */
+  puedeEditar?: boolean;
 }
 
 /**
@@ -82,7 +93,7 @@ interface VistaHoyProps {
  * rojo ni iconos de alerta, y el icono y el título son los MISMOS que usa el
  * plano en su sección equivalente (`CircleDashed`, "Pendientes de mesa").
  */
-export function VistaHoy({ onEspacioClick, onAsignarMesa }: VistaHoyProps) {
+export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puedeEditar = true }: VistaHoyProps) {
   const {
     data: resumen,
     isLoading,
@@ -223,6 +234,8 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa }: VistaHoyProps) {
         fecha={hoy}
         onEspacioClick={onEspacioClick}
         onAsignarMesa={onAsignarMesa}
+        onEditar={onEditarReserva}
+        puedeEditar={puedeEditar}
       />
 
       <CuartosDeHoy fecha={hoy} />
@@ -276,11 +289,17 @@ function FranjaPendientesMesa({
   fecha,
   onEspacioClick,
   onAsignarMesa,
+  onEditar,
+  puedeEditar,
 }: {
   grupos: GrupoPendientes[];
   fecha: string;
   onEspacioClick: (espacioId: string) => void;
   onAsignarMesa: (destino: DestinoAsignacion) => void;
+  /** Abre el editor de la reserva (por id). Sin él, las pastillas salen sin lápiz. */
+  onEditar?: (reservaId: string) => void;
+  /** Permiso de edición sobre «reservas»: sin él, el lápiz sale deshabilitado. */
+  puedeEditar: boolean;
 }) {
   if (grupos.length === 0) return null;
 
@@ -318,6 +337,8 @@ function FranjaPendientesMesa({
                 fecha={fecha}
                 nombreSala={grupo.nombreSala}
                 onAsignarMesa={onAsignarMesa}
+                onEditar={onEditar}
+                puedeEditar={puedeEditar}
               />
             ))}
           </div>
@@ -382,11 +403,17 @@ function PastillaPendiente({
   fecha,
   nombreSala,
   onAsignarMesa,
+  onEditar,
+  puedeEditar,
 }: {
   reserva: ReservaPendienteMesa;
   fecha: string;
   nombreSala: string | null;
   onAsignarMesa: (destino: DestinoAsignacion) => void;
+  /** Abre el editor de la reserva (por id). Sin él, no hay lápiz. */
+  onEditar?: (reservaId: string) => void;
+  /** Permiso de edición sobre «reservas»: sin él, el lápiz sale deshabilitado. */
+  puedeEditar: boolean;
 }) {
   const salto = resolverSaltoAsignacion(
     // `hora` va incluida: de ella sale el turno del destino, y sin turno el
@@ -398,38 +425,63 @@ function PastillaPendiente({
   const destino = salto.destino;
 
   return (
-    // El `title` va TAMBIÉN en un `<span>` que envuelve al botón, igual que
-    // `AccionIcono` en la lista: un botón deshabilitado no dispara eventos de
-    // ratón, así que su propio `title` no llega a enseñarse — y justo el caso
-    // deshabilitado (sin sala) es el que más necesita explicarse.
-    <span className="inline-flex min-w-0" title={salto.titulo}>
-      <button
-        type="button"
-        disabled={!destino}
-        title={salto.titulo}
-        onClick={destino ? () => onAsignarMesa(destino) : undefined}
-        className={cn(
-          "inline-flex min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2 py-0.5",
-          "text-xs text-foreground/90 transition-colors",
-          destino
-            ? "bg-background hover:bg-secondary hover:text-secondary-foreground"
-            : "cursor-not-allowed border-dashed bg-transparent text-muted-foreground opacity-70",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        )}
-      >
-        <span className="shrink-0 font-medium tabular-nums">
-          {String(reserva.hora ?? "").substring(0, 5)}
-        </span>
-        {/* `min-w-0` además de `truncate`: sin él un nombre largo no se recorta
-            —los hijos de un flex no bajan de su ancho de contenido— y la
-            pastilla se saltaría su propio `max-w`. */}
-        <span className="min-w-0 truncate">{reserva.nombre || "Sin nombre"}</span>
-        <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
-          <Users className="h-3 w-3" aria-hidden="true" />
-          <span className="tabular-nums">{reserva.numero_comensales}</span>
-          <span className="sr-only">comensales</span>
-        </span>
-      </button>
+    // Pastilla + lápiz de editar, uno al lado del otro (dentro de un botón no
+    // cabe otro botón). El lápiz (2026-09-30) va en TODA pastilla y NO depende
+    // de la sala: la pastilla «sin sala» está deshabilitada para saltar al
+    // plano, pero se puede editar, y editarla es justo cómo se le da sala.
+    <span className="inline-flex min-w-0 items-center gap-0.5">
+      {/* El `title` va TAMBIÉN en un `<span>` que envuelve al botón, igual que
+          `AccionIcono` en la lista: un botón deshabilitado no dispara eventos de
+          ratón, así que su propio `title` no llega a enseñarse — y justo el caso
+          deshabilitado (sin sala) es el que más necesita explicarse. */}
+      <span className="inline-flex min-w-0" title={salto.titulo}>
+        <button
+          type="button"
+          disabled={!destino}
+          title={salto.titulo}
+          onClick={destino ? () => onAsignarMesa(destino) : undefined}
+          className={cn(
+            "inline-flex min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2 py-0.5",
+            "text-xs text-foreground/90 transition-colors",
+            destino
+              ? "bg-background hover:bg-secondary hover:text-secondary-foreground"
+              : "cursor-not-allowed border-dashed bg-transparent text-muted-foreground opacity-70",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+        >
+          <span className="shrink-0 font-medium tabular-nums">
+            {String(reserva.hora ?? "").substring(0, 5)}
+          </span>
+          {/* `min-w-0` además de `truncate`: sin él un nombre largo no se recorta
+              —los hijos de un flex no bajan de su ancho de contenido— y la
+              pastilla se saltaría su propio `max-w`. */}
+          <span className="min-w-0 truncate">{reserva.nombre || "Sin nombre"}</span>
+          <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
+            <Users className="h-3 w-3" aria-hidden="true" />
+            <span className="tabular-nums">{reserva.numero_comensales}</span>
+            <span className="sr-only">comensales</span>
+          </span>
+        </button>
+      </span>
+      {onEditar && (
+        <button
+          type="button"
+          disabled={!puedeEditar}
+          onClick={() => onEditar(reserva.id)}
+          aria-label={`Editar la reserva de ${reserva.nombre || "este cliente"}`}
+          title={
+            puedeEditar ? "Editar la reserva: datos, día, hora, comensales y sala" : "No tienes permiso para editar reservas"
+          }
+          className={cn(
+            "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors",
+            "hover:bg-secondary hover:text-secondary-foreground",
+            "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+        >
+          <SquarePen className="h-3 w-3" aria-hidden="true" />
+        </button>
+      )}
     </span>
   );
 }

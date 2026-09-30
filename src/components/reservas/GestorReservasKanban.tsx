@@ -58,7 +58,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -66,6 +66,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { ControlLlegada } from "./ControlLlegada";
 import { BlacklistModal } from "./BlacklistModal";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { ConMotivo } from "./ConMotivo";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   ANCHO_COLUMNA_PLEGADA,
   accionesSoloIcono,
@@ -119,6 +122,8 @@ function ReservaCard({
   onMover,
   onToggleImportante,
   onBlacklist,
+  onEditar,
+  puedeEditar = true,
   isDragOverlay,
   anchoColumna,
 }: {
@@ -128,6 +133,10 @@ function ReservaCard({
   onMover: (reserva: ReservaServicio, destinoColumnaId: string) => void;
   onToggleImportante: (reserva: ReservaServicio) => void;
   onBlacklist: (reserva: ReservaServicio) => void;
+  /** Abre el editor de la reserva (2026-09-30): está en el menú «⋮» de TODA tarjeta, movible o no. */
+  onEditar?: (reserva: ReservaServicio) => void;
+  /** Permiso de edición sobre «reservas»: sin él, «Editar reserva» sale deshabilitado. */
+  puedeEditar?: boolean;
   isDragOverlay?: boolean;
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
@@ -217,6 +226,25 @@ function ReservaCard({
                   Llamar
                 </a>
               </DropdownMenuItem>
+            </>
+          )}
+          {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Va
+              en el menú de TODA tarjeta —también las que no se pueden mover— y
+              sin mirar el estado: lo único que lo apaga es el permiso. */}
+          {onEditar && (
+            <>
+              <DropdownMenuSeparator />
+              {/* El ítem deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
+              <ConMotivo className="block" motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                <DropdownMenuItem
+                  disabled={!puedeEditar}
+                  title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
+                  onSelect={() => onEditar(reserva)}
+                >
+                  <SquarePen className="h-3.5 w-3.5 mr-2" />
+                  Editar reserva
+                </DropdownMenuItem>
+              </ConMotivo>
             </>
           )}
           <DropdownMenuSeparator />
@@ -702,6 +730,11 @@ export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
   const queryClient = useQueryClient();
+  // Editar una reserva desde su tarjeta (2026-09-30). El Kanban no miraba el
+  // permiso de edición (se apoya en la RLS); el editor sí, para no abrir un
+  // formulario que la BD luego rechazaría.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
@@ -1058,6 +1091,8 @@ export function GestorReservasKanban() {
                             onMover={solicitarMovimiento}
                             onToggleImportante={toggleImportante}
                             onBlacklist={setBlacklistReserva}
+                            onEditar={(r) => editarReserva(r.id)}
+                            puedeEditar={puedeEditar}
                             anchoColumna={disposicion.anchoColumna}
                           />
                         ))}
@@ -1116,6 +1151,9 @@ export function GestorReservasKanban() {
         open={!!blacklistReserva}
         onOpenChange={(open) => { if (!open) setBlacklistReserva(null); }}
       />
+
+      {/* Editor de la reserva elegida en el menú «⋮» de una tarjeta. `null` hasta que se pide. */}
+      {dialogoEdicion}
     </div>
   );
 }

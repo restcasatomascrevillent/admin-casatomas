@@ -18,7 +18,8 @@ import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useUserRole } from "@/hooks/useUserRole";
+import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
@@ -48,6 +49,11 @@ export default function Reservas() {
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
   const isAdmin = role === "admin";
+  // Editar una reserva (2026-09-30). El diálogo vive aquí y se lo pasa a «Hoy»
+  // (las pastillas de «Pendientes de mesa»); el resto de vistas de reservas
+  // (Lista, Kanban, Asignación, plano, modo servicio…) llevan cada una el suyo.
+  const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
   // ÚNICA instancia en la página: el tab la usa para el contador y la lista
   // unificada para pintar las solicitudes (ver aviso de realtime en el hook).
   const solicitudesState = useSolicitudesPendientes();
@@ -327,7 +333,12 @@ export default function Reservas() {
             /reservas. Sin lista/tabla aquí a propósito: con el kanban
             delante, una tabla debajo solo duplicaba las mismas reservas. */}
         <TabsContent value="hoy" className="mt-6">
-          <VistaHoy onEspacioClick={handleEspacioClick} onAsignarMesa={handleAsignarMesa} />
+          <VistaHoy
+            onEspacioClick={handleEspacioClick}
+            onAsignarMesa={handleAsignarMesa}
+            onEditarReserva={editarReserva}
+            puedeEditar={puedeEditarReservas}
+          />
         </TabsContent>
 
         {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):
@@ -379,6 +390,9 @@ export default function Reservas() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Editor de la reserva elegida con el lápiz de una pastilla de «Hoy». `null` hasta que se pide. */}
+      {dialogoEdicion}
     </DashboardLayout>
   );
 }

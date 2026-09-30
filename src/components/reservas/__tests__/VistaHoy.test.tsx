@@ -24,6 +24,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const h = vi.hoisted(() => ({
   store: { reservas: [] as Record<string, unknown>[], error: null as unknown },
+  // Editar una reserva desde su pastilla (2026-09-30): el callback y el permiso
+  // de la sección «reservas» que `Reservas.tsx` le pasa a `VistaHoy` por props.
+  canEdit: true as boolean,
+  editarReserva: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -95,7 +99,14 @@ const reserva = (over: Record<string, unknown> & { id: string }) => ({
   ...over,
 });
 
-function montar(props?: Partial<{ onEspacioClick: (id: string) => void; onAsignarMesa: (d: unknown) => void }>) {
+function montar(
+  props?: Partial<{
+    onEspacioClick: (id: string) => void;
+    onAsignarMesa: (d: unknown) => void;
+    /** Montar la vista SIN editor (como la monta, p. ej., el test del timeline de estados). */
+    sinEditor: boolean;
+  }>,
+) {
   const onEspacioClick = vi.fn();
   const onAsignarMesa = vi.fn();
   const queryClient = new QueryClient({
@@ -107,6 +118,8 @@ function montar(props?: Partial<{ onEspacioClick: (id: string) => void; onAsigna
       <VistaHoy
         onEspacioClick={props?.onEspacioClick ?? onEspacioClick}
         onAsignarMesa={(props?.onAsignarMesa ?? onAsignarMesa) as (d: never) => void}
+        onEditarReserva={props?.sinEditor ? undefined : h.editarReserva}
+        puedeEditar={h.canEdit}
       />
     </QueryClientProvider>,
   );
@@ -122,9 +135,18 @@ async function esperarCarga(queryClient: QueryClient) {
   });
 }
 
+/**
+ * La pastilla de una reserva (el botón que salta al plano): su nombre accesible
+ * empieza por la hora. Se busca así y no por `/Ana/` a secas porque cada
+ * pastilla lleva además su lápiz de editar, «Editar la reserva de Ana», que
+ * también contiene el nombre.
+ */
+const pastillaDe = (nombre: string) => screen.findByRole("button", { name: new RegExp(`^\\d{2}:\\d{2}.*${nombre}`) });
+
 describe("VistaHoy — franja «Pendientes de mesa»", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.canEdit = true;
     h.store.reservas = [];
     h.store.error = null;
     vi.mocked(useResumenOcupacionHoy).mockReturnValue({
@@ -208,7 +230,7 @@ describe("VistaHoy — franja «Pendientes de mesa»", () => {
     const { onAsignarMesa, queryClient } = montar();
     await esperarCarga(queryClient);
 
-    fireEvent.click(await screen.findByRole("button", { name: /Ana/ }));
+    fireEvent.click(await pastillaDe("Ana"));
 
     expect(onAsignarMesa).toHaveBeenCalledTimes(1);
     expect(onAsignarMesa).toHaveBeenCalledWith({
@@ -241,7 +263,7 @@ describe("VistaHoy — franja «Pendientes de mesa»", () => {
     const { onAsignarMesa, queryClient } = montar();
     await esperarCarga(queryClient);
 
-    const pastilla = await screen.findByRole("button", { name: /Ana/ });
+    const pastilla = await pastillaDe("Ana");
     expect(pastilla).toBeDisabled();
     // Texto del módulo compartido, no uno inventado aquí.
     expect(pastilla).toHaveAttribute(
@@ -320,5 +342,140 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
     fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
     const rejillas = screen.getAllByTestId("rejilla-cuartos").map((r) => r.textContent);
     expect(rejillas).toEqual([`casa_tomas ${HOY}`, `touza ${HOY}`]);
+  });
+});
+
+// Editar una reserva desde su pastilla (2026-09-30: las reservas se editan
+// siempre, desde cualquier vista). La franja solo enseña lo que sigue SIN mesa
+// y cuenta (pendiente, verificada, confirmada y «Llegó»: canceladas y «No vino»
+// no ocupan sitio y no salen), y cada pastilla lleva su lápiz. El lápiz no
+// sienta a nadie y NO depende de que la reserva tenga sala: una pastilla «sin
+// sala» está deshabilitada para saltar al plano, pero se puede editar, y
+// editarla es justo cómo se le da sala.
+describe("VistaHoy — editar desde la pastilla", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.canEdit = true;
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
+      data: RESUMEN,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
+      typeof useEspaciosReserva
+    >);
+    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
+      typeof useAsignacionesMesa
+    >);
+  });
+
+  const lapizDe = (nombre: string) => screen.findByRole("button", { name: `Editar la reserva de ${nombre}` });
+
+  it.each(["pendiente", "verificada", "confirmada", "completada"])(
+    "la pastilla de una reserva «%s» lleva su lápiz y abre el editor de esa reserva",
+    async (estado) => {
+      h.store.reservas = [reserva({ id: "r1", nombre: "Ana", estado })];
+
+      const { onAsignarMesa, queryClient } = montar();
+      await esperarCarga(queryClient);
+
+      fireEvent.click(await lapizDe("Ana"));
+
+      expect(h.editarReserva).toHaveBeenCalledTimes(1);
+      expect(h.editarReserva).toHaveBeenCalledWith("r1");
+      // Editar no es sentar: no salta al plano.
+      expect(onAsignarMesa).not.toHaveBeenCalled();
+    },
+  );
+
+  it("cada pastilla tiene el suyo: dos reservas, dos lápices, cada uno con su id", async () => {
+    h.store.reservas = [
+      reserva({ id: "r1", nombre: "Ana", hora: "13:00:00" }),
+      reserva({ id: "r2", nombre: "Bruno", espacio_id: SALON, hora: "21:30:00" }),
+    ];
+
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    fireEvent.click(await lapizDe("Bruno"));
+    expect(h.editarReserva).toHaveBeenLastCalledWith("r2");
+    fireEvent.click(await lapizDe("Ana"));
+    expect(h.editarReserva).toHaveBeenLastCalledWith("r1");
+  });
+
+  it("una reserva SIN SALA (pastilla deshabilitada para saltar al plano) se puede editar igual", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Huerfana", espacio_id: null })];
+
+    const { onAsignarMesa, queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(await pastillaDe("Huerfana")).toBeDisabled();
+    const lapiz = await lapizDe("Huerfana");
+    expect(lapiz).toBeEnabled();
+
+    fireEvent.click(lapiz);
+    expect(h.editarReserva).toHaveBeenCalledWith("r1");
+    expect(onAsignarMesa).not.toHaveBeenCalled();
+  });
+
+  it("una reserva sin nombre (la BD lo permite) se puede editar igual", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: null })];
+
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Editar la reserva de este cliente" }));
+    expect(h.editarReserva).toHaveBeenCalledWith("r1");
+  });
+
+  it("sin permiso de edición sobre «reservas» el lápiz sale deshabilitado y lo explica", async () => {
+    h.canEdit = false;
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const lapiz = await lapizDe("Ana");
+    expect(lapiz).toBeDisabled();
+    expect(lapiz).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
+    fireEvent.click(lapiz);
+    expect(h.editarReserva).not.toHaveBeenCalled();
+  });
+
+  it("el lápiz no cambia el tono de la franja (sin rojo ni `destructive`) y la pastilla sigue igual", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+
+    const { onAsignarMesa, queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const lapiz = await lapizDe("Ana");
+    expect(lapiz.className).not.toMatch(/destructive|red-/);
+    // La pastilla sigue saltando al plano con su destino de siempre.
+    fireEvent.click(await pastillaDe("Ana"));
+    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin editor (`onEditarReserva` no llega) las pastillas salen sin lápiz y la vista se monta igual, sin proveedor de permisos", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+
+    const { onAsignarMesa, queryClient } = montar({ sinEditor: true });
+    await esperarCarga(queryClient);
+
+    expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
+    // Lo de siempre sigue en pie: la pastilla salta al plano.
+    fireEvent.click(await pastillaDe("Ana"));
+    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
+  });
+
+  it("si no hay nada pendiente no hay franja ni lápices", async () => {
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
   });
 });

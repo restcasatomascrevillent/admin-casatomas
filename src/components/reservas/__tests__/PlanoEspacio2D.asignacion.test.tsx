@@ -138,12 +138,20 @@ const h = vi.hoisted(() => {
     },
   };
 
-  return { store, supabaseDoble };
+  // Editar una reserva desde su fila del panel (2026-09-30): permiso de la sección
+  // «reservas» y el editor que abre el lápiz de cada fila.
+  return { store, supabaseDoble, canEdit: true as boolean, editarReserva: vi.fn() };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: h.supabaseDoble }));
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/usePlanosEspacio");
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: () => ({ canAccess: h.canEdit, loading: false }),
+}));
+vi.mock("@/hooks/useEdicionReserva", () => ({
+  useEdicionReserva: () => ({ editarReserva: h.editarReserva, dialogoEdicion: null }),
+}));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
@@ -1073,5 +1081,72 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     await waitFor(() => expect(rpcDeAsignacion().length).toBeGreaterThan(0));
     const usadas = rpcDeAsignacion().flatMap((l) => l.args.p_mesa_ids as string[]);
     expect(usadas).not.toContain("m6");
+  });
+});
+
+// Editar una reserva desde el panel del plano (2026-09-30: las reservas se
+// editan siempre, desde cualquier vista). El panel enseña las reservas de ESA
+// sala, día y turno que no están canceladas; el lápiz va en cada fila, con mesa
+// o sin ella, y no sienta a nadie.
+describe("PlanoEspacio2D · editar una reserva desde su fila", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.canEdit = true;
+    h.store.llamadasRpc = [];
+  });
+
+  const botonEditar = (nombre: string) => screen.getByRole("button", { name: `Editar la reserva de ${nombre}` });
+
+  it("cada fila lleva su lápiz y abre el editor de esa reserva", async () => {
+    montar();
+    await esperarReserva("Familia Pérez");
+
+    fireEvent.click(botonEditar("Familia Pérez"));
+    expect(h.editarReserva).toHaveBeenCalledWith("r-perez");
+
+    fireEvent.click(botonEditar("Ana López"));
+    expect(h.editarReserva).toHaveBeenLastCalledWith("r-ana");
+    expect(h.editarReserva).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["pendiente", "verificada", "confirmada", "completada", "no_show"])(
+    "una reserva «%s» también se puede editar desde el panel",
+    async (estado) => {
+      montar({ reservas: [reserva("r-x", "Cliente Equis", "13:00:00", 3, { estado })] });
+      await esperarReserva("Cliente Equis");
+
+      fireEvent.click(botonEditar("Cliente Equis"));
+      expect(h.editarReserva).toHaveBeenCalledWith("r-x");
+    },
+  );
+
+  it("también la que ya tiene mesa (sección «con mesa»)", async () => {
+    montar({ asignaciones: [{ id: "a-1", reserva_id: "r-perez", mesa_id: "m6" }] });
+    await esperarReserva("Familia Pérez");
+
+    fireEvent.click(botonEditar("Familia Pérez"));
+    expect(h.editarReserva).toHaveBeenCalledWith("r-perez");
+  });
+
+  it("editar no sienta a nadie: no activa la reserva ni llama al reparto de mesas", async () => {
+    montar();
+    await esperarReserva("Familia Pérez");
+
+    fireEvent.click(botonEditar("Familia Pérez"));
+
+    expect(within(filaDe("Familia Pérez")).getByRole("button", { name: /^Sentar a Familia Pérez/ })).toBeInTheDocument();
+    expect(rpcDeAsignacion()).toHaveLength(0);
+  });
+
+  it("sin permiso de edición sobre «reservas» el lápiz sale deshabilitado y lo explica", async () => {
+    h.canEdit = false;
+    montar();
+    await esperarReserva("Familia Pérez");
+
+    const boton = botonEditar("Familia Pérez");
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
+    fireEvent.click(boton);
+    expect(h.editarReserva).not.toHaveBeenCalled();
   });
 });

@@ -8,10 +8,13 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Euro, Info, ListFilter, ExternalLink } from "lucide-react";
+import { Bot, User, Euro, Info, ListFilter, ExternalLink, SquarePen } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { ConMotivo } from "@/components/reservas/ConMotivo";
 
 interface CallLog {
     id: string;
@@ -70,6 +73,11 @@ function formatDuration(sec: number | null | undefined) {
 }
 
 export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
+    // Editar la reserva que salió de la llamada (2026-09-30). El enlace «Ver
+    // reserva creada» lleva a `/reservas?reserva=<id>`, pero esa página no abre
+    // nada con ese parámetro: el editor se abre aquí mismo.
+    const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+    const { editarReserva, dialogoEdicion } = useEdicionReserva();
     const reservaId: string | undefined =
         call?.reserva_id ||
         (call?.structured_data as any)?.reserva_id ||
@@ -77,6 +85,7 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
             ?.result?.id;
 
     return (
+        <>
         <Dialog open={!!call} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
@@ -259,19 +268,35 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
 
                         {/* Link reserva */}
                         {reservaId && (
-                            <section>
+                            <section className="flex flex-wrap gap-2">
                                 <Button asChild variant="outline" size="sm">
                                     <Link to={`/reservas?reserva=${reservaId}`}>
                                         <ExternalLink className="w-3 h-3 mr-2" />
                                         Ver reserva creada
                                     </Link>
                                 </Button>
+                                {/* El botón deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
+                                <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={!puedeEditar}
+                                        title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
+                                        onClick={() => editarReserva(reservaId)}
+                                    >
+                                        <SquarePen className="w-3 h-3 mr-2" />
+                                        Editar reserva
+                                    </Button>
+                                </ConMotivo>
                             </section>
                         )}
                     </div>
                 </ScrollArea>
             </DialogContent>
         </Dialog>
+        {/* Editor de la reserva de la llamada. `null` hasta que se pide. */}
+        {dialogoEdicion}
+        </>
     );
 }
 

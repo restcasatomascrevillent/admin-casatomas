@@ -1,8 +1,13 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock } from "lucide-react";
+import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock, SquarePen } from "lucide-react";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
@@ -48,6 +53,12 @@ const getStatusColor = (p: number) => {
 
 export function ReservasHoy() {
   const navigate = useNavigate();
+  // Editar una reserva desde el popup de notas (2026-09-30). El popup pasa a ser
+  // controlado para poder cerrarlo al abrir el editor (dos diálogos uno encima
+  // de otro no se entienden). Hooks ANTES del `return` de error de más abajo.
+  const [notasAbiertas, setNotasAbiertas] = useState(false);
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const todasQuery = useTodayReservations();
   const confirmadasQuery = useTodayConfirmedReservations();
   const capacidadQuery = useEspaciosCapacidad();
@@ -146,7 +157,7 @@ export function ReservasHoy() {
             </Badge>
           )}
           {reservasConNotas.length > 0 && (
-            <Dialog>
+            <Dialog open={notasAbiertas} onOpenChange={setNotasAbiertas}>
               <DialogTrigger asChild>
                 <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-secondary/80 transition-colors">
                   <MessageSquare className="h-3 w-3" />
@@ -169,7 +180,30 @@ export function ReservasHoy() {
                             <span className="font-medium">{r.nombre || "Sin nombre"}</span>
                             <span className="text-muted-foreground text-sm ml-2">· {r.numero_comensales} pax</span>
                           </div>
-                          <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
+                            {/* Editar datos, día, hora, comensales, sala o notas de esta
+                                reserva, sea cual sea su estado. Cierra el popup antes. El
+                                botón deshabilitado no recibe el ratón: el motivo se ve en
+                                el envoltorio. */}
+                            <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground"
+                                disabled={!puedeEditar}
+                                aria-label={`Editar la reserva de ${r.nombre || "este cliente"}`}
+                                title={puedeEditar ? "Editar la reserva" : "No tienes permiso para editar reservas"}
+                                onClick={() => {
+                                  setNotasAbiertas(false);
+                                  editarReserva(r.id);
+                                }}
+                              >
+                                <SquarePen className="h-3.5 w-3.5" />
+                              </Button>
+                            </ConMotivo>
+                          </div>
                         </div>
                         <p className="text-sm text-muted-foreground bg-background p-2 rounded italic">
                           "{r.notas_cliente}"
@@ -293,6 +327,8 @@ export function ReservasHoy() {
           )}
         </div>
       </CardContent>
+      {/* Editor de la reserva elegida en el popup de notas. `null` hasta que se pide. */}
+      {dialogoEdicion}
     </Card>
   );
 }
