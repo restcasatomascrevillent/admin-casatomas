@@ -428,6 +428,109 @@ export const useDisponibilidadRango = (
   });
 };
 
+// ------------------------------------------------------------
+// AFORO AL EDITAR — la regla del trigger en un UPDATE
+// ------------------------------------------------------------
+// `supabase/migrations/20260930212000_aforo_permite_ediciones_sin_subir_ocupacion.sql`
+// (paso 0b de `validar_capacidad_reserva`): un UPDATE se rechaza solo si AÑADE
+// ocupación a un turno que queda por encima del aforo. Si la reserva ya
+// ocupaba plaza y se queda en el MISMO turno (mismo negocio, mismo día, mismo
+// lado del corte de las 17:00) sin subir de comensales, pasa aunque el turno
+// esté pasado de aforo (p. ej. tras desactivar una sala). Lo demás se comprueba
+// como un alta. El motor compartido de NUEVAS reservas no cambia.
+
+/**
+ * La reserva tal como está GUARDADA antes de editarla (lo que el trigger ve
+ * como OLD). `ReservaEditable` (`src/lib/reservas/edicionReserva.ts`) ya trae
+ * estas columnas: se le puede pasar tal cual.
+ */
+export interface ReservaAnteriorAforo {
+  id: string;
+  /** "yyyy-MM-dd" (lo que venga detrás, p. ej. "T00:00:00", se ignora). */
+  fecha: string;
+  /** "HH:MM" o "HH:MM:SS". */
+  hora: string;
+  numero_comensales: number;
+  estado: string | null;
+  marca?: string | null;
+}
+
+/** El cambio que se quiere guardar (lo que el trigger ve como NEW). */
+export interface CambioAforo {
+  fecha: string;
+  hora: string;
+  comensales: number;
+  /** `undefined` = la de la reserva anterior; `null`/"" = Casa Tomás (el COALESCE del trigger). */
+  marca?: string | null;
+  /** `undefined`/`null` = el de la reserva anterior: editar los datos no cambia el estado. */
+  estado?: string | null;
+}
+
+/**
+ * Qué hace el trigger con un UPDATE:
+ *   · "no_ocupa": el estado NUEVO no ocupa plaza (cancelada, completada,
+ *     no_show) → no comprueba nada;
+ *   · "no_suma": ya ocupaba plaza y sigue en el mismo turno sin subir de
+ *     comensales → pasa aunque el turno esté por encima del aforo;
+ *   · "suma": todo lo demás (sube comensales, cambia de turno, de día o de
+ *     negocio, o pasa de no ocupar a ocupar) → comprueba el aforo como un alta.
+ */
+export type EfectoEdicionAforo = "no_ocupa" | "no_suma" | "suma";
+
+const MINUTOS_DIA_AFORO = 24 * 60;
+const FECHA_ISO_AFORO = /^\d{4}-\d{2}-\d{2}$/;
+
+function ocupaPlaza(estado: string | null | undefined): boolean {
+  return ESTADOS_QUE_OCUPAN.includes(estado ?? "");
+}
+
+/** El COALESCE(marca, 'casa_tomas') del trigger. */
+function negocioDelAforo(marca: string | null | undefined): string {
+  return typeof marca === "string" && marca.trim() ? marca.trim() : MARCA_POR_DEFECTO;
+}
+
+/** "yyyy-MM-dd", o `null` si no lo es (y entonces no se da por «mismo día»). */
+function diaDelAforo(fecha: unknown): string | null {
+  const dia = String(fecha ?? "").slice(0, 10);
+  return FECHA_ISO_AFORO.test(dia) ? dia : null;
+}
+
+/**
+ * Turno con el corte del trigger. Una hora ilegible, o de las 24:00 en
+ * adelante (el motor compartido la pliega a la madrugada y la BD la clasifica
+ * como cena), da `null`: no se da por «mismo turno» y se comprueba el aforo.
+ */
+function turnoDelAforo(hora: unknown): "comida" | "cena" | null {
+  const minutos = horaAMinutos(hora);
+  if (minutos === null || minutos >= MINUTOS_DIA_AFORO) return null;
+  return turnoDeHora(minutos);
+}
+
+/**
+ * La regla del trigger para un UPDATE, sin I/O. Ante la duda (un dato ilegible
+ * o que falta) responde "suma", que es lo conservador: comprobar el aforo.
+ */
+export function efectoEdicionEnAforo(anterior: ReservaAnteriorAforo, cambio: CambioAforo): EfectoEdicionAforo {
+  if (!ocupaPlaza(cambio.estado ?? anterior.estado)) return "no_ocupa";
+  if (!ocupaPlaza(anterior.estado)) return "suma";
+
+  const marcaNueva = cambio.marca === undefined ? anterior.marca : cambio.marca;
+  const diaAnterior = diaDelAforo(anterior.fecha);
+  const turnoAnterior = turnoDelAforo(anterior.hora);
+  const mismoTurno =
+    negocioDelAforo(anterior.marca) === negocioDelAforo(marcaNueva) &&
+    diaAnterior !== null &&
+    diaAnterior === diaDelAforo(cambio.fecha) &&
+    turnoAnterior !== null &&
+    turnoAnterior === turnoDelAforo(cambio.hora);
+
+  const antes = Number(anterior.numero_comensales);
+  const despues = Number(cambio.comensales);
+  const noSube = Number.isFinite(antes) && Number.isFinite(despues) && despues <= antes;
+
+  return mismoTurno && noSube ? "no_suma" : "suma";
+}
+
 export interface AforoTurno {
   disponible: boolean;
   capacidadMaxima: number;
@@ -435,6 +538,11 @@ export interface AforoTurno {
   capacidadDisponible: number;
   esComida: boolean;
   mensaje: string;
+  /**
+   * Solo si se pasa la reserva ANTERIOR (edición): qué hará el trigger con el
+   * cambio (`efectoEdicionEnAforo`). `undefined` en un alta o si solo llega el id.
+   */
+  efectoEdicion?: EfectoEdicionAforo;
 }
 
 /**
@@ -448,17 +556,24 @@ export interface AforoTurno {
  * la autoridad es la base de datos, que además usa un advisory lock. El
  * INSERT puede fallar aunque esto diga que hay hueco, y es correcto.
  *
- * `excluirReservaId` (opcional): al editar una reserva, no contarla contra sí
- * misma — sin esto, cambiar la hora de una reserva de un turno casi lleno
- * avisaría de un «aforo superado» que la BD no va a dar.
+ * `reservaEditada` (opcional), al editar:
+ *   · su id: no se cuenta contra sí misma (como hace el trigger, `id != NEW.id`)
+ *     y se comprueba como un alta — lo de antes, para las llamadas que ya había;
+ *   · la reserva anterior entera (`ReservaAnteriorAforo`): además se aplica la
+ *     regla del UPDATE (`efectoEdicionEnAforo`): si el cambio no añade
+ *     ocupación, `disponible` es `true` aunque el turno esté pasado de aforo,
+ *     que es lo que hará la BD. El estado nuevo se da por igual al anterior
+ *     (editar los datos no cambia el estado).
  */
 export const verificarAforoTurno = async (
   fecha: string,
   hora: string,
   comensales: number,
   marca: string = MARCA_POR_DEFECTO,
-  excluirReservaId?: string | null,
+  reservaEditada?: string | ReservaAnteriorAforo | null,
 ): Promise<AforoTurno> => {
+  const anterior = reservaEditada && typeof reservaEditada === "object" ? reservaEditada : null;
+  const excluirReservaId = anterior ? anterior.id : (reservaEditada as string | null | undefined);
   const datos = await leerDatosDelDia(fecha, marca, excluirReservaId);
   const resultado = calcularDisponibilidad({
     fecha,
@@ -472,7 +587,20 @@ export const verificarAforoTurno = async (
   const turno = turnoDeHora(hora);
   const aforo = resultado.aforo[turno];
   const esComida = turno === "comida";
-  const disponible = !aforo.completo;
+  const efectoEdicion = anterior ? efectoEdicionEnAforo(anterior, { fecha, hora, comensales, marca }) : undefined;
+  const sinComprobar = efectoEdicion === "no_ocupa" || efectoEdicion === "no_suma";
+  const disponible = sinComprobar || !aforo.completo;
+
+  let mensaje: string;
+  if (efectoEdicion === "no_ocupa") {
+    mensaje = "Esta reserva no ocupa plaza (está cancelada o cerrada): el cambio no se comprueba contra el aforo.";
+  } else if (efectoEdicion === "no_suma" && aforo.completo) {
+    mensaje = `El turno de ${turno} ya está por encima del aforo (${aforo.ocupacion + Number(comensales)} de ${aforo.capacidad_maxima}), pero este cambio no suma comensales: se puede guardar.`;
+  } else if (disponible) {
+    mensaje = `Quedan ${aforo.disponible} plazas en el turno de ${turno} (${aforo.ocupacion}/${aforo.capacidad_maxima} ocupadas)`;
+  } else {
+    mensaje = `Aforo superado en el turno de ${turno}: quedan ${aforo.disponible} plazas de ${aforo.capacidad_maxima} y se piden ${comensales}`;
+  }
 
   return {
     disponible,
@@ -480,9 +608,8 @@ export const verificarAforoTurno = async (
     comensalesActuales: aforo.ocupacion,
     capacidadDisponible: aforo.disponible,
     esComida,
-    mensaje: disponible
-      ? `Quedan ${aforo.disponible} plazas en el turno de ${turno} (${aforo.ocupacion}/${aforo.capacidad_maxima} ocupadas)`
-      : `Aforo superado en el turno de ${turno}: quedan ${aforo.disponible} plazas de ${aforo.capacidad_maxima} y se piden ${comensales}`,
+    mensaje,
+    ...(efectoEdicion ? { efectoEdicion } : {}),
   };
 };
 
