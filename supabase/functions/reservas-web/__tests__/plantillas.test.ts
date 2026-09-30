@@ -4,7 +4,7 @@
  * Cubre lo que pide el encargo ("El Reservado, de Touza, reserva por la
  * misma función que Casa Tomás y recibía la marca equivocada en los 4
  * correos"):
- *   - una reserva de Touza produce los datos de Touza en las 4 plantillas;
+ *   - una reserva de Touza produce los datos de Touza en sus plantillas (eran 4; quedan 2 desde 2026-09-30);
  *   - una de Casa Tomás produce los suyos;
  *   - el caso indeterminado (sin ninguna señal reconocible) cae siempre en
  *     el valor por defecto (Casa Tomás), nunca en un correo sin marca ni
@@ -29,8 +29,6 @@ import {
   escapeHtml,
   tplSolicitudRecibida,
   tplSolicitudNoProcesada,
-  tplConfirmaAsistencia,
-  tplSinDisponibilidad,
   type Marca,
   type DatosNegocio,
 } from "../plantillas.ts";
@@ -178,8 +176,8 @@ describe("NEGOCIOS — configuración de contacto", () => {
 });
 
 // ----------------------------------------------------------------------------
-// Las 4 plantillas — cada una debe llevar los datos del negocio que se le
-// pasa, y NUNCA los del otro. Tabla común para no repetir las 4 llamadas por
+// Las plantillas — cada una debe llevar los datos del negocio que se le
+// pasa, y NUNCA los del otro. Tabla común para no repetir las llamadas por
 // separado en cada caso (Touza / Casa Tomás / valor por defecto).
 // ----------------------------------------------------------------------------
 
@@ -188,9 +186,8 @@ type Renderizador = (negocio: DatosNegocio) => string;
 const PLANTILLAS: Record<string, Renderizador> = {
   tplSolicitudRecibida: (negocio) => tplSolicitudRecibida(negocio, "Elena Morales", "2026-03-16", "21:00", 4),
   tplSolicitudNoProcesada: (negocio) => tplSolicitudNoProcesada(negocio, "Elena Morales", "2026-03-16", "21:00", 4),
-  tplConfirmaAsistencia: (negocio) =>
-    tplConfirmaAsistencia(negocio, "Elena Morales", "2026-03-16", "21:00", 4, "https://x/confirmar", "https://x/cancelar"),
-  tplSinDisponibilidad: (negocio) => tplSinDisponibilidad(negocio, "Elena Morales", "2026-03-16", "21:00", 4),
+  // tplConfirmaAsistencia y tplSinDisponibilidad se retiraron el 2026-09-30
+  // junto con la acción `/notificar-estado`, su único usuario.
 };
 
 describe.each(Object.entries(PLANTILLAS))("%s", (_nombrePlantilla, renderizar) => {
@@ -229,41 +226,10 @@ describe.each(Object.entries(PLANTILLAS))("%s", (_nombrePlantilla, renderizar) =
   });
 
   it("sigue escapando los datos de cliente (nombre) igual que antes de este cambio", () => {
-    const html =
-      renderizar === PLANTILLAS.tplConfirmaAsistencia
-        ? tplConfirmaAsistencia(NEGOCIOS.touza, '<script>alert(1)</script>', "2026-03-16", "21:00", 4, "https://x/a", "https://x/b")
-        : renderizar(NEGOCIOS.touza).replace("Elena Morales", "debería no importar");
+    const html = renderizar(NEGOCIOS.touza).replace("Elena Morales", "debería no importar");
     // Se reconstruye el caso general por separado abajo; aquí solo se
     // confirma que escapeHtml sigue en juego vía una plantilla concreta.
     expect(html).not.toContain("<script>alert(1)</script>");
-  });
-});
-
-describe("tplSinDisponibilidad — botón de llamada específico de esta plantilla", () => {
-  it("el botón de llamar usa tel:+34 + los dígitos del negocio, y el nombre en el texto del botón", () => {
-    const htmlTouza = tplSinDisponibilidad(NEGOCIOS.touza, "Elena Morales", "2026-03-16", "21:00", 4);
-    expect(htmlTouza).toContain(`href="tel:+34${NEGOCIOS.touza.telefonoDigits}"`);
-    expect(htmlTouza).toContain("Llamar a Touza");
-
-    const htmlCasaTomas = tplSinDisponibilidad(NEGOCIOS.casa_tomas, "Elena Morales", "2026-03-16", "21:00", 4);
-    expect(htmlCasaTomas).toContain(`href="tel:+34${NEGOCIOS.casa_tomas.telefonoDigits}"`);
-    expect(htmlCasaTomas).toContain("Llamar a Casa Tomás");
-  });
-});
-
-describe("tplConfirmaAsistencia — enlaces de confirmar/cancelar", () => {
-  it("incluye las URLs de confirmar y cancelar recibidas, sin tocarlas", () => {
-    const html = tplConfirmaAsistencia(
-      NEGOCIOS.touza,
-      "Elena Morales",
-      "2026-03-16",
-      "21:00",
-      4,
-      "https://reservas.example/confirmar?token=abc",
-      "https://reservas.example/cancelar?token=abc",
-    );
-    expect(html).toContain('href="https://reservas.example/confirmar?token=abc"');
-    expect(html).toContain('href="https://reservas.example/cancelar?token=abc"');
   });
 });
 

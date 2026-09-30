@@ -51,8 +51,9 @@
 //   4. Por defecto, 'casa_tomas' — el caso mayoritario y el seguro.
 //
 // Una vez creada la reserva, `marca` queda GUARDADA en la fila (columna
-// nueva) y el resto de acciones (`notificar-estado`, `confirmar`,
-// `cancelar`) la leen tal cual de `fetchReserva` — NO se vuelve a derivar de
+// nueva) y el resto de acciones (`confirmar`, `cancelar`; la antigua
+// `notificar-estado` se retiró el 2026-09-30) la leen tal cual de
+// `fetchReserva` — NO se vuelve a derivar de
 // notas_cliente en esos pasos, así que un cambio posterior en el texto de
 // Reservado.tsx no puede desincronizar los correos de una reserva ya creada.
 // ============================================================================
@@ -330,18 +331,17 @@ export type PrioridadAvisoEmailFallido = "alta" | "normal";
 export const ORIGEN_RESERVAS_WEB = "reservas_web";
 
 /** 'alta': el correo lleva una acción pendiente que depende de que el
- * cliente lo reciba (hoy solo "confirma asistencia" — el email con los
- * enlaces de confirmar/cancelar; ver `tplConfirmaAsistencia`). 'normal':
- * el resto — recibo o rechazo informativo, sin acción pendiente que
- * dependa del correo en sí (el cliente ya sabe su situación por la propia
- * respuesta HTTP de `/crear`, aunque no le llegue el email).
+ * cliente lo reciba (el caso tipo es "confirma asistencia" — un email con
+ * enlaces de confirmar/cancelar). 'normal': el resto — recibo o rechazo
+ * informativo, sin acción pendiente que dependa del correo en sí (el cliente
+ * ya sabe su situación por la propia respuesta HTTP de `/crear`, aunque no
+ * le llegue el email).
  *
- * NOTA: `handleNotificarEstado` (index.ts) todavía NO llama a
- * `avisarEmailFallido` cuando falla el envío de "confirma asistencia" — ese
- * fallo hoy no genera ningún aviso interno (gap real, pero fuera de los dos
- * fallos verificados en la prueba de QA que motivan esta sesión; no se
- * amplía el alcance para corregirlo aquí). Esta función queda lista para
- * cuando se conecte: clasifica 'alta' aunque ese punto no la use todavía. */
+ * NOTA (2026-09-30): la acción `/notificar-estado` y su plantilla
+ * `tplConfirmaAsistencia` se retiraron de reservas-web (ruta abierta sin
+ * secreto y sin llamadores; los correos de estado los manda
+ * `emails-reserva`). Nadie en esta función manda hoy "confirma asistencia";
+ * la clasificación 'alta' se conserva por si vuelve a hacerlo. */
 export function prioridadAvisoEmailFallido(contexto: string): PrioridadAvisoEmailFallido {
   return contexto === "confirma asistencia" ? "alta" : "normal";
 }
@@ -636,172 +636,6 @@ export function tplSolicitudNoProcesada(negocio: DatosNegocio, nombre: string, f
           <tr>
             <td style="padding:0 48px 40px;">
               <p style="margin:0;font-size:14px;color:#6B6560;line-height:1.7;">Agradecemos su comprensión y esperamos poder recibirle en otra ocasión.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">${negocio.nombre} · ${negocio.localidad}</div>
-              <div style="font-size:12px;color:#6B6560;">${negocio.direccion} &nbsp;·&nbsp; <a href="tel:${negocio.telefonoDigits}" style="color:#6B6560;text-decoration:none;">${negocio.telefonoTexto}</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-// ------------------------------------------------------------
-// PLANTILLA: Confirma tu asistencia (lleva los 2 enlaces con token)
-// ------------------------------------------------------------
-export function tplConfirmaAsistencia(negocio: DatosNegocio, nombre: string, fecha: string, hora: string, comensales: number, confirmUrl: string, cancelUrl: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Confirmación requerida - ${negocio.nombre}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">${negocio.nombre}</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">${negocio.localidad}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:36px 48px 0;text-align:center;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#1C1F22;font-weight:normal;margin-bottom:12px;">Confirma tu asistencia</div>
-              <p style="margin:0;font-size:15px;color:#6B6560;line-height:1.7;">Hola, <strong style="color:#1C1F22;">${escapeHtml(nombre)}</strong>. Tu mesa está casi lista. Solo necesitamos que confirmes tu asistencia para garantizar tu reserva.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 16px;">
-              <a href="${confirmUrl}" style="display:block;text-align:center;background:#B8936A;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;margin-bottom:12px;">
-                Sí, confirmo mi asistencia
-              </a>
-              <a href="${cancelUrl}" style="display:block;text-align:center;background:transparent;color:#6B6560;text-decoration:none;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:14px 0;border:1px solid #E8E0D5;">
-                Cancelar reserva
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">Si no confirmas, la mesa puede quedar disponible para otros clientes.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:24px 48px;background:#1C1F22;text-align:center;">
-              <div style="font-family:Georgia,serif;font-size:13px;color:#B8936A;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">${negocio.nombre} · ${negocio.localidad}</div>
-              <div style="font-size:12px;color:#6B6560;">${negocio.direccion} &nbsp;·&nbsp; <a href="tel:${negocio.telefonoDigits}" style="color:#6B6560;text-decoration:none;">${negocio.telefonoTexto}</a></div>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-// ------------------------------------------------------------
-// PLANTILLA: Sin disponibilidad (revisión manual del restaurante)
-// ------------------------------------------------------------
-export function tplSinDisponibilidad(negocio: DatosNegocio, nombre: string, fecha: string, hora: string, comensales: number): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sin disponibilidad - ${negocio.nombre}</title>
-</head>
-<body style="margin:0;padding:0;background-color:#F7F3EE;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F3EE;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background-color:#FFFFFF;border-top:3px solid #B8936A;">
-          <tr>
-            <td style="padding:40px 48px 32px;text-align:center;border-bottom:1px solid #E8E0D5;">
-              <div style="font-family:Georgia,'Times New Roman',serif;font-size:28px;letter-spacing:4px;color:#1C1F22;text-transform:uppercase;font-weight:normal;">${negocio.nombre}</div>
-              <div style="width:40px;height:1px;background:#B8936A;margin:14px auto 10px;"></div>
-              <div style="font-size:10px;letter-spacing:3px;color:#B8936A;text-transform:uppercase;">${negocio.localidad}</div>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px 48px 0;text-align:center;">
-              <span style="display:inline-block;background:#F0EDEA;border:1px solid #DDD5CC;color:#6B6560;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;">Sin disponibilidad</span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:28px 48px 0;">
-              <p style="margin:0 0 20px;font-size:22px;color:#1C1F22;font-family:Georgia,'Times New Roman',serif;font-weight:normal;">Estimado/a ${escapeHtml(nombre)}</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#6B6560;line-height:1.7;">Lamentamos informarle que el restaurante se encuentra completo para la fecha y hora solicitadas. No podremos confirmar su reserva para los siguientes datos:</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 32px;">
-              <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E8E0D5;border-top:2px solid #B8936A;">
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Fecha</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(fecha)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;border-bottom:1px solid #E8E0D5;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Hora</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${escapeHtml(hora)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:16px 20px;">
-                    <span style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#B8936A;display:block;margin-bottom:4px;">Comensales</span>
-                    <span style="font-size:16px;color:#1C1F22;font-weight:600;">${comensales} personas</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 16px;">
-              <a href="tel:+34${negocio.telefonoDigits}" style="display:block;text-align:center;background:#1C1F22;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:18px 0;">
-                Llamar a ${negocio.nombre}
-              </a>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:0 48px 40px;">
-              <p style="margin:0;font-size:13px;color:#9B948E;text-align:center;line-height:1.6;">Puedes contactarnos por teléfono para encontrar una alternativa. Disculpe las molestias.</p>
             </td>
           </tr>
           <tr>

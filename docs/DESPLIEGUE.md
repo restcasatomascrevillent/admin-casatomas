@@ -29,9 +29,9 @@ Sin ese secret la función falla **por los dos lados**:
 - `verifyReservaToken` es *fail-closed*: `if (!TOKEN_SECRET) return null`
   (`supabase/functions/reservas-web/index.ts:331-334`) → **todos** los enlaces de
   confirmar y cancelar devuelven "Enlace no válido".
-- `signReservaToken` llama a `crypto.subtle.importKey` con una clave de longitud
-  cero (`index.ts:310-311, 325`), que lanza `DataError` → `POST /notificar-estado`
-  devuelve 500 justo al mandar el correo de "confirma tu asistencia".
+- (`signReservaToken` y `POST /notificar-estado` se retiraron el 2026-09-30:
+  la ruta estaba abierta sin secreto. Solo queda la verificación de los
+  enlaces ya enviados.)
 
 **Defínelo en el Paso 0 o no despliegues `reservas-web`.**
 
@@ -98,8 +98,8 @@ parece que añades seguridad y lo que haces es **tirar el canal de reservas de l
 
 Si ese secret **no** existe, `checkSharedSecret` devuelve `true` y no bloquea nada
 (`supabase/functions/reservas-web/index.ts:96`). Si **sí** existe, pasa a exigir la
-cabecera `x-webhook-secret` en las tres rutas POST: `/disponibilidad`, `/crear`
-y `/notificar-estado` (`index.ts:903, 993, 1216`).
+cabecera `x-webhook-secret` en las dos rutas POST: `/disponibilidad` y `/crear`
+(`/notificar-estado` se retiró el 2026-09-30).
 
 El problema: **`casa-tomas-story` no manda esa cabecera, y es a propósito.** Era el
 secreto de n8n (`VITE_N8N_WEBHOOK_SECRET`), viajaba vacío en el bundle y además
@@ -326,7 +326,7 @@ Después, las que no dependen de ninguna migración pendiente:
 | Orden | Función | Nota |
 |---|---|---|
 | 7 | `reservas-web` | **Nueva.** No depende de ninguna de las 8 (usa `reservas`, `blacklist`, `configuracion_reservas`, `configuracion_turnos`, `espacios_reserva`, `solicitudes_pendientes`, todas ya en producción). Sí depende del secret `RESERVAS_WEB_TOKEN_SECRET` del Paso 0. |
-| 8 | `notify-reservation-change` | Llama a `reservas-web/notificar-estado`. Despliégala **después** de `reservas-web`. |
+| 8 | `notify-reservation-change` | Llama a `emails-reserva/notificar` (ya no a `reservas-web/notificar-estado`, retirada el 2026-09-30). |
 | 9 | `vapi-analytics` | **Nunca desplegada**, y el panel ya la llama. Necesita `VAPI_API_KEY`. Va en esta tanda a propósito: ver ⚠️ 3. |
 | 10 | `traducir-contenido` | **Nueva.** Sustituye a `traducir-carta` / `traducir-novedad` en 12 sitios del panel. |
 | 11 | `admin-create-user` · `admin-delete-user` · `admin-update-user-password` · `list-users` | Cambios de código. |
