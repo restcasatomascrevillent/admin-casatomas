@@ -14,6 +14,11 @@
  * deshabilitados con el motivo visible (`ConMotivo`), y el vocabulario es el único
  * «Ha llegado» / «No vino». El `// BUG conocido` del permiso pasó a «corregido».
  *
+ * PASO 2: el hook real de detrás es ya el ejecutor único. Las escrituras van condicionadas
+ * al estado de partida (`.in("estado", …)`) y el «Deshacer» del chip vuelve al estado que
+ * la reserva tenía antes de llegar, o a «Confirmada» si no se sabe (aquí, la reserva llega
+ * ya «Llegó», sin pasado conocido).
+ *
  * Nada llega a Supabase: el cliente y `sonner` están mockeados.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
@@ -336,13 +341,15 @@ interface Escritura {
   tabla: string;
   payload: Record<string, unknown>;
   eq: [string, unknown] | null;
+  /** La condición de estado de partida (`.in("estado", …)`); `null` si la escritura no la lleva. */
+  en: [string, unknown[]] | null;
   select: string | null;
 }
 
 function mockEscrituras(respuestas: Array<{ error?: unknown; data?: unknown }> = []) {
   const escrituras: Escritura[] = [];
   vi.mocked(supabase.from).mockImplementation(((tabla: string) => {
-    const escritura: Escritura = { tabla, payload: {}, eq: null, select: null };
+    const escritura: Escritura = { tabla, payload: {}, eq: null, en: null, select: null };
     const builder: Record<string, unknown> = {
       update: vi.fn((payload: Record<string, unknown>) => {
         escritura.payload = { ...payload };
@@ -351,6 +358,10 @@ function mockEscrituras(respuestas: Array<{ error?: unknown; data?: unknown }> =
       }),
       eq: vi.fn((columna: string, valor: unknown) => {
         escritura.eq = [columna, valor];
+        return builder;
+      }),
+      in: vi.fn((columna: string, valores: unknown[]) => {
+        escritura.en = [columna, valores];
         return builder;
       }),
       select: vi.fn((columnas: string) => {
@@ -405,6 +416,9 @@ describe("ControlLlegada + useAccionesServicioReserva (hook real, Supabase mocke
       payload: { estado: "completada" },
     });
     expect(typeof escrituras[0].payload.llegada_at).toBe("string");
+    // Solo si la BD sigue en el estado que VIO el personal (aquí, «Pendiente»): el estado previo que se
+    // recuerda para el «Deshacer» del chip tiene que ser verdad aunque la tarjeta esté desfasada (M1).
+    expect(escrituras[0].en).toEqual(["estado", ["pendiente"]]);
     expect(invalidadas).toEqual(expect.arrayContaining(["reservas-kanban", "reservas-hoy", "reservas-lista", "dashboard-stats"]));
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
@@ -417,6 +431,8 @@ describe("ControlLlegada + useAccionesServicioReserva (hook real, Supabase mocke
 
     await waitFor(() => expect(invalidadas.length).toBeGreaterThan(0));
     expect(escrituras[0].payload).toEqual({ estado: "no_show", llegada_at: null });
+    // La tarjeta de la prueba es «Confirmada».
+    expect(escrituras[0].en).toEqual(["estado", ["confirmada"]]);
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
 
@@ -431,6 +447,9 @@ describe("ControlLlegada + useAccionesServicioReserva (hook real, Supabase mocke
 
     await waitFor(() => expect(invalidadas.length).toBeGreaterThan(0));
     expect(escrituras[0].payload).toEqual({ estado: "confirmada", llegada_at: null });
+    // Solo si la BD sigue en el estado que vio el personal («Llegó» o «No vino»): no se pisa lo que haya
+    // pasado entre tanto (p. ej. que otro dispositivo la marcara «No vino» después de «Llegó»).
+    expect(escrituras[0].en).toEqual(["estado", [estado]]);
     expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
 

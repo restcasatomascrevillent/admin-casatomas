@@ -20,6 +20,7 @@ import {
   useAccionesServicioReserva,
   __resetColumnaLlegadaParaTests,
 } from "@/hooks/useAccionesServicioReserva";
+import { __vaciarEstadosPreviosParaTests } from "@/lib/reservas/estadoPrevio";
 import type { ReservaServicio } from "@/lib/reservas/servicioSala";
 
 const reserva: ReservaServicio = {
@@ -45,6 +46,8 @@ function mockUpdates(respuestas: { error: unknown; data?: unknown }[]) {
         return builder;
       }),
       eq: vi.fn(() => builder),
+      // La escritura va condicionada al estado de partida (`.in("estado", …)`).
+      in: vi.fn(() => builder),
       select: vi.fn(() => builder),
       then: (ok: (v: unknown) => unknown) => {
         const r = respuestas.shift() ?? { error: null };
@@ -75,6 +78,7 @@ describe("useAccionesServicioReserva", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetColumnaLlegadaParaTests();
+    __vaciarEstadosPreviosParaTests();
   });
 
   it("mover de espacio: actualiza el Kanban y NO envía correo", async () => {

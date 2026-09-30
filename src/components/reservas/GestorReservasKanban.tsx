@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent, CollisionDetection, Announcements } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { turnoDeHora } from "@/hooks/useDisponibilidad";
@@ -28,7 +28,7 @@ import {
   MARCA_POR_DEFECTO,
   normalizarMarca,
 } from "@/lib/reservas/negocios";
-import { useAccionesServicioReserva, CLAVES_LISTAS_RESERVAS } from "@/hooks/useAccionesServicioReserva";
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import {
   comensalesEnEspacioTurno,
@@ -763,7 +763,6 @@ interface MovimientoPendiente {
 export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
-  const queryClient = useQueryClient();
   // Permiso de edición sobre «reservas». Antes solo lo miraba el editor y el resto
   // del kanban se apoyaba en la RLS de la BD; ahora TODO lo que escribe en una
   // reserva (estrella, llegada, no vino, deshacer, mover, lista negra, editar)
@@ -786,23 +785,13 @@ export function GestorReservasKanban() {
   // vivían solo en la tabla "Reservas de Hoy" (retirada 2026-09-25 al pasar
   // el kanban a vista principal de "Hoy" — ver Reservas.tsx). Se traen aquí
   // para no perder capacidad, no para duplicar UI.
-  const toggleImportante = async (reserva: ReservaServicio) => {
-    const nuevoValor = !reserva.importante;
-    const { error } = await supabase
-      .from("reservas" as any)
-      .update({ importante: nuevoValor })
-      .eq("id", reserva.id);
-
-    if (error) {
-      console.error("Error actualizando la reserva:", error);
-      toast.error("No se pudo actualizar la reserva: " + error.message);
-      return;
-    }
-
-    for (const clave of CLAVES_LISTAS_RESERVAS) {
-      queryClient.invalidateQueries({ queryKey: [clave] });
-    }
-    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
+  //
+  // La estrella pasa por el ejecutor único (`alternarImportante`), igual que en la
+  // lista: pide la fila de vuelta (con la RLS denegando no da un falso «marcada»),
+  // cambia al instante y deshace el cambio si no se guarda. Antes cada pantalla tenía
+  // su copia de esta función.
+  const toggleImportante = (reserva: ReservaServicio) => {
+    void acciones.alternarImportante(reserva);
   };
 
   /** Plegar/desplegar una columna a mano. Nada la vuelve a plegar por su cuenta. */

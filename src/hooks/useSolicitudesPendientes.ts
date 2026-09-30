@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { ActualizacionSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import { esErrorEsquemaPendiente, mensajeErrorPropuesta } from "@/lib/reservas/propuestaCliente";
 import type { ContactoReserva } from "@/lib/reservas/altaPanel";
+import { notificarYAvisarSiFalla } from "@/lib/reservas/notificarCliente";
 
 export interface SolicitudPendiente {
   id: string;
@@ -197,9 +198,10 @@ export function useSolicitudesPendientes() {
       return res;
     }
     if (res.reserva_id && !res.ya_aceptada) {
-      supabase.functions
-        .invoke("notify-reservation-change", { body: { reserva_id: res.reserva_id } })
-        .catch((err) => console.error("Error notificando la reserva nueva:", err));
+      // La misma forma de llamar que las acciones de reserva (`notificarCliente.ts`): con la
+      // respuesta comprobada, y un aviso honesto al personal si el correo no sale (la
+      // reserva ya está creada y eso no se toca). No se espera: el correo no retrasa el «hecho».
+      void notificarYAvisarSiFalla(res.reserva_id, res.estado ? { estado: res.estado } : {});
     }
     if (res.ya_aceptada) toast.info("Ya estaba aceptada: la reserva existía.");
     else if (res.estado === "pendiente") toast.info("Reserva creada como pendiente de revisión (cliente en lista negra).");

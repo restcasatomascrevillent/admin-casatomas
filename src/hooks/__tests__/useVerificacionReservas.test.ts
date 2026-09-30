@@ -14,25 +14,22 @@
  *    14:00 pintaba un aviso ámbar por una diferencia invisible para el
  *    cliente.
  *
- * 2. Los avisos (toasts) cuentan lo que el camarero NO puede ver en pantalla:
- *    si al cliente le llega o no el correo.
+ * 2. `avisoAlCliente` cuenta lo que el camarero NO puede ver en pantalla: si al cliente
+ *    le llega o no el correo. (Los avisos completos de cada acción —título con la hora,
+ *    «Solicitud rechazada», el resumen del bloque— se prueban donde se ejecutan: las
+ *    acciones de gestión son del ejecutor, `useAccionesServicioReserva`; ver
+ *    `useVerificacionReservas.efectos.test.ts`.)
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
+// El módulo importa el cliente de Supabase (por `notificarCambioReserva`); aquí no se usa.
 vi.mock("@/integrations/supabase/client");
-vi.mock("sonner");
 
-import * as clienteMock from "@/integrations/supabase/client";
-const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
-import { toast } from "sonner";
 import {
   type ReservaParaVerificar,
   difiereSolicitudDeOferta,
   objetivoAceptarComoSolicitado,
   avisoAlCliente,
-  aceptarComoSolicitado,
-  verificarConHoraYSala,
-  rechazarReserva,
 } from "@/hooks/useVerificacionReservas";
 // La función del correo REAL, sin pasar por el hook: el espejo se compara
 // contra ella, no contra otra copia.
@@ -50,12 +47,6 @@ const reserva = (overrides: Partial<ReservaParaVerificar> = {}): ReservaParaVeri
   notas_cliente: null,
   espacio_id: null,
   ...overrides,
-});
-
-beforeEach(() => {
-  resetSupabaseMocks();
-  vi.mocked(toast.success).mockClear();
-  vi.mocked(toast.error).mockClear();
 });
 
 // ─── 1. Mismo criterio que el correo ─────────────────────────────────────────
@@ -130,7 +121,7 @@ describe("objetivoAceptarComoSolicitado", () => {
   });
 });
 
-// ─── 2. Los avisos ───────────────────────────────────────────────────────────
+// ─── 2. El aviso del correo ──────────────────────────────────────────────────
 
 describe("avisoAlCliente", () => {
   it("con correo, dice a dónde va", () => {
@@ -140,52 +131,5 @@ describe("avisoAlCliente", () => {
   it("sin correo, dice que hay que llamar (no se puede mandar nada)", () => {
     expect(avisoAlCliente(reserva({ email: null }))).toBe("No tiene correo: hay que avisarle por teléfono");
     expect(avisoAlCliente(reserva({ email: "   " }))).toBe("No tiene correo: hay que avisarle por teléfono");
-  });
-});
-
-describe("avisos de las acciones", () => {
-  it("verificar: título corto con la hora y el efecto de verdad debajo", async () => {
-    await verificarConHoraYSala(reserva(), { hora: "21:00", espacio_id: "salon-uuid" });
-    expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 21:00", {
-      description: "Se le manda el correo a miguel@ejemplo.com",
-    });
-  });
-
-  it("verificar sin correo del cliente: lo dice en vez de dar por hecho el aviso", async () => {
-    await verificarConHoraYSala(reserva({ email: null }), { hora: "14:00", espacio_id: null });
-    expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 14:00", {
-      description: "No tiene correo: hay que avisarle por teléfono",
-    });
-  });
-
-  it("aceptar de un clic (lista/hoy): mismo aviso, sin vocabulario de regateo", async () => {
-    await aceptarComoSolicitado(reserva({ hora_solicitada: "13:30:00" }));
-    expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 13:30", {
-      description: "Se le manda el correo a miguel@ejemplo.com",
-    });
-  });
-
-  it("el título no lleva el nombre del cliente (con uno largo partía en dos líneas)", async () => {
-    await aceptarComoSolicitado(reserva());
-    const [titulo] = vi.mocked(toast.success).mock.calls[0];
-    expect(String(titulo)).not.toContain("Miguel");
-    expect(String(titulo).length).toBeLessThan(40);
-  });
-
-  it("rechazar: también cuenta si al cliente le llega el correo", async () => {
-    await rechazarReserva(reserva({ email: null }));
-    expect(toast.success).toHaveBeenCalledWith("Solicitud rechazada", {
-      description: "No tiene correo: hay que avisarle por teléfono",
-    });
-  });
-
-  it("ningún aviso usa vocabulario de regateo", async () => {
-    await verificarConHoraYSala(reserva(), { hora: "21:00", espacio_id: null });
-    await aceptarComoSolicitado(reserva());
-    await rechazarReserva(reserva());
-    const textos = JSON.stringify(vi.mocked(toast.success).mock.calls).toLowerCase();
-    expect(textos).not.toContain("contraoferta");
-    expect(textos).not.toContain("tal y como se pidió");
-    expect(textos).not.toContain("propuesta");
   });
 });

@@ -2,13 +2,26 @@
  * `useCambiarSalaReserva` (vive en `useReservasPorAsignar.ts`) — tests de
  * caracterización de EFECTOS.
  *
- * Es el escritor de sala del panel «Asignación». Fijan lo que hace HOY: qué se
- * escribe y con qué filtros, que NO manda correo, qué pasa cuando la escritura la
- * deniega la RLS en silencio, y qué cachés refresca (que NO son las mismas que las
- * de `useAccionesServicioReserva`, el otro escritor de sala: el del kanban).
+ * Es el escritor de sala del panel «Asignación». Fijan qué se escribe y con qué
+ * filtros, que NO manda correo, qué pasa cuando la escritura la deniega la RLS en
+ * silencio, y qué cachés refresca.
  *
- * Afirman efectos y mutaciones, no el DOM. `// BUG conocido` marca lo que está mal
- * y se deja así a propósito: este fichero NO arregla nada.
+ * PASO 2 del refactor de acciones: comparte escritura (`escribirReserva`) y lista de
+ * claves (`clavesCache.ts`) con el ejecutor de acciones (`useAccionesServicioReserva`),
+ * el otro escritor de sala (el del kanban). Lo que cambia respecto al punto de partida:
+ *   · `// BUG conocido` → CORREGIDO: no refrescaba las claves derivadas (contadores, panel,
+ *     dashboard, modo servicio, disponibilidad…) que sí refrescaba el kanban; ahora las dos
+ *     escrituras de sala refrescan exactamente lo mismo;
+ *   · la escritura va condicionada al estado de partida (`.in("estado", …)`): una reserva
+ *     cancelada o «No vino» no ocupa sitio y no se mueve, aunque el panel la enseñara.
+ *   · (revisión independiente, B2) el aviso de «0 filas» YA NO miente: con la escritura condicionada,
+ *     «no tienes permiso… o ya no existe» no cubre que otra persona cambiara el estado. Se relee el estado
+ *     (un SELECT solo en ese fallo) y se dice «ya ha cambiado de estado (ahora está «Cancelada»)», o
+ *     «no tienes permiso», o —si no se puede saber— las tres causas.
+ * El contrato de la mutación (`mutateAsync({ reservaId, espacioId })`, `isPending`,
+ * `variables`, `ErrorSinPermisoSala`) y que NO hay actualización optimista siguen igual.
+ *
+ * Afirman efectos y mutaciones, no el DOM.
  *
  * Nada llega a Supabase: el cliente y `sonner` están mockeados.
  */
@@ -23,6 +36,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ErrorSinPermisoSala, useCambiarSalaReserva } from "@/hooks/useReservasPorAsignar";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 
 const DIA = "2026-09-30";
 
@@ -30,6 +44,8 @@ interface Escritura {
   tabla: string;
   payload: Record<string, unknown>;
   eq: [string, unknown] | null;
+  /** La condición de estado de partida (`.in("estado", …)`); `null` si la escritura no la lleva. */
+  en: [string, unknown[]] | null;
   select: string | null;
 }
 interface Respuesta {
@@ -37,14 +53,23 @@ interface Respuesta {
   data?: unknown;
   esperar?: Promise<void>;
 }
+/**
+ * Lo que contesta la RELECTURA del estado (`select("estado").eq("id", …).maybeSingle()`), que solo se
+ * hace cuando la escritura condicionada no toca nada. Sin ella, el doble no tiene `maybeSingle` y la
+ * relectura se ignora (el aviso nombra las tres causas posibles).
+ */
+interface Relectura {
+  data?: unknown;
+  error?: unknown;
+}
 
 /** Cada `await` de una escritura consume la siguiente respuesta; sin más, éxito con 1 fila. */
-function mockEscrituras(respuestas: Respuesta[] = []) {
+function mockEscrituras(respuestas: Respuesta[] = [], relectura?: Relectura) {
   const escrituras: Escritura[] = [];
   const tablasConsultadas: string[] = [];
   vi.mocked(supabase.from).mockImplementation(((tabla: string) => {
     tablasConsultadas.push(tabla);
-    const escritura: Escritura = { tabla, payload: {}, eq: null, select: null };
+    const escritura: Escritura = { tabla, payload: {}, eq: null, en: null, select: null };
     const builder: Record<string, unknown> = {
       update: vi.fn((payload: Record<string, unknown>) => {
         escritura.payload = { ...payload };
@@ -55,10 +80,17 @@ function mockEscrituras(respuestas: Respuesta[] = []) {
         escritura.eq = [columna, valor];
         return builder;
       }),
+      in: vi.fn((columna: string, valores: unknown[]) => {
+        escritura.en = [columna, valores];
+        return builder;
+      }),
       select: vi.fn((columnas: string) => {
         escritura.select = columnas;
         return builder;
       }),
+      maybeSingle: relectura
+        ? vi.fn(() => Promise.resolve({ data: relectura.data ?? null, error: relectura.error ?? null }))
+        : undefined,
       then: (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
         const r = respuestas.shift() ?? {};
         const resolver = async () => {
@@ -95,22 +127,19 @@ function montar() {
   return { result, queryClient, invalidadas };
 }
 
-/** Lo que refresca SIEMPRE este escritor (éxito o fallo), en este orden. */
-const CLAVES_QUE_REFRESCA = [
-  "resumen-asignacion-dia",
-  "asignaciones_mesa",
-  "ocupacion-salas-dia",
-  "reservas-kanban",
-  "reservas-hoy",
-  "reservas-lista",
-];
+/**
+ * Lo que refresca SIEMPRE este escritor (éxito o fallo), en este orden: la lista única de
+ * `clavesCache.ts`, la misma que el kanban. Antes eran seis (mesas, rejilla de salas y
+ * listas) y NO las del kanban.
+ */
+const CLAVES_QUE_REFRESCA = [...CLAVES_POR_CAMBIO.ocupacion];
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("useCambiarSalaReserva · qué escribe", () => {
-  it("cambia `espacio_id` en `reservas`, filtrando por id y pidiendo la fila de vuelta (`select('id')`)", async () => {
+  it("cambia `espacio_id` en `reservas`, filtrando por id, SOLO si ocupa sitio, y pidiendo la fila de vuelta (`select('id')`)", async () => {
     const { escrituras } = mockEscrituras();
     const { result } = montar();
 
@@ -120,7 +149,14 @@ describe("useCambiarSalaReserva · qué escribe", () => {
     });
 
     expect(escrituras).toEqual([
-      { tabla: "reservas", payload: { espacio_id: "terraza" }, eq: ["id", "res-1"], select: "id" },
+      {
+        tabla: "reservas",
+        payload: { espacio_id: "terraza" },
+        eq: ["id", "res-1"],
+        // Cancelada y «No vino» no ocupan sitio: no se mueven (la misma regla que «Mover a…» del kanban).
+        en: ["estado", ["pendiente", "verificada", "confirmada", "completada"]],
+        select: "id",
+      },
     ]);
     expect(devuelto).toEqual({ id: "res-1" });
   });
@@ -206,17 +242,77 @@ describe("useCambiarSalaReserva · cuando la escritura falla", () => {
     await act(async () => {
       const promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
       await expect(promesa).rejects.toBeInstanceOf(ErrorSinPermisoSala);
+      // Como la escritura va condicionada al estado, «no tienes permiso… o ya no existe» se quedaba corto:
+      // si no se puede releer el estado, el aviso nombra también el cambio de estado ajeno.
       await expect(promesa).rejects.toThrow(
-        "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe.",
+        "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe o ya ha cambiado de estado.",
       );
     });
 
     expect(toast.success).not.toHaveBeenCalled();
   });
+
+  it("B2: una reserva que ya se canceló mientras el panel la enseñaba no se mueve: lo dice, con el estado de verdad, en vez de «no tienes permiso»", async () => {
+    // La escritura va condicionada al estado; con la reserva ya cancelada no toca ninguna fila y se relee.
+    mockEscrituras([{ data: [] }], { data: { estado: "cancelada" } });
+    const { result } = montar();
+
+    await act(async () => {
+      const promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+      await expect(promesa).rejects.toBeInstanceOf(ErrorSinPermisoSala);
+      await expect(promesa).rejects.toThrow(
+        "La reserva ya ha cambiado de estado (ahora está «Cancelada») y no se ha cambiado la sala. Se ha refrescado la pantalla.",
+      );
+    });
+  });
+
+  it("B2: lo mismo con «No vino»", async () => {
+    mockEscrituras([{ data: [] }], { data: { estado: "no_show" } });
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toThrow(
+        "(ahora está «No vino»)",
+      );
+    });
+  });
+
+  it("B2: si la reserva sigue en un estado que se puede mover y aun así no se escribe, es la RLS: «no tienes permiso», sin inventar que ya no existe", async () => {
+    mockEscrituras([{ data: [] }], { data: { estado: "confirmada" } });
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toThrow(
+        "No tienes permiso para cambiar la sala de esta reserva.",
+      );
+    });
+  });
+
+  it("B2: si ni se puede ver la reserva: «no tienes permiso, o la reserva ya no existe»", async () => {
+    mockEscrituras([{ data: [] }], { data: null });
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toThrow(
+        "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe.",
+      );
+    });
+  });
+
+  it("todos estos avisos son del mismo tipo (`ErrorSinPermisoSala`): el panel enseña su mensaje tal cual", async () => {
+    mockEscrituras([{ data: [] }], { data: { estado: "cancelada" } });
+    const { result } = montar();
+
+    await act(async () => {
+      const promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+      await expect(promesa).rejects.toBeInstanceOf(ErrorSinPermisoSala);
+      await expect(promesa).rejects.toHaveProperty("name", "ErrorSinPermisoSala");
+    });
+  });
 });
 
 describe("useCambiarSalaReserva · caché", () => {
-  it("con éxito refresca las seis claves de abajo, una vez cada una, en este orden", async () => {
+  it("con éxito refresca la lista única de claves, una vez cada una, en este orden", async () => {
     mockEscrituras();
     const { result, invalidadas } = montar();
 
@@ -252,7 +348,7 @@ describe("useCambiarSalaReserva · caché", () => {
   });
 
   it("con parámetros inválidos refresca igual (la validación está dentro del `mutationFn` y `onSettled` corre al fallar)", async () => {
-    // Refresca seis claves aunque no se haya escrito nada. Se fija tal cual.
+    // Refresca la lista entera aunque no se haya escrito nada. Se fija tal cual.
     mockEscrituras();
     const { result, invalidadas } = montar();
 
@@ -286,11 +382,10 @@ describe("useCambiarSalaReserva · caché", () => {
     expect(queryClient.getQueryData<{ espacio_id: string }[]>(["reservas-kanban", DIA])![0].espacio_id).toBe("salon");
   });
 
-  it("BUG conocido: no refresca las ocho claves derivadas que sí refresca el kanban (contadores, panel, dashboard…)", async () => {
-    // Dos escritores de sala (este y `useAccionesServicioReserva.moverEspacio`) hacen el
-    // mismo UPDATE de `espacio_id`. Desde el paso 1 el kanban refresca las mesas asignadas
-    // (`resumen-asignacion-dia`, `asignaciones_mesa`) ADEMÁS de las derivadas de abajo; este
-    // sigue sin las derivadas. Unificar las dos listas de claves es del paso 2.
+  it("CORREGIDO (antes BUG conocido): refresca también las claves derivadas que sí refrescaba el kanban (contadores, panel, dashboard, modo servicio, disponibilidad…)", async () => {
+    // Dos escritores de sala (este y `useAccionesServicioReserva.moverEspacio`) hacen el mismo
+    // UPDATE de `espacio_id`. Este no refrescaba los contadores de Hoy, el dashboard, el modo
+    // servicio ni la disponibilidad; ahora los dos leen la misma lista (`clavesCache.ts`).
     mockEscrituras();
     const { result, invalidadas } = montar();
 
@@ -306,8 +401,14 @@ describe("useCambiarSalaReserva · caché", () => {
       "today-confirmed-reservations",
       "dashboard-stats",
       "reservas_mes",
+      "reservas-servicio-dia",
+      "reservas_sala_dia",
+      "disponibilidad",
+      "disponibilidad-detallada",
+      "disponibilidad-rango",
+      "disponibilidad-calculada",
     ]) {
-      expect(invalidadas, clave).not.toContain(clave);
+      expect(invalidadas, clave).toContain(clave);
     }
   });
 });

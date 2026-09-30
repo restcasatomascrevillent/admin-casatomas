@@ -17,8 +17,12 @@
  *     deshacer, mover, lista negra);
  *   · mover de sala no avisaba de que el trigger de la BD borra las mesas asignadas
  *     ni las refrescaba: ahora pregunta antes (como Asignación) y las refresca.
- * El resto de `// BUG conocido` (RLS denegada dada por buena en la estrella…) NO se
- * toca en este paso: es del paso 2.
+ * PASO 2: la estrella pasa por el ejecutor único (`useAccionesServicioReserva.alternarImportante`)
+ * y el último `// BUG conocido` (RLS denegada dada por buena en la estrella) pasa a
+ * «corregido»: ahora pide la fila de vuelta, y avisa y revierte si no se guardó. La
+ * estrella también refresca lo que enseña en el modo servicio y en el plano de sala, y
+ * llegada / «No vino» refrescan además las mesas asignadas y la disponibilidad (lista
+ * única de claves: `clavesCache.ts`).
  *
  * Nada llega a Supabase: el cliente y `sonner` están mockeados.
  */
@@ -36,6 +40,8 @@ const h = vi.hoisted(() => ({
     tabla: string;
     payload: Record<string, unknown>;
     eq: [string, unknown] | null;
+    /** Condición de estado de partida (`.in("estado", …)`); `null` si la escritura no la lleva. */
+    en: [string, unknown[]] | null;
     select: string | null;
   }>,
   /** Tablas a las que se ha llamado con `from(...)`, en orden. */
@@ -53,7 +59,13 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (tabla: string) => {
       h.tablas.push(tabla);
-      const escritura = { tabla, payload: {} as Record<string, unknown>, eq: null as [string, unknown] | null, select: null as string | null };
+      const escritura = {
+        tabla,
+        payload: {} as Record<string, unknown>,
+        eq: null as [string, unknown] | null,
+        en: null as [string, unknown[]] | null,
+        select: null as string | null,
+      };
       let esEscritura = false;
       const b: Record<string, unknown> = {};
       b.select = (columnas: string) => {
@@ -68,6 +80,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       };
       b.eq = (columna: string, valor: unknown) => {
         if (esEscritura) escritura.eq = [columna, valor];
+        return b;
+      };
+      b.in = (columna: string, valores: unknown[]) => {
+        if (esEscritura) escritura.en = [columna, valores];
         return b;
       };
       b.neq = () => b;
@@ -110,7 +126,7 @@ vi.mock("@/components/reservas/BlacklistModal", () => ({
 
 import { toast } from "sonner";
 import { GestorReservasKanban } from "@/components/reservas/GestorReservasKanban";
-import { CLAVES_LISTAS_RESERVAS } from "@/hooks/useAccionesServicioReserva";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -145,22 +161,12 @@ const asignacion = (reservaId: string, mesaId: string, mesaNombre: string, espac
   mesas: { id: mesaId, nombre: mesaNombre, capacidad: 4, espacio_id: espacioId },
 });
 
-/** Las once claves que refresca SIEMPRE una acción de servicio (ver useAccionesServicioReserva). */
-const CLAVES_DE_SERVICIO = [
-  "reservas-kanban",
-  "reservas-hoy",
-  "reservas-lista",
-  "reservas_hoy_resumen",
-  "reservas_hoy_todas",
-  "ocupacion_hoy",
-  "today-reservations",
-  "today-confirmed-reservations",
-  "dashboard-stats",
-  "reservas_mes",
-  "ocupacion-salas-dia",
-];
-/** Cambiar la sala refresca además las mesas asignadas (el trigger de la BD las borra). */
-const CLAVES_AL_CAMBIAR_SALA = [...CLAVES_DE_SERVICIO, "resumen-asignacion-dia", "asignaciones_mesa"];
+/** Lo que refresca SIEMPRE una acción de estado o de sala: la lista única de `clavesCache.ts`. */
+const CLAVES_DE_SERVICIO = [...CLAVES_POR_CAMBIO.ocupacion];
+/** Cambiar la sala refresca lo mismo (incluidas las mesas asignadas: el trigger de la BD las borra). */
+const CLAVES_AL_CAMBIAR_SALA = CLAVES_DE_SERVICIO;
+/** Lo que refresca la estrella: las listas y lo que enseña en el modo servicio y en el plano de sala. */
+const CLAVES_DE_LA_ESTRELLA = [...CLAVES_POR_CAMBIO.importante];
 
 function montar() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -219,18 +225,20 @@ afterEach(() => {
 });
 
 describe("tarjeta · la estrella («importante»)", () => {
-  it("marcar: escribe `{ importante: true }` filtrando por id (SIN pedir la fila de vuelta) y refresca solo las tres listas", async () => {
+  it("marcar: escribe `{ importante: true }` filtrando por id, AHORA pidiendo la fila de vuelta y sin condición de estado; refresca las listas y lo que enseña la estrella", async () => {
     const { invalidadas } = montar();
 
     fireEvent.click(within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" }));
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reserva marcada como importante"));
     expect(escrituras()).toEqual([
-      { tabla: "reservas", payload: { importante: true }, eq: ["id", "r-ana"], select: null },
+      { tabla: "reservas", payload: { importante: true }, eq: ["id", "r-ana"], select: "id" },
     ]);
-    // Solo `CLAVES_LISTAS_RESERVAS`: los contadores y el dashboard no se refrescan (la
-    // estrella no cambia ninguna cifra, pero sí el resaltado en «Reservas de hoy»).
-    expect(invalidadas).toEqual([...CLAVES_LISTAS_RESERVAS]);
+    // La estrella vale en cualquier estado: la escritura no lleva condición de estado de partida.
+    expect(h.escrituras[0].en).toBeNull();
+    // Las tres listas y el modo servicio / plano de sala: los contadores y el dashboard no se
+    // refrescan (la estrella no cambia ninguna cifra, pero sí el resaltado).
+    await waitFor(() => expect(invalidadas).toEqual(CLAVES_DE_LA_ESTRELLA));
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
@@ -244,7 +252,7 @@ describe("tarjeta · la estrella («importante»)", () => {
     expect(escrituras()[0].payload).toEqual({ importante: false });
   });
 
-  it("si la BD falla: avisa con el mensaje, no refresca nada y lo deja en el log", async () => {
+  it("si la BD falla: avisa con el mensaje, REFRESCA igual (antes no) y lo deja en el log", async () => {
     h.respuestasEscritura = [{ error: { code: "42501", message: "permission denied for table reservas" } }];
     const { invalidadas } = montar();
 
@@ -254,24 +262,28 @@ describe("tarjeta · la estrella («importante»)", () => {
       expect(toast.error).toHaveBeenCalledWith("No se pudo actualizar la reserva: permission denied for table reservas"),
     );
     expect(toast.success).not.toHaveBeenCalled();
-    expect(invalidadas).toEqual([]);
-    expect(consolaError).toHaveBeenCalledWith("Error actualizando la reserva:", expect.anything());
+    // Como todas las acciones: el refresco está en el `finally`, y vuelve a enseñar lo que hay en la BD.
+    await waitFor(() => expect(invalidadas).toEqual(CLAVES_DE_LA_ESTRELLA));
+    expect(consolaError).toHaveBeenCalledWith("[servicio-reserva] Error al actualizar la reserva:", expect.anything());
   });
 
-  it("BUG conocido: con la RLS denegando la escritura en silencio (sin error) da «marcada como importante» y refresca", async () => {
-    // A diferencia de llegada / no vino / mover (`ErrorSinFilasReserva`), la estrella no
-    // pide la fila de vuelta: una escritura denegada por RLS devuelve `data: null` sin error
-    // y aquí pasa por éxito. Con permiso denegado, el usuario leía «marcada» y no lo estaba.
-    // (Sin permiso ya no llega a escribir: el botón sale deshabilitado; esto sigue pasando
-    // con permiso y una RLS que lo rechaza.) Se arregla en el paso 2.
+  it("CORREGIDO (antes BUG conocido): con la RLS denegando la escritura en silencio (sin error) NO da «marcada como importante»: avisa y revierte", async () => {
+    // A diferencia de llegada / no vino / mover (`ErrorSinFilasReserva`), la estrella no pedía
+    // la fila de vuelta: una escritura denegada por RLS devolvía `data: null` sin error y
+    // pasaba por éxito. Con permiso denegado, el usuario leía «marcada» y no lo estaba.
     h.respuestasEscritura = [{ data: null }];
-    const { invalidadas } = montar();
+    montar();
 
     fireEvent.click(within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" }));
 
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reserva marcada como importante"));
-    expect(toast.error).not.toHaveBeenCalled();
-    expect(invalidadas).toEqual([...CLAVES_LISTAS_RESERVAS]);
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "No se pudo actualizar la reserva: no tienes permiso para cambiar esta reserva, o ya no existe.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    // La estrella vuelve a quedar sin marcar (se deshace el parche en local).
+    expect(await screen.findByRole("button", { name: "Marcar como importante" })).toBeInTheDocument();
   });
 
   it("sin permiso de edición la estrella sale deshabilitada, con el motivo visible, y no escribe", async () => {
@@ -309,8 +321,14 @@ describe("tarjeta · «Ha llegado» y «No vino» (ControlLlegada)", () => {
     expect(escritura).toMatchObject({ tabla: "reservas", eq: ["id", "r-ana"], select: "id", payload: { estado: "completada" } });
     expect(typeof escritura.payload.llegada_at).toBe("string");
     await waitFor(() => expect(invalidadas).toEqual(expect.arrayContaining(CLAVES_DE_SERVICIO)));
-    // Llegar no cambia la sala: no toca las mesas asignadas.
-    expect(invalidadas).not.toContain("asignaciones_mesa");
+    // Llegar saca a la reserva de la vista de asignación (solo tiene las vivas): ahora también
+    // refresca las mesas asignadas (antes solo lo hacía mover), el modo servicio y la disponibilidad.
+    expect(invalidadas).toEqual(
+      expect.arrayContaining(["asignaciones_mesa", "resumen-asignacion-dia", "reservas-servicio-dia", "disponibilidad"]),
+    );
+    // Y la escritura exige que la BD siga en el estado que VIO el personal (la tarjeta es «Confirmada»):
+    // así el estado previo que se recuerda para el «Deshacer» es verdad (M1 de la revisión independiente).
+    expect(h.escrituras[0].en).toEqual(["estado", ["confirmada"]]);
     expect(h.invoke).not.toHaveBeenCalled();
   });
 

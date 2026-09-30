@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { esGradoAsignacion, esTurno, gradoDeReserva, turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { normalizarMarca } from "@/lib/reservas/negocios";
 import { CLAVE_RESUMEN_ASIGNACION_DIA, type FilaAsignacionDia } from "@/hooks/useResumenAsignacionDia";
-import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
-import { CLAVES_LISTAS_RESERVAS } from "@/hooks/useAccionesServicioReserva";
-import { CLAVE_OCUPACION_SALAS_DIA } from "@/hooks/useOcupacionSalasDia";
+import { estadosDePartida } from "@/lib/reservas/accionesEjecutables";
+import { clavesAInvalidar } from "@/lib/reservas/clavesCache";
+import { ErrorSinFilasReserva, escribirReserva } from "@/lib/reservas/escribirReserva";
+import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
 
 // ============================================================================
 // RESERVAS POR ASIGNAR — panel "Asignación" (reservas-sin-salas, Fase B)
@@ -65,11 +66,33 @@ export function useReservasPorAsignar(desde: string, hasta: string, opciones?: {
   return query;
 }
 
-/** Error de escritura sin filas afectadas: RLS la ha filtrado en silencio. */
+/**
+ * Error de escritura sin filas afectadas: la RLS la ha filtrado en silencio, la reserva ya no existe
+ * o —la escritura va condicionada a que siga ocupando sitio— otra persona la cambió antes (la
+ * canceló, o no vino). El nombre es el de siempre (el panel comprueba `instanceof`); el MENSAJE
+ * dice la causa cuando se ha podido averiguar.
+ */
 export class ErrorSinPermisoSala extends Error {
-  constructor() {
-    super("No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe.");
+  constructor(mensaje = MENSAJE_SALA_NO_SE_SABE) {
+    super(mensaje);
     this.name = "ErrorSinPermisoSala";
+  }
+}
+
+const MENSAJE_SALA_NO_SE_SABE =
+  "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe o ya ha cambiado de estado.";
+
+/** Qué decirle al personal según por qué no se ha tocado ninguna fila (`escribirReserva` relee el estado). */
+function mensajeDeSala(error: ErrorSinFilasReserva): string {
+  switch (error.motivo) {
+    case "estado_cambiado":
+      return `La reserva ya ha cambiado de estado (ahora está «${etiquetaEstadoReserva(error.estadoActual)}») y no se ha cambiado la sala. Se ha refrescado la pantalla.`;
+    case "sin_permiso":
+      return "No tienes permiso para cambiar la sala de esta reserva.";
+    case "sin_permiso_o_inexistente":
+      return "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe.";
+    default:
+      return MENSAJE_SALA_NO_SE_SABE;
   }
 }
 
@@ -77,6 +100,13 @@ export class ErrorSinPermisoSala extends Error {
  * Cambia la sala de una reserva. Es una decisión INTERNA: no invoca
  * `notify-reservation-change` ni ningún otro envío, así que el cliente no
  * recibe correo (mismo criterio que `useAccionesServicioReserva`).
+ *
+ * Es el mismo cambio que «Mover a…» del kanban (`useAccionesServicioReserva.moverEspacio`)
+ * y comparte con él la escritura (`escribirReserva`: pide la fila de vuelta y va
+ * condicionada a que la reserva siga ocupando sitio, o sea, no cancelada ni «No vino»)
+ * y la lista de claves a refrescar (`clavesCache.ts`). Lo único propio de aquí es que es
+ * una mutación de React Query, sin actualización optimista y sin avisos: el panel pone
+ * los suyos.
  *
  * OJO: el trigger `trg_reservas_sincronizar_asignaciones` BORRA las mesas
  * asignadas cuando cambia la sala. Quien llama tiene que pedir confirmación
@@ -90,24 +120,18 @@ export function useCambiarSalaReserva() {
   return useMutation({
     mutationFn: async ({ reservaId, espacioId }: { reservaId: string; espacioId: string }) => {
       if (!reservaId || !espacioId) throw new Error("Falta la reserva o la sala");
-      // `.select("id")`: con RLS, una escritura denegada NO da error, devuelve
-      // 0 filas. Sin comprobarlo, la pantalla diría "guardado" sin haberlo.
-      const { data, error } = await supabase
-        .from("reservas")
-        .update({ espacio_id: espacioId })
-        .eq("id", reservaId)
-        .select("id");
-      if (error) throw error;
-      if (!data || data.length === 0) throw new ErrorSinPermisoSala();
-      return data[0];
+      try {
+        // Con RLS, una escritura denegada NO da error, devuelve 0 filas: `escribirReserva`
+        // lo trata como error para que la pantalla no diga «guardado» sin haberlo.
+        const filas = await escribirReserva(reservaId, { espacio_id: espacioId }, { desdeEstados: estadosDePartida("mover") });
+        return filas[0];
+      } catch (error) {
+        if (error instanceof ErrorSinFilasReserva) throw new ErrorSinPermisoSala(mensajeDeSala(error));
+        throw error;
+      }
     },
     onSettled: () => {
-      for (const clave of [
-        CLAVE_RESUMEN_ASIGNACION_DIA,
-        CLAVE_ASIGNACIONES_MESA,
-        CLAVE_OCUPACION_SALAS_DIA,
-        ...CLAVES_LISTAS_RESERVAS,
-      ]) {
+      for (const clave of clavesAInvalidar({ espacio_id: null })) {
         queryClient.invalidateQueries({ queryKey: [clave] });
       }
     },

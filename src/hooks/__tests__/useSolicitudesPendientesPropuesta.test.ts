@@ -96,8 +96,50 @@ describe("useSolicitudesPendientes · propuesta al cliente", () => {
 
     expect(res.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("fn_aceptar_propuesta_solicitud", { p_solicitud_id: "sol-1", p_via: "telefono" });
-    expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", { body: { reserva_id: "res-9" } });
+    // La misma forma de llamar que todas las acciones de reserva (`notificarCliente.ts`): `{ id, ...cambios }`.
+    // Antes era `{ reserva_id }`: el servidor lee `reserva_id ?? id`, así que es equivalente.
+    expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", {
+      body: { id: "res-9", estado: "confirmada" },
+    });
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it("aceptarPropuestaTelefono: si el correo de confirmación no sale, la reserva sigue creada y se avisa al personal", async () => {
+    builderSecuencia([{ data: [], error: null }]);
+    rpc.mockResolvedValue({ data: { ok: true, reserva_id: "res-9", estado: "verificada" }, error: null });
+    // `functions.invoke` NO lanza ante un 4xx/5xx: devuelve `{ data, error }`.
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "Edge Function returned a non-2xx status code" },
+    } as never);
+    const { result } = await montar();
+
+    let res: { ok: boolean } = { ok: false };
+    await act(async () => {
+      res = await result.current.aceptarPropuestaTelefono("sol-1");
+    });
+
+    expect(res.ok).toBe(true);
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "El correo al cliente no ha salido",
+        expect.objectContaining({ description: expect.stringMatching(/la reserva ya está guardada/i) }),
+      ),
+    );
+    // La reserva creada se cuenta igualmente.
+    expect(vi.mocked(toast.success).mock.calls.at(-1)?.[0]).toMatch(/correo para que la confirme/);
+  });
+
+  it("aceptarPropuestaTelefono: una reserva que ya estaba aceptada no vuelve a mandar el correo", async () => {
+    builderSecuencia([{ data: [], error: null }]);
+    rpc.mockResolvedValue({ data: { ok: true, reserva_id: "res-9", estado: "confirmada", ya_aceptada: true }, error: null });
+    const { result } = await montar();
+
+    await act(async () => {
+      await result.current.aceptarPropuestaTelefono("sol-1");
+    });
+
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
   });
 
   it("aceptarPropuestaTelefono con contacto: lo guarda en la solicitud antes de la RPC y avisa del correo de confirmación", async () => {
@@ -120,7 +162,9 @@ describe("useSolicitudesPendientes · propuesta al cliente", () => {
     expect(builder.eq).toHaveBeenCalledWith("id", "sol-1");
     const ordenUpdate = (builder.update as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
     expect(ordenUpdate).toBeLessThan(rpc.mock.invocationCallOrder[0]);
-    expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", { body: { reserva_id: "res-7" } });
+    expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", {
+      body: { id: "res-7", estado: "verificada" },
+    });
     expect(vi.mocked(toast.success).mock.calls.at(-1)?.[0]).toMatch(/correo para que la confirme/);
   });
 

@@ -33,12 +33,11 @@ import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuarto
 import { marcaDeEspacio, marcaDeReserva } from "@/lib/reservas/negocios";
 import { NegocioBadge } from "./NegocioBadge";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import {
-  type ReservaParaVerificar,
-  difiereSolicitudDeOferta,
-  verificarConHoraYSala,
-  rechazarReserva,
-} from "@/hooks/useVerificacionReservas";
+import { type ReservaParaVerificar, difiereSolicitudDeOferta } from "@/hooks/useVerificacionReservas";
+// El ejecutor único de acciones sobre una reserva: «Verificar» y «Rechazar» pasan por él (comprueba
+// que la escritura de verdad se ha guardado, la condiciona al estado de partida, refresca la caché
+// y avisa al cliente con la respuesta comprobada).
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 
 interface ModalVerificacionReservaProps {
   reserva: ReservaParaVerificar | null;
@@ -56,9 +55,10 @@ function horaCorta(hora: string | null | undefined): string {
 
 /**
  * Verificar una solicitud pendiente: el cliente pidió una hora y aquí se
- * decide QUÉ HORA SE LE DA. Ver `useVerificacionReservas.ts` para el contrato
+ * decide QUÉ HORA SE LE DA. Ver `src/lib/reservas/verificacion.ts` para el contrato
  * completo con el backend (columnas hora_solicitada/espacio_solicitado_id,
- * migración 20260920010000).
+ * migración 20260920010000). Guardar («Verificar») y rechazar los ejecuta el
+ * ejecutor único de acciones, `useAccionesServicioReserva`.
  *
  * DOS COSAS DISTINTAS, DOS SITIOS DISTINTOS (2026-09-29). Hasta ahora la hora
  * y la sala compartían el recuadro "Se le ofrece", como si las dos fueran
@@ -89,6 +89,7 @@ export function ModalVerificacionReserva({
 }: ModalVerificacionReservaProps) {
   const { canAccess: canEdit, loading: permisosLoading } = useCanAccessSection("reservas", "edit");
   const { data: espacios } = useEspaciosReserva();
+  const acciones = useAccionesServicioReserva();
 
   const [horaDecidida, setHoraDecidida] = useState("");
   const [salaAsignada, setSalaAsignada] = useState<string | null>(null);
@@ -169,7 +170,7 @@ export function ModalVerificacionReserva({
 
   const ejecutar = async (
     accion: "verificar" | "rechazar",
-    fn: () => Promise<{ ok: boolean }>,
+    fn: () => Promise<{ ok: boolean; cambioDeEstado?: boolean }>,
   ) => {
     setAccionEnCurso(accion);
     try {
@@ -177,6 +178,11 @@ export function ModalVerificacionReserva({
       if (resultado.ok) {
         onOpenChange(false);
         onSuccess();
+      } else if (resultado.cambioDeEstado) {
+        // La solicitud ya no está pendiente (otra persona la aceptó o la rechazó, o el cliente la gestionó
+        // desde su correo): el aviso dice «ya ha cambiado de estado» y este modal seguiría enseñando la
+        // reserva vieja. Se cierra; el ejecutor ya ha refrescado las listas, así que no hace falta `onSuccess`.
+        onOpenChange(false);
       }
     } finally {
       setAccionEnCurso(null);
@@ -378,7 +384,7 @@ export function ModalVerificacionReserva({
           {puedeEditar && (
             <Button
               variant="destructive"
-              onClick={() => ejecutar("rechazar", () => rechazarReserva(reserva))}
+              onClick={() => ejecutar("rechazar", () => acciones.rechazar(reserva))}
               disabled={!!accionEnCurso}
               className="sm:mr-auto"
             >
@@ -397,7 +403,7 @@ export function ModalVerificacionReserva({
             <Button
               onClick={() =>
                 ejecutar("verificar", () =>
-                  verificarConHoraYSala(reserva, { hora: horaDecidida, espacio_id: salaAsignada }),
+                  acciones.verificar(reserva, { hora: horaDecidida, espacio_id: salaAsignada }),
                 )
               }
               disabled={!!accionEnCurso || !horaDecidida}

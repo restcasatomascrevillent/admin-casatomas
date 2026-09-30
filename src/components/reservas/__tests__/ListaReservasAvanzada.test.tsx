@@ -32,8 +32,15 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 
 const supa = vi.hoisted(() => ({
+  // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
   update: vi.fn(),
   eq: vi.fn(),
+  en: vi.fn(),
+  select: vi.fn(),
+  /** Cada vez que la lista pide las reservas (`select` de la consulta de la lista, no el de una escritura). */
+  cargas: vi.fn(),
+  /** Respuestas de las siguientes escrituras (sin más: éxito con la fila de ESA reserva). */
+  respuestas: [] as Array<{ data?: unknown; error?: unknown }>,
   filas: [] as Record<string, unknown>[],
   // Props con las que se monta el alta al convertir una solicitud.
   formulario: vi.fn(),
@@ -47,17 +54,36 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
-      select: () => ({
-        order: () => ({ order: () => Promise.resolve({ data: supa.filas, error: null }) }),
-      }),
+      select: () => {
+        supa.cargas();
+        return {
+          order: () => ({ order: () => Promise.resolve({ data: supa.filas, error: null }) }),
+        };
+      },
       update: (valores: unknown) => {
         supa.update(valores);
-        return {
-          eq: (col: string, id: string) => {
-            supa.eq(col, id);
-            return Promise.resolve({ error: null });
+        let id: unknown;
+        const b: Record<string, unknown> = {
+          eq: (col: string, valor: string) => {
+            supa.eq(col, valor);
+            id = valor;
+            return b;
+          },
+          in: (col: string, valores: unknown[]) => {
+            supa.en(col, valores);
+            return b;
+          },
+          select: (columnas: string) => {
+            supa.select(columnas);
+            return b;
+          },
+          then: (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
+            const r = supa.respuestas.shift() ?? {};
+            const data = "data" in r ? r.data : r.error ? null : [{ id }];
+            return Promise.resolve({ data, error: r.error ?? null }).then(ok, ko);
           },
         };
+        return b;
       },
     }),
     functions: { invoke: vi.fn().mockResolvedValue({ data: null, error: null }) },
@@ -68,10 +94,6 @@ vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: supa.canEdit, loading: false }),
 }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
-vi.mock("@/hooks/useVerificacionReservas", () => ({
-  aceptarComoSolicitado: vi.fn().mockResolvedValue({ ok: true }),
-  aceptarVariasComoSolicitado: vi.fn().mockResolvedValue({ ok: true }),
-}));
 
 // Hijos pesados: aquí solo estorban.
 vi.mock("@/hooks/useEdicionReserva", () => ({
@@ -190,6 +212,7 @@ const filaDe = (tabla: HTMLElement, texto: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  supa.respuestas = [];
   supa.canEdit = true;
   supa.filas = [
     reserva("res-pendiente", "pendiente", "Ana Pendiente"),
@@ -560,5 +583,175 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
     expect(boton.getAttribute("aria-label")).toMatch(/No tienes permiso para editar reservas/);
     fireEvent.click(boton);
     expect(supa.editarReserva).not.toHaveBeenCalled();
+  });
+});
+
+// Desde el paso 2 del refactor de acciones, TODO lo que cambia una reserva desde la lista
+// (Aceptar de un clic, aceptar en bloque, Confirmar, Cancelar y la estrella) pasa por el
+// ejecutor único (`useAccionesServicioReserva`): pide la fila de vuelta, condiciona la
+// escritura al estado de partida y avisa al cliente con la respuesta comprobada. La lista
+// sigue siendo la vista de GESTIÓN (no cambia qué botones tiene cada fila).
+describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", () => {
+  const botones = (tabla: HTMLElement, cliente: string) => botonesDeFila(filaDe(tabla, cliente));
+  const notificaciones = () =>
+    vi
+      .mocked(supabase.functions.invoke)
+      .mock.calls.map(([funcion, opciones]) => ({ funcion, body: (opciones as { body: unknown }).body }));
+  const casilla = (tabla: HTMLElement, cliente: string) =>
+    within(filaDe(tabla, cliente)).getByRole("checkbox", { name: "Seleccionar para aceptar en bloque" });
+
+  it("«Aceptar»: verifica con lo que pidió el cliente, SOLO si sigue pendiente, y avisa al cliente con lo escrito", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ hora: "21:30:00", espacio_id: null, estado: "verificada" }));
+    expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
+    expect(supa.en).toHaveBeenCalledWith("estado", ["pendiente"]);
+    expect(supa.select).toHaveBeenCalledWith("id");
+    await waitFor(() =>
+      expect(notificaciones()).toEqual([
+        {
+          funcion: "notify-reservation-change",
+          body: { id: "res-pendiente", hora: "21:30:00", espacio_id: null, estado: "verificada" },
+        },
+      ]),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 21:30", {
+      description: "No tiene correo: hay que avisarle por teléfono",
+    });
+  });
+
+  it("CORREGIDO: «Aceptar» con la RLS denegando la escritura (0 filas) NO da «verificada» ni avisa al cliente", async () => {
+    supa.respuestas = [{ data: [] }];
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo guardar: no tienes permiso/)),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("«Confirmar» (verificada) escribe solo si sigue verificada y avisa al cliente con `{ id, estado }` (antes, la fila entera de la reserva)", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Berta Verificada")[0]);
+
+    await waitFor(() => expect(supa.en).toHaveBeenCalledWith("estado", ["verificada"]));
+    await waitFor(() => expect(notificaciones()).toHaveLength(1));
+    expect(notificaciones()[0]).toEqual({
+      funcion: "notify-reservation-change",
+      body: { id: "res-verificada", estado: "confirmada" },
+    });
+  });
+
+  it("cancelar solo parte de un estado VIVO (la escritura va condicionada) y avisa al cliente con `{ id, estado }`", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Carlos Confirmado")[4]);
+    const dialogo = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^Sí, cancelar/ }));
+
+    await waitFor(() => expect(supa.en).toHaveBeenCalledWith("estado", ["pendiente", "verificada", "confirmada"]));
+    await waitFor(() => expect(notificaciones()).toHaveLength(1));
+    expect(notificaciones()[0].body).toEqual({ id: "res-confirmada", estado: "cancelada" });
+  });
+
+  it("CORREGIDO (decisión del dueño): una reserva «Llegó» o «No vino» ya no se puede cancelar: el botón sale deshabilitado con el motivo", async () => {
+    // Antes solo quedaba deshabilitado el de una cancelada; podía cancelarse una «Llegó» o una «No vino».
+    supa.filas = [
+      reserva("res-llego", "completada", "Elena Llegó"),
+      reserva("res-no-vino", "no_show", "Fede NoVino"),
+      reserva("res-cancelada", "cancelada", "Diana Cancelada"),
+      reserva("res-confirmada", "confirmada", "Carlos Confirmado"),
+    ];
+    const { tabla } = await montar();
+    const cancelar = (cliente: string) => botones(tabla, cliente)[4];
+
+    expect(cancelar("Elena Llegó").hasAttribute("disabled")).toBe(true);
+    expect(cancelar("Elena Llegó").getAttribute("aria-label")).toBe("No se puede cancelar una reserva que ya llegó");
+    expect(cancelar("Fede NoVino").hasAttribute("disabled")).toBe(true);
+    expect(cancelar("Fede NoVino").getAttribute("aria-label")).toBe("No se puede cancelar una reserva marcada como «No vino»");
+    expect(cancelar("Diana Cancelada").hasAttribute("disabled")).toBe(true);
+    expect(cancelar("Diana Cancelada").getAttribute("aria-label")).toBe("La reserva ya está cancelada");
+    // Y una viva sigue pudiéndose cancelar.
+    expect(cancelar("Carlos Confirmado").hasAttribute("disabled")).toBe(false);
+    expect(cancelar("Carlos Confirmado").getAttribute("aria-label")).toMatch(/^Cancelar la reserva de Carlos Confirmado/);
+  });
+
+  it("la estrella: escribe `{ importante: true }` pidiendo la fila de vuelta y sin condición de estado, y avisa", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(within(filaDe(tabla, "Ana Pendiente")).getByRole("button", { name: "Marcar Ana Pendiente como importante" }));
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ importante: true }));
+    expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
+    expect(supa.select).toHaveBeenCalledWith("id");
+    expect(supa.en).not.toHaveBeenCalled();
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reserva marcada como importante"));
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("CORREGIDO: la estrella con la RLS denegando la escritura NO da «marcada como importante»", async () => {
+    supa.respuestas = [{ data: [] }];
+    const { tabla } = await montar();
+
+    fireEvent.click(within(filaDe(tabla, "Ana Pendiente")).getByRole("button", { name: "Marcar Ana Pendiente como importante" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "No se pudo actualizar la reserva: no tienes permiso para cambiar esta reserva, o ya no existe.",
+      ),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  /** Dos pendientes seleccionadas y el «Sí, aceptar» del diálogo de aceptar en bloque. */
+  async function aceptarEnBloqueDosPendientes() {
+    supa.filas = [
+      reserva("res-a", "pendiente", "Ana Pendiente"),
+      reserva("res-b", "pendiente", "Berta Pendiente"),
+      reserva("res-c", "confirmada", "Carlos Confirmado"),
+    ];
+    const { tabla } = await montar();
+    fireEvent.click(casilla(tabla, "Ana Pendiente"));
+    fireEvent.click(casilla(tabla, "Berta Pendiente"));
+    fireEvent.click(screen.getByRole("button", { name: /Verificar con la hora que pidieron/ }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^Sí, aceptar las reservas/ }));
+  }
+
+  it("aceptar en bloque: una escritura y un aviso al cliente por reserva, UN resumen, y se vacía la selección", async () => {
+    await aceptarEnBloqueDosPendientes();
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(2));
+    expect(supa.eq.mock.calls.map(([, id]) => id).sort()).toEqual(["res-a", "res-b"]);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+    expect(toast.success).toHaveBeenCalledWith("2 solicitudes verificadas", {
+      description: "2 sin correo: hay que avisarles por teléfono",
+    });
+    await waitFor(() => expect(notificaciones()).toHaveLength(2));
+    // La selección se vacía al terminar: la barra de acción en bloque desaparece.
+    await waitFor(() => expect(screen.queryByText(/solicitudes seleccionadas/)).not.toBeInTheDocument());
+  });
+
+  it("CORREGIDO: aceptar en bloque con la RLS denegando todo no cuenta ninguna como verificada ni avisa a los clientes", async () => {
+    supa.respuestas = [{ data: [] }, { data: [] }];
+    await aceptarEnBloqueDosPendientes();
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("2 solicitudes sin verificar", expect.anything()));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("al terminar una acción, la lista vuelve a pedir las reservas (el ejecutor refresca `reservas-lista`)", async () => {
+    const { tabla } = await montar();
+    const cargasAntes = supa.cargas.mock.calls.length;
+
+    fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
+
+    await waitFor(() => expect(supa.cargas.mock.calls.length).toBeGreaterThan(cargasAntes));
   });
 });

@@ -15,11 +15,15 @@
  *      no se pierde: la que ya tenía la reserva se guarda tal cual.
  *
  * Estrategia: hooks de datos mockeados (espacios, disponibilidad, permisos) y
- * `supabase`/`sonner` mockeados; `useVerificacionReservas` corre DE VERDAD,
- * porque parte de lo que se prueba es justo lo que escribe en la reserva.
+ * `supabase`/`sonner` mockeados; el ejecutor de acciones (`useAccionesServicioReserva`,
+ * que desde el paso 2 es quien guarda «Verificar» y «Rechazar») corre DE VERDAD,
+ * porque parte de lo que se prueba es justo lo que escribe en la reserva. Como usa React
+ * Query (actualización optimista y refresco), el modal se monta dentro de un
+ * `QueryClientProvider`.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 vi.mock("@/integrations/supabase/client");
 vi.mock("sonner");
@@ -44,6 +48,7 @@ vi.mock("@/hooks/useUserRole", () => ({
 }));
 
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { ModalVerificacionReserva } from "@/components/reservas/ModalVerificacionReserva";
 import type { ReservaParaVerificar } from "@/hooks/useVerificacionReservas";
 
@@ -76,24 +81,40 @@ const reserva = (overrides: Partial<ReservaParaVerificar> = {}): ReservaParaVeri
   ...overrides,
 });
 
-/** Builder de supabase con `update` espiable. */
-function espiarUpdate() {
-  const update = vi.fn().mockReturnThis();
+/**
+ * Builder de supabase con `update` espiable. La escritura del ejecutor es
+ * `update(…).eq("id", …).in("estado", …).select("id")`: `respuesta` es lo que contesta
+ * (por defecto, éxito con la fila afectada; `{ data: [] }` es una escritura denegada por RLS).
+ * `relectura` es lo que contesta la RELECTURA del estado (`select("estado").eq(…).maybeSingle()`)
+ * cuando la escritura condicionada no toca nada; sin ella no hay `maybeSingle` y se ignora.
+ */
+function espiarUpdate(respuesta: { data?: unknown; error?: unknown } = {}, relectura?: { data?: unknown }) {
+  const update = vi.fn();
   const builder: Record<string, unknown> = {
     update,
-    eq: vi.fn(function (this: unknown) {
-      return this;
-    }),
-    then: (onfulfilled: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(onfulfilled),
+    eq: vi.fn(),
+    in: vi.fn(),
+    select: vi.fn(),
+    maybeSingle: relectura ? vi.fn(() => Promise.resolve({ data: relectura.data ?? null, error: null })) : undefined,
+    then: (onfulfilled: (v: unknown) => unknown) =>
+      Promise.resolve({ data: "data" in respuesta ? respuesta.data : [{ id: "res-1" }], error: respuesta.error ?? null }).then(
+        onfulfilled,
+      ),
   };
-  builder.eq = vi.fn().mockReturnValue(builder);
-  update.mockReturnValue(builder);
+  for (const metodo of ["update", "eq", "in", "select"]) (builder[metodo] as ReturnType<typeof vi.fn>).mockReturnValue(builder);
   vi.mocked(supabase.from).mockReturnValue(builder as never);
-  return update;
+  return Object.assign(update, { builder });
 }
 
+const alAbrir = { onOpenChange: vi.fn(), onSuccess: vi.fn() };
+
 function abrir(r: ReservaParaVerificar) {
-  return render(<ModalVerificacionReserva reserva={r} open onOpenChange={vi.fn()} onSuccess={vi.fn()} />);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ModalVerificacionReserva reserva={r} open onOpenChange={alAbrir.onOpenChange} onSuccess={alAbrir.onSuccess} />
+    </QueryClientProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -210,5 +231,138 @@ describe("ModalVerificacionReserva", () => {
       reserva({ hora: "14:00:00", hora_solicitada: "14:00:00", espacio_id: "e-terraza", espacio_solicitado_id: null }),
     );
     expect(screen.queryByText(/ya tenía guardada una hora distinta/i)).not.toBeInTheDocument();
+  });
+});
+
+// Desde el paso 2, «Verificar» y «Rechazar» pasan por el ejecutor único de acciones
+// (`useAccionesServicioReserva`): comprueba que la escritura de verdad se ha guardado, la
+// condiciona al estado de partida y avisa al cliente con la respuesta comprobada.
+describe("ModalVerificacionReserva · lo que hace al guardar", () => {
+  it("«Verificar» escribe solo si la reserva sigue PENDIENTE, avisa al cliente con lo escrito y cierra el modal avisando a la lista", async () => {
+    const update = espiarUpdate();
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00", espacio_id: "e-salon" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() => expect(alAbrir.onSuccess).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.builder.in).toHaveBeenCalledWith("estado", ["pendiente"]);
+    expect(update.builder.eq).toHaveBeenCalledWith("id", "res-1");
+    expect(update.builder.select).toHaveBeenCalledWith("id");
+    expect(alAbrir.onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", {
+        body: { id: "res-1", hora: "14:00", espacio_id: "e-salon", estado: "verificada" },
+      }),
+    );
+  });
+
+  it("CORREGIDO: si la RLS deniega la escritura (0 filas) el modal NO se cierra, NO avisa a la lista ni al cliente, y lo dice", async () => {
+    // Antes la escritura no pedía la fila de vuelta: la denegación pasaba por éxito, el modal
+    // se cerraba diciendo «Reserva verificada» y el cliente recibía el correo.
+    espiarUpdate({ data: [] });
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo guardar: no tienes permiso/)));
+    expect(alAbrir.onSuccess).not.toHaveBeenCalled();
+    expect(alAbrir.onOpenChange).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+    // El botón vuelve a estar disponible para reintentar.
+    expect(screen.getByRole("button", { name: "Verificar con esta hora" })).toBeEnabled();
+  });
+
+  it("«Rechazar» pasa la reserva a 'cancelada' SOLO si sigue pendiente (B1), avisa al cliente y cierra", async () => {
+    const update = espiarUpdate();
+    abrir(reserva());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rechazar" }));
+
+    await waitFor(() => expect(alAbrir.onSuccess).toHaveBeenCalledTimes(1));
+    expect(update).toHaveBeenCalledWith({ estado: "cancelada" });
+    // B1: si otra persona aceptó la solicitud con el modal abierto, al cliente ya le salió la «propuesta»:
+    // rechazarla ahora mandaría «rechazada» encima. La escritura solo toca una pendiente.
+    expect(update.builder.in).toHaveBeenCalledWith("estado", ["pendiente"]);
+    await waitFor(() =>
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("notify-reservation-change", {
+        body: { id: "res-1", estado: "cancelada" },
+      }),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Solicitud rechazada", { description: "Se le manda el correo a miguel@ejemplo.com" });
+  });
+
+  it("«Rechazar» con la RLS denegando: no cierra ni da por rechazada la solicitud", async () => {
+    espiarUpdate({ data: [] });
+    abrir(reserva());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rechazar" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo rechazar la solicitud: no tienes permiso/)),
+    );
+    expect(alAbrir.onSuccess).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("(c) si la reserva YA HABÍA CAMBIADO de estado (otra persona la aceptó con el modal abierto) el modal se CIERRA: con la reserva vieja no tiene sentido seguir; sin avisar a la lista ni al cliente", async () => {
+    // El aviso dice «Se ha refrescado la pantalla»: el modal tiene que dejar de enseñar la solicitud vieja.
+    espiarUpdate({ data: [] }, { data: { estado: "verificada" } });
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() => expect(alAbrir.onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.error).toHaveBeenCalledWith(
+      "No se pudo guardar: la reserva ya ha cambiado de estado (ahora está «Verificada»). Se ha refrescado la pantalla.",
+    );
+    // No es un éxito: no se llama a `onSuccess` (el ejecutor ya ha refrescado las listas) ni se avisa al cliente.
+    expect(alAbrir.onSuccess).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("(c) «Rechazar» sobre una solicitud que otra persona ya aceptó (B1): tampoco se queda abierto con la reserva vieja", async () => {
+    espiarUpdate({ data: [] }, { data: { estado: "verificada" } });
+    abrir(reserva());
+
+    fireEvent.click(screen.getByRole("button", { name: "Rechazar" }));
+
+    await waitFor(() => expect(alAbrir.onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.error).toHaveBeenCalledWith(
+      "No se pudo rechazar la solicitud: la reserva ya ha cambiado de estado (ahora está «Verificada»). Se ha refrescado la pantalla.",
+    );
+    expect(alAbrir.onSuccess).not.toHaveBeenCalled();
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("(c) pero si la reserva SIGUE pendiente y aun así no se escribe (la RLS), el modal se queda abierto para reintentar", async () => {
+    espiarUpdate({ data: [] }, { data: { estado: "pendiente" } });
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("No se pudo guardar: no tienes permiso para cambiar esta reserva."),
+    );
+    expect(alAbrir.onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Verificar con esta hora" })).toBeEnabled();
+  });
+
+  it("si el correo no sale, el modal se cierra igual (lo guardado sigue guardado) y se avisa al personal", async () => {
+    espiarUpdate();
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "Edge Function returned a non-2xx status code" },
+    } as never);
+    abrir(reserva({ hora: "14:00:00", hora_solicitada: "14:00:00" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Verificar con esta hora" }));
+
+    await waitFor(() => expect(alAbrir.onSuccess).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("El correo al cliente no ha salido", expect.objectContaining({ duration: 10_000 })),
+    );
   });
 });

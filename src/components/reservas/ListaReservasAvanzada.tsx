@@ -68,11 +68,11 @@ import { ModalVerificacionReserva } from "./ModalVerificacionReserva";
 import { BlacklistModal } from "./BlacklistModal";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import {
-  type ReservaParaVerificar,
-  aceptarComoSolicitado,
-  aceptarVariasComoSolicitado,
-} from "@/hooks/useVerificacionReservas";
+import type { ReservaParaVerificar } from "@/hooks/useVerificacionReservas";
+// El ejecutor ÚNICO de acciones sobre una reserva (Aceptar, aceptar en bloque, Confirmar, Cancelar y la
+// estrella pasan por él) y la regla de qué botón se puede pulsar en cada estado.
+import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
+import { accionesDisponibles } from "@/lib/reservas/accionesReserva";
 import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
 import { CLAVES_REFRESCO_RESERVAS, FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
@@ -542,13 +542,6 @@ function accionPrincipalReserva(
   };
 }
 
-/** `title` del botón de cancelar, según por qué esté o no disponible. */
-function tituloCancelar(estado: string, canEdit: boolean, nombre: string) {
-  if (estado === "cancelada") return "La reserva ya está cancelada";
-  if (!canEdit) return "No tienes permiso para cancelar reservas";
-  return `Cancelar la reserva de ${nombre} — pedirá confirmación`;
-}
-
 interface ListaReservasAvanzadaProps {
   onEditReserva?: (reserva: Reservation) => void;
   onEspacioClick?: (espacioId: string) => void;
@@ -577,7 +570,6 @@ export function ListaReservasAvanzada({
   initialDateFilter,
   solicitudesState,
 }: ListaReservasAvanzadaProps) {
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   // Alto del contenedor de la tabla. Se MIDE en caliente en vez de descontar
   // un número fijo de rem al 100vh: encima de la lista hay cabecera de
   // página, pestañas y la tarjeta de filtros, y eso cambia — la fila superior
@@ -613,16 +605,15 @@ export function ListaReservasAvanzada({
   const refrescarReservas = () =>
     CLAVES_REFRESCO_RESERVAS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
-  const toggleImportante = async (reservation: Reservation) => {
-    const nuevoValor = !(reservation as any).importante;
-    const { error } = await supabase.from("reservas").update({ importante: nuevoValor }).eq("id", reservation.id);
-    if (error) {
-      console.error("Error actualizando la reserva:", error);
-      toast.error("No se pudo actualizar la reserva: " + error.message);
-      return;
-    }
-    toast.success(nuevoValor ? "Reserva marcada como importante" : "Reserva desmarcada");
-    fetchReservations();
+  // Todo lo que cambia una reserva desde esta lista (Aceptar, aceptar en bloque, Confirmar, Cancelar,
+  // la estrella) lo ejecuta este hook: comprueba que la escritura de verdad se ha guardado, la
+  // condiciona al estado de partida, cambia la fila al instante, refresca lo cacheado (también esta
+  // lista: `reservas-lista`) y, donde toca, avisa al cliente con la respuesta comprobada. Antes cada
+  // handler de aquí escribía, avisaba y refrescaba a su manera.
+  const acciones = useAccionesServicioReserva();
+
+  const toggleImportante = (reservation: Reservation) => {
+    void acciones.alternarImportante(reservation);
   };
 
   // Filtros - inicializar con props si vienen de URL
@@ -685,6 +676,19 @@ export function ListaReservasAvanzada({
     onClick: canEdit ? () => editarReserva(reserva.id) : undefined,
     icono: <SquarePen />,
   });
+  /**
+   * Ranura «Cancelar» de una fila de RESERVA. La regla la pone `accionesDisponibles` (la misma que
+   * aplica el ejecutor al escribir): solo se cancela una reserva VIVA y con permiso; «Llegó» y «No
+   * vino» ya no (decisión del dueño) y salen deshabilitadas con el motivo a la vista.
+   */
+  const accionCancelar = (reserva: Reservation, nombre: string, ocupada: boolean) => {
+    const { habilitada, titulo } = accionesDisponibles({ estado: reserva.estado, nombre }, { vista: "lista", canEdit }).cancelar;
+    return {
+      titulo,
+      onClick: habilitada && !ocupada ? () => setReservaACancelar(reserva) : undefined,
+      cargando: ocupada,
+    };
+  };
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -803,62 +807,18 @@ export function ListaReservasAvanzada({
     }
   };
 
-  const updateReservationStatus = async (id: string, newStatus: string) => {
-    setUpdatingId(id);
-    try {
-      const currentReservation = reservations.find(r => r.id === id);
-
-      const { error } = await supabase
-        .from("reservas")
-        .update({ estado: newStatus })
-        .eq("id", id);
-
-      if (error) {
-        toast.error("Error al actualizar estado");
-        return;
-      }
-
-      // Sin email (el alta manual ya no lo exige) el cambio de estado no manda
-      // ningún correo: se dice, para no dar por hecho que el cliente ya lo sabe.
-      if (currentReservation && !(currentReservation.email ?? "").trim()) {
-        toast.success("Estado actualizado correctamente", {
-          description: "Sin email: no se envía ningún correo al cliente.",
-        });
-      } else {
-        toast.success("Estado actualizado correctamente");
-      }
-
-      // Enviar datos al webhook
-      supabase.functions.invoke('notify-reservation-change', {
-        body: { ...currentReservation, estado: newStatus }
-      }).catch(err => console.error('Error notifying webhook:', err));
-
-      fetchReservations();
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
   /** Cancela de verdad — solo se llega aquí desde el "sí" del diálogo. */
   const confirmarCancelacion = async () => {
     const reserva = reservaACancelar;
     if (!reserva) return;
     setReservaACancelar(null);
-    await updateReservationStatus(reserva.id, "cancelada");
+    await acciones.cancelar(reserva);
   };
 
   // Un clic: acepta una solicitud pendiente exactamente como la pidió el
   // cliente (ver useVerificacionReservas.ts). Requisito explícito del dueño
   // ("hay mucho volumen"): esto NO abre el modal de contraoferta.
-  const handleAceptarUnaClic = async (reservation: Reservation) => {
-    setUpdatingId(reservation.id);
-    try {
-      const resultado = await aceptarComoSolicitado(reservation);
-      if (resultado.ok) fetchReservations();
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+  const handleAceptarUnaClic = (reservation: Reservation) => acciones.aceptar(reservation);
 
   const toggleSeleccion = (id: string) => {
     setSeleccionadas((prev) => {
@@ -892,9 +852,8 @@ export function ListaReservasAvanzada({
     if (elegidas.length === 0) return;
     setAceptandoBloque(true);
     try {
-      await aceptarVariasComoSolicitado(elegidas);
+      await acciones.aceptarVarias(elegidas);
       setSeleccionadas(new Set());
-      fetchReservations();
     } finally {
       setAceptandoBloque(false);
     }
@@ -1305,10 +1264,10 @@ export function ListaReservasAvanzada({
                     principal={accionPrincipalReserva(
                       reservation,
                       canEdit,
-                      updatingId === reservation.id || aceptandoBloque,
+                      acciones.estaEnCurso(reservation.id) || aceptandoBloque,
                       {
                         aceptar: () => handleAceptarUnaClic(reservation),
-                        confirmar: () => updateReservationStatus(reservation.id, "confirmada"),
+                        confirmar: () => acciones.confirmar(reservation),
                       },
                     )}
                     darMesa={accionDarMesa(reservation)}
@@ -1326,14 +1285,11 @@ export function ListaReservasAvanzada({
                           : undefined,
                     }}
                     gestionar={accionEditar(reservation)}
-                    cancelar={{
-                      titulo: tituloCancelar(reservation.estado, canEdit, reservation.nombre || "este cliente"),
-                      onClick:
-                        reservation.estado !== "cancelada" && canEdit && updatingId !== reservation.id
-                          ? () => setReservaACancelar(reservation)
-                          : undefined,
-                      cargando: updatingId === reservation.id,
-                    }}
+                    cancelar={accionCancelar(
+                      reservation,
+                      reservation.nombre || "este cliente",
+                      acciones.estaEnCurso(reservation.id),
+                    )}
                     listaNegra={{
                       titulo: `Añadir a ${reservation.nombre || "este cliente"} a la lista negra`,
                       onClick: () => setBlacklistReserva(reservation),
@@ -1421,7 +1377,7 @@ export function ListaReservasAvanzada({
                   const reservation = fila.reserva;
                   const importante = !!(reservation as any).importante;
                   const fondo = importante ? FONDOS.destacada : FONDOS.normal;
-                  const ocupada = updatingId === reservation.id;
+                  const ocupada = acciones.estaEnCurso(reservation.id);
                   const nombre = reservation.nombre || "Sin nombre";
                   return (
                   <TableRow key={reservation.id} className={cn("group", ALTO_FILA, fondo.fila)}>
@@ -1445,7 +1401,7 @@ export function ListaReservasAvanzada({
                         }
                         principal={accionPrincipalReserva(reservation, canEdit, ocupada || aceptandoBloque, {
                           aceptar: () => handleAceptarUnaClic(reservation),
-                          confirmar: () => updateReservationStatus(reservation.id, "confirmada"),
+                          confirmar: () => acciones.confirmar(reservation),
                         })}
                         darMesa={accionDarMesa(reservation)}
                         verificar={{
@@ -1462,14 +1418,7 @@ export function ListaReservasAvanzada({
                               : undefined,
                         }}
                         gestionar={accionEditar(reservation)}
-                        cancelar={{
-                          titulo: tituloCancelar(reservation.estado, canEdit, nombre),
-                          onClick:
-                            reservation.estado !== "cancelada" && canEdit && !ocupada
-                              ? () => setReservaACancelar(reservation)
-                              : undefined,
-                          cargando: ocupada,
-                        }}
+                        cancelar={accionCancelar(reservation, nombre, ocupada)}
                         listaNegra={{
                           titulo: `Añadir a ${nombre} a la lista negra`,
                           onClick: () => setBlacklistReserva(reservation),

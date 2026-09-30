@@ -124,6 +124,27 @@ describe("useAccionesModoServicio", () => {
     expect(toast.warning).toHaveBeenCalled();
   });
 
+  it("liberar y deshacer refrescan el modo servicio, las mesas asignadas y la rejilla de salas (la lista de «salida» de clavesCache), y nada más", async () => {
+    mockUpdate([{ id: "r1" }]);
+    const { result, queryClient } = setup();
+    const invalidadas: string[] = [];
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation((filtros) => {
+      invalidadas.push(String((filtros as { queryKey: unknown[] }).queryKey[0]));
+      return Promise.resolve();
+    });
+
+    await act(async () => {
+      await result.current.liberarMesa(reserva);
+    });
+    expect(invalidadas).toEqual(["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"]);
+
+    invalidadas.length = 0;
+    await act(async () => {
+      await result.current.deshacerLiberarMesa(reserva);
+    });
+    expect(invalidadas).toEqual(["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"]);
+  });
+
   it("columna salida_at sin migrar: mensaje específico, no el genérico", async () => {
     mockUpdate(null, { code: "PGRST204", message: "Could not find the 'salida_at' column of 'reservas' in the schema cache" });
     const { result } = setup();

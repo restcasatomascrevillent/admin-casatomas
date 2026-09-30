@@ -2,9 +2,7 @@ import { useCallback, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
-import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
-import { CLAVE_OCUPACION_SALAS_DIA } from "@/hooks/useOcupacionSalasDia";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 
 // ============================================================================
 // ACCIONES DEL MODO SERVICIO — liberar mesa y deshacer.
@@ -32,10 +30,15 @@ export interface ReservaAccionModoServicio {
   nombre?: string | null;
 }
 
+/**
+ * Refresca lo que cambia al liberar / volver a ocupar una mesa (`salida_at`): la lista de
+ * claves de ese tipo de cambio está en `clavesCache.ts`, con las demás (modo servicio,
+ * mesas asignadas y rejilla de ocupación de salas).
+ */
 function invalidarTodo(queryClient: QueryClient) {
-  queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA] });
-  queryClient.invalidateQueries({ queryKey: [CLAVE_ASIGNACIONES_MESA] });
-  queryClient.invalidateQueries({ queryKey: [CLAVE_OCUPACION_SALAS_DIA] });
+  for (const clave of CLAVES_POR_CAMBIO.salida) {
+    queryClient.invalidateQueries({ queryKey: [clave] });
+  }
 }
 
 export function useAccionesModoServicio() {
