@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -61,19 +62,24 @@ import { CLAVE_RESUMEN_ASIGNACION_DIA } from "@/hooks/useResumenAsignacionDia";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
 import {
+  antesDeLaEdicion,
   avisoAlClienteTrasEdicion,
   calcularCambiosEdicion,
   debeNotificarEdicion,
+  disponibilidadAvisoModificacion,
   efectoEnMesas,
+  enlaceQuedaRoto,
   errorEmailEdicion,
   errorNombreEdicion,
   errorTelefonoEdicion,
   ErrorSinFilasEdicion,
   esReservaViva,
+  interpretarRespuestaAvisoModificacion,
   interpretarRespuestaNotificacion,
   invalidaEnlaceConfirmacion,
   mensajeErrorEdicion,
   TEXTO_ENLACE_INVALIDADO,
+  TEXTO_ENLACE_NUEVO,
   textoCamposCambiados,
   valoresFormularioDesdeReserva,
   type EnvioCorreoEdicion,
@@ -170,6 +176,28 @@ async function pedirCorreoConfirmacion(reservaId: string, estado: string): Promi
     return interpretarRespuestaNotificacion(respuesta);
   } catch (err) {
     console.error("Error notificando cambio de reserva:", err);
+    return { resultado: "fallo" };
+  }
+}
+
+/**
+ * Pide el correo de «reserva modificada» (casilla «Avisar al cliente del
+ * cambio») y ESPERA la respuesta, igual que `pedirCorreoConfirmacion`. Va
+ * directo a `emails-reserva/notificar-modificacion` (JWT del usuario +
+ * permiso de escritura en reservas): lo de AHORA lo lee la función de la BD, ya
+ * guardado; aquí solo se manda cómo estaba antes. Nunca lanza.
+ */
+async function pedirAvisoModificacion(
+  reservaId: string,
+  antes: { fecha: string; hora: string; comensales: number },
+): Promise<EnvioCorreoEdicion> {
+  try {
+    const respuesta = await supabase.functions.invoke("emails-reserva/notificar-modificacion", {
+      body: { reserva_id: reservaId, antes },
+    });
+    return interpretarRespuestaAvisoModificacion(respuesta);
+  } catch (err) {
+    console.error("Error pidiendo el aviso de reserva modificada:", err);
     return { resultado: "fallo" };
   }
 }
@@ -336,6 +364,9 @@ export const FormularioReserva = ({
   const verificarBlacklist = useVerificarBlacklist();
   const { data: configReservas } = useConfiguracionReservas();
   const [modoOtraHora, setModoOtraHora] = useState(false);
+  // Solo al EDITAR: casilla «Avisar al cliente del cambio». Marcada por defecto;
+  // solo cuenta cuando se puede avisar (ver `disponibilidadAvisoModificacion`).
+  const [avisarCliente, setAvisarCliente] = useState(true);
 
   const esquema = useMemo(() => (reservaAEditar ? esquemaEdicion(reservaAEditar) : formSchema), [reservaAEditar]);
   const form = useForm<FormValues>({
@@ -469,10 +500,12 @@ export const FormularioReserva = ({
       setVerificando(true);
       try {
         // Aforo del turno DEL NEGOCIO de la reserva (igual que el trigger). Al
-        // editar, sin contar la propia reserva (el trigger tampoco la cuenta).
+        // editar se pasa la reserva ANTERIOR entera: no se cuenta contra sí misma
+        // (el trigger tampoco la cuenta) y se aplica la regla del UPDATE («editar
+        // no puede subir la ocupación»: si el cambio no suma, se puede guardar).
         const fechaAforo = format(watchedFecha, "yyyy-MM-dd");
         const resultado = reservaAEditar
-          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta, reservaAEditar.id)
+          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta, reservaAEditar)
           : await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta);
         if (!cancelado) {
           setDisponibilidadInfo({ disponible: resultado.disponible, mensaje: resultado.mensaje });
@@ -496,9 +529,23 @@ export const FormularioReserva = ({
       cancelado = true;
       clearTimeout(timeout);
     };
-    // `reservaAEditar` entra por su id: es lo único de ella que cambia la consulta.
+    // `reservaAEditar` entra por los campos que usa la comprobación (su id y lo
+    // que mira la regla del UPDATE: fecha, hora, comensales, estado y marca), no
+    // por el objeto, para no repetir la consulta cada vez que se recrea.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedFecha, watchedHora, watchedComensales, marcaAlta, comprobarAforo, reservaAEditar?.id]);
+  }, [
+    watchedFecha,
+    watchedHora,
+    watchedComensales,
+    marcaAlta,
+    comprobarAforo,
+    reservaAEditar?.id,
+    reservaAEditar?.fecha,
+    reservaAEditar?.hora,
+    reservaAEditar?.numero_comensales,
+    reservaAEditar?.estado,
+    reservaAEditar?.marca,
+  ]);
 
   useEffect(() => {
     const checkBlacklist = async () => {
@@ -619,9 +666,23 @@ export const FormularioReserva = ({
       : null;
   const efectoMesas =
     reservaAEditar && cambiosActuales && mesasAsignadas.length > 0 ? efectoEnMesas(reservaAEditar, cambiosActuales) : null;
+  // Casilla «Avisar al cliente del cambio»: sale si cambian día, hora o
+  // comensales; habilitada (y marcada por defecto) si se puede avisar. La lista
+  // negra cuenta si lo dice la comprobación en vivo o la marca de la reserva.
+  const avisoModificacion =
+    reservaAEditar && cambiosActuales
+      ? disponibilidadAvisoModificacion(reservaAEditar, cambiosActuales, {
+          ahora: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+          enListaNegra: !!blacklistEntry || !!reservaAEditar.en_blacklist,
+        })
+      : null;
+  const avisaraCambio = !!avisoModificacion?.disponible && avisarCliente;
+  // Con el aviso del cambio marcado no se pide además «Confirma tu reserva»: a
+  // una verificada ese aviso ya le lleva el enlace nuevo (no dos correos).
   const pediraCorreo =
     !!reservaAEditar &&
     !!cambiosActuales &&
+    !avisaraCambio &&
     debeNotificarEdicion(reservaAEditar, cambiosActuales, { hoy: hoyISO, enListaNegra: !!blacklistEntry });
   // La hora de una reserva VERIFICADA con email forma parte de la huella de su
   // enlace «Confirma tu reserva»: cambiarla lo deja en «enlace no válido» y nada
@@ -721,12 +782,26 @@ export const FormularioReserva = ({
 
       clavesRefrescoEdicion().forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
+      // Aviso de «reserva modificada»: solo con la casilla marcada y si se puede
+      // avisar AHORA (mismas reglas que la casilla, con la lista negra recién
+      // comprobada). Se espera la respuesta, como con «Confirma tu reserva».
+      const avisarCambio =
+        avisarCliente &&
+        disponibilidadAvisoModificacion(original, cambios, {
+          ahora: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+          enListaNegra: enListaNegra || !!blacklistEntry || !!original.en_blacklist,
+        }).disponible;
+      const avisoModificacion = avisarCambio
+        ? await pedirAvisoModificacion(original.id, antesDeLaEdicion(original))
+        : null;
+
       // Correo «Confirma tu reserva»: la MISMA regla que el alta, aplicada al
       // único caso en que una edición la activa (ver `debeNotificarEdicion`). Aquí
       // SÍ se espera la respuesta: si `emails-reserva` contesta que ya se envió uno
       // antes (un rebote también ocupa ese hueco) o que el email está bloqueado, el
-      // aviso no puede prometer que «se le manda».
-      const notificar = debeNotificarEdicion(original, cambios, { hoy: hoyISO, enListaNegra });
+      // aviso no puede prometer que «se le manda». No se pide si ya va el aviso del
+      // cambio (a una verificada le lleva el enlace nuevo).
+      const notificar = !avisarCambio && debeNotificarEdicion(original, cambios, { hoy: hoyISO, enListaNegra });
       const envio = notificar ? await pedirCorreoConfirmacion(original.id, original.estado) : null;
 
       const partes = [`Cambios guardados: ${textoCamposCambiados(cambios)}.`];
@@ -737,15 +812,16 @@ export const FormularioReserva = ({
             : "El cliente ya no está en la lista negra: se le quita la marca.",
         );
       }
-      const aviso = avisoAlClienteTrasEdicion(original, cambios, { hoy: hoyISO, envio });
+      const aviso = avisoAlClienteTrasEdicion(original, cambios, { hoy: hoyISO, envio, avisoModificacion });
       if (aviso) partes.push(aviso);
       // Un aviso sobre el cliente lo tiene que leer el personal: no se va a los 4 s de siempre.
       toast.success("Reserva actualizada", {
         description: partes.join(" "),
         ...(aviso ? { duration: DURACION_AVISO_LARGO_MS } : {}),
       });
-      // El enlace que el cliente ya tiene deja de valer y nadie más se va a enterar.
-      if (invalidaEnlaceConfirmacion(original, cambios, { hoy: hoyISO })) {
+      // El enlace que el cliente ya tiene deja de valer y nadie más se va a enterar
+      // (salvo que el aviso del cambio le haya llevado uno nuevo).
+      if (enlaceQuedaRoto(original, cambios, { hoy: hoyISO, avisoModificacion })) {
         toast.warning(TEXTO_ENLACE_INVALIDADO, { duration: DURACION_AVISO_ENLACE_MS });
       }
 
@@ -1135,6 +1211,7 @@ export const FormularioReserva = ({
                     // Una reserva no salta de negocio (cambiaría de aforo): igual
                     // que en el Kanban, que no deja moverla a una sala del otro.
                     // Además el trigger de aforo no mira `marca` al actualizar.
+                    // (desfasado tras aplicar 20260930212000)
                     <FormControl>
                       <Input value={etiquetaNegocio(field.value)} disabled readOnly />
                     </FormControl>
@@ -1386,12 +1463,47 @@ export const FormularioReserva = ({
           </Alert>
         )}
 
+        {/* Solo al EDITAR y si cambian día, hora o comensales: avisar al cliente
+            por correo («reserva modificada», emails-reserva). Deshabilitada, con
+            el motivo, si no se le puede avisar. */}
+        {editando && avisoModificacion?.mostrar && (
+          <div className="flex items-start gap-2 rounded-lg border p-3">
+            <Checkbox
+              id="avisar-cliente-cambio"
+              checked={avisaraCambio}
+              disabled={!avisoModificacion.disponible || form.formState.isSubmitting}
+              onCheckedChange={(valor) => setAvisarCliente(valor === true)}
+              className="mt-0.5"
+            />
+            <div className="space-y-1">
+              <Label
+                htmlFor="avisar-cliente-cambio"
+                className={cn("font-normal", !avisoModificacion.disponible && "text-muted-foreground")}
+              >
+                Avisar al cliente del cambio
+              </Label>
+              <p className="text-[11px] text-muted-foreground">
+                {!avisoModificacion.disponible
+                  ? avisoModificacion.motivo
+                  : avisaraCambio
+                    ? `Al guardar se le enviará un correo con lo que cambia (antes y ahora) y cómo queda la reserva.${
+                        reservaAEditar?.estado === "verificada"
+                          ? " Como aún no la ha confirmado, lleva un enlace nuevo «Confirma tu reserva»."
+                          : ""
+                      }`
+                    : "No se le enviará nada: si hace falta, avísale tú."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Cambiar la hora de una reserva verificada con email deja sin valor el
-            enlace «Confirma tu reserva» que el cliente ya recibió. */}
+            enlace «Confirma tu reserva» que el cliente ya recibió (con el aviso
+            del cambio marcado, se le manda uno nuevo). */}
         {enlaceSeRompe && (
           <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{TEXTO_ENLACE_INVALIDADO}</AlertDescription>
+            <AlertDescription>{avisaraCambio ? TEXTO_ENLACE_NUEVO : TEXTO_ENLACE_INVALIDADO}</AlertDescription>
           </Alert>
         )}
 
@@ -1401,7 +1513,9 @@ export const FormularioReserva = ({
             <span>
               {pediraCorreo
                 ? "Al guardar se pedirá el envío del correo «Confirma tu reserva» al nuevo email (si ya se le envió uno antes, aunque rebotara, no se repite)."
-                : "Guardar solo cambia los datos: el estado de la reserva se queda como está (se cambia con las acciones de la lista)."}
+                : avisaraCambio
+                  ? "Guardar cambia los datos y pide el aviso al cliente: el estado de la reserva se queda como está (se cambia con las acciones de la lista)."
+                  : "Guardar solo cambia los datos: el estado de la reserva se queda como está (se cambia con las acciones de la lista)."}
             </span>
           </p>
         )}

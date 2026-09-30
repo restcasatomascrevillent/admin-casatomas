@@ -62,6 +62,20 @@ export function datosEjemploParaTipo(tipo: TipoPlantilla, hoyIso: string): Datos
     };
   }
 
+  // 'reserva_modificada': un cambio de ejemplo en los tres datos, para que la
+  // prueba enseñe el bloque «Cambios en tu reserva» entero. Estado 'verificada'
+  // (el caso con más piezas: botones con enlace nuevo + su frase); los enlaces
+  // de prueba son "#" (ver handleEnviarPrueba), nunca un token de verdad.
+  if (tipo === "reserva_modificada") {
+    return {
+      ...base,
+      modificacion: {
+        antes: { fecha: fechaObjetivoRecordatorio(hoyIso, 7), hora: "20:30", comensales: 2 },
+        estado: "verificada",
+      },
+    };
+  }
+
   return base;
 }
 

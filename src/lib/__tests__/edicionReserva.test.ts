@@ -1,20 +1,25 @@
 import { describe, it, expect } from "vitest";
 import {
+  antesDeLaEdicion,
   avisoAlClienteTrasEdicion,
   calcularCambiosEdicion,
   cambiaAforo,
   camposCambiados,
   debeNotificarEdicion,
+  disponibilidadAvisoModificacion,
   efectoEnMesas,
+  enlaceQuedaRoto,
   errorEmailEdicion,
   errorNombreEdicion,
   errorTelefonoEdicion,
   ErrorSinFilasEdicion,
   esReservaViva,
+  interpretarRespuestaAvisoModificacion,
   interpretarRespuestaNotificacion,
   invalidaEnlaceConfirmacion,
   mensajeErrorEdicion,
   TEXTO_ENLACE_INVALIDADO,
+  TEXTO_ENLACE_NUEVO,
   textoCamposCambiados,
   valoresFormularioDesdeReserva,
   type EnvioCorreoEdicion,
@@ -553,5 +558,211 @@ describe("edicionReserva · errores legibles", () => {
     expect(mensajeErrorEdicion(new Error("boom"))).toBe("Error al guardar los cambios: boom");
     expect(mensajeErrorEdicion({})).toBe("Error al guardar los cambios: error desconocido");
     expect(mensajeErrorEdicion(null)).toBe("Error al guardar los cambios: error desconocido");
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Aviso de «reserva modificada» (casilla «Avisar al cliente del cambio»)
+// ----------------------------------------------------------------------------
+
+describe("edicionReserva · la casilla «Avisar al cliente del cambio»", () => {
+  // La reserva de partida es del 2026-10-10 a las 21:00.
+  const opciones = { ahora: "2026-10-01T12:00", enListaNegra: false };
+
+  it("no sale si no cambia el día, la hora ni los comensales (no hay nada que avisar)", () => {
+    for (const cambios of [{}, { nombre: "X" }, { notas_cliente: null, espacio_id: "terraza" }, { email: "otro@ejemplo.com" }]) {
+      expect(disponibilidadAvisoModificacion(reserva(), cambios, opciones)).toEqual({
+        mostrar: false,
+        disponible: false,
+        motivo: null,
+      });
+    }
+  });
+
+  it("con email, viva, futura y sin lista negra: disponible (y por tanto marcada por defecto)", () => {
+    for (const estado of ["pendiente", "verificada", "confirmada"]) {
+      for (const cambios of [{ fecha: "2026-10-12" }, { hora: "20:00" }, { numero_comensales: 6 }]) {
+        expect(disponibilidadAvisoModificacion(reserva({ estado }), cambios, opciones)).toEqual({
+          mostrar: true,
+          disponible: true,
+          motivo: null,
+        });
+      }
+    }
+  });
+
+  it("reserva que ya no está viva: se enseña deshabilitada, con el motivo", () => {
+    const cancelada = disponibilidadAvisoModificacion(reserva({ estado: "cancelada" }), { hora: "20:00" }, opciones);
+    expect(cancelada).toMatchObject({ mostrar: true, disponible: false });
+    expect(cancelada.motivo).toMatch(/cancelada/);
+    for (const estado of ["completada", "no_show"]) {
+      const cerrada = disponibilidadAvisoModificacion(reserva({ estado }), { hora: "20:00" }, opciones);
+      expect(cerrada).toMatchObject({ mostrar: true, disponible: false });
+      expect(cerrada.motivo).toMatch(/cerrada/);
+    }
+  });
+
+  it("pendiente de la WEB: deshabilitada, aún no ha recibido ningún correo (le llegará la propuesta al verificarla)", () => {
+    const web = disponibilidadAvisoModificacion(reserva({ estado: "pendiente", canal: "web" }), { hora: "20:00" }, opciones);
+    expect(web).toEqual({
+      mostrar: true,
+      disponible: false,
+      motivo: "Aún no ha recibido ningún correo: le llegará la propuesta al verificarla.",
+    });
+    // Teléfono o manual sí recibieron «solicitud recibida»; y una web ya verificada, la propuesta.
+    expect(disponibilidadAvisoModificacion(reserva({ estado: "pendiente", canal: "telefono" }), { hora: "20:00" }, opciones).disponible).toBe(true);
+    expect(disponibilidadAvisoModificacion(reserva({ estado: "pendiente", canal: "manual" }), { hora: "20:00" }, opciones).disponible).toBe(true);
+    expect(disponibilidadAvisoModificacion(reserva({ estado: "verificada", canal: "web" }), { hora: "20:00" }, opciones).disponible).toBe(true);
+  });
+
+  it("reserva que ya ha pasado (día Y hora, tal y como queda con el cambio)", () => {
+    const pasada = disponibilidadAvisoModificacion(reserva({ fecha: "2026-09-20" }), { hora: "20:00" }, opciones);
+    expect(pasada).toMatchObject({ mostrar: true, disponible: false });
+    expect(pasada.motivo).toMatch(/ya ha pasado/);
+    // Hoy, pero la hora nueva ya pasó.
+    const hoyTemprano = disponibilidadAvisoModificacion(reserva({ fecha: "2026-10-01" }), { hora: "11:00" }, opciones);
+    expect(hoyTemprano.disponible).toBe(false);
+    // Hoy y aún por llegar: sí.
+    expect(disponibilidadAvisoModificacion(reserva({ fecha: "2026-10-01" }), { hora: "21:30" }, opciones).disponible).toBe(true);
+    // Una reserva pasada que se mueve a un día futuro: sí.
+    expect(
+      disponibilidadAvisoModificacion(reserva({ fecha: "2026-09-20" }), { fecha: "2026-10-20" }, opciones).disponible,
+    ).toBe(true);
+  });
+
+  it("sin email (o quitándolo en esta edición): deshabilitada, avisar por teléfono", () => {
+    const sinEmail = disponibilidadAvisoModificacion(reserva({ email: null }), { hora: "20:00" }, opciones);
+    expect(sinEmail).toMatchObject({ mostrar: true, disponible: false });
+    expect(sinEmail.motivo).toMatch(/No tiene email/);
+    expect(disponibilidadAvisoModificacion(reserva(), { hora: "20:00", email: null }, opciones).disponible).toBe(false);
+    // Si el email se pone en esta misma edición, cuenta el nuevo.
+    expect(
+      disponibilidadAvisoModificacion(reserva({ email: null }), { hora: "20:00", email: "juan@ejemplo.com" }, opciones)
+        .disponible,
+    ).toBe(true);
+  });
+
+  it("cliente en lista negra: deshabilitada, no se le escribe", () => {
+    const negra = disponibilidadAvisoModificacion(reserva(), { hora: "20:00" }, { ...opciones, enListaNegra: true });
+    expect(negra).toMatchObject({ mostrar: true, disponible: false });
+    expect(negra.motivo).toMatch(/lista negra/);
+  });
+
+  it("«antes» que se manda a emails-reserva: la reserva tal y como estaba, hora sin segundos", () => {
+    expect(antesDeLaEdicion(reserva())).toEqual({ fecha: "2026-10-10", hora: "21:00", comensales: 4 });
+  });
+
+  it("con la casilla marcada, el aviso previo del enlace dice que se le manda uno nuevo", () => {
+    expect(TEXTO_ENLACE_NUEVO).toMatch(/deja de valer al cambiar la hora/);
+    expect(TEXTO_ENLACE_NUEVO).toMatch(/se le manda uno nuevo/);
+  });
+});
+
+describe("edicionReserva · interpretar la respuesta de emails-reserva/notificar-modificacion", () => {
+  /** Aquí no hay proxy: `data` ES el `{ ok, motivo? }` de emails-reserva. */
+  const directa = (cuerpo: unknown) => ({ data: cuerpo, error: null });
+
+  it("enviado / ya enviado / suprimido / otro motivo", () => {
+    expect(interpretarRespuestaAvisoModificacion(directa({ ok: true }))).toEqual({ resultado: "enviado" });
+    expect(interpretarRespuestaAvisoModificacion(directa({ ok: false, motivo: "ya_enviado_o_en_curso" }))).toEqual({
+      resultado: "ya_enviado",
+    });
+    expect(interpretarRespuestaAvisoModificacion(directa({ ok: false, motivo: "destinatario_suprimido" }))).toEqual({
+      resultado: "suprimido",
+    });
+    expect(interpretarRespuestaAvisoModificacion(directa({ ok: false, motivo: "reserva_pasada" }))).toEqual({
+      resultado: "no_enviado",
+      motivo: "reserva_pasada",
+    });
+  });
+
+  it("también si llega como texto JSON", () => {
+    expect(interpretarRespuestaAvisoModificacion(directa('{"ok":true}'))).toEqual({ resultado: "enviado" });
+  });
+
+  it("error de la función (401/403, 404 si aún no está desplegada) o de red: fallo; ilegible: solo «pedido»", () => {
+    expect(interpretarRespuestaAvisoModificacion({ data: null, error: new Error("non-2xx") })).toEqual({ resultado: "fallo" });
+    expect(interpretarRespuestaAvisoModificacion(directa("no es json"))).toEqual({ resultado: "pedido" });
+    expect(interpretarRespuestaAvisoModificacion(directa({}))).toEqual({ resultado: "pedido" });
+    expect(interpretarRespuestaAvisoModificacion(undefined)).toEqual({ resultado: "pedido" });
+  });
+});
+
+describe("edicionReserva · qué se le dice al personal tras pedir el aviso del cambio", () => {
+  const hoy = "2026-10-01";
+  const texto = (envio: EnvioCorreoEdicion, estado = "confirmada") =>
+    avisoAlClienteTrasEdicion(reserva({ estado }), { hora: "20:00" }, { hoy, avisoModificacion: envio })!;
+
+  it("enviado: lo dice; si estaba verificada, que lleva un enlace nuevo para confirmarla", () => {
+    expect(texto({ resultado: "enviado" })).toBe("Se le ha enviado al cliente un correo con el cambio.");
+    expect(texto({ resultado: "enviado" }, "verificada")).toMatch(/enlace nuevo/);
+  });
+
+  it("ya enviado (el último aviso ya llevaba estos datos, o se está enviando): no dice que se le manda otro", () => {
+    const t = texto({ resultado: "ya_enviado" });
+    expect(t).not.toMatch(/Se le ha enviado/);
+    expect(t).toMatch(/ya tiene un aviso con estos mismos datos/);
+  });
+
+  it("suprimido: bloqueado, hay que llamarle", () => {
+    const t = texto({ resultado: "suprimido" });
+    expect(t).toMatch(/bloqueado/);
+    expect(t).toMatch(/Llámale/);
+  });
+
+  it("los motivos conocidos se explican; los desconocidos se citan con «Llámale»", () => {
+    expect(texto({ resultado: "no_enviado", motivo: "fallido_reintentable" })).toMatch(/se reintentará solo/);
+    expect(texto({ resultado: "no_enviado", motivo: "reserva_pasada" })).toMatch(/ya ha pasado/);
+    expect(texto({ resultado: "no_enviado", motivo: "en_lista_negra" })).toMatch(/lista negra/);
+    expect(texto({ resultado: "no_enviado", motivo: "plantilla_no_configurada_reserva_modificada" })).toMatch(
+      /falta la plantilla/,
+    );
+    expect(texto({ resultado: "no_enviado", motivo: "pendiente_sin_correo_previo" })).toMatch(/le llegará la propuesta/);
+    expect(texto({ resultado: "no_enviado", motivo: "cambio_no_reciente" })).toMatch(/recién guardada/);
+    expect(texto({ resultado: "no_enviado", motivo: "demasiados_avisos" })).toMatch(/demasiados seguidos/);
+    const raro = texto({ resultado: "no_enviado", motivo: "token_no_configurado" });
+    expect(raro).toMatch(/token_no_configurado/);
+    expect(raro).toMatch(/Llámale/);
+  });
+
+  it("fallo al pedirlo: avisar por teléfono; respuesta ilegible: solo que se pidió", () => {
+    expect(texto({ resultado: "fallo" })).toMatch(/No se ha podido pedir el envío del aviso del cambio/);
+    expect(texto({ resultado: "fallo" })).toMatch(/teléfono/);
+    const pedido = texto({ resultado: "pedido" });
+    expect(pedido).toMatch(/Se ha pedido el envío/);
+    expect(pedido).not.toMatch(/Se le ha enviado/);
+  });
+
+  it("sin pedir el aviso (casilla desmarcada), se sigue diciendo que el cliente no recibe nada", () => {
+    expect(avisoAlClienteTrasEdicion(reserva(), { hora: "20:00" }, { hoy, avisoModificacion: null })).toBe(
+      "El cliente no recibe ningún aviso de este cambio.",
+    );
+  });
+});
+
+describe("edicionReserva · ¿el enlace «Confirma tu reserva» se queda roto tras guardar?", () => {
+  const hoy = "2026-10-01";
+  const verificada = reserva({ estado: "verificada" });
+
+  it("sin aviso del cambio (casilla desmarcada): sí, como hasta ahora", () => {
+    expect(enlaceQuedaRoto(verificada, { hora: "21:30" }, { hoy, avisoModificacion: null })).toBe(true);
+  });
+
+  it("si el aviso salió (o el cliente ya tenía uno con estos datos), tiene enlace nuevo: no", () => {
+    expect(enlaceQuedaRoto(verificada, { hora: "21:30" }, { hoy, avisoModificacion: { resultado: "enviado" } })).toBe(false);
+    expect(enlaceQuedaRoto(verificada, { hora: "21:30" }, { hoy, avisoModificacion: { resultado: "ya_enviado" } })).toBe(
+      false,
+    );
+  });
+
+  it("si el aviso no consta que saliera, sí (hay que confirmarla o llamarle)", () => {
+    for (const resultado of ["suprimido", "no_enviado", "pedido", "fallo"] as const) {
+      expect(enlaceQuedaRoto(verificada, { hora: "21:30" }, { hoy, avisoModificacion: { resultado } })).toBe(true);
+    }
+  });
+
+  it("si la edición no lo rompía (otro estado, sin hora), nunca", () => {
+    expect(enlaceQuedaRoto(reserva(), { hora: "21:30" }, { hoy, avisoModificacion: null })).toBe(false);
+    expect(enlaceQuedaRoto(verificada, { numero_comensales: 6 }, { hoy, avisoModificacion: null })).toBe(false);
   });
 });

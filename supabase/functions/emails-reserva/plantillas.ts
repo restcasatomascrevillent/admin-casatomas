@@ -88,6 +88,21 @@
 //    y la aplica `tipoEmailParaEstado()` en index.ts. Ver el comentario
 //    largo de esa función para el porqué y para qué canales siguen
 //    recibiéndolo.
+//
+// 9. 'reserva_modificada' (2026-09-30): aviso al cliente cuando el personal
+//    cambia el día, la hora o los comensales desde «Editar» del panel. NO sale
+//    por un cambio de estado (tipoEmailParaEstado nunca lo devuelve): lo pide
+//    el panel en POST /notificar-modificacion (ver reserva-modificada.ts). Lo
+//    que tiene de especial, todo AUTOMÁTICO (no editorial, igual que la
+//    comparación del punto 4 — un editor no puede ocultar qué ha cambiado):
+//      · `datos.modificacion` pinta el bloque «Cambios en tu reserva» con
+//        antes/ahora de SOLO lo que cambió (`cambiosDeLaReserva`);
+//      · debajo, una frase de qué tiene que hacer el cliente según el estado
+//        (`fraseEstadoTrasModificacion`): confirmada = nada; verificada =
+//        confirmarla con el botón (enlace NUEVO); pendiente = sigue en revisión;
+//      · con `modificacion` nunca se pinta el «Pediste / Te ofrecemos».
+//    Los botones son los de siempre: solo salen si hay texto Y enlace, y el
+//    enlace solo lo pone index.ts cuando la reserva está 'verificada'.
 // ============================================================================
 
 // Negocio del correo (2026-09-24): las reservas de "El Reservado" son de
@@ -109,7 +124,8 @@ export type TipoPlantilla =
   | "propuesta"
   | "confirmada"
   | "rechazada"
-  | "recordatorio";
+  | "recordatorio"
+  | "reserva_modificada";
 
 export const TIPOS_PLANTILLA: readonly TipoPlantilla[] = [
   "solicitud_recibida",
@@ -117,7 +133,25 @@ export const TIPOS_PLANTILLA: readonly TipoPlantilla[] = [
   "confirmada",
   "rechazada",
   "recordatorio",
+  "reserva_modificada",
 ];
+
+/** Lo que puede cambiar en un aviso de «reserva modificada» (punto 9). */
+export interface DiaHoraComensales {
+  /** ISO "YYYY-MM-DD" */
+  fecha: string;
+  /** "HH:MM" (o "HH:MM:SS") */
+  hora: string;
+  comensales: number;
+}
+
+/** Datos del aviso de «reserva modificada». Lo de AHORA son `fecha`/`hora`/
+ * `comensales` de DatosReservaParaCorreo (los vigentes); aquí va lo de ANTES. */
+export interface DatosModificacion {
+  antes: DiaHoraComensales;
+  /** Estado de la reserva al avisar: decide la frase de qué tiene que hacer el cliente. */
+  estado: string;
+}
 
 export interface FilaPlantilla {
   tipo: TipoPlantilla;
@@ -151,6 +185,15 @@ export interface DatosReservaParaCorreo {
   botonSecundarioUrl?: string | null;
   /** Negocio de la reserva (ver `negocioParaMarca`). Sin él, Casa Tomás. */
   negocio?: DatosNegocio | null;
+  /** Solo en 'reserva_modificada': cómo era la reserva antes del cambio (punto 9). */
+  modificacion?: DatosModificacion | null;
+}
+
+/** Una línea del bloque «Cambios en tu reserva», ya formateada. */
+export interface CambioReserva {
+  etiqueta: "Fecha" | "Hora" | "Comensales";
+  antes: string;
+  ahora: string;
 }
 
 interface FilaTabla {
@@ -219,6 +262,50 @@ export function formatearHora(hora: string): string {
 export function hayContraoferta(datos: DatosReservaParaCorreo): boolean {
   if (datos.horaSolicitada === undefined || datos.horaSolicitada === null) return false;
   return formatearHora(datos.hora) !== formatearHora(datos.horaSolicitada);
+}
+
+/**
+ * Las líneas del bloque «Cambios en tu reserva» (punto 9): SOLO lo que de
+ * verdad cambió entre `datos.modificacion.antes` y los datos vigentes, en
+ * orden fecha → hora → comensales y ya formateado. `[]` si el correo no es un
+ * aviso de modificación o si no cambió nada visible (nunca se pinta
+ * "antes 21:00, ahora 21:00"). Las horas se comparan sin segundos.
+ */
+export function cambiosDeLaReserva(datos: DatosReservaParaCorreo): CambioReserva[] {
+  const antes = datos.modificacion?.antes;
+  if (!antes) return [];
+  const cambios: CambioReserva[] = [];
+  if ((antes.fecha || "").slice(0, 10) !== (datos.fecha || "").slice(0, 10)) {
+    cambios.push({ etiqueta: "Fecha", antes: formatearFecha(antes.fecha), ahora: formatearFecha(datos.fecha) });
+  }
+  if (formatearHora(antes.hora) !== formatearHora(datos.hora)) {
+    cambios.push({ etiqueta: "Hora", antes: formatearHora(antes.hora), ahora: formatearHora(datos.hora) });
+  }
+  if (Number(antes.comensales) !== Number(datos.comensales)) {
+    cambios.push({ etiqueta: "Comensales", antes: `${antes.comensales}`, ahora: `${datos.comensales}` });
+  }
+  return cambios;
+}
+
+/**
+ * Frase automática bajo los cambios: qué tiene que hacer el cliente según el
+ * estado de su reserva (punto 9). `conBotonConfirmar` = el correo lleva de
+ * verdad el botón de confirmar (texto en la plantilla Y enlace en los datos):
+ * sin él no se le promete un botón que no está. `null` = sin frase.
+ */
+export function fraseEstadoTrasModificacion(estado: string, conBotonConfirmar: boolean): string | null {
+  switch (estado) {
+    case "confirmada":
+      return "Tu reserva sigue confirmada con estos datos: no tienes que hacer nada más.";
+    case "verificada":
+      return conBotonConfirmar
+        ? "Tu reserva sigue pendiente de tu confirmación. Confírmala con el botón de abajo: si tenías el enlace de un correo anterior, usa mejor este, que ya lleva los datos nuevos."
+        : "Tu reserva sigue pendiente de tu confirmación: llámanos para confirmarla.";
+    case "pendiente":
+      return "Tu solicitud sigue pendiente de revisión: te escribiremos en cuanto esté confirmada.";
+    default:
+      return null;
+  }
 }
 
 /**
@@ -324,6 +411,7 @@ const INSIGNIA_POR_TIPO: Record<TipoPlantilla, string> = {
   confirmada: "Reserva confirmada",
   rechazada: "Solicitud no procesada",
   recordatorio: "Recordatorio de tu reserva",
+  reserva_modificada: "Reserva modificada",
 };
 
 // ----------------------------------------------------------------------------
@@ -362,6 +450,8 @@ interface EsqueletoParams {
   cuerpoHtml: string;
   filasTabla: FilaTabla[];
   comparacion: { solicitado: FilaTabla; ofrecido: FilaTabla } | null;
+  /** Punto 9: bloque «Cambios en tu reserva» (null = no es un aviso de cambio). */
+  modificacion: { cambios: CambioReserva[]; frase: string | null } | null;
   botones: Boton[];
   pieHtml: string | null;
   colorAcento: string;
@@ -382,6 +472,30 @@ function envolverEsqueleto(p: EsqueletoParams): string {
               <div style="background:#FFF9F0;border:1px solid ${escapeHtml(p.colorAcento)};padding:16px 20px;font-size:13px;color:#6B6560;line-height:1.6;">
                 <strong style="color:${escapeHtml(p.colorOscuro)};">Pediste:</strong> ${escapeHtml(p.comparacion.solicitado.valor)}<br>
                 <strong style="color:${escapeHtml(p.colorOscuro)};">Te ofrecemos:</strong> ${escapeHtml(p.comparacion.ofrecido.valor)}
+              </div>
+            </td>
+          </tr>`
+    : "";
+
+  // Punto 9: mismo lenguaje visual que el bloque de comparación (caja crema
+  // con borde de acento), una línea por cambio y la frase de estado debajo.
+  const bloqueModificacion = p.modificacion
+    ? `
+          <tr>
+            <td style="padding:0 48px 8px;">
+              <div style="background:#FFF9F0;border:1px solid ${escapeHtml(p.colorAcento)};padding:16px 20px;font-size:13px;color:#6B6560;line-height:1.6;">
+                <div style="display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:${escapeHtml(p.colorAcento)};margin-bottom:6px;">Cambios en tu reserva</div>
+                ${p.modificacion.cambios
+                  .map(
+                    (c) =>
+                      `<strong style="color:${escapeHtml(p.colorOscuro)};">${escapeHtml(c.etiqueta)}:</strong> antes ${escapeHtml(c.antes)}, ahora <strong style="color:${escapeHtml(p.colorOscuro)};">${escapeHtml(c.ahora)}</strong>`,
+                  )
+                  .join("<br>\n                ")}${
+                  p.modificacion.frase
+                    ? `
+                <div style="margin-top:10px;color:${escapeHtml(p.colorOscuro)};">${escapeHtml(p.modificacion.frase)}</div>`
+                    : ""
+                }
               </div>
             </td>
           </tr>`
@@ -445,7 +559,7 @@ function envolverEsqueleto(p: EsqueletoParams): string {
               <p style="margin:0 0 20px;font-size:22px;color:${escapeHtml(p.colorOscuro)};font-family:Georgia,'Times New Roman',serif;font-weight:normal;">${p.saludoHtml}</p>
               ${p.cuerpoHtml}
             </td>
-          </tr>${bloqueComparacion}${bloqueTabla}${bloqueBotones}
+          </tr>${bloqueComparacion}${bloqueModificacion}${bloqueTabla}${bloqueBotones}
           <tr>
             <td style="padding:0 48px 24px;">
               <p style="margin:0;font-size:12px;color:#9B948E;text-align:center;line-height:1.6;">${escapeHtml(p.negocio.nombre)} · ${escapeHtml(p.negocio.direccion)}, ${escapeHtml(p.negocio.localidad)} · <a href="tel:${escapeHtml(p.negocio.telefonoDigits)}" style="color:#9B948E;">${escapeHtml(p.negocio.telefonoTexto)}</a></p>
@@ -525,7 +639,9 @@ export function renderPlantilla(
   // Solo horas: ni "Pediste: 20:00 en Terraza" ni "Te ofrecemos: 21:00 en
   // Comedor" (punto 7). `hayContraoferta` ya garantiza que las dos horas
   // son distintas, así que el bloque nunca sale diciendo lo mismo dos veces.
-  const comparacion = hayContraoferta(datos)
+  // En un aviso de cambio (punto 9) nunca: la hora pedida al crear la reserva
+  // no es lo que el cliente tenía antes de ESTE cambio.
+  const comparacion = !datos.modificacion && hayContraoferta(datos)
     ? {
         solicitado: { etiqueta: "Solicitado", valor: formatearHora(datos.horaSolicitada || datos.hora) },
         ofrecido: { etiqueta: "Ofrecido", valor: formatearHora(datos.hora) },
@@ -548,12 +664,28 @@ export function renderPlantilla(
     });
   }
 
+  // Punto 9: el bloque sale solo si hay algo que contar (sin cambios visibles
+  // no se pinta ni la frase). La frase sabe si el botón de confirmar está de
+  // verdad en el correo para no prometer uno que no se ve.
+  const cambios = cambiosDeLaReserva(datos);
+  const modificacion =
+    datos.modificacion && cambios.length > 0
+      ? {
+          cambios,
+          frase: fraseEstadoTrasModificacion(
+            datos.modificacion.estado,
+            botones.some((b) => b.estilo === "primario"),
+          ),
+        }
+      : null;
+
   const html = envolverEsqueleto({
     insignia: INSIGNIA_POR_TIPO[plantilla.tipo],
     saludoHtml,
     cuerpoHtml,
     filasTabla,
     comparacion,
+    modificacion,
     botones,
     pieHtml: mostrarPie ? pieTexto : null,
     colorAcento: plantilla.color_acento || "#B8936A",

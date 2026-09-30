@@ -51,7 +51,11 @@ vi.mock("@/hooks/useConfiguracionReservas", () => ({
   useConfiguracionReservas: () => ({ data: mocks.config }),
 }));
 vi.mock("@/hooks/useDisponibilidad", () => ({
-  verificarAforoTurno: (...args: unknown[]) => mocks.verificarAforo(...args),
+  // Misma firma que la real: (fecha, hora, comensales, marca, reservaEditada). Al
+  // EDITAR, `reservaEditada` es la reserva ANTERIOR entera (regla del UPDATE:
+  // «editar no puede subir la ocupación»), no solo su id.
+  verificarAforoTurno: (...args: Parameters<typeof import("@/hooks/useDisponibilidad").verificarAforoTurno>) =>
+    mocks.verificarAforo(...args),
 }));
 vi.mock("@/hooks/useVerificacionReservas", () => ({ notificarCambioReserva: vi.fn() }));
 vi.mock("@/hooks/useOcupacionSalasDia", async (importOriginal) => {
@@ -123,7 +127,7 @@ vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
-import { TEXTO_ENLACE_INVALIDADO, type ReservaEditable } from "@/lib/reservas/edicionReserva";
+import { TEXTO_ENLACE_INVALIDADO, TEXTO_ENLACE_NUEVO, type ReservaEditable } from "@/lib/reservas/edicionReserva";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -222,10 +226,17 @@ const descripcionDelAviso = () => {
   const [, opciones] = vi.mocked(toast.success).mock.calls.at(-1) as [string, { description: string; duration?: number }];
   return opciones;
 };
+/** La casilla «Avisar al cliente del cambio» (solo sale si cambia día, hora o comensales). */
+const casillaAviso = () => screen.getByRole("checkbox", { name: "Avisar al cliente del cambio" });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  notificaciones().mockResolvedValue(respuestaProxy({ ok: true }) as never);
+  // Cada función contesta con su forma: el proxy envuelve el `{ ok, motivo }` de
+  // emails-reserva en `resultado`; la ruta del aviso de cambio lo devuelve tal cual.
+  notificaciones().mockImplementation((async (nombre: string) =>
+    nombre === "emails-reserva/notificar-modificacion"
+      ? { data: { ok: true }, error: null }
+      : respuestaProxy({ ok: true })) as never);
   mocks.verificarBlacklist.mockResolvedValue(null);
   mocks.verificarAforo.mockResolvedValue({ disponible: true, mensaje: "Hay aforo en el turno." });
   mocks.config.min_comensales_por_reserva = 1;
@@ -528,18 +539,187 @@ describe("FormularioReserva · edición · email", () => {
     expect(notificaciones()).not.toHaveBeenCalled();
   });
 
-  it("cambiar la hora de una reserva con email no avisa al cliente y el aviso lo dice", async () => {
+  it("cambiar la hora de una reserva con email: «Avisar al cliente del cambio» sale MARCADA y se pide el aviso con el «antes»", async () => {
     const bd = prepararBD();
     montar();
 
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    expect(casillaAviso()).toBeChecked();
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
     expect(bd.update.mock.calls[0][0]).toEqual({ hora: "13:00" });
+    await waitFor(() => expect(notificaciones()).toHaveBeenCalledTimes(1));
+    // Directo a emails-reserva (no por notify-reservation-change): lo de ahora lo lee la función de la BD.
+    expect(notificaciones()).toHaveBeenCalledWith("emails-reserva/notificar-modificacion", {
+      body: { reserva_id: "res-1", antes: { fecha: EN_DIEZ_DIAS, hora: "21:00", comensales: 4 } },
+    });
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(descripcionDelAviso().description).toMatch(/Se le ha enviado al cliente un correo con el cambio\./);
+  });
+
+  it("si se desmarca, no se pide nada y el aviso dice que el cliente no recibe nada", async () => {
+    const bd = prepararBD();
+    montar();
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    fireEvent.click(casillaAviso());
+    expect(casillaAviso()).not.toBeChecked();
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
     expect(notificaciones()).not.toHaveBeenCalled();
-    const [, opciones] = vi.mocked(toast.success).mock.calls.at(-1) as [string, { description: string }];
-    expect(opciones.description).toMatch(/El cliente no recibe ningún aviso/);
+    expect(descripcionDelAviso().description).toMatch(/El cliente no recibe ningún aviso/);
+  });
+});
+
+describe("FormularioReserva · edición · casilla «Avisar al cliente del cambio»", () => {
+  it("no aparece si no cambia el día, la hora ni los comensales", async () => {
+    prepararBD();
+    montar();
+
+    escribir("Ana López", "Otro Nombre");
+    escribir("Sin gluten", "Sin gluten ni lactosa");
+    await guardar();
+    expect(screen.queryByRole("checkbox", { name: "Avisar al cliente del cambio" })).not.toBeInTheDocument();
+  });
+
+  it("aparece marcada al cambiar los comensales y explica qué se le manda", async () => {
+    prepararBD();
+    montar();
+
+    escribir("4", "6");
+    expect(casillaAviso()).toBeChecked();
+    expect(casillaAviso()).toBeEnabled();
+    expect(screen.getByText(/Al guardar se le enviará un correo con lo que cambia/)).toBeInTheDocument();
+  });
+
+  it("a una VERIFICADA le explica que el correo lleva un enlace nuevo para confirmar", async () => {
+    prepararBD();
+    montar({ estado: "verificada" });
+
+    escribir("4", "6");
+    expect(screen.getByText(/enlace nuevo «Confirma tu reserva»/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["sin email", { email: null }, /No tiene email/],
+    ["cancelada", { estado: "cancelada" }, /cancelada/],
+    ["ya pasada", { fecha: "2020-03-10" }, /ya ha pasado/],
+    // La web pendiente no recibe ningún correo hasta la propuesta (sin doble correo).
+    ["pendiente de la web", { estado: "pendiente", canal: "web" }, /Aún no ha recibido ningún correo/],
+  ])("%s: deshabilitada, sin marcar y con el motivo; al guardar no se pide nada", async (_caso, over, motivo) => {
+    const bd = prepararBD();
+    montar(over as Partial<ReservaEditable>);
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    expect(casillaAviso()).toBeDisabled();
+    expect(casillaAviso()).not.toBeChecked();
+    expect(screen.getByText(motivo)).toBeInTheDocument();
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(notificaciones()).not.toHaveBeenCalled();
+  });
+
+  it("cliente en lista negra: deshabilitada y no se le escribe", async () => {
+    mocks.verificarBlacklist.mockResolvedValue({ id: "bl-1", tipo: "telefono", valor: "+34612345678", nombre: "Ana", motivo: "No vino" });
+    const bd = prepararBD();
+    montar();
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    await waitFor(() => expect(casillaAviso()).toBeDisabled());
+    expect(screen.getByText(/lista negra: no se le escribe/)).toBeInTheDocument();
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(notificaciones()).not.toHaveBeenCalled();
+  });
+
+  it("ESPERA la respuesta de emails-reserva: hasta que llega no dice nada ni cierra", async () => {
+    let responder: (r: unknown) => void = () => {};
+    notificaciones().mockReturnValue(new Promise((resolve) => (responder = resolve)) as never);
+    const bd = prepararBD();
+    const { onSuccess } = montar();
+
+    escribir("4", "6");
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(notificaciones()).toHaveBeenCalledTimes(1));
+    expect(bd.update).toHaveBeenCalledTimes(1);
+    await dejarPasarLosRetardos();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    responder({ data: { ok: true }, error: null });
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(descripcionDelAviso().description).toMatch(/Se le ha enviado al cliente un correo con el cambio/);
+    expect(descripcionDelAviso().duration).toBeGreaterThanOrEqual(10_000);
+    expect(onSuccess).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["ya enviado (el último aviso ya llevaba estos datos)", { data: { ok: false, motivo: "ya_enviado_o_en_curso" }, error: null }, /ya tiene un aviso con estos mismos datos/],
+    ["email bloqueado", { data: { ok: false, motivo: "destinatario_suprimido" }, error: null }, /bloqueado/],
+    ["reintento en marcha", { data: { ok: false, motivo: "fallido_reintentable" }, error: null }, /se reintentará solo/],
+    ["otro motivo", { data: { ok: false, motivo: "token_no_configurado" }, error: null }, /token_no_configurado\)\. Llámale/],
+    ["la función falla o aún no está desplegada", { data: null, error: new Error("non-2xx") }, /No se ha podido pedir el envío del aviso del cambio/],
+  ])("%s: lo dice tal cual, sin afirmar que se le ha enviado", async (_caso, respuesta, texto) => {
+    notificaciones().mockResolvedValue(respuesta as never);
+    prepararBD();
+    montar();
+
+    escribir("4", "6");
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(descripcionDelAviso().description).toMatch(texto);
+    expect(descripcionDelAviso().description).not.toMatch(/Se le ha enviado/);
+  });
+
+  it("si la llamada LANZA (red caída), lo guardado queda guardado y se avisa", async () => {
+    const consola = vi.spyOn(console, "error").mockImplementation(() => {});
+    notificaciones().mockRejectedValue(new Error("Failed to fetch"));
+    const bd = prepararBD();
+    const { onSuccess } = montar();
+
+    escribir("4", "6");
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(bd.update).toHaveBeenCalledTimes(1);
+    expect(descripcionDelAviso().description).toMatch(/No se ha podido pedir el envío del aviso del cambio/);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalled();
+    consola.mockRestore();
+  });
+
+  it("doble clic en «Guardar cambios»: un solo guardado y un solo aviso pedido", async () => {
+    const bd = prepararBD();
+    montar();
+
+    escribir("4", "6");
+    const boton = await guardar();
+    fireEvent.click(boton);
+    fireEvent.click(boton);
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(bd.update).toHaveBeenCalledTimes(1);
+    expect(notificaciones()).toHaveBeenCalledTimes(1);
+  });
+
+  it("si el guardado falla, no se pide ningún aviso", async () => {
+    prepararBD({ errorUpdate: { code: "23514", message: "Aforo superado para el turno" } });
+    montar();
+
+    escribir("4", "6");
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(notificaciones()).not.toHaveBeenCalled();
   });
 });
 
@@ -646,14 +826,21 @@ describe("FormularioReserva · edición · el aviso dice lo que pasó de verdad 
 });
 
 describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Confirma tu reserva»", () => {
-  it("VERIFICADA con email: al cambiar la hora avisa ANTES de guardar (y solo entonces)", async () => {
+  it("VERIFICADA con email: al cambiar la hora avisa ANTES de guardar (y solo entonces); con la casilla marcada, que se le manda uno nuevo", async () => {
     prepararBD();
     montar({ estado: "verificada" });
 
+    expect(screen.queryByText(TEXTO_ENLACE_NUEVO)).not.toBeInTheDocument();
     expect(screen.queryByText(TEXTO_ENLACE_INVALIDADO)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
 
+    // Casilla marcada (por defecto): el aviso del cambio le lleva un enlace nuevo.
+    expect(await screen.findByText(TEXTO_ENLACE_NUEVO)).toBeInTheDocument();
+    expect(screen.queryByText(TEXTO_ENLACE_INVALIDADO)).not.toBeInTheDocument();
+    // Desmarcada: vuelve el aviso de siempre.
+    fireEvent.click(casillaAviso());
     expect(await screen.findByText(TEXTO_ENLACE_INVALIDADO)).toBeInTheDocument();
+    expect(screen.queryByText(TEXTO_ENLACE_NUEVO)).not.toBeInTheDocument();
     // La rejilla de salas devuelve la hora a las 21:00 (la de la reserva): el aviso
     // refleja lo que se guardaría AHORA, así que se va.
     fireEvent.click(screen.getByRole("button", { name: /asignación interna \(opcional\)/i }));
@@ -661,11 +848,38 @@ describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Con
     await waitFor(() => expect(screen.queryByText(TEXTO_ENLACE_INVALIDADO)).not.toBeInTheDocument());
   });
 
-  it("y otro aviso DESPUÉS de guardar, que no desaparece enseguida", async () => {
+  it("con la casilla marcada y el aviso ENVIADO (lleva enlace nuevo): ni aviso de enlace roto ni «Confirma tu reserva» aparte", async () => {
+    const bd = prepararBD();
+    montar({ estado: "verificada" });
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(notificaciones()).toHaveBeenCalledTimes(1);
+    expect(notificaciones()).toHaveBeenCalledWith("emails-reserva/notificar-modificacion", expect.anything());
+    expect(descripcionDelAviso().description).toMatch(/enlace nuevo para confirmar la reserva/);
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it("con la casilla marcada pero el aviso SIN salir: el enlace viejo sigue roto y se avisa", async () => {
+    notificaciones().mockResolvedValue({ data: null, error: new Error("non-2xx") } as never);
+    prepararBD();
+    montar({ estado: "verificada" });
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(TEXTO_ENLACE_INVALIDADO, expect.anything()));
+  });
+
+  it("y, DESMARCADA, otro aviso DESPUÉS de guardar, que no desaparece enseguida", async () => {
     const bd = prepararBD();
     const { onSuccess } = montar({ estado: "verificada" });
 
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    fireEvent.click(casillaAviso());
     fireEvent.click(await guardar());
 
     await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
@@ -679,8 +893,23 @@ describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Con
     expect(notificaciones()).not.toHaveBeenCalled();
   });
 
-  it("si se cambian hora y email a la vez, el correo ya enviado al antiguo sigue roto: los dos avisos", async () => {
+  it("DESMARCADA, si se cambian hora y email a la vez, el correo ya enviado al antiguo sigue roto: los dos avisos", async () => {
     notificaciones().mockResolvedValue(respuestaProxy({ ok: false, motivo: "ya_enviado_o_en_curso" }) as never);
+    prepararBD();
+    montar({ estado: "verificada", email: "mal@ejemplo.com" });
+
+    fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
+    fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "bien@ejemplo.com" } });
+    fireEvent.click(casillaAviso());
+    fireEvent.click(await guardar());
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(TEXTO_ENLACE_INVALIDADO, expect.anything()));
+    expect(notificaciones()).toHaveBeenCalledWith("notify-reservation-change", expect.anything());
+    expect(descripcionDelAviso().description).toMatch(/NO se repite/);
+  });
+
+  it("MARCADA, un cambio de hora y de email pide SOLO el aviso del cambio (lleva el enlace nuevo), no «Confirma tu reserva» aparte", async () => {
+    notificaciones().mockResolvedValue({ data: { ok: true }, error: null } as never);
     prepararBD();
     montar({ estado: "verificada", email: "mal@ejemplo.com" });
 
@@ -688,8 +917,11 @@ describe("FormularioReserva · edición · cambiar la hora rompe el enlace «Con
     fireEvent.change(screen.getByPlaceholderText("juan@email.com"), { target: { value: "bien@ejemplo.com" } });
     fireEvent.click(await guardar());
 
-    await waitFor(() => expect(toast.warning).toHaveBeenCalledWith(TEXTO_ENLACE_INVALIDADO, expect.anything()));
-    expect(descripcionDelAviso().description).toMatch(/NO se repite/);
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(notificaciones()).toHaveBeenCalledTimes(1);
+    expect(notificaciones()).toHaveBeenCalledWith("emails-reserva/notificar-modificacion", expect.anything());
+    expect(notificaciones()).not.toHaveBeenCalledWith("notify-reservation-change", expect.anything());
+    expect(toast.warning).not.toHaveBeenCalled();
   });
 
   it("si el guardado falla no se da por rota ni por arreglada: no sale el aviso de después", async () => {
@@ -951,7 +1183,7 @@ describe("FormularioReserva · edición · lista negra, límites y aforo", () =>
     expect(bd.builders.some((b) => b.in.mock.calls.length > 0)).toBe(false);
   });
 
-  it("el aforo previo no cuenta la propia reserva, solo se mira si cambia día/hora/comensales y NO bloquea", async () => {
+  it("el aforo previo recibe la reserva ANTERIOR entera (no se cuenta contra sí misma y aplica la regla del UPDATE), solo se mira si cambia día/hora/comensales y NO bloquea", async () => {
     mocks.verificarAforo.mockResolvedValue({ disponible: false, mensaje: "Aforo superado en el turno de comida" });
     const bd = prepararBD();
     montar();
@@ -959,7 +1191,20 @@ describe("FormularioReserva · edición · lista negra, límites y aforo", () =>
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
 
     await waitFor(() =>
-      expect(mocks.verificarAforo).toHaveBeenCalledWith(EN_DIEZ_DIAS, "13:00", 4, "casa_tomas", "res-1"),
+      expect(mocks.verificarAforo).toHaveBeenCalledWith(
+        EN_DIEZ_DIAS,
+        "13:00",
+        4,
+        "casa_tomas",
+        expect.objectContaining({
+          id: "res-1",
+          fecha: EN_DIEZ_DIAS,
+          hora: "21:00:00",
+          numero_comensales: 4,
+          estado: "confirmada",
+          marca: "casa_tomas",
+        }),
+      ),
     );
     expect(await screen.findByText(/Aforo superado en el turno de comida/)).toBeInTheDocument();
     // La BD tiene la última palabra: el botón no se deshabilita por el aviso previo.

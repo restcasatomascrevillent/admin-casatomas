@@ -77,11 +77,15 @@ export type PrioridadAviso = "alta" | "normal";
 /** "alta" si el correo afectado era una propuesta o una confirmación (el
  * cliente se queda sin la acción pendiente, o sin saber que está
  * confirmado, sin que nadie se entere) -- mismo criterio que
- * prioridadEmailFallido en emails-reserva/reintentos.ts. Cualquier otro
- * tipo (incluido uno que este módulo no reconozca) es "normal": no hay
- * motivo documentado para tratar lo desconocido como urgente por defecto. */
+ * prioridadEmailFallido en emails-reserva/reintentos.ts. También
+ * "reserva_modificada" (2026-09-30, igual que allí): si no llega, el cliente
+ * no sabe que su reserva cambió. Cualquier otro tipo (incluido uno que este
+ * módulo no reconozca) es "normal": no hay motivo documentado para tratar lo
+ * desconocido como urgente por defecto. */
 export function prioridadAvisoWebhook(tipoEmail: string): PrioridadAviso {
-  return tipoEmail === "propuesta" || tipoEmail === "confirmada" ? "alta" : "normal";
+  return tipoEmail === "propuesta" || tipoEmail === "confirmada" || tipoEmail === "reserva_modificada"
+    ? "alta"
+    : "normal";
 }
 
 /** Igual que debeCrearAvisoLote (emails-reserva/reintentos.ts): como mucho
@@ -109,6 +113,7 @@ const ETIQUETA_TIPO_EMAIL: Record<string, string> = {
   confirmada: "confirmación de reserva",
   rechazada: "aviso de cancelación",
   recordatorio: "recordatorio",
+  reserva_modificada: "aviso de cambio de reserva",
 };
 
 function etiquetaTipoEmail(tipo: string): string {

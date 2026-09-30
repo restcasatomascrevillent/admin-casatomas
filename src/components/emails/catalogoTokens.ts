@@ -55,6 +55,7 @@ export const ETIQUETA_TIPO: Record<TipoPlantilla, string> = {
   confirmada: "Confirmada",
   rechazada: "Rechazada",
   recordatorio: "Recordatorio",
+  reserva_modificada: "Reserva modificada",
 };
 
 // OJO al editar estos textos: son lo único que le dice al dueño CUÁNDO sale
@@ -73,6 +74,8 @@ export const DESCRIPCION_TIPO: Record<TipoPlantilla, string> = {
   confirmada: "Se envía en cuanto la reserva queda confirmada (directamente o tras aceptar una propuesta).",
   rechazada: "Se envía cuando la solicitud no se puede atender.",
   recordatorio: "Se envía automáticamente 2 días antes de la reserva confirmada.",
+  reserva_modificada:
+    "Se envía cuando alguien cambia el día, la hora o los comensales de una reserva desde «Editar» con la casilla «Avisar al cliente del cambio» marcada (pendiente, verificada o confirmada; nunca si ya pasó, sin email o en lista negra). El correo añade solo un bloque «Cambios en tu reserva» con lo de antes y lo de ahora (solo lo que cambió) y una frase según el estado. Los botones solo salen si la reserva aún está pendiente de que el cliente la confirme: llevan un enlace nuevo «Confirma tu reserva». Si ya está confirmada, solo informa.",
 };
 
 export interface FlagBloque {
@@ -138,6 +141,20 @@ export function datosEjemploPara(tipo: TipoPlantilla): DatosReservaParaCorreo {
       espacio: "Terraza",
       horaSolicitada: "21:00",
       espacioSolicitado: "Comedor",
+    };
+  }
+
+  // 'reserva_modificada': cambian los tres datos para ver el bloque entero, y la
+  // reserva está 'verificada' (el caso con más piezas: frase + botones con el
+  // enlace nuevo). Sin horaSolicitada: el aviso de cambio no lleva contraoferta.
+  if (tipo === "reserva_modificada") {
+    return {
+      ...base,
+      hora: "21:30",
+      espacio: "Comedor",
+      horaSolicitada: null,
+      espacioSolicitado: null,
+      modificacion: { antes: { fecha: "2026-03-14", hora: "21:00", comensales: 2 }, estado: "verificada" },
     };
   }
 

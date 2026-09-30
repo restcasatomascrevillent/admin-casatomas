@@ -54,6 +54,9 @@ describe("prioridadAvisoWebhook", () => {
     expect(prioridadAvisoWebhook("propuesta")).toBe("alta");
     expect(prioridadAvisoWebhook("confirmada")).toBe("alta");
   });
+  it("alta también para reserva_modificada (2026-09-30): el cliente no se entera del cambio de su reserva", () => {
+    expect(prioridadAvisoWebhook("reserva_modificada")).toBe("alta");
+  });
   it("normal para el resto, incluido un tipo que este módulo no reconozca", () => {
     for (const tipo of ["solicitud_recibida", "rechazada", "recordatorio", "algo_nuevo_no_documentado"]) {
       expect(prioridadAvisoWebhook(tipo)).toBe("normal");
@@ -92,6 +95,12 @@ describe("construirMensajeAvisoWebhook", () => {
 
   it("null para entregado -- no se avisa de una entrega correcta", () => {
     expect(construirMensajeAvisoWebhook({ ...base, estado: "entregado" })).toBeNull();
+  });
+
+  it("nombra el aviso de «reserva modificada» en castellano, no con el nombre interno", () => {
+    const m = construirMensajeAvisoWebhook({ ...base, estado: "rebotado", tipoEmail: "reserva_modificada" });
+    expect(m?.titulo).toBe("Un correo de reserva rebotó (aviso de cambio de reserva)");
+    expect(m?.titulo).not.toContain("reserva_modificada");
   });
 
   it("rebotado: menciona que no se reintentará solo y da nombre + contacto", () => {

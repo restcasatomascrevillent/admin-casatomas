@@ -352,9 +352,9 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
                 </div>
               ))}
               <p className="text-xs text-muted-foreground">
-                El aviso de "pediste X, te ofrecemos Y" no es uno de estos interruptores: aparece solo (y siempre)
-                cuando de verdad se le ofrece al cliente una HORA distinta de la que pidió. Un cambio de sala no
-                lo dispara: la sala no sale en el correo del cliente.
+                {tipo === "reserva_modificada"
+                  ? "El bloque «Cambios en tu reserva» (antes y ahora de lo que cambió) y la frase según el estado no son uno de estos interruptores: los pone el correo solo, siempre. Los botones solo se ven si la reserva aún está pendiente de que el cliente la confirme."
+                  : 'El aviso de "pediste X, te ofrecemos Y" no es uno de estos interruptores: aparece solo (y siempre) cuando de verdad se le ofrece al cliente una HORA distinta de la que pidió. Un cambio de sala no lo dispara: la sala no sale en el correo del cliente.'}
               </p>
             </CardContent>
           </Card>

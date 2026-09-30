@@ -312,6 +312,7 @@ const ETIQUETA_TIPO_EMAIL: Record<string, string> = {
   confirmada: "confirmación de reserva",
   rechazada: "aviso de cancelación",
   recordatorio: "recordatorio",
+  reserva_modificada: "aviso de cambio de reserva",
 };
 
 function etiquetaTipoEmail(tipo: string): string {
@@ -352,12 +353,17 @@ export type PrioridadAvisoEmailFallido = "alta" | "normal";
  *     "resend_no_configurado": ese problema bloquea TODOS los envíos, no
  *     solo el que se está avisando, y merece atención inmediata sin
  *     importar qué plantilla lo disparó primero.
+ *   'alta' también 'reserva_modificada' (2026-09-30): si se pierde, el
+ *     cliente no sabe que su reserva cambió de día, hora o comensales (y si
+ *     estaba 'verificada', tampoco tiene el enlace nuevo para confirmarla).
  *   'normal': el resto (solicitud_recibida, rechazada, recordatorio) —
  *     informativo, sin acción pendiente que dependa del correo en sí.
  */
 export function prioridadEmailFallido(tipoEmail: string, motivo: string): PrioridadAvisoEmailFallido {
   if (esProblemaDeConfiguracion(motivo)) return "alta";
-  return tipoEmail === "propuesta" || tipoEmail === "confirmada" ? "alta" : "normal";
+  return tipoEmail === "propuesta" || tipoEmail === "confirmada" || tipoEmail === "reserva_modificada"
+    ? "alta"
+    : "normal";
 }
 
 function contactoDe(p: EnvioPerdido): string {

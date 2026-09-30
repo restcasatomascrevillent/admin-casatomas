@@ -24,12 +24,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./useAuth";
 
+// Misma lista y mismo orden que TIPOS_PLANTILLA de la Edge Function
+// (emails-reserva/plantillas.ts); lo comprueba plantillaReservaModificada.test.tsx.
+// 'reserva_modificada' (2026-09-30) exige la migración 20260930211000: sin ella
+// su pestaña muestra «Todavía sin guardar» y guardar falla por el CHECK de `tipo`.
 export type TipoPlantilla =
   | "solicitud_recibida"
   | "propuesta"
   | "confirmada"
   | "rechazada"
-  | "recordatorio";
+  | "recordatorio"
+  | "reserva_modificada";
 
 export const TIPOS_PLANTILLA: readonly TipoPlantilla[] = [
   "solicitud_recibida",
@@ -37,6 +42,7 @@ export const TIPOS_PLANTILLA: readonly TipoPlantilla[] = [
   "confirmada",
   "rechazada",
   "recordatorio",
+  "reserva_modificada",
 ];
 
 export interface PlantillaEmailVersion {

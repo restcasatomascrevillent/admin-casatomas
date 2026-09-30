@@ -53,6 +53,21 @@
 //   rechazar a fn_rechazar_propuesta_solicitud. Todo en DOS pasos (ver
 //   /enlace/*): un escáner de correo que precargue el enlace no crea nada.
 //
+//   AVISO DE «RESERVA MODIFICADA» (2026-09-30, ver reserva-modificada.ts y la
+//   migración 20260930211000):
+//   POST /notificar-modificacion  JSON -> la llama el panel al guardar una
+//                                           edición con «Avisar al cliente
+//                                           del cambio» marcada (JWT de
+//                                           usuario + can_write_section,
+//                                           igual que /enviar-prueba). Body:
+//                                           { reserva_id, antes: { fecha,
+//                                           hora, comensales } }. Responde
+//                                           { ok, motivo? } como /notificar.
+//   Va DIRECTA (no por notify-reservation-change) a propósito: si el panel
+//   se publica antes que esta función, la ruta no existe (404) y el panel
+//   dice «no se ha podido pedir»; por /notificar, una versión vieja habría
+//   mandado el correo que tocara por ESTADO en vez del aviso de cambio.
+//
 // verify_jwt = false (ver config.toml) PARA TODA LA FUNCIÓN — no puede ser
 // true a nivel de función porque las rutas GET las pulsa el cliente desde su
 // correo, sin ninguna cabecera. La autenticación real de esas rutas es el
@@ -175,6 +190,20 @@ import {
   MENSAJE_ERROR_ENVIO,
   type SolicitudParaPropuesta,
 } from "./propuesta-solicitud.ts";
+import {
+  TIPO_RESERVA_MODIFICADA,
+  leerDiaHoraComensales,
+  modificacionReciente,
+  motivoParaNoAvisar,
+  planificarAviso,
+  avisoSigueVigente,
+  leerDetalleAviso,
+  datosModificacionParaCorreo,
+  valoresListaNegra,
+  hayEntradaListaNegraVigente,
+  type AvisoAnterior,
+  type DetalleAviso,
+} from "./reserva-modificada.ts";
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -249,12 +278,19 @@ interface ReservaRow {
   /** 'web' | 'telefono' | 'manual'. Decide si el estado 'pendiente' manda
    * o no el correo de 'solicitud_recibida' — ver `tipoEmailParaEstado`. */
   canal?: string | null;
+  /** Solo los mira el aviso de «reserva modificada»: datos de prueba
+   * (`esReservaDePrueba`), cliente marcado en lista negra y que la reserva se
+   * acabe de guardar (`modificacionReciente`: el trigger update_reservas_updated_at
+   * mueve updated_at en cada UPDATE). */
+  notas_cliente?: string | null;
+  en_blacklist?: boolean | null;
+  updated_at?: string | null;
 }
 
 async function fetchReserva(id: string): Promise<ReservaRow | null> {
   const { data, error } = await supabase
     .from("reservas")
-    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id, marca, canal")
+    .select("id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, hora_solicitada, espacio_solicitado_id, marca, canal, notas_cliente, en_blacklist, updated_at")
     .eq("id", id)
     .maybeSingle();
   if (error || !data) return null;
@@ -323,7 +359,11 @@ function tipoEmailParaEstado(estado: string, canal?: string | null): TipoPlantil
   }
 }
 
-async function obtenerPlantillaActual(tipo: TipoPlantilla): Promise<FilaPlantilla | null> {
+/** La fila vigente, con su `id` (lo guarda envios_email_reserva.plantilla_id
+ * para que un reintento use la MISMA versión). */
+type FilaPlantillaGuardada = FilaPlantilla & { id: string };
+
+async function obtenerPlantillaActual(tipo: TipoPlantilla): Promise<FilaPlantillaGuardada | null> {
   const { data, error } = await supabase
     .from("plantillas_email_reserva")
     .select("*")
@@ -331,7 +371,7 @@ async function obtenerPlantillaActual(tipo: TipoPlantilla): Promise<FilaPlantill
     .eq("es_actual", true)
     .maybeSingle();
   if (error || !data) return null;
-  return data as FilaPlantilla;
+  return data as FilaPlantillaGuardada;
 }
 
 /**
@@ -578,15 +618,23 @@ async function enviarPorResendConIdempotencia(payload: PayloadCorreo, idempotenc
  * completo— es IDÉNTICO en el intento original y en cada reintento de esa
  * fila. Solo afecta a 'propuesta' (el único tipo con token); una fila NUEVA
  * (nueva propuesta tras una anterior ya concluida) sigue obteniendo un
- * `creado_at` — y por tanto un `exp` — nuevo y correcto. */
+ * `creado_at` — y por tanto un `exp` — nuevo y correcto.
+ *
+ * 'reserva_modificada' (2026-09-30): `detalleAviso` es el `detalle` de su fila
+ * (antes/ahora/estado, ver reserva-modificada.ts) — lo mismo en el primer
+ * intento y en cada reintento, así que el correo sale idéntico. Si la reserva
+ * está 'verificada' lleva los MISMOS botones que 'propuesta', firmados con la
+ * huella actual y el `creado_at` de su propia fila: el enlace nuevo de
+ * «Confirma tu reserva». */
 async function construirCorreoParaTipo(
   reserva: ReservaRow,
   tipo: TipoPlantilla,
   plantilla: FilaPlantilla,
   tokenBasadoEnIso?: string,
+  detalleAviso?: DetalleAviso | null,
 ): Promise<{ asunto: string; html: string }> {
   let urlsBotones: { principal?: string; secundario?: string } | undefined;
-  if (tipo === "propuesta") {
+  if (tipo === "propuesta" || (tipo === TIPO_RESERVA_MODIFICADA && reserva.estado === "verificada")) {
     // Sin sala (reservas-sin-salas): asignarla después no rompe el enlace.
     const huella = calcularHuella(reserva.estado, reserva.hora);
     const basadoEnEpoch = tokenBasadoEnIso ? Math.floor(new Date(tokenBasadoEnIso).getTime() / 1000) : undefined;
@@ -598,6 +646,13 @@ async function construirCorreoParaTipo(
     };
   }
   const datos = await construirDatosReserva(reserva, urlsBotones);
+  if (tipo === TIPO_RESERVA_MODIFICADA) {
+    // La hora pedida AL CREAR la reserva no es «lo de antes» de este cambio:
+    // sin esto saldría también un «Pediste / Te ofrecemos» que no toca.
+    datos.horaSolicitada = null;
+    datos.espacioSolicitado = null;
+    datos.modificacion = detalleAviso ? datosModificacionParaCorreo(detalleAviso) : null;
+  }
   return renderPlantilla(plantilla, datos);
 }
 
@@ -823,6 +878,172 @@ async function enviarCorreoParaReserva(reservaId: string, tipoForzado?: TipoPlan
 }
 
 // ------------------------------------------------------------
+// AVISO DE «RESERVA MODIFICADA» (panel -> POST /notificar-modificacion).
+// Decisiones en reserva-modificada.ts; aquí solo el I/O. Del «reclamar» en
+// adelante es EXACTAMENTE el camino de enviarCorreoParaReserva (Resend con
+// Idempotency-Key por fila, supresión, fallido/fallido_definitivo + aviso).
+// ------------------------------------------------------------
+
+/**
+ * ¿Cliente en lista negra? La marca de la reserva (ya la mira
+ * motivoParaNoAvisar) o una entrada vigente de `blacklist` con su email o su
+ * teléfono en cualquier formato — la misma consulta que hace el panel
+ * (useVerificarBlacklist), repetida porque el servidor no se fía del
+ * navegador. FALLA CERRADO (`null`): al revés que estaDireccionSuprimida, aquí
+ * lo seguro es NO escribir; el panel lo dice y el personal llama.
+ */
+async function reservaEnListaNegra(reserva: ReservaRow): Promise<boolean | null> {
+  const { emails, telefonos } = valoresListaNegra(reserva.email, reserva.telefono);
+  const hoy = hoyEnMadridIso();
+  const busquedas: Array<[string, string[]]> = [
+    ["email", emails],
+    ["telefono", telefonos],
+  ];
+  for (const [tipo, valores] of busquedas) {
+    if (valores.length === 0) continue;
+    const { data, error } = await supabase.from("blacklist").select("caduca_el").eq("tipo", tipo).in("valor", valores);
+    if (error) {
+      console.error("[emails-reserva] notificar-modificacion: error comprobando la lista negra (no se envía):", error.message);
+      return null;
+    }
+    if (hayEntradaListaNegraVigente((data ?? []) as Array<{ caduca_el: string | null }>, hoy)) return true;
+  }
+  return false;
+}
+
+/** El aviso de modificación más reciente de la reserva que aún cuenta
+ * (pendiente, enviado o fallido que se reintentará). `undefined` = no se pudo
+ * leer: sin él no se puede garantizar que no se duplica, así que no se envía. */
+async function ultimoAvisoModificacion(reservaId: string): Promise<AvisoAnterior | null | undefined> {
+  const { data, error } = await supabase
+    .from("envios_email_reserva")
+    .select("id, resultado, detalle")
+    .eq("reserva_id", reservaId)
+    .eq("tipo_email", TIPO_RESERVA_MODIFICADA)
+    .in("resultado", ["pendiente", "enviado", "fallido"])
+    .order("creado_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(`[emails-reserva] Error leyendo el último aviso de modificación de ${reservaId}:`, error.message);
+    return undefined;
+  }
+  return (data as AvisoAnterior | null) ?? null;
+}
+
+// Discriminante por STRING literal (no booleano) — mismo motivo que
+// AutenticacionPanelOk/Fallo más abajo.
+type ReclamoAvisoModificacion =
+  | { status: "ok"; id: string; creado_at: string }
+  | { status: "ocupado" }
+  | { status: "error"; motivo: string };
+
+/** Como reclamarEnvio, pero con `clave_aviso` y `detalle`, y distinguiendo
+ * "ya hay un aviso igual" (23505 del índice único) de un error real — el panel
+ * espera la respuesta y no debe decir «ya se le había enviado» por un fallo de
+ * la BD (p. ej. la migración 20260930211000 sin aplicar). */
+async function reclamarAvisoModificacion(
+  reserva: ReservaRow,
+  destinatario: string,
+  plantillaId: string,
+  clave: string,
+  detalle: DetalleAviso,
+): Promise<ReclamoAvisoModificacion> {
+  const { data, error } = await supabase
+    .from("envios_email_reserva")
+    .insert({
+      reserva_id: reserva.id,
+      tipo_email: TIPO_RESERVA_MODIFICADA,
+      destinatario,
+      plantilla_id: plantillaId,
+      resultado: "pendiente",
+      clave_aviso: clave,
+      detalle,
+    })
+    .select("id, creado_at")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { status: "ocupado" };
+    console.error(`[emails-reserva] Error reclamando aviso de modificación (${reserva.id}):`, error.code, error.message);
+    // 23514 = CHECK sin 'reserva_modificada'; 42703/PGRST204 = sin las columnas nuevas.
+    const sinMigracion = error.code === "23514" || error.code === "42703" || error.code === "PGRST204";
+    return { status: "error", motivo: sinMigracion ? "migracion_pendiente" : "error_registrando_envio" };
+  }
+  return { status: "ok", id: data.id as string, creado_at: data.creado_at as string };
+}
+
+async function enviarAvisoModificacion(reservaId: string, antesBruto: unknown): Promise<ResultadoEnvio> {
+  // Lo de AHORA sale de la BD (la edición ya está guardada); del panel solo el «antes», validado.
+  const antes = leerDiaHoraComensales(antesBruto);
+  if (!antes) return { enviado: false, motivo: "antes_invalido" };
+
+  const reserva = await fetchReserva(reservaId);
+  if (!reserva) return { enviado: false, motivo: "reserva_no_encontrada" };
+
+  // Primero lo que no necesita más consultas; la lista negra, solo si todo lo demás deja avisar.
+  const motivo = motivoParaNoAvisar(reserva, antes, { ahoraIso: ahoraIso(), enListaNegra: false });
+  if (motivo) return { enviado: false, motivo };
+  // El «antes» viene del navegador: solo vale justo después de guardar la
+  // edición (updated_at lo mueve el trigger en cada UPDATE). Ver modificacionReciente.
+  if (!modificacionReciente(reserva.updated_at, ahoraIso())) return { enviado: false, motivo: "cambio_no_reciente" };
+  const enListaNegra = await reservaEnListaNegra(reserva);
+  if (enListaNegra === null) return { enviado: false, motivo: "error_comprobando_lista_negra" };
+  if (enListaNegra) return { enviado: false, motivo: "en_lista_negra" };
+
+  // 'verificada': el correo lleva el enlace NUEVO de «Confirma tu reserva» (el
+  // viejo deja de valer si cambió la hora). Sin secreto para firmarlo no se
+  // manda un aviso a medias: el panel lo dice y el personal llama.
+  if (reserva.estado === "verificada" && !TOKEN_SECRET) return { enviado: false, motivo: "token_no_configurado" };
+
+  const plantilla = await obtenerPlantillaActual(TIPO_RESERVA_MODIFICADA);
+  if (!plantilla) return { enviado: false, motivo: `plantilla_no_configurada_${TIPO_RESERVA_MODIFICADA}` };
+
+  // Mismo criterio que reclamarEnvio: un 'pendiente' abandonado (la función
+  // murió a medias) vuelve a 'fallido' ANTES de mirar cuál es el último aviso.
+  await liberarPendientesAbandonados({ reserva_id: reserva.id, tipo_email: TIPO_RESERVA_MODIFICADA });
+  const anterior = await ultimoAvisoModificacion(reserva.id);
+  if (anterior === undefined) return { enviado: false, motivo: "error_registrando_envio" };
+
+  const plan = planificarAviso({ reserva, antes, anterior });
+  if (plan.accion === "no_enviar") return { enviado: false, motivo: plan.motivo };
+
+  const destinatario = (reserva.email ?? "").trim();
+  const claim = await reclamarAvisoModificacion(reserva, destinatario, plantilla.id, plan.clave, plan.detalle);
+  if (claim.status === "ocupado") return { enviado: false, motivo: "ya_enviado_o_en_curso" };
+  if (claim.status === "error") return { enviado: false, motivo: claim.motivo };
+
+  if (!RESEND_API_KEY) {
+    await marcarFallidoDefinitivo(claim.id, "resend_no_configurado");
+    await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, TIPO_RESERVA_MODIFICADA, "resend_no_configurado")]);
+    return { enviado: false, motivo: "resend_no_configurado" };
+  }
+
+  if (await estaDireccionSuprimida(destinatario)) {
+    await marcarFallidoDefinitivo(claim.id, "destinatario_suprimido");
+    await avisarEnviosDefinitivamentePerdidos([resumenPerdido(reserva, TIPO_RESERVA_MODIFICADA, "destinatario_suprimido")]);
+    return { enviado: false, motivo: "destinatario_suprimido" };
+  }
+
+  const { asunto, html: cuerpoHtml } = await construirCorreoParaTipo(
+    reserva,
+    TIPO_RESERVA_MODIFICADA,
+    plantilla,
+    claim.creado_at,
+    plan.detalle,
+  );
+
+  const resultado = await intentarEnviarYRegistrar(claim.id, destinatario, asunto, cuerpoHtml, 1);
+  if (resultado.enviado) return { enviado: true };
+  if (resultado.agotado) {
+    await avisarEnviosDefinitivamentePerdidos([
+      resumenPerdido(reserva, TIPO_RESERVA_MODIFICADA, resultado.motivo ?? "error_desconocido"),
+    ]);
+    return { enviado: false, motivo: "fallido_definitivo" };
+  }
+  return { enviado: false, motivo: "fallido_reintentable" };
+}
+
+// ------------------------------------------------------------
 // REINTENTO DE ENVÍOS FALLIDOS (cron, vía pg_net — ver migración
 // 20260922160000_reintentos_emails_reserva.sql)
 // ------------------------------------------------------------
@@ -839,6 +1060,9 @@ interface FilaEnvioFallido {
    * token de 'propuesta' sea idéntico en cada reintento (punto 3 del
    * encargo, ver docstring de construirCorreoParaTipo). */
   creado_at: string;
+  /** Solo 'reserva_modificada': antes/ahora/estado del aviso (migración
+   * 20260930211000). `undefined` si la migración aún no está aplicada. */
+  detalle?: unknown;
 }
 
 async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnvioFallido[]> {
@@ -854,9 +1078,13 @@ async function obtenerFilasFallidasCandidatas(maxFilas: number): Promise<FilaEnv
   // los fallos recién marcados) para que las filas que ya tocan salgan
   // primero dentro del límite, y esReintentableAhora descarta en TS las que
   // el orden haya dejado dentro del límite sin tocarles aún.
+  // `*` en vez de la lista de columnas (2026-09-30): así llega `detalle`
+  // (aviso de «reserva modificada») sin que esta consulta —la de TODOS los
+  // reintentos— falle si la función se despliega antes que la migración
+  // 20260930211000 que crea esa columna.
   const { data, error } = await supabase
     .from("envios_email_reserva")
-    .select("id, reserva_id, tipo_email, plantilla_id, intentos, resultado, proximo_reintento_en, creado_at")
+    .select("*")
     .eq("resultado", "fallido")
     .lt("intentos", MAX_INTENTOS_POR_DEFECTO)
     .order("proximo_reintento_en", { ascending: true, nullsFirst: true })
@@ -920,7 +1148,16 @@ async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string
   // abandona sin aviso, que es exactamente lo que se quiere (no reintentar
   // un correo que ya no se manda). Las de teléfono/manual siguen igual.
   const tipoActual = tipoEmailParaEstado(reserva.estado, reserva.canal);
-  if (!tipoDeEmailSigueVigente(fila.tipo_email, reserva.estado, tipoActual)) {
+  // 'reserva_modificada' no sale de un ESTADO (tipoEmailParaEstado nunca lo
+  // devuelve): sigue vigente si la reserva conserva el estado y los datos con
+  // los que se avisó y aún no ha pasado (avisoSigueVigente). Si volvió a
+  // cambiar, el aviso nuevo ya lleva su propio correo: este se abandona.
+  const detalleAviso = fila.tipo_email === TIPO_RESERVA_MODIFICADA ? leerDetalleAviso(fila.detalle) : null;
+  const sigueVigente =
+    fila.tipo_email === TIPO_RESERVA_MODIFICADA
+      ? avisoSigueVigente(detalleAviso, reserva, ahoraIso_)
+      : tipoDeEmailSigueVigente(fila.tipo_email, reserva.estado, tipoActual);
+  if (!sigueVigente) {
     // La reserva avanzó a otro estado mientras este correo seguía fallido:
     // reintentarlo mandaría contenido obsoleto (p.ej. una 'propuesta' de una
     // reserva ya cancelada). Se abandona SIN aviso: no es un fallo de
@@ -967,6 +1204,7 @@ async function procesarReintentoDeFila(fila: FilaEnvioFallido, ahoraIso_: string
     fila.tipo_email as TipoPlantilla,
     plantillaData as FilaPlantilla,
     fila.creado_at,
+    detalleAviso,
   );
 
   const resultado = await intentarEnviarYRegistrar(claim.id, reserva.email, asunto, cuerpoHtml, claim.intentos);
@@ -1067,6 +1305,46 @@ async function handleNotificar(req: Request): Promise<Response> {
 }
 
 // ------------------------------------------------------------
+// ACCIÓN: notificar-modificacion (la llama el panel al guardar una edición
+// con «Avisar al cliente del cambio» marcada). Sesión de usuario real, NO
+// x-webhook-secret — mismo motivo que /enviar-prueba (ver cabecera). Responde
+// { ok, motivo? } con status 200 para cualquier resultado de negocio (el panel
+// ESPERA la respuesta para decirle al personal qué ha pasado de verdad).
+// ------------------------------------------------------------
+
+/** Tope por usuario (mismo patrón que /enviar-prueba, `rate_limit_log`): una
+ * persona editando a mano no pide más de un aviso cada pocos segundos; 20 en
+ * 5 minutos solo lo supera algo automatizado. Laxo a propósito (ver
+ * comprobarLimite): si no se puede leer la tabla, deja pasar. */
+const AVISO_MODIFICACION_LIMITE = 20;
+const AVISO_MODIFICACION_VENTANA_MS = 5 * 60 * 1000;
+
+async function handleNotificarModificacion(req: Request): Promise<Response> {
+  const auth = await autenticarUsuarioPanel(req);
+  if (auth.status === "error") return auth.response;
+  const dentroDelLimite = await comprobarLimite(
+    `emails-reserva:notificar-modificacion:${auth.userId}`,
+    AVISO_MODIFICACION_LIMITE,
+    AVISO_MODIFICACION_VENTANA_MS,
+  );
+  if (!dentroDelLimite) return json({ ok: false, motivo: "demasiados_avisos" });
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 400);
+  }
+  const reservaId = typeof body?.reserva_id === "string" && body.reserva_id.trim() ? body.reserva_id.trim() : null;
+  if (!reservaId) return json({ ok: false, error: "reserva_id_requerido" }, 400);
+
+  const resultado = await enviarAvisoModificacion(reservaId, body?.antes);
+  console.log(
+    `[emails-reserva] notificar-modificacion ${reservaId} (usuario ${auth.userId}): ${resultado.enviado ? "enviado" : resultado.motivo}`,
+  );
+  return json({ ok: resultado.enviado, motivo: resultado.motivo });
+}
+
+// ------------------------------------------------------------
 // ACCIÓN: enviar-prueba (la llama el panel, sesión de usuario real — ver
 // cabecera del fichero para por qué esta ruta no usa x-webhook-secret)
 // ------------------------------------------------------------
@@ -1146,8 +1424,15 @@ const PRUEBA_VENTANA_MS = 5 * 60 * 1000; // 5 minutos
  * propósito porque protege algo más sensible.
  */
 async function comprobarLimitePrueba(userId: string): Promise<boolean> {
-  const identificador = `emails-reserva:enviar-prueba:${userId}`;
-  const desde = new Date(Date.now() - PRUEBA_VENTANA_MS).toISOString();
+  return await comprobarLimite(`emails-reserva:enviar-prueba:${userId}`, PRUEBA_LIMITE_ENVIOS, PRUEBA_VENTANA_MS);
+}
+
+/** El mismo tope laxo de comprobarLimitePrueba (ver su comentario), para
+ * cualquier identificador: cuenta en `rate_limit_log` y registra la llamada;
+ * si no se puede leer, deja pasar. Lo usan /enviar-prueba y
+ * /notificar-modificacion. */
+async function comprobarLimite(identificador: string, limite: number, ventanaMs: number): Promise<boolean> {
+  const desde = new Date(Date.now() - ventanaMs).toISOString();
 
   const { count, error } = await supabase
     .from("rate_limit_log")
@@ -1156,14 +1441,14 @@ async function comprobarLimitePrueba(userId: string): Promise<boolean> {
     .gte("created_at", desde);
 
   if (error) {
-    console.error("[emails-reserva] enviar-prueba: error leyendo rate_limit_log (se deja pasar):", error.message);
+    console.error(`[emails-reserva] ${identificador}: error leyendo rate_limit_log (se deja pasar):`, error.message);
     return true;
   }
-  if (superaLimiteDePrueba(count ?? 0, PRUEBA_LIMITE_ENVIOS)) return false;
+  if (superaLimiteDePrueba(count ?? 0, limite)) return false;
 
   const { error: errInsert } = await supabase.from("rate_limit_log").insert({ identifier: identificador });
   if (errInsert) {
-    console.error("[emails-reserva] enviar-prueba: error registrando rate_limit_log:", errInsert.message);
+    console.error(`[emails-reserva] ${identificador}: error registrando rate_limit_log:`, errInsert.message);
   }
   return true;
 }
@@ -1832,6 +2117,7 @@ serve(async (req: Request) => {
     if (req.method === "POST" && route === "reintentar-fallidos") return await handleReintentarFallidos(req);
     if (req.method === "POST" && route === "enviar-prueba") return await handleEnviarPrueba(req);
     if (req.method === "POST" && route === "enviar-propuesta-solicitud") return await handleEnviarPropuestaSolicitud(req);
+    if (req.method === "POST" && route === "notificar-modificacion") return await handleNotificarModificacion(req);
     // Páginas de los enlaces: las sirve la web; aquí solo JSON + redirección.
     if (req.method === "POST" && route === "enlace/consultar") return await handleEnlace(req, "consultar");
     if (req.method === "POST" && route === "enlace/ejecutar") return await handleEnlace(req, "ejecutar");

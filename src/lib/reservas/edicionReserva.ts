@@ -29,9 +29,13 @@
 //     las mueve (o las descarta, sin fallar) al cambiar de día o de turno;
 //   · la política RLS de UPDATE solo mira el permiso de la sección, no el
 //     estado ni la fecha.
+// (desfasado tras aplicar 20260930212000)
 // ============================================================================
 import { format } from "date-fns";
 import { ESTADOS_QUE_OCUPAN, turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+// La regla del canal que no recibe «solicitud recibida» (la web) vive en la Edge
+// Function; se importa la misma para que panel y servidor no puedan divergir.
+import { debeEnviarSolicitudRecibida } from "../../../supabase/functions/emails-reserva/plantillas";
 import { debeNotificarAltaPanel, emailParaGuardar, errorEmailOpcional, errorTelefono } from "./altaPanel";
 import { normalizarMarca } from "./negocios";
 import { horaCorta } from "./ocupacionSalas";
@@ -270,10 +274,12 @@ export function errorEmailEdicion(nuevo: string | null | undefined, original: st
  * que una edición la activa: el email cambia y queda uno. Además:
  *   · nunca a un cliente en lista negra (queda pendiente de revisión);
  *   · nunca para un día que ya pasó.
- * Cualquier otro cambio (día, hora, comensales…) NO avisa al cliente: el
- * sistema de correos no tiene plantilla de «reserva modificada». Y ojo, que
- * `emails-reserva` es idempotente por (reserva, tipo): si «Confirma tu
- * reserva» ya se envió a la dirección anterior, no se repite a la nueva.
+ * Un cambio de día, hora o comensales va por OTRO correo, el aviso de
+ * «reserva modificada» (`disponibilidadAvisoModificacion`), que a una
+ * verificada ya le lleva un enlace nuevo: si ese aviso se pide, este no (el
+ * formulario no manda los dos). Y ojo, que `emails-reserva` es idempotente por
+ * (reserva, tipo): si «Confirma tu reserva» ya se envió a la dirección
+ * anterior, no se repite a la nueva.
  */
 export function debeNotificarEdicion(
   original: ReservaEditable,
@@ -290,8 +296,10 @@ export function debeNotificarEdicion(
  * El enlace del correo «Confirma tu reserva» lleva una huella de la reserva
  * (`v2|estado|HH:MM`, en `emails-reserva/tokens.ts`): cambia la HORA y el enlace
  * que el cliente ya tiene en su bandeja pasa a «enlace no válido» (cambiar el día
- * o los comensales NO lo invalida). Y no se reenvía nada: el correo es
- * idempotente por (reserva, tipo). Esto solo se puede AVISAR desde el panel.
+ * o los comensales NO lo invalida). «Confirma tu reserva» no se reenvía (es
+ * idempotente por reserva y tipo): el enlace nuevo solo le llega con el aviso de
+ * «reserva modificada» (casilla «Avisar al cliente del cambio», ver
+ * TEXTO_ENLACE_NUEVO). Este texto es para cuando ese aviso no se pide o no sale.
  */
 export const TEXTO_ENLACE_INVALIDADO =
   "El enlace de «Confirma tu reserva» que ya recibió el cliente deja de valer al cambiar la hora: confírmala tú o llámale.";
@@ -312,6 +320,76 @@ export function invalidaEnlaceConfirmacion(
   if (!("hora" in cambios)) return false;
   if (!emailParaGuardar(original.email)) return false;
   return (cambios.fecha ?? String(original.fecha).slice(0, 10)) >= opciones.hoy;
+}
+
+/**
+ * Con «Avisar al cliente del cambio» marcada, el correo de «reserva modificada»
+ * de una VERIFICADA lleva un enlace «Confirma tu reserva» NUEVO (firmado con la
+ * hora nueva). Es el aviso previo en ese caso; TEXTO_ENLACE_INVALIDADO se queda
+ * para cuando la casilla se desmarca (o el aviso no llega a salir).
+ */
+export const TEXTO_ENLACE_NUEVO =
+  "El enlace de «Confirma tu reserva» que ya recibió el cliente deja de valer al cambiar la hora: con el aviso del cambio se le manda uno nuevo.";
+
+/**
+ * La casilla «Avisar al cliente del cambio» del formulario de edición:
+ *   · mostrar: la edición cambia el día, la hora o los comensales (si no, no hay
+ *     nada que avisar y ni se enseña);
+ *   · disponible: se puede avisar, así que sale habilitada y MARCADA por
+ *     defecto: la reserva está viva, no ha pasado (día Y hora tal y como queda),
+ *     no es una web 'pendiente' (aún no ha recibido ningún correo: el primero
+ *     será la propuesta), tiene email (el de después de la edición) y el
+ *     cliente no está en la lista negra;
+ *   · motivo: por qué no, para enseñarlo junto a la casilla deshabilitada.
+ * `ahora` = "yyyy-MM-ddTHH:mm" en hora local (la del restaurante). Es la misma
+ * regla que vuelve a aplicar `emails-reserva` (reserva-modificada.ts): el
+ * servidor no se fía del navegador.
+ */
+export interface DisponibilidadAvisoModificacion {
+  mostrar: boolean;
+  disponible: boolean;
+  motivo: string | null;
+}
+
+export function disponibilidadAvisoModificacion(
+  original: ReservaEditable,
+  cambios: CambiosReserva,
+  opciones: { ahora: string; enListaNegra: boolean },
+): DisponibilidadAvisoModificacion {
+  if (!cambiaAforo(cambios)) return { mostrar: false, disponible: false, motivo: null };
+  const no = (motivo: string): DisponibilidadAvisoModificacion => ({ mostrar: true, disponible: false, motivo });
+  if (!esReservaViva(original.estado)) {
+    return no(
+      original.estado === "cancelada"
+        ? "La reserva está cancelada: no se avisa al cliente."
+        : "La reserva ya está cerrada («Llegó» o «No vino»): no se avisa al cliente.",
+    );
+  }
+  const fecha = cambios.fecha ?? String(original.fecha).slice(0, 10);
+  const hora = horaCorta(cambios.hora ?? original.hora) ?? "00:00";
+  if (`${fecha}T${hora}` <= opciones.ahora) return no("La reserva ya ha pasado: no se avisa al cliente.");
+  // La web pendiente no recibe ningún correo hasta la propuesta (decisión del
+  // dueño 2026-09-28): avisarle del cambio sería el doble correo que se quitó.
+  if (original.estado === "pendiente" && !debeEnviarSolicitudRecibida(original.canal)) {
+    return no("Aún no ha recibido ningún correo: le llegará la propuesta al verificarla.");
+  }
+  const email = "email" in cambios ? cambios.email : emailParaGuardar(original.email);
+  if (!email) return no("No tiene email: si hace falta, avísale por teléfono.");
+  if (opciones.enListaNegra) return no("El cliente está en la lista negra: no se le escribe.");
+  return { mostrar: true, disponible: true, motivo: null };
+}
+
+/**
+ * Lo que el panel manda a `emails-reserva/notificar-modificacion` como «antes»:
+ * la reserva tal y como estaba al abrir el editor. Lo de AHORA lo lee la
+ * función de la BD (ya guardado), no se le manda.
+ */
+export function antesDeLaEdicion(original: ReservaEditable): { fecha: string; hora: string; comensales: number } {
+  return {
+    fecha: String(original.fecha).slice(0, 10),
+    hora: horaCorta(original.hora) ?? String(original.hora).slice(0, 5),
+    comensales: Number(original.numero_comensales),
+  };
 }
 
 /**
@@ -342,7 +420,12 @@ export function interpretarRespuestaNotificacion(respuesta: unknown): EnvioCorre
   const cuerpo = (data && typeof data === "object" ? data : {}) as { success?: unknown; resultado?: unknown };
   if (cuerpo.success === false) return { resultado: "fallo" };
 
-  let detalle: unknown = cuerpo.resultado;
+  return resultadoDeEmailsReserva(cuerpo.resultado);
+}
+
+/** El `{ ok, motivo? }` de `emails-reserva` (objeto o texto JSON) → lo que pasó. */
+function resultadoDeEmailsReserva(respuesta: unknown): EnvioCorreoEdicion {
+  let detalle: unknown = respuesta;
   if (typeof detalle === "string") {
     try {
       detalle = JSON.parse(detalle);
@@ -358,6 +441,18 @@ export function interpretarRespuestaNotificacion(respuesta: unknown): EnvioCorre
     return { resultado: "no_enviado", motivo };
   }
   return { resultado: "pedido" };
+}
+
+/**
+ * Lee lo que devuelve `supabase.functions.invoke("emails-reserva/notificar-modificacion")`.
+ * Aquí no hay proxy: `data` ES el `{ ok, motivo? }` de `emails-reserva`. Un
+ * `error` (sin permiso, la función aún sin desplegar —404—, red) es `fallo`.
+ * Nunca lanza.
+ */
+export function interpretarRespuestaAvisoModificacion(respuesta: unknown): EnvioCorreoEdicion {
+  const { data, error } = (respuesta ?? {}) as { data?: unknown; error?: unknown };
+  if (error) return { resultado: "fallo" };
+  return resultadoDeEmailsReserva(data);
 }
 
 /** Frase para el personal según lo que pasó con el correo (sin afirmar nunca más de lo que se sabe). */
@@ -378,22 +473,69 @@ function textoEnvioCorreo(envio: EnvioCorreoEdicion): string {
   }
 }
 
+/** Motivos de `emails-reserva/notificar-modificacion` que se explican en claro. */
+const TEXTO_AVISO_NO_ENVIADO: Record<string, string> = {
+  fallido_reintentable:
+    "El aviso del cambio aún no ha salido (ha fallado el envío): se reintentará solo en los próximos minutos. Si al final no sale, lo verás en la campana.",
+  sin_cambios: "No se ha enviado el aviso: el día, la hora y los comensales quedan como el cliente ya los tenía.",
+  reserva_pasada: "No se ha enviado el aviso: la reserva ya ha pasado.",
+  reserva_no_viva: "No se ha enviado el aviso: la reserva ya no está activa.",
+  reserva_sin_email: "No se ha enviado el aviso: la reserva no tiene email. Si hace falta, llámale.",
+  en_lista_negra: "No se ha enviado el aviso: el cliente está en la lista negra.",
+  reserva_de_prueba: "No se ha enviado el aviso: es una reserva de prueba.",
+  pendiente_sin_correo_previo:
+    "No se ha enviado el aviso: aún no ha recibido ningún correo; le llegará la propuesta al verificarla.",
+  cambio_no_reciente:
+    "No se ha enviado el aviso: la reserva no consta como recién guardada. Vuelve a abrirla o llámale.",
+  demasiados_avisos: "No se ha enviado el aviso: se han pedido demasiados seguidos. Espera unos minutos o llámale.",
+  plantilla_no_configurada_reserva_modificada:
+    "No se ha enviado el aviso: falta la plantilla «Reserva modificada» (hay que aplicar su migración). Llámale.",
+  migracion_pendiente:
+    "No se ha enviado el aviso: falta aplicar la migración del correo «Reserva modificada». Llámale.",
+};
+
+/** Frase para el personal según lo que pasó con el aviso del cambio (sin afirmar más de lo que se sabe). */
+function textoAvisoModificacion(envio: EnvioCorreoEdicion, estado: string): string {
+  switch (envio.resultado) {
+    case "enviado":
+      return estado === "verificada"
+        ? "Se le ha enviado al cliente un correo con el cambio y un enlace nuevo para confirmar la reserva."
+        : "Se le ha enviado al cliente un correo con el cambio.";
+    case "ya_enviado":
+      return "No se ha enviado otro correo: el cliente ya tiene un aviso con estos mismos datos (o se le está enviando ahora).";
+    case "suprimido":
+      return "No se ha enviado el aviso del cambio: ese email está bloqueado porque antes rebotó o se quejó. Llámale.";
+    case "no_enviado":
+      return (
+        TEXTO_AVISO_NO_ENVIADO[envio.motivo ?? ""] ??
+        `No se ha podido enviar el aviso del cambio (${envio.motivo}). Llámale.`
+      );
+    case "fallo":
+      return "No se ha podido pedir el envío del aviso del cambio: avísale por teléfono.";
+    default:
+      return "Se ha pedido el envío del aviso del cambio, pero no consta que haya salido.";
+  }
+}
+
 /**
  * Frase para el aviso de «guardado»: lo ÚNICO que el personal no puede
  * comprobar mirando la pantalla es si el cliente se entera del cambio. Mismo
  * criterio que `avisoAlCliente` de las acciones de estado: decir qué NO ha
  * pasado para que nadie dé por hecho que ya se le ha avisado.
- *   · se pidió «Confirma tu reserva» (`envio`) → se dice qué ha pasado de verdad
- *     con ese correo, según lo que contestó `emails-reserva`;
- *   · cambia día, hora o comensales de una reserva viva que aún no ha pasado →
- *     el cliente no recibe nada (no hay plantilla de «reserva modificada»);
+ *   · se pidió el aviso de «reserva modificada» (`avisoModificacion`) → qué ha
+ *     pasado de verdad con ese correo, según lo que contestó `emails-reserva`;
+ *   · se pidió «Confirma tu reserva» (`envio`) → igual, con ese correo;
+ *   · cambia día, hora o comensales de una reserva viva que aún no ha pasado y
+ *     no se pidió el aviso (casilla desmarcada, o sin poder avisar) → el
+ *     cliente no recibe nada, y se dice;
  *   · cualquier otra cosa → nada que decir (`null`).
  */
 export function avisoAlClienteTrasEdicion(
   original: ReservaEditable,
   cambios: CambiosReserva,
-  opciones: { hoy: string; envio?: EnvioCorreoEdicion | null },
+  opciones: { hoy: string; envio?: EnvioCorreoEdicion | null; avisoModificacion?: EnvioCorreoEdicion | null },
 ): string | null {
+  if (opciones.avisoModificacion) return textoAvisoModificacion(opciones.avisoModificacion, original.estado);
   if (opciones.envio) return textoEnvioCorreo(opciones.envio);
   if (!cambiaAforo(cambios) || !esReservaViva(original.estado)) return null;
   if ((cambios.fecha ?? String(original.fecha).slice(0, 10)) < opciones.hoy) return null;
@@ -401,6 +543,24 @@ export function avisoAlClienteTrasEdicion(
   return email
     ? "El cliente no recibe ningún aviso de este cambio."
     : "No tiene email: si hace falta, avísale por teléfono.";
+}
+
+/**
+ * ¿Hay que avisar, DESPUÉS de guardar, de que el enlace «Confirma tu reserva»
+ * que ya tenía el cliente ha dejado de valer? Si la edición lo rompe
+ * (`invalidaEnlaceConfirmacion`) y NO consta que tenga ya uno nuevo: el aviso
+ * del cambio no se pidió (casilla desmarcada) o no salió. Si salió, o el cliente
+ * ya tenía un aviso con estos mismos datos (y su enlace, que con la misma hora
+ * vuelve a valer), no hace falta.
+ */
+export function enlaceQuedaRoto(
+  original: ReservaEditable,
+  cambios: CambiosReserva,
+  opciones: { hoy: string; avisoModificacion?: EnvioCorreoEdicion | null },
+): boolean {
+  if (!invalidaEnlaceConfirmacion(original, cambios, { hoy: opciones.hoy })) return false;
+  const resultado = opciones.avisoModificacion?.resultado;
+  return resultado !== "enviado" && resultado !== "ya_enviado";
 }
 
 /**
