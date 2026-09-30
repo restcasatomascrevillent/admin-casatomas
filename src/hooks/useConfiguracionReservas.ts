@@ -128,9 +128,13 @@ export function useActualizarConfiguracionReservas() {
       // ejemplo, `dias_max_antelacion`. Se reintenta sin ellas para no
       // bloquear el resto del formulario. Quien llama puede saber si se
       // guardaron mirando si la fila devuelta trae la columna.
-      if (error && esErrorEsquemaPendiente(error) && CAMPOS_OPCIONALES.some((campo) => campo in updates)) {
+      // Primero se quitan SOLO las de asignación (la migración más nueva): si
+      // las de modo servicio ya existen, sus cambios no se pierden en silencio.
+      for (const grupo of [CAMPOS_ASIGNACION, CAMPOS_OPCIONALES] as const) {
+        if (!error || !esErrorEsquemaPendiente(error)) break;
+        if (!grupo.some((campo) => campo in updates)) continue;
         const resto = { ...updates };
-        for (const campo of CAMPOS_OPCIONALES) delete (resto as Record<string, unknown>)[campo];
+        for (const campo of grupo) delete (resto as Record<string, unknown>)[campo];
         ({ data, error } = await supabase
           .from("configuracion_reservas" as any)
           .update(resto)
