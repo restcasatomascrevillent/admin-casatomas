@@ -1,0 +1,336 @@
+/**
+ * `useCambiarSalaReserva` (vive en `useReservasPorAsignar.ts`) — tests de
+ * caracterización de EFECTOS.
+ *
+ * Es el escritor de sala del panel «Asignación». Fijan lo que hace HOY: qué se
+ * escribe y con qué filtros, que NO manda correo, qué pasa cuando la escritura la
+ * deniega la RLS en silencio, y qué cachés refresca (que NO son las mismas que las
+ * de `useAccionesServicioReserva`, el otro escritor de sala: el del kanban).
+ *
+ * Afirman efectos y mutaciones, no el DOM. `// BUG conocido` marca lo que está mal
+ * y se deja así a propósito: este fichero NO arregla nada.
+ *
+ * Nada llega a Supabase: el cliente y `sonner` están mockeados.
+ */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+
+vi.mock("@/integrations/supabase/client");
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ErrorSinPermisoSala, useCambiarSalaReserva } from "@/hooks/useReservasPorAsignar";
+
+const DIA = "2026-09-30";
+
+interface Escritura {
+  tabla: string;
+  payload: Record<string, unknown>;
+  eq: [string, unknown] | null;
+  select: string | null;
+}
+interface Respuesta {
+  error?: unknown;
+  data?: unknown;
+  esperar?: Promise<void>;
+}
+
+/** Cada `await` de una escritura consume la siguiente respuesta; sin más, éxito con 1 fila. */
+function mockEscrituras(respuestas: Respuesta[] = []) {
+  const escrituras: Escritura[] = [];
+  const tablasConsultadas: string[] = [];
+  vi.mocked(supabase.from).mockImplementation(((tabla: string) => {
+    tablasConsultadas.push(tabla);
+    const escritura: Escritura = { tabla, payload: {}, eq: null, select: null };
+    const builder: Record<string, unknown> = {
+      update: vi.fn((payload: Record<string, unknown>) => {
+        escritura.payload = { ...payload };
+        escrituras.push(escritura);
+        return builder;
+      }),
+      eq: vi.fn((columna: string, valor: unknown) => {
+        escritura.eq = [columna, valor];
+        return builder;
+      }),
+      select: vi.fn((columnas: string) => {
+        escritura.select = columnas;
+        return builder;
+      }),
+      then: (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
+        const r = respuestas.shift() ?? {};
+        const resolver = async () => {
+          if (r.esperar) await r.esperar;
+          const data = "data" in r ? r.data : r.error ? null : [{ id: "res-1" }];
+          return { data, error: r.error ?? null };
+        };
+        return resolver().then(ok, ko);
+      },
+    };
+    return builder;
+  }) as never);
+  return { escrituras, tablasConsultadas };
+}
+
+function montar() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  const reservaEnCache = { id: "res-1", estado: "confirmada", espacio_id: "salon" };
+  queryClient.setQueryData(["reservas-kanban", DIA], [reservaEnCache]);
+  queryClient.setQueryData(["reservas-hoy", DIA], [reservaEnCache]);
+  queryClient.setQueryData(["reservas-lista"], [reservaEnCache]);
+
+  const invalidadas: string[] = [];
+  const invalidar = queryClient.invalidateQueries.bind(queryClient);
+  vi.spyOn(queryClient, "invalidateQueries").mockImplementation((filtros, opciones) => {
+    invalidadas.push(String((filtros as { queryKey: unknown[] }).queryKey[0]));
+    return invalidar(filtros, opciones);
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  const { result } = renderHook(() => useCambiarSalaReserva(), { wrapper });
+  return { result, queryClient, invalidadas };
+}
+
+/** Lo que refresca SIEMPRE este escritor (éxito o fallo), en este orden. */
+const CLAVES_QUE_REFRESCA = [
+  "resumen-asignacion-dia",
+  "asignaciones_mesa",
+  "ocupacion-salas-dia",
+  "reservas-kanban",
+  "reservas-hoy",
+  "reservas-lista",
+];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("useCambiarSalaReserva · qué escribe", () => {
+  it("cambia `espacio_id` en `reservas`, filtrando por id y pidiendo la fila de vuelta (`select('id')`)", async () => {
+    const { escrituras } = mockEscrituras();
+    const { result } = montar();
+
+    let devuelto: unknown;
+    await act(async () => {
+      devuelto = await result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    expect(escrituras).toEqual([
+      { tabla: "reservas", payload: { espacio_id: "terraza" }, eq: ["id", "res-1"], select: "id" },
+    ]);
+    expect(devuelto).toEqual({ id: "res-1" });
+  });
+
+  it("solo toca `reservas`: no consulta las mesas asignadas antes de quitar la sala (el trigger de la BD las borra)", async () => {
+    // `trg_reservas_sincronizar_asignaciones` BORRA las mesas de la reserva cuando cambia
+    // su sala. El hook no lo comprueba ni lo avisa: lo hace quien lo llama, pidiendo
+    // confirmación antes (ver su docstring).
+    const { tablasConsultadas } = mockEscrituras();
+    const { result } = montar();
+
+    await act(async () => {
+      await result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    expect(tablasConsultadas).toEqual(["reservas"]);
+  });
+
+  it.each([
+    ["sin reserva", { reservaId: "", espacioId: "terraza" }],
+    ["sin sala", { reservaId: "res-1", espacioId: "" }],
+    ["con la sala a null (nunca se deja una reserva sin sala desde aquí)", { reservaId: "res-1", espacioId: null as unknown as string }],
+  ])("%s: rechaza antes de escribir nada", async (_n, variables) => {
+    const { escrituras } = mockEscrituras();
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(variables)).rejects.toThrow("Falta la reserva o la sala");
+    });
+
+    expect(escrituras).toEqual([]);
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+});
+
+describe("useCambiarSalaReserva · quién manda correo: nadie", () => {
+  // Cambiar la sala es una asignación INTERNA: la sala no sale en el correo del cliente.
+  it("con éxito no llama a notify-reservation-change ni a ninguna otra función", async () => {
+    mockEscrituras();
+    const { result } = montar();
+
+    await act(async () => {
+      await result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it("con fallo tampoco", async () => {
+    mockEscrituras([{ error: { code: "42501", message: "denegado" } }]);
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toBeTruthy();
+    });
+
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+});
+
+describe("useCambiarSalaReserva · cuando la escritura falla", () => {
+  it("con error de la BD: la mutación falla con ESE error (el aviso lo pone quien llama; el hook no usa toast)", async () => {
+    const errorDeBd = { code: "42501", message: "permission denied for table reservas" };
+    mockEscrituras([{ error: errorDeBd }]);
+    const { result } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toBe(errorDeBd);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["0 filas", []],
+    ["data null", null],
+  ])("escritura denegada por RLS (%s, sin error): falla con ErrorSinPermisoSala en vez de dar el cambio por hecho", async (_n, data) => {
+    mockEscrituras([{ data }]);
+    const { result } = montar();
+
+    await act(async () => {
+      const promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+      await expect(promesa).rejects.toBeInstanceOf(ErrorSinPermisoSala);
+      await expect(promesa).rejects.toThrow(
+        "No tienes permiso para cambiar la sala de esta reserva, o la reserva ya no existe.",
+      );
+    });
+
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe("useCambiarSalaReserva · caché", () => {
+  it("con éxito refresca las seis claves de abajo, una vez cada una, en este orden", async () => {
+    mockEscrituras();
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+  });
+
+  it("con error de la BD las refresca igual (`onSettled`)", async () => {
+    mockEscrituras([{ error: { code: "42501", message: "denegado" } }]);
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toBeTruthy();
+    });
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+  });
+
+  it("con la escritura denegada por RLS (0 filas) también", async () => {
+    mockEscrituras([{ data: [] }]);
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" })).rejects.toBeInstanceOf(
+        ErrorSinPermisoSala,
+      );
+    });
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+  });
+
+  it("con parámetros inválidos refresca igual (la validación está dentro del `mutationFn` y `onSettled` corre al fallar)", async () => {
+    // Refresca seis claves aunque no se haya escrito nada. Se fija tal cual.
+    mockEscrituras();
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ reservaId: "", espacioId: "x" })).rejects.toBeTruthy();
+    });
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+  });
+
+  it("NO hay actualización optimista: las listas se quedan como estaban hasta el refetch", async () => {
+    // `useAccionesServicioReserva` (kanban) sí cambia la fila en local antes de escribir y
+    // hace rollback si falla. Este escritor no: la reserva sigue en su sala vieja hasta
+    // que vuelve la consulta.
+    let liberar!: () => void;
+    mockEscrituras([{ esperar: new Promise<void>((r) => (liberar = r)) }]);
+    const { result, queryClient } = montar();
+
+    let promesa!: Promise<unknown>;
+    act(() => {
+      promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    expect(queryClient.getQueryData<{ espacio_id: string }[]>(["reservas-kanban", DIA])![0].espacio_id).toBe("salon");
+
+    await act(async () => {
+      liberar();
+      await promesa;
+    });
+    expect(queryClient.getQueryData<{ espacio_id: string }[]>(["reservas-kanban", DIA])![0].espacio_id).toBe("salon");
+  });
+
+  it("BUG conocido: no refresca las ocho claves derivadas que sí refresca el kanban (contadores, panel, dashboard…)", async () => {
+    // Dos escritores de sala (este y `useAccionesServicioReserva.moverEspacio`) hacen el
+    // mismo UPDATE de `espacio_id` y cada uno refresca SU lista de claves: este sí las de
+    // asignación de mesas (`resumen-asignacion-dia`, `asignaciones_mesa`) y el kanban las
+    // derivadas de abajo; ninguno tiene las dos.
+    mockEscrituras();
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    for (const clave of [
+      "reservas_hoy_resumen",
+      "reservas_hoy_todas",
+      "ocupacion_hoy",
+      "today-reservations",
+      "today-confirmed-reservations",
+      "dashboard-stats",
+      "reservas_mes",
+    ]) {
+      expect(invalidadas, clave).not.toContain(clave);
+    }
+  });
+});
+
+describe("useCambiarSalaReserva · estado de la mutación", () => {
+  it("`isPending` y `variables` dicen qué reserva está en curso (lo usa el panel para pintar «guardando»)", async () => {
+    let liberar!: () => void;
+    mockEscrituras([{ esperar: new Promise<void>((r) => (liberar = r)) }]);
+    const { result } = montar();
+
+    expect(result.current.isPending).toBe(false);
+    let promesa!: Promise<unknown>;
+    act(() => {
+      promesa = result.current.mutateAsync({ reservaId: "res-1", espacioId: "terraza" });
+    });
+
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+    expect(result.current.variables).toEqual({ reservaId: "res-1", espacioId: "terraza" });
+
+    await act(async () => {
+      liberar();
+      await promesa;
+    });
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+});
