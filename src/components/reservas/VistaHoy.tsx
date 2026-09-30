@@ -29,6 +29,7 @@ import {
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { GestorReservasKanban } from "./GestorReservasKanban";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
+import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
 import { cn } from "@/lib/utils";
@@ -209,6 +210,13 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa }: VistaHoyProps) {
           />
         </div>
       </div>
+
+      {/* Cómo avanza una reserva (2026-09-30): los seis estados con la cifra
+          de hoy de cada uno. SIN consulta propia: usa las reservas de hoy
+          (`reservasHoy`, que no incluyen las canceladas) que ya carga la
+          franja de pendientes y las canceladas del resumen de arriba. Si esa
+          consulta cambia de filtros, estas cifras cambian con ella. */}
+      <TimelineEstadosReserva reservas={reservasHoy} canceladas={reservasCanceladas} />
 
       <FranjaPendientesMesa
         grupos={grupos}
