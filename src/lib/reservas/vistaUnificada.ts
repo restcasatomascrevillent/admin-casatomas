@@ -12,6 +12,7 @@
 
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { coincideNegocio, marcaDeReserva, marcaDeSolicitud } from "./negocios";
+import { ESTADOS_RESERVA, type EstadoReserva } from "./estadosReserva";
 
 /** Mínimo de `reservas` que necesita la lista unificada. */
 export interface ReservaListable {
@@ -45,15 +46,24 @@ export const esSolicitudAbierta = (estado: string) =>
 export const FILTRO_SOLICITUDES = "solicitudes";
 export const FILTRO_SOLICITUDES_CERRADAS = "solicitudes_cerradas";
 
+/**
+ * Orden de los estados en el filtro: «No vino» antes que «Cancelada» (el ciclo de
+ * vida del timeline las pone al revés). El TEXTO no se escribe aquí: sale de
+ * `ESTADOS_RESERVA` (`etiquetaFiltro`), la fuente única de los nombres de estado.
+ */
+const ORDEN_ESTADOS_EN_FILTRO: readonly EstadoReserva[] = [
+  "pendiente",
+  "verificada",
+  "confirmada",
+  "completada",
+  "no_show",
+  "cancelada",
+];
+
 export const OPCIONES_FILTRO_ESTADO: { value: string; label: string }[] = [
   { value: "all", label: "Todos" },
   { value: FILTRO_SOLICITUDES, label: "Solicitudes sin resolver" },
-  { value: "pendiente", label: "Pendiente" },
-  { value: "verificada", label: "Verificada" },
-  { value: "confirmada", label: "Confirmada" },
-  { value: "completada", label: "Llegó / completada" },
-  { value: "no_show", label: "No se presentó" },
-  { value: "cancelada", label: "Cancelada" },
+  ...ORDEN_ESTADOS_EN_FILTRO.map((estado) => ({ value: estado, label: ESTADOS_RESERVA[estado].etiquetaFiltro })),
   { value: FILTRO_SOLICITUDES_CERRADAS, label: "Solicitudes cerradas" },
 ];
 

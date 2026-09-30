@@ -320,6 +320,31 @@ export function mesaOcupadaPor<T extends { mesa_id: string; reserva_id: string }
   return lista.find((a) => a.mesa_id === mesaId && a.reserva_id !== reservaIdExcluida) ?? null;
 }
 
+/** Segunda frase del aviso de cambio de sala: decir que el cliente no recibe nada. */
+export const TEXTO_CAMBIO_INTERNO = "Es un cambio interno: al cliente no se le envía nada.";
+
+/**
+ * Frase del aviso «¿Cambiar de sala y quitar sus mesas?». El trigger
+ * `trg_reservas_sincronizar_asignaciones` BORRA las mesas asignadas de una
+ * reserva cuando cambia su sala (no bloquea el movimiento, para no romper el
+ * kanban), así que quien va a cambiar la sala lo pregunta antes. Lo usan el panel
+ * de Asignación y el kanban de Hoy: una sola frase para las dos pantallas.
+ */
+export function textoQuitarMesas(input: {
+  nombre: string | null | undefined;
+  cantidad: number;
+  mesasNombres: readonly string[];
+  /** Nombre de la sala de la que sale, si se conoce. */
+  salaActual: string | null | undefined;
+  destinoNombre: string;
+}): string {
+  const { nombre, cantidad, mesasNombres, salaActual, destinoNombre } = input;
+  const cuantas = cantidad === 1 ? "1 mesa asignada" : `${cantidad} mesas asignadas`;
+  const cuales = mesasNombres.length > 0 ? ` (${mesasNombres.join(", ")})` : "";
+  const enSala = salaActual ? ` en ${salaActual}` : "";
+  return `${nombre || "Esta reserva"} tiene ${cuantas}${cuales}${enSala}. Al pasarla a ${destinoNombre} se quitarán esas mesas y habrá que asignarlas de nuevo.`;
+}
+
 // ----------------------------------------------------------------------------
 // Ayudas internas
 // ----------------------------------------------------------------------------

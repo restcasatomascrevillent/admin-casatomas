@@ -29,12 +29,16 @@ import {
   normalizarMarca,
 } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva, CLAVES_LISTAS_RESERVAS } from "@/hooks/useAccionesServicioReserva";
+import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import {
   comensalesEnEspacioTurno,
   evaluarMovimiento,
   puedeMoverReserva,
   type ReservaServicio,
 } from "@/lib/reservas/servicioSala";
+import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
+import { etiquetaEstadoReserva, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacionMesas";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,16 +81,14 @@ import {
   type ItemColumna,
 } from "./kanbanLayout";
 
-// Estados del CHECK `reservas_estado_check`. Antes este mapa usaba "no-show"
-// (con guion, nunca casaba) y "rechazada" (no existe en la BD).
-const ESTADOS_RESERVA: Record<string, { label: string; color: string }> = {
-  pendiente: { label: "Pendiente", color: "bg-yellow-500" },
-  verificada: { label: "Verificada", color: "bg-blue-500" },
-  confirmada: { label: "Confirmada", color: "bg-green-500" },
-  cancelada: { label: "Cancelada", color: "bg-red-500" },
-  completada: { label: "Llegó", color: "bg-emerald-600" },
-  no_show: { label: "No vino", color: "bg-gray-500" },
-};
+// El nombre y el color de cada estado salen de `ESTADOS_RESERVA`
+// (src/lib/reservas/estadosReserva.ts), la fuente única que también leen el
+// timeline y el filtro (la Lista pasa a leerla después). Este kanban tenía su
+// propio mapa, con la paleta cruda de Tailwind (yellow-500, blue-500…); ahora usa
+// los tokens `status-*` del tema para pendiente/verificada/confirmada y las clases
+// de la Lista para cancelada, «Llegó» y «No vino» (no hay token para esos tres).
+// Qué botones tiene cada tarjeta, y cuáles se pueden pulsar, lo decide
+// `accionesDisponibles(reserva, { vista: "hoy", canEdit })`.
 
 // Columna "Sin asignar" POR NEGOCIO: "sin-asignar" es la de Casa Tomás (id
 // histórico) y "sin-asignar:<marca>" la de otro negocio (solo aparece si
@@ -123,7 +125,7 @@ function ReservaCard({
   onToggleImportante,
   onBlacklist,
   onEditar,
-  puedeEditar = true,
+  puedeEditar,
   isDragOverlay,
   anchoColumna,
 }: {
@@ -135,8 +137,12 @@ function ReservaCard({
   onBlacklist: (reserva: ReservaServicio) => void;
   /** Abre el editor de la reserva (2026-09-30): está en el menú «⋮» de TODA tarjeta, movible o no. */
   onEditar?: (reserva: ReservaServicio) => void;
-  /** Permiso de edición sobre «reservas»: sin él, «Editar reserva» sale deshabilitado. */
-  puedeEditar?: boolean;
+  /**
+   * Permiso de edición sobre «reservas». Obligatorio a propósito (un valor por
+   * defecto dejaría pasar a todo el mundo si alguien se olvida de pasarlo): sin él,
+   * todo lo que escribe en la reserva sale deshabilitado, con el motivo visible.
+   */
+  puedeEditar: boolean;
   isDragOverlay?: boolean;
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
@@ -146,22 +152,26 @@ function ReservaCard({
    */
   anchoColumna?: number;
 }) {
-  const movible = puedeMoverReserva(reserva.estado);
+  // Qué se puede hacer con esta reserva en Hoy (servicio), según su estado y el permiso.
+  const acc = accionesDisponibles(reserva, { vista: "hoy", canEdit: puedeEditar });
+  // Se arrastra solo si se puede mover: que su estado lo permita Y que haya permiso.
+  const arrastrable = acc.mover.habilitada;
+  // Una reserva que por su estado no ocupa sitio («No vino») se ve apagada; sin
+  // permiso, en cambio, se ve normal: lo único que cambia es que no se mueve.
+  const ocupaSitio = puedeMoverReserva(reserva.estado);
   const soloIcono = accionesSoloIcono(anchoColumna);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,
     data: reserva,
-    disabled: !movible || isDragOverlay,
+    disabled: !arrastrable || isDragOverlay,
   });
-
-  const estadoInfo = ESTADOS_RESERVA[reserva.estado] || { label: reserva.estado, color: "bg-gray-500" };
 
   if (isDragOverlay) {
     return (
       <div
         className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] shadow-2xl rotate-1 scale-[1.03] cursor-grabbing pointer-events-none"
       >
-        <ContenidoTarjeta reserva={reserva} estadoInfo={estadoInfo} />
+        <ContenidoTarjeta reserva={reserva} />
       </div>
     );
   }
@@ -205,7 +215,7 @@ function ReservaCard({
             <MoveRight className="h-3.5 w-3.5" />
             Mover a…
           </DropdownMenuLabel>
-          {movible ? (
+          {acc.mover.habilitada ? (
             destinos.map((c) => (
               <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
                 {c.title}
@@ -215,7 +225,9 @@ function ReservaCard({
               </DropdownMenuItem>
             ))
           ) : (
-            <DropdownMenuItem disabled>No se puede mover en este estado</DropdownMenuItem>
+            // El motivo, a la vista en el propio menú: «No se puede mover en este
+            // estado» o «No tienes permiso para editar reservas».
+            <DropdownMenuItem disabled>{acc.mover.titulo}</DropdownMenuItem>
           )}
           {reserva.telefono && (
             <>
@@ -235,10 +247,10 @@ function ReservaCard({
             <>
               <DropdownMenuSeparator />
               {/* El ítem deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
-              <ConMotivo className="block" motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+              <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.editar)}>
                 <DropdownMenuItem
-                  disabled={!puedeEditar}
-                  title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
+                  disabled={!acc.editar.habilitada}
+                  title={motivoSiNoSePuede(acc.editar)}
                   onSelect={() => onEditar(reserva)}
                 >
                   <SquarePen className="h-3.5 w-3.5 mr-2" />
@@ -248,16 +260,22 @@ function ReservaCard({
             </>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onBlacklist(reserva)} className="text-destructive focus:text-destructive">
-            <ShieldBan className="h-3.5 w-3.5 mr-2" />
-            Añadir a blacklist
-          </DropdownMenuItem>
+          <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.listaNegra)}>
+            <DropdownMenuItem
+              disabled={!acc.listaNegra.habilitada}
+              onSelect={() => onBlacklist(reserva)}
+              className="text-destructive focus:text-destructive"
+            >
+              <ShieldBan className="h-3.5 w-3.5 mr-2" />
+              Añadir a blacklist
+            </DropdownMenuItem>
+          </ConMotivo>
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Asa decorativa: se retira en columnas estrechas, donde esos 16px son
           la diferencia entre ver el nombre y no verlo. La tarjeta entera
           sigue siendo arrastrable. */}
-      {movible && !soloIcono && (
+      {arrastrable && !soloIcono && (
         <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
       )}
     </div>
@@ -270,28 +288,37 @@ function ReservaCard({
         "rounded-lg border bg-card transition-shadow duration-200 group outline-none",
         soloIcono ? "p-2" : "p-2.5 sm:p-3",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        movible ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30" : "cursor-default opacity-60",
+        arrastrable
+          ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30"
+          : ocupaSitio
+            ? "cursor-default"
+            : "cursor-default opacity-60",
         isDragging && "opacity-30 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
         (reserva as { en_blacklist?: boolean }).en_blacklist && "border-destructive/40 bg-destructive/5",
       )}
-      aria-roledescription={movible ? "reserva arrastrable" : "reserva"}
-      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${estadoInfo.label}`}
-      {...(movible ? listeners : {})}
+      aria-roledescription={arrastrable ? "reserva arrastrable" : "reserva"}
+      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${etiquetaEstadoReserva(reserva.estado)}`}
+      {...(arrastrable ? listeners : {})}
       {...attributes}
     >
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform"
-            aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"}
-            aria-pressed={!!reserva.importante}
-          >
-            <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
-          </button>
+          {/* Sin permiso, deshabilitada y con el motivo a la vista (en el envoltorio:
+              un botón deshabilitado no recibe el ratón). */}
+          <ConMotivo motivo={motivoSiNoSePuede(acc.importante)}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              disabled={!acc.importante.habilitada}
+              className="shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform disabled:pointer-events-none disabled:opacity-50"
+              aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"}
+              aria-pressed={!!reserva.importante}
+            >
+              <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
+            </button>
+          </ConMotivo>
           {/* `title`: con las columnas estrechas (112–220px) los nombres largos
               se cortan con puntos suspensivos; el completo se lee al pasar el
               ratón, además de estar en el `aria-label` de la tarjeta. */}
@@ -304,17 +331,17 @@ function ReservaCard({
         </div>
         {!soloIcono && menuAcciones}
       </div>
-      <ContenidoTarjeta reserva={reserva} estadoInfo={estadoInfo} sinCabecera />
+      <ContenidoTarjeta reserva={reserva} sinCabecera />
       {soloIcono ? (
         /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el
            suelo de ancho de columna lo marca el elemento suelto más ancho y no
            la fila entera. */
         <div className="flex flex-wrap items-center gap-1 mt-2">
-          <ControlLlegada reserva={reserva} acciones={acciones} compacto soloIcono />
+          <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto soloIcono />
           {menuAcciones}
         </div>
       ) : (
-        <ControlLlegada reserva={reserva} acciones={acciones} compacto className="mt-2" />
+        <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto className="mt-2" />
       )}
     </div>
   );
@@ -322,13 +349,14 @@ function ReservaCard({
 
 function ContenidoTarjeta({
   reserva,
-  estadoInfo,
   sinCabecera,
 }: {
   reserva: ReservaServicio;
-  estadoInfo: { label: string; color: string };
   sinCabecera?: boolean;
 }) {
+  // Nombre y color del estado, del mapa único. Un estado que no existe (el CHECK no
+  // lo permite) se pinta tal cual y en gris, como hacía este kanban.
+  const estado = infoEstadoReserva(reserva.estado);
   return (
     <>
       {!sinCabecera && (
@@ -346,8 +374,8 @@ function ContenidoTarjeta({
           <Users className="h-3 w-3" aria-hidden="true" />
           {reserva.numero_comensales}
         </span>
-        <Badge className={cn("text-[10px] px-1.5 py-0 text-white h-4", estadoInfo.color)}>
-          {estadoInfo.label}
+        <Badge className={cn("text-[10px] px-1.5 py-0 h-4", estado ? estado.insignia : "bg-gray-500 text-white")}>
+          {estado ? estado.etiqueta : reserva.estado}
         </Badge>
       </div>
       {reserva.telefono && (
@@ -717,22 +745,29 @@ const deteccionColisiones: CollisionDetection = (args) => {
   return bajoPuntero.length > 0 ? bajoPuntero : rectIntersection(args);
 };
 
+/**
+ * Un movimiento que se confirma antes de hacerlo. Hay DOS motivos para preguntar y
+ * pueden darse a la vez (entonces sale un solo aviso con los dos):
+ *   · `excede`: la sala de destino se pasaría de aforo en ese turno.
+ *   · `mesas`: la reserva tiene mesas asignadas y el trigger de la BD
+ *     (`trg_reservas_sincronizar_asignaciones`) las BORRA al cambiar la sala.
+ */
 interface MovimientoPendiente {
   reserva: ReservaServicio;
   destinoId: string | null;
   destinoNombre: string;
-  ocupacionTras: number;
-  capacidad: number;
-  turno: "comida" | "cena";
+  excede: { ocupacionTras: number; capacidad: number; turno: "comida" | "cena" } | null;
+  mesas: { nombres: string[]; salaActual: string | null } | null;
 }
 
 export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
   const queryClient = useQueryClient();
-  // Editar una reserva desde su tarjeta (2026-09-30). El Kanban no miraba el
-  // permiso de edición (se apoya en la RLS); el editor sí, para no abrir un
-  // formulario que la BD luego rechazaría.
+  // Permiso de edición sobre «reservas». Antes solo lo miraba el editor y el resto
+  // del kanban se apoyaba en la RLS de la BD; ahora TODO lo que escribe en una
+  // reserva (estrella, llegada, no vino, deshacer, mover, lista negra, editar)
+  // sale deshabilitado sin él, con el motivo a la vista (`accionesDisponibles`).
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
@@ -815,6 +850,25 @@ export function GestorReservasKanban() {
       return data as unknown as ReservaServicio[];
     },
   });
+
+  // Mesas asignadas de hoy, por reserva: sirven para avisar ANTES de mover a otra
+  // sala una reserva que tiene mesa (el trigger de la BD las borra). Es la misma
+  // consulta —y la misma clave de caché— que ya pide `VistaHoy`, así que no cuesta
+  // una petición más; `CLAVE_ASIGNACIONES_MESA` la refresca al cambiar de sala. Si
+  // aún no ha llegado (o falla) no se bloquea el movimiento: el trigger tampoco lo
+  // bloquea, para no romper el kanban.
+  const { data: asignacionesDeHoy } = useAsignacionesMesa(hoy);
+  const mesasPorReserva = useMemo(() => {
+    const porReserva = new Map<string, string[]>();
+    for (const a of asignacionesDeHoy ?? []) {
+      if (!a?.reserva_id) continue;
+      porReserva.set(a.reserva_id, [...(porReserva.get(a.reserva_id) ?? []), a.mesas?.nombre ?? ""]);
+    }
+    for (const nombres of porReserva.values()) {
+      nombres.sort((x, y) => x.localeCompare(y, "es", { numeric: true }));
+    }
+    return porReserva;
+  }, [asignacionesDeHoy]);
 
   const espaciosActivos = useMemo(
     () => (espacios || []).filter((e: any) => e.activa !== false),
@@ -943,17 +997,25 @@ export function GestorReservasKanban() {
         toast.error(evaluacion.motivo);
         return;
       case "excede_capacidad":
-        setMovimientoPendiente({
-          reserva,
-          destinoId,
-          destinoNombre: col?.title ?? "Sin asignar",
-          ocupacionTras: evaluacion.ocupacionTras,
-          capacidad: evaluacion.capacidad ?? 0,
-          turno: evaluacion.turno,
-        });
-        return;
-      case "ok":
-        void acciones.moverEspacio(reserva, destinoId, col?.title ?? "Sin asignar");
+      case "ok": {
+        const destinoNombre = col?.title ?? "Sin asignar";
+        const excede =
+          evaluacion.tipo === "excede_capacidad"
+            ? { ocupacionTras: evaluacion.ocupacionTras, capacidad: evaluacion.capacidad ?? 0, turno: evaluacion.turno }
+            : null;
+        const nombresMesas = mesasPorReserva.get(reserva.id);
+        const mesas = nombresMesas
+          ? {
+              nombres: nombresMesas,
+              salaActual: columnas.find((c) => c.id === columnaDeReserva(reserva, columnas))?.title ?? null,
+            }
+          : null;
+        if (!excede && !mesas) {
+          void acciones.moverEspacio(reserva, destinoId, destinoNombre);
+          return;
+        }
+        setMovimientoPendiente({ reserva, destinoId, destinoNombre, excede, mesas });
+      }
     }
   };
 
@@ -1114,6 +1176,7 @@ export function GestorReservasKanban() {
               onMover={solicitarMovimiento}
               onToggleImportante={toggleImportante}
               onBlacklist={setBlacklistReserva}
+              puedeEditar={puedeEditar}
               isDragOverlay
             />
           ) : null}
@@ -1123,12 +1186,35 @@ export function GestorReservasKanban() {
       <AlertDialog open={!!movimientoPendiente} onOpenChange={(open) => !open && setMovimientoPendiente(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Superar la capacidad de {movimientoPendiente?.destinoNombre}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Con la reserva de {movimientoPendiente?.reserva.nombre || "este cliente"} (
-              {movimientoPendiente?.reserva.numero_comensales} pax), el turno de{" "}
-              {movimientoPendiente?.turno === "comida" ? "comida" : "cena"} de {movimientoPendiente?.destinoNombre} quedaría
-              en {movimientoPendiente?.ocupacionTras} de {movimientoPendiente?.capacidad} plazas.
+            {/* Si se pasa de aforo manda ese aviso (el de siempre); si solo hay mesas
+                que se van a quitar, el mismo aviso que el panel de Asignación. */}
+            <AlertDialogTitle>
+              {movimientoPendiente?.excede
+                ? `¿Superar la capacidad de ${movimientoPendiente.destinoNombre}?`
+                : "¿Cambiar de sala y quitar sus mesas?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {movimientoPendiente?.excede && (
+                  <p>
+                    {`Con la reserva de ${movimientoPendiente.reserva.nombre || "este cliente"} (${movimientoPendiente.reserva.numero_comensales} pax), el turno de ${movimientoPendiente.excede.turno === "comida" ? "comida" : "cena"} de ${movimientoPendiente.destinoNombre} quedaría en ${movimientoPendiente.excede.ocupacionTras} de ${movimientoPendiente.excede.capacidad} plazas.`}
+                  </p>
+                )}
+                {movimientoPendiente?.mesas && (
+                  <>
+                    <p>
+                      {textoQuitarMesas({
+                        nombre: movimientoPendiente.reserva.nombre,
+                        cantidad: movimientoPendiente.mesas.nombres.length,
+                        mesasNombres: movimientoPendiente.mesas.nombres,
+                        salaActual: movimientoPendiente.mesas.salaActual,
+                        destinoNombre: movimientoPendiente.destinoNombre,
+                      })}
+                    </p>
+                    <p>{TEXTO_CAMBIO_INTERNO}</p>
+                  </>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1140,7 +1226,7 @@ export function GestorReservasKanban() {
                 if (m) void acciones.moverEspacio(m.reserva, m.destinoId, m.destinoNombre);
               }}
             >
-              Mover igualmente
+              {movimientoPendiente?.excede ? "Mover igualmente" : "Cambiar de sala"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

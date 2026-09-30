@@ -31,8 +31,13 @@
 // que las otras consultas no traen). El ESTADO de cada mesa lo calcula
 // `estadoMesaServicio` (puro, testeado, `src/lib/reservas/servicioSala.ts`).
 //
-// ACCIONES: "Sentar" reutiliza `useAccionesServicioReserva.marcarLlegada`
-// tal cual (no hay nada de servicio-específico ahí). "Liberar"/"Deshacer" son
+// ACCIONES: "Ha llegado" (antes «Sentar») reutiliza
+// `useAccionesServicioReserva.marcarLlegada` tal cual (no hay nada de
+// servicio-específico ahí: es el mismo cambio de estado que «Ha llegado» del
+// kanban, y por eso se llama igual). Qué botones hay y cuáles se pueden pulsar lo
+// decide `accionesDisponibles(reserva, { vista: "hoy", canEdit })`, como en el
+// kanban: sin permiso de edición salen deshabilitados con el motivo a la vista.
+// "Liberar"/"Deshacer" son
 // nuevas (`useAccionesModoServicio`, updates condicionados por concurrencia).
 // "Mover a otra mesa" reutiliza el RPC atómico `useAsignarMesasReserva`
 // (valida el solape en servidor); aquí se usa en su forma más simple —
@@ -77,10 +82,10 @@ import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
+import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import {
   configServicioSalaDesde,
   estadoMesaServicio,
-  esperandoLlegada,
   haLlegado,
   type EstadoMesaServicio,
   type ReservaMesaServicio,
@@ -201,6 +206,10 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   }, [filasMesas]);
 
   const mesaActiva = mesaSel ? filasMesas.find((f) => f.mesa.id === mesaSel.id) ?? null : null;
+  // Qué se puede hacer con la reserva de la mesa abierta (vista «Hoy»: servicio).
+  const accionesReserva = mesaActiva?.resultado.reserva
+    ? accionesDisponibles(mesaActiva.resultado.reserva, { vista: "hoy", canEdit: puedeEditar })
+    : null;
 
   // Mesas candidatas para "Mover a otra mesa": del mismo espacio, distintas de
   // la actual y libres en este turno (que no es lo mismo que "activa": una
@@ -229,7 +238,7 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
     editarReserva(reservaId);
   };
 
-  const handleSentar = async () => {
+  const handleHaLlegado = async () => {
     if (!mesaActiva?.resultado.reserva) return;
     const ok = await marcarLlegada(mesaActiva.resultado.reserva);
     if (ok) cerrarSheet();
@@ -452,13 +461,13 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
                     reserva. Sin mirar el estado: solo el permiso lo apaga. El
                     botón deshabilitado no recibe el ratón: el motivo se ve en
                     el envoltorio. */}
-                {mesaActiva.resultado.reserva && (
-                  <ConMotivo className="flex" motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                {accionesReserva?.editar.visible && (
+                  <ConMotivo className="flex" motivo={motivoSiNoSePuede(accionesReserva.editar)}>
                     <Button
                       className="w-full h-11"
                       variant="outline"
-                      disabled={!puedeEditar}
-                      title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
+                      disabled={!accionesReserva.editar.habilitada}
+                      title={motivoSiNoSePuede(accionesReserva.editar)}
                       onClick={handleEditar}
                     >
                       <SquarePen className="mr-2 h-4 w-4" /> Editar reserva
@@ -466,10 +475,17 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
                   </ConMotivo>
                 )}
 
-                {mesaActiva.resultado.reserva && esperandoLlegada(mesaActiva.resultado.reserva.estado) && (
-                  <Button className="w-full h-11" onClick={handleSentar}>
-                    <Utensils className="mr-2 h-4 w-4" /> Sentar
-                  </Button>
+                {/* Antes «Sentar»: es el mismo cambio de estado que «Ha llegado» del kanban. */}
+                {accionesReserva?.haLlegado.visible && (
+                  <ConMotivo className="flex" motivo={motivoSiNoSePuede(accionesReserva.haLlegado)}>
+                    <Button
+                      className="w-full h-11"
+                      disabled={!accionesReserva.haLlegado.habilitada}
+                      onClick={handleHaLlegado}
+                    >
+                      <Utensils className="mr-2 h-4 w-4" /> Ha llegado
+                    </Button>
+                  </ConMotivo>
                 )}
 
                 {mesaActiva.resultado.reserva &&

@@ -14,11 +14,12 @@
  *   Siguen siendo DIFERENTES a propósito; aquí solo se centraliza su fuente de
  *   verdad.
  * · Los cambios acordados: (a) sin cancelar «Llegó» / «No vino»; (b) «editar»
- *   siempre, en los seis estados; (c) Hoy respeta el permiso; (d) un solo
- *   vocabulario, «Ha llegado» / «No vino».
- * · Lo que hoy NO respeta el permiso y se conserva tal cual (verificar, estrella
- *   y lista negra en la Lista; lista negra en Hoy): está marcado abajo como
- *   «hoy no mira el permiso».
+ *   siempre, en los seis estados; (c) Hoy respeta el permiso en TODO —también la
+ *   lista negra, desde el paso 1—; (d) un solo vocabulario, «Ha llegado» /
+ *   «No vino».
+ * · Lo que en la Lista NO respeta el permiso y se conserva tal cual (verificar,
+ *   estrella y lista negra): está marcado abajo como «hoy no mira el permiso».
+ *   La Lista se migra en el paso 3.
  *
  * Los textos son los de hoy salvo donde lo dice un cambio acordado: el paso que
  * migre la Lista a este módulo no debe cambiar lo que lee el personal.
@@ -74,7 +75,7 @@ const CON_PERMISO: Record<VistaReservas, Fila> = {
     mover:       "✔✔✔✔✖✖", // cancelada y No vino no ocupan sitio: la entrada está, sin destinos
     editar:      "✔✔✔✔✔✔", // cambio (b)
     importante:  "✔✔✔✔✔✔",
-    listaNegra:  "✔✔✔✔✔✔", // hoy no mira el permiso
+    listaNegra:  "✔✔✔✔✔✔",
   },
 };
 
@@ -105,7 +106,7 @@ const SIN_PERMISO: Record<VistaReservas, Fila> = {
     mover:       "✖✖✖✖✖✖", // cambio (c)
     editar:      "✖✖✖✖✖✖", // cambio (b)
     importante:  "✖✖✖✖✖✖", // cambio (c)
-    listaNegra:  "✔✔✔✔✔✔", // hoy no mira el permiso
+    listaNegra:  "✖✖✖✖✖✖", // cambio (c), ampliado en el paso 1: también la lista negra de Hoy
   },
 };
 
@@ -180,8 +181,8 @@ describe("accionesDisponibles — invariantes de cada respuesta", () => {
   });
 
   it("sin permiso, lo que queda deshabilitado POR EL PERMISO lo dice en el título", () => {
-    // Las que no dependen del permiso (verificar, lista negra, estrella en la
-    // Lista…) no entran aquí: ver las tablas de arriba.
+    // Las que no dependen del permiso (verificar, lista negra y estrella en la
+    // Lista) no entran aquí: ver las tablas de arriba.
     for (const [vista, accion] of [
       ["lista", "aceptar"],
       ["lista", "editar"],
@@ -190,6 +191,7 @@ describe("accionesDisponibles — invariantes de cada respuesta", () => {
       ["hoy", "noVino"],
       ["hoy", "mover"],
       ["hoy", "importante"],
+      ["hoy", "listaNegra"],
       ["hoy", "editar"],
     ] as const) {
       expect(titulo("pendiente", vista, false, accion), `${vista}.${accion}`).toMatch(/permiso/i);
@@ -299,12 +301,12 @@ describe("cambios acordados", () => {
     });
   });
 
-  describe("(c) Hoy respeta el permiso en todo lo que escribe en la reserva", () => {
+  describe("(c) Hoy respeta el permiso en todas sus acciones (la lista negra, desde el paso 1)", () => {
     it("con permiso están habilitadas; sin él, deshabilitadas y dicen por qué", () => {
       for (const estado of ESTADOS) {
         const con = acciones(estado, "hoy", true);
         const sin = acciones(estado, "hoy", false);
-        for (const a of ["haLlegado", "noVino", "deshacer", "mover", "importante", "editar"] as const) {
+        for (const a of ["haLlegado", "noVino", "deshacer", "mover", "importante", "listaNegra", "editar"] as const) {
           if (!con[a].visible) continue;
           // mover en cancelada / No vino no se habilita ni con permiso: no hay a dónde.
           if (a !== "mover" || con[a].habilitada) expect(con[a].habilitada, `${estado}/${a}`).toBe(true);
@@ -416,7 +418,7 @@ describe("Hoy — textos (los del kanban y ControlLlegada, con el vocabulario de
     expect(titulo("confirmada", "hoy", true, "listaNegra")).toBe("Añadir a blacklist");
   });
 
-  it("sin permiso, todo lo que escribe en la reserva lleva el texto del permiso", () => {
+  it("sin permiso, TODAS las acciones visibles de Hoy llevan el texto del permiso (salvo mover en un estado que no se mueve)", () => {
     for (const [estado, accion] of [
       ["confirmada", "haLlegado"],
       ["confirmada", "noVino"],
@@ -425,6 +427,7 @@ describe("Hoy — textos (los del kanban y ControlLlegada, con el vocabulario de
       ["confirmada", "mover"],
       ["confirmada", "editar"],
       ["confirmada", "importante"],
+      ["confirmada", "listaNegra"],
     ] as const) {
       expect(titulo(estado, "hoy", false, accion), `${estado}/${accion}`).toBe(TITULO_SIN_PERMISO_EDITAR);
     }

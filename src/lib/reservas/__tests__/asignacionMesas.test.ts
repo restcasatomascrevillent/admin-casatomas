@@ -10,6 +10,8 @@ import {
   PREFIJOS_ERROR_ASIGNACION,
   resumenDia,
   resumenPorEspacio,
+  TEXTO_CAMBIO_INTERNO,
+  textoQuitarMesas,
   turnoDeHora,
   type FilaResumenEspacio,
   type GradoAsignacion,
@@ -418,5 +420,38 @@ describe("guardas de tipo", () => {
     expect(esGradoAsignacion("con_mesa")).toBe(true);
     expect(esGradoAsignacion("con_sala")).toBe(false);
     expect(esGradoAsignacion(undefined)).toBe(false);
+  });
+});
+
+// El trigger `trg_reservas_sincronizar_asignaciones` BORRA las mesas de una reserva
+// cuando cambia su sala. Dos pantallas lo avisan antes (Asignación y el kanban de
+// Hoy) y dicen lo mismo palabra por palabra: la frase sale de aquí.
+describe("textoQuitarMesas (aviso de «cambiar de sala y quitar sus mesas»)", () => {
+  it("con una mesa, sus nombres y su sala de origen", () => {
+    expect(
+      textoQuitarMesas({ nombre: "Ana", cantidad: 1, mesasNombres: ["4"], salaActual: "Salón", destinoNombre: "Terraza" }),
+    ).toBe("Ana tiene 1 mesa asignada (4) en Salón. Al pasarla a Terraza se quitarán esas mesas y habrá que asignarlas de nuevo.");
+  });
+
+  it("con varias mesas, en plural y con todos los nombres", () => {
+    expect(
+      textoQuitarMesas({ nombre: "Ana", cantidad: 2, mesasNombres: ["4", "5"], salaActual: "Salón", destinoNombre: "Terraza" }),
+    ).toBe("Ana tiene 2 mesas asignadas (4, 5) en Salón. Al pasarla a Terraza se quitarán esas mesas y habrá que asignarlas de nuevo.");
+  });
+
+  it("sin nombres de mesa ni sala conocida no inventa nada", () => {
+    expect(
+      textoQuitarMesas({ nombre: "Ana", cantidad: 3, mesasNombres: [], salaActual: null, destinoNombre: "Sin asignar" }),
+    ).toBe("Ana tiene 3 mesas asignadas. Al pasarla a Sin asignar se quitarán esas mesas y habrá que asignarlas de nuevo.");
+  });
+
+  it.each([null, undefined, ""])("una reserva sin nombre (%j) es «Esta reserva»", (nombre) => {
+    expect(
+      textoQuitarMesas({ nombre, cantidad: 1, mesasNombres: ["7"], salaActual: undefined, destinoNombre: "Terraza" }),
+    ).toBe("Esta reserva tiene 1 mesa asignada (7). Al pasarla a Terraza se quitarán esas mesas y habrá que asignarlas de nuevo.");
+  });
+
+  it("y se aclara siempre que es un cambio interno: al cliente no se le manda nada", () => {
+    expect(TEXTO_CAMBIO_INTERNO).toBe("Es un cambio interno: al cliente no se le envía nada.");
   });
 });

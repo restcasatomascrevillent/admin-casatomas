@@ -9,7 +9,7 @@ import { CLAVE_OCUPACION_SALAS_DIA } from "@/hooks/useOcupacionSalasDia";
 // ============================================================================
 // ACCIONES DEL MODO SERVICIO — liberar mesa y deshacer.
 // ----------------------------------------------------------------------------
-// "Sentar" (marcar llegada) reutiliza `useAccionesServicioReserva.marcarLlegada`
+// "Ha llegado" (antes «Sentar»: marcar llegada) reutiliza `useAccionesServicioReserva.marcarLlegada`
 // tal cual — no hay nada de servicio-específico ahí. "Mover a otra mesa"
 // reutiliza `useAsignarMesasReserva` (RPC atómico, ya valida el
 // `uq_asignaciones_mesa_mesa_fecha_turno` en servidor). Lo que SÍ es propio de

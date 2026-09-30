@@ -52,12 +52,13 @@
 //   mover                ✔      ✔       ✔         ✔      ✖            ✖
 //   editar               ✔      ✔       ✔         ✔      ✔            ✔
 //   importante           ✔      ✔       ✔         ✔      ✔            ✔
-//   listaNegra (*)       ✔      ✔       ✔         ✔      ✔            ✔
+//   listaNegra           ✔      ✔       ✔         ✔      ✔            ✔
 //   aceptar/confirmar/verificar/seleccionar/cancelar: · en todos los estados
 //
-// (*) NO mira `canEdit`, igual que hoy: «Verificar» abre el modal, que va en solo
-//     lectura sin permiso; la estrella y la lista negra escriben sin comprobarlo
-//     (la RLS las rechaza, y la estrella ni se entera: ver los tests de efectos).
+// (*) En la LISTA no mira `canEdit`, igual que hoy: «Verificar» abre el modal, que
+//     va en solo lectura sin permiso; la estrella y la lista negra escriben sin
+//     comprobarlo (la RLS las rechaza, y la estrella ni se entera: ver los tests
+//     de efectos). En HOY sí lo miran (cambio c). La Lista se alinea en el paso 3.
 // (**) Cambio acordado: antes también se podía cancelar una reserva «Llegó» o «No
 //     vino»; ya no (decisión del dueño). Si la Lista quiere que la ranura siga
 //     en su sitio, sale deshabilitada con el motivo.
@@ -68,9 +69,10 @@
 //   · (a) `cancelar` no se ofrece en «Llegó» / «No vino».
 //   · (b) `editar` está visible en los seis estados, y habilitada según
 //     `canEdit` («No tienes permiso para editar reservas» si no).
-//   · (c) Hoy respeta el permiso: «Ha llegado», «No vino», «Deshacer», «Mover» y
-//     la estrella pasan a ir deshabilitadas sin `canEdit`. Hoy el kanban no mira
-//     el permiso y se apoya en la RLS.
+//   · (c) Hoy respeta el permiso: «Ha llegado», «No vino», «Deshacer», «Mover», la
+//     estrella y la lista negra van deshabilitadas sin `canEdit`, con el motivo
+//     visible (`ConMotivo`). Antes el kanban no miraba el permiso y se apoyaba en
+//     la RLS.
 //   · (d) Un solo vocabulario: «Ha llegado» / «No vino» (antes el menú del kanban
 //     decía «No se presentó»).
 //
@@ -148,6 +150,13 @@ export const TITULO_SIN_PERMISO_CANCELAR = "No tienes permiso para cancelar rese
 
 const oculta = (): EstadoAccion => ({ visible: false, habilitada: false, titulo: "" });
 const accion = (habilitada: boolean, titulo: string): EstadoAccion => ({ visible: true, habilitada, titulo });
+
+/**
+ * El motivo por el que un botón está deshabilitado, listo para `ConMotivo`: el
+ * `titulo` si no se puede pulsar (ahí dice por qué) y nada si se puede. Un botón
+ * deshabilitado no recibe el ratón, así que el motivo se enseña en su envoltorio.
+ */
+export const motivoSiNoSePuede = (a: EstadoAccion): string | undefined => (a.habilitada ? undefined : a.titulo || undefined);
 
 /** Frase «la reserva está …» del estado, o el estado tal cual si no es de los seis. */
 const fraseDe = (estado: string) => infoEstadoReserva(estado)?.frase ?? estado;
@@ -252,8 +261,7 @@ function accionesDeHoy(estado: string, importante: boolean, canEdit: boolean): A
     editar: conPermiso("Editar reserva"),
 
     importante: conPermiso(importante ? "Quitar importante" : "Marcar como importante"),
-    // NO mira `canEdit` (la lista negra tiene su propia tabla y su propio modal).
-    listaNegra: accion(true, "Añadir a blacklist"),
+    listaNegra: conPermiso("Añadir a blacklist"),
 
     // De gestión: Hoy no los tiene.
     aceptar: oculta(),

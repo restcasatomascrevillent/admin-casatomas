@@ -93,7 +93,8 @@ describe("TimelineEstadosReserva — los estados y su orden", () => {
       expect(li).toHaveTextContent("Salida");
       expect(li).not.toHaveTextContent(/Paso \d de 4/);
     });
-    expect(within(items[4]).getByText("En cualquier momento:")).toBeInTheDocument();
+    // Cancelar solo se puede hasta que el cliente llega: «Llegó» y «No vino» ya no se cancelan.
+    expect(within(items[4]).getByText("Antes de que llegue:")).toBeInTheDocument();
     expect(within(items[5]).getByText("Si no se presenta:")).toBeInTheDocument();
   });
 

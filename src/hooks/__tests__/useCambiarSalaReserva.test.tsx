@@ -288,9 +288,9 @@ describe("useCambiarSalaReserva · caché", () => {
 
   it("BUG conocido: no refresca las ocho claves derivadas que sí refresca el kanban (contadores, panel, dashboard…)", async () => {
     // Dos escritores de sala (este y `useAccionesServicioReserva.moverEspacio`) hacen el
-    // mismo UPDATE de `espacio_id` y cada uno refresca SU lista de claves: este sí las de
-    // asignación de mesas (`resumen-asignacion-dia`, `asignaciones_mesa`) y el kanban las
-    // derivadas de abajo; ninguno tiene las dos.
+    // mismo UPDATE de `espacio_id`. Desde el paso 1 el kanban refresca las mesas asignadas
+    // (`resumen-asignacion-dia`, `asignaciones_mesa`) ADEMÁS de las derivadas de abajo; este
+    // sigue sin las derivadas. Unificar las dos listas de claves es del paso 2.
     mockEscrituras();
     const { result, invalidadas } = montar();
 

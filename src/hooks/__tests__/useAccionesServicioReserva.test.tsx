@@ -175,7 +175,7 @@ describe("useAccionesServicioReserva", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it("no se presentó: estado 'no_show' y limpia llegada", async () => {
+  it("«No vino»: estado 'no_show' y limpia llegada", async () => {
     const updates = mockUpdates([{ error: null }]);
     const { result } = setup();
     await act(async () => {

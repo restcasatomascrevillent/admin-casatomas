@@ -1,7 +1,8 @@
 import { useId, useMemo, useState } from "react";
-import { CheckCheck, CheckCircle, ChevronDown, Clock, UserX, XCircle, type LucideIcon } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { ESTADOS_RESERVA, ORDEN_ESTADOS, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 
 /**
  * Timeline de los estados de una reserva (pestaña "Hoy", 2026-09-30): qué
@@ -26,9 +27,11 @@ import { cn } from "@/lib/utils";
  *   viva → completada        Personal, con «Ha llegado» (`ControlLlegada`), desde
  *                            pendiente, verificada o confirmada. Se muestra como
  *                            «Llegó»: es el nombre de los badges.
- *   * → cancelada            Personal («Cancelar», o «Rechazar» si estaba
- *                            pendiente) o el cliente (correo o teléfono).
- *   viva → no_show           Personal, con «No se presentó». Además, el cron
+ *   viva → cancelada         Personal («Cancelar», o «Rechazar» si estaba
+ *                            pendiente) o el cliente (correo o teléfono). Solo
+ *                            mientras está viva: una reserva «Llegó» o «No vino»
+ *                            ya no se cancela (decisión del dueño).
+ *   viva → no_show           Personal, con «No vino». Además, el cron
  *                            nocturno `emails-reserva/detectar-ausencias` marca
  *                            así toda `confirmada` con más de 3 h de retraso que
  *                            nadie marcó como llegada.
@@ -41,17 +44,16 @@ import { cn } from "@/lib/utils";
  * `pendiente`.
  *
  * ----------------------------------------------------------------------------
- * ETIQUETAS, ICONOS Y COLORES: LOS DE LOS BADGES, NO UNOS NUEVOS
+ * ETIQUETAS, ICONOS Y COLORES: LOS DE `ESTADOS_RESERVA`
  * ----------------------------------------------------------------------------
- * Salen de `getStatusBadge` (ListaReservasAvanzada.tsx) y de `ESTADOS_RESERVA`
- * (GestorReservasKanban.tsx): mismos nombres —«Llegó», «No vino»—, mismos
- * iconos y los tokens `status-*` del tema. Ninguno de los dos mapas se exporta
- * (son locales de su componente), así que aquí hay una tercera copia; unificarlas
- * en un módulo único es un refactor aparte que no toca esta pantalla.
+ * Salen de `ESTADOS_RESERVA` (src/lib/reservas/estadosReserva.ts), la fuente única
+ * que también lee el kanban: mismos nombres —«Llegó», «No vino»—, mismos iconos y
+ * los tokens `status-*` del tema. Aquí solo se decide el DIBUJO: los cuatro
+ * primeros estados, en orden, son el camino y los dos últimos las salidas.
  *
  * Contraste: el token `status-pending-foreground` es blanco en oscuro y sobre el
- * ámbar no llega ni a 2:1; aquí el icono de «Pendiente» pasa a `text-background`
- * en oscuro (~7:1). Los demás iconos rondan 3,3–3,8:1 o más, y ninguno va solo:
+ * ámbar no llega ni a 2:1; en `ESTADOS_RESERVA.pendiente.burbuja` el icono de
+ * «Pendiente» pasa a `text-background` en oscuro (~7:1). Los demás iconos rondan 3,3–3,8:1 o más, y ninguno va solo:
  * el estado siempre lleva su nombre escrito al lado. (Hoy el panel no enciende
  * el modo oscuro —el bloque `.dark` de index.css se purga en el build y nada
  * añade la clase—, pero las clases `dark:` ya están por si se activa.)
@@ -69,8 +71,6 @@ import { cn } from "@/lib/utils";
  * Abierta por defecto: quien no la conoce tiene que verla sin buscarla.
  */
 
-type EstadoReserva = "pendiente" | "verificada" | "confirmada" | "completada" | "cancelada" | "no_show";
-
 interface NodoEstado {
   estado: EstadoReserva;
   /** Nombre tal y como sale en los badges. */
@@ -84,59 +84,19 @@ interface NodoEstado {
   texto: string;
 }
 
-/** El camino principal, en orden. Rellenos sólidos, unidos por una línea continua. */
-const CAMINO: readonly NodoEstado[] = [
-  {
-    estado: "pendiente",
-    nombre: "Pendiente",
-    icono: Clock,
-    burbuja: "bg-status-pending text-status-pending-foreground dark:text-background",
-    texto: "Solicitada por web o teléfono. Toca verificarla.",
-  },
-  {
-    estado: "verificada",
-    nombre: "Verificada",
-    icono: CheckCircle,
-    burbuja: "bg-status-verified text-status-verified-foreground",
-    texto: "Revisada: el cliente recibe «Confirma tu reserva».",
-  },
-  {
-    estado: "confirmada",
-    nombre: "Confirmada",
-    icono: CheckCircle,
-    burbuja: "bg-status-confirmed text-status-confirmed-foreground",
-    texto: "Confirma el cliente (o tú con «Confirmar»).",
-  },
-  {
-    estado: "completada",
-    nombre: "Llegó",
-    icono: CheckCheck,
-    burbuja: "bg-emerald-600 text-white",
-    texto: "Ya está en el local. Se marca con «Ha llegado».",
-  },
-];
+const aNodo = (estado: EstadoReserva): NodoEstado => {
+  const { etiqueta, Icono, burbuja, cuando, descripcion } = ESTADOS_RESERVA[estado];
+  return { estado, nombre: etiqueta, icono: Icono, burbuja, cuando, texto: descripcion };
+};
+
+/** Pasos del camino principal: los cuatro primeros del ciclo de vida. Rellenos sólidos, unidos por una línea continua. */
+const PASOS_DEL_CAMINO = 4;
+const CAMINO: readonly NodoEstado[] = ORDEN_ESTADOS.slice(0, PASOS_DEL_CAMINO).map(aNodo);
 
 /** Las salidas: no son un paso más, son por donde se sale del camino. Borde discontinuo. */
-const SALIDAS: readonly NodoEstado[] = [
-  {
-    estado: "cancelada",
-    nombre: "Cancelada",
-    icono: XCircle,
-    burbuja: "border-2 border-dashed border-destructive/70 bg-destructive/10 text-destructive",
-    cuando: "En cualquier momento:",
-    texto: "la cancelas tú o el cliente.",
-  },
-  {
-    estado: "no_show",
-    nombre: "No vino",
-    icono: UserX,
-    burbuja: "border-2 border-dashed border-muted-foreground/70 bg-muted/60 text-muted-foreground",
-    cuando: "Si no se presenta:",
-    texto: "lo marcas tú o el sistema.",
-  },
-];
+const SALIDAS: readonly NodoEstado[] = ORDEN_ESTADOS.slice(PASOS_DEL_CAMINO).map(aNodo);
 
-const ESTADOS_CONOCIDOS: ReadonlySet<string> = new Set([...CAMINO, ...SALIDAS].map((n) => n.estado));
+const ESTADOS_CONOCIDOS: ReadonlySet<string> = new Set(ORDEN_ESTADOS);
 
 type CifrasPorEstado = Record<EstadoReserva, number>;
 

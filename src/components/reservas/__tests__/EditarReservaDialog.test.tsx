@@ -146,7 +146,7 @@ describe("EditarReservaDialog · carga y formulario", () => {
     ["confirmada", /Estado: Confirmada/],
     ["cancelada", /Estado: Cancelada/],
     ["completada", /Estado: Llegó/],
-    ["no_show", /Estado: No se presentó/],
+    ["no_show", /Estado: No vino/],
   ])("una reserva «%s» se abre igual: no hay estado que la deje sin editor", async (estado, texto) => {
     mocks.reserva = fila({ estado });
     montar();

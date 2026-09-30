@@ -134,7 +134,7 @@ describe("agruparPendientesDeMesa", () => {
     expect(grupos[1].nombreSala).toBeNull();
   });
 
-  it("deja fuera las canceladas y los «no se presentó»", () => {
+  it("deja fuera las canceladas y los «No vino»", () => {
     const grupos = agruparPendientesDeMesa(
       [
         reserva({ id: "cancelada", estado: "cancelada" }),

@@ -2,21 +2,14 @@
 // ESTADOS DE UNA RESERVA — fuente ÚNICA de clave, nombre, icono, color y
 // descripción de los seis estados.
 // ----------------------------------------------------------------------------
-// Hasta ahora esto vivía COPIADO en cuatro sitios, cada uno con lo suyo:
-//   · `getStatusBadge` de ListaReservasAvanzada.tsx  (nombre + icono + color de
-//     las insignias de la lista) y `ESTADO_RESERVA_TEXTO` (la frase que sale en
-//     los `title` de sus botones).
-//   · `ESTADOS_RESERVA` de GestorReservasKanban.tsx  (nombre + color con la paleta
-//     cruda de Tailwind: yellow-500, blue-500, green-500…; sin icono).
-//   · `CAMINO` / `SALIDAS` de TimelineEstadosReserva.tsx (nombre + icono + color
-//     de las burbujas + la frase que explica cada estado).
-//   · `OPCIONES_FILTRO_ESTADO` de vistaUnificada.ts  (el texto de las opciones del
-//     filtro «Estado»; lo lee también EditarReservaDialog para rotular el estado).
-// Este módulo es un SUPERCONJUNTO de las cuatro: cada campo de aquí existe porque
-// alguna copia lo usa, y donde las copias DIFIEREN (ver `etiquetaFiltro`,
-// `frase`, `insignia` y `burbuja`) se conservan los valores actuales para que el
-// paso de migración de cada consumidor sea un cambio de fuente de datos y no de
-// aspecto. Qué converger y qué no es una decisión aparte.
+// Antes esto vivía COPIADO en cuatro sitios, cada uno con lo suyo. Hoy lo LEEN de
+// aquí el kanban de Hoy (`GestorReservasKanban`: nombre y color de la insignia),
+// el timeline (`TimelineEstadosReserva`: nodos, burbujas y frases), el control de
+// llegada (`ControlLlegada`), el modo servicio (`ModoServicioPlano`), el filtro
+// «Estado» (`vistaUnificada.ts`) y `servicioSala.ts` (constantes y predicados).
+// Queda UNA copia por migrar, la de la Lista: `getStatusBadge` y
+// `ESTADO_RESERVA_TEXTO` de ListaReservasAvanzada.tsx (paso 3); por eso este mapa
+// sigue llevando lo que ella usa (`insignia`, `frase`).
 //
 // Es un módulo de datos: sin hooks, sin JSX, sin Supabase. Importa los iconos de
 // `lucide-react` porque el icono forma parte del estado (lo pintan la lista y el
@@ -28,11 +21,14 @@
 // «completada» se ve como «Llegó» y «no_show» como «No vino» (ver
 // `servicioSala.ts`: «Ha llegado» pasa la reserva a 'completada').
 //
+// VOCABULARIO ÚNICO (decisión del dueño): las ACCIONES son «Ha llegado» y «No
+// vino»; los ESTADOS, «Llegó» y «No vino». «No se presentó» y «servida» ya no se
+// usan de cara al personal.
+//
 // TOKENS `status-*`: SOLO existen para los tres estados vivos (pendiente,
 // verificada, confirmada: index.css + tailwind.config.ts). Para cancelada, Llegó y
 // No vino NO hay token: se usan las clases que ya usa la lista (destructive,
-// emerald-600, secondary). Dárselos a los tres es crear tres variables nuevas en
-// index.css y tailwind.config.ts, fuera del alcance de este módulo.
+// emerald-600, secondary). No se crean tokens nuevos (decisión del dueño).
 // ============================================================================
 
 import { CheckCheck, CheckCircle, Clock, UserX, XCircle, type LucideIcon } from "lucide-react";
@@ -85,17 +81,16 @@ export interface InfoEstadoReserva {
   /** Nombre en las insignias de la lista, el kanban, el timeline y los chips: «Llegó», «No vino»… */
   etiqueta: string;
   /**
-   * Texto de la opción del filtro «Estado» (hoy en `vistaUnificada.ts`). Difiere
-   * de `etiqueta` en dos: «Llegó / completada» y «No se presentó». TRANSITORIO:
-   * se conserva para que migrar el filtro no cambie lo que ve el personal; si
-   * se converge al vocabulario único «Llegó» / «No vino», esta propiedad sobra.
+   * Texto de la opción del filtro «Estado» (`vistaUnificada.ts`, y de ahí el
+   * «Estado: …» del editor de reservas). Es `etiqueta` salvo en «Llegó», que el
+   * filtro escribe «Llegó / completada» para quien busca por el nombre de la BD.
    */
   etiquetaFiltro: string;
   /**
    * Cómo se dice el estado en una frase «la reserva está …» (hoy
    * `ESTADO_RESERVA_TEXTO` de la lista, para el `title` del botón principal).
-   * Conserva «ya servida» y «marcada como «no vino»»: distinto vocabulario del
-   * de las insignias, igual que `etiquetaFiltro`.
+   * Conserva «ya servida» para «Llegó»: pendiente de alinear con el vocabulario
+   * único cuando la Lista pase a este mapa (paso 3).
    */
   frase: string;
   Icono: LucideIcon;
@@ -170,13 +165,14 @@ export const ESTADOS_RESERVA: Readonly<Record<EstadoReserva, InfoEstadoReserva>>
     Icono: XCircle,
     insignia: "bg-destructive text-destructive-foreground",
     burbuja: "border-2 border-dashed border-destructive/70 bg-destructive/10 text-destructive",
-    cuando: "En cualquier momento:",
+    // Hasta que el cliente llega: una reserva «Llegó» o «No vino» ya no se cancela.
+    cuando: "Antes de que llegue:",
     descripcion: "la cancelas tú o el cliente.",
   },
   no_show: {
     clave: "no_show",
     etiqueta: "No vino",
-    etiquetaFiltro: "No se presentó",
+    etiquetaFiltro: "No vino",
     frase: "marcada como «no vino»",
     Icono: UserX,
     insignia: "bg-secondary text-secondary-foreground",

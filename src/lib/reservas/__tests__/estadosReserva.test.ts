@@ -96,7 +96,8 @@ describe("ESTADOS_RESERVA — cubre exactamente los seis estados", () => {
 
   it("solo las dos salidas del timeline traen «cuando»; los pasos del camino, no", () => {
     expect(SEIS_ESTADOS.filter((e) => ESTADOS_RESERVA[e].cuando !== undefined)).toEqual(["cancelada", "no_show"]);
-    expect(ESTADOS_RESERVA.cancelada.cuando).toBe("En cualquier momento:");
+    // «Antes de que llegue»: una reserva «Llegó» o «No vino» ya no se cancela (decisión (a)).
+    expect(ESTADOS_RESERVA.cancelada.cuando).toBe("Antes de que llegue:");
     expect(ESTADOS_RESERVA.no_show.cuando).toBe("Si no se presenta:");
   });
 
@@ -181,7 +182,13 @@ describe("conjuntos de estados", () => {
   });
 });
 
-describe("coherencia con servicioSala.ts (la otra definición de lo mismo, hasta el paso de migración)", () => {
+describe("servicioSala.ts reexporta el mapa: una sola definición de los estados", () => {
+  it("los predicados son LOS MISMOS (no una copia que coincide): esperandoLlegada, ocupaEspacio y puedeMoverReserva", () => {
+    expect(esperandoLlegada).toBe(esEstadoVivo);
+    expect(ocupaEspacioServicioSala).toBe(ocupaEspacio);
+    expect(puedeMoverReserva).toBe(ocupaEspacio);
+  });
+
   it("las constantes de estado son las mismas", () => {
     expect(ESTADO_LLEGADA).toBe(LLEGADA_SERVICIO_SALA);
     expect(ESTADO_NO_SHOW).toBe(NO_SHOW_SERVICIO_SALA);

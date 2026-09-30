@@ -50,7 +50,7 @@ import {
   recomendarUbicacion,
 } from "@/lib/reservas/ocupacionSalas";
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
-import type { GradoAsignacion } from "@/lib/reservas/asignacionMesas";
+import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas, type GradoAsignacion } from "@/lib/reservas/asignacionMesas";
 
 // ============================================================================
 // PESTAÑA "ASIGNACIÓN" (reservas-sin-salas, Fase B)
@@ -291,17 +291,16 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
               <div className="space-y-2">
                 {cambioPendiente && (
                   <p>
-                    {cambioPendiente.fila.nombre || "Esta reserva"} tiene{" "}
-                    {cambioPendiente.fila.mesas_asignadas === 1
-                      ? "1 mesa asignada"
-                      : `${cambioPendiente.fila.mesas_asignadas} mesas asignadas`}
-                    {cambioPendiente.fila.mesas_nombres.length > 0 &&
-                      ` (${cambioPendiente.fila.mesas_nombres.join(", ")})`}
-                    {cambioPendiente.fila.espacio_nombre && ` en ${cambioPendiente.fila.espacio_nombre}`}. Al pasarla
-                    a {cambioPendiente.destinoNombre} se quitarán esas mesas y habrá que asignarlas de nuevo.
+                    {textoQuitarMesas({
+                      nombre: cambioPendiente.fila.nombre,
+                      cantidad: cambioPendiente.fila.mesas_asignadas,
+                      mesasNombres: cambioPendiente.fila.mesas_nombres,
+                      salaActual: cambioPendiente.fila.espacio_nombre,
+                      destinoNombre: cambioPendiente.destinoNombre,
+                    })}
                   </p>
                 )}
-                <p>Es un cambio interno: al cliente no se le envía nada.</p>
+                <p>{TEXTO_CAMBIO_INTERNO}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

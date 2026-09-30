@@ -28,7 +28,18 @@
 // Import directo del motor compartido (el mismo que reexporta
 // useDisponibilidad.ts) para no arrastrar el cliente de Supabase a un módulo
 // puro — así se testea sin mocks.
-import { ESTADOS_QUE_OCUPAN, turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+// Los estados (constantes y predicados) viven en `estadosReserva.ts`, la fuente
+// única; aquí se reexportan con los nombres de siempre.
+import {
+  ESTADO_LLEGADA,
+  ESTADO_NO_SHOW,
+  ESTADO_TRAS_DESHACER,
+  esEstadoVivo,
+  ocupaEspacio,
+} from "./estadosReserva";
+
+export { ESTADO_LLEGADA, ESTADO_NO_SHOW, ESTADO_TRAS_DESHACER, ocupaEspacio };
 
 // ============================================================================
 // MODO SERVICIO (Fase 4, MVP) — estado de cada MESA en vivo durante el turno
@@ -221,14 +232,6 @@ export function estadoMesaServicio(
   };
 }
 
-export const ESTADO_LLEGADA = "completada" as const;
-export const ESTADO_NO_SHOW = "no_show" as const;
-/** Estado al que vuelve una reserva al deshacer "llegó" / "no se presentó". */
-export const ESTADO_TRAS_DESHACER = "confirmada" as const;
-
-/** Estados desde los que tiene sentido registrar que el cliente ha llegado. */
-const ESTADOS_ESPERANDO_LLEGADA = ["pendiente", "verificada", "confirmada"] as const;
-
 export interface ReservaServicio {
   id: string;
   nombre: string | null;
@@ -243,23 +246,18 @@ export interface ReservaServicio {
   llegada_at?: string | null;
 }
 
-export const esperandoLlegada = (estado: string) =>
-  (ESTADOS_ESPERANDO_LLEGADA as readonly string[]).includes(estado);
+/** Estados desde los que tiene sentido registrar que el cliente ha llegado: los vivos (pendiente, verificada, confirmada). */
+export const esperandoLlegada = esEstadoVivo;
 
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;
 
-/** Canceladas y no presentadas no ocupan sitio: no tiene sentido moverlas. */
-export const puedeMoverReserva = (estado: string) =>
-  estado !== "cancelada" && estado !== ESTADO_NO_SHOW;
+/** Canceladas y «No vino» no ocupan sitio: no tiene sentido moverlas. */
+export const puedeMoverReserva = ocupaEspacio;
 
-/**
- * Estados que ocupan sitio FÍSICO en un espacio para un turno: los que ocupan
- * aforo según el trigger (`ESTADOS_QUE_OCUPAN`: pendiente, verificada,
- * confirmada) MÁS 'completada' — un cliente que ya llegó está sentado en ese
- * espacio, aunque el trigger de aforo global ya no lo cuente (ver informe).
- */
-export const ocupaEspacio = (estado: string) =>
-  (ESTADOS_QUE_OCUPAN as readonly string[]).includes(estado) || estado === ESTADO_LLEGADA;
+// `ocupaEspacio` (reexportado arriba): los estados que ocupan sitio FÍSICO en un
+// espacio para un turno —los que ocupan aforo según el trigger (`ESTADOS_QUE_OCUPAN`:
+// pendiente, verificada, confirmada) MÁS 'completada': un cliente que ya llegó
+// está sentado en ese espacio, aunque el trigger de aforo global ya no lo cuente—.
 
 /** Comensales que ocupan `espacioId` (null = sin asignar) en un turno. */
 export function comensalesEnEspacioTurno(
@@ -310,7 +308,7 @@ export function evaluarMovimiento(
       motivo:
         reserva.estado === "cancelada"
           ? "Las reservas canceladas no se pueden mover."
-          : "Una reserva marcada como «no se presentó» no ocupa espacio.",
+          : "Una reserva marcada como «No vino» no ocupa espacio.",
     };
   }
   if ((reserva.espacio_id ?? null) === destinoId) return { tipo: "sin_cambio" };

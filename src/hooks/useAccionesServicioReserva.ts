@@ -1,9 +1,13 @@
 // ============================================================================
 // Acciones de servicio sobre una reserva: mover de espacio, marcar llegada,
-// "no se presentó" y deshacer.
+// «No vino» y deshacer.
 // ----------------------------------------------------------------------------
 // · Update optimista sobre TODAS las listas de reservas cacheadas por React
 //   Query (Kanban, "Reservas de hoy", lista completa) con rollback si falla.
+// · Cambiar la sala (mover, y su «Deshacer») refresca además las MESAS ASIGNADAS
+//   (`CLAVES_ASIGNACION`): el trigger `trg_reservas_sincronizar_asignaciones`
+//   BORRA las mesas de la reserva cuando cambia `espacio_id`. Es lo mismo que ya
+//   hace `useCambiarSalaReserva` (panel de asignación).
 // · NINGUNA de estas acciones invoca `notify-reservation-change`: mover de
 //   sala o registrar la llegada no son cambios que se comuniquen al cliente,
 //   y 'completada' / 'no_show' no tienen plantilla de correo
@@ -19,6 +23,8 @@ import { useCallback, useState } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
+import { CLAVE_RESUMEN_ASIGNACION_DIA } from "@/hooks/useResumenAsignacionDia";
 import {
   ESTADO_LLEGADA,
   ESTADO_NO_SHOW,
@@ -46,6 +52,9 @@ const CLAVES_DERIVADAS = [
   // marcar llegada cambia la ocupación por sala.
   "ocupacion-salas-dia",
 ];
+
+/** Mesas asignadas: cambiar la sala las deja viejas (el trigger de la BD las borra). Mismo orden que `useCambiarSalaReserva`. */
+const CLAVES_ASIGNACION = [CLAVE_RESUMEN_ASIGNACION_DIA, CLAVE_ASIGNACIONES_MESA];
 
 // null = aún no se sabe; se descubre en el primer UPDATE que la incluya.
 let columnaLlegadaDisponible: boolean | null = null;
@@ -129,7 +138,12 @@ export function useAccionesServicioReserva() {
         return false;
       } finally {
         marcar(id, false);
-        for (const clave of [...CLAVES_LISTAS_RESERVAS, ...CLAVES_DERIVADAS]) {
+        const cambiaLaSala = "espacio_id" in cambios;
+        for (const clave of [
+          ...CLAVES_LISTAS_RESERVAS,
+          ...CLAVES_DERIVADAS,
+          ...(cambiaLaSala ? CLAVES_ASIGNACION : []),
+        ]) {
           queryClient.invalidateQueries({ queryKey: [clave] });
         }
       }
@@ -185,13 +199,13 @@ export function useAccionesServicioReserva() {
     [ejecutar],
   );
 
-  /** Deshacer "llegó" o "no se presentó" más tarde: vuelve a 'confirmada'. */
+  /** Deshacer «Llegó» o «No vino» más tarde: vuelve a 'confirmada'. */
   const deshacerLlegadaONoShow = useCallback(
     async (reserva: ReservaServicio) => {
       const ok = await ejecutar(
         reserva.id,
         { estado: ESTADO_TRAS_DESHACER, llegada_at: null },
-        reserva.estado === ESTADO_NO_SHOW ? "quitar el «no se presentó»" : "deshacer la llegada",
+        reserva.estado === ESTADO_NO_SHOW ? "quitar el «No vino»" : "deshacer la llegada",
       );
       if (ok) toast.success("Reserva devuelta a «Confirmada»");
       return ok;
@@ -205,15 +219,15 @@ export function useAccionesServicioReserva() {
       const ok = await ejecutar(
         reserva.id,
         { estado: ESTADO_NO_SHOW, llegada_at: null },
-        "marcar «no se presentó»",
+        "marcar «No vino»",
       );
       if (ok) {
-        toast.success(`${reserva.nombre || "Reserva"}: no se presentó`, {
+        toast.success(`${reserva.nombre || "Reserva"}: no vino`, {
           duration: 10_000,
           action: {
             label: "Deshacer",
             onClick: () => {
-              void ejecutar(reserva.id, { estado: estadoPrevio }, "deshacer el «no se presentó»");
+              void ejecutar(reserva.id, { estado: estadoPrevio }, "deshacer el «No vino»");
             },
           },
         });

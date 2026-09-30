@@ -144,6 +144,13 @@ const CLAVES_QUE_REFRESCA = [
   "ocupacion-salas-dia",
 ];
 
+/**
+ * Cambiar la sala (mover, y su «Deshacer») refresca además las mesas asignadas: el trigger
+ * `trg_reservas_sincronizar_asignaciones` las BORRA al cambiar `espacio_id`. Mismas dos claves
+ * y mismo orden que `useCambiarSalaReserva`.
+ */
+const CLAVES_QUE_REFRESCA_AL_CAMBIAR_SALA = [...CLAVES_QUE_REFRESCA, "resumen-asignacion-dia", "asignaciones_mesa"];
+
 /** Acción del botón «Deshacer» del toast de éxito que se acaba de lanzar. */
 function accionDeshacerDelToast() {
   const llamadas = vi.mocked(toast.success).mock.calls;
@@ -499,7 +506,7 @@ describe("caché: qué se refresca después", () => {
       await result.current.moverEspacio(reserva(), "terraza", "Terraza");
     });
 
-    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA_AL_CAMBIAR_SALA);
   });
 
   it("después de escribir, no antes (las consultas se refrescan con el dato ya guardado)", async () => {
@@ -552,13 +559,10 @@ describe("caché: qué se refresca después", () => {
     expect(toast.error).toHaveBeenCalledWith("Esta reserva no se puede mover.");
   });
 
-  it("BUG conocido: mover de sala NO refresca `asignaciones_mesa` ni `resumen-asignacion-dia`, aunque el trigger de la BD borre las mesas", async () => {
-    // `useCambiarSalaReserva` (panel de asignación) sí los refresca, porque el
-    // trigger `trg_reservas_sincronizar_asignaciones` BORRA las mesas asignadas
-    // cuando cambia la sala. El kanban cambia la sala igual —mismo UPDATE de
-    // `espacio_id`—, no avisa de que se van a perder las mesas y deja esas dos
-    // cachés viejas hasta el siguiente refetch. Dos escritores de sala, dos listas
-    // de claves distintas.
+  it("mover de sala refresca TAMBIÉN las mesas asignadas (`asignaciones_mesa`, `resumen-asignacion-dia`), como useCambiarSalaReserva", async () => {
+    // El trigger `trg_reservas_sincronizar_asignaciones` BORRA las mesas de la reserva al
+    // cambiar su sala: sin este refresco el plano y el panel de asignación seguían
+    // enseñando mesas que ya no existen hasta el siguiente refetch.
     mockEscrituras();
     const { result, invalidadas } = montar();
 
@@ -566,8 +570,50 @@ describe("caché: qué se refresca después", () => {
       await result.current.moverEspacio(reserva(), "terraza", "Terraza");
     });
 
-    expect(invalidadas).not.toContain("asignaciones_mesa");
-    expect(invalidadas).not.toContain("resumen-asignacion-dia");
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA_AL_CAMBIAR_SALA);
+  });
+
+  it("y también lo hace el «Deshacer» del movimiento (vuelve a cambiar la sala)", async () => {
+    mockEscrituras([{}, {}]);
+    const { result, invalidadas } = montar(reserva({ espacio_id: "salon" }));
+
+    await act(async () => {
+      await result.current.moverEspacio(reserva({ espacio_id: "salon" }), "terraza", "Terraza");
+    });
+    invalidadas.length = 0;
+    await act(async () => {
+      accionDeshacerDelToast()!.onClick();
+    });
+    await waitFor(() => expect(invalidadas.length).toBeGreaterThan(0));
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA_AL_CAMBIAR_SALA);
+  });
+
+  it.each([
+    ["marcarLlegada", (r: ReturnType<typeof montar>["result"]) => r.current.marcarLlegada(reserva())],
+    ["marcarNoShow", (r: ReturnType<typeof montar>["result"]) => r.current.marcarNoShow(reserva())],
+    ["deshacerLlegadaONoShow", (r: ReturnType<typeof montar>["result"]) => r.current.deshacerLlegadaONoShow(reserva({ estado: "completada" }))],
+  ])("%s NO cambia la sala: no toca las mesas asignadas", async (_n, lanzar) => {
+    mockEscrituras();
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await lanzar(result);
+    });
+
+    expect(invalidadas).toEqual(CLAVES_QUE_REFRESCA);
+  });
+
+  it("BUG conocido: mover de sala sigue sin refrescar `reservas-servicio-dia` (modo servicio) ni `disponibilidad`", async () => {
+    // Fuera del alcance del paso 1 (las mesas asignadas sí): lo de modo servicio y la rejilla de
+    // disponibilidad se unifica con el resto de listas de claves en el paso 2.
+    mockEscrituras();
+    const { result, invalidadas } = montar();
+
+    await act(async () => {
+      await result.current.moverEspacio(reserva(), "terraza", "Terraza");
+    });
+
     expect(invalidadas).not.toContain("reservas-servicio-dia");
     expect(invalidadas).not.toContain("disponibilidad");
   });
@@ -591,7 +637,7 @@ describe("cuando la escritura falla", () => {
 
   it.each([
     ["marcarLlegada", "registrar la llegada", (r: ReturnType<typeof montar>["result"]) => r.current.marcarLlegada(reserva())],
-    ["marcarNoShow", "marcar «no se presentó»", (r: ReturnType<typeof montar>["result"]) => r.current.marcarNoShow(reserva())],
+    ["marcarNoShow", "marcar «No vino»", (r: ReturnType<typeof montar>["result"]) => r.current.marcarNoShow(reserva())],
     ["moverEspacio", "mover la reserva", (r: ReturnType<typeof montar>["result"]) => r.current.moverEspacio(reserva(), "terraza", "Terraza")],
   ])("%s con la escritura denegada por RLS (0 filas, sin error): false, revierte y dice que no hay permiso", async (_n, accion, lanzar) => {
     mockEscrituras([{ data: [] }]);
@@ -635,7 +681,7 @@ describe("cuando la escritura falla", () => {
     expect(toast.error).toHaveBeenCalledWith("No se pudo deshacer la llegada: el turno ya está completo (aforo superado).");
   });
 
-  it("deshacer un «No vino» con el mismo fallo habla de «no se presentó» (vocabulario pendiente de unificar)", async () => {
+  it("deshacer un «No vino» con el mismo fallo habla de «No vino» (vocabulario único)", async () => {
     mockEscrituras([{ error: { code: "23514", message: "Aforo superado para el turno" } }]);
     const { result } = montar(reserva({ estado: "no_show" }));
 
@@ -644,7 +690,7 @@ describe("cuando la escritura falla", () => {
     });
 
     expect(toast.error).toHaveBeenCalledWith(
-      "No se pudo quitar el «no se presentó»: el turno ya está completo (aforo superado).",
+      "No se pudo quitar el «No vino»: el turno ya está completo (aforo superado).",
     );
   });
 
@@ -660,7 +706,7 @@ describe("cuando la escritura falla", () => {
   });
 });
 
-describe("avisos de éxito (texto de hoy; «no se presentó» se unifica a «No vino» en el paso de vocabulario)", () => {
+describe("avisos de éxito (vocabulario único: «Ha llegado» / «No vino»)", () => {
   it("cada acción avisa con el nombre del cliente y, salvo deshacer, con botón «Deshacer» de 10 s", async () => {
     mockEscrituras([{}, {}, {}, {}]);
     const { result } = montar();
@@ -682,7 +728,7 @@ describe("avisos de éxito (texto de hoy; «no se presentó» se unifica a «No 
     expect(avisos.map(([texto]) => texto)).toEqual([
       "Ana → Terraza",
       "Ana ha llegado",
-      "Ana: no se presentó",
+      "Ana: no vino",
       "Reserva devuelta a «Confirmada»",
     ]);
     for (const [, opciones] of avisos.slice(0, 3)) {
@@ -709,7 +755,7 @@ describe("avisos de éxito (texto de hoy; «no se presentó» se unifica a «No 
     expect(vi.mocked(toast.success).mock.calls.map(([texto]) => texto)).toEqual([
       "Reserva → Terraza",
       "Cliente ha llegado",
-      "Reserva: no se presentó",
+      "Reserva: no vino",
     ]);
   });
 });

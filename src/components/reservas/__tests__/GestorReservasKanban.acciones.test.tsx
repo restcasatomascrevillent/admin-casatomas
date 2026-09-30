@@ -1,28 +1,36 @@
 /**
  * Kanban de «Hoy» (`GestorReservasKanban`): la TARJETA de una reserva — tests de
- * caracterización de EFECTOS.
+ * EFECTOS.
  *
- * Fijan lo que hace HOY cada acción de la tarjeta: la estrella («importante»),
- * «Ha llegado» / «No se presentó» (vía `ControlLlegada`), «Mover a…» y «Añadir a
- * blacklist». Lo que se afirma son efectos y mutaciones —qué se escribe y con qué
- * filtros, quién manda correo (nadie), qué cachés se refrescan, qué pasa con una
- * escritura denegada por RLS, si se mira el permiso de edición—, NO el DOM ni el
- * número de botones: los controles se buscan por su nombre accesible, y esta
- * pantalla está siendo tocada por otro encargo (se le añade «Editar reserva»).
+ * Fijan lo que hace cada acción de la tarjeta: la estrella («importante»), «Ha
+ * llegado» / «No vino» (vía `ControlLlegada`), «Mover a…» y «Añadir a blacklist».
+ * Lo que se afirma son efectos y mutaciones —qué se escribe y con qué filtros,
+ * quién manda correo (nadie), qué cachés se refrescan, qué pasa con una escritura
+ * denegada por RLS, qué pasa sin permiso de edición, cuándo se avisa antes de
+ * mover—, NO el número de botones: los controles se buscan por su nombre accesible.
  *
- * `// BUG conocido` marca lo que está mal y se deja así a propósito: este fichero
- * NO arregla nada, describe el punto de partida para el paso que unifique cómo se
- * ejecutan las acciones sobre una reserva.
+ * PASO 1 del refactor de acciones. Este fichero nació como caracterización del
+ * kanban tal como estaba y dos de sus `// BUG conocido` pasaron a «corregido»:
+ *   · el kanban no miraba el permiso de edición: ahora lo lee de
+ *     `accionesDisponibles(reserva, { vista: "hoy", canEdit })` y deja deshabilitado
+ *     —con el motivo visible— todo lo que escribe (estrella, llegada, no vino,
+ *     deshacer, mover, lista negra);
+ *   · mover de sala no avisaba de que el trigger de la BD borra las mesas asignadas
+ *     ni las refrescaba: ahora pregunta antes (como Asignación) y las refresca.
+ * El resto de `// BUG conocido` (RLS denegada dada por buena en la estrella…) NO se
+ * toca en este paso: es del paso 2.
  *
  * Nada llega a Supabase: el cliente y `sonner` están mockeados.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const h = vi.hoisted(() => ({
   /** Filas que devuelve la consulta del kanban. */
   reservas: [] as Record<string, unknown>[],
+  /** Filas de `asignaciones_mesa` (mesas asignadas de hoy). */
+  asignaciones: [] as Record<string, unknown>[],
   /** Cada escritura completa, en orden. */
   escrituras: [] as Array<{
     tabla: string;
@@ -65,7 +73,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       b.neq = () => b;
       b.order = () => b;
       b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
-        if (!esEscritura) return Promise.resolve({ data: h.reservas, error: null }).then(ok, ko);
+        if (!esEscritura) {
+          const filas = tabla === "asignaciones_mesa" ? h.asignaciones : h.reservas;
+          return Promise.resolve({ data: filas, error: null }).then(ok, ko);
+        }
         const r = h.respuestasEscritura.shift() ?? {};
         // Sin `.select`, Supabase devuelve `data: null` también cuando la RLS deniega la escritura.
         const data = "data" in r ? r.data : r.error ? null : escritura.select ? [{ id: escritura.eq?.[1] }] : null;
@@ -107,6 +118,8 @@ beforeAll(() => {
   window.HTMLElement.prototype.releasePointerCapture = vi.fn();
 });
 
+const MOTIVO_SIN_PERMISO = "No tienes permiso para editar reservas";
+
 const reserva = (id: string, estado: string, nombre: string, extra: Record<string, unknown> = {}) => ({
   id,
   nombre,
@@ -123,6 +136,15 @@ const reserva = (id: string, estado: string, nombre: string, extra: Record<strin
   ...extra,
 });
 
+/** Una fila de `asignaciones_mesa` tal como la trae `useAsignacionesMesa` (con la mesa dentro). */
+const asignacion = (reservaId: string, mesaId: string, mesaNombre: string, espacioId = "salon") => ({
+  id: `asig-${reservaId}-${mesaId}`,
+  reserva_id: reservaId,
+  mesa_id: mesaId,
+  reservas: { id: reservaId },
+  mesas: { id: mesaId, nombre: mesaNombre, capacidad: 4, espacio_id: espacioId },
+});
+
 /** Las once claves que refresca SIEMPRE una acción de servicio (ver useAccionesServicioReserva). */
 const CLAVES_DE_SERVICIO = [
   "reservas-kanban",
@@ -137,6 +159,8 @@ const CLAVES_DE_SERVICIO = [
   "reservas_mes",
   "ocupacion-salas-dia",
 ];
+/** Cambiar la sala refresca además las mesas asignadas (el trigger de la BD las borra). */
+const CLAVES_AL_CAMBIAR_SALA = [...CLAVES_DE_SERVICIO, "resumen-asignacion-dia", "asignaciones_mesa"];
 
 function montar() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
@@ -154,14 +178,24 @@ function montar() {
   return { invalidadas };
 }
 
-/** La tarjeta de ese cliente (el nombre accesible de la tarjeta empieza por el nombre). */
-const tarjeta = async (cliente: string) => await screen.findByRole("button", { name: new RegExp(`^${cliente},`) });
+/**
+ * La tarjeta de ese cliente (el nombre accesible de la tarjeta empieza por el nombre).
+ * `hidden`: con un menú de Radix abierto, el resto de la página queda `aria-hidden`.
+ */
+const tarjeta = async (cliente: string) =>
+  await screen.findByRole("button", { name: new RegExp(`^${cliente},`), hidden: true });
 
 /** Abre el menú «⋮» de la tarjeta de ese cliente (Radix abre con el teclado en jsdom). */
 async function abrirMenu(cliente: string) {
   const disparador = await screen.findByRole("button", { name: new RegExp(`^Acciones de la reserva de ${cliente}`) });
   fireEvent.keyDown(disparador, { key: "Enter" });
   return await screen.findByRole("menu");
+}
+
+/** Espera a que el kanban tenga ya las mesas asignadas de hoy (se piden a la vez que las reservas). */
+async function conMesasCargadas() {
+  await waitFor(() => expect(h.tablas).toContain("asignaciones_mesa"));
+  await act(async () => {});
 }
 
 /** Escrituras a `reservas`, sin ruido. */
@@ -175,6 +209,7 @@ beforeEach(() => {
   h.escrituras = [];
   h.tablas = [];
   h.respuestasEscritura = [];
+  h.asignaciones = [];
   h.reservas = [reserva("r-ana", "confirmada", "Ana")];
   consolaError = vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -226,7 +261,9 @@ describe("tarjeta · la estrella («importante»)", () => {
   it("BUG conocido: con la RLS denegando la escritura en silencio (sin error) da «marcada como importante» y refresca", async () => {
     // A diferencia de llegada / no vino / mover (`ErrorSinFilasReserva`), la estrella no
     // pide la fila de vuelta: una escritura denegada por RLS devuelve `data: null` sin error
-    // y aquí pasa por éxito. Con permiso denegado, el usuario lee «marcada» y no lo está.
+    // y aquí pasa por éxito. Con permiso denegado, el usuario leía «marcada» y no lo estaba.
+    // (Sin permiso ya no llega a escribir: el botón sale deshabilitado; esto sigue pasando
+    // con permiso y una RLS que lo rechaza.) Se arregla en el paso 2.
     h.respuestasEscritura = [{ data: null }];
     const { invalidadas } = montar();
 
@@ -237,18 +274,31 @@ describe("tarjeta · la estrella («importante»)", () => {
     expect(invalidadas).toEqual([...CLAVES_LISTAS_RESERVAS]);
   });
 
-  it("BUG conocido: no mira el permiso de edición; sin él, la estrella escribe igual (y confía en la RLS)", async () => {
+  it("sin permiso de edición la estrella sale deshabilitada, con el motivo visible, y no escribe", async () => {
     h.canEdit = false;
     montar();
 
-    fireEvent.click(within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" }));
+    const estrella = within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" });
 
-    await waitFor(() => expect(escrituras()).toHaveLength(1));
-    expect(escrituras()[0].payload).toEqual({ importante: true });
+    expect(estrella).toBeDisabled();
+    // Un botón deshabilitado no recibe el ratón: el motivo se ve en su envoltorio.
+    expect(estrella.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
+    fireEvent.click(estrella);
+    expect(escrituras()).toEqual([]);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("con permiso la estrella no lleva ningún motivo", async () => {
+    montar();
+
+    const estrella = within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" });
+
+    expect(estrella).toBeEnabled();
+    expect(estrella.parentElement).not.toHaveAttribute("title");
   });
 });
 
-describe("tarjeta · «Ha llegado» y «No se presentó» (ControlLlegada)", () => {
+describe("tarjeta · «Ha llegado» y «No vino» (ControlLlegada)", () => {
   it("«Ha llegado»: estado 'completada' + llegada_at, con la fila de vuelta pedida; refresca las 11 claves y NO manda correo", async () => {
     const { invalidadas } = montar();
 
@@ -259,17 +309,20 @@ describe("tarjeta · «Ha llegado» y «No se presentó» (ControlLlegada)", () 
     expect(escritura).toMatchObject({ tabla: "reservas", eq: ["id", "r-ana"], select: "id", payload: { estado: "completada" } });
     expect(typeof escritura.payload.llegada_at).toBe("string");
     await waitFor(() => expect(invalidadas).toEqual(expect.arrayContaining(CLAVES_DE_SERVICIO)));
+    // Llegar no cambia la sala: no toca las mesas asignadas.
+    expect(invalidadas).not.toContain("asignaciones_mesa");
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("«No se presentó»: estado 'no_show' y llegada_at null, y NO manda correo", async () => {
+  it("«No vino»: estado 'no_show' y llegada_at null, y NO manda correo", async () => {
     montar();
 
     fireEvent.keyDown(await screen.findByRole("button", { name: "Más opciones de llegada para Ana" }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: /No se presentó/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "No vino" }));
 
     await waitFor(() => expect(escrituras()).toHaveLength(1));
     expect(escrituras()[0].payload).toEqual({ estado: "no_show", llegada_at: null });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Ana: no vino", expect.anything()));
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
@@ -286,23 +339,41 @@ describe("tarjeta · «Ha llegado» y «No se presentó» (ControlLlegada)", () 
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("BUG conocido: no mira el permiso de edición; sin él, «Ha llegado» y «No se presentó» se ofrecen y escriben igual", async () => {
-    // Hoy solo la RLS (y, tras escribir, el aviso «no tienes permiso») frena a quien no puede editar.
+  it("sin permiso de edición «Ha llegado» y el menú «…» salen deshabilitados, con el motivo visible, y no escriben", async () => {
     h.canEdit = false;
     montar();
 
     const llegada = await screen.findByRole("button", { name: "Marcar que Ana ha llegado" });
-    expect(llegada).toBeEnabled();
-    fireEvent.click(llegada);
+    const menu = screen.getByRole("button", { name: "Más opciones de llegada para Ana" });
 
-    await waitFor(() => expect(escrituras()).toHaveLength(1));
-    expect(escrituras()[0].payload).toMatchObject({ estado: "completada" });
+    for (const boton of [llegada, menu]) {
+      expect(boton).toBeDisabled();
+      expect(boton.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
+    }
+    fireEvent.click(llegada);
+    fireEvent.keyDown(menu, { key: "Enter" });
+    expect(screen.queryByRole("menuitem", { name: "No vino" })).not.toBeInTheDocument();
+    expect(escrituras()).toEqual([]);
+  });
+
+  it("sin permiso, el «Deshacer» de una reserva que ya llegó también sale deshabilitado", async () => {
+    h.canEdit = false;
+    h.reservas = [reserva("r-ana", "completada", "Ana", { llegada_at: "2026-09-30T19:23:00.000Z" })];
+    montar();
+
+    const deshacer = await screen.findByRole("button", { name: "Deshacer llegada de Ana" });
+
+    expect(deshacer).toBeDisabled();
+    expect(deshacer.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
+    fireEvent.click(deshacer);
+    expect(escrituras()).toEqual([]);
   });
 });
 
 describe("tarjeta · «Mover a…»", () => {
-  it("mover a una sala con sitio: escribe `{ espacio_id }` AL MOMENTO (sin pedir confirmación), refresca las 11 claves y NO manda correo", async () => {
+  it("mover a una sala con sitio y sin mesas asignadas: escribe `{ espacio_id }` AL MOMENTO (sin pedir confirmación), refresca las mesas y NO manda correo", async () => {
     const { invalidadas } = montar();
+    await conMesasCargadas();
 
     const menu = await abrirMenu("Ana");
     fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
@@ -312,35 +383,118 @@ describe("tarjeta · «Mover a…»", () => {
     expect(escrituras()).toEqual([
       { tabla: "reservas", payload: { espacio_id: "terraza" }, eq: ["id", "r-ana"], select: "id" },
     ]);
-    await waitFor(() => expect(invalidadas).toEqual(expect.arrayContaining(CLAVES_DE_SERVICIO)));
+    await waitFor(() => expect(invalidadas).toEqual(expect.arrayContaining(CLAVES_AL_CAMBIAR_SALA)));
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("BUG conocido: no avisa de que el trigger de la BD borra las mesas asignadas, ni siquiera lo consulta", async () => {
-    // Cambiar la sala hace que `trg_reservas_sincronizar_asignaciones` BORRE las mesas de
-    // la reserva. El kanban solo lee `reservas`: no sabe si tiene mesas, no pregunta y no
-    // refresca `asignaciones_mesa` (ver los tests de `useAccionesServicioReserva`). El panel
-    // de asignación (`useCambiarSalaReserva`) deja esa confirmación a quien lo llama.
+  it("CON mesas asignadas avisa ANTES de que el trigger las borre, y NO escribe hasta que se acepta", async () => {
+    // Mismo aviso que el panel de Asignación (`textoQuitarMesas`): el trigger
+    // `trg_reservas_sincronizar_asignaciones` BORRA las mesas al cambiar la sala.
+    h.asignaciones = [asignacion("r-ana", "m5", "5"), asignacion("r-ana", "m4", "4")];
     montar();
+    await conMesasCargadas();
 
     const menu = await abrirMenu("Ana");
     fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
-    await waitFor(() => expect(escrituras()).toHaveLength(1));
 
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(new Set(h.tablas)).toEqual(new Set(["reservas"]));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(within(dialogo).getByText("¿Cambiar de sala y quitar sus mesas?")).toBeInTheDocument();
+    expect(dialogo.textContent).toContain(
+      "Ana tiene 2 mesas asignadas (4, 5) en Salón. Al pasarla a Terraza se quitarán esas mesas y habrá que asignarlas de nuevo.",
+    );
+    expect(dialogo.textContent).toContain("Es un cambio interno: al cliente no se le envía nada.");
+    expect(escrituras()).toEqual([]);
   });
 
-  it("si la sala se pasa de aforo pide confirmación y NO escribe hasta que se acepta", async () => {
+  it("al aceptar el aviso de mesas se mueve, se refrescan las mesas asignadas y NO se manda correo", async () => {
+    h.asignaciones = [asignacion("r-ana", "m4", "4")];
+    const { invalidadas } = montar();
+    await conMesasCargadas();
+
+    const menu = await abrirMenu("Ana");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cambiar de sala" }));
+
+    await waitFor(() => expect(escrituras()).toHaveLength(1));
+    expect(escrituras()[0]).toMatchObject({ payload: { espacio_id: "terraza" }, eq: ["id", "r-ana"] });
+    await waitFor(() => expect(invalidadas).toEqual(expect.arrayContaining(CLAVES_AL_CAMBIAR_SALA)));
+    expect(h.invoke).not.toHaveBeenCalled();
+  });
+
+  it("si se descarta el aviso de mesas no se escribe nada", async () => {
+    h.asignaciones = [asignacion("r-ana", "m4", "4")];
+    montar();
+    await conMesasCargadas();
+
+    const menu = await abrirMenu("Ana");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "No mover" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(escrituras()).toEqual([]);
+  });
+
+  it("las mesas de OTRA reserva no cuentan: Ana no tiene ninguna y se mueve sin preguntar", async () => {
+    h.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-berta", "confirmada", "Berta")];
+    h.asignaciones = [asignacion("r-berta", "m4", "4")];
+    montar();
+    await conMesasCargadas();
+
+    const menu = await abrirMenu("Ana");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
+
+    await waitFor(() => expect(escrituras()).toHaveLength(1));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("también avisa al pasarla a «Sin asignar» (cambia `espacio_id` igual)", async () => {
+    h.asignaciones = [asignacion("r-ana", "m4", "4")];
+    montar();
+    await conMesasCargadas();
+
+    const menu = await abrirMenu("Ana");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Sin asignar/ }));
+
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(dialogo.textContent).toContain("Al pasarla a Sin asignar se quitarán esas mesas");
+    expect(escrituras()).toEqual([]);
+  });
+
+  it("si además la sala se pasa de aforo, UN solo aviso con las dos cosas; «Mover igualmente» escribe", async () => {
     // Terraza: 30 plazas; ya hay 28 en la cena + 4 de Ana = 32.
     h.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-berta", "confirmada", "Berta", { espacio_id: "terraza", numero_comensales: 28 })];
+    h.asignaciones = [asignacion("r-ana", "m4", "4")];
     montar();
+    await conMesasCargadas();
 
     const menu = await abrirMenu("Ana");
     fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
 
     const dialogo = await screen.findByRole("alertdialog");
     expect(within(dialogo).getByText(/¿Superar la capacidad de Terraza\?/)).toBeInTheDocument();
+    expect(dialogo.textContent).toContain("quedaría en 32 de 30 plazas");
+    expect(dialogo.textContent).toContain("Ana tiene 1 mesa asignada (4) en Salón");
+    expect(escrituras()).toEqual([]);
+
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Mover igualmente" }));
+
+    await waitFor(() => expect(escrituras()).toHaveLength(1));
+    expect(escrituras()[0].payload).toEqual({ espacio_id: "terraza" });
+  });
+
+  it("si la sala se pasa de aforo pide confirmación y NO escribe hasta que se acepta", async () => {
+    // Terraza: 30 plazas; ya hay 28 en la cena + 4 de Ana = 32.
+    h.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-berta", "confirmada", "Berta", { espacio_id: "terraza", numero_comensales: 28 })];
+    montar();
+    await conMesasCargadas();
+
+    const menu = await abrirMenu("Ana");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
+
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(within(dialogo).getByText(/¿Superar la capacidad de Terraza\?/)).toBeInTheDocument();
+    // Sin mesas asignadas, el aviso es solo el de aforo (el de siempre).
+    expect(dialogo.textContent).not.toContain("mesas asignadas");
     expect(escrituras()).toEqual([]);
 
     fireEvent.click(within(dialogo).getByRole("button", { name: "Mover igualmente" }));
@@ -353,6 +507,7 @@ describe("tarjeta · «Mover a…»", () => {
   it("si se descarta el aviso de aforo no se escribe nada", async () => {
     h.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-berta", "confirmada", "Berta", { espacio_id: "terraza", numero_comensales: 28 })];
     montar();
+    await conMesasCargadas();
 
     const menu = await abrirMenu("Ana");
     fireEvent.click(within(menu).getByRole("menuitem", { name: /^Terraza/ }));
@@ -362,20 +517,28 @@ describe("tarjeta · «Mover a…»", () => {
     expect(escrituras()).toEqual([]);
   });
 
-  it("BUG conocido: no mira el permiso de edición; sin él, mover se ofrece y escribe igual", async () => {
+  it("sin permiso de edición no se ofrece ningún destino: el motivo sale en el menú, la tarjeta no se arrastra y no se escribe", async () => {
     h.canEdit = false;
     montar();
 
     const menu = await abrirMenu("Ana");
-    const terraza = within(menu).getByRole("menuitem", { name: /^Terraza/ });
-    expect(terraza).not.toHaveAttribute("data-disabled");
-    fireEvent.click(terraza);
 
-    await waitFor(() => expect(escrituras()).toHaveLength(1));
-    expect(escrituras()[0].payload).toEqual({ espacio_id: "terraza" });
+    expect(within(menu).getByText("Mover a…")).toBeInTheDocument();
+    const aviso = within(menu).getByRole("menuitem", { name: MOTIVO_SIN_PERMISO });
+    expect(aviso).toHaveAttribute("data-disabled");
+    expect(within(menu).queryByRole("menuitem", { name: /^Terraza/ })).not.toBeInTheDocument();
+    // dnd-kit apaga el arrastre (ratón, tacto y teclado) con `aria-disabled` en la tarjeta.
+    expect(await tarjeta("Ana")).toHaveAttribute("aria-disabled", "true");
+    expect(escrituras()).toEqual([]);
   });
 
-  it("una reserva que no ocupa sitio («No vino») no ofrece destinos: nada que escribir", async () => {
+  it("con permiso la tarjeta de una reserva viva SÍ se arrastra", async () => {
+    montar();
+
+    expect(await tarjeta("Ana")).toHaveAttribute("aria-disabled", "false");
+  });
+
+  it("una reserva que no ocupa sitio («No vino») no ofrece destinos: nada que escribir, ni arrastre", async () => {
     h.reservas = [reserva("r-fede", "no_show", "Fede")];
     montar();
 
@@ -383,7 +546,17 @@ describe("tarjeta · «Mover a…»", () => {
 
     expect(within(menu).getByText("No se puede mover en este estado")).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: /^Terraza/ })).not.toBeInTheDocument();
+    expect(await tarjeta("Fede")).toHaveAttribute("aria-disabled", "true");
     expect(escrituras()).toEqual([]);
+  });
+
+  it("«Llamar» no escribe nada y sigue disponible sin permiso", async () => {
+    h.canEdit = false;
+    montar();
+
+    const menu = await abrirMenu("Ana");
+
+    expect(within(menu).getByRole("menuitem", { name: /Llamar/ })).not.toHaveAttribute("data-disabled");
   });
 });
 
@@ -399,15 +572,51 @@ describe("tarjeta · «Añadir a blacklist»", () => {
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("no mira el permiso de edición de reservas (la lista negra es otra tabla y otro modal)", async () => {
+  it("sin permiso de edición sale deshabilitado, con el motivo visible, y no abre el modal", async () => {
     h.canEdit = false;
     montar();
 
     const menu = await abrirMenu("Ana");
     const item = within(menu).getByRole("menuitem", { name: /Añadir a blacklist/ });
-    expect(item).not.toHaveAttribute("data-disabled");
-    fireEvent.click(item);
 
-    await waitFor(() => expect(h.modalBlacklist).toHaveBeenLastCalledWith("r-ana", true));
+    expect(item).toHaveAttribute("data-disabled");
+    expect(item.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
+    fireEvent.click(item);
+    expect(h.modalBlacklist).not.toHaveBeenCalledWith("r-ana", true);
+  });
+});
+
+describe("tarjeta · la insignia de estado sale del mapa único (`ESTADOS_RESERVA`)", () => {
+  it.each([
+    ["pendiente", "Pendiente", ["bg-status-pending", "text-status-pending-foreground"]],
+    ["verificada", "Verificada", ["bg-status-verified", "text-status-verified-foreground"]],
+    ["confirmada", "Confirmada", ["bg-status-confirmed", "text-status-confirmed-foreground"]],
+    ["completada", "Llegó", ["bg-emerald-600", "text-white"]],
+    ["no_show", "No vino", ["bg-secondary", "text-secondary-foreground"]],
+  ])("%s se pinta como «%s» con los tokens del tema, no con la paleta cruda de Tailwind", async (estado, etiqueta, clases) => {
+    h.reservas = [reserva("r-ana", estado, "Ana")];
+    montar();
+
+    const insignia = within(await tarjeta("Ana")).getByText(etiqueta, { selector: "div" });
+
+    for (const clase of clases) expect(insignia.classList.contains(clase), clase).toBe(true);
+    // Ninguno de los colores crudos que tenía el kanban (yellow-500, blue-500, green-500, red-500, gray-500).
+    expect(insignia.className).not.toMatch(/bg-(yellow|blue|green|red|gray)-500/);
+  });
+
+  it("el nombre accesible de la tarjeta lleva el nombre del estado del mapa", async () => {
+    h.reservas = [reserva("r-ana", "completada", "Ana")];
+    montar();
+
+    expect(await screen.findByRole("button", { name: "Ana, 21:00, 4 comensales, Llegó" })).toBeInTheDocument();
+  });
+
+  it("un estado que no existe se pinta tal cual y en gris (nunca revienta)", async () => {
+    h.reservas = [reserva("r-ana", "rechazada", "Ana")];
+    montar();
+
+    const insignia = within(await tarjeta("Ana")).getByText("rechazada", { selector: "div" });
+
+    expect(insignia.classList.contains("bg-gray-500")).toBe(true);
   });
 });

@@ -86,6 +86,17 @@ describe("evaluarMovimiento", () => {
     expect(evaluarMovimiento(r({ estado: "cancelada" }), "terraza", todas, 30).tipo).toBe("bloqueado");
     expect(evaluarMovimiento(r({ estado: "no_show" }), "terraza", todas, 30).tipo).toBe("bloqueado");
   });
+
+  it("y lo explica con el vocabulario único: «No vino», no «no se presentó»", () => {
+    expect(evaluarMovimiento(r({ estado: "cancelada" }), "terraza", todas, 30)).toEqual({
+      tipo: "bloqueado",
+      motivo: "Las reservas canceladas no se pueden mover.",
+    });
+    expect(evaluarMovimiento(r({ estado: "no_show" }), "terraza", todas, 30)).toEqual({
+      tipo: "bloqueado",
+      motivo: "Una reserva marcada como «No vino» no ocupa espacio.",
+    });
+  });
 });
 
 describe("utilidades", () => {

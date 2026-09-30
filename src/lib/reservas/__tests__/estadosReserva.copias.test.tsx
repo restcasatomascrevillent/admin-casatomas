@@ -1,19 +1,15 @@
 /**
- * El mapa único (`estadosReserva.ts`) frente a las copias que hoy siguen vivas.
+ * El mapa único (`estadosReserva.ts`) frente a quienes lo consumen.
  *
- * Mientras cada pantalla tenga su propia copia de los estados, este fichero
- * comprueba que el mapa es un SUPERCONJUNTO de ellas: dice lo mismo que lo que
- * pintan de verdad (se renderiza el timeline y se importan las opciones del
- * filtro y las variantes del `Badge`), no lo que este test recuerda de ellas. Así
- * el paso de migración de cada consumidor es un cambio de fuente de datos y no de
- * aspecto; y si una copia se toca sin tocar el mapa, salta aquí.
+ * El timeline y el filtro «Estado» ya no tienen copia propia: leen del mapa. Aquí se
+ * comprueba el CABLEADO, que lo que pintan ES lo del mapa (se renderiza el timeline y
+ * se importan las opciones del filtro y las variantes del `Badge`); si alguien vuelve
+ * a escribir un texto, un icono o un color a mano en uno de ellos, salta aquí.
  *
- * Las otras dos copias —`getStatusBadge` de la lista y `ESTADOS_RESERVA` del
- * kanban— son locales a su componente y no se pueden importar; sus diferencias
- * con el mapa están en la cabecera de `estadosReserva.ts`.
- *
- * Cuando una copia desaparezca (paso 1), el bloque que la comprueba se borra con
- * ella.
+ * Queda UNA copia por migrar: la Lista (`getStatusBadge` y `ESTADO_RESERVA_TEXTO` de
+ * ListaReservasAvanzada.tsx, paso 3), local a su componente y no importable. Sus
+ * diferencias con el mapa están en la cabecera de `estadosReserva.ts`. El kanban
+ * (insignia) se comprueba en `GestorReservasKanban.acciones.test.tsx`.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, within } from "@testing-library/react";
@@ -39,7 +35,7 @@ function iconoRenderizado(estado: EstadoReserva) {
   return clases;
 }
 
-describe("contra TimelineEstadosReserva (copia viva: nombre, frase, burbuja e icono)", () => {
+describe("contra TimelineEstadosReserva (nombre, frase, burbuja e icono)", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -100,7 +96,7 @@ describe("contra las variantes del Badge (la lista pinta cancelada y No vino con
   });
 });
 
-describe("contra OPCIONES_FILTRO_ESTADO (copia viva: el filtro «Estado» de la lista)", () => {
+describe("contra OPCIONES_FILTRO_ESTADO (el filtro «Estado» de la lista)", () => {
   const opcionesDeReserva = OPCIONES_FILTRO_ESTADO.filter((o) => esEstadoReserva(o.value));
 
   it("tiene una opción por cada uno de los seis estados", () => {
@@ -113,15 +109,13 @@ describe("contra OPCIONES_FILTRO_ESTADO (copia viva: el filtro «Estado» de la 
     }
   });
 
-  it("las cuatro coinciden con `etiqueta` y las dos que no son «Llegó / completada» y «No se presentó»", () => {
+  it("todas coinciden con `etiqueta` salvo «Llegó / completada» (vocabulario único: «No se presentó» pasó a «No vino»)", () => {
     const distintas = opcionesDeReserva
       .filter(({ value, label }) => label !== ESTADOS_RESERVA[value as EstadoReserva].etiqueta)
       .map(({ value, label }) => [value, label]);
 
-    expect(distintas).toEqual([
-      ["completada", "Llegó / completada"],
-      ["no_show", "No se presentó"],
-    ]);
+    expect(distintas).toEqual([["completada", "Llegó / completada"]]);
+    expect(opcionesDeReserva.find((o) => o.value === "no_show")?.label).toBe("No vino");
   });
 
   it("el filtro usa otro orden que el ciclo de vida: No vino va antes que Cancelada", () => {
