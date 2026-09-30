@@ -426,6 +426,32 @@ export type Database = {
         }
         Relationships: []
       }
+      avisos_reserva_enviados: {
+        Row: {
+          clave: string
+          creado_at: string | null
+          reserva_id: string
+        }
+        Insert: {
+          clave: string
+          creado_at?: string | null
+          reserva_id: string
+        }
+        Update: {
+          clave?: string
+          creado_at?: string | null
+          reserva_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_reserva_enviados_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bew: {
         Row: {
           activado: boolean | null
@@ -1046,6 +1072,10 @@ export type Database = {
       }
       configuracion_reservas: {
         Row: {
+          asignacion_aviso_activo: boolean
+          asignacion_espacios_excluidos: string[]
+          asignacion_mesas_excluidas: string[]
+          asignacion_ventana_horas: number
           auto_confirmar: boolean
           created_at: string
           dias_max_antelacion: number
@@ -1063,6 +1093,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          asignacion_aviso_activo?: boolean
+          asignacion_espacios_excluidos?: string[]
+          asignacion_mesas_excluidas?: string[]
+          asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string
           dias_max_antelacion?: number
@@ -1080,6 +1114,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          asignacion_aviso_activo?: boolean
+          asignacion_espacios_excluidos?: string[]
+          asignacion_mesas_excluidas?: string[]
+          asignacion_ventana_horas?: number
           auto_confirmar?: boolean
           created_at?: string
           dias_max_antelacion?: number
@@ -3244,6 +3282,7 @@ export type Database = {
           fecha_solicitada: string | null
           hora_solicitada: string | null
           id: string
+          marca: string
           motivo_rechazo: string
           nombre: string | null
           notas_cliente: string | null
@@ -3267,6 +3306,7 @@ export type Database = {
           fecha_solicitada?: string | null
           hora_solicitada?: string | null
           id?: string
+          marca?: string
           motivo_rechazo: string
           nombre?: string | null
           notas_cliente?: string | null
@@ -3290,6 +3330,7 @@ export type Database = {
           fecha_solicitada?: string | null
           hora_solicitada?: string | null
           id?: string
+          marca?: string
           motivo_rechazo?: string
           nombre?: string | null
           notas_cliente?: string | null

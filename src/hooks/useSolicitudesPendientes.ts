@@ -29,6 +29,9 @@ export interface SolicitudPendiente {
   propuesta_respuesta_via?: string | null;
   propuesta_error?: string | null;
   reserva_id?: string | null;
+  // Migración 20260930100000_solicitudes_marca.sql (reservas-sin-salas):
+  // negocio EXPLÍCITO de la solicitud. Opcional: sin la migración no viene.
+  marca?: string | null;
 }
 
 /** Resultado de fn_aceptar_propuesta_solicitud / fn_rechazar_propuesta_solicitud. */

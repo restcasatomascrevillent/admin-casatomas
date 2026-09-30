@@ -80,6 +80,14 @@
 // grado 2 es IMPOSIBLE. Ahí no se pinta "0 %" -que dejaría al encargado
 // buscando mesas que no existen- sino el aviso de que la sala no tiene mesas
 // en el plano, y el salto sigue activo porque es donde se crean.
+//
+// ---------------------------------------------------------------------------
+// DISPONIBILIDAD POR CUARTOS DE HORA (reservas-sin-salas, 2026-09-29)
+// ---------------------------------------------------------------------------
+// Debajo del reparto va la rejilla interna del día de 15 en 15 minutos, un
+// bloque por negocio (`DisponibilidadCuartos`): cuándo llega la gente y cuánta
+// hay sentada. Es solo consulta, como el resto del panel. Sus datos son los de
+// `useOcupacionSalasDia` (reservas del día), no los de la vista de asignación.
 // ============================================================================
 
 import { useMemo, useState } from "react";
@@ -105,7 +113,7 @@ import { cn } from "@/lib/utils";
 import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useResumenAsignacionDia } from "@/hooks/useResumenAsignacionDia";
-import { marcaDeEspacio } from "@/lib/reservas/negocios";
+import { marcaDeEspacio, NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
 import {
   resumenDia,
   resumenPorEspacio,
@@ -114,6 +122,7 @@ import {
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
 import { NegocioBadge } from "./NegocioBadge";
+import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 
 export interface DetalleDiaEspaciosProps {
   /** Día que se está mirando. */
@@ -555,6 +564,12 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
             })}
           </>
         )}
+
+        <div className="space-y-3 border-t pt-3">
+          {NEGOCIOS_PANEL.map((n) => (
+            <DisponibilidadCuartos key={n.marca} fecha={fechaISO} marca={n.marca} compacto />
+          ))}
+        </div>
       </div>
     </div>
   );

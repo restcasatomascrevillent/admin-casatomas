@@ -60,6 +60,19 @@ describe("negocios: de dónde sale la marca", () => {
     expect(marcaDeSolicitud({ notas_cliente: "Mesa junto a la ventana" }, ESPACIOS_BD)).toBe("casa_tomas");
   });
 
+  it("solicitud con columna marca (reservas-sin-salas): manda la columna, nunca la sala", () => {
+    // Una solicitud del bot de Casa Tomás sin sala sigue siendo de Casa Tomás.
+    expect(marcaDeSolicitud({ marca: "casa_tomas" }, ESPACIOS_BD)).toBe("casa_tomas");
+    // Aunque se le ponga por dentro una sala de otro negocio, la marca no cambia.
+    expect(marcaDeSolicitud({ marca: "casa_tomas", espacio_propuesto_id: "reservado" }, ESPACIOS_BD)).toBe(
+      "casa_tomas",
+    );
+    expect(marcaDeSolicitud({ marca: "touza", espacio_propuesto_id: null }, ESPACIOS_BD)).toBe("touza");
+    // Sin columna (migración sin aplicar) o vacía: se sigue derivando como antes.
+    expect(marcaDeSolicitud({ marca: null, espacio_propuesto_id: "reservado" }, ESPACIOS_BD)).toBe("touza");
+    expect(marcaDeSolicitud({ marca: "  ", notas_cliente: "Solicitud de El Reservado" }, ESPACIOS_BD)).toBe("touza");
+  });
+
   it("sala única de un negocio: Touza => El Reservado; Casa Tomás no preselecciona", () => {
     expect(espacioUnicoDeNegocio("touza", ESPACIOS_BD)).toBe("reservado");
     expect(espacioUnicoDeNegocio("casa_tomas", ESPACIOS_BD)).toBeNull();

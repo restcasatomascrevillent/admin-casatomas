@@ -24,10 +24,12 @@ import {
   MessageSquare,
   Lock,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useDisponibilidadCalculada } from "@/hooks/useDisponibilidad";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
 import { marcaDeEspacio, marcaDeReserva } from "@/lib/reservas/negocios";
 import { NegocioBadge } from "./NegocioBadge";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -112,24 +114,31 @@ export function ModalVerificacionReserva({
   // aforo y las zonas que se pueden ofrecer son solo las de ese negocio.
   const marca = marcaDeReserva(reserva);
 
-  // Motor de disponibilidad (supabase/functions/_shared/disponibilidad.ts vía
-  // useDisponibilidad.ts) recalculado para la ZONA que se esté ofreciendo
-  // ahora mismo en el formulario: cambiar de zona recalcula qué horas caben.
-  const { data: disponibilidad, isLoading: cargandoHoras, isError: errorHoras } = useDisponibilidadCalculada(
+  // Horas: TODOS los cuartos del turno de ese negocio (rejilla interna,
+  // reservas-sin-salas 2026-09-29), no las que la escalera ofrecería al
+  // público ni filtradas por sala: la sala es asignación interna y no limita
+  // la hora. El aforo lo sigue validando el trigger por turno.
+  const {
+    rejilla,
+    isLoading: cargandoHoras,
+    isError: errorHoras,
+  } = useRejillaCuartos({
     fecha,
-    { comensales, espacioId: salaAsignada, marca },
-  );
+    marca,
+    comensales,
+    hora: horaDecidida,
+    excluirReservaId: reserva?.id,
+    enabled: open,
+  });
 
   const opcionesHora = useMemo(() => {
-    const delMotor = disponibilidad ? disponibilidad.huecos.filter((h) => h.ofrecido).map((h) => h.hora) : [];
-    const set = new Set(delMotor);
-    // La hora actualmente seleccionada se incluye SIEMPRE, aunque el motor ya
-    // no la ofrezca de fábrica (p.ej. se llenó mientras tanto): así el Select
-    // nunca queda en un valor sin opción visible. Elegir una hora DISTINTA
-    // sigue limitado a lo que el motor permite — nada de texto libre.
+    const set = new Set((rejilla?.franjas ?? []).map((f) => f.hora));
+    // La hora actualmente seleccionada se incluye SIEMPRE, aunque no caiga en
+    // un cuarto del turno: así el Select nunca queda en un valor sin opción
+    // visible. Nada de texto libre.
     if (horaDecidida) set.add(horaDecidida);
     return Array.from(set).sort();
-  }, [disponibilidad, horaDecidida]);
+  }, [rejilla, horaDecidida]);
 
   const opcionesEspacio = useMemo(() => {
     const activos = (espacios ?? []).filter((e: any) => e.activa && marcaDeEspacio(e) === marca);
@@ -286,13 +295,37 @@ export function ModalVerificacionReserva({
             </p>
           )}
 
+          {/* Cómo queda el turno de 15 en 15: pulsar una hora la elige. */}
+          <DisponibilidadCuartos
+            fecha={fecha}
+            marca={marca}
+            comensales={comensales}
+            hora={horaDecidida}
+            excluirReservaId={reserva.id}
+            onSeleccionarHora={puedeEditar && !accionEnCurso ? setHoraDecidida : undefined}
+            compacto
+          />
+
           {/* LA SALA: no sale en ningún correo del cliente, así que no puede
               estar en el recuadro de arriba junto a la hora. Es reparto de
-              comedor. Ver el comentario de cabecera del componente. */}
-          <div className="space-y-1.5 border-t pt-4">
+              comedor, opcional y plegado (reservas-sin-salas): se asigna por
+              dentro, normalmente el día antes. Plegarlo NO cambia el valor:
+              la sala que ya tenga la reserva se guarda tal cual, nunca null. */}
+          <Collapsible className="space-y-1.5 border-t pt-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Solo para el restaurante</p>
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" className="group h-8 w-full justify-between px-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                  Asignación interna (opcional)
+                  <span className="text-muted-foreground">
+                    · {opcionesEspacio.find((e) => e.id === salaAsignada)?.nombre ?? "sin sala"}
+                  </span>
+                </span>
+                <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex items-center gap-2">
               <Select
                 value={salaAsignada ?? SIN_ZONA}
                 onValueChange={(v) => setSalaAsignada(v === SIN_ZONA ? null : v)}
@@ -310,15 +343,15 @@ export function ModalVerificacionReserva({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </CollapsibleContent>
             <p className="text-xs text-muted-foreground">
               La sala no se le dice al cliente: sirve para repartir el comedor.
             </p>
-          </div>
+          </Collapsible>
 
           {errorHoras && (
             <p className="text-xs text-destructive">
-              No se pudieron calcular las horas disponibles ahora mismo. Puedes verificar con la hora que pidió o
+              No se pudieron cargar las horas del turno ahora mismo. Puedes verificar con la hora que pidió o
               rechazar; para darle otra hora, inténtalo de nuevo en un momento.
             </p>
           )}

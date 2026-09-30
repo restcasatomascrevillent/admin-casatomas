@@ -166,6 +166,7 @@ import {
 import {
   validarSolicitudParaEnvio,
   huellaPropuestaSolicitud,
+  huellaSolicitudCoincide,
   datosCorreoPropuestaSolicitud,
   marcaDeSolicitudParaCorreo,
   claveIdempotenciaPropuestaSolicitud,
@@ -268,11 +269,12 @@ async function obtenerMapaEspacios(): Promise<Map<string, string>> {
   return new Map(((data ?? []) as Array<{ id: string; nombre: string }>).map((e) => [e.id, e.nombre]));
 }
 
-/** Marca de una solicitud (sin columna marca): sala propuesta > marcador
- * de El Reservado en las notas > Casa Tomás. Ver marcaDeSolicitudParaCorreo. */
+/** Marca de una solicitud: la columna `marca` (20260930100000) si viene; si
+ * no (migración sin aplicar), sala propuesta > marcador de El Reservado en
+ * las notas > Casa Tomás. Ver marcaDeSolicitudParaCorreo. */
 async function marcaDeSolicitud(s: SolicitudParaPropuesta): Promise<Marca> {
   let marcaEspacio: unknown = null;
-  if (s.espacio_propuesto_id) {
+  if (!s.marca && s.espacio_propuesto_id) {
     const { data } = await supabase
       .from("espacios_reserva")
       .select("caracteristicas")
@@ -585,7 +587,8 @@ async function construirCorreoParaTipo(
 ): Promise<{ asunto: string; html: string }> {
   let urlsBotones: { principal?: string; secundario?: string } | undefined;
   if (tipo === "propuesta") {
-    const huella = calcularHuella(reserva.estado, reserva.hora, reserva.espacio_id);
+    // Sin sala (reservas-sin-salas): asignarla después no rompe el enlace.
+    const huella = calcularHuella(reserva.estado, reserva.hora);
     const basadoEnEpoch = tokenBasadoEnIso ? Math.floor(new Date(tokenBasadoEnIso).getTime() / 1000) : undefined;
     const tokenAceptar = await firmarToken(TOKEN_SECRET, reserva.id, "aceptar", huella, basadoEnEpoch);
     const tokenRechazar = await firmarToken(TOKEN_SECRET, reserva.id, "rechazar", huella, basadoEnEpoch);
@@ -1275,9 +1278,11 @@ async function fetchSolicitud(id: string): Promise<SolicitudParaPropuesta | null
   return data as SolicitudParaPropuesta;
 }
 
-/** La propuesta del enlace sigue siendo la vigente (mismos datos, mismo envío). */
+/** La propuesta del enlace sigue siendo la vigente (mismos datos, mismo envío).
+ * La sala no cuenta; los enlaces de formato antiguo siguen valiendo (ver
+ * huellaSolicitudCoincide). */
 function propuestaVigente(s: SolicitudParaPropuesta, huellaToken: string): boolean {
-  return s.propuesta_estado === "enviada" && huellaPropuestaSolicitud(s) === huellaToken;
+  return s.propuesta_estado === "enviada" && huellaSolicitudCoincide(huellaToken, s);
 }
 
 async function avisoPanelBestEffort(titulo: string, mensaje: string, solicitudId: string): Promise<void> {
@@ -1403,26 +1408,33 @@ async function handleEnviarPropuestaSolicitud(req: Request): Promise<Response> {
 // mismas huellas, mismas acciones — un token de un correo ya enviado vale
 // igual en la web nueva.
 
-/** Detalles para la web a partir de una solicitud (fecha ISO, hora HH:MM). */
-async function detallesDeSolicitud(s: SolicitudParaPropuesta): Promise<DetallesEnlace> {
+/** Nombre de la sala para la página del cliente: SOLO en Touza, donde el
+ * espacio (El Reservado) es lo que se reserva. En Casa Tomás la sala es una
+ * decisión interna y el cliente no la ve (reservas-sin-salas). */
+async function espacioVisibleParaCliente(marca: Marca, espacioId: string | null | undefined): Promise<string | null> {
+  if (marca !== "touza" || !espacioId) return null;
   const mapa = await obtenerMapaEspacios();
+  return mapa.get(espacioId) ?? null;
+}
+
+/** Detalles para la web a partir de una solicitud (fecha ISO, hora HH:MM). */
+async function detallesDeSolicitud(s: SolicitudParaPropuesta, marca: Marca): Promise<DetallesEnlace> {
   return {
     nombre: s.nombre || "",
     fecha: (s.fecha_solicitada ?? "").slice(0, 10),
     hora: horaCorta(s.hora_solicitada) ?? "",
     comensales: Number(s.numero_comensales) || 0,
-    espacio: s.espacio_propuesto_id ? mapa.get(s.espacio_propuesto_id) ?? null : null,
+    espacio: await espacioVisibleParaCliente(marca, s.espacio_propuesto_id),
   };
 }
 
 async function detallesDeReserva(r: ReservaRow): Promise<DetallesEnlace> {
-  const mapa = await obtenerMapaEspacios();
   return {
     nombre: r.nombre || "",
     fecha: (r.fecha ?? "").slice(0, 10),
     hora: (r.hora ?? "").slice(0, 5),
     comensales: r.numero_comensales,
-    espacio: r.espacio_id ? mapa.get(r.espacio_id) ?? null : null,
+    espacio: await espacioVisibleParaCliente(marcaSegura(r.marca), r.espacio_id),
   };
 }
 
@@ -1470,7 +1482,7 @@ async function consultarEnlace(token: string): Promise<RespuestaEnlace> {
     return respuestaEnlace(ctx, estado, await detallesDeReserva(ctx.reserva));
   }
   const estado = estadoPropuesta(ctx.accion, ctx.solicitud.propuesta_estado, propuestaVigente(ctx.solicitud, ctx.carga.fp));
-  return respuestaEnlace(ctx, estado, await detallesDeSolicitud(ctx.solicitud));
+  return respuestaEnlace(ctx, estado, await detallesDeSolicitud(ctx.solicitud, ctx.marca));
 }
 
 /** Contraoferta: aceptar = verificada -> confirmada; rechazar = verificada -> cancelada. */
@@ -1526,7 +1538,7 @@ async function avisoPanelReservaBestEffort(reserva: ReservaRow, accion: AccionWe
 /** Propuesta de una solicitud del bot: aceptar crea la reserva; rechazar la marca rechazada. */
 async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta" }>): Promise<RespuestaEnlace> {
   const { solicitud: s, accion } = ctx;
-  const detalles = await detallesDeSolicitud(s);
+  const detalles = await detallesDeSolicitud(s, ctx.marca);
   const previo = estadoPropuesta(accion, s.propuesta_estado, propuestaVigente(s, ctx.carga.fp));
   if (previo !== "pendiente") return respuestaEnlace(ctx, previo, detalles);
 
@@ -1640,7 +1652,7 @@ async function handleRecordatorios(req: Request): Promise<Response> {
 
   const { data: candidatas, error: errCand } = await supabase
     .from("reservas")
-    .select("id, estado, fecha, email")
+    .select("id, estado, fecha, email, nombre, notas_cliente") // nombre y notas: excluir datos de prueba (esReservaDePrueba)
     .eq("fecha", fechaObjetivo)
     .eq("estado", "confirmada");
   if (errCand) {

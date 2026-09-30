@@ -2,13 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Trash2 } from "lucide-react";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
 
 const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   solicitud_pendiente: AlertTriangle,
   reserva_nueva: Clock,
+  // Aviso del cron `reservas-aviso-sin-asignar`: reserva dentro de la ventana
+  // de asignación que aún no tiene sala o mesa.
+  reserva_sin_asignar: LayoutGrid,
   sistema: Info,
 };
 
@@ -42,7 +45,11 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
     marcarLeida(notif.id);
     // Las solicitudes viven ahora dentro de la pestaña unificada "Reservas",
     // filtradas por "Solicitudes sin resolver" (antes: ?tab=solicitudes).
-    if (notif.referencia_tipo === "solicitud") {
+    if (notif.tipo === "reserva_sin_asignar") {
+      // Reserva sin sala o sin mesa dentro de la ventana: al panel de
+      // asignación (pestaña "Asignación" de /reservas).
+      navigate("/reservas?tab=asignacion");
+    } else if (notif.referencia_tipo === "solicitud") {
       navigate("/reservas?tab=reservas&status=solicitudes");
     }
   };

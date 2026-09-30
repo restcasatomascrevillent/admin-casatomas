@@ -15,6 +15,19 @@ vi.mock("@/hooks/useOcupacionSalasDia", () => ({
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({ SolicitudCard: () => null }));
 vi.mock("@/components/reservas/OcupacionSalas", () => ({ OcupacionSalas: () => null }));
+// La rejilla en cuartos se prueba aparte; aquí se espía con qué negocio se pinta.
+const rejillaProps = vi.hoisted(() => [] as { marca?: string | null }[]);
+vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
+  DisponibilidadCuartos: (props: { marca?: string | null }) => {
+    rejillaProps.push(props);
+    return null;
+  },
+  useRejillaCuartos: () => ({
+    rejilla: { franjas: [{ hora: "21:00", origen: "turno" }], aforo: {} },
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 import { SolicitudGestionPanel } from "@/components/reservas/SolicitudGestionPanel";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
@@ -55,6 +68,28 @@ function montar(s: SolicitudPendiente) {
   );
   return { onAceptarTelefono };
 }
+
+describe("SolicitudGestionPanel · sala interna y marca (reservas-sin-salas)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    rejillaProps.length = 0;
+  });
+
+  it("la rejilla usa la columna marca de la solicitud, aunque no tenga sala", () => {
+    montar(solicitud({ marca: "touza" }));
+    expect(rejillaProps.at(-1)?.marca).toBe("touza");
+  });
+
+  it("la sala va plegada en 'Asignación interna (opcional)' y no forma parte de la propuesta de Casa Tomás", () => {
+    montar(solicitud({ marca: "casa_tomas" }));
+    expect(screen.getByRole("button", { name: /asignación interna \(opcional\)/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Sala")).not.toBeInTheDocument();
+    expect(screen.queryByRole("rowheader", { name: /sala|espacio/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /asignación interna \(opcional\)/i }));
+    expect(screen.getByLabelText("Sala")).toBeInTheDocument();
+  });
+});
 
 describe("SolicitudGestionPanel · aceptó por teléfono", () => {
   beforeEach(() => vi.clearAllMocks());

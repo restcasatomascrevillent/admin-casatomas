@@ -62,7 +62,7 @@ async function getPhoneConfig() {
 // ── Respuestas del bot — textos por defecto ─────────────────────────────────
 const DEFAULT_BOT_RESPONSES: Record<string, string> = {
     transfer_to_human: 'Un momento, ahora mismo te paso con el restaurante.',
-    availability_found: 'Perfecto, hay disponibilidad el {fecha} a las {hora} para {comensales} personas. Espacios disponibles: {espacios}. ¿Procedemos con la reserva? Solo necesito tu nombre.',
+    availability_found: 'Perfecto, hay disponibilidad el {fecha} a las {hora} para {comensales} personas. ¿Procedemos con la reserva? Solo necesito tu nombre.',
     availability_not_found: 'Vaya, lo siento — no tenemos hueco el {fecha} a las {hora} para {comensales} personas. ¿Quieres probar con otra fecha u hora?',
     reservation_created: 'Listo, {nombre}, ya tengo anotada tu reserva para {comensales} personas el {fecha} a las {hora}{notas_texto}. Quedará pendiente de confirmación — te llamaremos para dártela por buena. ¿En qué más puedo ayudarte?',
     reservation_blacklist: 'Lo siento, en este momento no podemos tramitar tu reserva por teléfono. Te animamos a contactarnos por otro medio.',
@@ -76,7 +76,7 @@ const DEFAULT_BOT_RESPONSES: Record<string, string> = {
     reservation_error: 'Vaya, ha habido un problema al registrar la reserva. ¿Lo intentamos de nuevo, o prefieres llamar directamente al restaurante?',
     find_no_phone: 'No puedo verificar tu número. Por favor, llama desde el teléfono con el que hiciste la reserva.',
     find_not_found: 'No encuentro reservas activas para este número{fecha_texto}. ¿Puede que la reserva estuviera a otro nombre o teléfono?',
-    find_found_one: 'Aquí tienes tu reserva: {fecha} a las {hora}, {comensales} personas{espacio_texto}, a nombre de {nombre} — estado: {estado}. [REF_INTERNA:{id}] ¿Quieres modificarla o cancelarla?',
+    find_found_one: 'Aquí tienes tu reserva: {fecha} a las {hora}, {comensales} personas, a nombre de {nombre} — estado: {estado}. [REF_INTERNA:{id}] ¿Quieres modificarla o cancelarla?',
     find_found_many: 'Tienes {cantidad} reservas activas:\n{lista}\n¿Cuál te gustaría modificar o cancelar? Dime la fecha o el número.',
     find_error: 'Ha habido un problema buscando tus reservas. Inténtalo de nuevo o llama al restaurante.',
     modify_not_found: 'No encuentro esa reserva, o puede que ya no esté activa.',
@@ -132,14 +132,14 @@ const BOT_RESPONSE_LABELS: Record<string, string> = {
 };
 
 const BOT_RESPONSE_VARS: Record<string, string> = {
-    availability_found: '{fecha}, {hora}, {comensales}, {espacios}',
+    availability_found: '{fecha}, {hora}, {comensales}',
     availability_not_found: '{fecha}, {hora}, {comensales}',
     reservation_created: '{nombre}, {fecha}, {hora}, {comensales}, {notas_texto}',
     reservation_group_large: '{max}', reservation_cutoff: '{minutos}',
     reservation_max_phone: '{max}', reservation_max_email: '{max}',
     reservation_no_availability: '{fecha}, {hora}, {comensales}',
     find_not_found: '{fecha_texto}',
-    find_found_one: '{fecha}, {hora}, {comensales}, {espacio_texto}, {nombre}, {estado}, {id}',
+    find_found_one: '{fecha}, {hora}, {comensales}, {nombre}, {estado}, {id}',
     find_found_many: '{cantidad}, {lista}',
     modify_no_availability: '{fecha}, {comensales}', modify_success: '{cambios}',
     validation_date_too_far: '{dias}', validation_cutoff: '{minutos}',

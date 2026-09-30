@@ -7,6 +7,8 @@ import { describe, it, expect } from "vitest";
 import {
   validarSolicitudParaEnvio,
   huellaPropuestaSolicitud,
+  huellaSolicitudCoincide,
+  marcaDeSolicitudParaCorreo,
   datosCorreoPropuestaSolicitud,
   epochSegundos,
   horaOriginalDeNotas,
@@ -73,18 +75,76 @@ describe("huellaPropuestaSolicitud", () => {
   it("normaliza la hora (14:30 == 14:30:00)", () => {
     expect(huellaPropuestaSolicitud(base({ hora_solicitada: "14:30:00" }))).toBe(huellaPropuestaSolicitud(base()));
   });
-  it("cambia si cambia día, hora, pax, sala o el envío", () => {
+  it("es v2|fecha|HH:MM|pax|enviada (sin sala)", () => {
+    expect(huellaPropuestaSolicitud(base({ propuesta_enviada_at: "2026-09-23T10:00:00Z" }))).toBe(
+      "v2|2026-10-06|14:30|12|1790157600",
+    );
+  });
+  it("cambia si cambia día, hora, pax o el envío", () => {
     const h = huellaPropuestaSolicitud(base({ propuesta_enviada_at: enviada }));
     for (const over of [
       { fecha_solicitada: "2026-10-07" },
       { hora_solicitada: "15:00" },
       { numero_comensales: 11 },
-      { espacio_propuesto_id: "esp-2" },
-      { espacio_propuesto_id: null },
       { propuesta_enviada_at: "2026-09-23T10:00:05.000Z" },
     ]) {
       expect(huellaPropuestaSolicitud(base({ propuesta_enviada_at: enviada, ...over }))).not.toBe(h);
     }
+  });
+  it("NO cambia si cambia o se quita la sala propuesta (es interna)", () => {
+    const h = huellaPropuestaSolicitud(base({ propuesta_enviada_at: enviada }));
+    expect(huellaPropuestaSolicitud(base({ propuesta_enviada_at: enviada, espacio_propuesto_id: "esp-2" }))).toBe(h);
+    expect(huellaPropuestaSolicitud(base({ propuesta_enviada_at: enviada, espacio_propuesto_id: null }))).toBe(h);
+  });
+});
+
+describe("marcaDeSolicitudParaCorreo con la columna marca (20260930100000)", () => {
+  it("la marca guardada manda sobre la sala y las notas", () => {
+    expect(marcaDeSolicitudParaCorreo({ marca: "touza", espacio_propuesto_id: null, notas_cliente: null }, null)).toBe("touza");
+    expect(marcaDeSolicitudParaCorreo({ marca: "casa_tomas", espacio_propuesto_id: "r", notas_cliente: null }, "touza")).toBe(
+      "casa_tomas",
+    );
+    expect(
+      marcaDeSolicitudParaCorreo({ marca: "casa_tomas", espacio_propuesto_id: null, notas_cliente: "Solicitud de El Reservado" }, null),
+    ).toBe("casa_tomas");
+  });
+  it("sin columna (migración sin aplicar) o valor raro: regla antigua", () => {
+    expect(marcaDeSolicitudParaCorreo({ espacio_propuesto_id: "r", notas_cliente: null }, "touza")).toBe("touza");
+    expect(marcaDeSolicitudParaCorreo({ marca: "otra", espacio_propuesto_id: null, notas_cliente: "Solicitud de El Reservado" }, null)).toBe(
+      "touza",
+    );
+  });
+});
+
+describe("huellaSolicitudCoincide", () => {
+  const enviada = "2026-09-23T10:00:00Z";
+  const s = base({ propuesta_enviada_at: enviada });
+
+  it("v2: coincide con la huella firmada y no si cambió algo", () => {
+    const fp = huellaPropuestaSolicitud(s);
+    expect(huellaSolicitudCoincide(fp, s)).toBe(true);
+    expect(huellaSolicitudCoincide(fp, { ...s, espacio_propuesto_id: "esp-9" })).toBe(true);
+    expect(huellaSolicitudCoincide(fp, { ...s, hora_solicitada: "15:00" })).toBe(false);
+  });
+
+  it("legado de 5 partes (fecha|hora|pax|sala|enviada): ignora la sala", () => {
+    const legado = "2026-10-06|14:30|12|esp-1|1790157600";
+    expect(huellaSolicitudCoincide(legado, s)).toBe(true);
+    expect(huellaSolicitudCoincide(legado, { ...s, espacio_propuesto_id: "esp-2" })).toBe(true);
+    expect(huellaSolicitudCoincide(legado, { ...s, espacio_propuesto_id: null })).toBe(true);
+  });
+
+  it("legado: se rechaza si cambió día, hora, pax o el envío", () => {
+    const legado = "2026-10-06|14:30|12|esp-1|1790157600";
+    expect(huellaSolicitudCoincide(legado, { ...s, fecha_solicitada: "2026-10-07" })).toBe(false);
+    expect(huellaSolicitudCoincide(legado, { ...s, hora_solicitada: "15:00" })).toBe(false);
+    expect(huellaSolicitudCoincide(legado, { ...s, numero_comensales: 11 })).toBe(false);
+    expect(huellaSolicitudCoincide(legado, { ...s, propuesta_enviada_at: "2026-09-23T10:00:05Z" })).toBe(false);
+  });
+
+  it("legado mal formado o vacío => no coincide", () => {
+    expect(huellaSolicitudCoincide("2026-10-06|14:30|12|1790157600", s)).toBe(false);
+    expect(huellaSolicitudCoincide("", s)).toBe(false);
   });
 });
 

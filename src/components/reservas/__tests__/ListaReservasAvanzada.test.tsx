@@ -28,6 +28,8 @@ const supa = vi.hoisted(() => ({
   update: vi.fn(),
   eq: vi.fn(),
   filas: [] as Record<string, unknown>[],
+  // Props con las que se monta el alta al convertir una solicitud.
+  formulario: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -66,7 +68,10 @@ vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerifica
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
 vi.mock("@/components/reservas/SolicitudGestionPanel", () => ({ SolicitudGestionPanel: () => null }));
 vi.mock("@/components/reservas/FormularioReserva", () => ({
-  FormularioReserva: () => null,
+  FormularioReserva: (props: unknown) => {
+    supa.formulario(props);
+    return null;
+  },
   CLAVES_REFRESCO_RESERVAS: ["reservas-lista"],
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({
@@ -361,5 +366,22 @@ describe("ListaReservasAvanzada · cancelar pide confirmación", () => {
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "cancelada" }));
     expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
     expect(supa.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ListaReservasAvanzada · convertir una solicitud respeta su marca", () => {
+  it("usa la marca GUARDADA en la solicitud, no la deduce de la sala", async () => {
+    // Solicitud de Touza sin sala propuesta ni marcador en las notas: antes se
+    // deducía Casa Tomás. Ahora manda la columna solicitudes_pendientes.marca.
+    const deTouza = { ...solicitud, marca: "touza" } as SolicitudPendiente;
+    const { tabla } = await montar({
+      solicitudesState: { ...estadoSolicitudes, solicitudes: [deTouza] } as typeof estadoSolicitudes,
+    });
+    const fila = filaDe(tabla, "Familia Ballester");
+    fireEvent.click(botonesDeFila(fila)[0]);
+
+    await waitFor(() => expect(supa.formulario).toHaveBeenCalled());
+    const props = supa.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: { marca: string } };
+    expect(props.datosPreseleccionados.marca).toBe("touza");
   });
 });

@@ -16,6 +16,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LayoutGrid, Utensils } from "lucide-react";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
+import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
@@ -260,6 +261,7 @@ export default function Reservas() {
                     Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                   </SelectItem>
                   <SelectItem value="calendario">Calendario</SelectItem>
+                  <SelectItem value="asignacion">Asignación</SelectItem>
                   <SelectItem value="blacklist">Blacklist</SelectItem>
                   {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
                 </SelectContent>
@@ -288,6 +290,7 @@ export default function Reservas() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
+                <TabsTrigger value="asignacion" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Asignación</TabsTrigger>
                 <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
                 {isAdmin && (
                   <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
@@ -357,6 +360,13 @@ export default function Reservas() {
 
         <TabsContent value="calendario" className="space-y-6 mt-6">
           <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
+        </TabsContent>
+
+        {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva
+            una hora; aquí se reparten salas y mesas, con las próximas N horas
+            arriba. "Mesas" usa el mismo salto al plano que Lista y Hoy. */}
+        <TabsContent value="asignacion" className="mt-6">
+          <PanelAsignacion onAsignarMesa={handleAsignarMesa} />
         </TabsContent>
 
         <TabsContent value="blacklist" className="space-y-6 mt-6">

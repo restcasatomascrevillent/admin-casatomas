@@ -730,11 +730,16 @@ export function ListaReservasAvanzada({
     const p = propuestaConversion;
     const fecha = p ? p.fecha : s.fecha_solicitada;
     const hora = p ? p.hora : s.hora_solicitada;
-    // Negocio de la solicitud (sala propuesta o marcador de El Reservado en
-    // las notas). Si es de un negocio con una sola sala (Touza), esa sala
-    // queda preseleccionada: la reserva nace de Touza, con su aforo.
+    // Negocio de la solicitud: manda la marca guardada en la solicitud
+    // (reservas-sin-salas); solo si falta se deduce de la sala propuesta o del
+    // marcador de El Reservado en las notas. Si es de un negocio con una sola
+    // sala (Touza), esa sala queda preseleccionada: la reserva nace de Touza,
+    // con su aforo.
     const espacioElegido = p ? p.espacioId : s.espacio_propuesto_id ?? null;
-    const marca = marcaDeSolicitud({ espacio_propuesto_id: espacioElegido, notas_cliente: s.notas_cliente }, espacios);
+    const marca = marcaDeSolicitud(
+      { marca: s.marca, espacio_propuesto_id: espacioElegido, notas_cliente: s.notas_cliente },
+      espacios,
+    );
     return {
       fecha: fecha ? new Date(`${fecha}T12:00:00`) : undefined,
       hora: hora ? String(hora).substring(0, 5) : undefined,

@@ -31,8 +31,12 @@ const reserva: ReservaServicio = {
   espacio_id: null,
 };
 
-/** Builder que resuelve cada `await` con la siguiente respuesta de la cola. */
-function mockUpdates(respuestas: { error: unknown }[]) {
+/**
+ * Builder que resuelve cada `await` con la siguiente respuesta de la cola.
+ * Sin `data` explícito, una escritura sin error devuelve la fila afectada
+ * (lo que da `.select("id")` cuando RLS la deja pasar).
+ */
+function mockUpdates(respuestas: { error: unknown; data?: unknown }[]) {
   const updates: Record<string, unknown>[] = [];
   (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
     const builder: Record<string, unknown> = {
@@ -41,8 +45,12 @@ function mockUpdates(respuestas: { error: unknown }[]) {
         return builder;
       }),
       eq: vi.fn(() => builder),
-      then: (ok: (v: unknown) => unknown) =>
-        Promise.resolve({ data: null, error: (respuestas.shift() ?? { error: null }).error }).then(ok),
+      select: vi.fn(() => builder),
+      then: (ok: (v: unknown) => unknown) => {
+        const r = respuestas.shift() ?? { error: null };
+        const data = "data" in r ? r.data : r.error ? null : [{ id: reserva.id }];
+        return Promise.resolve({ data, error: r.error }).then(ok);
+      },
     };
     return builder;
   });
@@ -94,6 +102,31 @@ describe("useAccionesServicioReserva", () => {
     expect(kanban(queryClient)[0].espacio_id).toBeNull();
     expect(queryClient.getQueryData<ReservaServicio[]>(["reservas-hoy", "2026-09-23"])![0].espacio_id).toBeNull();
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("permission denied"));
+  });
+
+  it("si RLS deniega la escritura (0 filas, sin error) NO lo da por hecho: revierte y avisa", async () => {
+    mockUpdates([{ error: null, data: [] }]);
+    const { result, queryClient } = setup();
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.moverEspacio(reserva, "terraza", "Terraza");
+    });
+    expect(ok).toBe(false);
+    expect(kanban(queryClient)[0].espacio_id).toBeNull();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no tienes permiso.*o ya no existe/i));
+  });
+
+  it("lo mismo al marcar la llegada: 0 filas es un error, no un éxito", async () => {
+    mockUpdates([{ error: null, data: [] }]);
+    const { result, queryClient } = setup();
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.marcarLlegada(reserva);
+    });
+    expect(ok).toBe(false);
+    expect(kanban(queryClient)[0].estado).toBe("confirmada");
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/registrar la llegada.*no tienes permiso/i));
   });
 
   it("no mueve reservas canceladas", async () => {

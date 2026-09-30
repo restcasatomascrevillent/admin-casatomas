@@ -83,6 +83,9 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 
+// Reglas de sala del alta (reservas-sin-salas): módulo puro, testeado con vitest.
+import { rechazarPorSala, contarEspaciosQueCaben, salaDelCliente } from "./reglas.ts";
+
 // ------------------------------------------------------------
 // CONFIGURACIÓN
 // ------------------------------------------------------------
@@ -244,6 +247,9 @@ interface SolicitudPendienteInput {
   notas?: string | null;
   motivo: string;
   descripcion?: string;
+  /** Negocio de la solicitud (columna de 20260930100000). Se guarda: ya no
+   * se deduce de la sala, que en Casa Tomás es interna. */
+  marca: Marca;
 }
 async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Promise<void> {
   try {
@@ -258,6 +264,7 @@ async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Prom
       motivo_rechazo: input.motivo,
       descripcion_rechazo: input.descripcion || null,
       estado: "pendiente",
+      marca: input.marca,
     });
     if (error) console.error("[SOLICITUD] Error al registrar:", error.message);
   } catch (err) {
@@ -299,7 +306,8 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     .eq("activa", true);
 
   // Filtra a la marca pedida ANTES de construir nada: ni el desglose por
-  // espacio (`espacios`, que decide `espaciosLibres` en `handleCrear`) ni
+  // espacio (`espacios`, que en Touza decide si el grupo cabe en un espacio,
+  // ver `rechazarPorSala` en reglas.ts) ni
   // `capacidadTotal` deben ver espacios de otro negocio. Bug corregido
   // 2026-09-22: antes sumaba TODOS los espacios activos sin mirar la marca
   // (150 -> 170 al dar de alta "El Reservado", de Touza). Mismo criterio
@@ -1040,8 +1048,8 @@ async function handleCrear(req: Request): Promise<Response> {
   const hora = typeof body?.hora === "string" ? body.hora : "";
   const partySize = parseInt(String(body?.numero_comensales), 10);
   const notas = typeof body?.notas_cliente === "string" ? body.notas_cliente.slice(0, 500) : null;
-  const salaNombre = typeof body?.sala === "string" ? body.sala : null;
-  const espacioIdInput = typeof body?.espacio_id === "string" ? body.espacio_id : null;
+  const salaNombreBody = typeof body?.sala === "string" ? body.sala : null;
+  const espacioIdBody = typeof body?.espacio_id === "string" ? body.espacio_id : null;
 
   // Marca (Casa Tomás / Touza) — primera pasada, SIN tocar la BD: solo con
   // `body.marca` (ningún frontend la manda hoy, pero ya se acepta) y con el
@@ -1053,6 +1061,17 @@ async function handleCrear(req: Request): Promise<Response> {
   // del INSERT — ver más abajo — para la reserva que de verdad se guarda.
   const marcaTemprana: Marca = resolverMarca({ marcaExplicita: body?.marca, notasCliente: notas });
   const negocioTemprano: DatosNegocio = NEGOCIOS[marcaTemprana];
+
+  // reservas-sin-salas: en Casa Tomás la sala es interna y la web IGNORA la
+  // que mande el cliente (la reserva queda sin sala y la asigna el personal).
+  // En Touza se respeta: El Reservado es lo que se reserva. Ver reglas.ts.
+  // Consecuencia aceptada: una petición cuya ÚNICA señal de Touza fuera un
+  // espacio_id/sala (sin `marca` ni el marcador de El Reservado en las notas)
+  // se trata como Casa Tomás. Ningún frontend manda hoy espacio_id ni sala.
+  const { espacioId: espacioIdInput, salaNombre } = salaDelCliente(marcaTemprana, {
+    espacioId: espacioIdBody,
+    salaNombre: salaNombreBody,
+  });
 
   if (!nombre) return json({ ok: false, error: "nombre_requerido" }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return json({ ok: false, error: "fecha_invalida" }, 400);
@@ -1079,7 +1098,7 @@ async function handleCrear(req: Request): Promise<Response> {
   if (config.telefono_obligatorio && !telefono) return json({ ok: false, error: "telefono_requerido" }, 400);
   if (config.email_obligatorio && !email) return json({ ok: false, error: "email_requerido" }, 400);
 
-  const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas };
+  const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas, marca: marcaTemprana };
   // B-3: antes esto devolvía SIEMPRE HTTP 200. El frontend solo mira
   // `response.ok` y nunca lee el cuerpo, así que un cliente RECHAZADO veía
   // el diálogo de "¡Reserva confirmada!" a la vez que recibía el email de
@@ -1292,8 +1311,9 @@ async function handleCrear(req: Request): Promise<Response> {
   // `marcaTemprana`: mismo razonamiento que en el bloque de arriba.
   const { espacios, capacidadTotal, ocupacionTotal } = await getEspaciosConOcupacion(fecha, hora, marcaTemprana);
   const disponibleGlobal = ocupacionTotal + partySize <= capacidadTotal;
-  const espaciosLibres = espacios.filter((e) => e.disponible >= partySize);
-  if (!disponibleGlobal || espaciosLibres.length === 0) {
+  // Casa Tomás: solo el aforo del turno (un grupo de 60 entra aunque ninguna
+  // sala tenga 60). Touza: además, que quepa en un espacio. Ver reglas.ts.
+  if (rechazarPorSala(marcaTemprana, disponibleGlobal, contarEspaciosQueCaben(espacios, partySize))) {
     return await avisar(
       "sin_disponibilidad",
       `Sin hueco el ${fecha} a las ${hora} para ${partySize} personas. Capacidad: ${capacidadTotal}, ocupación: ${ocupacionTotal}.`,
