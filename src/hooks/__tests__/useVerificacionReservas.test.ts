@@ -28,7 +28,7 @@ vi.mock("@/integrations/supabase/client");
 import {
   type ReservaParaVerificar,
   difiereSolicitudDeOferta,
-  objetivoAceptarComoSolicitado,
+  espacioAlAceptar,
   avisoAlCliente,
 } from "@/hooks/useVerificacionReservas";
 // La función del correo REAL, sin pasar por el hook: el espejo se compara
@@ -114,10 +114,20 @@ describe("difiereSolicitudDeOferta", () => {
   });
 });
 
-describe("objetivoAceptarComoSolicitado", () => {
-  it("sigue leyendo las columnas de lo solicitado (no se ha borrado ningún dato)", () => {
+describe("espacioAlAceptar", () => {
+  // cambio acordado con el dueño (2026-10-01): «Aceptar» acepta la reserva TAL COMO ESTÁ AHORA. Antes el test fijaba
+  // `objetivoAceptarComoSolicitado` = { hora: hora_solicitada, espacio_id: espacio_solicitado_id }, que borraba la
+  // sala y las mesas que el personal ya hubiera asignado (Casa Tomás: sala pedida null) y revertía la hora editada.
+  // La matriz completa está en `src/lib/reservas/__tests__/verificacion.test.ts`; aquí solo se comprueba que el hook
+  // sigue reexportando la función (la usa la ficha de verificación) y que respeta las columnas de lo solicitado.
+  it("con la hora editada y otra sala puesta: no toca ninguna de las dos (ni hora ni sala)", () => {
     const r = reserva({ hora: "21:00", hora_solicitada: "14:00", espacio_id: "a", espacio_solicitado_id: "b" });
-    expect(objetivoAceptarComoSolicitado(r)).toEqual({ hora: "14:00", espacio_id: "b" });
+    expect(espacioAlAceptar(r)).toEqual({});
+  });
+
+  it("sin sala y con una pedida (Touza): la rellena con la pedida", () => {
+    const r = reserva({ hora: "21:00", hora_solicitada: "14:00", espacio_id: null, espacio_solicitado_id: "b" });
+    expect(espacioAlAceptar(r)).toEqual({ espacio_id: "b" });
   });
 });
 

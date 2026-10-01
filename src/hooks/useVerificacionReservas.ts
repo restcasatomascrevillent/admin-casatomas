@@ -44,7 +44,7 @@ export {
   MENSAJE_MIGRACION_PENDIENTE,
   avisoAlCliente,
   esErrorMigracionReservasFaltante,
-  objetivoAceptarComoSolicitado,
+  espacioAlAceptar,
   type CambiosVerificacion,
   type ReservaParaVerificar,
 } from "@/lib/reservas/verificacion";

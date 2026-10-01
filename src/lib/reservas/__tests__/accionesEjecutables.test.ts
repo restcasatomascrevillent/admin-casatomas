@@ -99,15 +99,8 @@ describe("las columnas que escribe cada acción", () => {
     expect(mover(reserva(), { destinoId: null, nombreDestino: "Sin asignar" }, { ahora: AHORA })).toEqual({ espacio_id: null });
   });
 
-  it("aceptar: lo que pidió el cliente (hora_solicitada y espacio_solicitado_id mandan sobre los vigentes)", () => {
-    expect(cambios("aceptar", reserva({ estado: "pendiente", hora: "14:00:00" }))).toEqual({
-      hora: "14:00:00",
-      espacio_id: null,
-      estado: "verificada",
-    });
-    expect(
-      cambios("aceptar", reserva({ estado: "pendiente", hora: "21:00:00", hora_solicitada: "13:30:00", espacio_id: "salon", espacio_solicitado_id: null })),
-    ).toEqual({ hora: "13:30:00", espacio_id: null, estado: "verificada" });
+  it("aceptar: solo el estado (y la sala solo si hay que rellenarla): ver la sección «Aceptar acepta la reserva TAL COMO ESTÁ» más abajo", () => {
+    expect(cambios("aceptar", reserva({ estado: "pendiente", hora: "14:00:00" }))).toEqual({ estado: "verificada" });
   });
 
   it("verificar: la hora y la sala DECIDIDAS", () => {
@@ -135,6 +128,125 @@ describe("las columnas que escribe cada acción", () => {
     expect(cambios("importante", reserva({ importante: true }))).toEqual({ importante: false });
     expect(cambios("importante", reserva({ importante: null }))).toEqual({ importante: true });
     expect(cambios("importante", reserva({ importante: undefined }))).toEqual({ importante: true });
+  });
+});
+
+describe("aceptar: «Aceptar» acepta la reserva TAL COMO ESTÁ AHORA (cambio acordado con el dueño, 2026-10-01)", () => {
+  // Antes escribía `hora = hora_solicitada` y `espacio_id = espacio_solicitado_id`. En Casa Tomás el cliente ya
+  // no elige sala (`espacio_solicitado_id` es null), así que Aceptar dejaba `espacio_id` en null y el trigger de
+  // la BD BORRABA la sala y las mesas que el personal ya hubiera asignado; y revertía en silencio la hora que el
+  // personal hubiera editado antes de aceptar. Ahora solo escribe el estado (y la sala, solo para rellenarla).
+  const SALON = "e-salon";
+  const RESERVADO = "e-reservado-touza";
+
+  /**
+   * ¿Se ejecutaría `trg_reservas_sincronizar_asignaciones` (y con él, borrar o mover las mesas)? Es el `WHEN` del
+   * trigger (migración 20260926140000): cancelar, o cambiar `espacio_id`, `fecha` u `hora`. Copiado aquí para que
+   * el test diga CLARAMENTE que Aceptar no toca las mesas.
+   */
+  const tocariaLasMesas = (actual: ReservaEjecutable, cambiosEscritos: object) => {
+    const escrito = cambiosEscritos as Record<string, unknown>;
+    return (
+      escrito.estado === "cancelada" ||
+      ("espacio_id" in escrito && (escrito.espacio_id ?? null) !== (actual.espacio_id ?? null)) ||
+      ("hora" in escrito && escrito.hora !== actual.hora)
+    );
+  };
+
+  const pendiente = (extra: Partial<ReservaEjecutable>) => reserva({ estado: "pendiente", hora: "14:00:00", espacio_id: null, ...extra });
+
+  it("Casa Tomás, sin sala pedida ni asignada: escribe SOLO el estado", () => {
+    expect(cambios("aceptar", pendiente({ hora_solicitada: "14:00:00", espacio_solicitado_id: null }))).toEqual({ estado: "verificada" });
+  });
+
+  it("Casa Tomás con la sala que ya asignó el personal (el caso P1): NO la toca, así que el trigger no borra ni sala ni mesas", () => {
+    const actual = pendiente({ hora_solicitada: "14:00:00", espacio_id: SALON, espacio_solicitado_id: null });
+    const escrito = cambios("aceptar", actual);
+
+    expect(escrito).toEqual({ estado: "verificada" });
+    expect(escrito).not.toHaveProperty("espacio_id");
+    expect(tocariaLasMesas(actual, escrito)).toBe(false);
+  });
+
+  it("con la hora EDITADA por el personal (distinta de la pedida): NO se revierte, la hora ni se escribe", () => {
+    const actual = pendiente({ hora: "14:30:00", hora_solicitada: "14:00:00", espacio_solicitado_id: null });
+    const escrito = cambios("aceptar", actual);
+
+    expect(escrito).toEqual({ estado: "verificada" });
+    expect(escrito).not.toHaveProperty("hora");
+    expect(tocariaLasMesas(actual, escrito)).toBe(false);
+  });
+
+  it("hora editada Y sala asignada a la vez: lo único que cambia es el estado", () => {
+    const actual = pendiente({ hora: "21:15:00", hora_solicitada: "14:00:00", espacio_id: SALON, espacio_solicitado_id: null });
+
+    expect(cambios("aceptar", actual)).toEqual({ estado: "verificada" });
+  });
+
+  it("Touza (El Reservado), con su espacio ya fijado (el normal): idéntico a antes en el resultado, solo el estado", () => {
+    const actual = pendiente({ espacio_id: RESERVADO, espacio_solicitado_id: RESERVADO, hora_solicitada: "14:00:00" });
+    const escrito = cambios("aceptar", actual);
+
+    expect(escrito).toEqual({ estado: "verificada" });
+    expect(tocariaLasMesas(actual, escrito)).toBe(false);
+  });
+
+  it("Touza sin espacio ahora y con el pedido: lo RELLENA con el pedido (el espacio ES lo reservado)", () => {
+    expect(cambios("aceptar", pendiente({ espacio_id: null, espacio_solicitado_id: RESERVADO }))).toEqual({
+      espacio_id: RESERVADO,
+      estado: "verificada",
+    });
+  });
+
+  it("con la sala actual distinta de la pedida: manda la ACTUAL, no se cambia por la pedida", () => {
+    const actual = pendiente({ espacio_id: SALON, espacio_solicitado_id: RESERVADO });
+
+    expect(cambios("aceptar", actual)).toEqual({ estado: "verificada" });
+  });
+
+  it("con la migración sin aplicar (la fila no trae lo pedido): también solo el estado", () => {
+    expect(cambios("aceptar", pendiente({ espacio_id: SALON }))).toEqual({ estado: "verificada" });
+    expect(cambios("aceptar", pendiente({ espacio_id: null }))).toEqual({ estado: "verificada" });
+  });
+
+  it("INVARIANTE: en todas las combinaciones, jamás escribe `hora` ni `espacio_id` en null, ni cambia la sala por otra distinta de la que hay", () => {
+    const horas = ["14:00:00", "14:30:00", "21:00:00"];
+    const pedidasHora = [null, undefined, "14:00:00", "20:00:00"];
+    const actuales = [null, SALON, RESERVADO];
+    const pedidasSala = [null, undefined, SALON, RESERVADO, "e-terraza"];
+    for (const hora of horas) {
+      for (const hora_solicitada of pedidasHora) {
+        for (const espacio_id of actuales) {
+          for (const espacio_solicitado_id of pedidasSala) {
+            const actual = pendiente({ hora, hora_solicitada, espacio_id, espacio_solicitado_id });
+            const escrito = cambios("aceptar", actual);
+            const combinacion = JSON.stringify({ hora, hora_solicitada, espacio_id, espacio_solicitado_id });
+            expect(escrito.estado, combinacion).toBe("verificada");
+            expect(escrito, combinacion).not.toHaveProperty("hora");
+            expect(escrito.espacio_id, combinacion).not.toBeNull();
+            // La sala solo se escribe para RELLENAR la que falta, y con la pedida.
+            if ("espacio_id" in escrito) {
+              expect(espacio_id, combinacion).toBeNull();
+              expect(escrito.espacio_id, combinacion).toBe(espacio_solicitado_id);
+            }
+            // Y el UPDATE nunca llega a mover ni borrar mesas salvo al rellenar una sala que no había.
+            if (espacio_id) expect(tocariaLasMesas(actual, escrito), combinacion).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("el aviso dice la hora ACTUAL (la que ve el personal), aunque el cliente pidiera otra", () => {
+    const def = ACCIONES_EJECUTABLES.aceptar;
+    const actual = pendiente({ hora: "14:30:00", hora_solicitada: "14:00:00" });
+    const aviso = def.aviso(actual, undefined, def.cambios(actual, undefined, { ahora: AHORA }));
+
+    expect(aviso?.titulo).toBe("Reserva verificada para las 14:30");
+  });
+
+  it("sigue AVISANDO al cliente: es el estado lo que dispara el correo (el servidor relee la BD)", () => {
+    expect(ACCIONES_EJECUTABLES.aceptar.avisaCliente).toBe(true);
   });
 });
 
@@ -392,8 +504,10 @@ describe("el aviso al personal, una vez guardado", () => {
   });
 
   it("aceptar y verificar: título corto con la hora y, debajo, si al cliente le llega el correo", () => {
+    // cambio acordado con el dueño: «Aceptar» no cambia la hora, así que el aviso dice la hora ACTUAL de la
+    // reserva (la que ve el personal), no la que pidió el cliente.
     expect(aviso("aceptar", reserva({ estado: "pendiente", hora: "14:00:00", hora_solicitada: "13:30:00" }))).toEqual({
-      titulo: "Reserva verificada para las 13:30",
+      titulo: "Reserva verificada para las 14:00",
       descripcion: "Se le manda el correo a ana@ejemplo.com",
     });
     expect(aviso("verificar", reserva({ estado: "pendiente", email: null }), { hora: "21:00", espacio_id: null })).toEqual({

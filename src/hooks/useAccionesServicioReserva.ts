@@ -351,7 +351,11 @@ export function useAccionesServicioReserva() {
 
   // ─── Gestión (Lista y modal «Verificar solicitud») ─────────────────────────
 
-  /** Un clic: verifica la reserva con la hora y la sala que ya trae (lo que pidió el cliente). */
+  /**
+   * Un clic: verifica la reserva TAL COMO ESTÁ AHORA (lo que ve el personal): no cambia la hora ni la sala
+   * (ni, por el trigger de la BD, las mesas). La sala solo se rellena si falta y el cliente pidió una
+   * (Touza). Cambio acordado con el dueño, 2026-10-01; ver `espacioAlAceptar`.
+   */
   const aceptar = useCallback(
     (reserva: ReservaParaVerificar) => ejecutarAccion("aceptar", reserva),
     [ejecutarAccion],

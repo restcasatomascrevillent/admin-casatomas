@@ -47,10 +47,15 @@ export interface ReservaParaVerificar {
   marca?: string | null;
 }
 
+/**
+ * Lo que se escribe al verificar. `verificar` (el modal) escribe las tres columnas: la hora y la sala
+ * que decide el personal. «Aceptar» (de un clic y en bloque) solo escribe el estado —y la sala solo si
+ * hay que rellenarla, ver `espacioAlAceptar`—: no toca la hora, por eso son opcionales.
+ */
 export interface CambiosVerificacion {
-  hora: string;
-  espacio_id: string | null;
   estado: "verificada" | "cancelada";
+  hora?: string;
+  espacio_id?: string | null;
 }
 
 export const MENSAJE_MIGRACION_PENDIENTE =
@@ -78,14 +83,34 @@ export function horaCorta(hora: string | null | undefined): string {
   return (hora ?? "").slice(0, 5);
 }
 
-/** A qué hora/espacio equivale «aceptar tal cual lo pedido». */
-export function objetivoAceptarComoSolicitado(
-  reserva: Pick<ReservaParaVerificar, "hora" | "hora_solicitada" | "espacio_id" | "espacio_solicitado_id">,
-): { hora: string; espacio_id: string | null } {
-  return {
-    hora: reserva.hora_solicitada ?? reserva.hora,
-    espacio_id: reserva.espacio_solicitado_id !== undefined ? reserva.espacio_solicitado_id : (reserva.espacio_id ?? null),
-  };
+/**
+ * Qué SALA hay que escribir al «Aceptar» una solicitud (de un clic y en bloque). Devuelve `{}` si no hay
+ * nada que escribir.
+ *
+ * «ACEPTAR» = ACEPTAR LA RESERVA TAL COMO ESTÁ AHORA, o sea lo que ve el personal en la lista: no cambia
+ * la hora ni la sala (ni, por el trigger `trg_reservas_sincronizar_asignaciones`, las mesas) que ya tiene.
+ * Cambio acordado con el dueño (2026-10-01). Hasta entonces escribía `hora = hora_solicitada` y
+ * `espacio_id = espacio_solicitado_id`:
+ *   · en Casa Tomás el cliente ya no elige sala (reservas-sin-salas): `espacio_solicitado_id` es null (lo
+ *     congela el trigger BEFORE INSERT a lo que llegó) y al aceptar se escribía `espacio_id = null`, con lo
+ *     que el trigger de la BD BORRABA la sala y las mesas que el personal hubiera asignado a la solicitud;
+ *   · desde «editar siempre» el personal puede cambiar la hora de una pendiente antes de aceptarla, y
+ *     Aceptar la reescribía con la solicitada: la edición se revertía en silencio.
+ *
+ * LA REGLA: la hora no se toca nunca. La sala solo se escribe en UN caso: ahora no tiene (`espacio_id`
+ * null) y se pidió una (`espacio_solicitado_id`: Touza, donde el espacio ES lo reservado) → se rellena con
+ * la pedida. Nunca se escribe `espacio_id = null` ni una sala distinta de la que hay. Con la hora y la sala
+ * ya iguales a lo pedido (lo normal) no hay nada que escribir más que el estado: mismo resultado que antes.
+ *
+ * Por qué no se escriben tampoco los valores actuales «por si acaso»: la lista no tiene realtime y su fila
+ * puede ir desfasada; si otra persona asignó una sala hace un minuto, reescribir el valor viejo la borraría
+ * (y con ella las mesas). Escribir solo el estado no puede pisar nada.
+ */
+export function espacioAlAceptar(
+  reserva: Pick<ReservaParaVerificar, "espacio_id" | "espacio_solicitado_id">,
+): { espacio_id?: string } {
+  if (!reserva.espacio_id && reserva.espacio_solicitado_id) return { espacio_id: reserva.espacio_solicitado_id };
+  return {};
 }
 
 /**

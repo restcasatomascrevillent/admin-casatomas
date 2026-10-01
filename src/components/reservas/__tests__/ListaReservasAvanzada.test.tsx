@@ -600,12 +600,13 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
   const casilla = (tabla: HTMLElement, cliente: string) =>
     within(filaDe(tabla, cliente)).getByRole("checkbox", { name: "Seleccionar para aceptar en bloque" });
 
-  it("«Aceptar»: verifica con lo que pidió el cliente, SOLO si sigue pendiente, y avisa al cliente con lo escrito", async () => {
+  it("«Aceptar»: verifica la reserva TAL COMO ESTÁ (solo el estado), SOLO si sigue pendiente, y avisa al cliente con lo escrito", async () => {
+    // cambio acordado con el dueño (2026-10-01): antes el UPDATE llevaba también `hora` y `espacio_id` (los pedidos).
     const { tabla } = await montar();
 
     fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
 
-    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ hora: "21:30:00", espacio_id: null, estado: "verificada" }));
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
     expect(supa.eq).toHaveBeenCalledWith("id", "res-pendiente");
     expect(supa.en).toHaveBeenCalledWith("estado", ["pendiente"]);
     expect(supa.select).toHaveBeenCalledWith("id");
@@ -613,13 +614,42 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
       expect(notificaciones()).toEqual([
         {
           funcion: "notify-reservation-change",
-          body: { id: "res-pendiente", hora: "21:30:00", espacio_id: null, estado: "verificada" },
+          body: { id: "res-pendiente", estado: "verificada" },
         },
       ]),
     );
     expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 21:30", {
       description: "No tiene correo: hay que avisarle por teléfono",
     });
+  });
+
+  it("«Aceptar» con la sala que ya repartió el personal (Casa Tomás: el cliente no pidió sala): NO la toca, así que el trigger de la BD no borra ni sala ni mesas", async () => {
+    // cambio acordado con el dueño (2026-10-01). Antes escribía `espacio_id = espacio_solicitado_id` (null aquí).
+    supa.filas = [
+      { ...reserva("res-sala", "pendiente", "Ana ConSala", "esp-comedor"), hora_solicitada: "21:30:00", espacio_solicitado_id: null },
+    ];
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Ana ConSala")[0]);
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(1));
+    expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" });
+    expect(supa.update.mock.calls[0][0]).not.toHaveProperty("espacio_id");
+  });
+
+  it("«Aceptar» con la hora EDITADA por el personal: no la revierte (el UPDATE no lleva `hora`) y el aviso dice la hora actual", async () => {
+    // cambio acordado con el dueño (2026-10-01). Antes reescribía la hora con la que pidió el cliente (21:30).
+    supa.filas = [
+      { ...reserva("res-editada", "pendiente", "Ana Editada"), hora: "22:00:00", hora_solicitada: "21:30:00", espacio_solicitado_id: null },
+    ];
+    const { tabla } = await montar();
+
+    fireEvent.click(botones(tabla, "Ana Editada")[0]);
+
+    await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(1));
+    expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" });
+    expect(supa.update.mock.calls[0][0]).not.toHaveProperty("hora");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reserva verificada para las 22:00", expect.anything()));
   });
 
   it("CORREGIDO: «Aceptar» con la RLS denegando la escritura (0 filas) NO da «verificada» ni avisa al cliente", async () => {
@@ -728,6 +758,8 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
 
     await waitFor(() => expect(supa.update).toHaveBeenCalledTimes(2));
     expect(supa.eq.mock.calls.map(([, id]) => id).sort()).toEqual(["res-a", "res-b"]);
+    // cambio acordado con el dueño (2026-10-01): cada una se acepta TAL COMO ESTÁ (solo el estado), sin tocar hora ni sala.
+    expect(supa.update.mock.calls.map(([valores]) => valores)).toEqual([{ estado: "verificada" }, { estado: "verificada" }]);
     await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
     expect(toast.success).toHaveBeenCalledWith("2 solicitudes verificadas", {
       description: "2 sin correo: hay que avisarles por teléfono",

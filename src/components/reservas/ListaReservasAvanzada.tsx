@@ -710,7 +710,7 @@ export function ListaReservasAvanzada({
   // mismo patrón que ya usa `useBlacklist.ts` para las columnas nuevas de
   // `blacklist`. Si la migración no está aplicada, las dos columnas
   // simplemente no vienen en cada fila: `ReservaParaVerificar` las declara
-  // opcionales y el resto del código (objetivoAceptarComoSolicitado,
+  // opcionales y el resto del código (espacioAlAceptar,
   // difiereSolicitudDeOferta) ya trata su ausencia como "sin contraoferta
   // todavía", no como un error.
   //

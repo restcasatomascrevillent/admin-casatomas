@@ -56,8 +56,8 @@ import {
   MENSAJE_MIGRACION_PENDIENTE,
   avisoAlCliente,
   esErrorMigracionReservasFaltante,
+  espacioAlAceptar,
   horaCorta,
-  objetivoAceptarComoSolicitado,
   type ReservaParaVerificar,
 } from "./verificacion";
 
@@ -182,9 +182,13 @@ const soloDesde = (accion: string, requerido: string) => (reserva: ReservaEjecut
 const traducirErrorMigracion = (error: unknown): string | null =>
   esErrorMigracionReservasFaltante(error) ? MENSAJE_MIGRACION_PENDIENTE : null;
 
-/** El aviso de aceptar / verificar: título corto con la hora y, debajo, el efecto de verdad. */
+/**
+ * El aviso de aceptar / verificar: título corto con la hora y, debajo, el efecto de verdad. La hora es la que
+ * se ESCRIBE (`verificar`, el modal, la decide el personal) o, si no se escribe ninguna (`aceptar` no toca la
+ * hora), la ACTUAL de la reserva: la que ve el personal en la lista.
+ */
 const avisoVerificada = (reserva: ReservaEjecutable, cambios: CambiosReserva): AvisoPersonal => ({
-  titulo: `Reserva verificada para las ${horaCorta(cambios.hora)}`,
+  titulo: `Reserva verificada para las ${horaCorta(cambios.hora ?? reserva.hora)}`,
   descripcion: avisoAlCliente({ email: reserva.email ?? null }),
 });
 
@@ -200,11 +204,17 @@ const avisoEstadoActualizado = (reserva: ReservaEjecutable): AvisoPersonal =>
 
 export const ACCIONES_EJECUTABLES: { readonly [K in IdAccionEjecutable]: DefinicionAccion<K> } = {
   // ─── Gestión ──────────────────────────────────────────────────────────────
+  // «Aceptar» acepta la reserva TAL COMO ESTÁ AHORA, o sea lo que ve el personal (cambio acordado con el dueño,
+  // 2026-10-01): escribe SOLO el estado. La hora no se toca y la sala tampoco (ni, por el trigger de la BD, las
+  // mesas), salvo para RELLENAR la que falta con la pedida (Touza). Antes escribía la hora y la sala PEDIDAS: en
+  // Casa Tomás (sin sala pedida) dejaba `espacio_id` en null, y el trigger borraba la sala y las mesas asignadas.
+  // El correo no cambia: lo dispara el estado y el servidor relee la BD (si el personal editó la hora, ahora sale
+  // el «Solicitado / Ofrecido» con la hora que de verdad se le da). Ver `espacioAlAceptar`.
   aceptar: {
     guarda: { vista: "lista", accion: "aceptar" },
     verbo: () => "guardar",
     cambios: (reserva) => ({
-      ...objetivoAceptarComoSolicitado(reserva as ReservaParaVerificar),
+      ...espacioAlAceptar(reserva as ReservaParaVerificar),
       estado: ESTADO_VERIFICADA,
     }),
     avisaCliente: true,
