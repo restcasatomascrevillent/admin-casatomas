@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarClock, Check, ChevronDown, LayoutGrid, Loader2, MapPin, SquarePen, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, ChevronDown, Clock, LayoutGrid, Loader2, MapPin, SquarePen, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { NegocioBadge } from "./NegocioBadge";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "./ConMotivo";
 import { cn } from "@/lib/utils";
@@ -34,15 +33,20 @@ import {
   useReservasPorAsignar,
   type FilaAsignacionDia,
 } from "@/hooks/useReservasPorAsignar";
+import { configAsignacionDesde, fechaMadrid, sumarDias } from "@/lib/reservas/ventanaAsignacion";
 import {
-  agruparPorTurnoYGrado,
-  configAsignacionDesde,
-  fechaMadrid,
-  ordenarVentanaPrimero,
-  sumarDias,
-  type GrupoTurno,
-} from "@/lib/reservas/ventanaAsignacion";
-import { FILTRO_NEGOCIO_TODOS, NEGOCIOS_PANEL, marcaDeEspacio } from "@/lib/reservas/negocios";
+  agruparPorFecha,
+  construirDia,
+  diaPorDefecto,
+  diasDelRango,
+  etiquetasDia,
+  resolverDiaActivo,
+  reservasPorVenir,
+  resumirPestanas,
+} from "@/lib/reservas/asignacionPorDias";
+import { PanelDia } from "./asignacion/PanelDia";
+import { TiraDias } from "./asignacion/TiraDias";
+import { MARCA_POR_DEFECTO, marcaDeEspacio } from "@/lib/reservas/negocios";
 import {
   ETIQUETA_TURNO,
   calcularOcupacionSalas,
@@ -50,17 +54,23 @@ import {
   recomendarUbicacion,
 } from "@/lib/reservas/ocupacionSalas";
 import { resolverSaltoAsignacion, type DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
-import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas, type GradoAsignacion } from "@/lib/reservas/asignacionMesas";
+import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacionMesas";
 
 // ============================================================================
 // PESTAÑA "ASIGNACIÓN" (reservas-sin-salas, Fase B)
 // ----------------------------------------------------------------------------
 // El cliente de Casa Tomás solo reserva una hora: la sala y la mesa se deciden
-// por dentro. Aquí se ven ARRIBA las reservas de las próximas N horas
-// (`asignacion_ventana_horas`), agrupadas por día, turno y grado, y debajo las
-// posteriores. La ventana solo resalta: cualquier reserva futura se puede
-// asignar.
+// por dentro. La pantalla se organiza en PESTAÑAS POR DÍA (2026-10-01, petición
+// del dueño): una por cada día del rango de «Mostrar», cada una con la cuenta
+// de reservas sin mesa de ese día. Dentro de cada día, su resumen y los turnos
+// (comida, cena) agrupados por grado. La ventana de `asignacion_ventana_horas`
+// ya no parte la pantalla en dos bloques: solo MARCA en la tira los días que
+// caen dentro. Cualquier reserva futura se puede asignar, esté o no en ella.
 //
+// · Solo se pinta el día activo: con 60-100 reservas al día, tener los 14 días
+//   a la vez serían más de mil filas.
+// · Qué cuenta cada insignia, qué día se abre solo y cómo se conserva al cambiar
+//   los filtros: src/lib/reservas/asignacionPorDias.ts (puro y testeado).
 // · La sala se cambia con `useCambiarSalaReserva`, que NO manda correo al
 //   cliente. Si la reserva ya tiene mesas, se pide confirmación antes: el
 //   trigger `trg_reservas_sincronizar_asignaciones` las borra al cambiar de
@@ -74,18 +84,22 @@ import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas, type GradoAsignacion } from "@/
 
 const OPCIONES_DIAS = [7, 14, 30] as const;
 
-const ETIQUETA_GRADO: Record<GradoAsignacion, string> = {
-  sin_sala: "Sin sala",
-  sin_mesa: "Con sala, sin mesa",
-  con_mesa: "Con mesa",
-};
+/**
+ * Tope de filas por petición de la API de Supabase (PostgREST `max-rows`: 1000 por defecto en los
+ * proyectos alojados). `useReservasPorAsignar` pide todo el rango de una vez: si llegan justo
+ * tantas, lo normal es que falte el final del rango y las cuentas de las últimas pestañas se
+ * queden cortas. Se avisa en pantalla; la solución de fondo es paginar ese hook.
+ */
+const TOPE_FILAS_POR_CONSULTA = 1000;
 
-/** Pendiente no es error: tonos neutros, nunca rojo (ver saltoAsignacion.ts). */
-const CLASES_GRADO: Record<GradoAsignacion, string> = {
-  sin_sala: "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
-  sin_mesa: "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200",
-  con_mesa: "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200",
-};
+/**
+ * Dónde se recuerda el último día abierto. «Mesas» abre el plano de una sala y `Reservas` pinta
+ * entonces OTRA pantalla: este panel se desmonta y, al volver, se monta de nuevo. Sin memoria
+ * volvería siempre al día por defecto, y quien reparte las 60 reservas de un sábado tendría que
+ * buscarlo otra vez tras cada mesa. Se guarda en la caché de consultas (la misma para toda la
+ * app): dura lo que `gcTime` (5 min por defecto) y una recarga de la página la borra.
+ */
+const CLAVE_DIA_RECORDADO = ["asignacion-dia-recordado"] as const;
 
 interface CambioPendiente {
   fila: FilaAsignacionDia;
@@ -99,6 +113,7 @@ interface PanelAsignacionProps {
 }
 
 export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
+  const queryClient = useQueryClient();
   const { data: config } = useConfiguracionReservas();
   const { data: espaciosData } = useEspaciosReserva();
   const cambiarSala = useCambiarSalaReserva();
@@ -108,9 +123,17 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   const [dias, setDias] = useState<number>(14);
-  const [negocio, setNegocio] = useState<string>(FILTRO_NEGOCIO_TODOS);
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [cambioPendiente, setCambioPendiente] = useState<CambioPendiente | null>(null);
+  // Día de la pestaña abierta. Sin nada recordado (`null`), cuando llegan los datos se fija el de
+  // por defecto (el primero con reservas sin mesa), para que no se mueva solo cuando se vayan
+  // asignando mesas. Cambiar de rango o ocultar las que tienen mesa no lo toca.
+  const [diaElegido, setDiaElegido] = useState<string | null>(
+    () => queryClient.getQueryData<string>(CLAVE_DIA_RECORDADO) ?? null,
+  );
+  useEffect(() => {
+    if (diaElegido) queryClient.setQueryData(CLAVE_DIA_RECORDADO, diaElegido);
+  }, [diaElegido, queryClient]);
 
   // La ventana se desliza con el reloj: se recalcula cada minuto.
   const [ahora, setAhora] = useState(() => Date.now());
@@ -128,18 +151,54 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const hasta = sumarDias(desde, Math.max(dias, Math.ceil(asignacion.ventanaHoras / 24) + 1));
   const { data: filas, isLoading, isError, refetch } = useReservasPorAsignar(desde, hasta);
 
-  const { gruposVentana, gruposDespues, pendientesVentana } = useMemo(() => {
-    const visibles = (filas ?? []).filter((f) => negocio === FILTRO_NEGOCIO_TODOS || f.marca === negocio);
-    const partes = ordenarVentanaPrimero(visibles, asignacion.ventanaHoras, ahora);
-    const pendientes = partes.enVentana.filter((f) => f.grado !== "con_mesa").length;
-    const filtrar = (lista: FilaAsignacionDia[]) =>
-      soloPendientes ? lista.filter((f) => f.grado !== "con_mesa") : lista;
-    return {
-      gruposVentana: agruparPorTurnoYGrado(filtrar(partes.enVentana)),
-      gruposDespues: agruparPorTurnoYGrado(filtrar(partes.despues)),
-      pendientesVentana: pendientes,
-    };
-  }, [filas, negocio, soloPendientes, asignacion.ventanaHoras, ahora]);
+  // Una pestaña por cada día del rango. Las reservas son las vivas que aún no han empezado; la
+  // insignia de cada pestaña cuenta las que NO tienen mesa y no depende de «Ocultar las que ya
+  // tienen mesa» (ver `asignacionPorDias.ts`).
+  // Casa Tomás es el único negocio (Touza ya no admite reservas, 2026-10-01): sin filtro de negocio,
+  // y si quedan reservas de otro en datos antiguos ni se muestran ni se cuentan.
+  const diasRango = useMemo(() => diasDelRango(desde, hasta), [desde, hasta]);
+  const visibles = useMemo(
+    () => reservasPorVenir(filas ?? [], ahora).filter((f) => f.marca === MARCA_POR_DEFECTO),
+    [filas, ahora],
+  );
+  const pestanas = useMemo(
+    () => resumirPestanas(visibles, { dias: diasRango, ventanaHoras: asignacion.ventanaHoras, ahora }),
+    [visibles, diasRango, asignacion.ventanaHoras, ahora],
+  );
+  const filasPorDia = useMemo(() => agruparPorFecha(visibles), [visibles]);
+
+  const diaActivo = resolverDiaActivo({
+    dias: diasRango,
+    elegido: diaElegido,
+    porDefecto: diaPorDefecto(pestanas, desde),
+  });
+  const hayDatos = !!filas && !isError;
+  useEffect(() => {
+    if (hayDatos && diaElegido !== diaActivo) setDiaElegido(diaActivo);
+  }, [hayDatos, diaActivo, diaElegido]);
+
+  // Solo se calcula y se pinta el día abierto.
+  const datosDia = useMemo(
+    () => construirDia(filasPorDia.get(diaActivo) ?? [], { fecha: diaActivo, soloPendientes }),
+    [filasPorDia, diaActivo, soloPendientes],
+  );
+
+  // Al cambiar de día con la tira pegada arriba, el día nuevo se enseña desde su principio
+  // (si no, se quedaría a media altura de lo que se estaba mirando).
+  const tiraRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const diaMostrado = useRef<string | null>(null);
+  useEffect(() => {
+    const anterior = diaMostrado.current;
+    diaMostrado.current = diaActivo;
+    const tira = tiraRef.current;
+    const panel = panelRef.current;
+    if (anterior === null || anterior === diaActivo || !tira || !panel || typeof window.scrollTo !== "function") return;
+    const pegadaA = parseFloat(window.getComputedStyle(tira).top) || 0;
+    const limite = pegadaA + tira.offsetHeight;
+    const arriba = panel.getBoundingClientRect().top;
+    if (arriba < limite) window.scrollTo({ top: window.scrollY + arriba - limite - 8, behavior: "auto" });
+  }, [diaActivo]);
 
   /** Salas activas y usables de un negocio, por nombre. */
   const salasDe = (marca: string) =>
@@ -171,7 +230,6 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   };
 
   const filaProps = {
-    ahora,
     excluidas,
     salasDe,
     onElegirSala: elegirSala,
@@ -190,30 +248,20 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
             <CardTitle className="text-lg">Asignación de salas y mesas</CardTitle>
           </div>
           <CardDescription>
-            El cliente solo reserva una hora: la sala y la mesa se deciden aquí. Arriba, lo de las próximas{" "}
-            {asignacion.ventanaHoras} h; debajo, lo que viene después. Se puede asignar cualquier reserva, esté o no
-            en la ventana.
+            El cliente solo reserva una hora: la sala y la mesa se deciden aquí. Elige un día: el número de cada
+            pestaña son sus reservas sin mesa, la marca de verificación{" "}
+            <Check
+              className="inline h-3.5 w-3.5 align-[-2px] text-emerald-700 dark:text-emerald-300"
+              strokeWidth={3}
+              aria-hidden="true"
+            />{" "}
+            significa que ya está todo asignado y el reloj{" "}
+            <Clock className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /> señala los días de las próximas{" "}
+            {asignacion.ventanaHoras}&nbsp;h, los primeros que conviene repartir. Se puede asignar cualquier reserva,
+            esté o no en esa ventana.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="asignacion-negocio" className="text-xs text-muted-foreground">
-              Negocio
-            </Label>
-            <Select value={negocio} onValueChange={setNegocio}>
-              <SelectTrigger id="asignacion-negocio" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={FILTRO_NEGOCIO_TODOS}>Todos</SelectItem>
-                {NEGOCIOS_PANEL.map((n) => (
-                  <SelectItem key={n.marca} value={n.marca}>
-                    {n.etiqueta}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="asignacion-dias" className="text-xs text-muted-foreground">
               Mostrar
@@ -240,6 +288,20 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
         </CardContent>
       </Card>
 
+      {!isError && !isLoading && (filas?.length ?? 0) >= TOPE_FILAS_POR_CONSULTA && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            <span className="font-medium">Puede que falten reservas.</span> La consulta devuelve como máximo{" "}
+            {TOPE_FILAS_POR_CONSULTA} y este rango las alcanza: las cuentas de los últimos días pueden quedarse
+            cortas. Elige menos días en «Mostrar».
+          </p>
+        </div>
+      )}
+
       {isError ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
@@ -256,31 +318,26 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
           </CardContent>
         </Card>
       ) : (
-        <>
-          <section
-            aria-labelledby="titulo-ventana-asignacion"
-            className="space-y-3 rounded-lg border-2 border-primary/40 bg-primary/5 p-3 sm:p-4"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 id="titulo-ventana-asignacion" className="text-base font-semibold sm:text-lg">
-                Próximas {asignacion.ventanaHoras} horas
-              </h3>
-              <span className="text-sm text-muted-foreground">
-                {pendientesVentana === 0
-                  ? "Todo asignado"
-                  : `${pendientesVentana} reserva${pendientesVentana === 1 ? "" : "s"} sin mesa`}
-              </span>
-            </div>
-            <ListaGrupos grupos={gruposVentana} vacio="No hay reservas en la ventana." {...filaProps} />
-          </section>
-
-          <section aria-labelledby="titulo-despues-asignacion" className="space-y-3">
-            <h3 id="titulo-despues-asignacion" className="text-base font-semibold sm:text-lg">
-              Más adelante
-            </h3>
-            <ListaGrupos grupos={gruposDespues} vacio="No hay más reservas en este rango." {...filaProps} />
-          </section>
-        </>
+        <Tabs value={diaActivo} onValueChange={setDiaElegido} className="space-y-4">
+          <TiraDias
+            dias={pestanas}
+            hoy={desde}
+            ventanaHoras={asignacion.ventanaHoras}
+            activo={diaActivo}
+            tiraRef={tiraRef}
+          />
+          {/* Un único panel, el del día abierto: los demás días no se pintan. `scroll-mt`: al tabular
+              hacia una fila, el navegador no la deja tapada por la tira fija. */}
+          <TabsContent value={diaActivo} ref={panelRef} className="mt-0 [&_button]:scroll-mt-28">
+            <PanelDia
+              dia={datosDia}
+              etiquetas={etiquetasDia(diaActivo, desde)}
+              enVentana={pestanas.find((p) => p.fecha === diaActivo)?.enVentana ?? false}
+              ventanaHoras={asignacion.ventanaHoras}
+              renderFila={(fila: FilaAsignacionDia) => <FilaReserva key={fila.reserva_id} fila={fila} {...filaProps} />}
+            />
+          </TabsContent>
+        </Tabs>
       )}
 
       <AlertDialog open={!!cambioPendiente} onOpenChange={(abierto) => !abierto && setCambioPendiente(null)}>
@@ -327,7 +384,6 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 // ----------------------------------------------------------------------------
 
 interface PropsFila {
-  ahora: number;
   excluidas: ReadonlySet<string>;
   salasDe: (marca: string) => EspacioReserva[];
   onElegirSala: (fila: FilaAsignacionDia, espacioId: string) => void;
@@ -338,57 +394,6 @@ interface PropsFila {
   puedeEditar: boolean;
   /** Reserva cuya sala se está guardando ahora mismo. */
   salaEnCurso: string | null;
-}
-
-function etiquetaDia(fecha: string, ahora: number): string {
-  const hoy = fechaMadrid(ahora);
-  if (fecha === hoy) return "Hoy";
-  if (fecha === sumarDias(hoy, 1)) return "Mañana";
-  const texto = format(parseISO(fecha), "EEEE d 'de' MMMM", { locale: es });
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
-
-function ListaGrupos({
-  grupos,
-  vacio,
-  ...props
-}: PropsFila & { grupos: GrupoTurno<FilaAsignacionDia>[]; vacio: string }) {
-  if (grupos.length === 0) {
-    return <p className="py-4 text-center text-sm text-muted-foreground">{vacio}</p>;
-  }
-  return (
-    <div className="space-y-3">
-      {grupos.map((grupo) => (
-        <Card key={`${grupo.fecha}|${grupo.turno}`}>
-          <CardHeader className="px-3 pb-2 pt-3 sm:px-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <CardTitle className="text-sm font-semibold sm:text-base">
-                {etiquetaDia(grupo.fecha, props.ahora)} · {ETIQUETA_TURNO[grupo.turno]}
-              </CardTitle>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {grupo.comensales} comensales
-                {grupo.pendientes > 0 && ` · ${grupo.pendientes} sin mesa`}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 px-3 pb-3 sm:px-4">
-            {grupo.grados.map(({ grado, reservas }) => (
-              <div key={grado} className="space-y-1.5">
-                <Badge variant="outline" className={cn("text-[11px] font-medium", CLASES_GRADO[grado])}>
-                  {ETIQUETA_GRADO[grado]} · {reservas.length}
-                </Badge>
-                <ul className="divide-y rounded-md border">
-                  {reservas.map((fila) => (
-                    <FilaReserva key={fila.reserva_id} fila={fila} {...props} />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
 }
 
 function FilaReserva({
@@ -420,7 +425,6 @@ function FilaReserva({
           <Users className="h-3.5 w-3.5" aria-hidden="true" />
           {fila.numero_comensales}
         </span>
-        <NegocioBadge marca={fila.marca} corta />
         {fila.estado !== "confirmada" && (
           <span className="text-xs capitalize text-muted-foreground">{fila.estado}</span>
         )}

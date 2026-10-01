@@ -80,6 +80,16 @@ function montar() {
   return { onAsignarMesa };
 }
 
+/**
+ * La pantalla se organiza en pestañas por día y solo pinta la del día abierto (por defecto, el
+ * primero con reservas sin mesa): para ver las reservas de otro día hay que abrir su pestaña.
+ */
+function abrirDia(fecha: string) {
+  const pestana = document.querySelector<HTMLElement>(`[role="tab"][data-fecha="${fecha}"]`);
+  expect(pestana).not.toBeNull();
+  fireEvent.mouseDown(pestana!);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   h.canEdit = true;
@@ -98,11 +108,12 @@ beforeEach(() => {
 
 describe("PanelAsignacion · editar desde la fila", () => {
   it.each([
-    ["Ana Pendiente", "r-pendiente"],
-    ["Berta Verificada", "r-verificada"],
-    ["Carlos Confirmado", "r-confirmada"],
-  ])("la fila de %s lleva «Editar» y abre el editor de esa reserva", (cliente, id) => {
+    ["Ana Pendiente", "r-pendiente", MANANA],
+    ["Berta Verificada", "r-verificada", EN_TRES_DIAS],
+    ["Carlos Confirmado", "r-confirmada", MANANA],
+  ])("la fila de %s lleva «Editar» y abre el editor de esa reserva", (cliente, id, dia) => {
     montar();
+    abrirDia(dia);
 
     const boton = screen.getByRole("button", { name: `Editar la reserva de ${cliente}` });
     expect(boton).toBeEnabled();
