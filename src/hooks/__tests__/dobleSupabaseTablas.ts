@@ -8,11 +8,22 @@
  *   · devuelve SOLO las columnas pedidas en `select` (si un hook deja de pedir `marca`, sus filas llegan
  *     sin `marca`, como en producción, y el test que depende de ella cae);
  *   · aplica `eq`, `neq`, `in`, `gt`, `gte`, `lt` y `lte` con la semántica de SQL (un NULL no pasa ningún
- *     filtro) y el orden de `order`;
+ *     filtro) y el orden de `order`, con los NULL como en Postgres: AL FINAL al ordenar de forma ascendente
+ *     y AL PRINCIPIO de forma descendente (`NULLS LAST` / `NULLS FIRST` por defecto);
  *   · anota cada petición (tabla, columnas y filtros) en `peticiones`.
  *
  * Lo que NO imita: `or`, `not`, `range`, recuentos, selects con relaciones o alias (los rechaza con un
  * error, para que nadie crea que los prueba), escrituras ni el realtime (los canales no emiten nada).
+ * Y tres cosas más, que NO se rechazan y por eso pueden esconder un fallo:
+ *   · el TOPE de filas por petición (`max-rows`: 1000 en Supabase): aquí llegan todas las que pasan los
+ *     filtros, así que una lectura que en producción se queda en 1.000 filas, aquí no se queda corta
+ *     (para probarlo, `src/lib/reservas/__tests__/dobleSupabaseLotes.ts` sí lo aplica);
+ *   · una columna que NO existe en un `eq`, `neq`, `in`, `gt`, `gte`, `lt` o `lte`: devuelve cero filas
+ *     (ninguna pasa el filtro) en vez del error 400 de PostgREST («column … does not exist»);
+ *   · una columna que NO existe en un `select`: la fila trae esa columna a `null` en vez de dar ese
+ *     mismo error 400.
+ * Es decir: un nombre de columna mal escrito aquí no falla, y en producción sí. Los tests que dependan
+ * de que una columna exista tienen que sembrarla en las filas de `tablas`.
  */
 import { vi } from "vitest";
 
@@ -53,10 +64,16 @@ function proyectar(fila: FilaDobleTablas, columnas: string): FilaDobleTablas {
   return Object.fromEntries(lista.map((c) => [c, fila[c] ?? null]));
 }
 
+/**
+ * Compara como el `ORDER BY` de Postgres: un NULL es MAYOR que cualquier valor, así que en ascendente va
+ * AL FINAL y, como `ascendente ? c : -c` invierte el signo, en descendente va AL PRINCIPIO (`NULLS LAST` /
+ * `NULLS FIRST` por defecto). Los NULL empatan entre sí. Los filtros de rango (`gt`, `gte`, `lt`, `lte`) no
+ * la usan con un NULL: un NULL no pasa ninguno, ni como valor de la columna ni como argumento.
+ */
 const comparar = (a: unknown, b: unknown) => {
   if (a == null && b == null) return 0;
-  if (a == null) return -1;
-  if (b == null) return 1;
+  if (a == null) return 1;
+  if (b == null) return -1;
   return a < b ? -1 : a > b ? 1 : 0;
 };
 
@@ -91,19 +108,31 @@ class ConsultaDobleTablas implements PromiseLike<{ data: FilaDobleTablas[] | nul
   }
 
   gt(columna: string, valor: unknown) {
-    return this.filtrar(`${columna}>${String(valor)}`, (f) => f[columna] != null && comparar(f[columna], valor) > 0);
+    return this.filtrar(
+      `${columna}>${String(valor)}`,
+      (f) => f[columna] != null && valor != null && comparar(f[columna], valor) > 0,
+    );
   }
 
   gte(columna: string, valor: unknown) {
-    return this.filtrar(`${columna}>=${String(valor)}`, (f) => f[columna] != null && comparar(f[columna], valor) >= 0);
+    return this.filtrar(
+      `${columna}>=${String(valor)}`,
+      (f) => f[columna] != null && valor != null && comparar(f[columna], valor) >= 0,
+    );
   }
 
   lt(columna: string, valor: unknown) {
-    return this.filtrar(`${columna}<${String(valor)}`, (f) => f[columna] != null && comparar(f[columna], valor) < 0);
+    return this.filtrar(
+      `${columna}<${String(valor)}`,
+      (f) => f[columna] != null && valor != null && comparar(f[columna], valor) < 0,
+    );
   }
 
   lte(columna: string, valor: unknown) {
-    return this.filtrar(`${columna}<=${String(valor)}`, (f) => f[columna] != null && comparar(f[columna], valor) <= 0);
+    return this.filtrar(
+      `${columna}<=${String(valor)}`,
+      (f) => f[columna] != null && valor != null && comparar(f[columna], valor) <= 0,
+    );
   }
 
   order(columna: string, opciones?: { ascending?: boolean }) {
