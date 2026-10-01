@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -67,6 +67,7 @@ import { ControlLlegada } from "./ControlLlegada";
 import { BlacklistModal } from "./BlacklistModal";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "./ConMotivo";
+import { ElegirMesaDialog } from "./ElegirMesaDialog";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   ANCHO_COLUMNA_PLEGADA,
@@ -774,6 +775,10 @@ export function GestorReservasKanban() {
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
   const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
+  // La reserva que se acaba de mover y la sala a la que ha ido: tras guardarse el cambio se abre el
+  // mapa de esa sala para elegirle la mesa (`ElegirMesaDialog`). `null` hasta que se mueve algo.
+  const [mapaMesa, setMapaMesa] = useState<{ reserva: ReservaServicio; espacioId: string; espacioNombre: string } | null>(null);
+  const cerrarMapaMesa = useCallback(() => setMapaMesa(null), []);
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   // Marcar/desmarcar "importante" y añadir a blacklist: acciones que antes
@@ -960,6 +965,20 @@ export function GestorReservasKanban() {
   const nombreColumna = (id: string | number | undefined | null) =>
     columnas.find((c) => c.id === id)?.title ?? "Sin asignar";
 
+  /**
+   * Hace el movimiento (ya confirmado, si hacía falta) y, SOLO si se ha guardado, abre el mapa de la
+   * sala de destino para elegirle la mesa. Los dos caminos de mover (arrastrar y «Mover a…») y las
+   * dos confirmaciones (aforo y mesas) acaban aquí.
+   *
+   * «Sin asignar» no tiene plano y no se abre nada. Con una sala, `ElegirMesaDialog` comprueba por su
+   * cuenta que tenga mesas (por id de sala, nunca por nombre): si no las tiene no pinta nada y se cierra sin ruido.
+   */
+  const moverYElegirMesa = async (reserva: ReservaServicio, destinoId: string | null, destinoNombre: string) => {
+    const movida = await acciones.moverEspacio(reserva, destinoId, destinoNombre);
+    // Una sola reserva a la vez: si ya había un mapa abierto, éste lo sustituye (no se apilan).
+    if (movida && destinoId) setMapaMesa({ reserva, espacioId: destinoId, espacioNombre: destinoNombre });
+  };
+
   const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
     const destinoId = esSinAsignar(columnaId) ? null : columnaId;
     const col = columnas.find((c) => c.id === columnaId);
@@ -995,7 +1014,7 @@ export function GestorReservasKanban() {
             }
           : null;
         if (!excede && !mesas) {
-          void acciones.moverEspacio(reserva, destinoId, destinoNombre);
+          void moverYElegirMesa(reserva, destinoId, destinoNombre);
           return;
         }
         setMovimientoPendiente({ reserva, destinoId, destinoNombre, excede, mesas });
@@ -1207,7 +1226,7 @@ export function GestorReservasKanban() {
               onClick={() => {
                 const m = movimientoPendiente;
                 setMovimientoPendiente(null);
-                if (m) void acciones.moverEspacio(m.reserva, m.destinoId, m.destinoNombre);
+                if (m) void moverYElegirMesa(m.reserva, m.destinoId, m.destinoNombre);
               }}
             >
               {movimientoPendiente?.excede ? "Mover igualmente" : "Cambiar de sala"}
@@ -1215,6 +1234,19 @@ export function GestorReservasKanban() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tras mover una reserva a una sala con plano: el mapa de esa sala, con la reserva ya señalada,
+          para elegirle la mesa. «Ahora no» (o cerrar) la deja en la sala, sin mesa. Va FUERA del DndContext. */}
+      {mapaMesa && (
+        <ElegirMesaDialog
+          key={`${mapaMesa.reserva.id}|${mapaMesa.espacioId}`}
+          reserva={mapaMesa.reserva}
+          fecha={hoy}
+          espacioId={mapaMesa.espacioId}
+          espacioNombre={mapaMesa.espacioNombre}
+          onCerrar={cerrarMapaMesa}
+        />
+      )}
 
       <BlacklistModal
         reserva={blacklistReserva}

@@ -123,6 +123,10 @@ vi.mock("@/components/reservas/BlacklistModal", () => ({
     return null;
   },
 }));
+// El mapa de mesas que se abre tras mover una reserva (`ElegirMesaDialog`, con su plano y su Router) tiene
+// sus propios tests (`GestorReservasKanban.mapa.test.tsx`): aquí se aparta para que estos sigan hablando
+// solo de lo que escribe y refresca cada acción de la tarjeta.
+vi.mock("@/components/reservas/ElegirMesaDialog", () => ({ ElegirMesaDialog: () => null }));
 
 import { toast } from "sonner";
 import { GestorReservasKanban } from "@/components/reservas/GestorReservasKanban";
