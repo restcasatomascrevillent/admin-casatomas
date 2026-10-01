@@ -264,10 +264,10 @@ export default function Reservas() {
                 <SelectContent>
                   <SelectItem value="hoy">Hoy</SelectItem>
                   <SelectItem value="reservas">
-                    Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
+                    Lista de solicitudes de reserva{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                   </SelectItem>
                   <SelectItem value="calendario">Calendario</SelectItem>
-                  <SelectItem value="asignacion">Asignación</SelectItem>
+                  <SelectItem value="asignacion">Próximas reservas</SelectItem>
                   <SelectItem value="blacklist">Blacklist</SelectItem>
                   {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
                 </SelectContent>
@@ -284,7 +284,7 @@ export default function Reservas() {
               <TabsList className="w-max min-w-max justify-start gap-1 p-1">
                 <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
                 <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
-                  Lista
+                  Lista de solicitudes de reserva
                   {countPendientes > 0 && (
                     <span
                       className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
@@ -296,7 +296,7 @@ export default function Reservas() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
-                <TabsTrigger value="asignacion" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Asignación</TabsTrigger>
+                <TabsTrigger value="asignacion" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Próximas reservas</TabsTrigger>
                 <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
                 {isAdmin && (
                   <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">

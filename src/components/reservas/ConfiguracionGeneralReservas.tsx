@@ -583,7 +583,7 @@ function SeccionAsignacion({
       </div>
       <div className="space-y-4 pl-6">
         <p className="text-sm text-muted-foreground">
-          El cliente solo reserva una hora; la sala y la mesa las decide el equipo desde la pestaña «Asignación».
+          El cliente solo reserva una hora; la sala y la mesa las decide el equipo desde la pestaña «Próximas reservas».
         </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
