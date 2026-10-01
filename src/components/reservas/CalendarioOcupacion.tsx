@@ -7,75 +7,69 @@
 //    bien puestos"
 //
 // ---------------------------------------------------------------------------
-// QUÉ MIDE LA CUADRÍCULA (y por qué ya no hay porcentaje de aforo)
+// QUÉ SE VE EN LA CUADRÍCULA (rediseño del 2026-10-01)
 // ---------------------------------------------------------------------------
-// Cada casilla enseña reservas, comensales y cuántas siguen SIN SALA, y se
-// colorea por eso último: ámbar si queda reparto pendiente, verde si ya está
-// todo repartido por sala. Es el GRADO 1 del cierre, el que se puede saber del
-// mes entero con la única consulta que ya se hacía.
+// Cada casilla enseña los COMENSALES del día en grande, un color que es el %
+// de ocupación del servicio más lleno (comida o cena) y, discreto, un punto si
+// hay reservas sin sala dentro de la ventana de asignación. Toda la lógica
+// (umbrales, colores, qué estados cuentan, aforo por negocio, ventana) vive en
+// `src/lib/reservas/ocupacionCalendario.ts`, que es puro y está testeado; la
+// casilla es `CasillaOcupacion.tsx` y la leyenda `LeyendaOcupacion.tsx`.
 //
-// Antes había un "%" en cada casilla que SIEMPRE valía 0: `statsPerDay`
-// inicializaba `porcentaje: 0` y no lo calculaba nunca. Como
-// `getOccupancyColor(0)` devolvía "", los colores y la leyenda "Baja / Media /
-// Alta" no funcionaron nunca tampoco. Se ha quitado, no arreglado, y a
-// propósito:
-//
-//   · El aforo es POR MARCA (`casa_tomas` / `touza`), y este calendario mezcla
-//     los dos negocios a propósito (decisión del dueño 2026-09-24). Un único
-//     porcentaje sumando las dos capacidades no significa nada: un día con
-//     Casa Tomás lleno y Touza vacío daría "50 %", que no describe ninguno de
-//     los dos servicios.
-//   · El porcentaje que sí significa algo -`porcentajeCerrado`, cuánto del día
-//     está cerrado a nivel de mesa- necesita las asignaciones de mesa de todo
-//     el mes, y eso no cabe en esta consulta. Se enseña DÍA A DÍA en el panel
-//     de la derecha, que es donde se trabaja.
-//
-// Y ojo con el color: NUNCA en rojo. "Pendiente de repartir" es el estado
-// normal de un día que aún está lejos, no una alarma.
+// Historia: el calendario anterior coloreaba por «reservas sin sala» (verde /
+// ámbar). Desde que el cliente ya no elige sala (reservas-sin-salas: la sala y
+// la mesa las pone el personal en una ventana de 48 h) casi todo el futuro salía
+// ámbar y el color dejó de decir nada. Antes de eso hubo un «%» que SIEMPRE
+// valía 0 (`statsPerDay` lo inicializaba y no lo calculaba nunca) y se quitó.
+// Ahora el porcentaje existe de verdad, medido contra el aforo POR NEGOCIO.
 //
 // ---------------------------------------------------------------------------
-// DOS CONSULTAS, DOS DUEÑOS (y ya no se prestan datos)
+// DOS CONSULTAS, DOS DUEÑOS (y no se prestan datos)
 // ---------------------------------------------------------------------------
-// · La CUADRÍCULA lee la tabla `reservas` del mes entero (`reservas_mes`), que
-//   es lo único que cabe en una consulta: cuenta reservas, comensales y las que
-//   siguen sin sala de cada día.
+// · La CUADRÍCULA lee la tabla `reservas` del mes entero (`reservas_mes`), y el
+//   aforo de Casa Tomás de `espacios_reserva` (la caché que ya usa media app: no
+//   es una consulta más). Nada de N+1: una consulta por mes.
 // · El PANEL DEL DÍA lee la vista `vista_asignacion_dia` por su cuenta, desde
 //   `useResumenAsignacionDia`, y de ahí saca también las mesas.
 //
-// Hasta el 2026-09-26 este componente le pasaba además las reservas del día
-// seleccionado como RESPALDO, porque la vista aún no estaba aplicada. Ya lo
-// está (migración `20260926140000_asignaciones_mesa_sin_solapes.sql`), así que
-// el respaldo se ha quitado: solo servía para tapar la vista y, de paso, hacía
-// que una reserva con sala y sin mesa saliera como "no disponible" en vez de
-// como trabajo pendiente. `reservas_mes` se queda porque la cuadrícula la
-// necesita, no porque el panel dependa de ella.
+// CUIDADO CON LAS 1000 FILAS: PostgREST devuelve como mucho 1000 filas por
+// petición (el tope por defecto de Supabase). Con ~1.000 reservas confirmadas
+// en un mes, una sola consulta habría dejado sin contar el final del mes sin
+// dar error. Por eso `leerReservasDelMes` pide el mes por PÁGINAS de 1000 y
+// sigue hasta tener todas (con el recuento exacto que devuelve el servidor, para
+// no fiarse del tamaño de la última página).
+//
+// `"reservas_mes"` es la clave que invalidan las mutaciones de reservas
+// (`clavesCache.ts`); un test lee este fichero para comprobar que sigue aquí.
 //
 // ---------------------------------------------------------------------------
-// TODOS LOS NEGOCIOS JUNTOS
+// SOLO CASA TOMÁS (decisión del dueño, 2026-10-01)
 // ---------------------------------------------------------------------------
-// Casa Tomás + Touza · El Reservado (decisión del dueño 2026-09-24): la
-// cuadrícula solo cuenta reservas y comensales por día, y cada sala del panel
-// lleva su insignia de negocio. Quien calcule aforo debe hacerlo por negocio
-// (trigger `validar_capacidad_reserva`).
+// Touza ya no admite reservas y se va a retirar del sistema (otro encargo). El
+// calendario mide la ocupación SOLO de Casa Tomás, contra su aforo por turno, sin
+// selector de negocio ni mezcla de aforos; si en los datos antiguos aparece una
+// reserva de `marca = 'touza'`, se ignora (ver `esDeCasaTomas`). El panel del
+// día sigue enseñando sus salas tal cual: ese código antiguo lo retirará el
+// encargo de la retirada de Touza, no este.
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import {
-  eachDayOfInterval,
-  endOfMonth,
-  format,
-  isSameDay,
-  isSameMonth,
-  startOfMonth,
-} from "date-fns";
+import { eachDayOfInterval, endOfMonth, format, isSameDay, isSameMonth, startOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Users, Calendar as CalendarIcon } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { aforoCasaTomas, resumirMes, type ReservaCalendario } from "@/lib/reservas/ocupacionCalendario";
+import { configAsignacionDesde, fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
 import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
+import { CasillaOcupacion } from "./CasillaOcupacion";
+import { LeyendaOcupacion } from "./LeyendaOcupacion";
 
 // `onDayClick` ya no existe. Estaba declarada y desestructurada, pero NUNCA se
 // llamaba ni nadie la pasaba (el único consumidor es `Reservas.tsx`, que pasa
@@ -88,13 +82,52 @@ interface CalendarioOcupacionProps {
   onEspacioClick?: (espacioId: string) => void;
 }
 
-/** Recuento de un día para la cuadrícula. */
-type StatsDia = {
-  total: number;
-  comensales: number;
-  /** Grado 1 pendiente: reservas que todavía no tienen sala. */
-  sinSala: number;
-};
+/** Filas por petición de PostgREST (el tope por defecto de Supabase). */
+const FILAS_POR_PAGINA = 1000;
+/** Freno de seguridad: 20.000 reservas en un mes no existen; si llega, algo va mal. */
+const PAGINAS_MAXIMAS = 20;
+
+/**
+ * Todas las reservas NO canceladas del mes, página a página. Las canceladas
+ * nunca cuentan; el resto (incluidas completadas y «No vino») se trae porque
+ * los días pasados se enseñan como histórico: el filtro por estado vivo lo hace
+ * `resumirMes`, que es lo que se testea.
+ *
+ * `as any` en la tabla: `marca` no está en los tipos generados para `reservas`.
+ * Mismo recurso que `useDisponibilidad.ts`.
+ */
+async function leerReservasDelMes(inicio: string, fin: string): Promise<ReservaCalendario[]> {
+  const filas: ReservaCalendario[] = [];
+  let total: number | null = null;
+
+  for (let pagina = 0; pagina < PAGINAS_MAXIMAS; pagina++) {
+    const desde = pagina * FILAS_POR_PAGINA;
+    const { data, error, count } = await supabase
+      .from("reservas" as any)
+      .select("id, fecha, hora, numero_comensales, estado, marca, espacio_id", { count: "exact" })
+      .gte("fecha", inicio)
+      .lte("fecha", fin)
+      .neq("estado", "cancelada")
+      // `id` desempata: sin un orden total, dos páginas pueden repetir o saltarse filas.
+      .order("fecha")
+      .order("hora")
+      .order("id")
+      .range(desde, desde + FILAS_POR_PAGINA - 1);
+
+    if (error) throw error;
+    const lote = (data ?? []) as unknown as ReservaCalendario[];
+    filas.push(...lote);
+    if (typeof count === "number") total = count;
+
+    // Se acaba cuando ya están todas (según el recuento del servidor) o, si el
+    // servidor no lo da, cuando una página llega corta. Una página vacía corta
+    // siempre: no hay nada más que pedir.
+    if (lote.length === 0) break;
+    if (total !== null ? filas.length >= total : lote.length < FILAS_POR_PAGINA) break;
+  }
+
+  return filas;
+}
 
 /**
  * Qué día se selecciona al entrar en un mes: hoy si cae dentro (lo normal al
@@ -107,60 +140,106 @@ function diaPorDefectoDelMes(mes: Date): Date {
   return isSameMonth(hoy, mes) ? hoy : startOfMonth(mes);
 }
 
+/** Lo legible de un error de PostgREST/red, para poder reportarlo sin mirar logs. */
+function mensajeDeError(error: unknown): string {
+  if (!error) return "";
+  if (typeof error === "string") return error.trim();
+  if (error instanceof Error) return error.message.trim();
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message: unknown }).message).trim();
+  }
+  return "";
+}
+
+/**
+ * La consulta del mes ha fallado. Antes un fallo dejaba la cuadrícula VACÍA y
+ * sin avisar —«no hay reservas en todo el mes», que es mentira—; ahora se dice
+ * y se ofrece reintentar. Mismo lenguaje que el error del panel del día.
+ */
+function BloqueErrorMes({
+  error,
+  reintentando,
+  onReintentar,
+}: {
+  error: unknown;
+  reintentando: boolean;
+  onReintentar: () => void;
+}) {
+  const detalle = mensajeDeError(error);
+  return (
+    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+      <div className="flex min-w-0 items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm font-medium">No se han podido leer las reservas de este mes</p>
+          <p className="text-xs text-muted-foreground">
+            No se enseña ninguna cifra para no dar por buenos unos datos que no se han llegado a leer. Vuelve a
+            intentarlo.
+          </p>
+          {detalle && <p className="break-words text-xs text-muted-foreground/80">{detalle}</p>}
+        </div>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="mt-3 gap-2"
+        onClick={onReintentar}
+        disabled={reintentando}
+      >
+        <RefreshCw className={cn("h-3.5 w-3.5", reintentando && "animate-spin")} aria-hidden="true" />
+        {reintentando ? "Reintentando…" : "Reintentar"}
+      </Button>
+    </div>
+  );
+}
+
 export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps) {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
-  // Reservas del mes: la consulta de la CUADRÍCULA y de nadie más. Trae
-  // `espacio_id` porque de ahí sale el grado 1 (con sala / sin sala) de cada
-  // casilla. El panel del día NO come de aquí: lee `vista_asignacion_dia`.
-  //
-  // `as any` + cast final: `marca` no está en los tipos generados para
-  // `reservas`. Mismo recurso que `useDisponibilidad.ts`.
-  const { data: reservasMes, isLoading } = useQuery({
+  // El reloj de la pantalla: una vez por minuto, para que «hoy» y la ventana de
+  // asignación se muevan solos si la pestaña se queda abierta (p. ej. toda la noche).
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setAhora(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  // «Hoy» es el de Madrid, no el del navegador: los días pasados y la ventana de
+  // asignación se miden con la hora del restaurante.
+  const hoy = fechaMadrid(ahora);
+
+  // Reservas del mes: la consulta de la CUADRÍCULA y de nadie más. El panel del
+  // día NO come de aquí: lee `vista_asignacion_dia`.
+  const {
+    data: reservasMes,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery({
     queryKey: ["reservas_mes", format(currentMonth, "yyyy-MM")],
-    queryFn: async () => {
-      const inicio = format(startOfMonth(currentMonth), "yyyy-MM-dd");
-      const fin = format(endOfMonth(currentMonth), "yyyy-MM-dd");
-
-      const { data, error } = await supabase
-        .from("reservas" as any)
-        .select(`
-          id,
-          fecha,
-          hora,
-          numero_comensales,
-          estado,
-          nombre,
-          marca,
-          espacio_id
-        `)
-        .gte("fecha", inicio)
-        .lte("fecha", fin)
-        .neq("estado", "cancelada")
-        .order("fecha")
-        .order("hora");
-
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: () =>
+      leerReservasDelMes(
+        format(startOfMonth(currentMonth), "yyyy-MM-dd"),
+        format(endOfMonth(currentMonth), "yyyy-MM-dd"),
+      ),
   });
 
-  // Recuento por día.
-  const statsPerDay = useMemo(() => {
-    const stats: Record<string, StatsDia> = {};
-    if (!reservasMes) return stats;
+  // El aforo de Casa Tomás: de sus espacios activos (caché compartida con media
+  // app). La ventana de asignación: de la configuración (48 h por defecto
+  // mientras carga o si falla).
+  const { data: espacios, isLoading: cargandoEspacios, isError: errorEspacios } = useEspaciosReserva();
+  const { data: configuracion } = useConfiguracionReservas();
+  const { ventanaHoras } = configAsignacionDesde(configuracion);
+  const aforo = useMemo(() => aforoCasaTomas(espacios), [espacios]);
 
-    reservasMes.forEach((r: any) => {
-      const key = r.fecha;
-      if (!stats[key]) stats[key] = { total: 0, comensales: 0, sinSala: 0 };
-      stats[key].total++;
-      stats[key].comensales += Number(r.numero_comensales) || 0;
-      if (!r.espacio_id || !String(r.espacio_id).trim()) stats[key].sinSala++;
-    });
-
-    return stats;
-  }, [reservasMes]);
+  // Cifras y nivel de cada día del mes.
+  const resumenes = useMemo(
+    () => (reservasMes ? resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras }) : {}),
+    [reservasMes, aforo, hoy, ahora, ventanaHoras],
+  );
 
   /**
    * Cambia de mes. Si el día seleccionado se queda fuera del mes nuevo hay que
@@ -173,23 +252,15 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     setSelectedDate((sel) => (isSameMonth(sel, nuevo) ? sel : diaPorDefectoDelMes(nuevo)));
   };
 
-  /**
-   * Color de la casilla según el REPARTO POR SALA. Nada de rojo: que queden
-   * reservas sin sala es lo normal en un día que aún está lejos, no un fallo.
-   */
-  const colorDeReparto = (stats: StatsDia | undefined) => {
-    if (!stats || stats.total === 0) return "";
-    if (stats.sinSala > 0)
-      return "bg-amber-500/15 text-amber-900 border-amber-500/40 dark:text-amber-200";
-    return "bg-green-500/15 text-green-800 border-green-500/40 dark:text-green-300";
-  };
-
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
     end: endOfMonth(currentMonth),
   });
 
-  if (isLoading) {
+  // Los espacios casi siempre ya están en caché (la página los pide al montarse):
+  // solo se espera por ellos si de verdad faltan, para no pintar el mes en gris
+  // un instante y que luego salte a color.
+  if (isLoading || (cargandoEspacios && !espacios)) {
     return (
       <Card>
         <CardContent className="p-8">
@@ -205,150 +276,96 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   }
 
   return (
-    <div className="space-y-6">
-      {/* Navegación del mes */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <h3 className="text-xl font-semibold capitalize">
-              {format(currentMonth, "MMMM yyyy", { locale: es })}
-            </h3>
-            <Button variant="ghost" onClick={() => cambiarMes(1)} aria-label="Mes siguiente">
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-        {/* Calendario */}
-        <Card className="lg:col-span-2">
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Navegación del mes */}
+        <Card>
           <CardContent className="p-4">
-            {/* Header días de la semana */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
-                <div
-                  key={day}
-                  className="text-center text-sm font-medium text-muted-foreground py-2"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Días del mes */}
-            <div className="grid grid-cols-7 gap-1">
-              {/* Espacios vacíos para alinear el primer día */}
-              {Array.from({ length: (startOfMonth(currentMonth).getDay() + 6) % 7 }).map((_, i) => (
-                <div key={`empty-${i}`} className="aspect-square" />
-              ))}
-
-              {daysInMonth.map((day) => {
-                const dateKey = format(day, "yyyy-MM-dd");
-                const dayStats = statsPerDay[dateKey];
-                const isSelected = isSameDay(day, selectedDate);
-                const isToday = isSameDay(day, new Date());
-
-                return (
-                  <button
-                    key={dateKey}
-                    onClick={() => setSelectedDate(day)}
-                    aria-pressed={isSelected}
-                    aria-label={
-                      dayStats
-                        ? `${format(day, "d 'de' MMMM", { locale: es })}: ${dayStats.total} reservas, ${dayStats.comensales} comensales${dayStats.sinSala > 0 ? `, ${dayStats.sinSala} sin sala` : ", todas con sala"}`
-                        : `${format(day, "d 'de' MMMM", { locale: es })}: sin reservas`
-                    }
-                    className={cn(
-                      "aspect-square p-1 rounded-lg border transition-all hover:shadow-md",
-                      "flex flex-col items-center justify-start gap-0.5 overflow-hidden",
-                      isSelected
-                        ? "ring-2 ring-primary border-primary"
-                        : "border-border hover:border-primary/50",
-                      isToday && "bg-accent/50",
-                      colorDeReparto(dayStats),
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "text-sm font-medium tabular-nums",
-                        isToday &&
-                          "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center",
-                      )}
-                    >
-                      {format(day, "d")}
-                    </span>
-
-                    {dayStats && (
-                      <>
-                        <div
-                          className="text-[10px] flex items-center gap-0.5 tabular-nums"
-                          aria-hidden="true"
-                        >
-                          <CalendarIcon className="h-2.5 w-2.5" />
-                          {dayStats.total}
-                          <Users className="h-2.5 w-2.5 ml-1" />
-                          {dayStats.comensales}
-                        </div>
-                        {/* Solo se escribe lo que hay: si todo está repartido,
-                            la casilla ya lo dice con el color verde y no hace
-                            falta gastar una línea en "0 sin sala".
-
-                            `hidden sm:block`: por debajo de `sm` la casilla no
-                            da para tres líneas y el texto saldría cortado. Ahí
-                            la información no se pierde: el color ámbar sigue
-                            estando y el `aria-label` del botón la dice entera. */}
-                        {dayStats.sinSala > 0 && (
-                          <div
-                            className="hidden text-[10px] font-medium leading-none tabular-nums sm:block"
-                            aria-hidden="true"
-                          >
-                            {dayStats.sinSala} sin sala
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </Button>
+              <h3 className="text-xl font-semibold capitalize">
+                {format(currentMonth, "MMMM yyyy", { locale: es })}
+              </h3>
+              <Button variant="ghost" onClick={() => cambiarMes(1)} aria-label="Mes siguiente">
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Panel del día: el reparto por salas. Con tope de alto solo a partir de
-            `lg`, donde va en columna junto al calendario; apilado (por debajo de
-            `lg`) crece libre, que es lo que evita que se corte nada. */}
-        <Card className="flex flex-col lg:max-h-[620px]">
-          <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-            <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
-          </CardContent>
-        </Card>
+        {/* `grid-cols-1` explícito: sin él, por debajo de `lg` la columna es
+            `auto` y se ensancha hasta lo más ancho que lleve dentro (la tabla de
+            cuartos de hora del panel), con lo que la cuadrícula se salía de la
+            pantalla en el móvil. */}
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
+          {/* Calendario */}
+          <Card className="min-w-0 lg:col-span-2">
+            <CardContent className="p-2 sm:p-4">
+              {isError ? (
+                <BloqueErrorMes
+                  error={error}
+                  reintentando={isFetching}
+                  onReintentar={() => {
+                    void refetch();
+                  }}
+                />
+              ) : (
+                <>
+                  {/* Header días de la semana */}
+                  <div className="mb-1 grid grid-cols-7 gap-0.5 sm:mb-2 sm:gap-1">
+                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
+                      <div
+                        key={day}
+                        className="py-1 text-center text-xs font-medium text-muted-foreground sm:py-2 sm:text-sm"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Días del mes */}
+                  <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+                    {/* Espacios vacíos para alinear el primer día */}
+                    {Array.from({ length: (startOfMonth(currentMonth).getDay() + 6) % 7 }).map((_, i) => (
+                      <div key={`empty-${i}`} />
+                    ))}
+
+                    {daysInMonth.map((day) => {
+                      const dateKey = format(day, "yyyy-MM-dd");
+                      return (
+                        <CasillaOcupacion
+                          key={dateKey}
+                          dia={day}
+                          fechaISO={dateKey}
+                          resumen={resumenes[dateKey]}
+                          esPasado={dateKey < hoy}
+                          esHoy={dateKey === hoy}
+                          seleccionada={isSameDay(day, selectedDate)}
+                          ventanaHoras={ventanaHoras}
+                          onSeleccionar={setSelectedDate}
+                        />
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Panel del día: el reparto por salas. Con tope de alto solo a partir de
+              `lg`, donde va en columna junto al calendario; apilado (por debajo de
+              `lg`) crece libre, que es lo que evita que se corte nada. */}
+          <Card className="flex min-w-0 flex-col lg:max-h-[620px]">
+            <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+              <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <LeyendaOcupacion ventanaHoras={ventanaHoras} aforo={aforo} aforoNoDisponible={errorEspacios} />
       </div>
-
-      {/* Leyenda. Describe lo que la cuadrícula pinta DE VERDAD (reparto por
-          sala). La anterior hablaba de "Baja / Media / Alta ocupación", que
-          nunca llegó a funcionar porque el porcentaje siempre era 0. */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 rounded border border-green-500/40 bg-green-500/15" />
-              <span>Todas las reservas tienen sala</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 rounded border border-amber-500/40 bg-amber-500/15" />
-              <span>Quedan reservas por repartir por sala</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="h-4 w-4 rounded border border-border" />
-              <span>Sin reservas</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </TooltipProvider>
   );
 }

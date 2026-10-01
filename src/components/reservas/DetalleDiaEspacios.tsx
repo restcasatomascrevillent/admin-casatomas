@@ -88,6 +88,26 @@
 // bloque por negocio (`DisponibilidadCuartos`): cuándo llega la gente y cuánta
 // hay sentada. Es solo consulta, como el resto del panel. Sus datos son los de
 // `useOcupacionSalasDia` (reservas del día), no los de la vista de asignación.
+//
+// ---------------------------------------------------------------------------
+// CABECERA: LOS COMENSALES EN GRANDE Y LA OCUPACIÓN (2026-10-01)
+// ---------------------------------------------------------------------------
+// La cabecera pone los COMENSALES como protagonista (igual que la casilla del
+// mes: el dueño quiere esa cifra de un vistazo) y las reservas debajo, pequeñas.
+// Debajo va el % de aforo de comida y de cena (`OcupacionDelDia`): el desglose
+// del color de la casilla. Se calcula con la MISMA función que la casilla
+// (`ocupacionPorTurno`) y con las filas de `vista_asignacion_dia`, que ya son
+// solo las reservas vivas: casilla y panel no pueden discrepar. El aforo sale de
+// `useEspaciosReserva` (espacios activos de Casa Tomás, como el trigger). Los días
+// pasados no llevan %: lo que ya ocurrió no se mide contra el aforo.
+//
+// SOLO CASA TOMÁS: Touza ya no admite reservas (decisión del dueño, 2026-10-01).
+// Las cifras de la cabecera y el % ignoran cualquier fila de otro negocio que
+// quede en datos antiguos, igual que la casilla del mes. La lista de salas de
+// debajo no se ha tocado: la retirada de Touza es otro encargo.
+//
+// Las cifras de la cabecera (comensales, reservas, con mesa) siguen al filtro de
+// turno; el desglose de ocupación enseña siempre los dos turnos.
 // ============================================================================
 
 import { useMemo, useState } from "react";
@@ -112,7 +132,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useResumenAsignacionDia } from "@/hooks/useResumenAsignacionDia";
+import { useResumenAsignacionDia, type FilaAsignacionDia } from "@/hooks/useResumenAsignacionDia";
 import { marcaDeEspacio, NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
 import {
   resumenDia,
@@ -121,8 +141,11 @@ import {
   type ResumenEspacio,
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
+import { aforoCasaTomas, esDeCasaTomas, ocupacionPorTurno } from "@/lib/reservas/ocupacionCalendario";
+import { fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
 import { NegocioBadge } from "./NegocioBadge";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
+import { OcupacionDelDia } from "./OcupacionDelDia";
 
 export interface DetalleDiaEspaciosProps {
   /** Día que se está mirando. */
@@ -143,6 +166,23 @@ const ETIQUETA_TURNO: Record<FiltroTurno, string> = {
 function plural(n: number, singular: string, plural_: string) {
   return `${n} ${n === 1 ? singular : plural_}`;
 }
+
+/**
+ * Una fila de la vista reducida a lo justo para agrupar por sala. `turno` y
+ * `grado` se cogen TAL CUAL de la fila (los calcula la vista en SQL y el hook ya
+ * los ha saneado: volver a derivarlos aquí sería una segunda regla que podría
+ * discrepar de la base de datos). El nombre de la sala sí tiene respaldo local
+ * (`espaciosPorId`) porque es solo una etiqueta: si la vista lo trae vacío,
+ * enseñar "Sala sin nombre" teniendo el nombre a mano en caché no ayuda a nadie.
+ */
+const aFilaResumen =
+  (espaciosPorId: ReadonlyMap<string, { nombre: string }>) =>
+  (f: FilaAsignacionDia): FilaResumenEspacio => ({
+    grado: f.grado,
+    espacio_id: f.espacio_id,
+    espacio_nombre: f.espacio_nombre ?? (f.espacio_id ? espaciosPorId.get(f.espacio_id)?.nombre : null) ?? null,
+    numero_comensales: f.numero_comensales,
+  });
 
 /** Lo legible de un error de PostgREST/red, para poder reportarlo sin mirar logs. */
 function mensajeDeError(error: unknown): string {
@@ -401,25 +441,43 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
    * teniendo el nombre a mano en caché no ayuda a nadie.
    */
   const filasFiltradas = useMemo<FilaResumenEspacio[]>(() => {
-    return filas
-      .filter((f) => turno === "todos" || f.turno === turno)
-      .map((f) => ({
-        grado: f.grado,
-        espacio_id: f.espacio_id,
-        espacio_nombre:
-          f.espacio_nombre ??
-          (f.espacio_id ? espaciosPorId.get(f.espacio_id)?.nombre : null) ??
-          null,
-        numero_comensales: f.numero_comensales,
-      }));
+    return filas.filter((f) => turno === "todos" || f.turno === turno).map(aFilaResumen(espaciosPorId));
   }, [filas, turno, espaciosPorId]);
 
   const resumen = useMemo(() => resumenDia(filasFiltradas), [filasFiltradas]);
   const { porEspacio, sinSala } = useMemo(() => resumenPorEspacio(filasFiltradas), [filasFiltradas]);
+
+  // Las CIFRAS DE LA CABECERA (comensales, reservas, con mesa) son las de Casa
+  // Tomás: Touza ya no admite reservas y las antiguas que queden se ignoran, igual
+  // que en la casilla del mes (así las dos cifras coinciden siempre). Lo de abajo
+  // (salas y «Sin sala») no se toca. Casi siempre es exactamente lo mismo.
+  const filasCasaTomas = useMemo<FilaResumenEspacio[]>(() => {
+    return filas
+      .filter((f) => esDeCasaTomas(f.marca) && (turno === "todos" || f.turno === turno))
+      .map(aFilaResumen(espaciosPorId));
+  }, [filas, turno, espaciosPorId]);
+  const resumenCasaTomas = useMemo(() => resumenDia(filasCasaTomas), [filasCasaTomas]);
   const comensales = useMemo(
-    () => filasFiltradas.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
-    [filasFiltradas],
+    () => filasCasaTomas.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
+    [filasCasaTomas],
   );
+
+  // Ocupación del día por turno: con TODAS las filas (el filtro de turno no la
+  // recorta, enseña siempre comida y cena) y contra el aforo de Casa Tomás.
+  // Hasta que no llegan los espacios no se sabe el aforo, y enseñar "aforo sin
+  // configurar" un instante sería mentira.
+  const aforo = useMemo(() => aforoCasaTomas(espacios), [espacios]);
+  const ocupacion = useMemo(
+    () =>
+      ocupacionPorTurno(
+        filas.map((f) => ({ marca: f.marca, turno: f.turno, comensales: f.numero_comensales })),
+        aforo,
+      ),
+    [filas, aforo],
+  );
+  // Un día pasado no se mide contra el aforo: ya ocurrió.
+  const esPasado = fechaISO < fechaMadrid(Date.now());
+  const mostrarOcupacion = !esPasado && Array.isArray(espacios) && ocupacion.reservas > 0;
 
   // ¿Hay algo en el otro turno? Evita que un "no hay reservas" engañe cuando en
   // realidad lo que pasa es que el filtro está puesto en Comida.
@@ -445,7 +503,7 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
     // hijo desplazable calcula el `flex-1` sobre ESTE alto, así que sin los dos
     // el contenido no se desplazaría: se CORTARÍA contra el `overflow-hidden`
     // de la tarjeta.
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="panel-dia">
       {/* Cabecera: qué día es, el filtro de turno y el resumen del turno */}
       <div className="flex-shrink-0 space-y-2">
         <div className="flex min-w-0 items-center gap-2">
@@ -473,31 +531,43 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
 
         {/* Ni cifras ni porcentajes mientras no se sepa: cargando y error tienen
             su propia frase, y el recuento solo aparece cuando es de verdad. */}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {isError ? (
-            <span>El reparto de este día no se ha podido leer.</span>
-          ) : isLoading ? (
-            <span>Leyendo el reparto del día…</span>
-          ) : (
-            <>
-              <span className="whitespace-nowrap tabular-nums">
-                {plural(resumen.total, "reserva", "reservas")}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span className="whitespace-nowrap tabular-nums">
-                {plural(comensales, "comensal", "comensales")}
-              </span>
-              {resumen.total > 0 && (
-                <>
-                  <span aria-hidden="true">·</span>
-                  <span className="whitespace-nowrap tabular-nums">
-                    {resumen.conMesa} de {resumen.total} con mesa
-                  </span>
-                </>
-              )}
-            </>
-          )}
-        </div>
+        {isError ? (
+          <p className="text-xs text-muted-foreground">El reparto de este día no se ha podido leer.</p>
+        ) : isLoading ? (
+          <p className="text-xs text-muted-foreground">Leyendo el reparto del día…</p>
+        ) : (
+          <div className="space-y-2">
+            <div>
+              {/* Los COMENSALES, protagonistas. Sin `tabular-nums`: es un número
+                  grande suelto, no una columna. */}
+              <p className="flex items-baseline gap-1.5">
+                <span
+                  data-testid="comensales-dia"
+                  className="text-3xl font-semibold leading-none"
+                >
+                  {comensales}
+                </span>
+                {/* El espacio de texto no se ve (es un flex con `gap`) pero hace que el
+                    lector de pantalla y el texto copiado digan «35 comensales». */}{" "}
+                <span className="text-sm text-muted-foreground">{comensales === 1 ? "comensal" : "comensales"}</span>
+              </p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span className="whitespace-nowrap tabular-nums">
+                  {plural(resumenCasaTomas.total, "reserva", "reservas")}
+                </span>
+                {resumenCasaTomas.total > 0 && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap tabular-nums">
+                      {resumenCasaTomas.conMesa} de {resumenCasaTomas.total} con mesa
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+            {mostrarOcupacion && <OcupacionDelDia turnos={ocupacion.turnos} aforo={aforo} />}
+          </div>
+        )}
       </div>
 
       {/* Cuerpo desplazable. `min-h-0` es lo que impide que el contenido empuje
