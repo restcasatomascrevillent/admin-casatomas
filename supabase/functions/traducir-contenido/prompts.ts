@@ -4,9 +4,11 @@
 // se conserva tal cual el original salvo las correcciones deliberadas y
 // documentadas junto a su constante: PLATO_SYSTEM (categorías cerradas
 // incompletas), MENU_TAPAS_SYSTEM (el nodo n8n "Menú y tapas" reutilizaba por
-// error el prompt de Bebidas) y GLOSARIO_COCINA (términos de cocina española
-// que el modelo traducía mal de forma determinista; se añade a los dos prompts
-// por los que pasan nombres de plato: PLATO_SYSTEM y MENU_TAPAS_SYSTEM).
+// error el prompt de Bebidas), GLOSARIO_COCINA (términos de cocina española
+// que el modelo traducía mal de forma determinista; se añade a los tres prompts
+// por los que pasan nombres de plato: PLATO_SYSTEM, MENU_TAPAS_SYSTEM y
+// NOVEDAD_SYSTEM) y NOVEDAD_SYSTEM (reescrito: el original pedía "reescribir"
+// y el modelo cambiaba el sentido; ver su constante).
 // COCTEL_SYSTEM es nuevo: el switch de n8n nunca tuvo una rama "coctel" (por
 // eso hoy hay 0/13 cócteles traducidos).
 
@@ -90,6 +92,12 @@ Estructura JSON:
 // de buey con foie" salió como "Sirloin of Brown Crab" / "Filet de Tourteau"
 // (medido). En español "buey" es cangrejo cuando es el plato y bovino cuando va
 // detrás de un corte, así que el glosario tiene que decir las dos cosas.
+//
+// "zamburiñas" y "cocido" (añadidos el 2026-10-01) salen de las NOVEDADES: la
+// única publicada decía "coquilles Saint-Jacques au moelle" (eso es vieira, no
+// zamburiña; la carta ya publica "Variegated Scallops" / "Pétoncles") y una
+// del cocido, probada 4 veces contra la función desplegada, salía "Galician
+// Stew" en inglés y "Cocido" en francés: el mismo plato con dos nombres.
 // ---------------------------------------------------------------------------
 export const GLOSARIO_COCINA = `GLOSARIO OBLIGATORIO de cocina española. Es una lista CERRADA: si el texto de entrada contiene uno de estos términos, se traduce EXACTAMENTE como se indica aquí y no se interpreta de ninguna otra forma.
 - "buey de la ría", "buey de mar" o "buey" cuando es el plato entero: es un CANGREJO (Cancer pagurus), no un bovino. en: "Brown Crab". fr: "Tourteau". Nunca "ox", "beef", "estuary ox", "bœuf" ni "boeuf". Única excepción: si "buey" va detrás de un corte de carne ("chuletón de buey", "solomillo de buey", "entrecot de buey", "lomo de buey", "rabo de buey", "carrillera de buey") o la categoría de entrada es de carnes, ahí sí es el bovino y se traduce como "beef" / "bœuf" (el corte manda: "solomillo de buey" es "Beef Sirloin" / "Filet de bœuf", jamás un cangrejo).
@@ -98,6 +106,8 @@ export const GLOSARIO_COCINA = `GLOSARIO OBLIGATORIO de cocina española. Es una
 - "navajas": es un molusco. en: "Razor Clams". fr: "Couteaux". Nunca "razors", "pocket knives" ni "navettes".
 - "centollo": en: "Spider Crab". fr: "Araignée de mer".
 - "bonito" y "bonito del norte": es un pescado de la familia del atún, nunca un adjetivo. "bonito del norte" es atún blanco: en: "Albacore Tuna", fr: "Thon blanc". Nunca "pretty", "joli", "Northern bonito" ni "bonite du nord".
+- "zamburiñas" o "zamburiña": es una vieira PEQUEÑA, no la vieira grande. en: "Variegated Scallops". fr: "Pétoncles". Nunca "coquilles Saint-Jacques" (eso es la vieira) ni solo "Scallops".
+- "cocido" (cocido gallego, cocido madrileño, cocido montañés...): es el nombre propio del plato y se deja "cocido" en los DOS idiomas, con el gentilicio traducido: "cocido gallego" -> en: "Galician Cocido", fr: "Cocido galicien". Nunca "stew", "Galician stew", "pot-au-feu" ni "potée" como nombre del plato (si hace falta explicarlo, se explica en la descripción, no se cambia el nombre).
 
 Fuera de este glosario, traduce el resto de los términos de cocina de forma profesional, pero NUNCA cambies la especie ni el ingrediente por otro (no conviertas merluza en rape, ni marisco en carne). Si no reconoces con seguridad un término, deja el nombre español tal cual en vez de inventar una descripción.`;
 
@@ -116,9 +126,35 @@ export const PLATO_SYSTEM = `Eres un experto en traducción gastronómica profes
 ${GLOSARIO_COCINA}`;
 
 // ---------------------------------------------------------------------------
-// Novedades — nodo "Novedades". Verbatim.
+// Novedades — REESCRITO el 2026-10-01 (antes: nodo "Novedades" de n8n, verbatim).
+//
+// El original pedía "adaptar" y "reescribir los textos como si hubieran sido
+// creados originalmente en cada idioma", sin glosario. Medido contra la
+// función desplegada con una novedad del cocido (4 de 4 llamadas):
+//   · "Llega el cocido gallego" -> "Le Cocido Galicien est de Retour": cambia
+//     el sentido ("llega" no es "vuelve") y usa mayúsculas inglesas en francés.
+//   · Inglés "Galician Stew" y francés "Cocido": el mismo plato con dos nombres.
+// Y la única novedad publicada traduce "zamburiñas" como "coquilles
+// Saint-Jacques au moelle osseuse" (especie equivocada y error de género).
+// Ahora: fidelidad primero (mismos hechos, mismo sentido), tono natural sin
+// inventar, nombres de plato coherentes con la carta (GLOSARIO_COCINA) y la
+// MISMA forma de salida (bullets/tags: mismo número y orden), que mapResponse
+// valida para no guardar nunca una traducción a medias.
 // ---------------------------------------------------------------------------
-export const NOVEDAD_SYSTEM = `Eres un redactor y traductor nativo profesional especializado en marketing gastronómico. Tu tarea es adaptar el contenido proporcionado a inglés y francés con un tono natural, atractivo y propio de un hablante nativo, no literal, manteniendo la intención comercial y emocional del texto original. Reescribe los textos como si hubieran sido creados originalmente en cada idioma.
+export const NOVEDAD_SYSTEM = `Eres un traductor nativo profesional especializado en comunicación gastronómica para Casa Tomás, un restaurante de Crevillent (Alicante, España). Traduces del español al inglés (en) y al francés (fr) las novedades que se publican en su web (platos nuevos, eventos, promociones, avisos).
+
+Reglas obligatorias:
+- FIDELIDAD ante todo: cada traducción dice exactamente lo mismo que el original. No añadas, quites ni cambies información ni el sentido (si el original dice que algo "llega", no digas que "vuelve"; si no dice "tradicional", no lo añadas). Puedes reordenar la frase para que suene natural a un nativo, pero sin inventar.
+- Copia sin cambiar las cifras, precios, fechas, días, horas y rangos horarios; tradúcelos solo de formato si es obligatorio en el idioma (p. ej. "18€" -> "€18" en inglés).
+- Ingredientes y alérgenos: tradúcelos tal cual, sin cambiar ninguno por otro.
+- Nombres propios: "Casa Tomás", "Touza" y "Crevillent" se escriben siempre tal cual.
+- Nombres de platos: aplica el glosario de abajo. Un plato se llama IGUAL en inglés y en francés (o los dos traducidos o los dos en español); si no tiene una traducción reconocida, deja el nombre español en ambos idiomas.
+- Mayúsculas: en francés, el título va en minúscula salvo la primera palabra y los nombres propios ("Le cocido galicien arrive", nunca "Le Cocido Galicien Arrive"). En inglés puedes usar mayúsculas de título.
+- En francés, dirígete al cliente de "vous".
+- "bullets" y "tags": devuelve el MISMO número de elementos que la entrada y en el mismo orden, uno traducido por cada uno original.
+- Si un campo de entrada viene vacío, devuélvelo vacío ("" o []).
+
+${GLOSARIO_COCINA}
 
 Devuelve únicamente un objeto JSON válido, sin markdown, sin explicaciones y sin texto adicional, usando exactamente esta estructura:
 
@@ -234,6 +270,41 @@ const nullIfEmpty = (v: unknown): string | null => {
   return s === "" ? null : s;
 };
 const strArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+
+/**
+ * Qué campos de una novedad tienen texto en español pero llegan vacíos (o con
+ * otro número de elementos) en la respuesta del modelo. Lista vacía = completa.
+ * Misma regla que `camposSinTraducir` en el panel
+ * (src/lib/traduccion-novedad.ts): si se cambia una, cambiar la otra.
+ */
+export function camposNovedadSinTraducir(
+  datos: Record<string, unknown>,
+  respuesta: Record<"en" | "fr", Record<string, unknown>>,
+): string[] {
+  const faltan: string[] = [];
+  const lleno = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  const noVacios = (v: unknown) => strArray(v).filter((x) => x.trim() !== "");
+  const textos: [string, unknown][] = [
+    ["title", datos.titulo ?? datos.nombre],
+    ["description", datos.descripcion],
+    ["badge", datos.badge_text],
+  ];
+  const listas: [string, unknown][] = [
+    ["bullets", datos.bullets],
+    ["tags", datos.tags],
+  ];
+  for (const idioma of ["en", "fr"] as const) {
+    const bloque = respuesta[idioma] ?? {};
+    for (const [clave, original] of textos) {
+      if (lleno(original) && !lleno(bloque[clave])) faltan.push(`${idioma}.${clave}`);
+    }
+    for (const [clave, original] of listas) {
+      const esperados = noVacios(original).length;
+      if (esperados > 0 && noVacios(bloque[clave]).length !== esperados) faltan.push(`${idioma}.${clave}`);
+    }
+  }
+  return faltan;
+}
 
 // ---------------------------------------------------------------------------
 // Construcción del mensaje de usuario + mapeo de la respuesta a columnas de
@@ -360,6 +431,14 @@ export function buildPromptSpec(tipo: TipoContenido, datos: Record<string, unkno
           const r = (raw ?? {}) as Record<string, any>;
           const en = r.traducciones?.en ?? {};
           const fr = r.traducciones?.fr ?? {};
+          // Antes se devolvía lo que hubiera, aunque faltase un idioma entero:
+          // la función contestaba ok:true con nulls, el panel lo guardaba como
+          // "traducido" y en una edición machacaba la traducción buena anterior.
+          // Lanzar aquí hace que index.ts responda ok:false y el panel avise.
+          const faltan = camposNovedadSinTraducir(datos, { en, fr });
+          if (faltan.length > 0) {
+            throw new Error(`Traducción de la novedad incompleta: ${faltan.join(", ")}`);
+          }
           return {
             titulo_en: nullIfEmpty(en.title),
             descripcion_en: nullIfEmpty(en.description),

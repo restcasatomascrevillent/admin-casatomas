@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 
 export interface Novedad {
   id: string;
@@ -141,21 +142,25 @@ export function useNovedades() {
             }
           );
 
-          const t = !tradError && tradRes?.ok ? tradRes.translations : null;
-          if (t) {
+          const t = !tradError && tradRes?.ok ? normalizarTraduccionNovedad(tradRes.translations) : null;
+          // Igual que el editor: una traducción a medias no se guarda.
+          const faltan = t ? camposSinTraducir(data, t) : [];
+          if (faltan.length > 0) {
+            console.error("Traducción de la novedad incompleta, no se guarda:", faltan);
+          } else if (t) {
             const { error: updateError } = await supabase
               .from("novedades")
               .update({
-                titulo_en: t.titulo_en,
-                titulo_fr: t.titulo_fr,
-                descripcion_en: t.descripcion_en,
-                descripcion_fr: t.descripcion_fr,
-                badge_text_en: t.badge_text_en,
-                badge_text_fr: t.badge_text_fr,
-                bullets_en: t.bullets_en,
-                bullets_fr: t.bullets_fr,
-                tags_en: t.tags_en,
-                tags_fr: t.tags_fr,
+                titulo_en: t.titulo_en || null,
+                titulo_fr: t.titulo_fr || null,
+                descripcion_en: t.descripcion_en || null,
+                descripcion_fr: t.descripcion_fr || null,
+                badge_text_en: t.badge_text_en || null,
+                badge_text_fr: t.badge_text_fr || null,
+                bullets_en: t.bullets_en.length ? t.bullets_en : null,
+                bullets_fr: t.bullets_fr.length ? t.bullets_fr : null,
+                tags_en: t.tags_en.length ? t.tags_en : null,
+                tags_fr: t.tags_fr.length ? t.tags_fr : null,
               })
               .eq("id", data.id);
             if (updateError) {

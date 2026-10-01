@@ -19,6 +19,7 @@ import {
   MENU_TAPAS_SYSTEM,
   NOVEDAD_SYSTEM,
   PLATO_SYSTEM,
+  camposNovedadSinTraducir,
   VINO_SYSTEM,
 } from "../prompts.ts";
 
@@ -30,6 +31,8 @@ describe("GLOSARIO_COCINA", () => {
     ["navajas", ["Razor Clams", "Couteaux"]],
     ["centollo", ["Spider Crab", "Araignée de mer"]],
     ["bonito", ["Albacore Tuna", "Thon blanc"]],
+    ["zamburiñas", ["Variegated Scallops", "Pétoncles"]],
+    ["cocido", ["Galician Cocido", "Cocido galicien"]],
   ])("cubre '%s' con su traducción correcta", (termino, traducciones) => {
     expect(GLOSARIO_COCINA).toContain(termino);
     for (const t of traducciones) expect(GLOSARIO_COCINA).toContain(t);
@@ -58,9 +61,13 @@ describe("GLOSARIO_COCINA", () => {
 });
 
 describe("a qué prompts se engancha el glosario", () => {
+  // NOVEDAD_SYSTEM lo lleva desde el 2026-10-01: las novedades hablan de
+  // platos ("Llega el cocido gallego", "zamburiñas con tuétano") y sin
+  // glosario el modelo los llamaba distinto en cada idioma y que en la carta.
   it.each([
     ["PLATO_SYSTEM", PLATO_SYSTEM],
     ["MENU_TAPAS_SYSTEM", MENU_TAPAS_SYSTEM],
+    ["NOVEDAD_SYSTEM", NOVEDAD_SYSTEM],
   ])("%s lo incluye (por ahí pasan nombres de plato)", (_n, prompt) => {
     expect(prompt).toContain(GLOSARIO_COCINA);
   });
@@ -69,7 +76,6 @@ describe("a qué prompts se engancha el glosario", () => {
     ["VINO_SYSTEM", VINO_SYSTEM],
     ["BEBIDA_SYSTEM", BEBIDA_SYSTEM],
     ["COCTEL_SYSTEM", COCTEL_SYSTEM],
-    ["NOVEDAD_SYSTEM", NOVEDAD_SYSTEM],
   ])("%s NO lo incluye (sus nombres no se traducen)", (_n, prompt) => {
     expect(prompt).not.toContain(GLOSARIO_COCINA);
   });
@@ -101,6 +107,7 @@ describe("buildPromptSpec entrega el glosario al modelo", () => {
     ["plato", { nombre: "Buey de la ría", categoria: "MARISCOS" }],
     ["menu", { primero: "Navajas a la plancha", segundo: "Arroz a banda", postre: "Flan" }],
     ["tapas", { tapas: ["Cocochas al pil-pil", "Centollo gallego"] }],
+    ["novedad", { titulo: "Llega el cocido gallego" }],
   ] as const)("tipo=%s lleva el glosario en el system", (tipo, datos) => {
     expect(buildPromptSpec(tipo, datos).system).toContain(GLOSARIO_COCINA);
   });
@@ -109,8 +116,87 @@ describe("buildPromptSpec entrega el glosario al modelo", () => {
     ["vino", { nombre: "Vega Sicilia" }],
     ["bebida", { nombre: "Caña" }],
     ["coctel", { nombre: "Negroni" }],
-    ["novedad", { titulo: "Nueva temporada" }],
   ] as const)("tipo=%s no lo lleva", (tipo, datos) => {
     expect(buildPromptSpec(tipo, datos).system).not.toContain(GLOSARIO_COCINA);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Novedades (2026-10-01). El prompt original pedía "reescribir como si se
+// hubiera creado en cada idioma": con la novedad del cocido el francés decía
+// "est de Retour" (vuelve) cuando el español dice "Llega", y el inglés
+// llamaba "Galician Stew" al plato que el francés llamaba "Cocido".
+// ---------------------------------------------------------------------------
+describe("NOVEDAD_SYSTEM: fidelidad antes que marketing", () => {
+  it("ya no pide reescribir ni adaptar libremente", () => {
+    expect(NOVEDAD_SYSTEM).not.toMatch(/Reescribe los textos/);
+    expect(NOVEDAD_SYSTEM).toMatch(/FIDELIDAD/);
+    expect(NOVEDAD_SYSTEM).toMatch(/"llega", no digas que "vuelve"/);
+  });
+
+  it("pide el mismo nombre de plato en los dos idiomas", () => {
+    expect(NOVEDAD_SYSTEM).toMatch(/Un plato se llama IGUAL en inglés y en francés/);
+  });
+
+  it("pide mayúsculas francesas en el título", () => {
+    expect(NOVEDAD_SYSTEM).toMatch(/en francés, el título va en minúscula/);
+  });
+
+  it("pide el mismo número de bullets y tags", () => {
+    expect(NOVEDAD_SYSTEM).toMatch(/MISMO número de elementos/);
+  });
+
+  it("mantiene la estructura JSON que lee mapResponse", () => {
+    expect(NOVEDAD_SYSTEM).toContain('"traducciones"');
+    for (const clave of ['"title"', '"description"', '"badge"', '"bullets"', '"tags"']) {
+      expect(NOVEDAD_SYSTEM).toContain(clave);
+    }
+  });
+});
+
+describe("novedad: una traducción a medias no se da por buena", () => {
+  const datos = {
+    titulo: "Llega el cocido gallego",
+    descripcion: "Garbanzos, lacón y grelos.",
+    badge_text: "Nuevo",
+    bullets: ["Precio: 18€", "Solo los jueves"],
+    tags: ["Platos"],
+  };
+  const bloque = (titulo: string) => ({
+    title: titulo,
+    description: "Desc",
+    badge: "New",
+    bullets: ["a", "b"],
+    tags: ["t"],
+  });
+  const completa = { traducciones: { en: bloque("Galician Cocido Is Here"), fr: bloque("Le cocido galicien arrive") } };
+
+  it("mapea una respuesta completa a las columnas", () => {
+    const cols = buildPromptSpec("novedad", datos).mapResponse(completa);
+    expect(cols.titulo_en).toBe("Galician Cocido Is Here");
+    expect(cols.titulo_fr).toBe("Le cocido galicien arrive");
+    expect(cols.bullets_fr).toEqual(["a", "b"]);
+  });
+
+  it("lanza si falta un idioma entero (antes devolvía nulls con ok:true)", () => {
+    const sinFrances = { traducciones: { en: bloque("Galician Cocido Is Here") } };
+    expect(() => buildPromptSpec("novedad", datos).mapResponse(sinFrances)).toThrow(/fr\.title/);
+  });
+
+  it("lanza si el modelo usa otra estructura (sin 'traducciones')", () => {
+    const otraForma = { en: bloque("x"), fr: bloque("y") };
+    expect(() => buildPromptSpec("novedad", datos).mapResponse(otraForma)).toThrow(/incompleta/);
+  });
+
+  it("lanza si se come un bullet", () => {
+    const r = structuredClone(completa);
+    r.traducciones.en.bullets = ["a"];
+    expect(() => buildPromptSpec("novedad", datos).mapResponse(r)).toThrow(/en\.bullets/);
+  });
+
+  it("no exige traducir lo que en español está vacío", () => {
+    expect(
+      camposNovedadSinTraducir({ titulo: "Solo título" }, { en: { title: "Only title" }, fr: { title: "Seul titre" } }),
+    ).toEqual([]);
   });
 });

@@ -52,6 +52,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
+import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
 
@@ -584,19 +585,16 @@ export function EditorNovedadesWeb() {
         console.error("Error al traducir:", error ?? data?.error);
         return null;
       }
-      const t = data.translations || {};
-      return {
-        titulo_en: t.titulo_en || "",
-        titulo_fr: t.titulo_fr || "",
-        descripcion_en: t.descripcion_en || "",
-        descripcion_fr: t.descripcion_fr || "",
-        badge_text_en: t.badge_text_en || "",
-        badge_text_fr: t.badge_text_fr || "",
-        bullets_en: t.bullets_en || [],
-        bullets_fr: t.bullets_fr || [],
-        tags_en: t.tags_en || [],
-        tags_fr: t.tags_fr || [],
-      };
+      const t = normalizarTraduccionNovedad(data.translations);
+      // Una traducción a medias (falta un idioma, la mitad de los puntos...)
+      // se trata como un fallo: antes se guardaba tal cual y, al editar,
+      // machacaba la traducción buena que ya había.
+      const faltan = camposSinTraducir(datos, t);
+      if (faltan.length > 0) {
+        console.error("Traducción incompleta, se descarta:", faltan);
+        return null;
+      }
+      return t;
     } catch (e) {
       console.error("Error al traducir:", e);
       return null;
