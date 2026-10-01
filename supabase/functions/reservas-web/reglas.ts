@@ -12,11 +12,16 @@
 //     incluida la regla de que el grupo quepa en un espacio.
 //
 // Separado de index.ts para poder testearlo con vitest (index.ts importa de
-// URLs de Deno). Solo lo usa handleCrear: handleDisponibilidad nunca tuvo la
-// regla de sala.
+// URLs de Deno). Las reglas de sala solo las usa handleCrear:
+// handleDisponibilidad nunca tuvo la regla de sala.
+//
+// 2026-10-01: Touza deja de admitir reservas — ver
+// `rechazoTouzaSinReservas` al final (esa sí la usan las dos rutas). Las
+// ramas de Touza de las reglas de sala quedan sin uso hasta que se retire
+// toda la lógica de reservas de Touza (paso posterior).
 // ============================================================================
 
-import type { Marca } from "./plantillas.ts";
+import { NEGOCIOS, type Marca } from "./plantillas.ts";
 
 /**
  * ¿Hay que rechazar el alta por falta de sitio?
@@ -46,4 +51,55 @@ export function salaDelCliente(
 ): { espacioId: string | null; salaNombre: string | null } {
   if (marca === "casa_tomas") return { espacioId: null, salaNombre: null };
   return { espacioId: entrada.espacioId, salaNombre: entrada.salaNombre };
+}
+
+// ============================================================================
+// TOUZA NO ADMITE RESERVAS (decisión del dueño, 2026-10-01)
+// ============================================================================
+// «Toda la lógica de reservas de Touza va fuera, no se reserva.» Primer paso,
+// el seguro: el servidor público rechaza cualquier petición cuya marca se
+// resuelva como Touza (misma `resolverMarca` de siempre, en plantillas.ts)
+// ANTES de la lista negra, de `grupo_grande`, de los límites por
+// teléfono/email y del INSERT. Esas ramas registran una solicitud
+// (`solicitudes_pendientes`) o mandan un correo, y la web de Touza pinta
+// `grupo_grande` como «Solicitud recibida»: el cliente creería que alguien
+// la va a revisar y no la atendería nadie.
+//
+// TRAMPA — NO quitar "touza" de MARCAS_VALIDAS ni tocar `resolverMarca` ni la
+// marca por defecto: la web de Touza sigue mandando `marca: "touza"`. Si
+// dejara de ser una marca válida, `resolverMarca` la mandaría a Casa Tomás y
+// se crearía EN SILENCIO una reserva del restaurante. Este rechazo depende de
+// que la marca se siga reconociendo.
+//
+// FORMA: 409 + `motivo` + `mensaje`, lo que la web de Touza ya sabe enseñar
+// (touza-restaurant-website, src/lib/reservas-web.ts::
+// interpretarRechazoReserva): título «No hemos podido enviar tu solicitud»,
+// el `mensaje` tal cual y, para un 409 con un motivo que no conoce, la salida
+// «Llámanos al …». Ni 2xx ni `grupo_grande`: son los dos únicos casos que esa
+// web pinta como «Solicitud recibida» (Reservado.tsx).
+// ============================================================================
+
+export const MOTIVO_TOUZA_SIN_RESERVAS = "touza_sin_reservas";
+
+export interface RechazoTouzaSinReservas {
+  status: 409;
+  cuerpo: { ok: false; motivo: typeof MOTIVO_TOUZA_SIN_RESERVAS; mensaje: string };
+}
+
+/**
+ * Respuesta para una petición de Touza a `/crear` o `/disponibilidad`, o
+ * `null` si la marca sí admite reservas. El teléfono sale de `NEGOCIOS.touza`
+ * (misma fuente que el resto de textos de Touza de esta función).
+ */
+export function rechazoTouzaSinReservas(marca: Marca): RechazoTouzaSinReservas | null {
+  if (marca !== "touza") return null;
+  const { nombre, telefonoTexto } = NEGOCIOS.touza;
+  return {
+    status: 409,
+    cuerpo: {
+      ok: false,
+      motivo: MOTIVO_TOUZA_SIN_RESERVAS,
+      mensaje: `${nombre} no admite reservas por la web. Para cualquier consulta, llámanos al ${telefonoTexto}.`,
+    },
+  };
 }
