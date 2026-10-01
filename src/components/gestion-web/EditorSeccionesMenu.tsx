@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertTriangle,
+  Camera,
   ChevronDown,
   ChevronUp,
   ImageOff,
@@ -67,11 +68,17 @@ import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 type Secciones = Record<SeccionMenu, ItemMenu[]>;
 
 /**
- * Base flexible de cada sección: 3 columnas con el editor a ≥62rem, una por
- * fila por debajo (ver el comentario en `EditorSeccionesMenu`). Va como clase
- * literal completa para que Tailwind la genere.
+ * Reparto de las tres secciones según el ancho REAL del editor (ver el
+ * comentario en `EditorSeccionesMenu`). Van como clases literales completas
+ * para que Tailwind las genere.
+ *
+ * - `CONTENEDOR_SECCIONES`: el envoltorio es un *query container* de ancho.
+ *   La contención de tamaño en línea hace además que su ancho NO dependa de lo
+ *   que lleve dentro: nunca puede ensancharse con las secciones.
+ * - `REJILLA_SECCIONES`: una columna; tres cuando el envoltorio mide ≥62rem.
  */
-const UMBRAL_TRES_COLUMNAS = "basis-[calc((62rem_-_100%)_*_999)]";
+const CONTENEDOR_SECCIONES = "[container-type:inline-size]";
+const REJILLA_SECCIONES = "grid grid-cols-1 gap-3 [@container(min-width:62rem)]:grid-cols-3";
 
 /** `object-position` a partir de `imagen_posicion_y` (0..100, 50 por defecto). */
 const posicionImagen = (y: number | null) => `50% ${typeof y === "number" ? y : 50}%`;
@@ -209,24 +216,37 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
   );
 
   if (!item.imagenUrl) {
+    // Tiene que LEERSE como botón, no como el hueco gris de «sin foto» de los
+    // platos de la carta: borde y color de acción, icono de cámara y la palabra
+    // «Foto». Con el gris tenue de antes nadie adivinaba que se podía pulsar.
     return (
       <>
-        <button
-          ref={botonRef}
-          type="button"
-          onClick={elegirArchivo}
-          disabled={subiendo}
-          aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Subir foto de ${nombre}`}
-          aria-busy={subiendo}
-          title="Subir foto"
-          className={`${HUECO_FOTO} border-dashed bg-muted/40 text-muted-foreground/60 hover:border-primary/60 hover:bg-muted hover:text-foreground`}
-        >
-          {subiendo ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <ImagePlus className="h-4 w-4" aria-hidden="true" />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              ref={botonRef}
+              type="button"
+              onClick={elegirArchivo}
+              disabled={subiendo}
+              aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Subir foto de ${nombre}`}
+              aria-busy={subiendo}
+              data-testid="boton-subir-foto"
+              className={`${HUECO_FOTO} flex-col gap-0.5 border-dashed border-primary/50 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10`}
+            >
+              {subiendo ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                  <span className="text-[10px] font-medium leading-none" aria-hidden="true">
+                    Foto
+                  </span>
+                </>
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{subiendo ? "Subiendo foto..." : "Subir foto"}</TooltipContent>
+        </Tooltip>
         {input}
       </>
     );
@@ -671,84 +691,92 @@ export function EditorSeccionesMenu({
   // márgenes: el nombre (o el input de «A mano») se quedaba a 0px y los botones
   // se salían de la tarjeta, montándose sobre la sección de al lado.
   //
-  // Truco de «flex-basis negativo» (holy albatross): con el contenedor por
-  // encima de UMBRAL_TRES_COLUMNAS la base sale negativa → 0 y las tres crecen
-  // a partes iguales; por debajo sale enorme y cada una ocupa su propia fila.
-  // Nunca hay un 2 + 1 descolgado. 62rem ≈ 3 columnas de 320px + 2 huecos de
-  // 12px: lo justo para que el nombre de una línea tenga ~120px.
+  // Se decide con una container query (`@container (min-width: 62rem)`), no
+  // con media queries: mide el envoltorio, que siempre ocupa el ancho de la
+  // tarjeta. Es una rejilla de 1 o 3 columnas, así que nunca hay un 2 + 1
+  // descolgado. 62rem ≈ 3 columnas de 320px + 2 huecos de 12px: lo justo para
+  // que el nombre de una línea tenga ~120px.
+  //
+  // Sustituye (2026-10-01) al truco de «flex-basis negativo»
+  // (`flex-basis: calc((62rem - 100%) * 999)`): ese `100%` solo funciona si el
+  // ancho del contenedor está resuelto de antemano; en cuanto algo lo mide por
+  // contenido (min/max-content), la base se calcula sin él y las secciones
+  // pueden acabar en fila, más anchas que la pantalla.
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-wrap gap-3">
-        {SECCIONES_MENU.map((seccion) => {
-          const items = secciones[seccion];
+      <div className={CONTENEDOR_SECCIONES} data-testid="contenedor-secciones-menu">
+        <div className={REJILLA_SECCIONES}>
+          {SECCIONES_MENU.map((seccion) => {
+            const items = secciones[seccion];
 
-          const añadirDeCarta = (plato: PlatoDeCarta) =>
-            actualizarSeccion(seccion, [...items, itemDesdePlato(plato)]);
+            const añadirDeCarta = (plato: PlatoDeCarta) =>
+              actualizarSeccion(seccion, [...items, itemDesdePlato(plato)]);
 
-          const añadirAMano = () => actualizarSeccion(seccion, [...items, itemLibre("")]);
+            const añadirAMano = () => actualizarSeccion(seccion, [...items, itemLibre("")]);
 
-          return (
-            <section
-              key={seccion}
-              data-testid={`seccion-menu-${seccion}`}
-              className={`rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0 grow ${UMBRAL_TRES_COLUMNAS}`}
-            >
-              <header className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold">{ETIQUETA_SECCION[seccion]}</h4>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-xs text-muted-foreground tabular-nums cursor-default">
-                      {items.length}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {items.length === 1 ? "1 plato" : `${items.length} platos`}
-                  </TooltipContent>
-                </Tooltip>
-              </header>
+            return (
+              <section
+                key={seccion}
+                data-testid={`seccion-menu-${seccion}`}
+                className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0"
+              >
+                <header className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold">{ETIQUETA_SECCION[seccion]}</h4>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground tabular-nums cursor-default">
+                        {items.length}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {items.length === 1 ? "1 plato" : `${items.length} platos`}
+                    </TooltipContent>
+                  </Tooltip>
+                </header>
 
-              {items.length === 0 ? (
-                <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
-                  Sin platos todavía
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {items.map((item, indice) => (
-                    <LineaMenu
-                      key={item.id}
-                      item={item}
-                      indice={indice}
-                      total={items.length}
-                      platoActual={item.platoId ? platosPorId.get(item.platoId) : undefined}
-                      onCambiar={(nuevo) =>
-                        actualizarSeccion(
-                          seccion,
-                          items.map((x) => (x.id === item.id ? nuevo : x)),
-                        )
-                      }
-                      onQuitar={() => actualizarSeccion(seccion, items.filter((x) => x.id !== item.id))}
-                      onMover={(direccion) => {
-                        const destino = indice + direccion;
-                        if (destino < 0 || destino >= items.length) return;
-                        const copia = [...items];
-                        [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-                        actualizarSeccion(seccion, copia);
-                      }}
-                    />
-                  ))}
-                </ul>
-              )}
+                {items.length === 0 ? (
+                  <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
+                    Sin platos todavía
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {items.map((item, indice) => (
+                      <LineaMenu
+                        key={item.id}
+                        item={item}
+                        indice={indice}
+                        total={items.length}
+                        platoActual={item.platoId ? platosPorId.get(item.platoId) : undefined}
+                        onCambiar={(nuevo) =>
+                          actualizarSeccion(
+                            seccion,
+                            items.map((x) => (x.id === item.id ? nuevo : x)),
+                          )
+                        }
+                        onQuitar={() => actualizarSeccion(seccion, items.filter((x) => x.id !== item.id))}
+                        onMover={(direccion) => {
+                          const destino = indice + direccion;
+                          if (destino < 0 || destino >= items.length) return;
+                          const copia = [...items];
+                          [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+                          actualizarSeccion(seccion, copia);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                )}
 
-              <div className="flex flex-wrap gap-2">
-                <SelectorPlato platos={platos} cargando={cargandoPlatos} onElegir={añadirDeCarta} />
-                <Button type="button" variant="ghost" size="sm" className="h-8" onClick={añadirAMano}>
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  A mano
-                </Button>
-              </div>
-            </section>
-          );
-        })}
+                <div className="flex flex-wrap gap-2">
+                  <SelectorPlato platos={platos} cargando={cargandoPlatos} onElegir={añadirDeCarta} />
+                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={añadirAMano}>
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    A mano
+                  </Button>
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
     </TooltipProvider>
   );
