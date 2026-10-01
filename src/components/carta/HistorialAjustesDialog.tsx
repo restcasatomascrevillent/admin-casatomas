@@ -140,7 +140,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                             className="gap-2"
                           >
                             <RotateCcw className="h-4 w-4" />
-                            Todo
+                            Restaurar
                           </Button>
                           <Button
                             variant="ghost"
