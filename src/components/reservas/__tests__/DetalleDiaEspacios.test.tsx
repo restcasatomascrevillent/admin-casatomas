@@ -91,11 +91,9 @@ vi.mock("@/integrations/supabase/client", () => {
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
 // La rejilla por cuartos (reservas-sin-salas) se prueba aparte; aquí solo se
-// comprueba que el panel del día la monta, para ese día y por negocio.
+// comprueba que el panel del día la monta, una sola y para ese día.
 vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: ({ marca, fecha }: { marca: string; fecha: string }) => (
-    <div data-testid="rejilla-cuartos" data-marca={marca} data-fecha={fecha} />
-  ),
+  DisponibilidadCuartos: ({ fecha }: { fecha: string }) => <div data-testid="rejilla-cuartos" data-fecha={fecha} />,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -459,11 +457,12 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
 
   // ── Rejilla por cuartos de hora (reservas-sin-salas) ──────────────────────
 
-  it("monta la rejilla por cuartos del día elegido, una por negocio, también en un día vacío", async () => {
+  // Touza no admite reservas (decisión del dueño 2026-10-01): antes se montaba una rejilla por negocio.
+  it("monta UNA rejilla por cuartos (la de Casa Tomás) del día elegido, también en un día vacío", async () => {
     montar();
     await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
     const deHoy = screen.getAllByTestId("rejilla-cuartos");
-    expect(deHoy.map((r) => r.getAttribute("data-marca"))).toEqual(["casa_tomas", "touza"]);
+    expect(deHoy).toHaveLength(1);
     expect(deHoy.every((r) => r.getAttribute("data-fecha") === HOY_ISO)).toBe(true);
 
     fireEvent.click(casillaDia(OTRO_DIA.getDate()));
@@ -665,7 +664,7 @@ describe("CalendarioOcupacion · casilla y panel coherentes", () => {
     expect(screen.getByTestId("ocupacion-del-dia").textContent ?? "").not.toMatch(/touza|\b30\b/i);
   });
 
-  it("IGNORA una reserva antigua de Touza: ni suma a los comensales de la cabecera ni al %", async () => {
+  it("IGNORA una reserva antigua de Touza: ni suma a los comensales de la cabecera, ni al %, ni sale su sala", async () => {
     // Touza ya no admite reservas (2026-10-01). Si queda una en los datos, no cuenta.
     tablas.vista_asignacion_dia = {
       data: [
@@ -680,8 +679,11 @@ describe("CalendarioOcupacion · casilla y panel coherentes", () => {
     expect(screen.getByText("5 reservas")).toBeInTheDocument();
     expect(screen.getByText(/2 de 5 con mesa/)).toBeInTheDocument();
     expect(bloque.getByTestId("ocupacion-cena")).toHaveTextContent("7%");
-    // La lista de salas de debajo no se ha tocado: la retirada de Touza es otro encargo.
-    expect(tarjetaSala("Interior")).toBeInTheDocument();
+    // Touza no admite reservas (decisión del dueño 2026-10-01): la lista de salas de debajo tampoco la enseña
+    // (antes salía la tarjeta «Interior», de Touza). Las salas de Casa Tomás, las mismas de siempre.
+    expect(screen.queryByRole("button", { name: "Abrir el plano de Interior" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir el plano de Comedor" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir el plano de Reservado" })).toBeInTheDocument();
   });
 
   it("un día pasado no lleva porcentaje en el panel: ya ocurrió", async () => {

@@ -43,7 +43,10 @@ export interface ReservaParaVerificar {
   hora_solicitada?: string | null;
   /** NUEVO (migración 20260920010000, aún no aplicada). Puede faltar. */
   espacio_solicitado_id?: string | null;
-  /** Negocio (`reservas.marca`): casa_tomas | touza (El Reservado). */
+  /**
+   * Negocio (`reservas.marca`, CHECK casa_tomas | touza). Solo Casa Tomás admite reservas (decisión del
+   * dueño, 2026-10-01): las pantallas ya no enseñan reservas de Touza, así que aquí solo llegan de Casa Tomás.
+   */
   marca?: string | null;
 }
 

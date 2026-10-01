@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   editarReserva: vi.fn(),
   vistaHoy: vi.fn(),
   formulario: vi.fn(),
+  solicitudes: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -47,7 +48,7 @@ vi.mock("@/components/reservas/ConfiguracionTurnos", () => ({ ConfiguracionTurno
 vi.mock("@/components/reservas/PanelAsignacion", () => ({ PanelAsignacion: () => null }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
 vi.mock("@/hooks/useSolicitudesPendientes", () => ({
-  useSolicitudesPendientes: () => ({ solicitudes: [], countPendientes: 0 }),
+  useSolicitudesPendientes: () => ({ solicitudes: h.solicitudes }),
 }));
 vi.mock("@/hooks/useUserRole", () => ({
   useUserRole: () => ({ role: "admin" }),
@@ -75,6 +76,30 @@ const ultimasProps = () => h.vistaHoy.mock.calls.at(-1)![0] as { onEditarReserva
 beforeEach(() => {
   vi.clearAllMocks();
   h.canEdit = true;
+  h.solicitudes = [];
+});
+
+// Touza no admite reservas (decisión del dueño 2026-10-01): la insignia de la pestaña Lista cuenta lo mismo
+// que enseña la lista, las solicitudes pendientes de Casa Tomás (`contarSolicitudesPendientes`).
+describe("Reservas (página) · insignia de solicitudes sin resolver", () => {
+  it("cuenta solo las pendientes de Casa Tomás: ni las de Touza ni las ya contactadas", () => {
+    h.solicitudes = [
+      { id: "s-ct", estado: "pendiente", marca: "casa_tomas" },
+      { id: "s-sin-marca", estado: "pendiente", marca: null },
+      { id: "s-contactado", estado: "contactado", marca: "casa_tomas" },
+      { id: "s-tz", estado: "pendiente", marca: "touza" },
+    ];
+    montar();
+
+    expect(screen.getByLabelText("2 solicitudes sin resolver")).toHaveTextContent("2");
+  });
+
+  it("sin pendientes de Casa Tomás no hay insignia, aunque quede una de Touza", () => {
+    h.solicitudes = [{ id: "s-tz", estado: "pendiente", marca: "touza" }];
+    montar();
+
+    expect(screen.queryByLabelText(/sin resolver/)).not.toBeInTheDocument();
+  });
 });
 
 describe("Reservas (página) · el editor llega a «Hoy»", () => {

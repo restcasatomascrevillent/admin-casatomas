@@ -26,7 +26,6 @@ import {
   aforoCasaTomas,
   describirDia,
   estiloNivel,
-  esDeCasaTomas,
   etiquetaNivel,
   nivelDeOcupacion,
   ocupacionPorTurno,
@@ -38,6 +37,7 @@ import {
   type ContextoCalendario,
   type ReservaCalendario,
 } from "../ocupacionCalendario";
+import { admiteReservas, salaAdmiteReservas } from "../negocios";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -224,13 +224,25 @@ describe("aforoCasaTomas", () => {
   });
 });
 
-describe("esDeCasaTomas: Touza ya no admite reservas", () => {
-  it("Casa Tomás y lo que no tiene marca sí; Touza no", () => {
-    expect(esDeCasaTomas("casa_tomas")).toBe(true);
-    expect(esDeCasaTomas(null)).toBe(true);
-    expect(esDeCasaTomas(undefined)).toBe(true);
-    expect(esDeCasaTomas("")).toBe(true);
-    expect(esDeCasaTomas("touza")).toBe(false);
+// Touza no admite reservas (decisión del dueño 2026-10-01). El filtro local `esDeCasaTomas` desapareció: el
+// calendario usa la regla común del panel, `admiteReservas` (negocios.ts), que se prueba en negocios.test.ts.
+describe("el calendario usa la regla común de negocio (`admiteReservas`)", () => {
+  it("cuenta exactamente lo que `admiteReservas` admite, sea cual sea la marca", () => {
+    for (const marca of ["casa_tomas", null, undefined, "", "  ", "touza", "otro_negocio"]) {
+      const r = ocupacionPorTurno([{ marca, turno: "cena", comensales: 10 }], AFORO);
+      expect(r.reservas, String(marca)).toBe(admiteReservas(marca) ? 1 : 0);
+    }
+  });
+
+  it("y el aforo, exactamente las salas activas que `salaAdmiteReservas` admite", () => {
+    const espacios = [
+      { id: "ct-terraza", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+      { id: "tz-terraza", capacidad_maxima: 30, activa: true, caracteristicas: { marca: "touza" } },
+      { id: "ct-reservado", capacidad_maxima: 20, activa: true, caracteristicas: {} },
+    ];
+    const esperado = espacios.filter(salaAdmiteReservas).reduce((s, e) => s + e.capacidad_maxima, 0);
+    expect(aforoCasaTomas(espacios)).toBe(esperado);
+    expect(esperado).toBe(70);
   });
 });
 

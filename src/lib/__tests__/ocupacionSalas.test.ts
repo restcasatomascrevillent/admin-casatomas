@@ -5,7 +5,7 @@ import {
   construirFranjas,
   evaluarUbicacion,
   horaCorta,
-  horasBaseDeNegocio,
+  horasBaseDelDia,
   nivelOcupacion,
   recomendarUbicacion,
   type EspacioSala,
@@ -263,11 +263,9 @@ describe("el caso del dueño: 15:30 y 21:30 con el día casi vacío", () => {
   ];
 
   it("el motor solo ofrece horas en punto; 15:30 y 21:30 salen marcadas como 'reserva'", () => {
-    const { horasBase, cerrado } = horasBaseDeNegocio(
-      "2026-09-28",
-      { marca: "casa_tomas", espacios: SALAS, reservas: RESERVAS },
-      CONFIG,
-    );
+    // Touza no admite reservas (decisión del dueño 2026-10-01): `horasBaseDeNegocio` pasa a ser
+    // `horasBaseDelDia`, sin negocio (siempre los turnos generales, que eran los de Casa Tomás).
+    const { horasBase, cerrado } = horasBaseDelDia("2026-09-28", { espacios: SALAS, reservas: RESERVAS }, CONFIG);
     expect(cerrado).toBe(false);
     expect([...horasBase].sort()).toEqual(["13:00", "14:00", "15:00", "20:00", "21:00", "22:00"]);
 

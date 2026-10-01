@@ -16,15 +16,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
-import { agruparPorNegocio, marcaDeEspacio, marcaDeReserva, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
+import { marcaDeEspacio, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
 
 /**
- * Aforo por negocio (marca). El 2026-09-22 esta tarjeta sumaba las plazas de
- * los dos negocios ("0/170 pax"). Desde el 2026-09-24 (decisión del dueño:
- * El Reservado de Touza se gestiona igual que las demás salas) la tarjeta
- * cuenta las reservas de los DOS negocios, pero la ocupación (%) se da POR
- * NEGOCIO contra su propio aforo — igual que el trigger
- * `validar_capacidad_reserva` —, nunca sobre la suma.
+ * Aforo de Casa Tomás: suma de sus salas activas, igual que el trigger
+ * `validar_capacidad_reserva` (que suma por marca). Solo Casa Tomás admite
+ * reservas (decisión del dueño, 2026-10-01): las salas de Touza que queden
+ * activas no suman, y las reservas de Touza ya no llegan aquí
+ * (`useTodayReservations` las descarta). Antes la tarjeta daba un bloque de
+ * ocupación por negocio.
  */
 function useEspaciosCapacidad() {
   return useQuery({
@@ -88,22 +88,10 @@ export function ReservasHoy() {
   const comensalesCena = reservasCena.reduce((acc, r) => acc + r.numero_comensales, 0);
   const comensalesActivos = reservasActivas.reduce((acc, r) => acc + r.numero_comensales, 0);
 
-  // Ocupación POR NEGOCIO (aforo separado, como el trigger). Casa Tomás
-  // siempre sale; Touza si tiene sala activa o reservas hoy.
-  const ocupacionPorNegocio = agruparPorNegocio(
-    [
-      ...espaciosCapacidad.map((e) => e.marca),
-      ...reservasActivas.map((r) => marcaDeReserva(r)),
-    ],
-    (m) => m,
-    [MARCA_POR_DEFECTO],
-  ).map(({ negocio }) => {
-    const capacidad = sumarCapacidadPorMarca(espaciosCapacidad, negocio.marca);
-    const delNegocio = reservasActivas.filter((r) => marcaDeReserva(r) === negocio.marca);
-    const comensales = delNegocio.reduce((acc, r) => acc + r.numero_comensales, 0);
-    const porcentaje = capacidad > 0 ? Math.round((comensales / capacidad) * 100) : 0;
-    return { negocio, capacidad, comensales, reservas: delNegocio.length, porcentaje, colors: getStatusColor(porcentaje) };
-  });
+  // Ocupación de Casa Tomás contra su aforo (como el trigger).
+  const capacidad = sumarCapacidadPorMarca(espaciosCapacidad, MARCA_POR_DEFECTO);
+  const porcentaje = capacidad > 0 ? Math.round((comensalesActivos / capacidad) * 100) : 0;
+  const colors = getStatusColor(porcentaje);
 
   // Alertas
   const reservasBlacklist = todasReservas?.filter(r => r.en_blacklist) || [];
@@ -229,30 +217,27 @@ export function ReservasHoy() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Ocupación por negocio: cada uno contra SU aforo */}
+        {/* Ocupación de hoy contra el aforo del restaurante */}
         <div className="space-y-2">
-          {ocupacionPorNegocio.map(({ negocio, capacidad, comensales, reservas, porcentaje, colors }) => (
-            <div key={negocio.marca} className={`p-3 rounded-lg ${colors.bg}`}>
-              <div className="flex items-center justify-between mb-1.5 gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-2xl font-bold ${colors.text}`}>{porcentaje}%</span>
-                  <Badge variant="outline" className={`${colors.text} border-current text-[10px]`}>
-                    {colors.label}
-                  </Badge>
-                  <span className="text-xs font-medium truncate">{negocio.etiqueta}</span>
-                </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {comensales}/{capacidad} pax · {reservas} res.
-                </span>
+          <div className={`p-3 rounded-lg ${colors.bg}`}>
+            <div className="flex items-center justify-between mb-1.5 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`text-2xl font-bold ${colors.text}`}>{porcentaje}%</span>
+                <Badge variant="outline" className={`${colors.text} border-current text-[10px]`}>
+                  {colors.label}
+                </Badge>
               </div>
-              <div className="h-2 bg-background/50 rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${colors.bar} transition-all duration-500`}
-                  style={{ width: `${Math.min(100, porcentaje)}%` }}
-                />
-              </div>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {comensalesActivos}/{capacidad} pax · {reservasActivas.length} res.
+              </span>
             </div>
-          ))}
+            <div className="h-2 bg-background/50 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${colors.bar} transition-all duration-500`}
+                style={{ width: `${Math.min(100, porcentaje)}%` }}
+              />
+            </div>
+          </div>
           <p className="text-[10px] text-muted-foreground">
             {reservasActivas.length} reservas activas ({comensalesActivos} pax, sin canceladas) = {numConfirmadas} confirmadas
             + {reservasVerificadas} verificadas + {reservasPendientes} pendientes

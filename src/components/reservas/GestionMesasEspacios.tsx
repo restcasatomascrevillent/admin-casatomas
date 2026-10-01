@@ -64,6 +64,10 @@
 // Las cuentas NO se hacen aquí: viven en `src/lib/reservas/aforoMesas.ts`, que
 // replica exactamente el filtro de las funciones SQL de capacidad efectiva
 // (espacios activos + misma marca + `coalesce(is_merged,false) = false`).
+//
+// SOLO CASA TOMÁS (decisión del dueño, 2026-10-01: Touza no admite reservas):
+// se enseñan las salas de Casa Tomás y un único resumen de aforo; las salas de
+// Touza que queden en la base de datos no salen (`salaAdmiteReservas`).
 // ============================================================================
 
 import { useMemo, useState } from "react";
@@ -95,18 +99,17 @@ import { useMesas, useActualizarMesa, type Mesa } from "@/hooks/useMesas";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
-  calcularCuadrePorNegocio,
   calcularCuadres,
+  calcularCuadreTotal,
   textoEstadoCuadre,
   type CuadreEspacio,
-  type CuadreNegocio,
+  type CuadreTotal,
 } from "@/lib/reservas/aforoMesas";
 import {
   mensajeNombreMesaDuplicado,
   nombreMesaDuplicado,
 } from "@/components/espacios/nombresMesa";
-import { agruparPorNegocio } from "@/lib/reservas/negocios";
-import { NegocioBadge } from "./NegocioBadge";
+import { salaAdmiteReservas } from "@/lib/reservas/negocios";
 
 const plural = (n: number, singular: string, plural_: string) =>
   `${n} ${n === 1 ? singular : plural_}`;
@@ -452,9 +455,9 @@ function BloqueEspacio({ cuadre, mesas, puedeAbrirPlano, onAbrirPlano }: BloqueE
   );
 }
 
-// ── Resumen por negocio ─────────────────────────────────────────────────────
+// ── Resumen del aforo (salas activas de Casa Tomás) ─────────────────────────
 
-function ResumenNegocio({ resumen }: { resumen: CuadreNegocio }) {
+function ResumenAforo({ resumen }: { resumen: CuadreTotal }) {
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
       <span>
@@ -505,18 +508,14 @@ export function GestionMesasEspacios() {
   // pasar por Super Admin. Crear y borrar mesas sí sigue siendo solo del plano.
   const { isSuperAdmin, loading: cargandoPermiso } = useSuperAdmin();
 
+  // Solo las salas de Casa Tomás (activas o no): las de Touza no se enseñan.
   const espacios = useMemo(
-    () => ((espaciosData ?? []) as EspacioReserva[]).filter(Boolean),
+    () => ((espaciosData ?? []) as EspacioReserva[]).filter((e) => !!e && salaAdmiteReservas(e)),
     [espaciosData],
   );
 
   const cuadres = useMemo(() => calcularCuadres(espacios, mesas), [espacios, mesas]);
-  const grupos = useMemo(() => agruparPorNegocio(cuadres, (c) => c.marca), [cuadres]);
-  const resumenPorMarca = useMemo(() => {
-    const mapa = new Map<string, CuadreNegocio>();
-    for (const r of calcularCuadrePorNegocio(cuadres)) mapa.set(r.marca, r);
-    return mapa;
-  }, [cuadres]);
+  const resumen = useMemo(() => calcularCuadreTotal(cuadres), [cuadres]);
 
   const mesasDeEspacio = (espacioId: string) =>
     mesas.filter((m) => m.espacio_id === espacioId);
@@ -555,27 +554,24 @@ export function GestionMesasEspacios() {
             No hay espacios de reserva dados de alta.
           </p>
         ) : (
-          grupos.map(({ negocio, items }) => (
-            <section key={negocio.marca} className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <NegocioBadge marca={negocio.marca} />
-                {resumenPorMarca.has(negocio.marca) && (
-                  <ResumenNegocio resumen={resumenPorMarca.get(negocio.marca)!} />
-                )}
+          <section className="space-y-3">
+            {resumen && (
+              <div className="flex flex-wrap items-center gap-2">
+                <ResumenAforo resumen={resumen} />
               </div>
-              <div className="space-y-3">
-                {items.map((cuadre) => (
-                  <BloqueEspacio
-                    key={cuadre.espacioId}
-                    cuadre={cuadre}
-                    mesas={mesasDeEspacio(cuadre.espacioId)}
-                    puedeAbrirPlano={!cargandoPermiso && isSuperAdmin}
-                    onAbrirPlano={() => abrirPlano(cuadre.espacioId)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))
+            )}
+            <div className="space-y-3">
+              {cuadres.map((cuadre) => (
+                <BloqueEspacio
+                  key={cuadre.espacioId}
+                  cuadre={cuadre}
+                  mesas={mesasDeEspacio(cuadre.espacioId)}
+                  puedeAbrirPlano={!cargandoPermiso && isSuperAdmin}
+                  onAbrirPlano={() => abrirPlano(cuadre.espacioId)}
+                />
+              ))}
+            </div>
+          </section>
         )}
 
         <Separator />

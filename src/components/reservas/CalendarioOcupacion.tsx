@@ -12,7 +12,7 @@
 // Cada casilla enseña los COMENSALES del día en grande, un color que es el %
 // de ocupación del servicio más lleno (comida o cena) y, discreto, un punto si
 // hay reservas sin sala dentro de la ventana de asignación. Toda la lógica
-// (umbrales, colores, qué estados cuentan, aforo por negocio, ventana) vive en
+// (umbrales, colores, qué estados cuentan, aforo de Casa Tomás, ventana) vive en
 // `src/lib/reservas/ocupacionCalendario.ts`, que es puro y está testeado; la
 // casilla es `CasillaOcupacion.tsx` y la leyenda `LeyendaOcupacion.tsx`.
 //
@@ -21,7 +21,7 @@
 // la mesa las pone el personal en una ventana de 48 h) casi todo el futuro salía
 // ámbar y el color dejó de decir nada. Antes de eso hubo un «%» que SIEMPRE
 // valía 0 (`statsPerDay` lo inicializaba y no lo calculaba nunca) y se quitó.
-// Ahora el porcentaje existe de verdad, medido contra el aforo POR NEGOCIO.
+// Ahora el porcentaje existe de verdad, medido contra el aforo de Casa Tomás.
 //
 // ---------------------------------------------------------------------------
 // DOS CONSULTAS, DOS DUEÑOS (y no se prestan datos)
@@ -45,12 +45,11 @@
 // ---------------------------------------------------------------------------
 // SOLO CASA TOMÁS (decisión del dueño, 2026-10-01)
 // ---------------------------------------------------------------------------
-// Touza ya no admite reservas y se va a retirar del sistema (otro encargo). El
-// calendario mide la ocupación SOLO de Casa Tomás, contra su aforo por turno, sin
-// selector de negocio ni mezcla de aforos; si en los datos antiguos aparece una
-// reserva de `marca = 'touza'`, se ignora (ver `esDeCasaTomas`). El panel del
-// día sigue enseñando sus salas tal cual: ese código antiguo lo retirará el
-// encargo de la retirada de Touza, no este.
+// Touza ya no admite reservas. El calendario mide la ocupación SOLO de Casa
+// Tomás, contra su aforo por turno, sin selector de negocio ni mezcla de aforos;
+// si en los datos antiguos aparece una reserva de `marca = 'touza'`, se ignora
+// con la regla común de todo el panel (`admiteReservas`, en negocios.ts), igual
+// que en el panel del día.
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";

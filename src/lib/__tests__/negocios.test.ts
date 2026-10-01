@@ -1,216 +1,173 @@
 import { describe, it, expect } from "vitest";
 import {
-  agruparPorNegocio,
-  coincideNegocio,
-  espacioUnicoDeNegocio,
-  etiquetaNegocio,
+  admiteReservas,
+  MARCA_POR_DEFECTO,
   marcaDeEspacio,
-  marcaDeReserva,
-  marcaDeSolicitud,
-  marcaParaAlta,
   normalizarMarca,
+  salaAdmiteReservas,
 } from "@/lib/reservas/negocios";
+import { cifrasDeLaLista } from "@/lib/reservas/cifrasPorEstado";
+import { aforoCasaTomas, resumirDia, resumirMes } from "@/lib/reservas/ocupacionCalendario";
+import { calcularCuadres, calcularCuadreTotal } from "@/lib/reservas/aforoMesas";
+import { resumirOcupacion } from "@/lib/reservas/resumenOcupacion";
 import {
-  calcularOcupacionPorNegocio,
-  horasBaseDeNegocio,
-  repartirPorNegocio,
-  type EspacioSala,
-  type ReservaOcupacionSala,
-} from "@/lib/reservas/ocupacionSalas";
-import { resumirOcupacionPorNegocio } from "@/lib/reservas/resumenNegocios";
-import { filtrarFilasUnificadas, unificarReservasYSolicitudes } from "@/lib/reservas/vistaUnificada";
+  contarSolicitudesPendientes,
+  filtrarFilasUnificadas,
+  unificarReservasYSolicitudes,
+} from "@/lib/reservas/vistaUnificada";
+import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 
-// Decisión del dueño 2026-09-24: las reservas de "El Reservado" (Touza) se
-// ven y se gestionan igual que las de Casa Tomás, con su aforo aparte.
+// Decisión del dueño 2026-10-01: «toda la lógica de reservas de Touza va fuera, no se reserva».
+// Solo Casa Tomás admite reservas. La regla es UNA (`admiteReservas`, negocios.ts) y la usan todas
+// las pantallas para ignorar lo que quede de Touza en la base de datos (5 reservas de demostración,
+// 2 vivas, y sus 3 salas todavía activas). Antes había dos filtros locales que hacían lo mismo
+// (`esDeCasaTomas` en el calendario y la comprobación de `MARCA_POR_DEFECTO` de la asignación).
+//
+// Touza no admite reservas (decisión del dueño 2026-10-01): se retiran los tests del panel de dos
+// negocios (alta con la marca de la sala, marca de una solicitud por la sala o las notas, sala única de
+// Touza preseleccionada, etiquetas «Touza · El Reservado», filtro «Negocio», agrupar por negocio,
+// aforo y franjas por negocio y el resumen de hoy con desglose por negocio).
 
+/** Las salas de producción (2026-10-01): dos «Terraza» y «Reservado» ≠ «El Reservado». */
 const ESPACIOS_BD = [
-  { id: "comedor", nombre: "Comedor", capacidad_maxima: 60, activa: true, caracteristicas: {} },
-  { id: "salon", nombre: "Salón", capacidad_maxima: 60, activa: true, caracteristicas: null },
-  { id: "terraza", nombre: "Terraza", capacidad_maxima: 30, activa: true, caracteristicas: { marca: "casa_tomas" } },
-  { id: "reservado", nombre: "El Reservado", capacidad_maxima: 20, activa: true, caracteristicas: { privada: true, marca: "touza" } },
+  { id: "ct-comedor", nombre: "Comedor", capacidad_maxima: 50, activa: true, caracteristicas: {} },
+  { id: "ct-salon", nombre: "Salón", capacidad_maxima: 50, activa: true, caracteristicas: null },
+  { id: "ct-terraza", nombre: "Terraza", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+  { id: "ct-reservado", nombre: "Reservado", capacidad_maxima: 20, activa: true, caracteristicas: { marca: "casa_tomas" } },
+  { id: "tz-reservado", nombre: "El Reservado", capacidad_maxima: 20, activa: true, caracteristicas: { privada: true, marca: "touza" } },
+  { id: "tz-terraza", nombre: "Terraza", capacidad_maxima: 30, activa: true, caracteristicas: { marca: "touza" } },
+  { id: "tz-interior", nombre: "Interior", capacidad_maxima: 30, activa: true, caracteristicas: { marca: "touza" } },
 ];
 
 describe("negocios: de dónde sale la marca", () => {
   it("normaliza null/vacío a Casa Tomás", () => {
+    expect(MARCA_POR_DEFECTO).toBe("casa_tomas");
     expect(normalizarMarca(null)).toBe("casa_tomas");
     expect(normalizarMarca("  ")).toBe("casa_tomas");
-    expect(normalizarMarca("touza")).toBe("touza");
+    expect(normalizarMarca(" touza ")).toBe("touza");
   });
 
-  it("reserva: columna marca; espacio: caracteristicas.marca (sin etiqueta = Casa Tomás, como el trigger)", () => {
-    expect(marcaDeReserva({ marca: "touza" })).toBe("touza");
-    expect(marcaDeReserva({})).toBe("casa_tomas");
+  it("espacio: caracteristicas.marca (o `marca` ya aplanada); sin etiqueta = Casa Tomás, como el trigger", () => {
     expect(marcaDeEspacio(ESPACIOS_BD[0])).toBe("casa_tomas");
     expect(marcaDeEspacio(ESPACIOS_BD[1])).toBe("casa_tomas");
-    expect(marcaDeEspacio(ESPACIOS_BD[3])).toBe("touza");
-  });
-
-  it("alta desde el panel: elegir El Reservado => touza; sin sala => Casa Tomás", () => {
-    expect(marcaParaAlta("reservado", ESPACIOS_BD)).toBe("touza");
-    expect(marcaParaAlta("comedor", ESPACIOS_BD)).toBe("casa_tomas");
-    expect(marcaParaAlta(null, ESPACIOS_BD)).toBe("casa_tomas");
-  });
-
-  it("solicitud: sala propuesta > marcador de El Reservado en notas > Casa Tomás", () => {
-    expect(marcaDeSolicitud({ espacio_propuesto_id: "reservado" }, ESPACIOS_BD)).toBe("touza");
-    expect(marcaDeSolicitud({ notas_cliente: "Solicitud de El Reservado\nCumpleaños" }, ESPACIOS_BD)).toBe("touza");
-    expect(
-      marcaDeSolicitud({ espacio_propuesto_id: "comedor", notas_cliente: "Solicitud de El Reservado" }, ESPACIOS_BD),
-    ).toBe("casa_tomas");
-    expect(marcaDeSolicitud({ notas_cliente: "Mesa junto a la ventana" }, ESPACIOS_BD)).toBe("casa_tomas");
-  });
-
-  it("solicitud con columna marca (reservas-sin-salas): manda la columna, nunca la sala", () => {
-    // Una solicitud del bot de Casa Tomás sin sala sigue siendo de Casa Tomás.
-    expect(marcaDeSolicitud({ marca: "casa_tomas" }, ESPACIOS_BD)).toBe("casa_tomas");
-    // Aunque se le ponga por dentro una sala de otro negocio, la marca no cambia.
-    expect(marcaDeSolicitud({ marca: "casa_tomas", espacio_propuesto_id: "reservado" }, ESPACIOS_BD)).toBe(
-      "casa_tomas",
-    );
-    expect(marcaDeSolicitud({ marca: "touza", espacio_propuesto_id: null }, ESPACIOS_BD)).toBe("touza");
-    // Sin columna (migración sin aplicar) o vacía: se sigue derivando como antes.
-    expect(marcaDeSolicitud({ marca: null, espacio_propuesto_id: "reservado" }, ESPACIOS_BD)).toBe("touza");
-    expect(marcaDeSolicitud({ marca: "  ", notas_cliente: "Solicitud de El Reservado" }, ESPACIOS_BD)).toBe("touza");
-  });
-
-  it("sala única de un negocio: Touza => El Reservado; Casa Tomás no preselecciona", () => {
-    expect(espacioUnicoDeNegocio("touza", ESPACIOS_BD)).toBe("reservado");
-    expect(espacioUnicoDeNegocio("casa_tomas", ESPACIOS_BD)).toBeNull();
-  });
-
-  it("etiquetas y filtro", () => {
-    expect(etiquetaNegocio("touza")).toBe("Touza · El Reservado");
-    expect(etiquetaNegocio(null)).toBe("Casa Tomás");
-    expect(coincideNegocio("touza", "all")).toBe(true);
-    expect(coincideNegocio(null, "casa_tomas")).toBe(true);
-    expect(coincideNegocio("touza", "casa_tomas")).toBe(false);
-  });
-
-  it("agrupa en orden fijo (Casa Tomás primero) e incluye los obligatorios", () => {
-    const grupos = agruparPorNegocio([{ m: "touza" }, { m: null }], (x) => x.m ?? "", ["casa_tomas"]);
-    expect(grupos.map((g) => g.negocio.marca)).toEqual(["casa_tomas", "touza"]);
-    expect(agruparPorNegocio([{ m: "touza" }], (x) => x.m, ["casa_tomas"])[0].items).toEqual([]);
+    expect(marcaDeEspacio(ESPACIOS_BD[4])).toBe("touza");
+    expect(marcaDeEspacio({ marca: "touza" })).toBe("touza");
+    expect(marcaDeEspacio(null)).toBe("casa_tomas");
   });
 });
 
-describe("aforo por negocio (mismo criterio que validar_capacidad_reserva)", () => {
-  const espacios: EspacioSala[] = ESPACIOS_BD.map((e) => ({
-    id: e.id,
-    nombre: e.nombre,
-    capacidad_maxima: e.capacidad_maxima,
-    marca: marcaDeEspacio(e),
-  }));
-  const r = (o: Partial<ReservaOcupacionSala>): ReservaOcupacionSala => ({
-    id: Math.random().toString(36).slice(2),
-    hora: "14:00",
-    numero_comensales: 2,
-    estado: "confirmada",
-    espacio_id: null,
-    ...o,
-  });
-  const HORAS = ["13:00", "14:00", "20:00", "21:00"];
-
-  it("reparte espacios y reservas por la columna marca", () => {
-    const bloques = repartirPorNegocio(espacios, [
-      r({ marca: "touza", espacio_id: "reservado", numero_comensales: 18 }),
-      r({ marca: null, espacio_id: "comedor", numero_comensales: 4 }),
-    ]);
-    expect(bloques.map((b) => b.marca)).toEqual(["casa_tomas", "touza"]);
-    expect(bloques[0].espacios.map((e) => e.id)).toEqual(["comedor", "salon", "terraza"]);
-    expect(bloques[1].espacios.map((e) => e.id)).toEqual(["reservado"]);
-    expect(bloques[1].reservas).toHaveLength(1);
+describe("admiteReservas: el interruptor central (solo Casa Tomás)", () => {
+  it("Casa Tomás y lo que no tiene marca (null, vacío, espacios) sí; Touza o cualquier otra marca, no", () => {
+    for (const marca of ["casa_tomas", " casa_tomas ", null, undefined, "", "   "]) {
+      expect(admiteReservas(marca), String(marca)).toBe(true);
+    }
+    for (const marca of ["touza", "Touza", "otra", "pulperia"]) {
+      expect(admiteReservas(marca), marca).toBe(false);
+    }
   });
 
-  it("los pax de Touza nunca cuentan contra el aforo de Casa Tomás (ni al revés)", () => {
-    const reservas = [
-      r({ marca: "touza", espacio_id: "reservado", numero_comensales: 18 }),
-      r({ marca: "casa_tomas", espacio_id: "comedor", numero_comensales: 145 }),
-    ];
-    const bloques = repartirPorNegocio(espacios, reservas).map((b) => ({ ...b, horasBase: HORAS }));
-    const [ct, touza] = calcularOcupacionPorNegocio({ bloques, comensales: 5, marcaEnJuego: "casa_tomas" });
-    expect(ct.ocupacion.aforo.comida.capacidad).toBe(150);
-    expect(ct.ocupacion.aforo.comida.ocupados).toBe(145);
-    expect(ct.ocupacion.aforo.comida.cabe).toBe(true); // 145 + 5 = 150; las 18 de Touza no suman
-    expect(touza.ocupacion.aforo.comida.capacidad).toBe(20);
-    expect(touza.ocupacion.aforo.comida.ocupados).toBe(18);
-
-    const [, touzaEnJuego] = calcularOcupacionPorNegocio({ bloques, comensales: 3, marcaEnJuego: "touza" });
-    expect(touzaEnJuego.ocupacion.aforo.comida.cabe).toBe(false); // 18 + 3 > 20
-  });
-
-  it("una reserva de Touza con sala de otro negocio cuenta en Touza (sin asignar), como el trigger", () => {
-    const bloques = repartirPorNegocio(espacios, [r({ marca: "touza", espacio_id: "comedor", numero_comensales: 6 })]).map(
-      (b) => ({ ...b, horasBase: HORAS }),
-    );
-    const [ct, touza] = calcularOcupacionPorNegocio({ bloques, comensales: 0 });
-    expect(ct.ocupacion.aforo.comida.ocupados).toBe(0);
-    expect(touza.ocupacion.aforo.comida.ocupados).toBe(6);
-    expect(touza.ocupacion.sinAsignar?.turnos.comida.ocupados).toBe(6);
-  });
-
-  it("franjas por negocio: El Reservado usa sus turnos propios; Casa Tomás, los generales", () => {
-    const configuraciones = [
-      { hora_inicio: "13:00", hora_fin: "15:00", intervalo_base_minutos: 60, espacio_id: null, activo: true },
-      { hora_inicio: "21:00", hora_fin: "23:00", intervalo_base_minutos: 60, espacio_id: "reservado", activo: true },
-    ];
-    const [ct, touza] = repartirPorNegocio(espacios, []);
-    const horasCt = horasBaseDeNegocio("2026-10-01", ct, configuraciones);
-    const horasTouza = horasBaseDeNegocio("2026-10-01", touza, configuraciones);
-    expect(horasCt.cerrado).toBe(false);
-    expect(horasCt.horasBase.every((h) => h < "17:00")).toBe(true);
-    expect(horasTouza.cerrado).toBe(false);
-    expect(horasTouza.horasBase.length).toBeGreaterThan(0);
-    expect(horasTouza.horasBase.every((h) => h >= "21:00")).toBe(true);
+  it("salaAdmiteReservas: la misma regla con la marca de la sala; las dos «Terraza» se distinguen por su marca", () => {
+    const admitidas = ESPACIOS_BD.filter(salaAdmiteReservas).map((e) => e.id);
+    expect(admitidas).toEqual(["ct-comedor", "ct-salon", "ct-terraza", "ct-reservado"]);
+    // Mismo nombre, distinto negocio: el nombre no decide nada.
+    const terrazas = ESPACIOS_BD.filter((e) => e.nombre === "Terraza");
+    expect(terrazas.map(salaAdmiteReservas)).toEqual([true, false]);
+    // «Reservado» (Casa Tomás) se queda; «El Reservado» (Touza), no.
+    expect(salaAdmiteReservas(ESPACIOS_BD.find((e) => e.nombre === "Reservado"))).toBe(true);
+    expect(salaAdmiteReservas(ESPACIOS_BD.find((e) => e.nombre === "El Reservado"))).toBe(false);
   });
 });
 
-describe("resumen de hoy por negocio", () => {
-  it("total del grupo + desglose; % de cada negocio contra su propio aforo", () => {
-    const res = resumirOcupacionPorNegocio(
-      [
-        { estado: "confirmada", numero_comensales: 30, marca: "casa_tomas" },
-        { estado: "verificada", numero_comensales: 10, marca: "touza" },
-        { estado: "cancelada", numero_comensales: 8, marca: "touza" },
-      ],
-      ESPACIOS_BD,
-    );
-    expect(res.totalReservas).toBe(2);
-    expect(res.totalComensales).toBe(40);
-    expect(res.capacidadTotal).toBe(170);
-    const [ct, touza] = res.porNegocio;
-    expect(ct.negocio.marca).toBe("casa_tomas");
-    expect(ct.capacidadTotal).toBe(150);
-    expect(ct.porcentajeTotal).toBe(20);
-    expect(touza.capacidadTotal).toBe(20);
-    expect(touza.porcentajeTotal).toBe(50);
-    expect(touza.reservasCanceladas).toBe(1);
-  });
+// ─── Las reservas de Touza que quedan en la base de datos se IGNORAN en todas las cifras ────────────
+
+const HOY = "2026-10-01";
+const reserva = (id: string, o: Record<string, unknown> = {}) => ({
+  id,
+  fecha: HOY,
+  hora: "21:00:00",
+  nombre: `Cliente ${id}`,
+  telefono: null,
+  email: null,
+  estado: "confirmada",
+  canal: "web",
+  numero_comensales: 4,
+  notas_cliente: null,
+  espacio_id: null as string | null,
+  marca: "casa_tomas" as string | null,
+  ...o,
 });
 
-describe("lista unificada: filtro Negocio", () => {
-  const reservas = [
-    { id: "a", fecha: "2026-10-01", hora: "14:00", estado: "confirmada", numero_comensales: 2, marca: "casa_tomas" },
-    { id: "b", fecha: "2026-10-01", hora: "21:00", estado: "verificada", numero_comensales: 12, marca: "touza" },
-  ];
-  const solicitudes = [
-    {
-      id: "s1",
-      estado: "pendiente",
-      fecha_solicitada: "2026-10-01",
-      hora_solicitada: "21:00",
-      numero_comensales: 15,
-      notas_cliente: "Solicitud de El Reservado\nCena de empresa",
-      created_at: "2026-09-24T10:00:00Z",
-      motivo_rechazo: "grupo_grande",
-    },
-  ] as any[];
+/** Casa Tomás: 3 reservas de hoy (2 confirmadas y 1 pendiente, 10 comensales vivos). */
+const CASA_TOMAS = [
+  reserva("ct1", { numero_comensales: 4, espacio_id: "ct-salon" }),
+  reserva("ct2", { numero_comensales: 2, marca: null }),
+  reserva("ct3", { numero_comensales: 4, estado: "pendiente", hora: "14:00:00" }),
+];
+/** Las de Touza de producción que caen hoy y mañana (las 2 vivas) y una pasada. */
+const TOUZA = [
+  reserva("tz-hoy", { numero_comensales: 6, espacio_id: "tz-reservado", marca: "touza" }),
+  reserva("tz-manana", { fecha: "2026-10-02", estado: "verificada", numero_comensales: 10, espacio_id: "tz-reservado", marca: "touza" }),
+  reserva("tz-pasada", { fecha: "2026-09-26", estado: "pendiente", numero_comensales: 14, marca: "touza" }),
+];
+const TODAS = [...CASA_TOMAS, ...TOUZA];
 
-  it("Touza muestra sus reservas y las solicitudes de El Reservado", () => {
-    const filas = unificarReservasYSolicitudes(reservas as any, solicitudes);
-    const touza = filtrarFilasUnificadas(filas, { negocio: "touza" });
-    expect(touza.map((f) => (f.tipo === "reserva" ? f.reserva.id : f.solicitud.id)).sort()).toEqual(["b", "s1"]);
-    const ct = filtrarFilasUnificadas(filas, { negocio: "casa_tomas" });
-    expect(ct.map((f) => (f.tipo === "reserva" ? f.reserva.id : f.solicitud.id))).toEqual(["a"]);
-    expect(filtrarFilasUnificadas(filas, { negocio: "all" })).toHaveLength(3);
+describe("Touza se ignora en los recuentos (misma regla en todas las pantallas)", () => {
+  it("Lista: ni sus reservas ni sus solicitudes llegan a ser filas; el «N reservas» es el de Casa Tomás", () => {
+    const solicitudes = [
+      { id: "s-ct", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "casa_tomas", motivo_rechazo: "grupo_grande" },
+      { id: "s-tz", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "touza", motivo_rechazo: "grupo_grande" },
+    ] as unknown as SolicitudPendiente[];
+    const filas = unificarReservasYSolicitudes(TODAS, solicitudes);
+    expect(filas.map((f) => f.id).sort()).toEqual(["ct1", "ct2", "ct3", "solicitud-s-ct"]);
+    const deHoy = filtrarFilasUnificadas(filas, { fecha: HOY });
+    expect(deHoy.filter((f) => f.tipo === "reserva")).toHaveLength(3);
+  });
+
+  it("Insignia de la pestaña Lista: solo las solicitudes pendientes de Casa Tomás (las que enseña la lista)", () => {
+    const solicitudes = [
+      { id: "s-ct", estado: "pendiente", marca: "casa_tomas" },
+      { id: "s-sin-marca", estado: "pendiente", marca: null },
+      { id: "s-ct-contactado", estado: "contactado", marca: "casa_tomas" },
+      { id: "s-tz", estado: "pendiente", marca: "touza" },
+    ] as unknown as SolicitudPendiente[];
+    expect(contarSolicitudesPendientes(solicitudes)).toBe(2);
+    // Todas cerradas: 0 (lo que antes probaba el `countPendientes` del hook, ya retirado).
+    const cerradas = [
+      { id: "s1", estado: "resuelta", marca: "casa_tomas" },
+      { id: "s2", estado: "descartada", marca: null },
+    ] as unknown as SolicitudPendiente[];
+    expect(contarSolicitudesPendientes(cerradas)).toBe(0);
+  });
+
+  it("Timeline de la Lista: las cifras por estado son las de Casa Tomás", () => {
+    expect(cifrasDeLaLista(TODAS, {})).toEqual(cifrasDeLaLista(CASA_TOMAS, {}));
+    expect(cifrasDeLaLista(TODAS, {})).toMatchObject({ confirmada: 2, pendiente: 1, verificada: 0 });
+  });
+
+  it("Calendario: comensales, reservas y % del día solo de Casa Tomás; un día con solo Touza sale vacío", () => {
+    const contexto = { hoy: HOY, ahora: Date.parse("2026-10-01T16:00:00Z"), ventanaHoras: 48 };
+    const dia = resumirDia(HOY, TODAS, 170, contexto);
+    expect(dia).toMatchObject({ reservas: 3, comensales: 10 });
+    expect(dia.turnos.cena.comensales).toBe(6);
+    const mes = resumirMes(TODAS, 170, contexto);
+    expect(mes["2026-10-02"]).toBeUndefined();
+  });
+
+  it("Aforo: las salas de Touza no suman (ni en el calendario ni en el cuadre de mesas)", () => {
+    expect(aforoCasaTomas(ESPACIOS_BD)).toBe(170);
+    const total = calcularCuadreTotal(
+      calcularCuadres(ESPACIOS_BD.map((e) => ({ ...e, caracteristicas: e.caracteristicas ?? undefined })), []),
+    );
+    expect(total?.capacidadDeclarada).toBe(170);
+  });
+
+  it("Hoy (franja de cifras): reservas, comensales, capacidad y % de Casa Tomás", () => {
+    expect(resumirOcupacion(TODAS.filter((r) => r.fecha === HOY), ESPACIOS_BD)).toMatchObject({
+      totalReservas: 3,
+      totalComensales: 10,
+      capacidadTotal: 170,
+      porcentajeTotal: 6,
+      reservasConfirmadas: 2,
+    });
   });
 });

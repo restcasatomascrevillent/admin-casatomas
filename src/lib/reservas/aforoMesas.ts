@@ -14,8 +14,8 @@
 // mesas hoy son dibujo: no entran en ninguna validación. La regla alternativa
 // ("que mande la suma de las mesas") está escrita en la migración
 // `supabase/migrations/20260926120000_capacidad_efectiva_mesas.sql`, pero está
-// DORMIDA y SIN APLICAR — encenderla cambiaría de golpe el aforo real de los
-// dos negocios (ver `bloquearia` más abajo).
+// DORMIDA y SIN APLICAR — encenderla cambiaría de golpe el aforo real del
+// restaurante (ver `bloquearia` más abajo).
 //
 // ESTO ES SOLO INFORMACIÓN. La pantalla de Configuración de /reservas enseña
 // el descuadre para que el dueño lo vea y lo arregle cuando quiera; NO bloquea
@@ -68,12 +68,14 @@
 // tienen que dar el mismo número o volvemos al desajuste cliente/servidor que
 // ya costó el bug de `20260922190000_aforo_por_marca.sql`.
 //
-// AGREGADO POR NEGOCIO: replica exactamente el filtro del trigger
-// (espacio con `activa = true` + marca del espacio), porque el aforo se valida
-// POR MARCA y no por espacio. Ver `calcularCuadrePorNegocio`.
+// AGREGADO DEL RESTAURANTE: replica exactamente el filtro del trigger para la
+// marca de Casa Tomás (espacio con `activa = true` + marca del espacio), porque
+// el aforo se valida POR MARCA y no por espacio. Ver `calcularCuadreTotal`.
+// Solo Casa Tomás admite reservas (decisión del dueño, 2026-10-01): las salas de
+// otro negocio no entran (`admiteReservas`).
 // ============================================================================
 
-import { agruparPorNegocio, marcaDeEspacio, normalizarMarca } from "./negocios";
+import { admiteReservas, marcaDeEspacio } from "./negocios";
 
 export interface EspacioParaCuadre {
   id: string;
@@ -148,20 +150,20 @@ export interface CuadreEspacio {
   descuadra: boolean;
 }
 
-export interface CuadreNegocio {
-  marca: string;
+/** Agregado de las salas activas de Casa Tomás (las que suman en el aforo del turno). */
+export interface CuadreTotal {
   capacidadDeclarada: number;
-  /** Suma de las plazas REALES de los espacios activos de la marca (sin uniones). */
+  /** Suma de las plazas REALES de las salas activas (sin uniones). */
   plazasMesas: number;
-  /** Suma de las plazas de las uniones activas de la marca. Informativo: no cuenta para el aforo. */
+  /** Suma de las plazas de las uniones activas. Informativo: no cuenta para el aforo. */
   plazasFusionadas: number;
   diferencia: number;
-  /** Espacios activos que no aportan NI UNA plaza real: plano vacío (`sin_mesas`) o solo uniones (`solo_fusionadas`). */
+  /** Salas activas que no aportan NI UNA plaza real: plano vacío (`sin_mesas`) o solo uniones (`solo_fusionadas`). */
   espaciosSinMesas: number;
-  /** Subconjunto del anterior: espacios con filas activas pero todas uniones. Son los que hay que redibujar. */
+  /** Subconjunto del anterior: salas con filas activas pero todas uniones. Son las que hay que redibujar. */
   espaciosSoloFusionadas: number;
   espaciosDescuadrados: number;
-  /** true si al encender la regla ese negocio se quedaría a 0 y no podría reservar nada */
+  /** true si al encender la regla el restaurante se quedaría a 0 y no podría reservar nada */
   bloquearia: boolean;
 }
 
@@ -250,7 +252,7 @@ export function calcularCuadreEspacio(espacio: EspacioParaCuadre, mesas: readonl
     // espacio con `activa IS NULL` como apagado en los DOS sitios que deciden
     // sobre él — el `WHERE activa = true` del trigger `validar_capacidad_reserva`
     // y el `USING (activa = true)` de su política RLS. Si aquí contara como
-    // activo, el resumen por negocio prometería plazas que el trigger no
+    // activo, el resumen prometería plazas que el trigger no
     // concedería: exactamente el desajuste cliente/servidor que ya costó el bug
     // de `20260922190000_aforo_por_marca.sql`. Las MESAS sí usan `!== false`
     // (ver `mesaActiva`), porque ahí el SQL filtra con `activa is not false`.
@@ -277,8 +279,9 @@ export function calcularCuadres(
 }
 
 /**
- * Agregado por negocio, en el orden de `NEGOCIOS_PANEL` (Casa Tomás, Touza y
- * las marcas desconocidas al final, por orden alfabético).
+ * Agregado del restaurante: las salas ACTIVAS de Casa Tomás. `null` si no hay
+ * ninguna. Las salas de otro negocio no entran (`admiteReservas`: Touza no
+ * admite reservas desde el 2026-10-01).
  *
  * SOLO SUMA LOS ESPACIOS ACTIVOS, a propósito: el agregado tiene que medir
  * EXACTAMENTE lo que mide el trigger `validar_capacidad_reserva()`, que hace
@@ -292,36 +295,33 @@ export function calcularCuadres(
  * `bloquearia` salta MÁS a menudo —Terraza aporta 0 donde antes aportaba 12—
  * y eso es correcto: mide lo que pasaría de verdad al encender la regla.
  */
-export function calcularCuadrePorNegocio(cuadres: readonly CuadreEspacio[]): CuadreNegocio[] {
-  const activos = (cuadres ?? []).filter((c) => c && c.activa === true);
-  return agruparPorNegocio(activos, (c) => normalizarMarca(c.marca)).map(({ negocio, items }) => {
-    const capacidadDeclarada = items.reduce((s, c) => s + c.capacidadDeclarada, 0);
-    const plazasMesas = items.reduce((s, c) => s + c.plazasMesas, 0);
-    const plazasFusionadas = items.reduce((s, c) => s + c.plazasFusionadas, 0);
-    return {
-      marca: negocio.marca,
-      capacidadDeclarada,
-      plazasMesas,
-      plazasFusionadas,
-      diferencia: plazasMesas - capacidadDeclarada,
-      // Cuenta los DOS estados sin mesas reales (plano vacío y solo uniones):
-      // para el aforo son lo mismo, cero plazas. `espaciosSoloFusionadas`
-      // separa los que además hay que redibujar.
-      espaciosSinMesas: items.filter((c) => c.estado === "sin_mesas" || c.estado === "solo_fusionadas").length,
-      espaciosSoloFusionadas: items.filter((c) => c.estado === "solo_fusionadas").length,
-      espaciosDescuadrados: items.filter((c) => c.descuadra).length,
-      // POR QUÉ SE MIDE POR NEGOCIO Y NO POR ESPACIO: el trigger suma por
-      // MARCA. Un solo espacio a 0 mesas no bloquea nada mientras sus hermanos
-      // de la misma marca aporten plazas (el aforo del negocio sigue > 0). Pero
-      // si TODA la marca está a 0, con la regla encendida el trigger calcularía
-      // capacidad total = 0 y rechazaría (23514) CUALQUIER reserva de ese
-      // negocio: teléfono, web y panel se quedarían sin poder reservar.
-      // `plazasMesas` son PLAZAS REALES: una marca cuyas salas solo tengan
-      // uniones bloquearía igual que una sin mesas, porque
-      // `fn_capacidad_efectiva_marca` también las excluye.
-      bloquearia: plazasMesas === 0 && capacidadDeclarada > 0,
-    };
-  });
+export function calcularCuadreTotal(cuadres: readonly CuadreEspacio[]): CuadreTotal | null {
+  const items = (cuadres ?? []).filter((c) => c && c.activa === true && admiteReservas(c.marca));
+  if (items.length === 0) return null;
+  const capacidadDeclarada = items.reduce((s, c) => s + c.capacidadDeclarada, 0);
+  const plazasMesas = items.reduce((s, c) => s + c.plazasMesas, 0);
+  const plazasFusionadas = items.reduce((s, c) => s + c.plazasFusionadas, 0);
+  return {
+    capacidadDeclarada,
+    plazasMesas,
+    plazasFusionadas,
+    diferencia: plazasMesas - capacidadDeclarada,
+    // Cuenta los DOS estados sin mesas reales (plano vacío y solo uniones):
+    // para el aforo son lo mismo, cero plazas. `espaciosSoloFusionadas`
+    // separa los que además hay que redibujar.
+    espaciosSinMesas: items.filter((c) => c.estado === "sin_mesas" || c.estado === "solo_fusionadas").length,
+    espaciosSoloFusionadas: items.filter((c) => c.estado === "solo_fusionadas").length,
+    espaciosDescuadrados: items.filter((c) => c.descuadra).length,
+    // POR QUÉ SE MIDE EN EL TOTAL Y NO POR ESPACIO: el trigger suma por MARCA.
+    // Un solo espacio a 0 mesas no bloquea nada mientras sus hermanos aporten
+    // plazas (el aforo sigue > 0). Pero si TODAS las salas están a 0, con la
+    // regla encendida el trigger calcularía capacidad total = 0 y rechazaría
+    // (23514) CUALQUIER reserva: teléfono, web y panel se quedarían sin poder
+    // reservar. `plazasMesas` son PLAZAS REALES: unas salas que solo tengan
+    // uniones bloquearían igual que sin mesas, porque
+    // `fn_capacidad_efectiva_marca` también las excluye.
+    bloquearia: plazasMesas === 0 && capacidadDeclarada > 0,
+  };
 }
 
 /** Frase corta para la insignia de la pantalla ("Sin mesas dadas de alta", "Sobran 14 plazas"...). */

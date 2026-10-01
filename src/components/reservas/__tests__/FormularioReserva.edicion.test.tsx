@@ -62,27 +62,16 @@ vi.mock("@/hooks/useOcupacionSalasDia", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/hooks/useOcupacionSalasDia")>();
   return {
     ...real,
+    // El día de Casa Tomás (las salas de Touza ya no llegan: las descarta el hook).
     useOcupacionSalasDia: () => ({
       data: {
-        negocios: [
-          {
-            marca: "casa_tomas",
-            espacios: [
-              { id: "salon", nombre: "Salón", capacidad_maxima: 60, marca: "casa_tomas" },
-              { id: "terraza", nombre: "Terraza", capacidad_maxima: 30, marca: "casa_tomas" },
-            ],
-            reservas: [],
-            horasBase: ["13:00", "21:00"],
-            cerrado: false,
-          },
-          {
-            marca: "touza",
-            espacios: [{ id: "reservado", nombre: "El Reservado", capacidad_maxima: 20, marca: "touza" }],
-            reservas: [],
-            horasBase: ["21:00"],
-            cerrado: false,
-          },
+        espacios: [
+          { id: "salon", nombre: "Salón", capacidad_maxima: 60 },
+          { id: "terraza", nombre: "Terraza", capacidad_maxima: 30 },
         ],
+        reservas: [],
+        horasBase: ["13:00", "21:00"],
+        cerrado: false,
       },
     }),
   };
@@ -1261,15 +1250,20 @@ describe("FormularioReserva · edición · lista negra, límites y aforo", () =>
   });
 });
 
-describe("FormularioReserva · edición · negocio, sala, importante y mesa", () => {
-  it("el negocio se ve pero no se cambia (una reserva no salta de negocio: se cancela y se crea otra)", async () => {
-    prepararBD();
-    montar({ marca: "touza", espacio_id: "reservado" });
+describe("FormularioReserva · edición · sala, importante y mesa", () => {
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retira «el negocio se ve pero no se cambia».
+  // Ya no hay campo «Negocio»; editar nunca escribe la marca.
+  it("no hay campo «Negocio» y guardar un cambio no escribe la marca", async () => {
+    const bd = prepararBD();
+    montar();
 
-    const negocio = screen.getByLabelText("Negocio");
-    expect(negocio).toBeDisabled();
-    expect(negocio).toHaveValue("Touza · El Reservado");
-    expect(screen.getByText(/cancela la reserva y crea otra/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Negocio")).not.toBeInTheDocument();
+    expect(screen.queryByText(/cancela la reserva y crea otra/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Marcar como importante" }));
+    fireEvent.click(await guardar());
+    await waitFor(() => expect(bd.update).toHaveBeenCalledTimes(1));
+    expect(bd.update.mock.calls[0][0]).not.toHaveProperty("marca");
   });
 
   it("«Marcar como importante» se guarda como importante: true", async () => {

@@ -37,7 +37,6 @@ import { ESTADOS_QUE_OCUPAN, turnoDeHora } from "../../../supabase/functions/_sh
 // Function; se importa la misma para que panel y servidor no puedan divergir.
 import { debeEnviarSolicitudRecibida } from "../../../supabase/functions/emails-reserva/plantillas";
 import { debeNotificarAltaPanel, emailParaGuardar, errorEmailOpcional, errorTelefono } from "./altaPanel";
-import { normalizarMarca } from "./negocios";
 import { horaCorta } from "./ocupacionSalas";
 import { formatearTelefonoReserva } from "./telefono";
 
@@ -55,6 +54,7 @@ export interface ReservaEditable {
   estado: string;
   notas_cliente: string | null;
   espacio_id: string | null;
+  /** Se lee (la comprobación de aforo mira la marca de la reserva) pero nunca se edita. */
   marca?: string | null;
   canal?: string | null;
   importante?: boolean | null;
@@ -75,7 +75,6 @@ export interface ValoresFormularioEdicion {
   hora: string;
   numero_comensales: number;
   notas_cliente: string;
-  marca: string;
   espacio_id: string | null;
   importante: boolean;
 }
@@ -94,13 +93,12 @@ export function valoresFormularioDesdeReserva(reserva: ReservaEditable): Valores
     hora: horaCorta(reserva.hora) ?? "",
     numero_comensales: Number(reserva.numero_comensales) || 0,
     notas_cliente: reserva.notas_cliente ?? "",
-    marca: normalizarMarca(reserva.marca),
     espacio_id: reserva.espacio_id ?? null,
     importante: !!reserva.importante,
   };
 }
 
-/** Lo que el usuario deja en el formulario (el mismo shape que el alta, menos el negocio, que no se edita). */
+/** Lo que el usuario deja en el formulario (el mismo shape que el alta). */
 export interface ValoresEditados {
   nombre: string;
   telefono: string;

@@ -53,7 +53,8 @@
 //     Es el mismo corte del trigger de aforo, no una regla de la interfaz.
 //   · `marca`: la de la SALA cuando la reserva ya tiene sala (es donde se
 //     sienta la gente); solo cuando aún no hay sala se usa `reservas.marca`.
-//     Nunca llega vacía: por defecto 'casa_tomas'.
+//     Nunca llega vacía: por defecto 'casa_tomas'. Las filas que no son de
+//     Casa Tomás ya las descarta el hook (`admiteReservas`).
 //   · `grado`: `sin_sala` → `sin_mesa` → `con_mesa`, calculado en SQL a partir
 //     de `espacio_id` y del recuento de `asignaciones_mesa`.
 //
@@ -76,7 +77,7 @@
 // SALAS SIN MESAS EN EL PLANO
 // ---------------------------------------------------------------------------
 // Caso real de producción (2026-09-26): de 7 espacios solo 3 tienen mesas
-// (Comedor 2, Salón 15, Terraza 3, todas de Casa Tomás). En las otras 4 el
+// (Comedor 2, Salón 15, Terraza 3, todas de Casa Tomás). En las demás el
 // grado 2 es IMPOSIBLE. Ahí no se pinta "0 %" -que dejaría al encargado
 // buscando mesas que no existen- sino el aviso de que la sala no tiene mesas
 // en el plano, y el salto sigue activo porque es donde se crean.
@@ -84,10 +85,11 @@
 // ---------------------------------------------------------------------------
 // DISPONIBILIDAD POR CUARTOS DE HORA (reservas-sin-salas, 2026-09-29)
 // ---------------------------------------------------------------------------
-// Debajo del reparto va la rejilla interna del día de 15 en 15 minutos, un
-// bloque por negocio (`DisponibilidadCuartos`): cuándo llega la gente y cuánta
-// hay sentada. Es solo consulta, como el resto del panel. Sus datos son los de
-// `useOcupacionSalasDia` (reservas del día), no los de la vista de asignación.
+// Debajo del reparto va la rejilla interna del día de 15 en 15 minutos
+// (`DisponibilidadCuartos`, una sola, la de Casa Tomás): cuándo llega la gente
+// y cuánta hay sentada. Es solo consulta, como el resto del panel. Sus datos
+// son los de `useOcupacionSalasDia` (reservas del día), no los de la vista de
+// asignación.
 //
 // ---------------------------------------------------------------------------
 // CABECERA: LOS COMENSALES EN GRANDE Y LA OCUPACIÓN (2026-10-01)
@@ -97,14 +99,21 @@
 // Debajo va el % de aforo de comida y de cena (`OcupacionDelDia`): el desglose
 // del color de la casilla. Se calcula con la MISMA función que la casilla
 // (`ocupacionPorTurno`) y con las filas de `vista_asignacion_dia`, que ya son
-// solo las reservas vivas: casilla y panel no pueden discrepar. El aforo sale de
-// `useEspaciosReserva` (espacios activos de Casa Tomás, como el trigger). Los días
-// pasados no llevan %: lo que ya ocurrió no se mide contra el aforo.
+// solo las reservas vivas. El aforo sale de `useEspaciosReserva` (espacios
+// activos de Casa Tomás, como el trigger). Los días pasados no llevan %: lo que
+// ya ocurrió no se mide contra el aforo.
+//
+// Casilla y panel cuentan lo mismo MIENTRAS la marca de cada reserva sea la de
+// su sala: la casilla filtra por `reservas.marca` y este panel por la marca de
+// la vista, que es la de la SALA cuando la reserva tiene sala (ver la cabecera
+// de `useResumenAsignacionDia`). Hoy coinciden siempre (el 2026-10-01: 0
+// discrepancias de 1.241 reservas); si algún día no, una reserva de una marca
+// en una sala de la otra contaría en uno y no en el otro.
 //
 // SOLO CASA TOMÁS: Touza ya no admite reservas (decisión del dueño, 2026-10-01).
-// Las cifras de la cabecera y el % ignoran cualquier fila de otro negocio que
-// quede en datos antiguos, igual que la casilla del mes. La lista de salas de
-// debajo no se ha tocado: la retirada de Touza es otro encargo.
+// Ni las cifras de la cabecera, ni el %, ni las salas de debajo, ni la rejilla
+// enseñan nada de otro negocio que quede en datos antiguos, igual que la casilla
+// del mes: `useResumenAsignacionDia` ya descarta esas filas con `admiteReservas`.
 //
 // Las cifras de la cabecera (comensales, reservas, con mesa) siguen al filtro de
 // turno; el desglose de ocupación enseña siempre los dos turnos.
@@ -133,7 +142,6 @@ import { cn } from "@/lib/utils";
 import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useResumenAsignacionDia, type FilaAsignacionDia } from "@/hooks/useResumenAsignacionDia";
-import { marcaDeEspacio, NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
 import {
   resumenDia,
   resumenPorEspacio,
@@ -141,9 +149,8 @@ import {
   type ResumenEspacio,
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
-import { aforoCasaTomas, esDeCasaTomas, ocupacionPorTurno } from "@/lib/reservas/ocupacionCalendario";
+import { aforoCasaTomas, ocupacionPorTurno } from "@/lib/reservas/ocupacionCalendario";
 import { fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
-import { NegocioBadge } from "./NegocioBadge";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 import { OcupacionDelDia } from "./OcupacionDelDia";
 
@@ -291,12 +298,10 @@ function BloqueErrorDia({
 // otra.
 function TarjetaSala({
   grupo,
-  marca,
   tieneMesas,
   onIr,
 }: {
   grupo: ResumenEspacio;
-  marca: string | null;
   /** ¿La sala tiene alguna mesa activa en el plano? Si no, el grado 2 es imposible. */
   tieneMesas: boolean;
   onIr: (espacioId: string) => void;
@@ -321,7 +326,6 @@ function TarjetaSala({
           <span className="truncate font-medium" title={grupo.espacio_nombre}>
             {grupo.espacio_nombre}
           </span>
-          <NegocioBadge corta marca={marca} className="shrink-0" />
         </div>
         <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
@@ -410,13 +414,10 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   const { data: mesas } = useMesas();
 
   const espaciosPorId = useMemo(() => {
-    const mapa = new Map<string, { nombre: string; marca: string }>();
-    // `caracteristicas` va en el tipo porque es de donde `marcaDeEspacio` saca
-    // la marca (`caracteristicas->>'marca'`). Sin ella el cast mentía y
-    // `tsc -p tsconfig.app.json` lo cantaba (TS2559).
-    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string; caracteristicas?: unknown; marca?: string | null }>) {
+    const mapa = new Map<string, { nombre: string }>();
+    for (const e of (espacios ?? []) as Array<{ id: string; nombre: string }>) {
       if (!e?.id) continue;
-      mapa.set(e.id, { nombre: e.nombre, marca: marcaDeEspacio(e) });
+      mapa.set(e.id, { nombre: e.nombre });
     }
     return mapa;
   }, [espacios]);
@@ -447,19 +448,15 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   const resumen = useMemo(() => resumenDia(filasFiltradas), [filasFiltradas]);
   const { porEspacio, sinSala } = useMemo(() => resumenPorEspacio(filasFiltradas), [filasFiltradas]);
 
-  // Las CIFRAS DE LA CABECERA (comensales, reservas, con mesa) son las de Casa
-  // Tomás: Touza ya no admite reservas y las antiguas que queden se ignoran, igual
-  // que en la casilla del mes (así las dos cifras coinciden siempre). Lo de abajo
-  // (salas y «Sin sala») no se toca. Casi siempre es exactamente lo mismo.
-  const filasCasaTomas = useMemo<FilaResumenEspacio[]>(() => {
-    return filas
-      .filter((f) => esDeCasaTomas(f.marca) && (turno === "todos" || f.turno === turno))
-      .map(aFilaResumen(espaciosPorId));
-  }, [filas, turno, espaciosPorId]);
-  const resumenCasaTomas = useMemo(() => resumenDia(filasCasaTomas), [filasCasaTomas]);
+  // Las CIFRAS DE LA CABECERA (comensales, reservas, con mesa) son las de las
+  // mismas filas, todas de Casa Tomás (el hook descarta las de otro negocio), así
+  // que coinciden siempre con las salas de debajo. Con la casilla del mes
+  // coinciden mientras la marca de cada reserva sea la de su sala: la casilla
+  // filtra por `reservas.marca` y la vista da la de la SALA (ver la cabecera de
+  // este fichero y la de `useResumenAsignacionDia`).
   const comensales = useMemo(
-    () => filasCasaTomas.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
-    [filasCasaTomas],
+    () => filasFiltradas.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
+    [filasFiltradas],
   );
 
   // Ocupación del día por turno: con TODAS las filas (el filtro de turno no la
@@ -553,13 +550,13 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
               </p>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                 <span className="whitespace-nowrap tabular-nums">
-                  {plural(resumenCasaTomas.total, "reserva", "reservas")}
+                  {plural(resumen.total, "reserva", "reservas")}
                 </span>
-                {resumenCasaTomas.total > 0 && (
+                {resumen.total > 0 && (
                   <>
                     <span aria-hidden="true">·</span>
                     <span className="whitespace-nowrap tabular-nums">
-                      {resumenCasaTomas.conMesa} de {resumenCasaTomas.total} con mesa
+                      {resumen.conMesa} de {resumen.total} con mesa
                     </span>
                   </>
                 )}
@@ -623,22 +620,14 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
             {porEspacio.map((grupo) => {
               const id = grupo.espacio_id as string;
               return (
-                <TarjetaSala
-                  key={id}
-                  grupo={grupo}
-                  marca={espaciosPorId.get(id)?.marca ?? null}
-                  tieneMesas={salasConMesas.has(id)}
-                  onIr={irAlPlano}
-                />
+                <TarjetaSala key={id} grupo={grupo} tieneMesas={salasConMesas.has(id)} onIr={irAlPlano} />
               );
             })}
           </>
         )}
 
         <div className="space-y-3 border-t pt-3">
-          {NEGOCIOS_PANEL.map((n) => (
-            <DisponibilidadCuartos key={n.marca} fecha={fechaISO} marca={n.marca} compacto />
-          ))}
+          <DisponibilidadCuartos fecha={fechaISO} compacto />
         </div>
       </div>
     </div>

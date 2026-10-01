@@ -13,7 +13,6 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import type { CifrasNegocio } from "@/lib/reservas/resumenNegocios";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,7 +31,7 @@ import { GestorReservasKanban } from "./GestorReservasKanban";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { NEGOCIOS_PANEL } from "@/lib/reservas/negocios";
+import { admiteReservas } from "@/lib/reservas/negocios";
 import { cn } from "@/lib/utils";
 
 interface VistaHoyProps {
@@ -57,9 +56,11 @@ interface VistaHoyProps {
  * escondido detrás de un botón "Gestor de reservas" — en 1366px las 4
  * tarjetas solas ya llenaban la pantalla y no se veía ni una reserva.
  *
- * Ahora: una franja compacta con los mismos 4 datos (+ desglose por
- * negocio, que no se pierde) y, justo debajo, el kanban por espacios como
- * protagonista — es la vista de servicio, así que es lo primero que se ve.
+ * Ahora: una franja compacta con los mismos 4 datos y, justo debajo, el
+ * kanban por espacios como protagonista — es la vista de servicio, así que
+ * es lo primero que se ve. Solo Casa Tomás: Touza no admite reservas
+ * (decisión del dueño, 2026-10-01), así que lo que quede de Touza en la base
+ * de datos no sale ni cuenta en ninguna parte de esta pestaña.
  *
  * Ojo: NO hay lista/tabla de reservas de hoy aquí (decisión explícita del
  * dueño — "quita la lista de reservas de hoy, solo el kanban"). Buscar por
@@ -111,11 +112,12 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
   const { data: asignaciones } = useAsignacionesMesa(hoy);
 
   /**
-   * Reservas de hoy, sólo las 6 columnas que necesita la franja.
+   * Reservas de hoy, sólo las columnas que necesita la franja (y `marca`, para
+   * quedarse solo con las de Casa Tomás: `admiteReservas`).
    *
    * NO se reutiliza `useReservasServicioDia`: ese pide `llegada_at` y
    * `salida_at`, columnas de migraciones que pueden no estar aplicadas, y su
-   * error subiría hasta aquí y tumbaría la pestaña entera. Estas 6 existen
+   * error subiría hasta aquí y tumbaría la pestaña entera. Estas existen
    * seguro. Mismo patrón que `useReservasDeSala` (`"reservas" as any` porque
    * `espacio_id` no está en los tipos generados).
    *
@@ -137,12 +139,14 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("id, nombre, hora, numero_comensales, estado, espacio_id")
+        .select("id, nombre, hora, numero_comensales, estado, espacio_id, marca")
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
         .order("hora");
       if (error) throw error;
-      return (data ?? []) as unknown as ReservaPendienteMesa[];
+      return ((data ?? []) as unknown as (ReservaPendienteMesa & { marca?: string | null })[]).filter((r) =>
+        admiteReservas(r.marca),
+      );
     },
   });
 
@@ -177,7 +181,6 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
   }
 
   const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
-  const porNegocio = resumen?.porNegocio ?? [];
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -192,32 +195,24 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
             label="Reservas hoy"
             value={resumen?.totalReservas ?? 0}
             detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
-            porNegocio={porNegocio}
-            cifra={(n) => `${n.totalReservas}`}
           />
           <IndicadorHoy
             icon={Users}
             iconClass="bg-accent/10 text-accent"
             label="Comensales"
             value={resumen?.totalComensales ?? 0}
-            porNegocio={porNegocio}
-            cifra={(n) => `${n.totalComensales}`}
           />
           <IndicadorHoy
             icon={MapPin}
             iconClass="bg-secondary/10 text-secondary"
             label="Capacidad"
             value={resumen?.capacidadTotal ?? 0}
-            porNegocio={porNegocio}
-            cifra={(n) => `${n.capacidadTotal}`}
           />
           <IndicadorHoy
             icon={TrendingUp}
             iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
             label="Ocupación"
             value={`${resumen?.porcentajeTotal ?? 0}%`}
-            porNegocio={porNegocio}
-            cifra={(n) => `${n.porcentajeTotal}%`}
           />
         </div>
       </div>
@@ -247,9 +242,10 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
 
 /**
  * Rejilla interna por cuartos de hora del día (reservas-sin-salas,
- * 2026-09-29), PLEGADA: el kanban sigue siendo el protagonista de Hoy. Un
- * bloque por negocio, cada uno con su aforo. Mientras está plegada no se
- * monta nada (Radix desmonta el contenido), así que no cuesta consultas.
+ * 2026-09-29), PLEGADA: el kanban sigue siendo el protagonista de Hoy. Una
+ * sola rejilla, la de Casa Tomás con su aforo (antes había otra para Touza).
+ * Mientras está plegada no se monta nada (Radix desmonta el contenido), así
+ * que no cuesta consultas.
  */
 function CuartosDeHoy({ fecha }: { fecha: string }) {
   return (
@@ -262,9 +258,9 @@ function CuartosDeHoy({ fecha }: { fecha: string }) {
         <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-4 pt-2">
-        {NEGOCIOS_PANEL.map((n) => (
-          <DisponibilidadCuartos key={n.marca} fecha={fecha} marca={n.marca} compacto />
-        ))}
+        {/* `ocultarTitulo`: el botón del plegable ya dice «Disponibilidad por cuartos de hora»; repetirlo
+            justo debajo sobraba (antes el segundo llevaba «· Casa Tomás», de cuando había dos negocios). */}
+        <DisponibilidadCuartos fecha={fecha} compacto ocultarTitulo />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -486,23 +482,19 @@ function PastillaPendiente({
   );
 }
 
-/** Un dato de la franja compacta: icono + número + (si hay 2 negocios) su desglose. */
+/** Un dato de la franja compacta: icono + número. */
 function IndicadorHoy({
   icon: Icon,
   iconClass,
   label,
   value,
   detalle,
-  porNegocio,
-  cifra,
 }: {
   icon: LucideIcon;
   iconClass: string;
   label: string;
   value: string | number;
   detalle?: string;
-  porNegocio: CifrasNegocio[];
-  cifra: (n: CifrasNegocio) => string;
 }) {
   return (
     <div className="flex items-center gap-2 min-w-0 sm:px-3 sm:first:pl-1">
@@ -515,11 +507,6 @@ function IndicadorHoy({
           {value}
           {detalle && <span className="ml-1 text-[10px] font-normal text-muted-foreground">{detalle}</span>}
         </p>
-        {porNegocio.length > 1 && (
-          <p className="text-[10px] text-muted-foreground truncate tabular-nums" aria-label="Desglose por negocio">
-            {porNegocio.map((n) => `${n.negocio.nombre} ${cifra(n)}`).join(" · ")}
-          </p>
-        )}
       </div>
     </div>
   );

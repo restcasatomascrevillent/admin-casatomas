@@ -206,22 +206,20 @@ describe("GestionMesasEspacios", () => {
     expect(screen.getByText(/No hay espacios de reserva dados de alta/i)).toBeInTheDocument();
   });
 
-  it("agrupa los espacios por negocio, Casa Tomás antes que Touza", () => {
-    montar();
-    const insignias = screen.getAllByTitle(/^Negocio:/);
-    expect(insignias[0]).toHaveTextContent("Casa Tomás");
-    expect(insignias[1]).toHaveTextContent("Touza");
-  });
-
-  it("pinta los siete espacios de producción", () => {
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retiran «agrupa los espacios por negocio» y
+  // «pinta los siete espacios de producción». Solo salen las cuatro salas de Casa Tomás, sin insignia de negocio.
+  it("pinta solo las cuatro salas de Casa Tomás de producción, sin grupos ni insignias de negocio", () => {
     montar();
     expect(screen.getByText("Comedor")).toBeInTheDocument();
     expect(screen.getByText("Salón")).toBeInTheDocument();
     expect(screen.getByText("Reservado")).toBeInTheDocument();
-    expect(screen.getByText("Interior")).toBeInTheDocument();
-    expect(screen.getByText("El Reservado")).toBeInTheDocument();
-    // "Terraza" está en los dos negocios
-    expect(screen.getAllByText("Terraza")).toHaveLength(2);
+    // "Terraza" está en los dos negocios: solo sale la de Casa Tomás (se distingue por id/marca, no por nombre).
+    expect(screen.getAllByText("Terraza")).toHaveLength(1);
+    expect(bloqueDe("Terraza")).toHaveTextContent(/Declarada\s*50/);
+    expect(screen.queryByText("Interior")).not.toBeInTheDocument();
+    expect(screen.queryByText("El Reservado")).not.toBeInTheDocument();
+    expect(screen.queryAllByTitle(/^Negocio:/)).toHaveLength(0);
+    expect(screen.queryByText(/Touza|Casa Tomás/)).not.toBeInTheDocument();
   });
 
   it("dice en la descripción que las mesas se dan de alta en el plano y que el número se corrige aquí", () => {
@@ -283,26 +281,32 @@ describe("GestionMesasEspacios", () => {
     expect(bloque).not.toHaveTextContent(/No impide reservar/i);
   });
 
-  it("resume por negocio el aforo declarado frente a la suma de mesas", () => {
+  it("resume en UNA línea el aforo declarado de Casa Tomás frente a la suma de mesas", () => {
     montar();
-    // Casa Tomás: 50+50+50+20 = 170 declaradas, 4+64+12+0 = 80 sumando mesas.
+    // Casa Tomás: 50+50+50+20 = 170 declaradas, 4+64+12+0 = 80 sumando mesas. (Antes había otra línea para
+    // Touza, 80 declaradas y 0 sumando mesas: Touza no admite reservas, decisión del dueño 2026-10-01.)
     const declarados = screen.getAllByText(/Aforo declarado/i);
+    expect(declarados).toHaveLength(1);
     expect(declarados[0]).toHaveTextContent(/170/);
-    // Touza: 30+30+20 = 80 declaradas.
-    expect(declarados[1]).toHaveTextContent(/80/);
     const resumenes = screen.getAllByText(/sumando mesas/i);
+    expect(resumenes).toHaveLength(1);
     expect(resumenes[0]).toHaveTextContent("80");
-    // Touza: 30+30+20 = 80 declaradas, 0 sumando mesas → se quedaría sin aforo.
-    expect(resumenes[1]).toHaveTextContent("0");
-    expect(screen.getByText(/Sin mesas en ninguna sala/i)).toBeInTheDocument();
   });
 
-  it("no marca a un negocio como bloqueado si alguna de sus salas tiene mesas", () => {
+  it("no marca el restaurante como bloqueado si alguna de sus salas tiene mesas", () => {
     montar();
     // Casa Tomás tiene "Reservado" a 0 mesas, pero sus otras salas suman 80:
     // el trigger de aforo suma por MARCA, así que no se quedaría sin aforo.
-    const insigniasBloqueo = screen.queryAllByText(/Sin mesas en ninguna sala/i);
-    expect(insigniasBloqueo).toHaveLength(1);
+    // (La única insignia que salía era la de Touza, que ya no se enseña.)
+    expect(screen.queryAllByText(/Sin mesas en ninguna sala/i)).toHaveLength(0);
+  });
+
+  it("sí lo marca si NINGUNA sala de Casa Tomás tiene mesas reales", () => {
+    montar({
+      espacios: [espacio("e-a", "Sala A", 20, "casa_tomas"), espacio("e-b", "Sala B", 30, "casa_tomas")],
+      mesas: [],
+    });
+    expect(screen.getByText(/Sin mesas en ninguna sala/i)).toBeInTheDocument();
   });
 
   // ── Mesas reales vs mesas juntadas (datos reales del 2026-09-27) ────────────
@@ -593,7 +597,7 @@ describe("GestionMesasEspacios", () => {
 
   // ── Espacios desactivados ──────────────────────────────────────────────────
 
-  it("marca los espacios desactivados y los deja fuera del resumen del negocio", () => {
+  it("marca los espacios desactivados y los deja fuera del resumen del aforo", () => {
     montar({
       espacios: [
         espacio("e-on", "Sala Activa", 10, "casa_tomas"),
@@ -602,7 +606,7 @@ describe("GestionMesasEspacios", () => {
       mesas: [mesa("m-1", "e-on", "1", 10)],
     });
     expect(within(bloqueDe("Sala Cerrada")).getByText("Desactivado")).toBeInTheDocument();
-    // El resumen por negocio replica el filtro del trigger (`activa = true`):
+    // El resumen replica el filtro del trigger (`activa = true`):
     // solo cuenta la sala activa, así que declara 10 y no 50.
     expect(screen.getByText(/Aforo declarado/i).closest("span")).toHaveTextContent(/10/);
   });

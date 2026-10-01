@@ -17,7 +17,7 @@
  *   esto no se entera... pero si alguien deja de usar el módulo compartido, sí.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ─── Doble en memoria de `reservas` ──────────────────────────────────────────
@@ -34,14 +34,27 @@ vi.mock("@/integrations/supabase/client", () => {
   const builder = () => {
     const q: Record<string, unknown> = {};
     const seguir = () => q;
-    q.select = seguir;
+    // Como PostgREST, devuelve SOLO las columnas pedidas: si la consulta deja de pedir `marca`, las filas
+    // llegan sin ella y la reserva de Touza pasaría por una de Casa Tomás (lo vigila su test, más abajo).
+    let columnas: string[] = [];
+    q.select = (lista = "*") => {
+      columnas = String(lista)
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c && c !== "*");
+      return q;
+    };
+    const proyectar = (fila: Record<string, unknown>) =>
+      columnas.length === 0 ? fila : Object.fromEntries(columnas.map((c) => [c, fila[c] ?? null]));
     q.eq = seguir;
     q.neq = seguir;
     q.order = seguir;
     // El cliente real es "thenable": se espera con await sin llamar a nada más.
     q.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
       Promise.resolve(
-        h.store.error ? { data: null, error: h.store.error } : { data: h.store.reservas, error: null },
+        h.store.error
+          ? { data: null, error: h.store.error }
+          : { data: h.store.reservas.map(proyectar), error: null },
       ).then(ok, ko);
     return q;
   };
@@ -54,11 +67,11 @@ vi.mock("@/components/reservas/GestorReservasKanban", () => ({
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
-// La rejilla por cuartos se prueba aparte; aquí solo cuántas se montan y de qué negocio.
+// La rejilla por cuartos se prueba aparte; aquí solo cuántas se montan y de qué día.
 vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: ({ marca, fecha }: { marca: string; fecha: string }) => (
-    <div data-testid="rejilla-cuartos">
-      {marca} {fecha}
+  DisponibilidadCuartos: ({ fecha, ocultarTitulo }: { fecha: string; ocultarTitulo?: boolean }) => (
+    <div data-testid="rejilla-cuartos" data-ocultar-titulo={String(!!ocultarTitulo)}>
+      {fecha}
     </div>
   ),
 }));
@@ -87,7 +100,6 @@ const RESUMEN = {
   capacidadTotal: 60,
   porcentajeTotal: 17,
   reservasCanceladas: 0,
-  porNegocio: [],
 };
 
 const reserva = (over: Record<string, unknown> & { id: string }) => ({
@@ -224,6 +236,28 @@ describe("VistaHoy — franja «Pendientes de mesa»", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
   });
 
+  // Touza no admite reservas (decisión del dueño 2026-10-01): una reserva antigua de Touza que quede hoy en la
+  // base de datos no sale en la franja (ni su sala), aunque no tenga mesa. Vigila también que la consulta
+  // pida `marca`: el doble solo devuelve las columnas pedidas.
+  it("no pinta las reservas de Touza (ni su sala), solo las de Casa Tomás", async () => {
+    h.store.reservas = [
+      reserva({ id: "r1", nombre: "Ana", marca: "casa_tomas" }),
+      reserva({ id: "tz", nombre: "Touza Demo", espacio_id: "tz-reservado", marca: "touza", hora: "21:00:00" }),
+    ];
+    vi.mocked(useEspaciosReserva).mockReturnValue({
+      data: [...SALAS, { id: "tz-reservado", nombre: "El Reservado", activa: true, caracteristicas: { marca: "touza" } }],
+    } as unknown as ReturnType<typeof useEspaciosReserva>);
+
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(await screen.findByText("Ana")).toBeInTheDocument();
+    expect(screen.queryByText("Touza Demo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "El Reservado" })).not.toBeInTheDocument();
+    // La franja cuenta 1 pendiente, no 2.
+    expect(within(screen.getByRole("region", { name: "Pendientes de mesa" })).getByText("1")).toBeInTheDocument();
+  });
+
   it("un clic en la pastilla salta al plano con el destino exacto de la reserva", async () => {
     h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
 
@@ -337,11 +371,18 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
     expect(screen.queryByTestId("rejilla-cuartos")).not.toBeInTheDocument();
   });
 
-  it("al desplegarla enseña una rejilla de hoy por negocio", () => {
+  // Touza no admite reservas (decisión del dueño 2026-10-01): antes salía una rejilla por negocio (Casa Tomás y Touza).
+  it("al desplegarla enseña UNA rejilla de hoy, la de Casa Tomás", () => {
     montar();
     fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
     const rejillas = screen.getAllByTestId("rejilla-cuartos").map((r) => r.textContent);
-    expect(rejillas).toEqual([`casa_tomas ${HOY}`, `touza ${HOY}`]);
+    expect(rejillas).toEqual([HOY]);
+  });
+
+  it("el título no sale dos veces seguidas: el botón del plegable ya lo dice y la rejilla lo oculta", () => {
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
+    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-ocultar-titulo", "true");
   });
 });
 

@@ -45,7 +45,7 @@ export const TOKENS_DISPONIBLES: TokenInfo[] = [
     clave: "negocio",
     etiqueta: "Negocio",
     descripcion:
-      'Nombre del negocio de la reserva: "Casa Tomás" o "Touza". Úsalo en vez de escribir el nombre a mano y el mismo texto servirá para los dos.',
+      'Nombre del negocio de la reserva: "Casa Tomás" (desde el 1 de octubre de 2026 Touza no admite reservas; las que se hicieron antes dicen "Touza"). Úsalo en vez de escribir el nombre a mano.',
   },
 ];
 

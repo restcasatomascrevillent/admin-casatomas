@@ -13,17 +13,16 @@
 // QUÉ CUENTA `cifrasDeLaLista`, EXACTAMENTE
 // ----------------------------------------------------------------------------
 //   Cuenta las RESERVAS de la lista que pasan los filtros vigentes —búsqueda,
-//   fecha, canal y negocio— y NO el filtro de «Estado». Por tres motivos:
+//   fecha y canal— y NO el filtro de «Estado». Por tres motivos:
 //     1. Al filtrar por un estado, los otros cinco siguen dando su cifra: el
 //        timeline sirve de referencia («hay 12 pendientes y 38 confirmadas») y
 //        de atajo para cambiar de filtro. Si contara con el filtro de estado
 //        puesto, al elegir «Pendiente» todos los demás pasarían a 0.
 //     2. La cifra de un estado es JUSTO el número de filas de reserva que la
 //        lista enseña al filtrar por él (lo comprueba el test contra
-//        `filtrarFilasUnificadas`, el filtro de la propia lista; salvo las de
-//        Touza, ver más abajo).
+//        `filtrarFilasUnificadas`, el filtro de la propia lista).
 //     3. Con el filtro de estado en «Todos» las seis cifras suman lo que dice el
-//        contador «N reservas» de los filtros (salvo las de Touza).
+//        contador «N reservas» de los filtros.
 //   · Incluye las CANCELADAS (la lista las enseña, a diferencia de la pestaña
 //     Hoy, cuya consulta las excluye).
 //   · NO cuenta las solicitudes del bot (`solicitudes_pendientes`): no son
@@ -31,28 +30,23 @@
 //     aparte («· 2 solicitudes»). Sí se ven en la lista, no en el timeline.
 //   · Un estado que no es uno de los seis (no debería existir por el CHECK
 //     `reservas_estado_check`) no cuenta en ninguno.
-//   · TOUZA NO ADMITE RESERVAS (decisión del dueño, 2026-10-01): las reservas que
-//     no son de Casa Tomás (`marca = 'touza'`; en los datos de demo hay 5) NO
-//     CUENTAN, con cualquier filtro. La regla es `esDeCasaTomas`
-//     (`ocupacionCalendario.ts`, el único sitio donde se decide): aquí no se repite
-//     ninguna comprobación de Touza ni se crea otro filtro de negocio, y cuando se
-//     retire Touza del sistema esta línea queda sin efecto sola. Una reserva sin
-//     marca es de Casa Tomás y sí cuenta.
-//     Consecuencia temporal, a sabiendas: mientras la lista siga ENSEÑANDO esas
-//     filas, las seis cifras suman esas reservas menos que el contador «N reservas»
-//     y al pulsar un estado la tabla puede enseñar alguna fila más que su cifra.
-//     Se arregla sola cuando la lista deje de enseñarlas (otro encargo).
+//   · SOLO CASA TOMÁS (decisión del dueño, 2026-10-01: Touza no admite reservas).
+//     Las reservas de otro negocio (`marca = 'touza'`; en los datos de demo hay 5)
+//     no cuentan con ningún filtro, igual que no salen en la lista: las descarta
+//     `unificarReservasYSolicitudes` con `admiteReservas`, la regla común. Aquí no
+//     se repite ninguna comprobación de negocio. Una reserva sin marca es de Casa
+//     Tomás y sí cuenta.
 //   · Sin consulta propia: recibe las reservas que la lista YA tiene cargadas.
 //
-// El filtro es el MISMO que el de la lista: se llama a `filtrarFilasUnificadas`
-// (`vistaUnificada.ts`) con los mismos filtros y `estado: "all"`. Nada de repetir
-// aquí la lógica de búsqueda, canal o negocio: si cambia allí, cambia aquí.
+// El filtro es el MISMO que el de la lista: se llama a `unificarReservasYSolicitudes`
+// y `filtrarFilasUnificadas` (`vistaUnificada.ts`) con los mismos filtros y
+// `estado: "all"`. Nada de repetir aquí la lógica de búsqueda o canal: si cambia
+// allí, cambia aquí.
 // ============================================================================
 
 import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { ORDEN_ESTADOS, type EstadoReserva } from "./estadosReserva";
-import { esDeCasaTomas } from "./ocupacionCalendario";
 import {
   filtrarFilasUnificadas,
   unificarReservasYSolicitudes,
@@ -102,17 +96,16 @@ export function contarPorEstado(
 
 /**
  * Las cifras de la pestaña Lista: las reservas que pasan los filtros de la lista
- * (búsqueda, fecha, canal, negocio) contadas por estado, SIN aplicar el filtro de
- * estado (`filtros.estado` se ignora, sea cual sea su valor) y SIN las reservas
- * que no son de Casa Tomás (Touza no admite reservas: `esDeCasaTomas`). Ver la
+ * (búsqueda, fecha, canal) contadas por estado, SIN aplicar el filtro de estado
+ * (`filtros.estado` se ignora, sea cual sea su valor). Como en la propia lista,
+ * las que no son de Casa Tomás no entran (`unificarReservasYSolicitudes`). Ver la
  * cabecera. No toca `reservas` ni `filtros`.
  */
 export function cifrasDeLaLista<R extends ReservaListable>(
   reservas: readonly R[],
   filtros: FiltrosListaUnificada,
 ): CifrasPorEstado {
-  const deCasaTomas = reservas.filter((r) => esDeCasaTomas(r.marca));
-  const filas = filtrarFilasUnificadas(unificarReservasYSolicitudes(deCasaTomas, []), {
+  const filas = filtrarFilasUnificadas(unificarReservasYSolicitudes(reservas, []), {
     ...filtros,
     estado: "all",
   });
@@ -137,8 +130,8 @@ export const ALCANCE_HOY: AlcanceCifras = { cabecera: "cifras de hoy", lectura: 
  *   · con otro día           → «cifras de la lista del 3 oct 2026» (el formato del botón de fecha)
  *   · con filtro de estado   → lo anterior + «, sin el filtro de estado»: avisa de que las demás cifras
  *                              no son las de las filas que se ven (cuentan todos los estados).
- * Siempre dice «de la lista» porque, además del día, pueden estar puestos la búsqueda, el canal y el
- * negocio: las cifras son las de la lista TAL COMO ESTÁ FILTRADA, no las de un día entero.
+ * Siempre dice «de la lista» porque, además del día, pueden estar puestos la búsqueda y el canal: las
+ * cifras son las de la lista TAL COMO ESTÁ FILTRADA, no las de un día entero.
  */
 export function alcanceCifrasDeLaLista({
   fecha,

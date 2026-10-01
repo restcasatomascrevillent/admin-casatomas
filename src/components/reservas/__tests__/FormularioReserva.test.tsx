@@ -1,11 +1,10 @@
 /**
  * Tests para src/components/reservas/FormularioReserva.tsx
  *
- * reservas-sin-salas (decisión del dueño 2026-09-29): el negocio de una
- * reserva manual se ELIGE (obligatorio) y ya no lo decide la sala, que pasa a
- * ser interna, opcional y plegada.
- *   1. Sin negocio elegido no se guarda: error de validación, sin INSERT.
- *   2. Touza sin sala se guarda como Touza (marca 'touza', espacio_id null).
+ * reservas-sin-salas (decisión del dueño 2026-09-29): la sala es interna,
+ * opcional y plegada. Touza no admite reservas (decisión del dueño 2026-10-01):
+ * ya no hay selector «Negocio»; el alta escribe SIEMPRE la marca de Casa Tomás
+ * (la BD tiene un CHECK sobre `marca` y el trigger de aforo cuenta por marca).
  *
  * Email OPCIONAL en el alta manual (2026-09-30): puede quedar vacío y entonces
  * se guarda `null` (nunca ''); si se rellena, se sigue validando el formato.
@@ -46,24 +45,13 @@ vi.mock("@/hooks/useOcupacionSalasDia", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/hooks/useOcupacionSalasDia")>();
   return {
     ...real,
+    // El día de Casa Tomás (las salas de Touza ya no llegan: las descarta el hook).
     useOcupacionSalasDia: () => ({
       data: {
-        negocios: [
-          {
-            marca: "casa_tomas",
-            espacios: [{ id: "salon", nombre: "Salón", capacidad_maxima: 60, marca: "casa_tomas" }],
-            reservas: [],
-            horasBase: ["21:00"],
-            cerrado: false,
-          },
-          {
-            marca: "touza",
-            espacios: [{ id: "reservado", nombre: "El Reservado", capacidad_maxima: 20, marca: "touza" }],
-            reservas: [],
-            horasBase: ["21:00"],
-            cerrado: false,
-          },
-        ],
+        espacios: [{ id: "salon", nombre: "Salón", capacidad_maxima: 60 }],
+        reservas: [],
+        horasBase: ["21:00"],
+        cerrado: false,
       },
     }),
   };
@@ -106,6 +94,37 @@ function espiarInsert() {
   return insert;
 }
 
+type Llamada = [string, ...unknown[]];
+
+/**
+ * Como `espiarInsert`, pero con un builder POR consulta que anota sus llamadas (`[método, ...argumentos]`),
+ * para saber qué filtros lleva cada una (el de duplicados, el límite por teléfono, el límite por email…).
+ */
+function espiarCadenas() {
+  const cadenas: Llamada[][] = [];
+  const insert = vi.fn();
+  vi.mocked(supabase.from).mockImplementation((() => {
+    const llamadas: Llamada[] = [];
+    cadenas.push(llamadas);
+    const builder: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "neq", "in", "not", "or", "order"]) {
+      builder[m] = vi.fn((...args: unknown[]) => {
+        llamadas.push([m, ...args]);
+        return builder;
+      });
+    }
+    builder.insert = (...args: unknown[]) => {
+      insert(...args);
+      llamadas.push(["insert", ...args]);
+      return builder;
+    };
+    builder.single = vi.fn().mockResolvedValue({ data: { id: "res-nueva" }, error: null });
+    builder.then = (ok: (v: unknown) => unknown) => Promise.resolve({ data: [], count: 0, error: null }).then(ok);
+    return builder;
+  }) as never);
+  return { cadenas, insert };
+}
+
 function montar(datos: Record<string, unknown>) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidar = vi.spyOn(qc, "invalidateQueries");
@@ -138,38 +157,65 @@ beforeEach(() => {
   mocks.config.max_reservas_por_email_dia = 0;
 });
 
-describe("FormularioReserva · negocio obligatorio y sala interna", () => {
-  it("sin negocio elegido no guarda y lo pide", async () => {
-    const insert = espiarInsert();
-    montar({ marca: "" });
+// Touza no admite reservas (decisión del dueño 2026-10-01): se retiran «sin negocio elegido no guarda» y
+// «Touza sin sala se guarda como Touza». No hay campo «Negocio» y el alta es siempre de Casa Tomás.
+describe("FormularioReserva · siempre Casa Tomás, sala interna", () => {
+  it("no hay selector «Negocio» ni se nombra ningún negocio", () => {
+    espiarInsert();
+    montar({});
 
-    fireEvent.click(screen.getByRole("button", { name: "Crear Reserva" }));
-
-    expect((await screen.findAllByText("Elige el negocio")).length).toBeGreaterThan(0);
-    expect(insert).not.toHaveBeenCalled();
+    expect(screen.queryByText("Negocio")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Elige el negocio|Touza|Casa Tomás/)).not.toBeInTheDocument();
   });
 
-  it("Touza sin sala se guarda como Touza y sin espacio", async () => {
+  it("sin sala se guarda con la marca de Casa Tomás y sin espacio", async () => {
     const insert = espiarInsert();
-    const { onSuccess } = montar({ marca: "touza", espacio_id: null });
+    const { onSuccess } = montar({ espacio_id: null });
 
     // La sala va plegada: el selector no se ve hasta desplegarla.
     expect(screen.getByRole("button", { name: /asignación interna \(opcional\)/i })).toHaveTextContent("sin sala");
     fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
 
     await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
-    expect(insert.mock.calls[0][0]).toMatchObject({ marca: "touza", espacio_id: null, hora: "21:00" });
+    expect(insert.mock.calls[0][0]).toMatchObject({ marca: "casa_tomas", espacio_id: null, hora: "21:00" });
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
 
-  it("Casa Tomás por defecto si no viene negocio", async () => {
+  it("aunque llegue una marca de otro negocio en los datos de partida, se guarda como Casa Tomás", async () => {
     const insert = espiarInsert();
-    montar({});
+    montar({ marca: "touza" });
 
     fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
 
     await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     expect(insert.mock.calls[0][0]).toMatchObject({ marca: "casa_tomas", espacio_id: null });
+  });
+});
+
+// Touza no admite reservas (decisión del dueño 2026-10-01): una reserva suya con el mismo teléfono o email ni
+// sale como duplicado ni gasta el cupo diario del cliente (antes contaba, aunque fuera de otro negocio).
+describe("FormularioReserva · duplicados y límites, solo con reservas de Casa Tomás", () => {
+  it("el aviso de duplicados y los límites por teléfono y por email filtran por la marca de Casa Tomás", async () => {
+    mocks.config.max_reservas_por_telefono_dia = 2;
+    mocks.config.max_reservas_por_email_dia = 2;
+    const { cadenas, insert } = espiarCadenas();
+    montar({});
+
+    // El aviso de duplicados es una consulta con retardo de 600 ms al abrir el formulario.
+    await waitFor(() => expect(cadenas.some((c) => c.some(([m]) => m === "or"))).toBe(true));
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+
+    const deCasaTomas = (c: Llamada[]) => c.some(([m, col, valor]) => m === "eq" && col === "marca" && valor === "casa_tomas");
+    const duplicados = cadenas.filter((c) => c.some(([m]) => m === "or"));
+    const porTelefono = cadenas.filter((c) => c.some(([m, col]) => m === "in" && col === "telefono"));
+    const porEmail = cadenas.filter((c) => c.some(([m, col]) => m === "in" && col === "email"));
+    expect(duplicados.length).toBeGreaterThan(0);
+    expect(porTelefono).toHaveLength(1);
+    expect(porEmail).toHaveLength(1);
+    for (const c of duplicados) expect(deCasaTomas(c), "duplicados").toBe(true);
+    expect(deCasaTomas(porTelefono[0]), "límite por teléfono").toBe(true);
+    expect(deCasaTomas(porEmail[0]), "límite por email").toBe(true);
   });
 });
 

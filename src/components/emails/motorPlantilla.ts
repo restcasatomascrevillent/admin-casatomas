@@ -25,17 +25,20 @@
 // Ninguno toca `Deno.*`, `process.env`, red ni secretos. (El fichero impuro
 // es `emails-reserva/index.ts`, que sí importa de `https://deno.land` y
 // `https://esm.sh` — ese NO se toca desde aquí.) El import va SIN extensión,
-// que es como lo escriben los otros 9 sitios del panel que ya importan de
+// que es como lo escriben los demás sitios del panel que importan de
 // `supabase/functions/`; Deno exige el `.ts` en su lado y lo pone en sus
 // propios imports, y las dos formas conviven sin problema.
 //
-// ESTO NO ES UN ACOPLAMIENTO NUEVO: el panel YA importaba de
-// `supabase/functions/` en 9 sitios antes de esto — `_shared/disponibilidad`
-// desde los hooks de disponibilidad y el kanban, y `reservas-web/plantillas`
-// (el mismo fichero que arrastra esta reexportación) desde
-// `src/lib/reservas/negocios.ts`. `_shared/disponibilidad` ya viaja en el
-// bundle que se despliega. Lo que hacemos aquí es seguir la convención que ya
-// existía, no inventar una.
+// ESTO NO ES UN ACOPLAMIENTO NUEVO: cuando se hizo, el panel YA importaba de
+// `supabase/functions/` en 9 sitios — `_shared/disponibilidad` desde los hooks
+// de disponibilidad y el kanban, y `reservas-web/plantillas` (el mismo fichero
+// que arrastra esta reexportación) desde `src/lib/reservas/negocios.ts`. Este
+// último import ya no existe (2026-10-01: al retirar las reservas de Touza,
+// `negocios.ts` dejó de resolver la marca por las notas), pero la convención
+// sigue: hoy importan de `supabase/functions/` varios hooks y librerías de
+// reservas (`_shared/disponibilidad`) y, además de este fichero,
+// `useVerificacionReservas` y `edicionReserva` (`emails-reserva/plantillas`).
+// Lo que hacemos aquí es seguir esa convención, no inventar una.
 //
 // AUN ASÍ, dicho claro: si alguien mete un import de Deno en uno de esos dos
 // ficheros puros, el build del panel se rompe. Es un fallo RUIDOSO y de

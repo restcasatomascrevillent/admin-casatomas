@@ -401,7 +401,6 @@ describe("TimelineEstadosReserva — montado en la pestaña Hoy (VistaHoy)", () 
     capacidadTotal: 170,
     porcentajeTotal: 12,
     reservasCanceladas: 3,
-    porNegocio: [],
   };
   const reserva = (id: string, estado: string) => ({
     id,

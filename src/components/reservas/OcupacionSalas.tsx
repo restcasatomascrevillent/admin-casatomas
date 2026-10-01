@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import {
-  calcularOcupacionPorNegocio,
+  calcularOcupacionSalas,
   ETIQUETA_NIVEL,
   ETIQUETA_ORIGEN_FRANJA,
   ETIQUETA_TURNO,
@@ -16,14 +16,11 @@ import {
   type CeldaTurno,
   type FilaSala,
   type NivelOcupacion,
-  type OcupacionNegocio,
   type OcupacionSalasDia,
   type OrigenFranja,
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
-import { etiquetaNegocio, normalizarMarca } from "@/lib/reservas/negocios";
-import { NegocioBadge } from "./NegocioBadge";
 
 // ============================================================================
 // "Ocupación de salas": rejilla salas × franjas de un día para decidir dónde
@@ -31,11 +28,9 @@ import { NegocioBadge } from "./NegocioBadge";
 // (ver su cabecera: cómo se cuenta y por qué coincide con el trigger).
 // Se usa en el diálogo de solicitudes del bot y en FormularioReserva.
 //
-// Un bloque por negocio (Casa Tomás y Touza · El Reservado), cada uno con SU
-// aforo por turno, igual que el trigger. El grupo que se quiere colocar solo
-// se prueba en el negocio "en juego" (el de la sala elegida); la
-// recomendación también se limita a ese negocio: no se propone mover a un
-// cliente del restaurante al Reservado de Touza ni al revés.
+// Una sola rejilla, la de las salas de Casa Tomás con SU aforo por turno, igual
+// que el trigger. Touza no admite reservas (decisión del dueño, 2026-10-01): sus
+// salas y reservas ya llegan descartadas de `useOcupacionSalasDia`.
 //
 // POR QUÉ ESTÁ CADA COLUMNA (2026-09-28). El dueño preguntó "no sé por qué
 // salen 15:30 y no a las y media": unas horas llevan media y otras no, y eso
@@ -82,8 +77,6 @@ export interface OcupacionSalasProps {
   /** Si se pasa, cada celda es un botón que fija sala + hora. */
   onSeleccionar?: (espacioId: string | null, hora: string) => void;
   excluirReservaId?: string | null;
-  /** Negocio en juego si no hay sala elegida (por defecto, el de `espacioId`). */
-  marca?: string | null;
   className?: string;
 }
 
@@ -94,34 +87,21 @@ export function OcupacionSalas({
   espacioId,
   onSeleccionar,
   excluirReservaId,
-  marca,
   className,
 }: OcupacionSalasProps) {
   const { data, isLoading, error, refetch, isFetching } = useOcupacionSalasDia(fecha);
 
-  // Negocio en juego: el de la sala elegida; si no hay, el que diga quien
-  // llama; si no, Casa Tomás.
-  const marcaEnJuego = useMemo(() => {
-    const deSala = espacioId
-      ? data?.negocios.find((n) => n.espacios.some((e) => e.id === espacioId))?.marca
-      : undefined;
-    return normalizarMarca(deSala ?? marca);
-  }, [data, espacioId, marca]);
-
-  const bloques = useMemo<OcupacionNegocio[] | null>(() => {
+  const ocupacion = useMemo<OcupacionSalasDia | null>(() => {
     if (!data) return null;
-    return calcularOcupacionPorNegocio({
-      bloques: data.negocios,
+    return calcularOcupacionSalas({
+      espacios: data.espacios,
+      reservas: data.reservas,
+      horasBase: data.horasBase,
       horasExtra: [hora],
       comensales,
-      marcaEnJuego,
       excluirReservaId,
     });
-  }, [data, hora, comensales, marcaEnJuego, excluirReservaId]);
-
-  const bloqueEnJuego = bloques?.find((b) => b.marca === marcaEnJuego) ?? null;
-  const ocupacion = bloqueEnJuego?.ocupacion ?? null;
-  const variosNegocios = (bloques?.length ?? 0) > 1;
+  }, [data, hora, comensales, excluirReservaId]);
 
   const recomendacion = useMemo(
     () => (ocupacion ? recomendarUbicacion(ocupacion, { espacioId, hora }) : null),
@@ -129,10 +109,10 @@ export function OcupacionSalas({
   );
 
   // ¿Hay alguna columna que el motor no ofrezca ese día? Solo entonces tiene
-  // sentido explicar el asterisco (leyenda y nota de abajo).
+  // sentido explicar el asterisco (leyenda, pie y `<caption>`).
   const hayFueraDeRejilla = useMemo(
-    () => (bloques ?? []).some((b) => Object.values(b.ocupacion.origenFranja).some((o) => o !== "turno")),
-    [bloques],
+    () => !!ocupacion && Object.values(ocupacion.origenFranja).some((o) => o !== "turno"),
+    [ocupacion],
   );
 
   const horaSel = horaCorta(hora);
@@ -172,7 +152,7 @@ export function OcupacionSalas({
             Reintentar
           </Button>
         </div>
-      ) : !bloques || bloques.every((b) => b.ocupacion.salas.length === 0 && !b.ocupacion.sinAsignar) ? (
+      ) : !ocupacion || (ocupacion.salas.length === 0 && !ocupacion.sinAsignar) ? (
         <EstadoVacio>No hay salas activas configuradas.</EstadoVacio>
       ) : (
         <>
@@ -193,7 +173,6 @@ export function OcupacionSalas({
               ) : (
                 <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
               )}
-              {variosNegocios && <NegocioBadge marca={marcaEnJuego} className="bg-background" />}
               <span className="min-w-0 flex-1">{recomendacion.texto}</span>
               {recomendacion.tipo === "sugerencia" && onSeleccionar && (
                 <Button
@@ -209,17 +188,14 @@ export function OcupacionSalas({
             </div>
           )}
 
-          {bloques.map((bloque) => (
-            <BloqueNegocio
-              key={bloque.marca}
-              bloque={bloque}
-              mostrarCabecera={variosNegocios}
-              enJuego={bloque.marca === marcaEnJuego}
-              horaSel={horaSel}
-              espacioSel={espacioId}
-              onSeleccionar={onSeleccionar}
-            />
-          ))}
+          <TablaSalas
+            ocupacion={ocupacion}
+            cerrado={!!data?.cerrado}
+            hayFueraDeRejilla={hayFueraDeRejilla}
+            horaSel={horaSel}
+            espacioSel={espacioId}
+            onSeleccionar={onSeleccionar}
+          />
           <p className="text-[11px] text-muted-foreground">
             Las columnas son las horas que el sistema ofrece ese día —con el turno vacío, solo las horas en punto; a
             medida que se llena, se abren las y media y después los cuartos—, más las horas que ya tienen alguna
@@ -235,8 +211,8 @@ export function OcupacionSalas({
           </p>
           {onSeleccionar && (
             <p className="text-[11px] text-muted-foreground">
-              Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00) y por
-              negocio, igual que la base de datos.
+              Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00), igual
+              que la base de datos.
             </p>
           )}
         </>
@@ -245,49 +221,30 @@ export function OcupacionSalas({
   );
 }
 
-function BloqueNegocio({
-  bloque,
-  mostrarCabecera,
-  enJuego,
+function TablaSalas({
+  ocupacion,
+  cerrado,
+  hayFueraDeRejilla,
   horaSel,
   espacioSel,
   onSeleccionar,
 }: {
-  bloque: OcupacionNegocio;
-  mostrarCabecera: boolean;
-  enJuego: boolean;
+  ocupacion: OcupacionSalasDia;
+  /** Ese día no hay turnos configurados. */
+  cerrado: boolean;
+  /** Alguna columna no la ofrece el motor ese día. */
+  hayFueraDeRejilla: boolean;
   horaSel: string | null;
   espacioSel: string | null;
   onSeleccionar?: (espacioId: string | null, hora: string) => void;
 }) {
-  const ocupacion = bloque.ocupacion;
-  const idCabecera = useId();
   const sinFranjas = ocupacion.franjas.comida.length + ocupacion.franjas.cena.length === 0;
-  const vacio = ocupacion.salas.length === 0 && !ocupacion.sinAsignar;
-  // ¿Este negocio tiene alguna columna que el motor no ofrece ese día?
-  const hayFueraDeRejilla = [...ocupacion.franjas.comida, ...ocupacion.franjas.cena].some(
-    (h) => (ocupacion.origenFranja[h] ?? "turno") !== "turno",
-  );
 
   return (
-    <div
-      className="space-y-1.5"
-      role={mostrarCabecera ? "group" : undefined}
-      aria-labelledby={mostrarCabecera ? idCabecera : undefined}
-    >
-      {mostrarCabecera && (
-        <h4 id={idCabecera} className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-          {etiquetaNegocio(bloque.marca)}
-          {!enJuego && (
-            <span className="font-normal text-muted-foreground">· solo ocupación (aforo independiente)</span>
-          )}
-        </h4>
-      )}
-      {vacio ? (
-        <EstadoVacio>No hay salas activas configuradas para este negocio.</EstadoVacio>
-      ) : sinFranjas ? (
+    <div className="space-y-1.5">
+      {sinFranjas ? (
         <EstadoVacio>
-          {bloque.cerrado
+          {cerrado
             ? "Ese día no hay turnos configurados (cerrado). Puedes indicar una hora personalizada."
             : "No hay franjas horarias para ese día."}
         </EstadoVacio>
@@ -295,8 +252,8 @@ function BloqueNegocio({
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full border-collapse text-xs tabular-nums">
             <caption className="sr-only">
-              {etiquetaNegocio(bloque.marca)}: comensales por sala y franja horaria. Cada turno muestra ocupadas sobre
-              capacidad; cada hora, los comensales ya reservados a esa hora
+              Comensales por sala y franja horaria. Cada turno muestra ocupadas sobre capacidad; cada hora, los
+              comensales ya reservados a esa hora
               {ocupacion.comensales > 0 ? ` y si caben ${ocupacion.comensales} más` : ""}.
               {hayFueraDeRejilla &&
                 " Las horas marcadas con asterisco no las ofrece el sistema ese día: salen porque ya hay una reserva a esa hora o porque es la hora que estás proponiendo."}
@@ -332,7 +289,7 @@ function BloqueNegocio({
                         scope="col"
                         className={cn(
                           "px-1 py-1 text-center font-normal",
-                          enJuego && h === horaSel && "font-semibold text-foreground",
+                          h === horaSel && "font-semibold text-foreground",
                         )}
                         title={fuera ? `${h} · ${ETIQUETA_ORIGEN_FRANJA[origen]}. ${MOTIVO_ORIGEN_FRANJA[origen]}` : undefined}
                       >
@@ -354,7 +311,7 @@ function BloqueNegocio({
                   key={sala.espacioId ?? "sin-asignar"}
                   sala={sala}
                   ocupacion={ocupacion}
-                  horaSel={enJuego ? horaSel : null}
+                  horaSel={horaSel}
                   espacioSel={espacioSel}
                   onSeleccionar={onSeleccionar}
                 />

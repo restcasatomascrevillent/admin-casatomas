@@ -3,8 +3,11 @@
  *
  * Cubre:
  * - Carga inicial de solicitudes
- * - Cálculo correcto de countPendientes
  * - Filtrado local por estado
+ *
+ * La cifra de solicitudes pendientes ya no la da el hook (`countPendientes`, retirado el 2026-10-01: contaba
+ * también las de Touza y nadie la usaba): la calcula `contarSolicitudesPendientes`
+ * (src/lib/reservas/vistaUnificada.ts), probada en src/lib/__tests__/negocios.test.ts.
  * - updateEstado: llama a Supabase y recarga
  * - updateNotasInternas: llama a Supabase y recarga
  * - Manejo de errores
@@ -115,7 +118,6 @@ describe("useSolicitudesPendientes", () => {
 
     expect(result.current.loading).toBe(true);
     expect(result.current.solicitudes).toEqual([]);
-    expect(result.current.countPendientes).toBe(0);
   });
 
   it("carga la lista de solicitudes correctamente", async () => {
@@ -136,34 +138,18 @@ describe("useSolicitudesPendientes", () => {
     expect(result.current.solicitudes[0].id).toBe("sol-1");
   });
 
-  it("calcula countPendientes correctamente (solo estado=pendiente)", async () => {
-    const items = [
-      makeSolicitud({ id: "sol-1", estado: "pendiente" }),
-      makeSolicitud({ id: "sol-2", estado: "resuelta" }),
-      makeSolicitud({ id: "sol-3", estado: "pendiente" }),
-      makeSolicitud({ id: "sol-4", estado: "descartada" }),
-    ];
-    mockSelectSolicitudes(items);
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retiran «calcula countPendientes
+  // correctamente» y «muestra 0 pendientes cuando todas están resueltas». El hook ya no cuenta: devuelve las
+  // solicitudes tal cual y la cifra la calcula `contarSolicitudesPendientes` (ver la cabecera).
+  it("ya no devuelve una cifra de pendientes propia (la que contaba también las de Touza)", async () => {
+    mockSelectSolicitudes([makeSolicitud({ id: "sol-1", estado: "pendiente", marca: "touza" })]);
 
     const { result } = renderHook(() => useSolicitudesPendientes());
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.countPendientes).toBe(2);
-  });
-
-  it("muestra 0 pendientes cuando todas están resueltas", async () => {
-    const items = [
-      makeSolicitud({ id: "sol-1", estado: "resuelta" }),
-      makeSolicitud({ id: "sol-2", estado: "descartada" }),
-    ];
-    mockSelectSolicitudes(items);
-
-    const { result } = renderHook(() => useSolicitudesPendientes());
-
-    await waitFor(() => expect(result.current.loading).toBe(false));
-
-    expect(result.current.countPendientes).toBe(0);
+    expect(result.current).not.toHaveProperty("countPendientes");
+    expect(result.current.solicitudes).toHaveLength(1);
   });
 
   it("maneja error de Supabase en la carga inicial", async () => {

@@ -49,7 +49,9 @@ export interface ResultadoPropuesta {
 export function useSolicitudesPendientes() {
   const [solicitudes, setSolicitudes] = useState<SolicitudPendiente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [countPendientes, setCountPendientes] = useState(0);
+  // Sin `countPendientes` (2026-10-01): la cifra de la insignia la calcula quien la pinta con
+  // `contarSolicitudesPendientes` (src/lib/reservas/vistaUnificada.ts), que deja fuera las de otro negocio
+  // igual que la lista. Aquí contaba también las de Touza y ya nadie la usaba.
 
   const fetchSolicitudes = useCallback(async () => {
     setLoading(true);
@@ -62,9 +64,7 @@ export function useSolicitudesPendientes() {
       console.error("Error cargando solicitudes:", error);
       toast.error("Error al cargar solicitudes pendientes");
     } else {
-      const items = (data || []) as SolicitudPendiente[];
-      setSolicitudes(items);
-      setCountPendientes(items.filter((s) => s.estado === "pendiente").length);
+      setSolicitudes((data || []) as SolicitudPendiente[]);
     }
     setLoading(false);
   }, []);
@@ -275,7 +275,6 @@ export function useSolicitudesPendientes() {
   return {
     solicitudes,
     loading,
-    countPendientes,
     fetchSolicitudes,
     updateEstado,
     updateNotasInternas,

@@ -21,7 +21,7 @@ import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
-import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
+import { contarSolicitudesPendientes, resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { toast } from "sonner";
 
@@ -57,7 +57,12 @@ export default function Reservas() {
   // ÚNICA instancia en la página: el tab la usa para el contador y la lista
   // unificada para pintar las solicitudes (ver aviso de realtime en el hook).
   const solicitudesState = useSolicitudesPendientes();
-  const { countPendientes } = solicitudesState;
+  // La insignia cuenta lo mismo que enseña la lista: solo solicitudes de Casa
+  // Tomás (Touza no admite reservas, decisión del dueño 2026-10-01).
+  const countPendientes = useMemo(
+    () => contarSolicitudesPendientes(solicitudesState.solicitudes),
+    [solicitudesState.solicitudes],
+  );
   const listaRef = useRef<HTMLElement | null>(null);
 
   // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,

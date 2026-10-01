@@ -18,26 +18,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useCrearEspacio,
   useActualizarEspacio,
   useEspaciosReserva,
   type EspacioReserva,
 } from "@/hooks/useEspaciosReserva";
-import { useMesas, type Mesa } from "@/hooks/useMesas";
+import { useMesas } from "@/hooks/useMesas";
 import { calcularCuadreEspacio, textoEstadoCuadre } from "@/lib/reservas/aforoMesas";
-import {
-  NEGOCIOS_PANEL,
-  MARCA_POR_DEFECTO,
-  marcaDeEspacio,
-  etiquetaNegocio,
-} from "@/lib/reservas/negocios";
+import { MARCA_POR_DEFECTO, marcaDeEspacio } from "@/lib/reservas/negocios";
 import {
   Dialog,
   DialogContent,
@@ -48,11 +36,17 @@ import {
 
 /**
  * Construye el esquema de validación con el listado de espacios YA
- * EXISTENTES (para el aviso de nombre duplicado dentro del mismo negocio).
- * Se reconstruye cada vez que cambia esa lista — ver `schemaRef` más abajo,
- * que es lo que de verdad lee `zodResolver` en cada validación.
+ * EXISTENTES (para el aviso de nombre duplicado). Se reconstruye cada vez que
+ * cambia esa lista — ver `schemaRef` más abajo, que es lo que de verdad lee
+ * `zodResolver` en cada validación.
+ *
+ * Solo Casa Tomás admite reservas (decisión del dueño, 2026-10-01): no hay
+ * selector de negocio. Un espacio NUEVO es de Casa Tomás; uno que se EDITA
+ * conserva su negocio (`marca`, ver `onSubmit`). El nombre tiene que ser único
+ * entre los espacios de ese mismo negocio: para Casa Tomás, las salas de Touza
+ * que queden en la base de datos no cuentan (hay dos «Terraza»).
  */
-const buildFormSchema = (otrosEspacios: readonly EspacioReserva[]) =>
+const buildFormSchema = (otrosEspacios: readonly EspacioReserva[], marca: string) =>
   z
     .object({
       nombre: z
@@ -66,20 +60,17 @@ const buildFormSchema = (otrosEspacios: readonly EspacioReserva[]) =>
         .min(1, "La capacidad debe ser al menos 1")
         .max(500, "La capacidad máxima admitida es 500 plazas"),
       activa: z.boolean().default(true),
-      marca: z.string().min(1, "Selecciona el negocio al que pertenece este espacio"),
     })
     .superRefine((values, ctx) => {
       const nombreNormalizado = values.nombre.trim().toLowerCase();
       const duplicado = otrosEspacios.some(
-        (e) =>
-          marcaDeEspacio(e) === values.marca &&
-          (e.nombre || "").trim().toLowerCase() === nombreNormalizado,
+        (e) => marcaDeEspacio(e) === marca && (e.nombre || "").trim().toLowerCase() === nombreNormalizado,
       );
       if (duplicado) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["nombre"],
-          message: `Ya existe un espacio llamado "${values.nombre.trim()}" en ${etiquetaNegocio(values.marca)}. Usa otro nombre.`,
+          message: `Ya existe un espacio llamado "${values.nombre.trim()}". Usa otro nombre.`,
         });
       }
     });
@@ -104,9 +95,16 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
   const crearEspacio = useCrearEspacio();
   const actualizarEspacio = useActualizarEspacio();
 
-  // Lista completa de espacios (todos los negocios) para el aviso de nombre
-  // duplicado. Ya está cacheada por Espacios.tsx con la misma queryKey, así
-  // que esto no dispara una petición extra en el caso normal.
+  // Negocio con el que se guarda: el de Casa Tomás si es nuevo; el que ya tiene
+  // si se edita. Las pantallas solo dejan abrir aquí salas de Casa Tomás, pero si
+  // llegara otra, guardarla NO la cambia de negocio: el trigger
+  // `validar_capacidad_reserva` suma el aforo por marca y sus plazas pasarían a
+  // contar en el de Casa Tomás.
+  const marcaEspacio = espacio ? marcaDeEspacio(espacio) : MARCA_POR_DEFECTO;
+
+  // Lista completa de espacios para el aviso de nombre duplicado (el esquema
+  // solo mira los del mismo negocio). Ya está cacheada por Espacios.tsx con la
+  // misma queryKey, así que esto no dispara una petición extra en el caso normal.
   const { data: todosEspacios = [] } = useEspaciosReserva() as { data: EspacioReserva[] };
   const otrosEspacios = useMemo(
     () => (todosEspacios as EspacioReserva[]).filter((e) => e.id !== espacio?.id),
@@ -118,12 +116,10 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
   // envolvemos en una función que siempre lee el esquema más reciente desde
   // esta ref, para que el aviso de "nombre duplicado" use la lista de
   // espacios actual sin tener que recrear el formulario.
-  const schemaRef = useRef(buildFormSchema(otrosEspacios));
+  const schemaRef = useRef(buildFormSchema(otrosEspacios, marcaEspacio));
   useEffect(() => {
-    schemaRef.current = buildFormSchema(otrosEspacios);
-  }, [otrosEspacios]);
-
-  const marcaInicial = espacio ? marcaDeEspacio(espacio) : MARCA_POR_DEFECTO;
+    schemaRef.current = buildFormSchema(otrosEspacios, marcaEspacio);
+  }, [otrosEspacios, marcaEspacio]);
 
   const form = useForm<FormValues>({
     resolver: (values, context, options) => zodResolver(schemaRef.current)(values, context, options),
@@ -132,7 +128,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
       descripcion: espacio?.descripcion || "",
       capacidad_maxima: espacio?.capacidad_maxima || 10,
       activa: espacio?.activa ?? true,
-      marca: marcaInicial,
     },
   });
 
@@ -150,7 +145,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
       descripcion: espacio?.descripcion || "",
       capacidad_maxima: espacio?.capacidad_maxima || 10,
       activa: espacio?.activa ?? true,
-      marca: espacio ? marcaDeEspacio(espacio) : MARCA_POR_DEFECTO,
     });
     // Foco inicial en "Nombre del espacio" al abrir el modal (alta o edición).
     // Un pequeño retraso evita pelear con el foco que pone Radix Dialog.
@@ -166,7 +160,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
     habilitado: !!espacio?.id,
   });
   const capacidadEscrita = form.watch("capacidad_maxima");
-  const marcaEscrita = form.watch("marca");
   const cuadre = useMemo(() => {
     if (!espacio) return null;
     // Se compara contra el valor del formulario (no el guardado) para que el
@@ -180,24 +173,14 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
     );
   }, [espacio, capacidadEscrita, mesas]);
 
-  // Cambiar el negocio de un espacio YA existente es delicado: el aforo por
-  // turno de cada negocio se calcula en vivo sumando la capacidad declarada
-  // de los espacios que en ESE MOMENTO tienen esa marca (trigger
-  // `validar_capacidad_reserva`, migración `20260922190000_aforo_por_marca`).
-  // Mover un espacio de negocio no toca las reservas ya hechas en él
-  // (`reservas.marca` es una columna propia, independiente) pero sí cambia,
-  // desde ese instante, el aforo total de AMBOS negocios — el nuevo suma esta
-  // capacidad y el anterior la pierde. Por eso avisamos pero NO bloqueamos el
-  // guardado: bloquear impediría corregir un espacio mal etiquetado (p.ej. el
-  // backfill de la migración `20260922180000` se equivoca), y quien lo hace
-  // desde Super Admin es quien decide el aforo. El aviso es más urgente si el
-  // espacio ya tiene mesas/plano configurado.
-  const cambiaDeNegocio = !!espacio && marcaEscrita !== marcaInicial;
-  const mesasActivasCount = (mesas as Mesa[]).filter((m) => m.activa !== false).length;
-
   const onSubmit = async (values: FormValues) => {
+    // El negocio del espacio se sigue ESCRIBIENDO (`caracteristicas.marca`): el
+    // trigger `validar_capacidad_reserva` suma el aforo por marca. Un espacio
+    // nuevo es de Casa Tomás, el único negocio que admite reservas; uno que se
+    // edita conserva el suyo (`marcaEspacio`, ver arriba). El resto de
+    // `caracteristicas` se conserva tal cual.
     const caracteristicasBase = (espacio?.caracteristicas as Record<string, unknown> | null) ?? {};
-    const caracteristicas = { ...caracteristicasBase, marca: values.marca };
+    const caracteristicas = { ...caracteristicasBase, marca: marcaEspacio };
     try {
       if (espacio) {
         await actualizarEspacio.mutateAsync({
@@ -286,58 +269,6 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
 
             <FormField
               control={form.control}
-              name="marca"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Negocio</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={guardando}
-                  >
-                    <FormControl>
-                      <SelectTrigger aria-label="Negocio">
-                        <SelectValue placeholder="Selecciona un negocio" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {NEGOCIOS_PANEL.map((n) => (
-                        <SelectItem key={n.marca} value={n.marca}>
-                          {n.etiqueta}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Negocio al que pertenece este espacio. Decide en qué aforo por turno se cuenta su capacidad
-                    (Casa Tomás y Touza tienen aforos independientes: nunca se suman entre sí).
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {cambiaDeNegocio && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  Vas a mover <strong>{espacio?.nombre}</strong> de {etiquetaNegocio(marcaInicial)} a{" "}
-                  {etiquetaNegocio(marcaEscrita)}.{" "}
-                  {mesasActivasCount > 0
-                    ? `Este espacio tiene ${mesasActivasCount} mesa${mesasActivasCount === 1 ? "" : "s"} activa${mesasActivasCount === 1 ? "" : "s"} configurada${mesasActivasCount === 1 ? "" : "s"}. `
-                    : ""}
-                  Las reservas ya hechas en este espacio conservan su negocio original, pero desde que guardes su
-                  capacidad pasará a contar en el aforo por turno de {etiquetaNegocio(marcaEscrita)} y dejará de
-                  contar en el de {etiquetaNegocio(marcaInicial)}. Puedes guardar igualmente si es lo que quieres.
-                </span>
-              </div>
-            )}
-
-            <FormField
-              control={form.control}
               name="descripcion"
               render={({ field }) => (
                 <FormItem>
@@ -378,7 +309,7 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
                   </FormControl>
                   <FormDescription>
                     Aforo declarado de este espacio: las plazas que se ofrecen a los clientes por turno. Es la cifra
-                    que usa el aforo del negocio (no se calcula automáticamente a partir de las mesas del plano).
+                    que usa el aforo del restaurante (no se calcula automáticamente a partir de las mesas del plano).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

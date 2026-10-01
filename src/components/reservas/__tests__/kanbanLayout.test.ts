@@ -287,13 +287,15 @@ describe("accionesSoloIcono", () => {
     expect(accionesSoloIcono(ANCHO_MIN_COLUMNA)).toBe(true);
   });
 
-  it("la decisión va por columna, no por fila: dos negocios a la vez pueden diferir", () => {
-    // Misma pantalla (1024px, 687 útiles): Casa Tomás reparte entre 5 columnas
-    // y Touza entre 3, así que una fila va en iconos y la otra con texto.
-    const casaTomas = calcularDisposicion(cols(CASA_TOMAS), UTILES_POR_VENTANA[1024]);
-    const touza = calcularDisposicion(cols(3), UTILES_POR_VENTANA[1024]);
-    expect(accionesSoloIcono(casaTomas.anchoColumna)).toBe(true);
-    expect(accionesSoloIcono(touza.anchoColumna)).toBe(false);
+  // Touza no admite reservas (decisión del dueño 2026-10-01): ya no conviven dos filas (Casa Tomás con 5
+  // columnas y Touza con 3). Se conserva lo que probaba: la decisión depende del ancho de COLUMNA.
+  it("la decisión va por ancho de columna: misma pantalla, 5 columnas en iconos y 3 con texto", () => {
+    // Misma pantalla (1024px, 687 útiles): con 5 columnas (todas las salas de
+    // Casa Tomás) va en iconos; con 3 (dos salas desactivadas), con texto.
+    const cinco = calcularDisposicion(cols(CASA_TOMAS), UTILES_POR_VENTANA[1024]);
+    const tres = calcularDisposicion(cols(3), UTILES_POR_VENTANA[1024]);
+    expect(accionesSoloIcono(cinco.anchoColumna)).toBe(true);
+    expect(accionesSoloIcono(tres.anchoColumna)).toBe(false);
   });
 });
 
@@ -358,7 +360,7 @@ describe("garantía de que ninguna columna queda partida", () => {
     { nombre: "4 columnas", items: cols(4) },
     { nombre: "5 columnas (Casa Tomás)", items: cols(CASA_TOMAS) },
     { nombre: "8 columnas", items: cols(8) },
-    { nombre: "1 columna (Touza sola)", items: cols(1) },
+    { nombre: "1 columna (sin salas activas: solo «Sin asignar»)", items: cols(1) },
     { nombre: "6 columnas con dos plegadas a mano", items: cols(6, ["c0", "c3"]) },
     { nombre: "3 columnas con la primera plegada", items: cols(3, ["c0"]) },
   ];
@@ -440,9 +442,9 @@ describe("anchoParaQueQuepanTodas", () => {
   });
 
   it("con UNA sola columna no hay nada que desplazar: se estrecha y se queda", () => {
-    // Touza puede tener una sola sala. Por debajo del mínimo la columna se
-    // estrecha hasta el ancho de la pantalla, que es preferible a un scroll
-    // que no llevaría a ninguna parte.
+    // Sin salas activas solo queda «Sin asignar» (antes, también Touza con su
+    // única sala). Por debajo del mínimo la columna se estrecha hasta el ancho
+    // de la pantalla, que es preferible a un scroll que no llevaría a ninguna parte.
     const items = cols(1);
     expect(anchoParaQueQuepanTodas(items)).toBe(ANCHO_MIN_COLUMNA);
     const d = calcularDisposicion(items, ANCHO_MIN_COLUMNA - 1);

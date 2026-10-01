@@ -8,10 +8,14 @@
  * corre de verdad.
  *
  * Cubre el trabajo de "Mejorar el modal de espacio" (2026-09-26):
- *   - Selector de negocio obligatorio (nuevo campo `marca`).
- *   - Nombre único dentro del mismo negocio (aviso cliente-side).
+ *   - Nombre único (aviso cliente-side).
  *   - Capacidad máxima entre 1 y 500.
- *   - Aviso al cambiar de negocio un espacio ya existente.
+ *
+ * Touza no admite reservas (decisión del dueño 2026-10-01): se retiran el
+ * selector de negocio y el aviso al cambiar de negocio. Un espacio NUEVO se
+ * guarda como de Casa Tomás (`caracteristicas.marca = 'casa_tomas'`, que el
+ * trigger de aforo sigue leyendo); uno que se EDITA conserva su marca, y el
+ * nombre solo tiene que ser único entre los espacios de su mismo negocio.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -70,59 +74,112 @@ describe("EspacioForm", () => {
     vi.mocked(useMesas).mockReturnValue({ data: [] } as never);
   });
 
-  // ── Selector de negocio ────────────────────────────────────────────────────
+  // ── Sin negocio que elegir: siempre Casa Tomás ─────────────────────────────
 
-  it("muestra el selector de negocio con Casa Tomás preseleccionado al crear", () => {
+  it("no hay selector de negocio ni se nombra ningún negocio", () => {
     render(<EspacioForm open onOpenChange={vi.fn()} espacio={null} />);
 
-    expect(screen.getByText("Negocio")).toBeInTheDocument();
-    // El combobox del negocio muestra la etiqueta del negocio por defecto.
-    expect(screen.getByRole("combobox", { name: /negocio/i })).toHaveTextContent("Casa Tomás");
+    expect(screen.queryByText("Negocio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /negocio/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Touza|Casa Tomás/)).not.toBeInTheDocument();
   });
 
-  it("al editar, preselecciona el negocio actual del espacio (Touza)", () => {
-    render(
-      <EspacioForm
-        open
-        onOpenChange={vi.fn()}
-        espacio={espacio("e-reservado", "El Reservado", "touza") as never}
-      />,
-    );
-
-    expect(screen.getByRole("combobox", { name: /negocio/i })).toHaveTextContent("Touza");
-  });
-
-  // ── Nombre único dentro del mismo negocio ──────────────────────────────────
-
-  it("rechaza un nombre ya usado por otro espacio del MISMO negocio", async () => {
+  it("un espacio nuevo se guarda SIEMPRE como de Casa Tomás", async () => {
     render(<EspacioForm open onOpenChange={vi.fn()} espacio={null} />);
 
     fireEvent.change(screen.getByPlaceholderText("Ej: Terraza, Sala Principal"), {
-      target: { value: "Salón" }, // ya existe en casa_tomas, y casa_tomas es el negocio por defecto
-    });
-    fireEvent.click(screen.getByRole("button", { name: /crear espacio/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/ya existe un espacio llamado "Salón" en Casa Tomás/i)).toBeInTheDocument();
-    });
-    expect(mutateAsyncCrear).not.toHaveBeenCalled();
-  });
-
-  it("permite el mismo nombre si el negocio elegido es distinto", async () => {
-    render(<EspacioForm open onOpenChange={vi.fn()} espacio={null} />);
-
-    // Cambiamos el negocio a Touza: "Salón" no existe en Touza.
-    fireEvent.click(screen.getByRole("combobox", { name: /negocio/i }));
-    fireEvent.click(await screen.findByRole("option", { name: /touza/i }));
-
-    fireEvent.change(screen.getByPlaceholderText("Ej: Terraza, Sala Principal"), {
-      target: { value: "Salón" },
+      target: { value: "Patio" },
     });
     fireEvent.click(screen.getByRole("button", { name: /crear espacio/i }));
 
     await waitFor(() => expect(mutateAsyncCrear).toHaveBeenCalledTimes(1));
     expect(mutateAsyncCrear).toHaveBeenCalledWith(
-      expect.objectContaining({ nombre: "Salón", caracteristicas: { marca: "touza" } }),
+      expect.objectContaining({ nombre: "Patio", caracteristicas: { marca: "casa_tomas" } }),
+    );
+  });
+
+  it("al editar conserva el resto de `caracteristicas` y escribe la marca de Casa Tomás", async () => {
+    render(
+      <EspacioForm
+        open
+        onOpenChange={vi.fn()}
+        espacio={espacio("e-terraza", "Terraza", "casa_tomas", { caracteristicas: { privada: true } }) as never}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar espacio/i }));
+
+    await waitFor(() => expect(mutateAsyncActualizar).toHaveBeenCalledTimes(1));
+    expect(mutateAsyncActualizar).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "e-terraza", caracteristicas: { privada: true, marca: "casa_tomas" } }),
+    );
+  });
+
+  // Las pantallas solo dejan abrir aquí salas de Casa Tomás (Espacios.tsx y su enlace `?editar=`), pero si
+  // llegara una de Touza, guardarla NO puede pasarla a Casa Tomás: el trigger de aforo suma por marca y sus
+  // plazas pasarían a contar en el aforo de Casa Tomás.
+  it("al editar una sala de Touza conserva su marca: guardar no la pasa a Casa Tomás", async () => {
+    render(
+      <EspacioForm
+        open
+        onOpenChange={vi.fn()}
+        espacio={espacio("e-reservado", "El Reservado", "touza", { caracteristicas: { privada: true, marca: "touza" } }) as never}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar espacio/i }));
+
+    await waitFor(() => expect(mutateAsyncActualizar).toHaveBeenCalledTimes(1));
+    expect(mutateAsyncActualizar).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "e-reservado", caracteristicas: { privada: true, marca: "touza" } }),
+    );
+  });
+
+  it("el nombre se compara con los del MISMO negocio: la «Terraza» de Touza no choca con la de Casa Tomás", async () => {
+    render(
+      <EspacioForm
+        open
+        onOpenChange={vi.fn()}
+        espacio={espacio("tz-terraza", "Terraza", "touza", { capacidad_maxima: 30 }) as never}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /actualizar espacio/i }));
+
+    await waitFor(() => expect(mutateAsyncActualizar).toHaveBeenCalledTimes(1));
+    expect(mutateAsyncActualizar).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "tz-terraza", nombre: "Terraza", caracteristicas: { marca: "touza" } }),
+    );
+    expect(screen.queryByText(/ya existe un espacio llamado/i)).not.toBeInTheDocument();
+  });
+
+  // ── Nombre único (entre los espacios de Casa Tomás) ────────────────────────
+
+  it("rechaza un nombre ya usado por otro espacio", async () => {
+    render(<EspacioForm open onOpenChange={vi.fn()} espacio={null} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ej: Terraza, Sala Principal"), {
+      target: { value: "Salón" }, // ya existe en Casa Tomás
+    });
+    fireEvent.click(screen.getByRole("button", { name: /crear espacio/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/ya existe un espacio llamado "Salón"\. Usa otro nombre/i)).toBeInTheDocument();
+    });
+    expect(mutateAsyncCrear).not.toHaveBeenCalled();
+  });
+
+  it("un nombre que solo usa una sala de Touza (no admite reservas) no cuenta como repetido", async () => {
+    render(<EspacioForm open onOpenChange={vi.fn()} espacio={null} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ej: Terraza, Sala Principal"), {
+      target: { value: "El Reservado" }, // solo existe en Touza
+    });
+    fireEvent.click(screen.getByRole("button", { name: /crear espacio/i }));
+
+    await waitFor(() => expect(mutateAsyncCrear).toHaveBeenCalledTimes(1));
+    expect(mutateAsyncCrear).toHaveBeenCalledWith(
+      expect.objectContaining({ nombre: "El Reservado", caracteristicas: { marca: "casa_tomas" } }),
     );
   });
 
@@ -157,31 +214,6 @@ describe("EspacioForm", () => {
     expect(mutateAsyncCrear).not.toHaveBeenCalled();
   });
 
-  // ── Aviso al cambiar de negocio en edición ─────────────────────────────────
-
-  it("avisa (sin bloquear) al cambiar el negocio de un espacio existente", async () => {
-    vi.mocked(useMesas).mockReturnValue({
-      data: [{ id: "m-1", espacio_id: "e-salon", capacidad: 4, activa: true }],
-    } as never);
-
-    render(
-      <EspacioForm
-        open
-        onOpenChange={vi.fn()}
-        espacio={espacio("e-salon", "Salón", "casa_tomas") as never}
-      />,
-    );
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("combobox", { name: /negocio/i }));
-    fireEvent.click(await screen.findByRole("option", { name: /touza/i }));
-
-    const aviso = await screen.findByRole("alert");
-    expect(aviso).toHaveTextContent(/mover/i);
-    expect(aviso).toHaveTextContent(/1 mesa activa configurada/i);
-
-    // El botón de guardar sigue habilitado: es un aviso, no un bloqueo.
-    expect(screen.getByRole("button", { name: /actualizar espacio/i })).not.toBeDisabled();
-  });
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retira «avisa (sin bloquear) al cambiar el
+  // negocio de un espacio existente»: ya no hay negocio que cambiar.
 });

@@ -86,9 +86,9 @@ export const ANCHO_MIN_BOTON_CON_TEXTO = 152;
 
 /**
  * ¿La botonera de las tarjetas de esta columna va sin textos? La decisión se
- * toma con el ancho de la COLUMNA, no con el de la ventana: en la misma
- * pantalla conviven Casa Tomás (5 columnas) y Touza (3), así que sus columnas
- * miden distinto y cada fila decide por su cuenta.
+ * toma con el ancho de la COLUMNA, no con el de la ventana: la misma ventana
+ * da columnas distintas según cuántas salas activas haya y si el menú lateral
+ * está plegado, así que la fila decide por su cuenta.
  *
  * `null`/indefinido = no lo sabemos todavía (o la tarjeta no vive en una
  * columna, como la que se arrastra): se asume ancho de sobra y va con texto.

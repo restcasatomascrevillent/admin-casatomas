@@ -12,13 +12,11 @@ export interface EspacioReserva {
 }
 
 /**
- * Espacios de reserva de TODOS los negocios del grupo: Comedor/Salón/Terraza
- * (Casa Tomás) y "El Reservado" (Touza). Decisión del dueño 2026-09-24: las
- * reservas de El Reservado se gestionan igual que las demás, así que su
- * espacio sale en Espacios, turnos, Kanban, verificación y alta. El negocio
- * de cada espacio está en `caracteristicas.marca` (ver
- * `src/lib/reservas/negocios.ts`, `marcaDeEspacio`); quien sume aforo debe
- * agrupar por negocio, nunca sumar todos los espacios juntos.
+ * TODAS las filas de `espacios_reserva`, también las salas de Touza que siguen
+ * en la base de datos. Solo Casa Tomás admite reservas (decisión del dueño,
+ * 2026-10-01): cada pantalla enseña y suma únicamente las salas que pasan
+ * `salaAdmiteReservas` (`src/lib/reservas/negocios.ts`), que decide por
+ * `caracteristicas.marca`, nunca por el nombre (hay dos «Terraza»).
  */
 export const useEspaciosReserva = () => {
   return useQuery({
