@@ -30,8 +30,8 @@
  *   Reservado (casa_tomas) · SIN mesas  ← el grado 2 es imposible ahí
  *   Interior  (touza)      · SIN mesas
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { format, startOfMonth } from "date-fns";
@@ -43,17 +43,25 @@ import { format, startOfMonth } from "date-fns";
 // estado de CARGA del panel ahora que no hay respaldo que pintar mientras.
 const tablas: Record<string, { data?: unknown[] | null; error?: unknown; pendiente?: boolean }> = {};
 
-// Los filtros se aplican DE VERDAD (`eq`, `neq`, `gte`, `lte`, `in`): si no, el
-// doble devolvería las reservas de hoy para cualquier día y no se podría probar
-// ni un día vacío ni el cambio de día.
+// Los filtros se aplican DE VERDAD (`eq`, `neq`, `gte`, `lte`, `in`) y también
+// `range` y el recuento: el calendario pide el mes por páginas de 1000 y, si el
+// doble no las respetara, no se podría probar. Sin filtros reales el doble
+// devolvería las reservas de hoy para cualquier día y no se podría probar ni un
+// día vacío ni el cambio de día.
 vi.mock("@/integrations/supabase/client", () => {
   type Fila = Record<string, unknown>;
   const encadenable = (tabla: string) => {
     const filtros: Array<(f: Fila) => boolean> = [];
+    let rango: [number, number] | null = null;
+    let contar = false;
+    let una = false;
     const q: Record<string, unknown> = {};
-    q.select = () => q;
+    q.select = (_columnas?: string, opciones?: { count?: string }) => ((contar = !!opciones?.count), q);
     q.order = () => q;
     q.limit = () => q;
+    q.range = (desde: number, hasta: number) => ((rango = [desde, hasta]), q);
+    q.single = () => ((una = true), q);
+    q.maybeSingle = () => ((una = true), q);
     q.eq = (c: string, v: unknown) => (filtros.push((f) => f[c] === v), q);
     q.neq = (c: string, v: unknown) => (filtros.push((f) => f[c] !== v), q);
     q.gte = (c: string, v: string) => (filtros.push((f) => String(f[c]) >= v), q);
@@ -65,8 +73,15 @@ vi.mock("@/integrations/supabase/client", () => {
       // Nunca se resuelve: la consulta se queda cargando.
       if (r.pendiente) return new Promise<never>(() => {});
       if (r.error) return Promise.resolve({ data: null, error: r.error }).then(ok, ko);
-      const filas = ((r.data ?? []) as Fila[]).filter((f) => filtros.every((p) => p(f)));
-      return Promise.resolve({ data: filas, error: null }).then(ok, ko);
+      const todas = ((r.data ?? []) as Fila[]).filter((f) => filtros.every((p) => p(f)));
+      const filas = rango ? todas.slice(rango[0], rango[1] + 1) : todas;
+      if (una) {
+        const res = filas[0]
+          ? { data: filas[0], error: null }
+          : { data: null, error: { code: "PGRST116", message: "no rows" } };
+        return Promise.resolve(res).then(ok, ko);
+      }
+      return Promise.resolve({ data: filas, count: contar ? todas.length : null, error: null }).then(ok, ko);
     };
     return q;
   };
@@ -97,6 +112,13 @@ const HOY = new Date();
 const HOY_ISO = format(HOY, "yyyy-MM-dd");
 const OTRO_DIA =
   HOY.getDate() === 1 ? new Date(HOY.getFullYear(), HOY.getMonth(), 2) : startOfMonth(HOY);
+
+// El reloj va congelado a las 12:00 de HOY y SOLO en `Date`: los temporizadores
+// siguen siendo de verdad (`findBy…` y React Query los necesitan). Sin esto, que
+// la reserva de las 21:30 sin sala esté «dentro de la ventana de asignación»
+// dependería de la hora a la que se pasaran los tests, y el punto de «sin sala»
+// de la cuadrícula saldría o no según cuándo se ejecutaran.
+const MEDIODIA = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate(), 12, 0, 0);
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -211,11 +233,17 @@ const url = () => screen.getByTestId("url").textContent ?? "";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(MEDIODIA);
   for (const k of Object.keys(tablas)) delete tablas[k];
   tablas.reservas = { data: RESERVAS_TABLA };
   tablas.vista_asignacion_dia = { data: VISTA_HOY };
   vi.mocked(useEspaciosReserva).mockReturnValue({ data: ESPACIOS, isLoading: false } as never);
   vi.mocked(useMesas).mockReturnValue({ data: MESAS, isLoading: false } as never);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -331,7 +359,28 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     montar();
     // 5 reservas y 2+20+4+6+3 = 35 comensales
     expect(await screen.findByText("5 reservas")).toBeInTheDocument();
-    expect(screen.getByText("35 comensales")).toBeInTheDocument();
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("35");
+  });
+
+  it("los COMENSALES son la cifra protagonista de la cabecera y las reservas van debajo, pequeñas", async () => {
+    montar();
+    const reservas = await screen.findByText("5 reservas");
+    const comensales = screen.getByTestId("comensales-dia");
+    expect(comensales).toHaveTextContent("35");
+    // «35» en grande, con su palabra al lado…
+    expect(comensales).toHaveClass("text-3xl");
+    expect(comensales.parentElement).toHaveTextContent("35 comensales");
+    // …y el nº de reservas, en la línea pequeña de debajo.
+    expect(reservas.closest("p")).toHaveClass("text-xs");
+    expect(reservas.closest("p")).not.toBe(comensales.parentElement);
+  });
+
+  it("con un solo comensal dice «comensal», en singular", async () => {
+    tablas.vista_asignacion_dia = { data: [{ ...VISTA_HOY[3], numero_comensales: 1 }] };
+    montar();
+    await screen.findByRole("button", { name: "Abrir el plano de Salón" });
+    expect(screen.getByTestId("comensales-dia").parentElement).toHaveTextContent("1 comensal");
+    expect(screen.getByTestId("comensales-dia").parentElement).not.toHaveTextContent("1 comensales");
   });
 
   // ── Salas sin mesas en el plano ───────────────────────────────────────────
@@ -363,7 +412,7 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     expect(screen.queryByRole("button", { name: /Abrir el plano de Reservado/ })).not.toBeInTheDocument();
     // Cena: Carla en el Salón + Diego sin sala = 2 reservas, 9 comensales.
     expect(screen.getByText("2 reservas")).toBeInTheDocument();
-    expect(screen.getByText("9 comensales")).toBeInTheDocument();
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("9");
   });
 
   it("filtra por turno de comida y deja fuera las salas de cena", async () => {
@@ -379,7 +428,7 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     expect(screen.queryByText("Sin sala")).not.toBeInTheDocument();
     // 3 reservas y 2+4+20 = 26 comensales
     expect(screen.getByText("3 reservas")).toBeInTheDocument();
-    expect(screen.getByText("26 comensales")).toBeInTheDocument();
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("26");
   });
 
   it("vuelve al día entero al pulsar el turno ya activo", async () => {
@@ -512,11 +561,17 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
 
     // Ni salas, ni "no hay reservas" (que sería mentira), ni ceros, ni una
     // barra a 0% que dentro de un instante salte a otra cifra.
+    // (Todo se mira dentro del PANEL: la cuadrícula y la leyenda del calendario tienen
+            // sus propias cifras, que llegan por otra consulta.)
+    const panel = within(screen.getByTestId("panel-dia"));
     expect(screen.queryByRole("button", { name: /^Abrir el plano de / })).not.toBeInTheDocument();
-    expect(screen.queryByText("No hay reservas para este día")).not.toBeInTheDocument();
-    expect(screen.queryByText(/0 reservas/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/0 comensales/)).not.toBeInTheDocument();
-    expect(document.body.textContent ?? "").not.toMatch(/\d\s?%/);
+    expect(panel.queryByText("No hay reservas para este día")).not.toBeInTheDocument();
+    expect(panel.queryByText(/0 reservas/)).not.toBeInTheDocument();
+    expect(panel.queryByText(/0 comensales/)).not.toBeInTheDocument();
+    // El panel NO enseña ni la cifra grande ni la ocupación mientras no sabe.
+    expect(panel.queryByTestId("comensales-dia")).not.toBeInTheDocument();
+    expect(panel.queryByTestId("ocupacion-del-dia")).not.toBeInTheDocument();
+    expect(screen.getByTestId("panel-dia").textContent ?? "").not.toMatch(/\d\s?%/);
   });
 
   it("si la vista falla lo dice, no inventa ceros y ofrece reintentar", async () => {
@@ -563,56 +618,90 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     // La cuadrícula come de `reservas`, que sigue respondiendo.
     expect(casillaDia(HOY.getDate())).toHaveAttribute(
       "aria-label",
-      expect.stringContaining("5 reservas, 35 comensales, 1 sin sala"),
+      expect.stringContaining("35 comensales en 5 reservas"),
     );
+    // Y el panel no enseña ocupación inventada con una vista que no se ha leído.
+    expect(within(screen.getByTestId("panel-dia")).queryByTestId("ocupacion-del-dia")).not.toBeInTheDocument();
   });
 });
 
-// ─── La cuadrícula del mes (el bug del porcentaje) ───────────────────────────
+// ─── Casilla del mes y panel del día dicen lo mismo ──────────────────────────
+//
+// La cuadrícula (tabla `reservas`) y el panel (vista `vista_asignacion_dia`) leen
+// de sitios distintos. El dueño pidió que la cifra grande de la casilla y la de la
+// cabecera del panel coincidan SIEMPRE. El resto de la cuadrícula (niveles, aforo
+// por negocio, días pasados, ventana de «sin sala», más de 1000 filas…) se prueba
+// en `CalendarioOcupacion.test.tsx`.
 
-describe("CalendarioOcupacion · cuadrícula del mes", () => {
-  it("cuenta reservas, comensales y las que siguen sin sala en cada casilla", async () => {
-    montar();
-    await waitFor(() =>
-      expect(casillaDia(HOY.getDate())).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("5 reservas, 35 comensales, 1 sin sala"),
-      ),
-    );
-    expect(casillaDia(HOY.getDate())).toHaveTextContent("1 sin sala");
-  });
-
-  it("no queda rastro del porcentaje de aforo que siempre valía 0", async () => {
+describe("CalendarioOcupacion · casilla y panel coherentes", () => {
+  it("la cifra grande de la casilla de hoy es la misma que la de la cabecera del panel", async () => {
     montar();
     await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
-    // Antes cada casilla del mes pintaba "0%" y la leyenda hablaba de una
-    // ocupación que nunca se calculó.
-    expect(casillaDia(HOY.getDate())).not.toHaveTextContent("0%");
-    expect(screen.queryByText(/Baja ocupación/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Media \(50-80%\)/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Alta \(>80%\)/i)).not.toBeInTheDocument();
+    const casilla = casillaDia(HOY.getDate());
+    await waitFor(() => expect(within(casilla).getByTestId("comensales-casilla")).toHaveTextContent("35"));
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("35");
   });
 
-  it("la leyenda describe el reparto por sala, que es lo que se pinta", async () => {
+  it("el % de cada turno de la cabecera es el de la casilla (comida 21 %, cena 7 %)", async () => {
+    // Aforo del escenario: Casa Tomás 50+50+20 = 120 por turno.
+    //   comida: Ana 2 + Elena 20 + Bruno 4 = 26  → 26/120 = 21 %
+    //   cena:   Carla 6 + Diego 3 = 9             →  9/120 =  7 %
     montar();
     await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
-    expect(screen.getByText("Todas las reservas tienen sala")).toBeInTheDocument();
-    expect(screen.getByText("Quedan reservas por repartir por sala")).toBeInTheDocument();
-    expect(screen.getByText("Sin reservas")).toBeInTheDocument();
+    const bloque = within(await screen.findByTestId("ocupacion-del-dia"));
+    expect(bloque.getByTestId("ocupacion-comida")).toHaveTextContent("21%");
+    expect(bloque.getByTestId("ocupacion-cena")).toHaveTextContent("7%");
+    // Y la casilla del mes pone el color del turno más lleno (la comida, 21 %).
+    await waitFor(() => expect(casillaDia(HOY.getDate())).toHaveAttribute("data-nivel", "bajo"));
+    expect(within(casillaDia(HOY.getDate())).getByTestId("porcentaje-casilla")).toHaveTextContent("21%");
   });
 
-  it("un día en el que todo está repartido no aparece marcado como pendiente", async () => {
-    // Las mismas reservas, pero Diego ya tiene sala.
-    tablas.reservas = {
-      data: RESERVAS_TABLA.map((r) => (r.id === "r-diego" ? { ...r, espacio_id: "e-salon" } : r)),
+  it("el aforo es el de Casa Tomás (120 en este escenario) y se dice una sola vez, sin bloque por negocio", async () => {
+    montar();
+    const bloque = within(await screen.findByTestId("ocupacion-del-dia"));
+    expect(bloque.getByText("Aforo: 120 comensales por turno")).toBeInTheDocument();
+    // Una sola escala: dos filas, comida y cena. Nada de Touza (su aforo era 30 aquí).
+    expect(bloque.getAllByTestId(/^ocupacion-(comida|cena)$/)).toHaveLength(2);
+    expect(screen.getByTestId("ocupacion-del-dia").textContent ?? "").not.toMatch(/touza|\b30\b/i);
+  });
+
+  it("IGNORA una reserva antigua de Touza: ni suma a los comensales de la cabecera ni al %", async () => {
+    // Touza ya no admite reservas (2026-10-01). Si queda una en los datos, no cuenta.
+    tablas.vista_asignacion_dia = {
+      data: [
+        ...VISTA_HOY,
+        { ...filaVista("r-touza", "21:00:00", "Marta", 15, "e-interior-tz", "Interior", 0, "sin_mesa"), marca: "touza" },
+      ],
     };
     montar();
-    await waitFor(() =>
-      expect(casillaDia(HOY.getDate())).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("todas con sala"),
-      ),
-    );
-    expect(casillaDia(HOY.getDate())).not.toHaveTextContent("sin sala");
+    const bloque = within(await screen.findByTestId("ocupacion-del-dia"));
+    // Casa Tomás igual que sin la reserva de Touza: 35 comensales, 5 reservas, cena 9/120 = 7 %.
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("35");
+    expect(screen.getByText("5 reservas")).toBeInTheDocument();
+    expect(screen.getByText(/2 de 5 con mesa/)).toBeInTheDocument();
+    expect(bloque.getByTestId("ocupacion-cena")).toHaveTextContent("7%");
+    // La lista de salas de debajo no se ha tocado: la retirada de Touza es otro encargo.
+    expect(tarjetaSala("Interior")).toBeInTheDocument();
+  });
+
+  it("un día pasado no lleva porcentaje en el panel: ya ocurrió", async () => {
+    // El reloj, al día 15 del mes: el 14 es un día pasado seguro caiga HOY donde caiga
+    // (el día 1 del mes no hay ningún día pasado en pantalla).
+    vi.setSystemTime(new Date(HOY.getFullYear(), HOY.getMonth(), 15, 12, 0, 0));
+    const dia = (n: number) => format(new Date(HOY.getFullYear(), HOY.getMonth(), n), "yyyy-MM-dd");
+    tablas.reservas = { data: [] };
+    tablas.vista_asignacion_dia = {
+      data: [
+        { ...VISTA_HOY[0], reserva_id: "r-pasada", fecha: dia(14) },
+        { ...VISTA_HOY[0], reserva_id: "r-hoy", fecha: dia(15) },
+      ],
+    };
+    montar();
+    // Hoy (el 15): el panel sí lleva la ocupación…
+    await screen.findByTestId("ocupacion-del-dia");
+    // …y el 14, ya pasado, no.
+    fireEvent.click(casillaDia(14));
+    await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
+    await waitFor(() => expect(screen.queryByTestId("ocupacion-del-dia")).not.toBeInTheDocument());
   });
 });
