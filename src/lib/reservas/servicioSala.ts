@@ -30,16 +30,13 @@
 // puro — así se testea sin mocks.
 import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
 // Los estados (constantes y predicados) viven en `estadosReserva.ts`, la fuente
-// única; aquí se reexportan con los nombres de siempre.
-import {
-  ESTADO_LLEGADA,
-  ESTADO_NO_SHOW,
-  ESTADO_TRAS_DESHACER,
-  esEstadoVivo,
-  ocupaEspacio,
-} from "./estadosReserva";
+// única. Aquí se reexportan solo los dos que aún se importan desde este módulo
+// (`ESTADO_LLEGADA`, `ocupaEspacio`); los alias de otros nombres
+// (`esperandoLlegada` = `esEstadoVivo`, `puedeMoverReserva` = `ocupaEspacio`) y
+// las reexportaciones que nadie usaba se quitaron en el paso 4 del refactor.
+import { ESTADO_LLEGADA, ESTADO_NO_SHOW, esEstadoVivo, ocupaEspacio } from "./estadosReserva";
 
-export { ESTADO_LLEGADA, ESTADO_NO_SHOW, ESTADO_TRAS_DESHACER, ocupaEspacio };
+export { ESTADO_LLEGADA, ocupaEspacio };
 
 // ============================================================================
 // MODO SERVICIO (Fase 4, MVP) — estado de cada MESA en vivo durante el turno
@@ -138,7 +135,7 @@ function minutosDelDia(hora: string): number {
 function ocupaMesaServicio(r: ReservaMesaServicio): boolean {
   if (r.estado === "cancelada" || r.estado === ESTADO_NO_SHOW) return false;
   if (haLlegado(r.estado) && r.salida_at) return false;
-  return esperandoLlegada(r.estado) || haLlegado(r.estado);
+  return esEstadoVivo(r.estado) || haLlegado(r.estado);
 }
 
 /**
@@ -246,18 +243,14 @@ export interface ReservaServicio {
   llegada_at?: string | null;
 }
 
-/** Estados desde los que tiene sentido registrar que el cliente ha llegado: los vivos (pendiente, verificada, confirmada). */
-export const esperandoLlegada = esEstadoVivo;
-
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;
-
-/** Canceladas y «No vino» no ocupan sitio: no tiene sentido moverlas. */
-export const puedeMoverReserva = ocupaEspacio;
 
 // `ocupaEspacio` (reexportado arriba): los estados que ocupan sitio FÍSICO en un
 // espacio para un turno —los que ocupan aforo según el trigger (`ESTADOS_QUE_OCUPAN`:
 // pendiente, verificada, confirmada) MÁS 'completada': un cliente que ya llegó
 // está sentado en ese espacio, aunque el trigger de aforo global ya no lo cuente—.
+// Por eso es también la regla de qué se puede MOVER: canceladas y «No vino» no
+// ocupan sitio y no tiene sentido moverlas.
 
 /** Comensales que ocupan `espacioId` (null = sin asignar) en un turno. */
 export function comensalesEnEspacioTurno(
@@ -302,7 +295,7 @@ export function evaluarMovimiento(
   todas: ReservaServicio[],
   capacidadDestino: number | null | undefined,
 ): EvaluacionMovimiento {
-  if (!puedeMoverReserva(reserva.estado)) {
+  if (!ocupaEspacio(reserva.estado)) {
     return {
       tipo: "bloqueado",
       motivo:

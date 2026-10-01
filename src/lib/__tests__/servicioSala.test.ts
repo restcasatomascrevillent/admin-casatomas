@@ -3,12 +3,14 @@ import {
   comensalesEnEspacioTurno,
   esErrorColumnaLlegadaInexistente,
   evaluarMovimiento,
-  esperandoLlegada,
-  puedeMoverReserva,
+  ocupaEspacio,
   aplicarCambioReserva,
   mensajeErrorServicio,
   type ReservaServicio,
 } from "@/lib/reservas/servicioSala";
+// Los predicados de estado viven en el mapa único; los alias de este módulo
+// (`esperandoLlegada`, `puedeMoverReserva`) se quitaron en el paso 4.
+import { esEstadoVivo } from "@/lib/reservas/estadosReserva";
 
 const r = (o: Partial<ReservaServicio> = {}): ReservaServicio => ({
   id: "x",
@@ -21,18 +23,18 @@ const r = (o: Partial<ReservaServicio> = {}): ReservaServicio => ({
 });
 
 describe("reglas de estado", () => {
-  it("no se mueven canceladas ni no presentadas", () => {
-    expect(puedeMoverReserva("cancelada")).toBe(false);
-    expect(puedeMoverReserva("no_show")).toBe(false);
-    expect(puedeMoverReserva("completada")).toBe(true);
-    expect(puedeMoverReserva("pendiente")).toBe(true);
+  it("no se mueven canceladas ni no presentadas (no ocupan sitio)", () => {
+    expect(ocupaEspacio("cancelada")).toBe(false);
+    expect(ocupaEspacio("no_show")).toBe(false);
+    expect(ocupaEspacio("completada")).toBe(true);
+    expect(ocupaEspacio("pendiente")).toBe(true);
   });
 
-  it("solo se espera llegada en estados activos", () => {
-    expect(esperandoLlegada("confirmada")).toBe(true);
-    expect(esperandoLlegada("pendiente")).toBe(true);
-    expect(esperandoLlegada("completada")).toBe(false);
-    expect(esperandoLlegada("cancelada")).toBe(false);
+  it("solo se espera llegada en estados activos (vivos)", () => {
+    expect(esEstadoVivo("confirmada")).toBe(true);
+    expect(esEstadoVivo("pendiente")).toBe(true);
+    expect(esEstadoVivo("completada")).toBe(false);
+    expect(esEstadoVivo("cancelada")).toBe(false);
   });
 });
 

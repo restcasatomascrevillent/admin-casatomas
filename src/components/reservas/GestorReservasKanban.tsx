@@ -30,14 +30,9 @@ import {
 } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
-import {
-  comensalesEnEspacioTurno,
-  evaluarMovimiento,
-  puedeMoverReserva,
-  type ReservaServicio,
-} from "@/lib/reservas/servicioSala";
+import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
-import { etiquetaEstadoReserva, infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
 import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacionMesas";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -158,7 +153,7 @@ function ReservaCard({
   const arrastrable = acc.mover.habilitada;
   // Una reserva que por su estado no ocupa sitio («No vino») se ve apagada; sin
   // permiso, en cambio, se ve normal: lo único que cambia es que no se mueve.
-  const ocupaSitio = puedeMoverReserva(reserva.estado);
+  const ocupaSitio = ocupaEspacio(reserva.estado);
   const soloIcono = accionesSoloIcono(anchoColumna);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: reserva.id,

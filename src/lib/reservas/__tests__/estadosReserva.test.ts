@@ -38,14 +38,11 @@ import {
   ocupaEspacio,
   type EstadoReserva,
 } from "../estadosReserva";
+import * as servicioSala from "../servicioSala";
 import {
   ESTADO_LLEGADA as LLEGADA_SERVICIO_SALA,
-  ESTADO_NO_SHOW as NO_SHOW_SERVICIO_SALA,
-  ESTADO_TRAS_DESHACER as TRAS_DESHACER_SERVICIO_SALA,
-  esperandoLlegada,
   haLlegado,
   ocupaEspacio as ocupaEspacioServicioSala,
-  puedeMoverReserva,
 } from "../servicioSala";
 import { ESTADOS_QUE_OCUPAN } from "../../../../supabase/functions/_shared/disponibilidad";
 // Texto de los ficheros, tal cual (`?raw` de Vite): no hace falta `fs` ni rutas.
@@ -183,33 +180,33 @@ describe("conjuntos de estados", () => {
 });
 
 describe("servicioSala.ts reexporta el mapa: una sola definición de los estados", () => {
-  it("los predicados son LOS MISMOS (no una copia que coincide): esperandoLlegada, ocupaEspacio y puedeMoverReserva", () => {
-    expect(esperandoLlegada).toBe(esEstadoVivo);
+  it("lo que reexporta es LO MISMO (no una copia que coincide): ESTADO_LLEGADA y ocupaEspacio", () => {
     expect(ocupaEspacioServicioSala).toBe(ocupaEspacio);
-    expect(puedeMoverReserva).toBe(ocupaEspacio);
+    expect(LLEGADA_SERVICIO_SALA).toBe(ESTADO_LLEGADA);
   });
 
-  it("las constantes de estado son las mismas", () => {
-    expect(ESTADO_LLEGADA).toBe(LLEGADA_SERVICIO_SALA);
-    expect(ESTADO_NO_SHOW).toBe(NO_SHOW_SERVICIO_SALA);
-    expect(ESTADO_TRAS_DESHACER).toBe(TRAS_DESHACER_SERVICIO_SALA);
-    expect([ESTADO_PENDIENTE, ESTADO_VERIFICADA, ESTADO_CONFIRMADA, ESTADO_CANCELADA]).toEqual([
+  it("ya no lleva alias con otro nombre ni reexportaciones que nadie usa (paso 4)", () => {
+    // `esperandoLlegada` era `esEstadoVivo` y `puedeMoverReserva`, `ocupaEspacio`: se usan esos.
+    for (const nombre of ["esperandoLlegada", "puedeMoverReserva", "ESTADO_NO_SHOW", "ESTADO_TRAS_DESHACER"]) {
+      expect(Object.keys(servicioSala), nombre).not.toContain(nombre);
+    }
+  });
+
+  it("las constantes de estado", () => {
+    expect([ESTADO_PENDIENTE, ESTADO_VERIFICADA, ESTADO_CONFIRMADA, ESTADO_LLEGADA, ESTADO_CANCELADA, ESTADO_NO_SHOW]).toEqual([
       "pendiente",
       "verificada",
       "confirmada",
+      "completada",
       "cancelada",
+      "no_show",
     ]);
+    expect(ESTADO_TRAS_DESHACER).toBe("confirmada");
   });
 
-  it.each([...SEIS_ESTADOS, "rechazada"])("%s: los mismos predicados que esperandoLlegada, haLlegado, ocupaEspacio y puedeMoverReserva", (estado) => {
-    expect(esEstadoVivo(estado)).toBe(esperandoLlegada(estado));
-    expect(estado === ESTADO_LLEGADA).toBe(haLlegado(estado));
-    expect(ocupaEspacio(estado)).toBe(ocupaEspacioServicioSala(estado));
-  });
-
-  it.each(SEIS_ESTADOS)("%s: se puede mover exactamente si ocupa sitio", (estado) => {
-    // Canceladas y no presentadas no ocupan sitio, así que no tiene sentido moverlas.
-    expect(ocupaEspacio(estado)).toBe(puedeMoverReserva(estado));
+  it.each([...SEIS_ESTADOS, "rechazada"])("%s: `haLlegado` y `ocupaEspacio` de servicioSala dicen lo mismo que el mapa", (estado) => {
+    expect(haLlegado(estado)).toBe(estado === ESTADO_LLEGADA);
+    expect(ocupaEspacioServicioSala(estado)).toBe(ocupaEspacio(estado));
   });
 
   it("deshacer «Llegó» / «No vino» devuelve a un estado vivo", () => {

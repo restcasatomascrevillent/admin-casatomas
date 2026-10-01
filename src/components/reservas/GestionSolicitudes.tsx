@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users,
   Phone,
@@ -22,7 +21,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { format } from "date-fns";
-import { useSolicitudesPendientes, type SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { estadoPropuestaVista } from "@/lib/reservas/propuestaCliente";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
 import { NegocioBadge } from "./NegocioBadge";
@@ -46,8 +45,10 @@ export const ESTADO_LABELS: Record<string, { label: string; icon: typeof Clock }
   descartada: { label: "Descartada", icon: XCircle },
 };
 
-// Exportada: la lista unificada de reservas (ListaReservasAvanzada.tsx) la
-// reutiliza para las solicitudes que se muestran mezcladas con las reservas.
+// La tarjeta de una solicitud del bot. La usan la lista unificada de reservas
+// (ListaReservasAvanzada.tsx, vista de móvil) y el diálogo de gestión
+// (SolicitudGestionPanel.tsx). La pestaña propia de solicitudes que la montaba
+// (`GestionSolicitudes`) ya no existe: las solicitudes viven en la Lista.
 export function SolicitudCard({
   solicitud,
   onUpdateEstado,
@@ -317,82 +318,5 @@ export function SolicitudCard({
         )}
       </CardContent>
     </Card>
-  );
-}
-
-export function GestionSolicitudes() {
-  const { solicitudes, loading, updateEstado, updateNotasInternas } = useSolicitudesPendientes();
-  const [estadoFilter, setEstadoFilter] = useState<string>("pendiente");
-
-  const filtered = solicitudes.filter((s) => {
-    if (estadoFilter === "all") return true;
-    return s.estado === estadoFilter;
-  });
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Header con filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium">Solicitudes que el bot no pudo resolver</h3>
-              <p className="text-xs text-muted-foreground">
-                Peticiones de clientes que necesitan gestión manual
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="pendiente">Pendientes</SelectItem>
-                  <SelectItem value="contactado">Contactadas</SelectItem>
-                  <SelectItem value="resuelta">Resueltas</SelectItem>
-                  <SelectItem value="descartada">Descartadas</SelectItem>
-                </SelectContent>
-              </Select>
-              <Badge variant="secondary">{filtered.length}</Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de solicitudes */}
-      {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8 text-muted-foreground">
-            {estadoFilter === "pendiente"
-              ? "No hay solicitudes pendientes. ¡Todo al día!"
-              : "No hay solicitudes con este filtro."}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((s) => (
-            <SolicitudCard
-              key={s.id}
-              solicitud={s}
-              onUpdateEstado={updateEstado}
-              onUpdateNotas={updateNotasInternas}
-            />
-          ))}
-        </div>
-      )}
-    </div>
   );
 }

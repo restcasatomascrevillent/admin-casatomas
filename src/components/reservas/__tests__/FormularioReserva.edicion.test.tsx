@@ -366,9 +366,16 @@ describe("FormularioReserva · edición · arranque y guardado", () => {
       "reservas-servicio-dia",
       "reservas_sala_dia",
       "reservas_hoy_resumen",
+      // La fila que tiene abierta el editor.
+      "reserva-edicion",
+      // Desde que la lista sale de `clavesCache.ts` (paso 4): la rejilla de horas calculada también.
+      "disponibilidad-calculada",
     ]) {
       expect(claves).toContain(clave);
     }
+    // Y ya no refresca nombres que ninguna consulta usa.
+    expect(claves).not.toContain("ocupacion-reservas-hoy");
+    expect(claves).not.toContain("resumen-ocupacion-hoy-completo");
   });
 });
 

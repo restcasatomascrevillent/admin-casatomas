@@ -15,8 +15,8 @@
 // disponibilidad; cambiar la sala desde Asignación no refrescaba los contadores de
 // Hoy; marcar la estrella solo las tres listas. Aquí hay UNA lista por TIPO de cambio
 // y la leen las acciones de reserva (`useAccionesServicioReserva`), el cambio de sala
-// del panel de asignación y el modo servicio. (Las dos de `FormularioReserva` siguen
-// como estaban: ese fichero es de otro encargo; queda anotado migrarlas aquí.)
+// del panel de asignación, el modo servicio y, desde el paso 4, el alta y la edición
+// de `FormularioReserva` (`ocupacion`; la edición, más la fila del editor).
 //
 // Los nombres van como TEXTO y no importados de los hooks que los definen
 // (`CLAVE_ASIGNACIONES_MESA`…): un test que monte una pantalla con un mock parcial de

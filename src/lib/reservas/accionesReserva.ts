@@ -2,13 +2,13 @@
 // ACCIONES DE UNA RESERVA — qué se puede hacer con ella en cada vista, por
 // estado y por permiso. Una función PURA: sin React, sin Supabase, sin reloj.
 // ----------------------------------------------------------------------------
-// Hasta ahora esta decisión estaba repartida en los `if (estado === …)` de la
-// lista (ListaReservasAvanzada: `accionPrincipalReserva`, `tituloCancelar`, los
+// Antes esta decisión estaba repartida en los `if (estado === …)` de la lista
+// (ListaReservasAvanzada: `accionPrincipalReserva`, `tituloCancelar`, los
 // `onClick` de cada ranura), en `ControlLlegada` + la tarjeta del kanban
 // (GestorReservasKanban) y en las comprobaciones de `canEdit` de cada pantalla.
-// `accionesDisponibles` las junta en UN sitio para que las dos vistas puedan
-// pintar (paso 3: componente `AccionesReserva`) y ejecutar (paso 2: un único
-// ejecutor) sin volver a decidir nada.
+// `accionesDisponibles` las junta en UN sitio y las dos vistas la leen para
+// pintar (Hoy: kanban, `ControlLlegada` y modo servicio; Lista: componente
+// `AccionesReserva`) y para ejecutar (un único ejecutor) sin volver a decidir nada.
 //
 // LISTA Y HOY SON DIFERENTES A PROPÓSITO (decisión del dueño): la Lista es de
 // GESTIÓN (aceptar, verificar, confirmar, cancelar) y Hoy es de SERVICIO (ha
@@ -30,9 +30,8 @@
 //
 // MATRIZ CON PERMISO (✔ = habilitada, ✖ = visible pero deshabilitada, · = no
 // visible). Columnas en el orden del ciclo de vida (`ORDEN_ESTADOS`). Sin permiso
-// (`canEdit` false) todo lo que escribe en `reservas` pasa de ✔ a ✖ y lo que
-// estaba en · sigue en ·; la única excepción es «seleccionar», que sin permiso
-// desaparece.
+// (`canEdit` false) todo pasa de ✔ a ✖ y lo que estaba en · sigue en ·; la única
+// excepción es «seleccionar», que sin permiso desaparece.
 //
 //   LISTA (gestión)     pend.  verif.  confirm.  Llegó  cancel.  No vino
 //   aceptar              ✔      ·       ·         ·      ·        ·
@@ -55,10 +54,12 @@
 //   listaNegra           ✔      ✔       ✔         ✔      ✔            ✔
 //   aceptar/confirmar/verificar/seleccionar/cancelar: · en todos los estados
 //
-// (*) En la LISTA no mira `canEdit`, igual que hoy: «Verificar» abre el modal, que
-//     va en solo lectura sin permiso; la estrella y la lista negra escriben sin
-//     comprobarlo (la RLS las rechaza, y la estrella ni se entera: ver los tests
-//     de efectos). En HOY sí lo miran (cambio c). La Lista se alinea en el paso 3.
+// (*) Cambio (e), paso 3: en la LISTA también respetan `canEdit`. Hasta entonces
+//     no lo miraban («Verificar» abría el modal en solo lectura; la estrella y la
+//     lista negra escribían y lo paraba la RLS). Decisión del dueño (2026-10-01),
+//     junto con endurecer la RLS de `reservas` (escribir exige permiso de EDICIÓN):
+//     sin permiso salen deshabilitadas con «No tienes permiso para editar
+//     reservas», como en Hoy (cambio c).
 // (**) Cambio acordado: antes también se podía cancelar una reserva «Llegó» o «No
 //     vino»; ya no (decisión del dueño). Si la Lista quiere que la ranura siga
 //     en su sitio, sale deshabilitada con el motivo.
@@ -74,7 +75,9 @@
 //     visible (`ConMotivo`). Antes el kanban no miraba el permiso y se apoyaba en
 //     la RLS.
 //   · (d) Un solo vocabulario: «Ha llegado» / «No vino» (antes el menú del kanban
-//     decía «No se presentó»).
+//     decía «No se presentó»). En la Lista, «Llegó» ya no se dice «ya servida».
+//   · (e) La Lista también respeta el permiso en «Verificar», la estrella y la
+//     lista negra (ver (*)).
 //
 // FUERA DE ESTA FUNCIÓN, a propósito y tal como está hoy:
 //   · «Dar mesa» lo decide `resolverSaltoAsignacion` (saltoAsignacion.ts), módulo
@@ -147,6 +150,11 @@ export interface OpcionesAcciones {
 export const TITULO_SIN_PERMISO_EDITAR = "No tienes permiso para editar reservas";
 /** Texto actual del botón de cancelar de la lista. */
 export const TITULO_SIN_PERMISO_CANCELAR = "No tienes permiso para cancelar reservas";
+/**
+ * «Aceptar» de la Lista: acepta la reserva TAL COMO ESTÁ, sin tocar hora ni sala
+ * (cambio acordado con el dueño, 2026-10-01). Antes: «tal y como la pidió el cliente».
+ */
+export const TITULO_ACEPTAR = "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email";
 
 const oculta = (): EstadoAccion => ({ visible: false, habilitada: false, titulo: "" });
 const accion = (habilitada: boolean, titulo: string): EstadoAccion => ({ visible: true, habilitada, titulo });
@@ -191,8 +199,10 @@ function accionesDeLista(estado: string, nombre: string, importante: boolean, ca
   return {
     // La acción PRINCIPAL de la fila es una sola: «Aceptar» si está pendiente y
     // «Confirmar» en el resto (deshabilitada si no hay nada que confirmar).
+    // «Aceptar» acepta la reserva TAL COMO ESTÁ, sin tocar hora ni sala (ver
+    // `espacioAlAceptar` en verificacion.ts).
     aceptar: pendiente
-      ? accion(canEdit, canEdit ? "Aceptar la reserva tal y como la pidió el cliente" : TITULO_SIN_PERMISO_EDITAR)
+      ? accion(canEdit, canEdit ? TITULO_ACEPTAR : TITULO_SIN_PERMISO_EDITAR)
       : oculta(),
     confirmar: pendiente
       ? oculta()
@@ -202,11 +212,13 @@ function accionesDeLista(estado: string, nombre: string, importante: boolean, ca
           ? accion(true, "Confirmar la reserva verificada")
           : accion(false, `Nada que aceptar ni confirmar: la reserva está ${fraseDe(estado)}`),
 
-    // NO mira `canEdit`: hoy el botón abre el modal aunque no haya permiso y el
-    // modal se queda en solo lectura (sin «Verificar» ni «Rechazar»).
-    verificar: pendiente
-      ? accion(true, "Verificar: comparar lo pedido con lo ofrecido")
-      : accion(false, "Verificar: solo para reservas pendientes"),
+    // Cambio (e): sin permiso no se abre el modal (antes se abría en solo
+    // lectura). Como en «Confirmar», sin permiso manda el permiso.
+    verificar: !canEdit
+      ? accion(false, TITULO_SIN_PERMISO_EDITAR)
+      : pendiente
+        ? accion(true, "Verificar: comparar lo pedido con lo ofrecido")
+        : accion(false, "Verificar: solo para reservas pendientes"),
 
     // La casilla de «aceptar en bloque»: solo las pendientes y solo con permiso.
     seleccionar: pendiente && canEdit ? accion(true, "Seleccionar para aceptar en bloque") : oculta(),
@@ -224,9 +236,12 @@ function accionesDeLista(estado: string, nombre: string, importante: boolean, ca
         : TITULO_SIN_PERMISO_EDITAR,
     ),
 
-    // NO miran `canEdit` (ver la cabecera).
-    importante: accion(true, importante ? `Desmarcar ${nombre} como importante` : `Marcar ${nombre} como importante`),
-    listaNegra: accion(true, `Añadir a ${nombre} a la lista negra`),
+    // Cambio (e): en cualquier estado, pero solo con permiso.
+    importante: accion(
+      canEdit,
+      canEdit ? (importante ? `Desmarcar ${nombre} como importante` : `Marcar ${nombre} como importante`) : TITULO_SIN_PERMISO_EDITAR,
+    ),
+    listaNegra: accion(canEdit, canEdit ? `Añadir a ${nombre} a la lista negra` : TITULO_SIN_PERMISO_EDITAR),
 
     // De servicio: la Lista no los tiene.
     haLlegado: oculta(),

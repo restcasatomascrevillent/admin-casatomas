@@ -27,26 +27,16 @@ import {
 import { NegocioBadge } from "./NegocioBadge";
 import { toast } from "sonner";
 import {
-  CheckCircle,
   CheckCheck,
-  XCircle,
-  Clock,
   Search,
   Users,
   Calendar,
   Loader2,
-  ShieldBan,
-  Star,
   Phone,
   Globe,
   Pencil,
-  UserX,
   Inbox,
   CalendarPlus,
-  Settings2,
-  ClipboardCheck,
-  Armchair,
-  SquarePen,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -70,12 +60,24 @@ import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import type { ReservaParaVerificar } from "@/hooks/useVerificacionReservas";
 // El ejecutor ÚNICO de acciones sobre una reserva (Aceptar, aceptar en bloque, Confirmar, Cancelar y la
-// estrella pasan por él) y la regla de qué botón se puede pulsar en cada estado.
+// estrella pasan por él).
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
-import { accionesDisponibles } from "@/lib/reservas/accionesReserva";
+// Los botones de cada reserva: los pinta `AccionesReserva` a partir de `accionesDisponibles` (qué hay,
+// qué se puede pulsar y con qué texto); aquí solo se dice qué hace cada uno.
+import {
+  AccionesReserva,
+  CasillaAceptarEnBloque,
+  EstrellaImportante,
+  RanuraSeleccion,
+  RanurasDeAcciones,
+  type AlPulsar,
+  type RanuraAccion,
+} from "./AccionesReserva";
+import { infoEstadoReserva } from "@/lib/reservas/estadosReserva";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
-import { CLAVES_REFRESCO_RESERVAS, FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
+import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
@@ -173,8 +175,9 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 // 944 px útiles de cada caso. Si se toca algo de aquí, vuelve a medirlo.
 //
 // 2026-09-28 · la SEXTA ranura de acciones ("Dar mesa") ensancha esta primera
-// columna. Cuentas hechas a mano, PENDIENTES de medir en el navegador a
-// 1024 px (aquí no hay forma de calcular diseño):
+// columna. Cuentas hechas a mano (medido después en Chrome, 2026-10-01, con 58
+// filas de prueba: a 1024 px la tabla llena los 703 px de su contenedor SIN
+// scroll horizontal y esta columna mide ~249 px; a 1366 px, ~285 px):
 //   · ancho real del contenido de la celda de acciones = relleno + ranuras +
 //     huecos + el borde derecho:
 //       lg  12 + (16 + 76 + 5×24) + 6×2 + 1 = 237 px  (antes 211: 4 iconos)
@@ -186,8 +189,9 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 //   · suma de anchos sugeridos a 1024 px: 250+74+120+40+40+152 = 676 px de
 //     los ~688 útiles. Cabe, pero el colchón baja de 38 px a 12 px. Si al
 //     medir apareciera scroll horizontal, lo siguiente que hay que apretar en
-//     la franja `lg` es ANCHO_PRINCIPAL (76 px — ojo: "Confirmar" es la
-//     etiqueta más larga y ya va justa) o el `gap-0.5` de CeldaAcciones.
+//     la franja `lg` es ANCHO_PRINCIPAL (en AccionesReserva.tsx: 76 px — ojo:
+//     "Confirmar" es la etiqueta más larga y ya va justa) o el `gap-0.5` de
+//     CeldaAcciones.
 //     NUNCA recortar insignias ni dejar que aparezca el scroll horizontal.
 const ANCHO_ACCIONES = "w-[250px] xl:w-[276px]";
 const ANCHO_FECHA = "w-[74px] xl:w-[116px]";
@@ -229,116 +233,11 @@ const FONDOS = {
 } as const;
 
 /**
- * Acción secundaria de una fila: solo icono, con tooltip y `aria-label`. Las
- * destructivas (Cancelar, lista negra) van en rojo y se rellenan al pasar por
- * encima, para que no se confundan con las normales.
- *
- * SIEMPRE se pinta, aplique o no a esa fila: cuando no aplica va `disabled`,
- * nunca se quita (2026-09-26, petición del dueño). Así la columna mide lo
- * mismo en todas las filas y los botones no bailan de sitio al recorrer la
- * lista. El `title` va también en un `span` envolvente porque un botón
- * deshabilitado no recibe eventos de ratón y no llegaría a enseñarlo.
- */
-function AccionIcono({
-  etiqueta,
-  onClick,
-  disabled,
-  destructiva = false,
-  children,
-}: {
-  etiqueta: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  destructiva?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <span className="inline-flex shrink-0" title={etiqueta}>
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        // `title` nativo en vez de <Tooltip> de Radix a propósito: con 375+
-        // filas había ~750 tooltips montados y repintar la lista entera (p. ej.
-        // al vaciar el buscador) costaba ~590 ms. Con `title` baja a ~250 ms sin
-        // perder la pista de qué hace cada icono. `aria-label` mantiene el
-        // nombre accesible para lectores de pantalla.
-        title={etiqueta}
-        aria-label={etiqueta}
-        disabled={disabled || !onClick}
-        onClick={onClick}
-        className={cn(
-          // 24 px de 1024 a 1279 px, 28 px a partir de ahí: con las seis
-          // ranuras (5 iconos + 6 huecos) son ~32 px los que se ahorran aquí
-          // en `lg`, y se los queda la columna Cliente, que es la que peor lo
-          // pasa en pantalla estrecha.
-          "h-6 w-6 shrink-0 [&_svg]:size-3.5 xl:h-7 xl:w-7",
-          destructiva &&
-            "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
-        )}
-      >
-        {children}
-      </Button>
-    </span>
-  );
-}
-
-// Ancho FIJO de la acción principal. Es la única con texto y las etiquetas
-// miden distinto ("Aceptar", "Confirmar", "Convertir"), así que sin fijarlo
-// los iconos de al lado caerían en una X distinta según la fila.
-const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px]";
-
-/**
- * Acción PRINCIPAL de la fila: la única con texto, para que se distinga de un
- * vistazo cuál es lo siguiente que hacer con esa fila. Cuando no hay nada que
- * hacer (reserva ya confirmada, solicitud cerrada…) se queda deshabilitada,
- * pero ocupando exactamente el mismo sitio.
- */
-function AccionPrincipal({
-  etiqueta,
-  titulo,
-  onClick,
-  disabled,
-  cargando,
-  children,
-}: {
-  etiqueta: string;
-  titulo: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  cargando?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <span className="inline-flex shrink-0" title={titulo}>
-      <Button
-        type="button"
-        size="sm"
-        title={titulo}
-        disabled={disabled || !onClick}
-        onClick={onClick}
-        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
-      >
-        {cargando ? <Loader2 className="animate-spin" /> : children}
-        {etiqueta}
-      </Button>
-    </span>
-  );
-}
-
-/**
- * Hueco de ancho fijo para la casilla de selección, dentro de la celda de
- * acciones. Se pinta siempre —vacío cuando la fila no es seleccionable— para
- * que los botones de todas las filas empiecen en la misma X.
- */
-function RanuraSeleccion({ children }: { children?: ReactNode }) {
-  return <span className="inline-flex w-4 shrink-0 items-center justify-center">{children}</span>;
-}
-
-/**
  * Celda de acciones. Es la PRIMERA columna, antes de "Fecha y hora"
  * (2026-09-26, petición del dueño) y sin título en la cabecera. Se ancla a la
- * izquierda por si algún día hiciera falta scroll horizontal.
+ * izquierda por si algún día hiciera falta scroll horizontal. Lo de dentro (las
+ * ranuras, iguales en todas las filas) lo pintan `AccionesReserva` en una
+ * reserva y `RanurasDeAcciones` en una solicitud.
  */
 function CeldaAcciones({
   fondo,
@@ -371,13 +270,6 @@ function CeldaAcciones({
   );
 }
 
-/** Una de las seis ranuras de acción. `onClick` ausente = deshabilitada. */
-interface Accion {
-  titulo: string;
-  onClick?: () => void;
-  cargando?: boolean;
-}
-
 /**
  * Ranura "Dar mesa" de una fila de SOLICITUD: siempre deshabilitada. Una
  * solicitud del bot todavía no es una reserva (otra tabla, otro ciclo de
@@ -386,74 +278,7 @@ interface Accion {
  * aquí, para que la lista y la pestaña Hoy digan lo mismo palabra por palabra.
  * Se calcula una sola vez: es constante.
  */
-const DAR_MESA_SOLICITUD: Accion = { titulo: resolverSaltoAsignacion(null).titulo };
-
-/**
- * El MISMO juego de acciones para todas las filas, reservas y solicitudes, en
- * el mismo orden y en la misma X: selección · principal · dar mesa ·
- * verificar · gestionar · cancelar · lista negra. Lo que no aplica a una fila
- * sale deshabilitado (2026-09-26, petición del dueño: antes cada fila traía un
- * número distinto de botones y cambiaban de sitio al bajar por la lista).
- */
-function AccionesUnificadas({
-  seleccion,
-  principal,
-  darMesa,
-  verificar,
-  gestionar,
-  cancelar,
-  listaNegra,
-}: {
-  /** `undefined` = no hay selección en toda la lista (sin permiso de edición). */
-  seleccion?: ReactNode;
-  principal: Accion & { etiqueta: string; icono: ReactNode };
-  /** Salto al plano de SU sala, en SU día, con la reserva señalada. */
-  darMesa: Accion;
-  verificar: Accion;
-  /**
-   * Cuarta ranura. En una SOLICITUD es «Gestionar» (engranaje); en una RESERVA es
-   * «Editar» (lápiz, vía `icono`): antes la ranura estaba siempre deshabilitada
-   * en las reservas, y ahora es su editor, disponible en cualquier estado.
-   */
-  gestionar: Accion & { icono?: ReactNode };
-  cancelar: Accion;
-  listaNegra: Accion;
-}) {
-  return (
-    <>
-      {seleccion !== undefined && <RanuraSeleccion>{seleccion}</RanuraSeleccion>}
-      <AccionPrincipal
-        etiqueta={principal.etiqueta}
-        titulo={principal.titulo}
-        onClick={principal.onClick}
-        cargando={principal.cargando}
-      >
-        {principal.icono}
-      </AccionPrincipal>
-      {/* "Dar mesa": abre el plano de la sala de ESA reserva, en SU fecha y
-          con ella ya señalada, en vez de obligar a deducir la sala y buscarla
-          dentro. Va SIN `destructiva` a propósito: "con sala pero sin mesa" es
-          trabajo pendiente normal, no un error ni un aviso, y el rojo diría lo
-          contrario (ver el encabezado de `saltoAsignacion.ts`). El sillón es
-          el mismo icono con el que el plano dibuja las mesas. */}
-      <AccionIcono etiqueta={darMesa.titulo} onClick={darMesa.onClick}>
-        <Armchair />
-      </AccionIcono>
-      <AccionIcono etiqueta={verificar.titulo} onClick={verificar.onClick}>
-        <ClipboardCheck />
-      </AccionIcono>
-      <AccionIcono etiqueta={gestionar.titulo} onClick={gestionar.onClick}>
-        {gestionar.icono ?? <Settings2 />}
-      </AccionIcono>
-      <AccionIcono destructiva etiqueta={cancelar.titulo} onClick={cancelar.onClick}>
-        {cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />}
-      </AccionIcono>
-      <AccionIcono destructiva etiqueta={listaNegra.titulo} onClick={listaNegra.onClick}>
-        <ShieldBan />
-      </AccionIcono>
-    </>
-  );
-}
+const DAR_MESA_SOLICITUD: RanuraAccion = { titulo: resolverSaltoAsignacion(null).titulo };
 
 /**
  * Celda "Fecha y hora". Hasta 1279 px va en dos líneas y con el año de dos
@@ -493,63 +318,37 @@ function CeldaFechaHora({ dia, hora }: { dia: Date | null; hora: string | null |
   );
 }
 
-/** Estado de una reserva en texto llano, para los `title` de los botones. */
-const ESTADO_RESERVA_TEXTO: Record<string, string> = {
-  pendiente: "pendiente",
-  verificada: "verificada",
-  confirmada: "ya confirmada",
-  cancelada: "cancelada",
-  completada: "ya servida",
-  no_show: "marcada como «no vino»",
-};
-
 /**
- * Acción principal de una fila de RESERVA: "Aceptar" si está pendiente,
- * "Confirmar" si ya está verificada. En cualquier otro caso el botón sigue
- * en su sitio, deshabilitado y explicando en el `title` por qué.
+ * Insignia del estado de una reserva (columna Estado y tarjeta de móvil). Nombre,
+ * icono, color y variante salen de `ESTADOS_RESERVA`, el mapa único que leen
+ * también el kanban y el timeline: «Llegó» para 'completada', «No vino» para
+ * 'no_show'. Un estado que no es de los seis se enseña tal cual, con borde.
  */
-function accionPrincipalReserva(
-  reserva: Reservation,
-  canEdit: boolean,
-  ocupada: boolean,
-  acciones: { aceptar: () => void; confirmar: () => void },
-) {
-  if (!canEdit) {
-    return { etiqueta: "Aceptar", titulo: "No tienes permiso para editar reservas", icono: <CheckCircle /> };
+function InsigniaEstado({ estado }: { estado: string }) {
+  const info = infoEstadoReserva(estado);
+  if (!info) {
+    return (
+      <Badge variant="outline" className={INSIGNIA}>
+        {estado}
+      </Badge>
+    );
   }
-  if (reserva.estado === "pendiente") {
-    return {
-      etiqueta: "Aceptar",
-      titulo: "Aceptar la reserva tal y como la pidió el cliente",
-      icono: <CheckCircle />,
-      onClick: ocupada ? undefined : acciones.aceptar,
-      cargando: ocupada,
-    };
-  }
-  if (reserva.estado === "verificada") {
-    return {
-      etiqueta: "Confirmar",
-      titulo: "Confirmar la reserva verificada",
-      icono: <CheckCheck />,
-      onClick: ocupada ? undefined : acciones.confirmar,
-      cargando: ocupada,
-    };
-  }
-  return {
-    etiqueta: "Confirmar",
-    titulo: `Nada que aceptar ni confirmar: la reserva está ${ESTADO_RESERVA_TEXTO[reserva.estado] ?? reserva.estado}`,
-    icono: <CheckCheck />,
-  };
+  const { Icono } = info;
+  return (
+    <Badge variant={info.varianteInsignia} className={cn(INSIGNIA, info.insignia)}>
+      <Icono className="h-3 w-3" />
+      {info.etiqueta}
+    </Badge>
+  );
 }
 
 interface ListaReservasAvanzadaProps {
-  onEditReserva?: (reserva: Reservation) => void;
-  onEspacioClick?: (espacioId: string) => void;
   /**
-   * Salto al plano de la sala de una reserva, para darle mesa. Opcional como
-   * `onEspacioClick`: si la pantalla que monta la lista no tiene plano al que
-   * llevar, el botón se queda en su sitio pero deshabilitado — nunca
-   * desaparece, o los botones bailarían de una fila a otra.
+   * Salto al plano de la sala de una reserva, para darle mesa. Opcional: si la
+   * pantalla que monta la lista no tiene plano al que llevar, el botón se queda
+   * en su sitio pero deshabilitado — nunca desaparece, o los botones bailarían
+   * de una fila a otra. (El editor de una reserva lo abre la propia lista, con
+   * `useEdicionReserva`.)
    */
   onAsignarMesa?: (destino: DestinoAsignacion) => void;
   initialStatusFilter?: string;
@@ -563,8 +362,6 @@ interface ListaReservasAvanzadaProps {
 }
 
 export function ListaReservasAvanzada({
-  onEditReserva,
-  onEspacioClick,
   onAsignarMesa,
   initialStatusFilter,
   initialDateFilter,
@@ -602,8 +399,10 @@ export function ListaReservasAvanzada({
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
   const queryClient = useQueryClient();
+  // Tras crear una reserva desde una solicitud (aceptar la propuesta por teléfono): las mismas
+  // claves que refrescan las acciones que cambian ocupación (`clavesCache.ts`).
   const refrescarReservas = () =>
-    CLAVES_REFRESCO_RESERVAS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+    CLAVES_POR_CAMBIO.ocupacion.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
   // Todo lo que cambia una reserva desde esta lista (Aceptar, aceptar en bloque, Confirmar, Cancelar,
   // la estrella) lo ejecuta este hook: comprueba que la escritura de verdad se ha guardado, la
@@ -611,10 +410,6 @@ export function ListaReservasAvanzada({
   // lista: `reservas-lista`) y, donde toca, avisa al cliente con la respuesta comprobada. Antes cada
   // handler de aquí escribía, avisaba y refrescaba a su manera.
   const acciones = useAccionesServicioReserva();
-
-  const toggleImportante = (reservation: Reservation) => {
-    void acciones.alternarImportante(reservation);
-  };
 
   // Filtros - inicializar con props si vienen de URL
   const [searchQuery, setSearchQuery] = useState("");
@@ -628,67 +423,17 @@ export function ListaReservasAvanzada({
   const marcaSolicitud = (s: SolicitudPendiente) => marcaDeSolicitud(s, espacios);
   // Nombre de sala por id, para que el `title` de "Dar mesa" diga a DÓNDE
   // lleva ("Abrir el plano en Comedor para darle mesa"). Sale de los espacios
-  // que la lista ya tiene cargados: ni una consulta más por esto.
+  // que la lista ya tiene cargados: ni una consulta más por esto. No se mira si
+  // ya tiene MESA (`yaTieneMesa`) a propósito: eso está en `asignaciones_mesa` y
+  // costaría otra consulta para las 375+ filas solo para cambiar una frase del
+  // tooltip; el plano, nada más abrirse, ya enseña si está sentada o no.
   const nombresDeSala = useMemo(() => {
     const porId = new Map<string, string>();
     for (const e of espacios) if (e?.id) porId.set(String(e.id), String(e.nombre ?? ""));
     return porId;
   }, [espacios]);
-
-  /**
-   * Ranura "Dar mesa" de una fila de RESERVA. Ni la decisión ni el texto se
-   * escriben aquí: los pone `resolverSaltoAsignacion`, compartido con la
-   * pestaña Hoy. Si la reserva no tiene sala, el botón se queda deshabilitado
-   * diciendo que primero hay que dársela desde «Gestionar», en vez de abrir un
-   * plano en el que esa reserva no aparecería.
-   *
-   * No se pasa `yaTieneMesa` a propósito: la mesa concreta no está en
-   * `reservas` sino en `asignaciones_mesa`, así que saberlo costaría otra
-   * consulta para las 375+ filas de la lista solo para cambiar una frase del
-   * tooltip. El plano, nada más abrirse, ya enseña si está sentada o no.
-   */
-  const accionDarMesa = (reserva: Reservation): Accion => {
-    const { destino, titulo } = resolverSaltoAsignacion(reserva, {
-      nombreSala: reserva.espacio_id ? nombresDeSala.get(reserva.espacio_id) ?? null : null,
-    });
-    return {
-      // Si esta pantalla no trae a dónde saltar, el botón sigue ocupando su
-      // sitio pero no promete un plano que no existe. Esto NO es un motivo del
-      // módulo compartido (que habla de la reserva): es que aquí no hay plano.
-      titulo: onAsignarMesa ? titulo : "Dar mesa: esta pantalla no lleva al plano de sala",
-      onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
-    };
-  };
-
-  /**
-   * Cuarta ranura de una fila de RESERVA: el EDITOR (2026-09-30, «las reservas
-   * se editan siempre»). Antes era «Gestionar» y en las reservas estaba
-   * deshabilitada para siempre. Se abre en CUALQUIER estado, con cualquier fecha
-   * y de cualquier canal: no mira ni `estado`, ni `fecha`, ni `canal`; solo el
-   * permiso de edición de la sección (la política RLS de UPDATE pide lo mismo).
-   * El texto sigue empezando por «Gestionar» porque «Dar mesa» sin sala manda a
-   * ese nombre para asignar la sala, y aquí se puede.
-   */
-  const accionEditar = (reserva: Reservation): Accion & { icono: ReactNode } => ({
-    titulo: canEdit
-      ? `Gestionar: editar la reserva de ${reserva.nombre || "este cliente"} — datos, día, hora, comensales y sala`
-      : "No tienes permiso para editar reservas",
-    onClick: canEdit ? () => editarReserva(reserva.id) : undefined,
-    icono: <SquarePen />,
-  });
-  /**
-   * Ranura «Cancelar» de una fila de RESERVA. La regla la pone `accionesDisponibles` (la misma que
-   * aplica el ejecutor al escribir): solo se cancela una reserva VIVA y con permiso; «Llegó» y «No
-   * vino» ya no (decisión del dueño) y salen deshabilitadas con el motivo a la vista.
-   */
-  const accionCancelar = (reserva: Reservation, nombre: string, ocupada: boolean) => {
-    const { habilitada, titulo } = accionesDisponibles({ estado: reserva.estado, nombre }, { vista: "lista", canEdit }).cancelar;
-    return {
-      titulo,
-      onClick: habilitada && !ocupada ? () => setReservaACancelar(reserva) : undefined,
-      cargando: ocupada,
-    };
-  };
+  const nombreSalaDe = (reserva: Reservation) =>
+    reserva.espacio_id ? nombresDeSala.get(reserva.espacio_id) ?? null : null;
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -815,9 +560,9 @@ export function ListaReservasAvanzada({
     await acciones.cancelar(reserva);
   };
 
-  // Un clic: acepta una solicitud pendiente exactamente como la pidió el
-  // cliente (ver useVerificacionReservas.ts). Requisito explícito del dueño
-  // ("hay mucho volumen"): esto NO abre el modal de contraoferta.
+  // Un clic: acepta la reserva pendiente TAL COMO ESTÁ, sin tocar su hora ni su
+  // sala (ver `espacioAlAceptar` en verificacion.ts). Requisito explícito del
+  // dueño ("hay mucho volumen"): esto NO abre el modal de contraoferta.
   const handleAceptarUnaClic = (reservation: Reservation) => acciones.aceptar(reservation);
 
   const toggleSeleccion = (id: string) => {
@@ -828,6 +573,27 @@ export function ListaReservasAvanzada({
       return next;
     });
   };
+
+  /**
+   * Qué hace cada botón de una reserva: lo mismo en la tabla y en la tarjeta de
+   * móvil. Si se puede pulsar o no (y por qué) lo decide `AccionesReserva` con
+   * `accionesDisponibles`; aquí solo se dice a quién se llama.
+   */
+  const alPulsar = (reserva: Reservation): AlPulsar => ({
+    aceptar: () => void handleAceptarUnaClic(reserva),
+    confirmar: () => void acciones.confirmar(reserva),
+    verificar: () => {
+      setSelectedReservaForVerification(reserva);
+      setVerificacionModalOpen(true);
+    },
+    seleccionar: () => toggleSeleccion(reserva.id),
+    // El editor (2026-09-30, «las reservas se editan siempre»): en CUALQUIER estado, fecha y canal.
+    editar: () => editarReserva(reserva.id),
+    // Cancelar no cancela al primer clic: abre la confirmación (más abajo).
+    cancelar: () => setReservaACancelar(reserva),
+    listaNegra: () => setBlacklistReserva(reserva),
+    importante: () => void acciones.alternarImportante(reserva),
+  });
 
   // Solo las pendientes de la PÁGINA actual: "seleccionar todas" tiene que
   // marcar lo que el usuario está viendo, no 300 reservas que no ve.
@@ -894,56 +660,6 @@ export function ListaReservasAvanzada({
             <span className={ETIQUETA_CANAL}>Web</span>
           </Badge>
         );
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pendiente":
-        return (
-          <Badge className={cn(INSIGNIA, "bg-status-pending text-status-pending-foreground")}>
-            <Clock className="h-3 w-3" />
-            Pendiente
-          </Badge>
-        );
-      case "verificada":
-        return (
-          <Badge className={cn(INSIGNIA, "bg-status-verified text-status-verified-foreground")}>
-            <CheckCircle className="h-3 w-3" />
-            Verificada
-          </Badge>
-        );
-      case "confirmada":
-        return (
-          <Badge className={cn(INSIGNIA, "bg-status-confirmed text-status-confirmed-foreground")}>
-            <CheckCircle className="h-3 w-3" />
-            Confirmada
-          </Badge>
-        );
-      case "cancelada":
-        return (
-          <Badge variant="destructive" className={INSIGNIA}>
-            <XCircle className="h-3 w-3" />
-            Cancelada
-          </Badge>
-        );
-      // 'completada' = el cliente llegó (ver src/lib/reservas/servicioSala.ts).
-      case "completada":
-        return (
-          <Badge className={cn(INSIGNIA, "bg-emerald-600 text-white")}>
-            <CheckCheck className="h-3 w-3" />
-            Llegó
-          </Badge>
-        );
-      case "no_show":
-        return (
-          <Badge variant="secondary" className={INSIGNIA}>
-            <UserX className="h-3 w-3" />
-            No vino
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline" className={INSIGNIA}>{status}</Badge>;
     }
   };
 
@@ -1189,7 +905,7 @@ export function ListaReservasAvanzada({
               </Button>
               <Button size="sm" onClick={() => setConfirmarBloque(true)} disabled={aceptandoBloque}>
                 {aceptandoBloque ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCheck className="h-4 w-4 mr-1" />}
-                Verificar con la hora que pidieron
+                Verificar tal como están
               </Button>
             </div>
           </CardContent>
@@ -1223,25 +939,22 @@ export function ListaReservasAvanzada({
                 marca={marcaSolicitud(fila.solicitud)}
               />
             )
-          ) : (() => { const reservation = fila.reserva; return (
+          ) : (() => { const reservation = fila.reserva; const al = alPulsar(reservation); return (
             <Card key={reservation.id} className={(reservation as any).importante ? "bg-amber-50/60 dark:bg-amber-950/20" : ""}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {reservation.estado === "pendiente" && canEdit && (
-                      <Checkbox
-                        checked={seleccionadas.has(reservation.id)}
-                        onCheckedChange={() => toggleSeleccion(reservation.id)}
-                        className="shrink-0"
-                        aria-label="Seleccionar para aceptar en bloque"
-                      />
-                    )}
-                    <button onClick={() => toggleImportante(reservation)} className="shrink-0">
-                      <Star className={cn("h-4 w-4", (reservation as any).importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40")} />
-                    </button>
+                    <CasillaAceptarEnBloque
+                      reserva={reservation}
+                      canEdit={canEdit}
+                      marcada={seleccionadas.has(reservation.id)}
+                      onCambiar={al.seleccionar}
+                      className="shrink-0"
+                    />
+                    <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="tarjeta" onClick={al.importante} />
                     <span className="font-medium text-sm">{reservation.nombre || "Sin nombre"}</span>
                   </div>
-                  {getStatusBadge(reservation.estado)}
+                  <InsigniaEstado estado={reservation.estado} />
                 </div>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span>{new Date(reservation.fecha).toLocaleDateString("es-ES")}</span>
@@ -1259,43 +972,16 @@ export function ListaReservasAvanzada({
                     tabla, para no tener que reaprenderlo al cambiar de
                     pantalla. La casilla de selección no se repite aquí: ya
                     está arriba, junto al nombre. */}
-                <div className="flex items-center gap-1 pt-1">
-                  <AccionesUnificadas
-                    principal={accionPrincipalReserva(
-                      reservation,
-                      canEdit,
-                      acciones.estaEnCurso(reservation.id) || aceptandoBloque,
-                      {
-                        aceptar: () => handleAceptarUnaClic(reservation),
-                        confirmar: () => acciones.confirmar(reservation),
-                      },
-                    )}
-                    darMesa={accionDarMesa(reservation)}
-                    verificar={{
-                      titulo:
-                        reservation.estado === "pendiente"
-                          ? "Verificar: comparar lo pedido con lo ofrecido"
-                          : "Verificar: solo para reservas pendientes",
-                      onClick:
-                        reservation.estado === "pendiente"
-                          ? () => {
-                              setSelectedReservaForVerification(reservation);
-                              setVerificacionModalOpen(true);
-                            }
-                          : undefined,
-                    }}
-                    gestionar={accionEditar(reservation)}
-                    cancelar={accionCancelar(
-                      reservation,
-                      reservation.nombre || "este cliente",
-                      acciones.estaEnCurso(reservation.id),
-                    )}
-                    listaNegra={{
-                      titulo: `Añadir a ${reservation.nombre || "este cliente"} a la lista negra`,
-                      onClick: () => setBlacklistReserva(reservation),
-                    }}
-                  />
-                </div>
+                <AccionesReserva
+                  variante="tarjeta"
+                  reserva={reservation}
+                  canEdit={canEdit}
+                  al={al}
+                  ocupada={acciones.estaEnCurso(reservation.id)}
+                  bloqueEnCurso={aceptandoBloque}
+                  nombreSala={nombreSalaDe(reservation)}
+                  onAsignarMesa={onAsignarMesa}
+                />
               </CardContent>
             </Card>
           ); })())
@@ -1377,52 +1063,24 @@ export function ListaReservasAvanzada({
                   const reservation = fila.reserva;
                   const importante = !!(reservation as any).importante;
                   const fondo = importante ? FONDOS.destacada : FONDOS.normal;
-                  const ocupada = acciones.estaEnCurso(reservation.id);
                   const nombre = reservation.nombre || "Sin nombre";
+                  const al = alPulsar(reservation);
                   return (
                   <TableRow key={reservation.id} className={cn("group", ALTO_FILA, fondo.fila)}>
                     {/* Acciones PRIMERO (2026-09-26, petición del dueño). El
                         juego de acciones es el mismo en todas las filas; lo
                         que no aplica va deshabilitado, nunca se quita. */}
                     <CeldaAcciones fondo={fondo.acciones}>
-                      <AccionesUnificadas
-                        seleccion={
-                          canEdit
-                            ? reservation.estado === "pendiente"
-                              ? (
-                                <Checkbox
-                                  checked={seleccionadas.has(reservation.id)}
-                                  onCheckedChange={() => toggleSeleccion(reservation.id)}
-                                  aria-label="Seleccionar para aceptar en bloque"
-                                />
-                              )
-                              : null
-                            : undefined
-                        }
-                        principal={accionPrincipalReserva(reservation, canEdit, ocupada || aceptandoBloque, {
-                          aceptar: () => handleAceptarUnaClic(reservation),
-                          confirmar: () => acciones.confirmar(reservation),
-                        })}
-                        darMesa={accionDarMesa(reservation)}
-                        verificar={{
-                          titulo:
-                            reservation.estado === "pendiente"
-                              ? "Verificar: comparar lo pedido con lo ofrecido"
-                              : "Verificar: solo para reservas pendientes",
-                          onClick:
-                            reservation.estado === "pendiente"
-                              ? () => {
-                                  setSelectedReservaForVerification(reservation);
-                                  setVerificacionModalOpen(true);
-                                }
-                              : undefined,
-                        }}
-                        gestionar={accionEditar(reservation)}
-                        cancelar={accionCancelar(reservation, nombre, ocupada)}
-                        listaNegra={{
-                          titulo: `Añadir a ${nombre} a la lista negra`,
-                          onClick: () => setBlacklistReserva(reservation),
-                        }}
+                      <AccionesReserva
+                        variante="fila"
+                        reserva={reservation}
+                        canEdit={canEdit}
+                        al={al}
+                        ocupada={acciones.estaEnCurso(reservation.id)}
+                        bloqueEnCurso={aceptandoBloque}
+                        seleccionada={seleccionadas.has(reservation.id)}
+                        nombreSala={nombreSalaDe(reservation)}
+                        onAsignarMesa={onAsignarMesa}
                       />
                     </CeldaAcciones>
                     {/* Fecha y hora juntas: dos columnas para esto gastaban
@@ -1430,14 +1088,7 @@ export function ListaReservasAvanzada({
                     <CeldaFechaHora dia={new Date(reservation.fecha)} hora={reservation.hora} />
                     <TableCell className={cn(CELDA, ANCHO_CLIENTE)}>
                       <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleImportante(reservation)}
-                          className="shrink-0 transition-transform hover:scale-110"
-                          aria-label={importante ? `Desmarcar ${nombre} como importante` : `Marcar ${nombre} como importante`}
-                        >
-                          <Star className={cn("h-4 w-4", importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400")} />
-                        </button>
+                        <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="fila" onClick={al.importante} />
                         <div className={ANCHO_NOMBRE}>
                           <div className="flex min-w-0 items-center gap-1.5">
                             <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
@@ -1458,7 +1109,9 @@ export function ListaReservasAvanzada({
                       </div>
                     </TableCell>
                     <TableCell className={cn(CELDA, ANCHO_CANAL)}>{getCanalBadge(reservation.canal)}</TableCell>
-                    <TableCell className={cn(CELDA, ANCHO_ESTADO)}>{getStatusBadge(reservation.estado)}</TableCell>
+                    <TableCell className={cn(CELDA, ANCHO_ESTADO)}>
+                      <InsigniaEstado estado={reservation.estado} />
+                    </TableCell>
                   </TableRow>
                 ); })())
               )}
@@ -1511,8 +1164,8 @@ export function ListaReservasAvanzada({
       />
 
       {/* Editor de una reserva (cuarta ranura de cada fila): al guardar refresca
-          por sí solo la lista y el resto de pantallas (ver
-          `clavesRefrescoEdicion` de `FormularioReserva`). Es `null` hasta que se pide editar. */}
+          por sí solo la lista y el resto de pantallas (`CLAVES_POR_CAMBIO.ocupacion`
+          de `clavesCache.ts`, ver `FormularioReserva`). Es `null` hasta que se pide editar. */}
       {dialogoEdicion}
 
       {/* Lista negra: NO necesita AlertDialog propio. `BlacklistModal` ya es
@@ -1580,11 +1233,11 @@ export function ListaReservasAvanzada({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              ¿Verificar {seleccionadas.size} reserva{seleccionadas.size === 1 ? "" : "s"} con la hora que pidieron?
+              ¿Verificar {seleccionadas.size} reserva{seleccionadas.size === 1 ? " tal como está" : "s tal como están"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Se verificarán sin abrir ninguna ficha, con el día y la hora que pidió cada cliente, y se le
-              enviará a cada uno el correo para que confirme. La sala no se toca: se asigna por dentro y el
+              Se verificarán sin abrir ninguna ficha, tal como están ahora (con el día y la hora que tienen), y
+              se le enviará a cada uno el correo para que confirme. La sala no se toca: se asigna por dentro y el
               cliente no la ve. Para echarse atrás habría que cambiarlas una a una.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1700,11 +1353,12 @@ function FilaSolicitud({
         !abierta && "opacity-70",
       )}
     >
-      {/* Mismas ranuras que una fila de reserva y en el mismo orden: lo que
-          una solicitud no puede hacer (dar mesa, verificar, cancelar, lista
-          negra) sale deshabilitado, no desaparece. */}
+      {/* Mismas ranuras que una fila de reserva (el mismo molde,
+          `RanurasDeAcciones`) y en el mismo orden: lo que una solicitud no
+          puede hacer (dar mesa, verificar, cancelar, lista negra) sale
+          deshabilitado, no desaparece. */}
       <CeldaAcciones franja fondo={FONDOS.destacada.acciones}>
-        <AccionesUnificadas
+        <RanurasDeAcciones
           seleccion={canEdit ? null : undefined}
           principal={{
             etiqueta: "Convertir",

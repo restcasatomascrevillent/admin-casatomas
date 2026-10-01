@@ -16,8 +16,8 @@ import { ESTADOS_RESERVA, ORDEN_ESTADOS, type EstadoReserva } from "@/lib/reserv
  * cancelada | completada | no_show. "rechazada" NO existe: el botón «Rechazar»
  * del modal de verificación deja la reserva en `cancelada`.
  *
- *   pendiente → verificada   Personal, con «Aceptar» (un clic, la hora que pidió
- *                            el cliente) o «Verificar» (modal, otra hora). Sale
+ *   pendiente → verificada   Personal, con «Aceptar» (un clic, tal como está, sin
+ *                            tocar hora ni sala) o «Verificar» (modal, otra hora). Sale
  *                            el correo «Confirma tu reserva»; si el cliente no
  *                            tiene email, hay que avisarle por teléfono
  *                            (`useVerificacionReservas.ts`).

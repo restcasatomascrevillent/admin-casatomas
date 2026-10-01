@@ -6,10 +6,10 @@
  * se importan las opciones del filtro y las variantes del `Badge`); si alguien vuelve
  * a escribir un texto, un icono o un color a mano en uno de ellos, salta aquí.
  *
- * Queda UNA copia por migrar: la Lista (`getStatusBadge` y `ESTADO_RESERVA_TEXTO` de
- * ListaReservasAvanzada.tsx, paso 3), local a su componente y no importable. Sus
- * diferencias con el mapa están en la cabecera de `estadosReserva.ts`. El kanban
- * (insignia) se comprueba en `GestorReservasKanban.acciones.test.tsx`.
+ * La Lista tampoco tiene ya copia (paso 3): su insignia de estado lee `etiqueta`, `Icono`,
+ * `insignia` y `varianteInsignia` del mapa (se comprueba en `ListaReservasAvanzada.test.tsx`)
+ * y el texto de sus botones, `frase` (vía `accionesReserva.ts`). El kanban (insignia) se
+ * comprueba en `GestorReservasKanban.acciones.test.tsx`.
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, within } from "@testing-library/react";
@@ -84,15 +84,22 @@ describe("contra TimelineEstadosReserva (nombre, frase, burbuja e icono)", () =>
   });
 });
 
-describe("contra las variantes del Badge (la lista pinta cancelada y No vino con `variant`, no con clases)", () => {
-  it("cancelada = variant=destructive", () => {
+describe("contra las variantes del Badge (la lista pinta cancelada y No vino con su `variant`)", () => {
+  it("cancelada = variant=destructive, y sus clases son las de esa variante", () => {
+    expect(ESTADOS_RESERVA.cancelada.varianteInsignia).toBe("destructive");
     const variante = badgeVariants({ variant: "destructive" }).split(/\s+/);
     for (const clase of ESTADOS_RESERVA.cancelada.insignia.split(/\s+/)) expect(variante, clase).toContain(clase);
   });
 
-  it("No vino = variant=secondary", () => {
+  it("No vino = variant=secondary, y sus clases son las de esa variante", () => {
+    expect(ESTADOS_RESERVA.no_show.varianteInsignia).toBe("secondary");
     const variante = badgeVariants({ variant: "secondary" }).split(/\s+/);
     for (const clase of ESTADOS_RESERVA.no_show.insignia.split(/\s+/)) expect(variante, clase).toContain(clase);
+  });
+
+  it("el resto va con la variante por defecto y sus clases", () => {
+    const conVariante = ORDEN_ESTADOS.filter((e) => ESTADOS_RESERVA[e].varianteInsignia !== undefined);
+    expect(conVariante).toEqual(["cancelada", "no_show"]);
   });
 });
 

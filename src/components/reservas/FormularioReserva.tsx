@@ -31,7 +31,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
-import { useOcupacionSalasDia, CLAVE_OCUPACION_SALAS_DIA, datosDeNegocio } from "@/hooks/useOcupacionSalasDia";
+import { useOcupacionSalasDia, datosDeNegocio } from "@/hooks/useOcupacionSalasDia";
 import {
   espacioUnicoDeNegocio,
   etiquetaNegocio,
@@ -58,9 +58,8 @@ import {
 } from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
-import { CLAVE_RESUMEN_ASIGNACION_DIA } from "@/hooks/useResumenAsignacionDia";
-import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
-import { CLAVE_RESERVAS_SERVICIO_DIA } from "@/hooks/useReservasServicioDia";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
+import { notificarAlCliente } from "@/lib/reservas/notificarCliente";
 import {
   antesDeLaEdicion,
   avisoAlClienteTrasEdicion,
@@ -75,7 +74,6 @@ import {
   ErrorSinFilasEdicion,
   esReservaViva,
   interpretarRespuestaAvisoModificacion,
-  interpretarRespuestaNotificacion,
   invalidaEnlaceConfirmacion,
   mensajeErrorEdicion,
   TEXTO_ENLACE_INVALIDADO,
@@ -163,26 +161,9 @@ const DURACION_AVISO_LARGO_MS = 10_000;
 const DURACION_AVISO_ENLACE_MS = 20_000;
 
 /**
- * Pide a `notify-reservation-change` que escriba al cliente y ESPERA la
- * respuesta (a diferencia de `notificarCambioReserva`, que es fire-and-forget):
- * lo que se le dice al personal depende de si el correo salió de verdad. Nunca
- * lanza: una llamada caída es un `fallo`, y lo que ya se guardó sigue guardado.
- */
-async function pedirCorreoConfirmacion(reservaId: string, estado: string): Promise<EnvioCorreoEdicion> {
-  try {
-    const respuesta = await supabase.functions.invoke("notify-reservation-change", {
-      body: { id: reservaId, estado },
-    });
-    return interpretarRespuestaNotificacion(respuesta);
-  } catch (err) {
-    console.error("Error notificando cambio de reserva:", err);
-    return { resultado: "fallo" };
-  }
-}
-
-/**
  * Pide el correo de «reserva modificada» (casilla «Avisar al cliente del
- * cambio») y ESPERA la respuesta, igual que `pedirCorreoConfirmacion`. Va
+ * cambio») y ESPERA la respuesta, igual que el de «Confirma tu reserva»
+ * (`notificarAlCliente`, la única forma de llamar a `notify-reservation-change`). Va
  * directo a `emails-reserva/notificar-modificacion` (JWT del usuario +
  * permiso de escritura en reservas): lo de AHORA lo lee la función de la BD, ya
  * guardado; aquí solo se manda cómo estaba antes. Nunca lanza.
@@ -210,46 +191,20 @@ async function pedirAvisoModificacion(
 const SIN_ASIGNAR = "__sin_asignar__";
 const OTRA_HORA = "__otra__";
 
-/** Claves de React Query a invalidar tras crear una reserva (desde aquí o
- * aceptando la propuesta de una solicitud). */
-export const CLAVES_REFRESCO_RESERVAS = [
-  "reservas-hoy",
-  "reservas-kanban",
-  "reservas-lista",
-  "reservas_mes",
-  "reservas_hoy_todas",
-  "ocupacion_hoy",
-  "ocupacion-reservas-hoy",
-  "today-reservations",
-  "today-confirmed-reservations",
-  "dashboard-stats",
-  "disponibilidad",
-  "disponibilidad-detallada",
-  "disponibilidad-rango",
-  "resumen-ocupacion-hoy-completo",
-  CLAVE_OCUPACION_SALAS_DIA,
-];
+/**
+ * Claves de React Query a refrescar tras CREAR una reserva: las de cualquier
+ * cambio de ocupación (`clavesCache.ts`: listas, contadores, vistas del día,
+ * disponibilidad, mesas y panel «Asignación»). Antes había aquí una lista propia
+ * con dos nombres que ninguna consulta usa (`ocupacion-reservas-hoy`,
+ * `resumen-ocupacion-hoy-completo`) y sin `disponibilidad-calculada`.
+ */
+const CLAVES_REFRESCO_ALTA = CLAVES_POR_CAMBIO.ocupacion;
 
 /**
- * Además de las de arriba, al EDITAR hay que refrescar lo que depende de la
- * sala, la mesa y el día de una reserva que ya existía: el panel «Asignación» y
- * el detalle del calendario (`vista_asignacion_dia`), las mesas asignadas, el
- * modo servicio, las reservas de una sala en el plano y el resumen de Hoy.
- *
- * Es una FUNCIÓN y no una constante a propósito: así las claves de esos hooks se
- * leen al guardar y no al importar este módulo. Un test que monte cualquier
- * pantalla con un mock parcial de uno de ellos (p. ej. `useAsignacionesMesa`
- * sin su constante) no revienta solo por importar el formulario.
+ * Al EDITAR, las mismas y además la fila que tiene abierta el editor
+ * (`EditarReservaDialog`, prefijo "reserva-edicion").
  */
-const clavesRefrescoEdicion = () => [
-  ...CLAVES_REFRESCO_RESERVAS,
-  CLAVE_RESUMEN_ASIGNACION_DIA,
-  CLAVE_ASIGNACIONES_MESA,
-  CLAVE_RESERVAS_SERVICIO_DIA,
-  "reservas_sala_dia",
-  "reservas_hoy_resumen",
-  "reserva-edicion",
-];
+const CLAVES_REFRESCO_EDICION = [...CLAVES_POR_CAMBIO.ocupacion, "reserva-edicion"];
 
 interface ReservaMismoDia {
   hora: string;
@@ -780,7 +735,7 @@ export const FormularioReserva = ({
       if (error) throw error;
       if (!data || data.length === 0) throw new ErrorSinFilasEdicion();
 
-      clavesRefrescoEdicion().forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+      CLAVES_REFRESCO_EDICION.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
       // Aviso de «reserva modificada»: solo con la casilla marcada y si se puede
       // avisar AHORA (mismas reglas que la casilla, con la lista negra recién
@@ -802,7 +757,7 @@ export const FormularioReserva = ({
       // aviso no puede prometer que «se le manda». No se pide si ya va el aviso del
       // cambio (a una verificada le lleva el enlace nuevo).
       const notificar = !avisarCambio && debeNotificarEdicion(original, cambios, { hoy: hoyISO, enListaNegra });
-      const envio = notificar ? await pedirCorreoConfirmacion(original.id, original.estado) : null;
+      const envio = notificar ? await notificarAlCliente(original.id, { estado: original.estado }) : null;
 
       const partes = [`Cambios guardados: ${textoCamposCambiados(cambios)}.`];
       if ("en_blacklist" in cambios) {
@@ -953,7 +908,7 @@ export const FormularioReserva = ({
       // Refrescar todo lo que muestra reservas del día, ocupación y disponibilidad:
       // sin esto la reserva se crea pero no aparece en ninguna pantalla y el hueco
       // recién ocupado se sigue ofreciendo como libre.
-      CLAVES_REFRESCO_RESERVAS.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+      CLAVES_REFRESCO_ALTA.forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
 
       if (blacklisted) {
         toast.info("Reserva registrada como pendiente de revisión (cliente en lista negra)");

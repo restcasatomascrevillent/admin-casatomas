@@ -360,7 +360,6 @@ export default function Reservas() {
               // `key`: si llega otro filtro por URL estando ya en la página
               // (p. ej. desde la campana), la lista se reinicia con él.
               key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
-              onEspacioClick={handleEspacioClick}
               onAsignarMesa={handleAsignarMesa}
               initialStatusFilter={statusFromUrl || undefined}
               initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}

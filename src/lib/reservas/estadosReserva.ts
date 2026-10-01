@@ -6,10 +6,9 @@
 // aquí el kanban de Hoy (`GestorReservasKanban`: nombre y color de la insignia),
 // el timeline (`TimelineEstadosReserva`: nodos, burbujas y frases), el control de
 // llegada (`ControlLlegada`), el modo servicio (`ModoServicioPlano`), el filtro
-// «Estado» (`vistaUnificada.ts`) y `servicioSala.ts` (constantes y predicados).
-// Queda UNA copia por migrar, la de la Lista: `getStatusBadge` y
-// `ESTADO_RESERVA_TEXTO` de ListaReservasAvanzada.tsx (paso 3); por eso este mapa
-// sigue llevando lo que ella usa (`insignia`, `frase`).
+// «Estado» (`vistaUnificada.ts`), `servicioSala.ts` (constantes y predicados) y,
+// desde el paso 3, la Lista (`ListaReservasAvanzada`: la insignia de estado, con
+// `insignia` y `varianteInsignia`) y sus botones (`accionesReserva.ts`: `frase`).
 //
 // Es un módulo de datos: sin hooks, sin JSX, sin Supabase. Importa los iconos de
 // `lucide-react` porque el icono forma parte del estado (lo pintan la lista y el
@@ -49,8 +48,8 @@ export const ESTADO_TRAS_DESHACER = "confirmada" as const;
 /**
  * Orden del CICLO DE VIDA, el del timeline: el camino (pendiente → verificada →
  * confirmada → llegó) y luego las dos salidas (cancelada, no vino). El filtro
- * «Estado» de la lista usa hoy otro orden (no_show antes que cancelada) y la
- * función `getStatusBadge` un tercero; ninguno es el del CHECK de la BD.
+ * «Estado» de la lista usa otro orden (no_show antes que cancelada); ninguno es
+ * el del CHECK de la BD.
  */
 export const ORDEN_ESTADOS = [
   "pendiente",
@@ -63,8 +62,7 @@ export const ORDEN_ESTADOS = [
 
 /**
  * Estados «vivos»: los que todavía esperan al cliente y cuentan para el aforo
- * (mismo conjunto que `ESTADOS_QUE_OCUPAN` del trigger y que `esperandoLlegada`
- * de servicioSala.ts; un test lo comprueba).
+ * (mismo conjunto que `ESTADOS_QUE_OCUPAN` del trigger; un test lo comprueba).
  */
 export const ESTADOS_VIVOS = ["pendiente", "verificada", "confirmada"] as const satisfies readonly EstadoReserva[];
 
@@ -87,10 +85,10 @@ export interface InfoEstadoReserva {
    */
   etiquetaFiltro: string;
   /**
-   * Cómo se dice el estado en una frase «la reserva está …» (hoy
-   * `ESTADO_RESERVA_TEXTO` de la lista, para el `title` del botón principal).
-   * Conserva «ya servida» para «Llegó»: pendiente de alinear con el vocabulario
-   * único cuando la Lista pase a este mapa (paso 3).
+   * Cómo se dice el estado en una frase «la reserva está …» (el `title` del botón
+   * principal de la Lista cuando no hay nada que aceptar ni confirmar, vía
+   * `accionesReserva.ts`). «Llegó» se dice «marcada como «Llegó»»: el vocabulario
+   * único, ya no «ya servida».
    */
   frase: string;
   Icono: LucideIcon;
@@ -101,6 +99,13 @@ export interface InfoEstadoReserva {
    * emerald-600 / secondary) porque NO hay token para esos tres estados.
    */
   insignia: string;
+  /**
+   * Variante del `Badge` con la que la Lista pinta la insignia, si no es la de por
+   * defecto: cancelada y «No vino» van con la suya (`destructive`, `secondary`), que
+   * trae su propio fondo al pasar el ratón; las demás, con la de por defecto y sus
+   * clases.
+   */
+  varianteInsignia?: "destructive" | "secondary";
   /**
    * Clases de la burbuja del timeline: sólida en el camino principal y con borde
    * discontinuo en las dos salidas (cancelada, no vino).
@@ -113,8 +118,9 @@ export interface InfoEstadoReserva {
 }
 
 /**
- * Los seis estados, en el orden de `ORDEN_ESTADOS`. Las cadenas son las mismas
- * que hoy pintan las cuatro copias (ver la cabecera); no hay ninguna nueva.
+ * Los seis estados, en el orden de `ORDEN_ESTADOS`. Las cadenas son las que
+ * pintaban las cuatro copias que había (ver la cabecera), salvo la `frase` de
+ * «Llegó», que deja el «ya servida» por el vocabulario único.
  */
 export const ESTADOS_RESERVA: Readonly<Record<EstadoReserva, InfoEstadoReserva>> = {
   pendiente: {
@@ -151,7 +157,7 @@ export const ESTADOS_RESERVA: Readonly<Record<EstadoReserva, InfoEstadoReserva>>
     clave: "completada",
     etiqueta: "Llegó",
     etiquetaFiltro: "Llegó / completada",
-    frase: "ya servida",
+    frase: "marcada como «Llegó»",
     Icono: CheckCheck,
     insignia: "bg-emerald-600 text-white",
     burbuja: "bg-emerald-600 text-white",
@@ -164,6 +170,7 @@ export const ESTADOS_RESERVA: Readonly<Record<EstadoReserva, InfoEstadoReserva>>
     frase: "cancelada",
     Icono: XCircle,
     insignia: "bg-destructive text-destructive-foreground",
+    varianteInsignia: "destructive",
     burbuja: "border-2 border-dashed border-destructive/70 bg-destructive/10 text-destructive",
     // Hasta que el cliente llega: una reserva «Llegó» o «No vino» ya no se cancela.
     cuando: "Antes de que llegue:",
@@ -176,6 +183,7 @@ export const ESTADOS_RESERVA: Readonly<Record<EstadoReserva, InfoEstadoReserva>>
     frase: "marcada como «no vino»",
     Icono: UserX,
     insignia: "bg-secondary text-secondary-foreground",
+    varianteInsignia: "secondary",
     burbuja: "border-2 border-dashed border-muted-foreground/70 bg-muted/60 text-muted-foreground",
     cuando: "Si no se presenta:",
     descripcion: "lo marcas tú o el sistema.",
@@ -199,9 +207,8 @@ export function esTerminal(estado: string | null | undefined): boolean {
 
 /**
  * ¿Ocupa sitio físico en una sala? Los vivos más «Llegó» (el cliente ya está
- * sentado). Cancelada y No vino no ocupan nada: por eso no se mueven. Es
- * `ocupaEspacio` de servicioSala.ts, y para los seis estados coincide con
- * `puedeMoverReserva`.
+ * sentado). Cancelada y No vino no ocupan nada: por eso no se mueven (es
+ * también la regla de «Mover»). servicioSala.ts la reexporta con este nombre.
  */
 export function ocupaEspacio(estado: string | null | undefined): boolean {
   return esEstadoVivo(estado) || estado === ESTADO_LLEGADA;

@@ -82,6 +82,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -107,6 +108,7 @@ function espiarInsert() {
 
 function montar(datos: Record<string, unknown>) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const invalidar = vi.spyOn(qc, "invalidateQueries");
   const onSuccess = vi.fn();
   render(
     <QueryClientProvider client={qc}>
@@ -126,7 +128,7 @@ function montar(datos: Record<string, unknown>) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  return { onSuccess };
+  return { onSuccess, invalidar };
 }
 
 beforeEach(() => {
@@ -168,6 +170,24 @@ describe("FormularioReserva · negocio obligatorio y sala interna", () => {
 
     await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
     expect(insert.mock.calls[0][0]).toMatchObject({ marca: "casa_tomas", espacio_id: null });
+  });
+});
+
+describe("FormularioReserva · qué se refresca al crear", () => {
+  it("las claves de cualquier cambio de ocupación (`clavesCache.ts`): sin las dos que no existían y con `disponibilidad-calculada`", async () => {
+    const insert = espiarInsert();
+    const { invalidar, onSuccess } = montar({});
+
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    const claves = invalidar.mock.calls.map(([filtro]) => (filtro as { queryKey: string[] }).queryKey[0]);
+    for (const clave of CLAVES_POR_CAMBIO.ocupacion) expect(claves, clave).toContain(clave);
+    expect(claves).toContain("disponibilidad-calculada");
+    // Nombres que ninguna consulta usa: refrescarlos no refrescaba nada.
+    expect(claves).not.toContain("ocupacion-reservas-hoy");
+    expect(claves).not.toContain("resumen-ocupacion-hoy-completo");
   });
 });
 

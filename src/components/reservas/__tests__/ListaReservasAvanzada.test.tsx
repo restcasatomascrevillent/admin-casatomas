@@ -30,6 +30,7 @@ import { format, addDays } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 
 const supa = vi.hoisted(() => ({
   // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
@@ -107,7 +108,6 @@ vi.mock("@/components/reservas/FormularioReserva", () => ({
     supa.formulario(props);
     return null;
   },
-  CLAVES_REFRESCO_RESERVAS: ["reservas-lista"],
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({
   SolicitudCard: () => null,
@@ -749,8 +749,12 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     const { tabla } = await montar();
     fireEvent.click(casilla(tabla, "Ana Pendiente"));
     fireEvent.click(casilla(tabla, "Berta Pendiente"));
-    fireEvent.click(screen.getByRole("button", { name: /Verificar con la hora que pidieron/ }));
-    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: /^Sí, aceptar las reservas/ }));
+    // Cambio acordado (2026-10-01): se aceptan TAL COMO ESTÁN; antes decía «con la hora que pidieron».
+    fireEvent.click(screen.getByRole("button", { name: /Verificar tal como están/ }));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(dialogo.textContent).toMatch(/¿Verificar 2 reservas tal como están\?/);
+    expect(dialogo.textContent).not.toMatch(/pidi(ó|eron)/);
+    fireEvent.click(within(dialogo).getByRole("button", { name: /^Sí, aceptar las reservas/ }));
   }
 
   it("aceptar en bloque: una escritura y un aviso al cliente por reserva, UN resumen, y se vacía la selección", async () => {
@@ -785,5 +789,126 @@ describe("ListaReservasAvanzada · las acciones pasan por el ejecutor único", (
     fireEvent.click(botones(tabla, "Ana Pendiente")[0]);
 
     await waitFor(() => expect(supa.cargas.mock.calls.length).toBeGreaterThan(cargasAntes));
+  });
+});
+
+// Paso 3 del refactor de acciones: la Lista ya no tiene copia propia de los estados ni decide sus
+// botones. La insignia de estado sale del mapa único (`ESTADOS_RESERVA`) y los botones, de
+// `AccionesReserva` (`accionesDisponibles`): lo que se ve es lo de antes, salvo lo acordado.
+describe("ListaReservasAvanzada · estados y botones desde la fuente única", () => {
+  const SEIS: [string, EstadoReserva, string][] = [
+    ["res-p", "pendiente", "Ana Pendiente"],
+    ["res-v", "verificada", "Berta Verificada"],
+    ["res-c", "confirmada", "Carlos Confirmado"],
+    ["res-l", "completada", "Elena Llegó"],
+    ["res-x", "cancelada", "Diana Cancelada"],
+    ["res-n", "no_show", "Fede NoVino"],
+  ];
+  const montarSeis = () => {
+    supa.filas = SEIS.map(([id, estado, nombre]) => reserva(id, estado, nombre));
+    return montar();
+  };
+  /** Las clases `lucide-…` de un icono: dicen QUÉ icono es. */
+  const clasesIcono = (svg: Element | null | undefined) =>
+    (svg?.getAttribute("class") ?? "").split(/\s+/).filter((c) => c.startsWith("lucide-")).sort();
+
+  it("la insignia de cada estado lleva el nombre, el icono, el color y la variante del mapa", async () => {
+    const { tabla } = await montarSeis();
+
+    for (const [, estado, nombre] of SEIS) {
+      const insignia = filaDe(tabla, nombre).querySelectorAll("td")[5].firstElementChild!;
+      const ficha = ESTADOS_RESERVA[estado];
+      expect(insignia.textContent?.trim(), estado).toBe(ficha.etiqueta);
+      for (const clase of ficha.insignia.split(/\s+/)) expect(insignia.classList.contains(clase), `${estado}: ${clase}`).toBe(true);
+      const { container, unmount } = render(<ficha.Icono />);
+      expect(clasesIcono(insignia.querySelector("svg")), estado).toEqual(clasesIcono(container.querySelector("svg")));
+      unmount();
+    }
+    // Cancelada y «No vino» van con SU variante del Badge, como antes (su fondo al pasar el ratón).
+    expect(filaDe(tabla, "Diana Cancelada").querySelectorAll("td")[5].firstElementChild!.className).toMatch(/hover:bg-destructive\/80/);
+    expect(filaDe(tabla, "Fede NoVino").querySelectorAll("td")[5].firstElementChild!.className).toMatch(/hover:bg-secondary\/80/);
+  });
+
+  it("CAMBIO ACORDADO: nada dice «servida»; la principal de una «Llegó» lo explica con «Llegó»", async () => {
+    const { tabla, container } = await montarSeis();
+
+    expect(container.innerHTML).not.toMatch(/servida/i);
+    const [principal] = botonesDeFila(filaDe(tabla, "Elena Llegó"));
+    expect(principal.textContent?.trim()).toBe("Confirmar");
+    expect(principal.getAttribute("title")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «Llegó»");
+  });
+
+  it("CAMBIO ACORDADO (2026-10-01): «Aceptar» dice que acepta la reserva tal como está", async () => {
+    const { tabla } = await montarSeis();
+
+    const [aceptar] = botonesDeFila(filaDe(tabla, "Ana Pendiente"));
+    expect(aceptar.textContent?.trim()).toBe("Aceptar");
+    expect(aceptar.getAttribute("title")).toMatch(/^Aceptar la reserva tal como está/);
+    expect(aceptar.getAttribute("title")).not.toMatch(/pidió/);
+  });
+
+  it("lo deshabilitado enseña su motivo al pasar el ratón (en el envoltorio: el botón no recibe el ratón)", async () => {
+    const { tabla } = await montarSeis();
+
+    const cancelar = botonesDeFila(filaDe(tabla, "Elena Llegó"))[4];
+    expect(cancelar.hasAttribute("disabled")).toBe(true);
+    expect(cancelar.parentElement?.getAttribute("title")).toBe("No se puede cancelar una reserva que ya llegó");
+    // Lo habilitado lleva su texto en el propio botón y nada en el envoltorio.
+    const editar = botonesDeFila(filaDe(tabla, "Elena Llegó"))[3];
+    expect(editar.hasAttribute("disabled")).toBe(false);
+    expect(editar.parentElement?.hasAttribute("title")).toBe(false);
+  });
+
+  it("sin permiso, la principal dice «Aceptar» en todas las filas, deshabilitada y explicándolo (como antes)", async () => {
+    supa.canEdit = false;
+    const { tabla } = await montarSeis();
+
+    for (const [, estado, nombre] of SEIS) {
+      const [principal] = botonesDeFila(filaDe(tabla, nombre));
+      expect(principal.textContent?.trim(), estado).toBe("Aceptar");
+      expect(principal.hasAttribute("disabled"), estado).toBe(true);
+      expect(principal.getAttribute("title"), estado).toBe("No tienes permiso para editar reservas");
+    }
+  });
+
+  it("CAMBIO ACORDADO (2026-10-01): sin permiso, «Verificar», la estrella y la lista negra salen deshabilitados y lo dicen", async () => {
+    // Antes no miraban el permiso: «Verificar» abría el modal en solo lectura y la estrella y la
+    // lista negra escribían (las paraba la RLS). Va con la RLS de `reservas` endurecida.
+    supa.canEdit = false;
+    const { tabla } = await montarSeis();
+    const fila = filaDe(tabla, "Ana Pendiente");
+    const botones = botonesDeFila(fila);
+    const estrella = within(fila).getByRole("button", { name: "Marcar Ana Pendiente como importante" });
+
+    for (const boton of [botones[2], botones[5], estrella]) {
+      expect(boton.hasAttribute("disabled")).toBe(true);
+      expect(boton.parentElement?.getAttribute("title")).toBe("No tienes permiso para editar reservas");
+      fireEvent.click(boton);
+    }
+    expect(supa.update).not.toHaveBeenCalled();
+    // «Dar mesa» no escribe nada (abre el plano): sigue sin mirar el permiso.
+    expect(botones[1].getAttribute("aria-label")).not.toMatch(/permiso/);
+  });
+
+  it("una reserva sin nombre: los botones dicen «este cliente», como el editor y la tarjeta de móvil", async () => {
+    supa.filas = [{ ...reserva("res-anonima", "confirmada", ""), nombre: null }];
+    const { tabla } = await montar();
+    const fila = filaDe(tabla, "Sin nombre");
+    const botones = botonesDeFila(fila);
+
+    expect(botones[4].getAttribute("aria-label")).toBe("Cancelar la reserva de este cliente — pedirá confirmación");
+    expect(botones[5].getAttribute("aria-label")).toBe("Añadir a este cliente a la lista negra");
+    expect(within(fila).getByRole("button", { name: "Marcar este cliente como importante" })).toBeInTheDocument();
+  });
+
+  it("la estrella de la tarjeta de móvil también dice qué hace y marca la misma reserva", async () => {
+    await montarSeis();
+
+    // jsdom monta a la vez la tabla y las tarjetas: la misma estrella sale dos veces.
+    const estrellas = screen.getAllByRole("button", { name: "Marcar Carlos Confirmado como importante" });
+    expect(estrellas).toHaveLength(2);
+    fireEvent.click(estrellas.find((b) => !b.closest("table"))!);
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ importante: true }));
+    expect(supa.eq).toHaveBeenCalledWith("id", "res-c");
   });
 });

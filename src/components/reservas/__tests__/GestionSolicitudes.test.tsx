@@ -1,200 +1,81 @@
 /**
- * Tests para src/components/reservas/GestionSolicitudes.tsx
+ * Tests para src/components/reservas/GestionSolicitudes.tsx: la tarjeta de una
+ * solicitud del bot (`SolicitudCard`).
  *
- * Estrategia: mock completo de useSolicitudesPendientes para aislar
- * la lógica de renderizado y filtrado del componente.
- *
- * Requisitos del entorno:
- *   - @testing-library/react
- *   - @testing-library/jest-dom
- *   - Radix UI funciona con jsdom (sin animaciones)
+ * La pestaña propia que la montaba (`GestionSolicitudes()`, con su filtro por estado
+ * y su contador) era código muerto —ninguna pantalla la usaba: las solicitudes viven
+ * mezcladas en la Lista de reservas— y se borró en el paso 4 del refactor de acciones.
+ * Lo que estos tests comprobaban de la TARJETA a través de ella se comprueba ahora
+ * sobre la tarjeta directamente, que es lo que siguen usando la Lista (móvil) y el
+ * diálogo de gestión.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-
-// Mock del hook para no depender de Supabase
-vi.mock("@/hooks/useSolicitudesPendientes");
-vi.mock("sonner");
-
-import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
-import { GestionSolicitudes } from "@/components/reservas/GestionSolicitudes";
+import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import { SolicitudCard } from "@/components/reservas/GestionSolicitudes";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-const makeSolicitud = (overrides = {}) => ({
-  id: "sol-1",
-  nombre: "Juan García",
-  telefono: "+34 666 111 222",
-  email: "juan@test.com",
-  fecha_solicitada: "2026-04-01",
-  hora_solicitada: "13:00",
-  numero_comensales: 8,
-  notas_cliente: "Cumpleaños",
-  motivo_rechazo: "grupo_grande",
-  descripcion_rechazo: "Grupo superior al máximo permitido",
-  estado: "pendiente",
-  notas_internas: null,
-  created_at: "2026-03-21T10:00:00Z",
-  updated_at: "2026-03-21T10:00:00Z",
-  ...overrides,
-});
+const makeSolicitud = (overrides: Partial<SolicitudPendiente> = {}) =>
+  ({
+    id: "sol-1",
+    nombre: "Juan García",
+    telefono: "+34 666 111 222",
+    email: "juan@test.com",
+    fecha_solicitada: "2026-04-01",
+    hora_solicitada: "13:00",
+    numero_comensales: 8,
+    notas_cliente: "Cumpleaños",
+    motivo_rechazo: "grupo_grande",
+    descripcion_rechazo: "Grupo superior al máximo permitido",
+    estado: "pendiente",
+    notas_internas: null,
+    created_at: "2026-03-21T10:00:00Z",
+    updated_at: "2026-03-21T10:00:00Z",
+    ...overrides,
+  }) as SolicitudPendiente;
 
-const defaultHookReturn = {
-  solicitudes: [],
-  loading: false,
-  countPendientes: 0,
-  fetchSolicitudes: vi.fn(),
-  updateEstado: vi.fn().mockResolvedValue(true),
-  updateNotasInternas: vi.fn().mockResolvedValue(true),
-  updatePropuesta: vi.fn().mockResolvedValue(true),
-  enviarPropuesta: vi.fn().mockResolvedValue(true),
-  aceptarPropuestaTelefono: vi.fn().mockResolvedValue({ ok: true }),
-  rechazarPropuestaTelefono: vi.fn().mockResolvedValue({ ok: true }),
-  marcarConvertida: vi.fn().mockResolvedValue(true),
+const montar = (solicitud: SolicitudPendiente, props: Partial<Parameters<typeof SolicitudCard>[0]> = {}) => {
+  const onUpdateEstado = vi.fn().mockResolvedValue(true);
+  const onUpdateNotas = vi.fn().mockResolvedValue(true);
+  render(<SolicitudCard solicitud={solicitud} onUpdateEstado={onUpdateEstado} onUpdateNotas={onUpdateNotas} {...props} />);
+  return { onUpdateEstado, onUpdateNotas };
 };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe("GestionSolicitudes", () => {
+describe("SolicitudCard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   // ── Renderizado básico ─────────────────────────────────────────────────────
 
-  it("muestra spinner mientras carga", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      loading: true,
-    });
-
-    const { container } = render(<GestionSolicitudes />);
-    // El spinner es el único elemento visible mientras carga
-    // Buscamos el SVG de Loader2 (lucide-react renderiza SVGs)
-    const svgs = container.querySelectorAll("svg");
-    expect(svgs.length).toBeGreaterThan(0);
-  });
-
-  it("muestra mensaje vacío cuando no hay pendientes", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [],
-    });
-
-    render(<GestionSolicitudes />);
-    expect(
-      screen.getByText(/no hay solicitudes pendientes/i)
-    ).toBeDefined();
-  });
-
   it("renderiza correctamente una solicitud pendiente", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud()],
-      countPendientes: 1,
-    });
-
-    render(<GestionSolicitudes />);
+    montar(makeSolicitud());
     expect(screen.getByText("Juan García")).toBeDefined();
   });
 
   it("renderiza el badge del motivo de rechazo", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ motivo_rechazo: "grupo_grande" })],
-    });
-
-    render(<GestionSolicitudes />);
+    montar(makeSolicitud({ motivo_rechazo: "grupo_grande" }));
     expect(screen.getByText("Grupo grande")).toBeDefined();
   });
 
   it("renderiza el badge de estado 'Pendiente'", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ estado: "pendiente" })],
-    });
-
-    render(<GestionSolicitudes />);
+    montar(makeSolicitud({ estado: "pendiente" }));
     expect(screen.getByText("Pendiente")).toBeDefined();
   });
 
-  // ── Filtrado ───────────────────────────────────────────────────────────────
-
-  it("filtro por defecto muestra solo pendientes", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [
-        makeSolicitud({ id: "sol-1", estado: "pendiente", nombre: "Juan" }),
-        makeSolicitud({ id: "sol-2", estado: "resuelta", nombre: "María" }),
-      ],
-    });
-
-    render(<GestionSolicitudes />);
-    // Solo Juan debe aparecer (filtro inicial = "pendiente")
-    expect(screen.getByText("Juan")).toBeDefined();
-    expect(screen.queryByText("María")).toBeNull();
-  });
-
-  it("mostrar 'No hay solicitudes con este filtro' para filtro sin resultados", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ estado: "pendiente" })],
-    });
-
-    render(<GestionSolicitudes />);
-
-    // El select de estado tiene valor "pendiente" por defecto
-    // Simulamos cambio a "contactado" (no hay ninguna)
-    const trigger = screen.getByRole("combobox");
-    fireEvent.click(trigger);
-
-    // En Radix Select, las opciones se renderizan en un portal.
-    // Verificamos al menos que el componente no explota.
-    expect(trigger).toBeDefined();
-  });
-
-  // ── Badge contador ─────────────────────────────────────────────────────────
-
-  it("badge de contador muestra el número correcto de solicitudes filtradas", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [
-        makeSolicitud({ id: "sol-1", estado: "pendiente" }),
-        makeSolicitud({ id: "sol-2", estado: "pendiente" }),
-      ],
-      countPendientes: 2,
-    });
-
-    render(<GestionSolicitudes />);
-    // El badge muestra el número 2
-    expect(screen.getByText("2")).toBeDefined();
-  });
-
-  // ── Solicitud con notas internas ────────────────────────────────────────────
-
   it("muestra notas internas cuando existen", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [
-        makeSolicitud({ notas_internas: "Llamar a las 10h mañana" }),
-      ],
-    });
-
-    render(<GestionSolicitudes />);
+    montar(makeSolicitud({ notas_internas: "Llamar a las 10h mañana" }));
     expect(screen.getByText("Llamar a las 10h mañana")).toBeDefined();
   });
 
   // ── Interacciones ───────────────────────────────────────────────────────────
 
   it("botón Gestionar expande las opciones de la tarjeta", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud()],
-    });
-
-    render(<GestionSolicitudes />);
-    const gestionarBtn = screen.getByText("Gestionar");
-    fireEvent.click(gestionarBtn);
+    montar(makeSolicitud());
+    fireEvent.click(screen.getByText("Gestionar"));
 
     // Después de expandir, deben aparecer los botones de acción
     expect(screen.getByText("Resuelta")).toBeDefined();
@@ -202,48 +83,44 @@ describe("GestionSolicitudes", () => {
   });
 
   it("al hacer clic en Resuelta se llama updateEstado con 'resuelta'", async () => {
-    const updateEstado = vi.fn().mockResolvedValue(true);
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ id: "sol-1" })],
-      updateEstado,
-    });
-
-    render(<GestionSolicitudes />);
+    const { onUpdateEstado } = montar(makeSolicitud({ id: "sol-1" }));
     fireEvent.click(screen.getByText("Gestionar"));
     fireEvent.click(screen.getByText("Resuelta"));
 
     await waitFor(() => {
-      expect(updateEstado).toHaveBeenCalledWith("sol-1", "resuelta");
+      expect(onUpdateEstado).toHaveBeenCalledWith("sol-1", "resuelta");
     });
   });
 
   it("al hacer clic en Descartar se llama updateEstado con 'descartada'", async () => {
-    const updateEstado = vi.fn().mockResolvedValue(true);
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ id: "sol-1" })],
-      updateEstado,
-    });
-
-    render(<GestionSolicitudes />);
+    const { onUpdateEstado } = montar(makeSolicitud({ id: "sol-1" }));
     fireEvent.click(screen.getByText("Gestionar"));
     fireEvent.click(screen.getByText("Descartar"));
 
     await waitFor(() => {
-      expect(updateEstado).toHaveBeenCalledWith("sol-1", "descartada");
+      expect(onUpdateEstado).toHaveBeenCalledWith("sol-1", "descartada");
     });
   });
 
-  it("solicitud resuelta no muestra botón 'Resuelta' (ya está en ese estado)", () => {
-    vi.mocked(useSolicitudesPendientes).mockReturnValue({
-      ...defaultHookReturn,
-      solicitudes: [makeSolicitud({ id: "sol-1", estado: "resuelta" })],
-    });
+  it("una solicitud resuelta no ofrece «Resuelta» (ya lo está) y sí «Volver a pendiente»", () => {
+    montar(makeSolicitud({ estado: "resuelta" }));
+    fireEvent.click(screen.getByText("Gestionar"));
 
-    render(<GestionSolicitudes />);
-    // El filtro por defecto es "pendiente", así que resuelta no aparece
-    // Verificamos que no hay tarjeta del todo
-    expect(screen.queryByText("Juan García")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Resuelta$/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Volver a pendiente/ })).toBeDefined();
+  });
+
+  it("«Convertir en reserva» solo si se pasa `onConvertir` y la solicitud sigue abierta", () => {
+    const onConvertir = vi.fn();
+    montar(makeSolicitud({ estado: "contactado" }), { onConvertir });
+    fireEvent.click(screen.getByText("Gestionar"));
+    fireEvent.click(screen.getByRole("button", { name: /Convertir en reserva/ }));
+    expect(onConvertir).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin `onConvertir` (sin permiso) no hay «Convertir en reserva»", () => {
+    montar(makeSolicitud());
+    fireEvent.click(screen.getByText("Gestionar"));
+    expect(screen.queryByRole("button", { name: /Convertir en reserva/ })).toBeNull();
   });
 });

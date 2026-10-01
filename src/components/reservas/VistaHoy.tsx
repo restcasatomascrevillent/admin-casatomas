@@ -120,9 +120,9 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
    * `espacio_id` no está en los tipos generados).
    *
    * CLAVE: empieza por "reservas-hoy", que es uno de los prefijos de
-   * `CLAVES_LISTAS_RESERVAS` (useAccionesServicioReserva) y el primero de
-   * `CLAVES_REFRESCO_RESERVAS` (FormularioReserva). Es decir, sin tocar ningún
-   * otro fichero:
+   * `CLAVES_LISTAS_RESERVAS` y está en `CLAVES_POR_CAMBIO.ocupacion`
+   * (`clavesCache.ts`: las acciones de reserva y el alta/edición del
+   * formulario refrescan esa lista). Es decir, sin tocar ningún otro fichero:
    *   · mover una reserva de sala o marcar llegada en el kanban ya invalida
    *     (y actualiza de forma optimista, porque el dato es un array de filas
    *     con `id`) todo lo que empiece por "reservas-hoy" → la franja se

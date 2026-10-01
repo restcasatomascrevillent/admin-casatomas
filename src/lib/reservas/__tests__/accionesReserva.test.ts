@@ -16,17 +16,18 @@
  * · Los cambios acordados: (a) sin cancelar «Llegó» / «No vino»; (b) «editar»
  *   siempre, en los seis estados; (c) Hoy respeta el permiso en TODO —también la
  *   lista negra, desde el paso 1—; (d) un solo vocabulario, «Ha llegado» /
- *   «No vino».
- * · Lo que en la Lista NO respeta el permiso y se conserva tal cual (verificar,
- *   estrella y lista negra): está marcado abajo como «hoy no mira el permiso».
- *   La Lista se migra en el paso 3.
+ *   «No vino»; (e) desde el paso 3, la Lista también respeta el permiso en
+ *   «Verificar», la estrella y la lista negra (decisión del dueño, 2026-10-01, con
+ *   la RLS de `reservas` endurecida). Ya no queda nada que escriba sin mirarlo.
  *
- * Los textos son los de hoy salvo donde lo dice un cambio acordado: el paso que
- * migre la Lista a este módulo no debe cambiar lo que lee el personal.
+ * Los textos son los de hoy salvo donde lo dice un cambio acordado (en el paso 3,
+ * «Llegó» deja de decirse «ya servida»): migrar la Lista no cambia lo que lee el
+ * personal.
  */
 import { describe, it, expect } from "vitest";
 import {
   ACCIONES_RESERVA,
+  TITULO_ACEPTAR,
   TITULO_SIN_PERMISO_CANCELAR,
   TITULO_SIN_PERMISO_EDITAR,
   accionesDisponibles,
@@ -34,8 +35,8 @@ import {
   type EstadoAccion,
   type VistaReservas,
 } from "../accionesReserva";
-import { ORDEN_ESTADOS } from "../estadosReserva";
-import { esperandoLlegada, haLlegado, puedeMoverReserva } from "../servicioSala";
+import { ORDEN_ESTADOS, esEstadoVivo, ocupaEspacio } from "../estadosReserva";
+import { haLlegado } from "../servicioSala";
 // Texto del fichero, tal cual (`?raw` de Vite): no hace falta `fs` ni rutas.
 import fuenteDeAcciones from "../accionesReserva.ts?raw";
 
@@ -52,12 +53,12 @@ const CON_PERMISO: Record<VistaReservas, Fila> = {
   lista: {
     aceptar:     "✔·····",
     confirmar:   "·✔✖✖✖✖",
-    verificar:   "✔✖✖✖✖✖", // hoy no mira el permiso
+    verificar:   "✔✖✖✖✖✖",
     seleccionar: "✔·····",
     cancelar:    "✔✔✔✖✖✖", // cambio (a): Llegó y No vino ya no se cancelan
     editar:      "✔✔✔✔✔✔", // cambio (b)
-    importante:  "✔✔✔✔✔✔", // hoy no mira el permiso
-    listaNegra:  "✔✔✔✔✔✔", // hoy no mira el permiso
+    importante:  "✔✔✔✔✔✔",
+    listaNegra:  "✔✔✔✔✔✔",
     haLlegado:   "······",
     noVino:      "······",
     deshacer:    "······",
@@ -83,12 +84,12 @@ const SIN_PERMISO: Record<VistaReservas, Fila> = {
   lista: {
     aceptar:     "✖·····",
     confirmar:   "·✖✖✖✖✖",
-    verificar:   "✔✖✖✖✖✖", // hoy no mira el permiso: abre el modal en solo lectura
+    verificar:   "✖✖✖✖✖✖", // cambio (e): antes abría el modal en solo lectura
     seleccionar: "······", // sin permiso desaparece la casilla de aceptar en bloque
     cancelar:    "✖✖✖✖✖✖",
     editar:      "✖✖✖✖✖✖",
-    importante:  "✔✔✔✔✔✔", // hoy no mira el permiso
-    listaNegra:  "✔✔✔✔✔✔", // hoy no mira el permiso
+    importante:  "✖✖✖✖✖✖", // cambio (e)
+    listaNegra:  "✖✖✖✖✖✖", // cambio (e)
     haLlegado:   "······",
     noVino:      "······",
     deshacer:    "······",
@@ -181,12 +182,14 @@ describe("accionesDisponibles — invariantes de cada respuesta", () => {
   });
 
   it("sin permiso, lo que queda deshabilitado POR EL PERMISO lo dice en el título", () => {
-    // Las que no dependen del permiso (verificar, lista negra y estrella en la
-    // Lista) no entran aquí: ver las tablas de arriba.
+    // Desde el cambio (e) también «Verificar», la estrella y la lista negra de la Lista.
     for (const [vista, accion] of [
       ["lista", "aceptar"],
       ["lista", "editar"],
       ["lista", "cancelar"],
+      ["lista", "verificar"],
+      ["lista", "importante"],
+      ["lista", "listaNegra"],
       ["hoy", "haLlegado"],
       ["hoy", "noVino"],
       ["hoy", "mover"],
@@ -248,16 +251,16 @@ describe("Lista y Hoy siguen siendo diferentes", () => {
   });
 });
 
-describe("coherencia con las reglas que ya usan ControlLlegada y el kanban (servicioSala.ts)", () => {
-  it.each(ESTADOS)("%s: «Ha llegado» / «No vino» solo si se espera su llegada; «Deshacer» solo si ya llegó o no vino", (estado) => {
+describe("coherencia con las reglas que ya usan ControlLlegada y el kanban (estadosReserva.ts, servicioSala.ts)", () => {
+  it.each(ESTADOS)("%s: «Ha llegado» / «No vino» solo si se espera su llegada (viva); «Deshacer» solo si ya llegó o no vino", (estado) => {
     const hoy = acciones(estado, "hoy", true);
-    expect(hoy.haLlegado.visible).toBe(esperandoLlegada(estado));
-    expect(hoy.noVino.visible).toBe(esperandoLlegada(estado));
+    expect(hoy.haLlegado.visible).toBe(esEstadoVivo(estado));
+    expect(hoy.noVino.visible).toBe(esEstadoVivo(estado));
     expect(hoy.deshacer.visible).toBe(haLlegado(estado) || estado === "no_show");
   });
 
-  it.each(ESTADOS)("%s: se puede mover exactamente si puedeMoverReserva lo dice", (estado) => {
-    expect(acciones(estado, "hoy", true).mover.habilitada).toBe(puedeMoverReserva(estado));
+  it.each(ESTADOS)("%s: se puede mover exactamente si ocupa sitio (`ocupaEspacio`)", (estado) => {
+    expect(acciones(estado, "hoy", true).mover.habilitada).toBe(ocupaEspacio(estado));
   });
 });
 
@@ -342,12 +345,23 @@ describe("cambios acordados", () => {
       );
       expect(todos.filter((t) => /no se present/i.test(t))).toEqual([]);
     });
+
+    it("ni «servida»: el estado se llama «Llegó» (paso 3, al pasar la Lista a este módulo)", () => {
+      const todos = VISTAS.flatMap((vista) =>
+        [true, false].flatMap((canEdit) => ESTADOS.flatMap((estado) => ACCIONES_RESERVA.map((a) => acciones(estado, vista, canEdit)[a].titulo))),
+      );
+      expect(todos.filter((t) => /servida/i.test(t))).toEqual([]);
+    });
   });
 });
 
 describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo que lee el personal)", () => {
   it("aceptar", () => {
-    expect(titulo("pendiente", "lista", true, "aceptar")).toBe("Aceptar la reserva tal y como la pidió el cliente");
+    // Cambio acordado (2026-10-01): «Aceptar» acepta la reserva tal como está; antes decía «tal y como la pidió el cliente».
+    expect(titulo("pendiente", "lista", true, "aceptar")).toBe(
+      "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
+    );
+    expect(TITULO_ACEPTAR).toBe(titulo("pendiente", "lista", true, "aceptar"));
     expect(titulo("pendiente", "lista", false, "aceptar")).toBe(TITULO_SIN_PERMISO_EDITAR);
   });
 
@@ -356,8 +370,8 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
     expect(titulo("confirmada", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está ya confirmada");
     expect(titulo("cancelada", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está cancelada");
     expect(titulo("no_show", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «no vino»");
-    // Vocabulario pendiente de converger (decisión (d)): hoy dice «ya servida», no «Llegó».
-    expect(titulo("completada", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está ya servida");
+    // Vocabulario único (decisión (d), paso 3): «Llegó», ya no «ya servida».
+    expect(titulo("completada", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «Llegó»");
     // Sin permiso manda el permiso, sea cual sea el estado.
     for (const estado of ["verificada", "confirmada", "completada", "cancelada", "no_show"]) {
       expect(titulo(estado, "lista", false, "confirmar"), estado).toBe(TITULO_SIN_PERMISO_EDITAR);
@@ -368,6 +382,18 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
     expect(titulo("pendiente", "lista", true, "verificar")).toBe("Verificar: comparar lo pedido con lo ofrecido");
     for (const estado of ["verificada", "confirmada", "completada", "cancelada", "no_show"]) {
       expect(titulo(estado, "lista", true, "verificar"), estado).toBe("Verificar: solo para reservas pendientes");
+    }
+  });
+
+  it("CAMBIO (e): sin permiso, «Verificar», la estrella y la lista negra lo dicen, en cualquier estado", () => {
+    for (const estado of ESTADOS) {
+      for (const accion of ["verificar", "importante", "listaNegra"] as const) {
+        expect(acciones(estado, "lista", false)[accion], `${estado}/${accion}`).toEqual({
+          visible: true,
+          habilitada: false,
+          titulo: TITULO_SIN_PERMISO_EDITAR,
+        });
+      }
     }
   });
 
