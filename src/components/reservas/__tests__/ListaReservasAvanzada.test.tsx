@@ -461,20 +461,32 @@ describe("ListaReservasAvanzada · reservas sin email", () => {
   });
 });
 
-describe("ListaReservasAvanzada · convertir una solicitud respeta su marca", () => {
-  it("usa la marca GUARDADA en la solicitud, no la deduce de la sala", async () => {
-    // Solicitud de Touza sin sala propuesta ni marcador en las notas: antes se
-    // deducía Casa Tomás. Ahora manda la columna solicitudes_pendientes.marca.
-    const deTouza = { ...solicitud, marca: "touza" } as SolicitudPendiente;
+// Touza no admite reservas (decisión del dueño 2026-10-01): se retira «convertir una solicitud de Touza usa la
+// marca guardada (touza)». Una solicitud de Touza que quedara en la base de datos ni sale en la lista (así no se
+// puede convertir sin querer en una reserva de Casa Tomás), y las de Casa Tomás se convierten sin negocio: el
+// alta escribe siempre la marca de Casa Tomás.
+describe("ListaReservasAvanzada · solicitudes: solo Casa Tomás", () => {
+  it("una solicitud de Touza no sale en la lista (ni en el contador)", async () => {
+    const deTouza = { ...solicitud, id: "sol-tz", nombre: "Grupo Touza", marca: "touza" } as SolicitudPendiente;
     const { tabla } = await montar({
-      solicitudesState: { ...estadoSolicitudes, solicitudes: [deTouza] } as typeof estadoSolicitudes,
+      solicitudesState: { ...estadoSolicitudes, solicitudes: [solicitud, deTouza] } as typeof estadoSolicitudes,
     });
-    const fila = filaDe(tabla, "Familia Ballester");
-    fireEvent.click(botonesDeFila(fila)[0]);
+
+    expect(within(tabla).getByText("Familia Ballester")).toBeInTheDocument();
+    expect(screen.queryByText("Grupo Touza")).not.toBeInTheDocument();
+    expect(screen.getByText(/· 1 solicitud$/)).toBeInTheDocument();
+  });
+
+  it("convertir una solicitud de Casa Tomás no pasa ningún negocio al alta", async () => {
+    const { tabla } = await montar({
+      solicitudesState: { ...estadoSolicitudes, solicitudes: [{ ...solicitud, marca: "casa_tomas" }] } as typeof estadoSolicitudes,
+    });
+    fireEvent.click(botonesDeFila(filaDe(tabla, "Familia Ballester"))[0]);
 
     await waitFor(() => expect(supa.formulario).toHaveBeenCalled());
-    const props = supa.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: { marca: string } };
-    expect(props.datosPreseleccionados.marca).toBe("touza");
+    const props = supa.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: Record<string, unknown> };
+    expect(props.datosPreseleccionados).not.toHaveProperty("marca");
+    expect(props.datosPreseleccionados).toMatchObject({ canal: "telefono", solicitud_id: "sol-1", espacio_id: null });
   });
 });
 
@@ -920,10 +932,10 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
 
 // «Cómo avanza una reserva» también en la Lista (2026-10-01, petición del dueño). Es el timeline de la pestaña
 // Hoy (`TimelineEstadosReserva`) con otras cifras: las de lo que se ve en ESTA lista. Cuenta las reservas que
-// pasan los filtros de la lista —fecha, búsqueda, canal y negocio— y NO el de estado, para que al filtrar por
-// uno los demás sigan dando su cifra. No cuenta las solicitudes del bot (no son reservas) ni las reservas de
-// Touza (no admite reservas: `esDeCasaTomas`), y no hace consultas propias: usa las reservas que la lista ya
-// tiene cargadas.
+// pasan los filtros de la lista —fecha, búsqueda y canal— y NO el de estado, para que al filtrar por uno los
+// demás sigan dando su cifra. No cuenta las solicitudes del bot (no son reservas) ni las reservas de Touza (no
+// admite reservas: `admiteReservas`, que tampoco las deja salir en la tabla), y no hace consultas propias: usa
+// las reservas que la lista ya tiene cargadas.
 // Tiempo límite holgado (30 s) para todo el bloque: cada test monta la lista entera (tabla + tarjetas) y,
 // con la máquina cargada, alguno pasa de los 5 s por defecto sin que haya ningún problema.
 describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras de la lista", { timeout: 30_000 }, () => {
@@ -1065,10 +1077,10 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     expect(cifras()).toEqual(["0", "1", "1", "0", "0", "0"]);
   });
 
-  it("TOUZA NO ADMITE RESERVAS: las reservas de `marca = 'touza'` no cuentan en ninguna cifra", async () => {
-    // Decisión del dueño (2026-10-01; en los datos de demo hay 5 de Touza). La regla es `esDeCasaTomas`, que la
-    // lista no repite: lo comprueba aquí solo el resultado. (No se prueba el filtro de negocio de la lista, que
-    // se retira en otro encargo.) Una reserva sin marca es de Casa Tomás y sí cuenta.
+  it("TOUZA NO ADMITE RESERVAS: las reservas de `marca = 'touza'` no cuentan en ninguna cifra ni salen en la tabla", async () => {
+    // Decisión del dueño (2026-10-01; en los datos de demo hay 5 de Touza). La regla es la común,
+    // `admiteReservas`: lo comprueba aquí el resultado. Una reserva sin marca es de Casa Tomás y sí cuenta.
+    // Ya no hay filtro «Negocio» en la lista, así que filas, contador y cifras cuadran siempre.
     supa.filas = [
       reserva("ct", "pendiente", "De Casa Tomas"),
       { ...reserva("sin-marca", "verificada", "Sin Marca"), marca: null },
@@ -1076,9 +1088,13 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
       { ...reserva("tz-2", "confirmada", "De Touza Dos"), marca: "touza" },
       { ...reserva("tz-3", "cancelada", "De Touza Tres"), marca: "touza" },
     ];
-    await montar();
+    const { tabla } = await montar();
 
     expect(cifras()).toEqual(["1", "1", "0", "0", "0", "0"]);
+    expect(filasDeDatos(tabla).filter((f) => !f.textContent?.includes("Familia Ballester"))).toHaveLength(2);
+    expect(screen.queryByText(/De Touza/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^2 reservas/)).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Filtrar por negocio" })).not.toBeInTheDocument();
   });
 
   it("los filtros se combinan: día + búsqueda", async () => {

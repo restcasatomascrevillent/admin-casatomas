@@ -27,8 +27,9 @@
 //     confirmada y 'completada': quien ya llegó está sentado). El AFORO del
 //     turno usa `ESTADOS_QUE_OCUPAN`, la cuenta exacta del trigger. Canceladas
 //     y no presentadas no cuentan nunca.
-//   · CAPACIDAD: la del turno del negocio (suma de sus salas activas). Las
-//     salas no limitan nada aquí: son asignación interna.
+//   · CAPACIDAD: la del turno de Casa Tomás (suma de sus salas activas). Las
+//     salas no limitan nada aquí: son asignación interna. Touza no admite
+//     reservas (2026-10-01): sus reservas y salas ya llegan filtradas.
 // ============================================================================
 
 import {
@@ -40,7 +41,6 @@ import {
   turnoDeHora,
   type ConfiguracionTurnoInput,
 } from "../../../supabase/functions/_shared/disponibilidad";
-import { MARCA_POR_DEFECTO, normalizarMarca } from "./negocios";
 import { nivelOcupacion, TURNOS, type AforoTurnoDia, type NivelOcupacion, type Turno } from "./ocupacionSalas";
 import { ocupaEspacio } from "./servicioSala";
 
@@ -92,9 +92,9 @@ export interface EstanciaTurnos {
 
 export interface EntradaRejillaCuartos {
   periodos: readonly PeriodoCuarto[];
-  /** Reservas del día de UN negocio, en cualquier estado (aquí se filtran). */
+  /** Reservas del día de Casa Tomás, en cualquier estado (aquí se filtran). */
   reservas: readonly ReservaCuarto[];
-  /** Capacidad del turno del negocio (suma de sus salas activas). */
+  /** Capacidad del turno (suma de las salas activas de Casa Tomás). */
   capacidadTurno: number;
   /** Minutos de estancia estimada por turno (`configuracion_reservas`). */
   estancia: EstanciaTurnos;
@@ -106,32 +106,23 @@ export interface EntradaRejillaCuartos {
 }
 
 /**
- * Periodos del día para un negocio. Casa Tomás: turnos generales
- * (`espacio_id` null). Otro negocio: la unión de los periodos de cada uno de
- * sus espacios (los propios del espacio si los tiene, si no los generales),
- * la misma regla que `horasBaseDeNegocio`. Vacío = ese día no abre.
+ * Periodos del día: los turnos generales (`espacio_id` null), los de Casa
+ * Tomás, igual que `horasBaseDelDia`. Vacío = ese día no abre.
  */
 export function periodosDelDia(
   fecha: string,
-  marca: string | null | undefined,
   configuraciones: readonly ConfiguracionTurnoInput[] | null | undefined,
-  espacios: readonly { id: string; marca?: string | null }[] | null | undefined,
 ): PeriodoCuarto[] {
   const dia = diaDeLaSemana(fecha);
   if (dia === null) return [];
-  const m = normalizarMarca(marca);
-  const propios = (espacios ?? []).filter((e) => normalizarMarca(e.marca) === m);
-  const ids: (string | null)[] = m === MARCA_POR_DEFECTO || propios.length === 0 ? [null] : propios.map((e) => e.id);
 
   const vistos = new Map<string, PeriodoCuarto>();
-  for (const espacioId of ids) {
-    for (const c of seleccionarConfiguraciones([...(configuraciones ?? [])], espacioId, dia)) {
-      const inicio = horaAMinutos(c.hora_inicio);
-      let fin = horaAMinutos(c.hora_fin);
-      if (inicio === null || fin === null) continue;
-      if (fin <= inicio) fin += MINUTOS_DIA; // cruza medianoche
-      vistos.set(`${inicio}-${fin}`, { inicio, fin });
-    }
+  for (const c of seleccionarConfiguraciones([...(configuraciones ?? [])], null, dia)) {
+    const inicio = horaAMinutos(c.hora_inicio);
+    let fin = horaAMinutos(c.hora_fin);
+    if (inicio === null || fin === null) continue;
+    if (fin <= inicio) fin += MINUTOS_DIA; // cruza medianoche
+    vistos.set(`${inicio}-${fin}`, { inicio, fin });
   }
   return Array.from(vistos.values()).sort((a, b) => a.inicio - b.inicio || a.fin - b.fin);
 }

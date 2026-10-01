@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { resumirOcupacionPorNegocio } from "@/lib/reservas/resumenNegocios";
-import { normalizarMarca } from "@/lib/reservas/negocios";
+import { resumirOcupacion } from "@/lib/reservas/resumenOcupacion";
+import { MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
 
 export interface OcupacionEspacio {
   espacio_id?: string;
@@ -29,7 +29,7 @@ export interface OcupacionEspacio {
 interface EspacioCapacidad {
   capacidad_maxima: number;
   activa: boolean;
-  /** `caracteristicas->>'marca'`. Ver "Aforo por negocio" en `useDisponibilidad.ts`. */
+  /** `caracteristicas->>'marca'`: solo cuentan las salas de Casa Tomás (`salaAdmiteReservas`). */
   caracteristicas?: { marca?: string | null } | null;
 }
 
@@ -45,9 +45,10 @@ interface ReservaParaResumen {
  * sobre `reservas` sin `GROUP BY` ni columna `marca`/`espacio_id` (ver
  * `supabase/migrations/20260919130000_fix_vista_ocupacion_hoy_estados.sql`),
  * así que no hay forma de filtrarla por marca en el cliente. NO usar esto
- * para ningún número que se presente como "del restaurante": mezcla
- * casa_tomas y touza. Hoy (sesión 2026-09-23) no tiene consumidores propios
- * — `useResumenOcupacionHoy` calcula sus totales aparte, ver más abajo.
+ * para ningún número que se presente como "del restaurante": cuenta también
+ * las reservas que queden de otro negocio. Hoy (sesión 2026-09-23) no tiene
+ * consumidores propios — `useResumenOcupacionHoy` calcula sus totales aparte,
+ * ver más abajo.
  */
 export function useOcupacionHoy() {
   return useQuery({
@@ -65,21 +66,16 @@ export function useOcupacionHoy() {
 }
 
 /**
- * Resumen de las reservas de HOY: total del grupo + desglose por negocio
- * (Casa Tomás / Touza · El Reservado, decisión del dueño 2026-09-24).
+ * Resumen de las reservas de HOY de Casa Tomás (la franja de cifras de la
+ * pestaña «Hoy»).
  * ------------------------------------------------------------
  * No usa `vista_ocupacion_hoy` (no expone `marca`): lee `reservas` de hoy y
- * `espacios_reserva` y agrega en JS con `resumirOcupacionPorNegocio`
- * (src/lib/reservas/resumenNegocios.ts). La capacidad de cada negocio es la
- * suma de SUS espacios activos (mismo criterio que el trigger de aforo): el
- * aforo de El Reservado nunca se suma al del restaurante en el % de ocupación
- * de un negocio.
- *
- * `marca` opcional: si se pasa, solo ese negocio (las cifras de nivel
- * superior son las suyas); sin ella, los dos.
+ * `espacios_reserva` y agrega en JS con `resumirOcupacion`
+ * (src/lib/reservas/resumenOcupacion.ts). Touza no admite reservas (decisión
+ * del dueño, 2026-10-01): sus reservas y salas se ignoran. La capacidad es la
+ * suma de las salas activas de Casa Tomás (mismo criterio que el trigger).
  */
-export function useResumenOcupacionHoy(marca?: string | null) {
-  const marcaFiltro = marca ? normalizarMarca(marca) : null;
+export function useResumenOcupacionHoy() {
   const espaciosQuery = useQuery({
     queryKey: ["espacios_capacidad_total"],
     queryFn: async () => {
@@ -119,15 +115,7 @@ export function useResumenOcupacionHoy(marca?: string | null) {
   // canceladas y no_show no. El trigger de aforo NO cuenta 'completada' y así
   // se queda (decisión del dueño 2026-09-23: todo se reserva con antelación y
   // el día se bloquea la víspera, así que no se revende el hueco).
-  const resumen = reservas
-    ? (() => {
-        const todo = resumirOcupacionPorNegocio(reservas, espacios);
-        if (!marcaFiltro) return todo;
-        const propio = todo.porNegocio.find((n) => n.negocio.marca === marcaFiltro);
-        const { negocio: _negocio, ...cifras } = propio ?? { negocio: null, ...resumirOcupacionPorNegocio([], []) };
-        return { ...cifras, porNegocio: propio ? [propio] : [] };
-      })()
-    : null;
+  const resumen = reservas ? resumirOcupacion(reservas, espacios) : null;
 
   return {
     data: resumen,
@@ -141,20 +129,16 @@ export function useResumenOcupacionHoy(marca?: string | null) {
 }
 
 /**
- * Todas las reservas de HOY (sin cancelar), para el plano 2D por espacio.
- *
- * Filtradas por negocio (marca): el plano de un espacio solo debe ofrecer
- * como "pendientes de asignar" y sumar reservas de SU negocio. Quien lo usa
- * pasa la marca del espacio que se está mirando (El Reservado => 'touza');
- * por defecto Casa Tomás.
+ * Todas las reservas de HOY (sin cancelar) de Casa Tomás, para el plano 2D.
+ * Touza no admite reservas (decisión del dueño, 2026-10-01): solo la marca de
+ * Casa Tomás (antes se pasaba la marca de la sala que se miraba).
  *
  * El nombre es heredado: NO filtra por `espacio_id` (devuelve las de TODOS
- * los espacios del negocio, asignadas o no) — quien consume esto filtra
- * luego localmente. No se ha tocado ese comportamiento: es una pregunta
- * distinta a la de esta sesión (filtrar por marca).
+ * los espacios, asignadas o no) — quien consume esto filtra luego
+ * localmente. Hoy no tiene consumidores (el plano usa `useReservasDeSala`).
  */
-export function useReservasHoyPorEspacio(marcaEspacio?: string | null) {
-  const marca = normalizarMarca(marcaEspacio);
+export function useReservasHoyPorEspacio() {
+  const marca = MARCA_POR_DEFECTO;
   return useQuery({
     queryKey: ["reservas_hoy_todas", marca],
     queryFn: async () => {

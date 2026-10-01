@@ -72,7 +72,8 @@ describe("edicionReserva · valoresFormularioDesdeReserva", () => {
     expect(v.notas_cliente).toBe("");
     expect(v.espacio_id).toBeNull();
     expect(v.hora).toBe("21:00");
-    expect(v.marca).toBe("casa_tomas");
+    // Touza no admite reservas (decisión del dueño 2026-10-01): el formulario ya no tiene campo «Negocio».
+    expect(v).not.toHaveProperty("marca");
     // Mediodía local: un `new Date("2026-10-10")` (UTC) caería en el día anterior en husos negativos.
     expect(v.fecha.getFullYear()).toBe(2026);
     expect(v.fecha.getMonth()).toBe(9);

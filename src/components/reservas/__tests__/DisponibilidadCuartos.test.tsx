@@ -14,13 +14,14 @@ vi.mock("@/hooks/useOcupacionSalasDia", () => ({
     isError: false,
     isFetching: false,
     refetch: vi.fn(),
-    negocio: {
-      marca: "casa_tomas",
+    // Touza no admite reservas (decisión del dueño 2026-10-01): el hook devuelve el día de Casa Tomás en
+    // `data` (antes, el bloque del negocio pedido en `negocio`).
+    data: {
       espacios: [
-        { id: "comedor", nombre: "Comedor", capacidad_maxima: 100, marca: "casa_tomas" },
-        { id: "salon", nombre: "Salón", capacidad_maxima: 70, marca: "casa_tomas" },
+        { id: "comedor", nombre: "Comedor", capacidad_maxima: 100 },
+        { id: "salon", nombre: "Salón", capacidad_maxima: 70 },
       ],
-      reservas: [{ id: "r1", hora: "13:00:00", numero_comensales: 4, estado: "confirmada", espacio_id: "salon", marca: "casa_tomas" }],
+      reservas: [{ id: "r1", hora: "13:00:00", numero_comensales: 4, estado: "confirmada", espacio_id: "salon" }],
       horasBase: ["13:00"],
       cerrado: false,
     },
@@ -42,7 +43,7 @@ import { DisponibilidadCuartos } from "@/components/reservas/DisponibilidadCuart
 
 describe("DisponibilidadCuartos", () => {
   it("enseña los 12 cuartos de la comida, sin escalera y sin salas", () => {
-    const { container } = render(<DisponibilidadCuartos fecha="2026-10-05" marca="casa_tomas" />);
+    const { container } = render(<DisponibilidadCuartos fecha="2026-10-05" />);
     const tabla = screen.getByRole("table");
     const cabeceras = within(tabla).getAllByRole("columnheader").map((th) => th.textContent);
     expect(cabeceras).toEqual([
@@ -58,7 +59,6 @@ describe("DisponibilidadCuartos", () => {
     render(
       <DisponibilidadCuartos
         fecha="2026-10-05"
-        marca="casa_tomas"
         hora="14:15"
         comensales={6}
         onSeleccionarHora={onSeleccionarHora}
@@ -71,7 +71,31 @@ describe("DisponibilidadCuartos", () => {
   });
 
   it("sin fecha pide elegir un día", () => {
-    render(<DisponibilidadCuartos fecha={null} marca="casa_tomas" />);
+    render(<DisponibilidadCuartos fecha={null} />);
     expect(screen.getByText(/elige un día/i)).toBeInTheDocument();
+  });
+
+  // Touza no admite reservas (decisión del dueño 2026-10-01): una sola rejilla, sin «· Casa Tomás» ni otro negocio.
+  it("el título no nombra ningún negocio", () => {
+    render(<DisponibilidadCuartos fecha="2026-10-05" />);
+    expect(screen.getByRole("heading", { name: "Disponibilidad por cuartos de hora" })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Casa Tomás|Touza/);
+  });
+
+  it("compacta, sigue llevando su título (el panel del día y la verificación no tienen otro)", () => {
+    render(<DisponibilidadCuartos fecha="2026-10-05" compacto />);
+    expect(screen.getByRole("heading", { name: "Disponibilidad por cuartos de hora" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["compacta", true],
+    ["completa", false],
+  ])("%s y con `ocultarTitulo` no repite el título a la vista, pero la sección conserva su nombre", (_, compacto) => {
+    render(<DisponibilidadCuartos fecha="2026-10-05" compacto={compacto} ocultarTitulo />);
+    expect(screen.queryByRole("heading", { name: "Disponibilidad por cuartos de hora" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Disponibilidad por cuartos de hora")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Disponibilidad por cuartos de hora" })).toBeInTheDocument();
+    // La rejilla sigue entera.
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularCuadreEspacio,
-  calcularCuadrePorNegocio,
+  calcularCuadreTotal,
   calcularCuadres,
   plazasDeMesas,
   textoEstadoCuadre,
@@ -289,7 +289,9 @@ describe("calcularCuadres", () => {
   });
 });
 
-describe("calcularCuadrePorNegocio", () => {
+// Touza no admite reservas (decisión del dueño 2026-10-01): el agregado POR NEGOCIO
+// (`calcularCuadrePorNegocio`, un bloque por marca) pasa a ser UN total, el de las salas de Casa Tomás.
+describe("calcularCuadreTotal", () => {
   const cuadresDe = (espacios: EspacioParaCuadre[], listaMesas: MesaParaCuadre[]) =>
     calcularCuadres(espacios, listaMesas);
 
@@ -301,11 +303,8 @@ describe("calcularCuadrePorNegocio", () => {
       ],
       mesas("salon", 10, 4),
     );
-    const porNegocio = calcularCuadrePorNegocio(cuadres);
-    expect(porNegocio).toHaveLength(1);
     // Sin el filtro, lo declarado saldría 250 en vez de 50.
-    expect(porNegocio[0]).toMatchObject({
-      marca: "casa_tomas",
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({
       capacidadDeclarada: 50,
       plazasMesas: 40,
       diferencia: -10,
@@ -317,7 +316,7 @@ describe("calcularCuadrePorNegocio", () => {
       ...mesas("salon", 8, 4),
       ...uniones("salon", 4, 8),
     ]);
-    expect(calcularCuadrePorNegocio(cuadres)[0]).toMatchObject({
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({
       capacidadDeclarada: 50,
       plazasMesas: 32,
       plazasFusionadas: 32,
@@ -325,25 +324,22 @@ describe("calcularCuadrePorNegocio", () => {
     });
   });
 
-  it("ordena casa_tomas, touza y las marcas desconocidas al final por orden alfabético", () => {
+  it("solo suma las salas de Casa Tomás: las de Touza (u otra marca) no entran, aunque estén activas", () => {
     const cuadres = cuadresDe(
       [
         espacio({ id: "p", nombre: "Pulpería", capacidad_maxima: 10, caracteristicas: { marca: "pulperia" } }),
         espacio({ id: "t", nombre: "El Reservado", capacidad_maxima: 20, caracteristicas: { marca: "touza" } }),
-        espacio({ id: "b", nombre: "Bodega", capacidad_maxima: 10, caracteristicas: { marca: "bodega" } }),
+        espacio({ id: "tz-terraza", nombre: "Terraza", capacidad_maxima: 30, caracteristicas: { marca: "touza" } }),
         espacio({ id: "c", nombre: "Comedor", capacidad_maxima: 50 }),
+        espacio({ id: "ct-terraza", nombre: "Terraza", capacidad_maxima: 50, caracteristicas: { marca: "casa_tomas" } }),
       ],
-      [],
+      [...mesas("tz-terraza", 5, 4), ...mesas("ct-terraza", 3, 4)],
     );
-    expect(calcularCuadrePorNegocio(cuadres).map((n) => n.marca)).toEqual([
-      "casa_tomas",
-      "touza",
-      "bodega",
-      "pulperia",
-    ]);
+    // Dos «Terraza»: cuenta la de Casa Tomás (por su marca, no por el nombre).
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({ capacidadDeclarada: 100, plazasMesas: 12, espaciosSinMesas: 1 });
   });
 
-  it("cuenta espaciosSinMesas y espaciosDescuadrados del negocio", () => {
+  it("cuenta espaciosSinMesas y espaciosDescuadrados", () => {
     const cuadres = cuadresDe(
       [
         espacio({ id: "salon", capacidad_maxima: 40 }), // 40 plazas => cuadra
@@ -352,7 +348,7 @@ describe("calcularCuadrePorNegocio", () => {
       ],
       [...mesas("salon", 10, 4), ...mesas("comedor", 2, 2)],
     );
-    expect(calcularCuadrePorNegocio(cuadres)[0]).toMatchObject({
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({
       capacidadDeclarada: 120,
       plazasMesas: 44,
       diferencia: -76,
@@ -374,7 +370,7 @@ describe("calcularCuadrePorNegocio", () => {
       ],
       [...uniones("terraza", 3, 4), ...mesas("salon", 9, 4)],
     );
-    expect(calcularCuadrePorNegocio(cuadres)[0]).toMatchObject({
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({
       capacidadDeclarada: 120,
       plazasMesas: 36,
       plazasFusionadas: 12,
@@ -385,9 +381,9 @@ describe("calcularCuadrePorNegocio", () => {
     });
   });
 
-  it("bloquearia solo si TODA la marca se queda a 0 con capacidad declarada", () => {
-    // Un espacio a 0 mesas no bloquea nada si un hermano de su marca aporta plazas.
-    const conHermano = calcularCuadrePorNegocio(
+  it("bloquearia solo si TODAS las salas se quedan a 0 con capacidad declarada", () => {
+    // Una sala a 0 mesas no bloquea nada si otra aporta plazas.
+    const conHermano = calcularCuadreTotal(
       cuadresDe(
         [
           espacio({ id: "salon", capacidad_maxima: 50 }),
@@ -396,26 +392,18 @@ describe("calcularCuadrePorNegocio", () => {
         mesas("salon", 10, 4),
       ),
     );
-    expect(conHermano[0]).toMatchObject({ plazasMesas: 40, espaciosSinMesas: 1, bloquearia: false });
+    expect(conHermano).toMatchObject({ plazasMesas: 40, espaciosSinMesas: 1, bloquearia: false });
 
-    // Marca entera sin mesas y con capacidad declarada: el trigger daría 0.
-    const marcaEnteraVacia = calcularCuadrePorNegocio(
-      cuadresDe([espacio({ id: "t", capacidad_maxima: 20, caracteristicas: { marca: "touza" } })], []),
-    );
-    expect(marcaEnteraVacia[0]).toMatchObject({ marca: "touza", plazasMesas: 0, bloquearia: true });
+    // Todas sin mesas y con capacidad declarada: el trigger daría 0.
+    const todoVacio = calcularCuadreTotal(cuadresDe([espacio({ id: "r", capacidad_maxima: 20 })], []));
+    expect(todoVacio).toMatchObject({ plazasMesas: 0, bloquearia: true });
 
-    // Y bloquearía IGUAL una marca cuyas salas solo tengan uniones: las plazas
-    // de las uniones no son plazas, y `fn_capacidad_efectiva_marca` también las
+    // Y bloquearía IGUAL si las salas solo tienen uniones: las plazas de las
+    // uniones no son plazas, y `fn_capacidad_efectiva_marca` también las
     // excluye. Con el cálculo viejo (que sumaba las fusionadas) esto salía
     // `bloquearia: false` y era mentira.
-    const marcaSoloUniones = calcularCuadrePorNegocio(
-      cuadresDe(
-        [espacio({ id: "t", capacidad_maxima: 20, caracteristicas: { marca: "touza" } })],
-        uniones("t", 2, 6),
-      ),
-    );
-    expect(marcaSoloUniones[0]).toMatchObject({
-      marca: "touza",
+    const soloUniones = calcularCuadreTotal(cuadresDe([espacio({ id: "r", capacidad_maxima: 20 })], uniones("r", 2, 6)));
+    expect(soloUniones).toMatchObject({
       plazasMesas: 0,
       plazasFusionadas: 12,
       espaciosSoloFusionadas: 1,
@@ -423,14 +411,18 @@ describe("calcularCuadrePorNegocio", () => {
     });
 
     // Sin capacidad declarada no hay nada que romper.
-    const sinDeclarar = calcularCuadrePorNegocio(cuadresDe([espacio({ capacidad_maxima: 0 })], []));
-    expect(sinDeclarar[0]).toMatchObject({ capacidadDeclarada: 0, bloquearia: false });
+    const sinDeclarar = calcularCuadreTotal(cuadresDe([espacio({ capacidad_maxima: 0 })], []));
+    expect(sinDeclarar).toMatchObject({ capacidadDeclarada: 0, bloquearia: false });
   });
 
-  it("sin espacios activos devuelve array vacío", () => {
-    expect(calcularCuadrePorNegocio([])).toEqual([]);
-    expect(calcularCuadrePorNegocio(cuadresDe([espacio({ activa: false })], []))).toEqual([]);
-    expect(calcularCuadrePorNegocio(null as unknown as CuadreEspacio[])).toEqual([]);
+  it("sin salas activas de Casa Tomás no hay total (null)", () => {
+    expect(calcularCuadreTotal([])).toBeNull();
+    expect(calcularCuadreTotal(cuadresDe([espacio({ activa: false })], []))).toBeNull();
+    expect(calcularCuadreTotal(null as unknown as CuadreEspacio[])).toBeNull();
+    // Solo salas de Touza: tampoco (no admiten reservas).
+    expect(
+      calcularCuadreTotal(cuadresDe([espacio({ id: "t", capacidad_maxima: 20, caracteristicas: { marca: "touza" } })], [])),
+    ).toBeNull();
   });
 });
 
@@ -560,12 +552,8 @@ describe("escenario real de producción (2026-09-27)", () => {
     expect(cuadres.filter((c) => c.descuadra)).toHaveLength(7);
   });
 
-  it("agregado por negocio: Casa Tomás 170 declaradas y solo 40 plazas reales; Touza 80/0", () => {
-    const porNegocio = calcularCuadrePorNegocio(cuadres);
-    expect(porNegocio.map((n) => n.marca)).toEqual(["casa_tomas", "touza"]);
-
-    expect(porNegocio[0]).toMatchObject({
-      marca: "casa_tomas",
+  it("total de Casa Tomás: 170 declaradas y solo 40 plazas reales (las salas de Touza no entran)", () => {
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({
       capacidadDeclarada: 170,
       // 4 (Comedor) + 36 (Salón) + 0 (Terraza) + 0 (Reservado). Con el cálculo
       // viejo salían 80: 40 plazas de más, la mitad del aforo inventada.
@@ -578,21 +566,7 @@ describe("escenario real de producción (2026-09-27)", () => {
       // El restaurante sigue teniendo mesas reales, así que no se quedaría a 0.
       bloquearia: false,
     });
-
-    expect(porNegocio[1]).toMatchObject({
-      marca: "touza",
-      capacidadDeclarada: 80,
-      plazasMesas: 0,
-      plazasFusionadas: 0,
-      diferencia: -80,
-      espaciosSinMesas: 3,
-      espaciosSoloFusionadas: 0,
-      espaciosDescuadrados: 3,
-      // ESTA es la prueba de por qué el dueño quiere la regla DORMIDA: si hoy
-      // mandara la suma de las mesas, el trigger calcularía capacidad 0 para
-      // Touza y rechazaría todas las reservas de El Reservado (teléfono, web y
-      // panel) hasta que alguien dibujase su plano.
-      bloquearia: true,
-    });
+    // Touza no admite reservas (decisión del dueño 2026-10-01): se retira su bloque (80 declaradas, 0 reales,
+    // «bloquearía»). Sus tres salas siguen en el fixture de producción y no suman nada.
   });
 });

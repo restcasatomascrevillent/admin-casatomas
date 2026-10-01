@@ -2,9 +2,11 @@
 // OCUPACIÓN DE UN DÍA POR TURNO — cabecera del panel del día
 // ----------------------------------------------------------------------------
 // Es lo que está detrás del color de la casilla del mes, desglosado: el % de
-// aforo de Casa Tomás en comida y en cena. Los datos son los MISMOS que usa la
-// casilla (`ocupacionPorTurno`, que calcula también el panel con las filas de
-// `vista_asignacion_dia`), así que casilla y panel dicen siempre lo mismo.
+// aforo de Casa Tomás en comida y en cena. El cálculo es el MISMO que usa la
+// casilla (`ocupacionPorTurno`, que el panel aplica a las filas de
+// `vista_asignacion_dia`), así que casilla y panel dicen lo mismo mientras la
+// marca de cada reserva sea la de su sala (la casilla filtra por
+// `reservas.marca`; la vista da la de la SALA: ver `useResumenAsignacionDia`).
 //
 // Una sola escala, un solo negocio (Touza ya no admite reservas: su aforo no se
 // enseña y sus reservas antiguas se ignoran). Cada fila lleva el % escrito y una

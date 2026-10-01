@@ -8,10 +8,15 @@
 // descartada), otro trigger (campana) y muchas no llegan nunca a ser reserva.
 // La fusión es solo de presentación: este módulo convierte ambas fuentes en
 // filas de una misma lista y aplica los mismos filtros a las dos.
+//
+// SOLO CASA TOMÁS (decisión del dueño, 2026-10-01: Touza no admite reservas).
+// Las reservas y solicitudes de otro negocio que queden en la base de datos ni
+// siquiera llegan a ser filas: las descarta `unificarReservasYSolicitudes` con
+// `admiteReservas`, así que ni se ven, ni se cuentan, ni se pueden convertir.
 // ============================================================================
 
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
-import { coincideNegocio, marcaDeReserva, marcaDeSolicitud } from "./negocios";
+import { admiteReservas } from "./negocios";
 import { ESTADOS_RESERVA, type EstadoReserva } from "./estadosReserva";
 
 /** Mínimo de `reservas` que necesita la lista unificada. */
@@ -26,7 +31,7 @@ export interface ReservaListable {
   canal?: string | null;
   numero_comensales: number;
   notas_cliente?: string | null;
-  /** Negocio (`reservas.marca`): casa_tomas | touza. */
+  /** Negocio (`reservas.marca`). Solo se listan las de Casa Tomás (`admiteReservas`). */
   marca?: string | null;
 }
 
@@ -38,6 +43,15 @@ export type FilaUnificada<R extends ReservaListable = ReservaListable> =
 export const ESTADOS_SOLICITUD_ABIERTA = ["pendiente", "contactado"] as const;
 export const esSolicitudAbierta = (estado: string) =>
   (ESTADOS_SOLICITUD_ABIERTA as readonly string[]).includes(estado);
+
+/**
+ * La cifra de la insignia de la pestaña Lista: las solicitudes del bot en estado
+ * `pendiente` de Casa Tomás. Las de otro negocio no cuentan, igual que no salen
+ * en la lista (`admiteReservas`), para que insignia y lista digan lo mismo.
+ */
+export function contarSolicitudesPendientes(solicitudes: readonly SolicitudPendiente[]): number {
+  return solicitudes.filter((s) => s.estado === "pendiente" && admiteReservas(s.marca)).length;
+}
 
 /**
  * Valores del filtro "Estado" de la lista. Los de reserva son los del CHECK
@@ -75,29 +89,30 @@ export interface FiltrosListaUnificada {
   canal?: string;
   /** "yyyy-MM-dd" */
   fecha?: string | null;
-  /** "all" | casa_tomas | touza (ver src/lib/reservas/negocios.ts). */
-  negocio?: string;
-  /** Negocio de una solicitud (no tiene columna marca). Por defecto:
-   * marcador de El Reservado en las notas, si no Casa Tomás. */
-  marcaDeSolicitud?: (s: SolicitudPendiente) => string;
 }
 
 const normalizarHora = (hora: string | null | undefined) =>
   hora ? String(hora).substring(0, 5) : null;
 
+/**
+ * Junta reservas y solicitudes en una sola lista ordenada. Lo que no es de Casa
+ * Tomás (`admiteReservas`: Touza ya no admite reservas) se queda FUERA aquí, en el
+ * único punto de entrada de la lista: las filas, el contador «N reservas» y las
+ * cifras del timeline (`cifrasDeLaLista`) salen todos de este resultado.
+ */
 export function unificarReservasYSolicitudes<R extends ReservaListable>(
-  reservas: R[],
-  solicitudes: SolicitudPendiente[],
+  reservas: readonly R[],
+  solicitudes: readonly SolicitudPendiente[],
 ): FilaUnificada<R>[] {
   const filas: FilaUnificada<R>[] = [
-    ...reservas.map((r) => ({
+    ...reservas.filter((r) => admiteReservas(r.marca)).map((r) => ({
       tipo: "reserva" as const,
       id: r.id,
       fecha: r.fecha ?? null,
       hora: normalizarHora(r.hora),
       reserva: r,
     })),
-    ...solicitudes.map((s) => ({
+    ...solicitudes.filter((s) => admiteReservas(s.marca)).map((s) => ({
       tipo: "solicitud" as const,
       id: `solicitud-${s.id}`,
       fecha: s.fecha_solicitada ?? null,
@@ -141,17 +156,9 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
   const estado = filtros.estado ?? "all";
   const canal = filtros.canal ?? "all";
   const fecha = filtros.fecha ?? null;
-  const negocio = filtros.negocio ?? "all";
-  const marcaSolicitud = filtros.marcaDeSolicitud ?? ((s: SolicitudPendiente) => marcaDeSolicitud(s, []));
 
   return filas.filter((f) => {
     if (fecha && f.fecha !== fecha) return false;
-    if (
-      negocio !== "all" &&
-      !coincideNegocio(f.tipo === "reserva" ? marcaDeReserva(f.reserva) : marcaSolicitud(f.solicitud), negocio)
-    ) {
-      return false;
-    }
 
     if (f.tipo === "solicitud") {
       const s = f.solicitud;

@@ -1,14 +1,9 @@
-import { useEffect, useId, useMemo } from "react";
+import { useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ESTADOS_QUE_OCUPAN } from "../../supabase/functions/_shared/disponibilidad";
-import {
-  horasBaseDeNegocio,
-  repartirPorNegocio,
-  type EspacioSala,
-  type ReservaOcupacionSala,
-} from "@/lib/reservas/ocupacionSalas";
-import { MARCA_POR_DEFECTO, normalizarMarca } from "@/lib/reservas/negocios";
+import { horasBaseDelDia, type EspacioSala, type ReservaOcupacionSala } from "@/lib/reservas/ocupacionSalas";
+import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { ESTADO_LLEGADA } from "@/lib/reservas/servicioSala";
 
 // ============================================================================
@@ -19,10 +14,12 @@ import { ESTADO_LLEGADA } from "@/lib/reservas/servicioSala";
 // fuente de horas que la web y el panel) y la ocupación la calcula
 // `src/lib/reservas/ocupacionSalas.ts` (puro, testeado).
 //
-// TODOS los negocios (Casa Tomás + Touza · El Reservado, decisión del dueño
-// 2026-09-24), ya repartidos en `negocios`: cada bloque trae sus espacios,
-// sus reservas (columna `reservas.marca`) y sus franjas, para que el aforo se
-// cuente por negocio igual que el trigger `validar_capacidad_reserva`.
+// SOLO CASA TOMÁS (decisión del dueño, 2026-10-01: Touza no admite reservas).
+// Las salas y reservas de otro negocio que aún queden en la base de datos se
+// descartan aquí con `admiteReservas` / `salaAdmiteReservas`, así que ninguna
+// rejilla (cuartos de hora, salas, formulario, solicitudes, asignación) las ve.
+// El aforo del turno es el de Casa Tomás, el mismo que valida el trigger
+// `validar_capacidad_reserva` para su marca.
 //
 // Clave ["ocupacion-salas-dia", fecha]: FormularioReserva y
 // useAccionesServicioReserva invalidan por prefijo tras crear/mover, y además
@@ -34,42 +31,23 @@ export const CLAVE_OCUPACION_SALAS_DIA = "ocupacion-salas-dia";
 /** Estados que hay que traer: los que ocupan aforo + 'completada' (sentados). */
 const ESTADOS_A_LEER = [...ESTADOS_QUE_OCUPAN, ESTADO_LLEGADA];
 
-export interface DatosNegocioDia {
-  marca: string;
-  espacios: EspacioSala[];
-  reservas: ReservaOcupacionSala[];
-  /** Horas que ofrece el motor ese día para ESTE negocio ("HH:MM"). */
-  horasBase: string[];
-  /** El negocio no tiene turnos ese día (cerrado). */
-  cerrado: boolean;
-}
-
 export interface DatosOcupacionSalasDia {
-  /** Un bloque por negocio (Casa Tomás siempre, el primero). */
-  negocios: DatosNegocioDia[];
-}
-
-/** Bloque de un negocio (vacío si ese día no tiene nada). */
-export function datosDeNegocio(
-  datos: DatosOcupacionSalasDia | null | undefined,
-  marca: string | null | undefined,
-): DatosNegocioDia | null {
-  if (!datos) return null;
-  const m = normalizarMarca(marca);
-  return (
-    datos.negocios.find((n) => n.marca === m) ?? { marca: m, espacios: [], reservas: [], horasBase: [], cerrado: true }
-  );
+  /** Salas activas de Casa Tomás. */
+  espacios: EspacioSala[];
+  /** Reservas del día de Casa Tomás que ocupan sitio (o ya llegaron). */
+  reservas: ReservaOcupacionSala[];
+  /** Horas que ofrece el motor ese día ("HH:MM"). */
+  horasBase: string[];
+  /** No hay turnos ese día (cerrado). */
+  cerrado: boolean;
 }
 
 export function useOcupacionSalasDia(
   fecha: string | null | undefined,
   opciones?: {
     enabled?: boolean;
-    /** Negocio cuyas franjas devuelve `horasBase` (por defecto Casa Tomás). */
-    marca?: string | null;
   },
 ) {
-  const marca = normalizarMarca(opciones?.marca ?? MARCA_POR_DEFECTO);
   const queryClient = useQueryClient();
   const idCanal = useId();
 
@@ -94,32 +72,29 @@ export function useOcupacionSalasDia(
       if (espaciosRes.error) throw espaciosRes.error;
       if (reservasRes.error) throw reservasRes.error;
 
-      const espacios: EspacioSala[] = ((espaciosRes.data ?? []) as any[]).map((e) => ({
-        id: e.id as string,
-        nombre: e.nombre as string,
-        capacidad_maxima: Number(e.capacidad_maxima) || 0,
-        marca: normalizarMarca((e.caracteristicas?.marca as string | undefined) ?? null),
-      }));
+      const espacios: EspacioSala[] = ((espaciosRes.data ?? []) as any[])
+        .filter((e) => salaAdmiteReservas(e))
+        .map((e) => ({
+          id: e.id as string,
+          nombre: e.nombre as string,
+          capacidad_maxima: Number(e.capacidad_maxima) || 0,
+        }));
 
-      const reservas: ReservaOcupacionSala[] = ((reservasRes.data ?? []) as any[]).map((r) => ({
-        id: r.id as string,
-        hora: String(r.hora),
-        numero_comensales: Number(r.numero_comensales) || 0,
-        estado: r.estado as string,
-        espacio_id: (r.espacio_id as string | null) ?? null,
-        marca: normalizarMarca((r.marca as string | null) ?? null),
-      }));
+      const reservas: ReservaOcupacionSala[] = ((reservasRes.data ?? []) as any[])
+        .filter((r) => admiteReservas(r.marca as string | null))
+        .map((r) => ({
+          id: r.id as string,
+          hora: String(r.hora),
+          numero_comensales: Number(r.numero_comensales) || 0,
+          estado: r.estado as string,
+          espacio_id: (r.espacio_id as string | null) ?? null,
+        }));
 
       // Sin `ahora` ni política: aquí interesan TODAS las franjas del día (el
       // personal puede reservar hoy mismo y fuera del corte), no solo las que
       // la web ofrecería al público en este instante.
       const configuraciones = (turnosRes.data ?? []) as any[];
-      return {
-        negocios: repartirPorNegocio(espacios, reservas).map((bloque) => ({
-          ...bloque,
-          ...horasBaseDeNegocio(fecha as string, bloque, configuraciones),
-        })),
-      };
+      return { espacios, reservas, ...horasBaseDelDia(fecha as string, { espacios, reservas }, configuraciones) };
     },
   });
 
@@ -143,8 +118,5 @@ export function useOcupacionSalasDia(
     };
   }, [fecha, idCanal, queryClient, opciones?.enabled]);
 
-  const negocio = useMemo(() => datosDeNegocio(query.data, marca), [query.data, marca]);
-  const horasBase = useMemo(() => negocio?.horasBase ?? [], [negocio]);
-  /** Bloque del negocio pedido (`opciones.marca`) y sus franjas. */
-  return { ...query, negocio, horasBase };
+  return query;
 }

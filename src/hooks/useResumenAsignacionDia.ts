@@ -14,7 +14,7 @@ import {
   type ResumenEspacio,
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
-import { FILTRO_NEGOCIO_TODOS, normalizarMarca } from "@/lib/reservas/negocios";
+import { admiteReservas, normalizarMarca } from "@/lib/reservas/negocios";
 
 // ============================================================================
 // CÓMO VA EL CIERRE DE UN DÍA — una fila por reserva + agregados
@@ -33,6 +33,24 @@ import { FILTRO_NEGOCIO_TODOS, normalizarMarca } from "@/lib/reservas/negocios";
 //
 // Todo el cálculo vive en `src/lib/reservas/asignacionMesas.ts` (puro y
 // testeado): aquí solo se lee, se normaliza y se agrega.
+//
+// Solo Casa Tomás (decisión del dueño, 2026-10-01: Touza no admite reservas):
+// las filas de otro negocio que queden en la vista se descartan aquí con
+// `admiteReservas`, así que no salen ni en las cifras ni en las salas del día.
+//
+// OJO, DE DÓNDE SALE ESA MARCA. `vista_asignacion_dia.marca` NO es
+// `reservas.marca`: es la marca de la SALA cuando la reserva tiene sala
+// (`caracteristicas->>'marca'` del espacio) y la de la reserva solo cuando aún
+// no tiene sala (migración 20260926140000_asignaciones_mesa_sin_solapes.sql).
+// Este hook (y con él el panel del día del Calendario) y la pestaña «Próximas
+// reservas» (PanelAsignacion, que lee la misma vista con
+// `useReservasPorAsignar`) filtran por ESA marca; el kanban, la Lista, la
+// casilla del mes del Calendario, la pestaña «Hoy» y el Dashboard filtran por
+// `reservas.marca`. Hoy coinciden en el 100 % de los casos (el 2026-10-01: 0
+// reservas de 1.241 con una marca distinta de la de su sala), pero si algún día
+// difirieran, una reserva de una marca sentada en una sala de la otra saldría en
+// unas pantallas y en otras no. La solución de fondo (que la vista exponga
+// `reservas.marca` y se filtre por ella) es de la fase de base de datos.
 // ============================================================================
 
 /** Prefijo de caché. Las mutaciones de mesas invalidan por aquí. */
@@ -48,7 +66,7 @@ export interface FilaAsignacionDia {
   nombre: string;
   numero_comensales: number;
   estado: string;
-  /** Negocio: 'casa_tomas' | 'touza' (normalizado, nunca vacío). */
+  /** Negocio (normalizado, nunca vacío). Solo llegan filas de Casa Tomás. */
   marca: string;
   espacio_id: string | null;
   espacio_nombre: string | null;
@@ -77,12 +95,6 @@ export interface DatosResumenAsignacionDia {
 export interface OpcionesResumenAsignacionDia {
   /** Solo comida o solo cena. Sin pasarlo, el día entero. */
   turno?: Turno;
-  /**
-   * Negocio ('casa_tomas' | 'touza'). Acepta el valor "all" del filtro de la
-   * interfaz, que NO filtra (si se pasara tal cual a la consulta no saldría
-   * nada, porque ninguna reserva tiene marca "all").
-   */
-  marca?: string;
   /** Montar el hook sin lanzar la consulta (reglas de los hooks de React). */
   enabled?: boolean;
 }
@@ -109,17 +121,14 @@ const RESUMEN_VACIO: DatosResumenAsignacionDia = {
  * calculados (nunca `undefined`: con la consulta aún en vuelo salen vacíos, así
  * la interfaz no tiene que defenderse de nulos en cada render).
  *
- * `turno` y `marca` filtran EN SERVIDOR (son columnas de la vista) y viajan en
- * la clave de caché, para que cambiar de turno no reutilice el recuento del otro.
+ * `turno` filtra EN SERVIDOR (es columna de la vista) y viaja en la clave de
+ * caché, para que cambiar de turno no reutilice el recuento del otro.
  */
 export function useResumenAsignacionDia(fecha: string, opciones?: OpcionesResumenAsignacionDia) {
   const turno = esTurno(opciones?.turno) ? opciones?.turno : undefined;
-  // "all" (FILTRO_NEGOCIO_TODOS) significa "no filtres", no es una marca.
-  const marca =
-    opciones?.marca && opciones.marca !== FILTRO_NEGOCIO_TODOS ? normalizarMarca(opciones.marca) : undefined;
 
   const query = useQuery({
-    queryKey: [CLAVE_RESUMEN_ASIGNACION_DIA, fecha, turno ?? null, marca ?? null],
+    queryKey: [CLAVE_RESUMEN_ASIGNACION_DIA, fecha, turno ?? null],
     enabled: !!fecha && (opciones?.enabled ?? true),
     queryFn: async (): Promise<FilaAsignacionDia[]> => {
       let consulta = supabase
@@ -129,12 +138,17 @@ export function useResumenAsignacionDia(fecha: string, opciones?: OpcionesResume
         .order("hora", { ascending: true });
 
       if (turno) consulta = consulta.eq("turno", turno);
-      if (marca) consulta = consulta.eq("marca", marca);
 
       const { data, error } = await consulta;
       if (error) throw error;
 
-      return ((data ?? []) as Record<string, unknown>[]).filter(Boolean).map(normalizarFila);
+      // `f.marca` es la de la vista: la de la SALA si la reserva tiene sala (ver
+      // la cabecera: no es `reservas.marca`, que es por la que filtran el kanban,
+      // la Lista, la casilla del mes, «Hoy» y el Dashboard).
+      return ((data ?? []) as Record<string, unknown>[])
+        .filter(Boolean)
+        .map(normalizarFila)
+        .filter((f) => admiteReservas(f.marca));
     },
   });
 

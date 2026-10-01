@@ -19,15 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { turnoDeHora } from "@/hooks/useDisponibilidad";
-import { ESTADOS_QUE_OCUPAN } from "../../../supabase/functions/_shared/disponibilidad";
-import {
-  agruparPorNegocio,
-  etiquetaNegocio,
-  marcaDeEspacio,
-  marcaDeReserva,
-  MARCA_POR_DEFECTO,
-  normalizarMarca,
-} from "@/lib/reservas/negocios";
+import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
@@ -86,28 +78,24 @@ import {
 // Qué botones tiene cada tarjeta, y cuáles se pueden pulsar, lo decide
 // `accionesDisponibles(reserva, { vista: "hoy", canEdit })`.
 
-// Columna "Sin asignar" POR NEGOCIO: "sin-asignar" es la de Casa Tomás (id
-// histórico) y "sin-asignar:<marca>" la de otro negocio (solo aparece si
-// tiene reservas sin sala, p. ej. una de El Reservado llegada desde la web).
+// Solo Casa Tomás (decisión del dueño, 2026-10-01: Touza no admite reservas).
+// Las columnas son «Sin asignar» + las salas activas de Casa Tomás, y las
+// reservas, las de Casa Tomás: lo que quede de Touza en la base de datos (sus
+// salas aún activas, sus reservas de demostración) no sale (`admiteReservas`).
+// Antes los negocios iban en filas de columnas apiladas, cada una con su aforo.
 const SIN_ASIGNAR = "sin-asignar";
-const idSinAsignar = (marca: string) =>
-  normalizarMarca(marca) === MARCA_POR_DEFECTO ? SIN_ASIGNAR : `${SIN_ASIGNAR}:${normalizarMarca(marca)}`;
-const esSinAsignar = (id: string) => id === SIN_ASIGNAR || id.startsWith(`${SIN_ASIGNAR}:`);
+const esSinAsignar = (id: string) => id === SIN_ASIGNAR;
 type FiltroTurno = "todo" | "comida" | "cena";
 
 interface Columna {
   id: string;
   title: string;
   capacidadMax?: number;
-  /** Negocio de la columna (casa_tomas | touza). */
-  marca: string;
 }
 
-/** Columna en la que se pinta una reserva: su sala si es de su negocio; si no, "Sin asignar" de su negocio. */
+/** Columna en la que se pinta una reserva: su sala si está entre las columnas; si no, "Sin asignar". */
 function columnaDeReserva(reserva: ReservaServicio, columnas: Columna[]): string {
-  const marca = marcaDeReserva(reserva as { marca?: string | null });
-  const propia = reserva.espacio_id ? columnas.find((c) => c.id === reserva.espacio_id) : undefined;
-  return propia && propia.marca === marca ? propia.id : idSinAsignar(marca);
+  return reserva.espacio_id && columnas.some((c) => c.id === reserva.espacio_id) ? reserva.espacio_id : SIN_ASIGNAR;
 }
 
 type Acciones = ReturnType<typeof useAccionesServicioReserva>;
@@ -143,8 +131,8 @@ function ReservaCard({
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
    * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
-   * en la misma pantalla conviven Casa Tomás (5 columnas) y Touza (3), así que
-   * sus columnas miden distinto y cada una decide por su cuenta.
+   * el mismo ancho de ventana da columnas distintas según cuántas salas haya
+   * y el menú lateral, así que cada columna decide por su cuenta.
    */
   anchoColumna?: number;
 }) {
@@ -172,12 +160,8 @@ function ReservaCard({
     );
   }
 
-  // Solo se puede mover dentro de su negocio: una reserva de Casa Tomás no
-  // pasa a El Reservado (Touza) ni al revés (cambiaría de aforo sin cambiar
-  // de negocio). Para eso, cancelar y crear otra.
   const columnaActual = columnaDeReserva(reserva, columnas);
-  const marcaReserva = marcaDeReserva(reserva as { marca?: string | null });
-  const destinos = columnas.filter((c) => c.id !== columnaActual && c.marca === marcaReserva);
+  const destinos = columnas.filter((c) => c.id !== columnaActual);
 
   // El menú «…» de la tarjeta. En columnas estrechas baja a la fila de
   // acciones para dejarle al NOMBRE todo el ancho de la cabecera: con el menú
@@ -548,7 +532,8 @@ function KanbanColumn({
 }
 
 /**
- * Fila de columnas de UN negocio. Cumple los dos encargos del dueño:
+ * La fila de columnas (Sin asignar + una por sala). Cumple los dos encargos del
+ * dueño:
  *
  *   · TODAS las columnas a la vista a la vez (2026-09-26). Ninguna se pliega
  *     sola: el ancho mínimo por columna es 112px, así que las 5 de Casa Tomás
@@ -560,25 +545,14 @@ function KanbanColumn({
  *     (pantalla muy estrecha) se desplaza, y entonces con imán: al pararse el
  *     scroll siempre hay columnas enteras a la vista.
  *
- * Por qué una fila por negocio y no todas en la misma: cuando Casa Tomás y
- * Touza convivían en la MISMA fila con scroll, el ancho pedido era siempre
- * mayor que el disponible y la última columna quedaba cortada por el borde.
- * Apilando los negocios, cada uno dispone del ancho completo.
- *
  * El ancho se mide con ResizeObserver, no por breakpoints: el ancho real
  * depende del sidebar, que se pliega.
  */
-function FilaNegocio({
-  etiqueta,
-  aforo,
-  mostrarCabecera,
+function FilaColumnas({
   items,
   arrastrando,
   children,
 }: {
-  etiqueta: string;
-  aforo?: { comida: number; cena: number; capacidad: number };
-  mostrarCabecera: boolean;
   items: ItemColumna[];
   arrastrando: boolean;
   children: (disposicion: DisposicionKanban) => React.ReactNode;
@@ -646,55 +620,40 @@ function FilaNegocio({
   };
 
   return (
-    <section
-      aria-label={etiqueta}
-      className={cn("flex flex-col gap-2 min-w-0", mostrarCabecera && "rounded-xl border border-dashed p-2")}
-    >
-      {(mostrarCabecera || desplazable) && (
+    <section aria-label="Salas de hoy" className="flex flex-col gap-2 min-w-0">
+      {desplazable && (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-1 text-xs min-w-0">
-          {mostrarCabecera && (
-            <>
-              <span className="font-semibold">{etiqueta}</span>
-              {aforo && aforo.capacidad > 0 && (
-                <span className="text-muted-foreground tabular-nums">
-                  aforo comida {aforo.comida}/{aforo.capacidad} · cena {aforo.cena}/{aforo.capacidad}
-                </span>
-              )}
-            </>
-          )}
-          {desplazable && (
-            <div className="ml-auto flex items-center gap-1 self-center">
-              <span
-                role="status"
-                className="text-muted-foreground tabular-nums"
-                aria-label={`Viendo los espacios ${desde} a ${hasta} de ${items.length} de ${etiqueta}`}
-              >
-                {desde}–{hasta} de {items.length}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-6 w-6"
-                disabled={paradaActual <= 0}
-                onClick={() => irAParada(paradaActual - 1)}
-                aria-label={`Ver los espacios anteriores de ${etiqueta}`}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-6 w-6"
-                disabled={paradaActual >= totalParadas - 1}
-                onClick={() => irAParada(paradaActual + 1)}
-                aria-label={`Ver los siguientes espacios de ${etiqueta}`}
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-1 self-center">
+            <span
+              role="status"
+              className="text-muted-foreground tabular-nums"
+              aria-label={`Viendo los espacios ${desde} a ${hasta} de ${items.length}`}
+            >
+              {desde}–{hasta} de {items.length}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-6 w-6"
+              disabled={paradaActual <= 0}
+              onClick={() => irAParada(paradaActual - 1)}
+              aria-label="Ver los espacios anteriores"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-6 w-6"
+              disabled={paradaActual >= totalParadas - 1}
+              onClick={() => irAParada(paradaActual + 1)}
+              aria-label="Ver los siguientes espacios"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -810,9 +769,9 @@ export function GestorReservasKanban() {
     useSensor(KeyboardSensor),
   );
 
-  // Reservas de hoy de TODOS los negocios (decisión del dueño 2026-09-24):
-  // Casa Tomás con sus salas y Touza con "El Reservado", agrupados por
-  // negocio y con el aforo de cada uno por separado (como el trigger).
+  // Reservas de hoy de Casa Tomás. Touza no admite reservas (decisión del dueño
+  // 2026-10-01): las de otro negocio que queden en la base de datos se
+  // descartan aquí (`admiteReservas`), así que ni se pintan ni se cuentan.
   //
   // `select("*")`: trae `llegada_at` si la migración 20260923_reservas_llegada
   // está aplicada, sin romper si no lo está (nombrarla en la lista fallaría),
@@ -836,7 +795,9 @@ export function GestorReservasKanban() {
         .neq("estado", "cancelada")
         .order("hora", { ascending: true });
       if (error) throw error;
-      return data as unknown as ReservaServicio[];
+      return ((data ?? []) as unknown as (ReservaServicio & { marca?: string | null })[]).filter((r) =>
+        admiteReservas(r.marca),
+      );
     },
   });
 
@@ -859,68 +820,24 @@ export function GestorReservasKanban() {
     return porReserva;
   }, [asignacionesDeHoy]);
 
+  // Salas activas de Casa Tomás, por id (hay dos «Terraza», una de cada negocio).
   const espaciosActivos = useMemo(
-    () => (espacios || []).filter((e: any) => e.activa !== false),
+    () => (espacios || []).filter((e: any) => e.activa !== false && salaAdmiteReservas(e)),
     [espacios],
   );
 
-  // Grupos de columnas por negocio. Casa Tomás: "Sin asignar" + sus salas.
-  // Otro negocio (Touza): sus salas ("El Reservado") y, solo si hace falta,
-  // su propio "Sin asignar".
-  const grupos = useMemo(() => {
-    const todas = reservas || [];
-    return agruparPorNegocio(
-      [
-        ...espaciosActivos.map((e: any) => ({ tipo: "espacio" as const, marca: marcaDeEspacio(e), e })),
-        ...todas.map((r) => ({ tipo: "reserva" as const, marca: marcaDeReserva(r as { marca?: string | null }), e: null })),
-      ],
-      (x) => x.marca,
-      [MARCA_POR_DEFECTO],
-    ).map(({ negocio, items }) => {
-      const salas: Columna[] = items
-        .filter((x) => x.tipo === "espacio")
-        .map((x: any) => ({ id: x.e.id, title: x.e.nombre, capacidadMax: x.e.capacidad_maxima, marca: negocio.marca }));
-      const idsSalas = new Set(salas.map((c) => c.id));
-      const hayHuerfanas = todas.some(
-        (r) =>
-          marcaDeReserva(r as { marca?: string | null }) === negocio.marca &&
-          (!r.espacio_id || !idsSalas.has(r.espacio_id)),
-      );
-      const sinAsignar: Columna = {
-        id: idSinAsignar(negocio.marca),
-        title: negocio.marca === MARCA_POR_DEFECTO ? "Sin asignar" : `Sin asignar (${negocio.nombre})`,
-        marca: negocio.marca,
-      };
-      const columnasGrupo =
-        negocio.marca === MARCA_POR_DEFECTO || hayHuerfanas || salas.length === 0 ? [sinAsignar, ...salas] : salas;
-      return { negocio, columnas: columnasGrupo };
-    });
-  }, [espaciosActivos, reservas]);
-
-  const columnas = useMemo<Columna[]>(() => grupos.flatMap((g) => g.columnas), [grupos]);
-
-  // Aforo del turno POR NEGOCIO (lo que valida el trigger): reservas que
-  // ocupan (pendiente/verificada/confirmada) de ese negocio contra la suma
-  // de SUS salas. Las de Touza nunca cuentan contra Casa Tomás.
-  const aforoPorNegocio = useMemo(() => {
-    const todas = reservas || [];
-    const map: Record<string, { comida: number; cena: number; capacidad: number }> = {};
-    for (const g of grupos) {
-      const propias = todas.filter(
-        (r) =>
-          marcaDeReserva(r as { marca?: string | null }) === g.negocio.marca &&
-          (ESTADOS_QUE_OCUPAN as readonly string[]).includes(r.estado),
-      );
-      const pax = (turno: "comida" | "cena") =>
-        propias.filter((r) => turnoDeHora(r.hora) === turno).reduce((s, r) => s + (Number(r.numero_comensales) || 0), 0);
-      map[g.negocio.marca] = {
-        comida: pax("comida"),
-        cena: pax("cena"),
-        capacidad: g.columnas.reduce((s, c) => s + (c.capacidadMax || 0), 0),
-      };
-    }
-    return map;
-  }, [grupos, reservas]);
+  // Columnas: "Sin asignar" + las salas de Casa Tomás.
+  const columnas = useMemo<Columna[]>(
+    () => [
+      { id: SIN_ASIGNAR, title: "Sin asignar" },
+      ...espaciosActivos.map((e: any) => ({ id: e.id, title: e.nombre, capacidadMax: e.capacidad_maxima })),
+    ],
+    [espaciosActivos],
+  );
+  const itemsFila = useMemo<ItemColumna[]>(
+    () => columnas.map((col) => ({ id: col.id, plegada: minimizedCols.has(col.id) })),
+    [columnas, minimizedCols],
+  );
 
   const reservasFiltradas = useMemo(() => {
     const q = busqueda.toLowerCase().trim();
@@ -947,16 +864,15 @@ export function GestorReservasKanban() {
 
   // Ocupación por espacio y TURNO sobre todas las reservas del día (no solo
   // las visibles por la búsqueda): la capacidad no depende de lo que se
-  // filtre. Cada columna cuenta solo reservas de SU negocio.
+  // filtre.
   const paxPorColumna = useMemo(() => {
     const todas = reservas || [];
     const map: Record<string, { comida: number; cena: number }> = {};
     columnas.forEach((c) => {
-      const delNegocio = todas.filter((r) => marcaDeReserva(r as { marca?: string | null }) === c.marca);
       const espacioId = esSinAsignar(c.id) ? null : c.id;
       map[c.id] = {
-        comida: comensalesEnEspacioTurno(delNegocio, espacioId, "comida"),
-        cena: comensalesEnEspacioTurno(delNegocio, espacioId, "cena"),
+        comida: comensalesEnEspacioTurno(todas, espacioId, "comida"),
+        cena: comensalesEnEspacioTurno(todas, espacioId, "cena"),
       };
     });
     return map;
@@ -982,16 +898,7 @@ export function GestorReservasKanban() {
   const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
     const destinoId = esSinAsignar(columnaId) ? null : columnaId;
     const col = columnas.find((c) => c.id === columnaId);
-    const marcaReserva = marcaDeReserva(reserva as { marca?: string | null });
-    if (col && col.marca !== marcaReserva) {
-      toast.error(
-        `Esta reserva es de ${etiquetaNegocio(marcaReserva)} y «${col.title}» es de ${etiquetaNegocio(col.marca)}. ` +
-          "No se puede mover entre negocios: cancélala y crea una nueva.",
-      );
-      return;
-    }
-    const delNegocio = (reservas || []).filter((r) => marcaDeReserva(r as { marca?: string | null }) === marcaReserva);
-    const evaluacion = evaluarMovimiento(reserva, destinoId, delNegocio, col?.capacidadMax);
+    const evaluacion = evaluarMovimiento(reserva, destinoId, reservas || [], col?.capacidadMax);
 
     switch (evaluacion.tipo) {
       case "sin_cambio":
@@ -1108,66 +1015,48 @@ export function GestorReservasKanban() {
           },
         }}
       >
-        {/* Los negocios se APILAN (antes iban uno al lado del otro y entre los
-            dos nunca cabían): así cada uno dispone del ancho completo. */}
         <div className="flex flex-col gap-3 min-w-0 flex-1">
-          {grupos.map(({ negocio, columnas: columnasGrupo }) => {
-            const cuenta = (id: string) => reservasPorColumna[id]?.length || 0;
-            const itemsFila: ItemColumna[] = columnasGrupo.map((col) => ({
-              id: col.id,
-              plegada: minimizedCols.has(col.id),
-            }));
-            return (
-              <FilaNegocio
-                key={negocio.marca}
-                etiqueta={negocio.etiqueta}
-                aforo={aforoPorNegocio[negocio.marca]}
-                mostrarCabecera={grupos.length > 1}
-                items={itemsFila}
-                arrastrando={!!activeReserva}
-              >
-                {(disposicion) =>
-                  columnasGrupo.map((col) => {
-                    const plegada = minimizedCols.has(col.id);
-                    return (
-                      <KanbanColumn
-                        key={col.id}
-                        id={col.id}
-                        title={col.title}
-                        capacidadMax={col.capacidadMax}
-                        paxComida={paxPorColumna[col.id]?.comida ?? 0}
-                        paxCena={paxPorColumna[col.id]?.cena ?? 0}
-                        filtroTurno={filtroTurno}
-                        count={cuenta(col.id)}
-                        isActive={!!activeReserva}
-                        minimized={plegada}
-                        onToggleMinimize={() => togglePlegado(col.id)}
-                        ancho={disposicion.anchoColumna}
-                        margenDerecho={disposicion.margenes[col.id] ?? 0}
-                        conIman={disposicion.idsConIman.includes(col.id)}
-                        alturaMaxima={grupos.length > 1 ? "42vh" : "65vh"}
-                      >
-                        {(reservasPorColumna[col.id] || []).map((reserva) => (
-                          <ReservaCard
-                            key={reserva.id}
-                            reserva={reserva}
-                            columnas={columnas}
-                            acciones={acciones}
-                            onMover={solicitarMovimiento}
-                            onToggleImportante={toggleImportante}
-                            onBlacklist={setBlacklistReserva}
-                            onEditar={(r) => editarReserva(r.id)}
-                            puedeEditar={puedeEditar}
-                            anchoColumna={disposicion.anchoColumna}
-                          />
-                        ))}
-                      </KanbanColumn>
-                    );
-                  })
-                }
-              </FilaNegocio>
-            );
-          })}
+          <FilaColumnas items={itemsFila} arrastrando={!!activeReserva}>
+            {(disposicion) =>
+              columnas.map((col) => {
+                const plegada = minimizedCols.has(col.id);
+                return (
+                  <KanbanColumn
+                    key={col.id}
+                    id={col.id}
+                    title={col.title}
+                    capacidadMax={col.capacidadMax}
+                    paxComida={paxPorColumna[col.id]?.comida ?? 0}
+                    paxCena={paxPorColumna[col.id]?.cena ?? 0}
+                    filtroTurno={filtroTurno}
+                    count={reservasPorColumna[col.id]?.length || 0}
+                    isActive={!!activeReserva}
+                    minimized={plegada}
+                    onToggleMinimize={() => togglePlegado(col.id)}
+                    ancho={disposicion.anchoColumna}
+                    margenDerecho={disposicion.margenes[col.id] ?? 0}
+                    conIman={disposicion.idsConIman.includes(col.id)}
+                    alturaMaxima="65vh"
+                  >
+                    {(reservasPorColumna[col.id] || []).map((reserva) => (
+                      <ReservaCard
+                        key={reserva.id}
+                        reserva={reserva}
+                        columnas={columnas}
+                        acciones={acciones}
+                        onMover={solicitarMovimiento}
+                        onToggleImportante={toggleImportante}
+                        onBlacklist={setBlacklistReserva}
+                        onEditar={(r) => editarReserva(r.id)}
+                        puedeEditar={puedeEditar}
+                        anchoColumna={disposicion.anchoColumna}
+                      />
+                    ))}
+                  </KanbanColumn>
+                );
+              })
+            }
+          </FilaColumnas>
         </div>
 
         <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>

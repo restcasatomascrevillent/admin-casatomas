@@ -28,7 +28,7 @@ import {
   excluirSala,
   incluirSala,
 } from "@/lib/reservas/ventanaAsignacion";
-import { NEGOCIOS_PANEL, marcaDeEspacio } from "@/lib/reservas/negocios";
+import { salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { GestionMesasEspacios } from "./GestionMesasEspacios";
 
 const baseSchema = z.object({
@@ -67,8 +67,13 @@ export function ConfiguracionGeneralReservas() {
   const { data: espaciosData } = useEspaciosReserva();
   const { data: mesasData } = useMesas();
 
+  // Salas activas de Casa Tomás: Touza no admite reservas (decisión del dueño,
+  // 2026-10-01), así que sus salas no se ofrecen al asignar ni se enseñan.
   const espaciosActivos = useMemo(
-    () => ((espaciosData ?? []) as EspacioReserva[]).filter((e) => e.activa !== false).sort(ordenNatural),
+    () =>
+      ((espaciosData ?? []) as EspacioReserva[])
+        .filter((e) => e.activa !== false && salaAdmiteReservas(e))
+        .sort(ordenNatural),
     [espaciosData],
   );
   const mesas = useMemo(() => [...((mesasData ?? []) as Mesa[])].sort(ordenNatural), [mesasData]);
@@ -570,11 +575,6 @@ function SeccionAsignacion({
     form.setValue("asignacion_mesas_excluidas", siguiente, { shouldDirty: true, shouldValidate: true });
   };
 
-  const gruposNegocio = NEGOCIOS_PANEL.map((n) => ({
-    ...n,
-    espacios: espacios.filter((e) => marcaDeEspacio(e) === n.marca),
-  })).filter((g) => g.espacios.length > 0);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -649,61 +649,56 @@ function SeccionAsignacion({
                   en una sala desmarcada se quedan en ella (el panel las señala).
                 </FormDescription>
               </div>
-              {gruposNegocio.length === 0 ? (
+              {espacios.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No hay salas activas.</p>
               ) : (
-                gruposNegocio.map((grupo) => (
-                  <div key={grupo.marca} className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {grupo.etiqueta}
-                    </p>
-                    {grupo.espacios.map((espacio) => {
-                      const salaUsable = !salasFuera.has(espacio.id);
-                      const mesasSala = mesas.filter((m) => m.espacio_id === espacio.id);
-                      const idSala = `usable-sala-${espacio.id}`;
-                      return (
-                        <div key={espacio.id} className="space-y-2 rounded-lg border p-3">
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id={idSala}
-                              checked={salaUsable}
-                              onCheckedChange={(v) => alternarSala(espacio.id, v === true)}
-                            />
-                            <label htmlFor={idSala} className="text-sm font-medium">
-                              {espacio.nombre}
-                            </label>
-                            <span className="text-xs text-muted-foreground">
-                              {salaUsable ? "Se ofrece" : "No se ofrece"}
-                            </span>
-                          </div>
-                          {mesasSala.length > 0 && (
-                            <div className="flex flex-wrap gap-x-4 gap-y-2 pl-6">
-                              {mesasSala.map((mesa) => {
-                                const idMesa = `usable-mesa-${mesa.id}`;
-                                return (
-                                  <div key={mesa.id} className="flex items-center gap-1.5">
-                                    <Checkbox
-                                      id={idMesa}
-                                      checked={salaUsable && !mesasFuera.has(mesa.id)}
-                                      disabled={!salaUsable}
-                                      onCheckedChange={(v) => alternarMesa(mesa.id, v === true)}
-                                    />
-                                    <label
-                                      htmlFor={idMesa}
-                                      className={cn("text-sm tabular-nums", !salaUsable && "text-muted-foreground")}
-                                    >
-                                      {mesa.nombre}
-                                    </label>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                <div className="space-y-2">
+                  {espacios.map((espacio) => {
+                    const salaUsable = !salasFuera.has(espacio.id);
+                    const mesasSala = mesas.filter((m) => m.espacio_id === espacio.id);
+                    const idSala = `usable-sala-${espacio.id}`;
+                    return (
+                      <div key={espacio.id} className="space-y-2 rounded-lg border p-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id={idSala}
+                            checked={salaUsable}
+                            onCheckedChange={(v) => alternarSala(espacio.id, v === true)}
+                          />
+                          <label htmlFor={idSala} className="text-sm font-medium">
+                            {espacio.nombre}
+                          </label>
+                          <span className="text-xs text-muted-foreground">
+                            {salaUsable ? "Se ofrece" : "No se ofrece"}
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                ))
+                        {mesasSala.length > 0 && (
+                          <div className="flex flex-wrap gap-x-4 gap-y-2 pl-6">
+                            {mesasSala.map((mesa) => {
+                              const idMesa = `usable-mesa-${mesa.id}`;
+                              return (
+                                <div key={mesa.id} className="flex items-center gap-1.5">
+                                  <Checkbox
+                                    id={idMesa}
+                                    checked={salaUsable && !mesasFuera.has(mesa.id)}
+                                    disabled={!salaUsable}
+                                    onCheckedChange={(v) => alternarMesa(mesa.id, v === true)}
+                                  />
+                                  <label
+                                    htmlFor={idMesa}
+                                    className={cn("text-sm tabular-nums", !salaUsable && "text-muted-foreground")}
+                                  >
+                                    {mesa.nombre}
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
               <FormMessage />
             </FormItem>

@@ -9,16 +9,15 @@ import { format, addDays } from "date-fns";
 
 vi.mock("sonner");
 vi.mock("@/hooks/useOcupacionSalasDia", () => ({
-  useOcupacionSalasDia: () => ({ data: undefined, horasBase: [] }),
-  datosDeNegocio: () => null,
+  useOcupacionSalasDia: () => ({ data: undefined }),
   CLAVE_OCUPACION_SALAS_DIA: "ocupacion-salas-dia",
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({ SolicitudCard: () => null }));
 vi.mock("@/components/reservas/OcupacionSalas", () => ({ OcupacionSalas: () => null }));
-// La rejilla en cuartos se prueba aparte; aquí se espía con qué negocio se pinta.
-const rejillaProps = vi.hoisted(() => [] as { marca?: string | null }[]);
+// La rejilla en cuartos se prueba aparte; aquí se espía con qué se pinta.
+const rejillaProps = vi.hoisted(() => [] as Record<string, unknown>[]);
 vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: (props: { marca?: string | null }) => {
+  DisponibilidadCuartos: (props: Record<string, unknown>) => {
     rejillaProps.push(props);
     return null;
   },
@@ -75,9 +74,14 @@ describe("SolicitudGestionPanel · sala interna y marca (reservas-sin-salas)", (
     rejillaProps.length = 0;
   });
 
-  it("la rejilla usa la columna marca de la solicitud, aunque no tenga sala", () => {
-    montar(solicitud({ marca: "touza" }));
-    expect(rejillaProps.at(-1)?.marca).toBe("touza");
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retira «la rejilla usa la marca de la
+  // solicitud (touza)». La rejilla y la propuesta son siempre las de Casa Tomás, sin campo «Negocio».
+  it("la rejilla es la de Casa Tomás (no recibe negocio) y la propuesta no enseña ningún negocio", () => {
+    montar(solicitud({ marca: "casa_tomas" }));
+    expect(rejillaProps.at(-1)).not.toHaveProperty("marca");
+    expect(rejillaProps.at(-1)).toMatchObject({ fecha: manana, comensales: 4, hora: "21:00" });
+    expect(screen.queryByText("Negocio")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Casa Tomás|Touza/);
   });
 
   it("la sala va plegada en 'Asignación interna (opcional)' y no forma parte de la propuesta de Casa Tomás", () => {

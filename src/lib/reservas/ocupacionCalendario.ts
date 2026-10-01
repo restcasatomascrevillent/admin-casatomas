@@ -18,13 +18,11 @@
 //    negocio (hoy 170: Comedor 50 + Salón 50 + Terraza 50 + Reservado 20) y el
 //    turno parte a las 17:00.
 //
-//    TOUZA YA NO ADMITE RESERVAS (decisión del dueño, 2026-10-01). Si en los
-//    datos aparece una reserva antigua de `marca = 'touza'` se IGNORA: no suma
-//    comensales, reservas ni %, ni pone el punto de «sin sala», y el aforo de sus
-//    espacios no se mira. No hay selector de negocio ni se combinan dos
-//    negocios: hay una sola escala por turno. Esa regla es `esDeCasaTomas`, el
-//    único sitio donde se decide, y desaparece sola cuando se retire Touza del
-//    sistema.
+//    SOLO CASA TOMÁS ADMITE RESERVAS (decisión del dueño, 2026-10-01). Si en los
+//    datos aparece una reserva antigua de otro negocio (`marca = 'touza'`) se
+//    IGNORA: no suma comensales, reservas ni %, ni pone el punto de «sin sala»,
+//    y el aforo de sus espacios no se mira. Hay una sola escala por turno. La
+//    regla es `admiteReservas` (`negocios.ts`), la misma en todo el panel.
 //
 // 2. QUÉ COLOR TIENE EL DÍA: el del turno MÁS LLENO (comida o cena). No una
 //    media: una media de comida al 20 % y cena al 95 % da un 57 % «moderado» que
@@ -80,7 +78,7 @@
 
 import { turnoDeHora, TURNOS, type Turno } from "@/lib/reservas/asignacionMesas";
 import { ESTADO_CANCELADA, esEstadoVivo } from "@/lib/reservas/estadosReserva";
-import { MARCA_POR_DEFECTO, marcaDeEspacio, normalizarMarca } from "@/lib/reservas/negocios";
+import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { enVentana, sumarDias } from "@/lib/reservas/ventanaAsignacion";
 
 // ----------------------------------------------------------------------------
@@ -275,18 +273,8 @@ export function porcentajeOcupacion(ocupados: number, capacidad: number | null |
 }
 
 // ----------------------------------------------------------------------------
-// Casa Tomás: el único negocio que se mide
+// Casa Tomás: el único negocio que se mide (la regla es `admiteReservas`)
 // ----------------------------------------------------------------------------
-
-/**
- * ¿Cuenta esta reserva (o este espacio) para el calendario? Solo Casa Tomás:
- * Touza ya no admite reservas, y las antiguas que queden se IGNORAN. Sin marca
- * (o vacía) es Casa Tomás, igual que en el trigger. Es el único sitio donde se
- * decide.
- */
-export function esDeCasaTomas(marca: string | null | undefined): boolean {
-  return normalizarMarca(marca) === MARCA_POR_DEFECTO;
-}
 
 /** Lo que se lee de un espacio para saber su aforo (los `select("*")` traen más). */
 export interface EspacioConAforo {
@@ -301,13 +289,13 @@ export interface EspacioConAforo {
  * Aforo por turno de Casa Tomás: suma de `capacidad_maxima` de sus espacios
  * ACTIVOS, igual que el trigger (un espacio sin marca es de Casa Tomás y uno sin
  * `activa` se da por activo: solo `activa === false` se descarta). Los espacios
- * de Touza no cuentan. `null` si no hay aforo (lista vacía o nula, o todo a 0):
+ * de otro negocio no cuentan (`salaAdmiteReservas`). `null` si no hay aforo (lista vacía o nula, o todo a 0):
  * es «no se sabe», no «0 plazas».
  */
 export function aforoCasaTomas(espacios: ReadonlyArray<EspacioConAforo> | null | undefined): number | null {
   let total = 0;
   for (const e of espacios ?? []) {
-    if (!e || e.activa === false || marcaDeEspacio(e) !== MARCA_POR_DEFECTO) continue;
+    if (!e || e.activa === false || !salaAdmiteReservas(e)) continue;
     total += entero(e.capacidad_maxima);
   }
   return total > 0 ? total : null;
@@ -319,7 +307,7 @@ export function aforoCasaTomas(espacios: ReadonlyArray<EspacioConAforo> | null |
 
 /** Una reserva viva reducida a lo que mide el aforo. */
 export interface ItemOcupacion {
-  /** Las que no son de Casa Tomás se ignoran (ver `esDeCasaTomas`). */
+  /** Las que no son de Casa Tomás se ignoran (ver `admiteReservas`). */
   marca?: string | null;
   turno: Turno;
   comensales: number;
@@ -377,7 +365,7 @@ export function ocupacionPorTurno(items: readonly ItemOcupacion[], aforo: number
     cena: { comensales: 0, reservas: 0 },
   };
   for (const it of items) {
-    if (!esDeCasaTomas(it.marca)) continue;
+    if (!admiteReservas(it.marca)) continue;
     acumulado[it.turno].comensales += entero(it.comensales);
     acumulado[it.turno].reservas += 1;
   }
@@ -441,7 +429,7 @@ const tieneSala = (espacioId: string | null | undefined) => !!espacioId && Strin
 /**
  * Resumen de UN día a partir de TODAS sus reservas (cualquier estado y marca:
  * aquí se filtra). Ver la cabecera del fichero para qué estados cuentan, por qué
- * los días pasados son histórico y por qué Touza se ignora.
+ * los días pasados son histórico y por qué lo de otro negocio se ignora.
  */
 export function resumirDia(
   fecha: string,
@@ -449,7 +437,7 @@ export function resumirDia(
   aforo: number | null | undefined,
   contexto: ContextoCalendario,
 ): ResumenDiaCalendario {
-  const deCasaTomas = reservas.filter((r) => esDeCasaTomas(r.marca));
+  const deCasaTomas = reservas.filter((r) => admiteReservas(r.marca));
 
   if (fecha < contexto.hoy) {
     let n = 0;

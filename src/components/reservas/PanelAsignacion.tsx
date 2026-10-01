@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
-import { datosDeNegocio, useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
+import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import {
   ErrorSinPermisoSala,
   useCambiarSalaReserva,
@@ -47,7 +47,7 @@ import {
 } from "@/lib/reservas/asignacionPorDias";
 import { PanelDia } from "./asignacion/PanelDia";
 import { TiraDias } from "./asignacion/TiraDias";
-import { MARCA_POR_DEFECTO, marcaDeEspacio } from "@/lib/reservas/negocios";
+import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import {
   ETIQUETA_TURNO,
   calcularOcupacionSalas,
@@ -144,7 +144,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 
   const asignacion = useMemo(() => configAsignacionDesde(config), [config]);
   const excluidas = useMemo(() => new Set(asignacion.espaciosExcluidos), [asignacion.espaciosExcluidos]);
-  const espacios = (espaciosData ?? []) as EspacioReserva[];
+  const espacios = useMemo(() => (espaciosData ?? []) as EspacioReserva[], [espaciosData]);
 
   const desde = fechaMadrid(ahora);
   // Al menos toda la ventana, aunque se elija un rango más corto.
@@ -155,10 +155,10 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   // insignia de cada pestaña cuenta las que NO tienen mesa y no depende de «Ocultar las que ya
   // tienen mesa» (ver `asignacionPorDias.ts`).
   // Casa Tomás es el único negocio (Touza ya no admite reservas, 2026-10-01): sin filtro de negocio,
-  // y si quedan reservas de otro en datos antiguos ni se muestran ni se cuentan.
+  // y si quedan reservas de otro en datos antiguos ni se muestran ni se cuentan (`admiteReservas`).
   const diasRango = useMemo(() => diasDelRango(desde, hasta), [desde, hasta]);
   const visibles = useMemo(
-    () => reservasPorVenir(filas ?? [], ahora).filter((f) => f.marca === MARCA_POR_DEFECTO),
+    () => reservasPorVenir(filas ?? [], ahora).filter((f) => admiteReservas(f.marca)),
     [filas, ahora],
   );
   const pestanas = useMemo(
@@ -200,11 +200,14 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
     if (arriba < limite) window.scrollTo({ top: window.scrollY + arriba - limite - 8, behavior: "auto" });
   }, [diaActivo]);
 
-  /** Salas activas y usables de un negocio, por nombre. */
-  const salasDe = (marca: string) =>
-    espacios
-      .filter((e) => e.activa !== false && !excluidas.has(e.id) && marcaDeEspacio(e) === marca)
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  /** Salas activas y usables de Casa Tomás, por nombre (por id: hay dos «Terraza», una de cada negocio). */
+  const salasUsables = useMemo(
+    () =>
+      espacios
+        .filter((e) => e.activa !== false && !excluidas.has(e.id) && salaAdmiteReservas(e))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [espacios, excluidas],
+  );
 
   const aplicarCambio = async ({ fila, destinoId, destinoNombre }: CambioPendiente) => {
     try {
@@ -231,7 +234,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 
   const filaProps = {
     excluidas,
-    salasDe,
+    salas: salasUsables,
     onElegirSala: elegirSala,
     onAsignarMesa,
     onEditar: editarReserva,
@@ -385,7 +388,8 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 
 interface PropsFila {
   excluidas: ReadonlySet<string>;
-  salasDe: (marca: string) => EspacioReserva[];
+  /** Salas activas y usables de Casa Tomás. */
+  salas: EspacioReserva[];
   onElegirSala: (fila: FilaAsignacionDia, espacioId: string) => void;
   onAsignarMesa: (destino: DestinoAsignacion) => void;
   /** Abre el editor de la reserva (por id). */
@@ -399,7 +403,7 @@ interface PropsFila {
 function FilaReserva({
   fila,
   excluidas,
-  salasDe,
+  salas,
   onElegirSala,
   onAsignarMesa,
   onEditar,
@@ -467,7 +471,7 @@ function FilaReserva({
             Editar
           </Button>
         </ConMotivo>
-        <SelectorSala fila={fila} salas={salasDe(fila.marca)} guardando={guardando} onElegir={onElegirSala} />
+        <SelectorSala fila={fila} salas={salas} guardando={guardando} onElegir={onElegirSala} />
         <Button
           variant="outline"
           size="sm"
@@ -533,16 +537,15 @@ function OpcionesSala({
   salas: EspacioReserva[];
   onElegir: (espacioId: string) => void;
 }) {
-  const { data, isLoading } = useOcupacionSalasDia(fila.fecha, { marca: fila.marca });
+  const { data, isLoading } = useOcupacionSalasDia(fila.fecha);
 
   const { ocupacion, sugerida, texto } = useMemo(() => {
-    const bloque = datosDeNegocio(data, fila.marca);
-    if (!bloque) return { ocupacion: null, sugerida: null, texto: null };
+    if (!data) return { ocupacion: null, sugerida: null, texto: null };
     const usables = new Set(salas.map((s) => s.id));
     const oc = calcularOcupacionSalas({
-      espacios: bloque.espacios.filter((e) => usables.has(e.id)),
-      reservas: bloque.reservas,
-      horasBase: bloque.horasBase,
+      espacios: data.espacios.filter((e) => usables.has(e.id)),
+      reservas: data.reservas,
+      horasBase: data.horasBase,
       comensales: fila.numero_comensales,
       excluirReservaId: fila.reserva_id,
     });
@@ -559,7 +562,7 @@ function OpcionesSala({
   if (salas.length === 0) {
     return (
       <p className="p-3 text-sm text-muted-foreground">
-        No hay salas usables para este negocio. Revísalo en Configuración.
+        No hay salas usables. Revísalo en Configuración.
       </p>
     );
   }

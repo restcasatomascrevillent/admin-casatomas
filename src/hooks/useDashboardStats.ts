@@ -1,38 +1,38 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { admiteReservas } from "@/lib/reservas/negocios";
 
 /**
  * Negocio (marca) — las consultas de este fichero leen `reservas` sin
- * filtrar por `espacio_id`. Decisión del dueño 2026-09-24: el dashboard es
- * del GRUPO (Casa Tomás + Touza · El Reservado), así que por defecto
- * (`marca` null/undefined) cuentan los dos negocios; cada fila trae su
- * `marca` para que el widget desglose por negocio. Pasar una marca filtra a
- * ese negocio. El aforo (%) nunca se calcula sobre la suma de los dos: ver
- * `ReservasHoy.tsx` y `src/lib/reservas/resumenNegocios.ts`.
+ * filtrar por `espacio_id`. Solo Casa Tomás admite reservas (decisión del
+ * dueño, 2026-10-01: Touza no se reserva), así que las filas de otro negocio
+ * que queden en la base de datos se descartan con `admiteReservas` antes de
+ * llegar a ningún widget del dashboard: ni se enseñan ni se cuentan. (Antes el
+ * dashboard era del grupo y desglosaba por negocio.)
  */
-export function useDashboardStats(startDate: Date, endDate: Date, marca?: string | null) {
+const soloQueAdmitenReservas = (filas: unknown): any[] =>
+  ((filas ?? []) as any[]).filter((r) => admiteReservas(r?.marca));
+
+export function useDashboardStats(startDate: Date, endDate: Date) {
   return useQuery({
-    queryKey: ["dashboard-stats", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd"), marca ?? "all"],
+    queryKey: ["dashboard-stats", format(startDate, "yyyy-MM-dd"), format(endDate, "yyyy-MM-dd")],
     queryFn: async () => {
       const start = format(startDate, "yyyy-MM-dd");
       const end = format(endDate, "yyyy-MM-dd");
 
       // Fetch reservations - solo confirmadas para métricas
       //
-      // `as any` en `.from(...)`: el filtro `.eq("marca", marca)` añadido
-      // junto con `select("*")` y la cadena de filtros hacía que TypeScript
-      // fallara con "Type instantiation is excessively deep" al inferir el
-      // tipo del query builder de Supabase. Mismo recurso que ya usa
+      // `as any` en `.from(...)`: `select("*")` con la cadena de filtros hacía
+      // que TypeScript fallara con "Type instantiation is excessively deep" al
+      // inferir el tipo del query builder de Supabase. Mismo recurso que ya usa
       // `useDisponibilidad.ts` para `reservas`/`espacios_reserva`.
-      let consulta = supabase
+      const { data: reservasData, error: reservasError } = await supabase
         .from("reservas" as any)
         .select("*")
         .gte("fecha", start)
         .lte("fecha", end)
         .eq("estado", "confirmada");
-      if (marca) consulta = consulta.eq("marca", marca);
-      const { data: reservasData, error: reservasError } = await consulta;
 
       if (reservasError) throw reservasError;
 
@@ -43,58 +43,51 @@ export function useDashboardStats(startDate: Date, endDate: Date, marca?: string
       // (`GraficoReservasPorDia.tsx`) solo lee `data.reservas`, así que esa
       // parte se ha eliminado. Ver docs/funcionalidades/10-retirada-seccion-personal.md.
       return {
-        // `as any[]`: mismo motivo que el `as any` de `.from(...)` de arriba
-        // — `marca` no está en los tipos generados de Supabase para
+        // `any[]`: `marca` no está en los tipos generados de Supabase para
         // `reservas`, y sin este cast final el resultado se queda tipado
         // como `SelectQueryError` y rompe a quien consuma `data.reservas`
         // (p. ej. `GraficoReservasPorDia.tsx`).
-        reservas: (reservasData || []) as any[],
+        reservas: soloQueAdmitenReservas(reservasData),
       };
     },
   });
 }
 
 // Hook para todas las reservas de hoy (para mostrar en widgets informativos)
-export function useTodayReservations(marca?: string | null) {
+export function useTodayReservations() {
   return useQuery({
-    queryKey: ["today-reservations", marca ?? "all"],
+    queryKey: ["today-reservations"],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
 
-      // `as any` + cast final: ver la nota de `useDashboardStats` más arriba
-      // (mismo "Type instantiation is excessively deep" al añadir
-      // `.eq("marca", marca)` sobre `select("*")`).
-      let consulta = supabase
+      // `as any` + cast final: ver la nota de `useDashboardStats` más arriba.
+      const { data, error } = await supabase
         .from("reservas" as any)
         .select("*")
         .eq("fecha", today)
         .neq("estado", "cancelada");
-      if (marca) consulta = consulta.eq("marca", marca);
-      const { data, error } = await consulta;
 
       if (error) throw error;
-      return (data ?? []) as any[];
+      return soloQueAdmitenReservas(data);
     },
   });
 }
 
 // Hook para solo reservas confirmadas de hoy (para métricas de ocupación)
-export function useTodayConfirmedReservations(marca?: string | null) {
+export function useTodayConfirmedReservations() {
   return useQuery({
-    queryKey: ["today-confirmed-reservations", marca ?? "all"],
+    queryKey: ["today-confirmed-reservations"],
     queryFn: async () => {
       const today = format(new Date(), "yyyy-MM-dd");
 
-      let consulta = supabase
+      const { data, error } = await supabase
         .from("reservas" as any)
         .select("*")
         .eq("fecha", today)
         .eq("estado", "confirmada");
-      if (marca) consulta = consulta.eq("marca", marca);
-      const { data, error } = await consulta;
 
       if (error) throw error;
-      return (data ?? []) as any[];
+      return soloQueAdmitenReservas(data);
     },
   });
 }

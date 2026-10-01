@@ -30,8 +30,7 @@ import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DisponibilidadCuartos, useRejillaCuartos } from "./DisponibilidadCuartos";
-import { marcaDeEspacio, marcaDeReserva } from "@/lib/reservas/negocios";
-import { NegocioBadge } from "./NegocioBadge";
+import { salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { type ReservaParaVerificar, difiereSolicitudDeOferta } from "@/hooks/useVerificacionReservas";
 // El ejecutor único de acciones sobre una reserva: «Verificar» y «Rechazar» pasan por él (comprueba
@@ -111,11 +110,8 @@ export function ModalVerificacionReserva({
 
   const fecha = reserva?.fecha || "";
   const comensales = reserva?.numero_comensales || 1;
-  // Negocio de la reserva (Casa Tomás / Touza · El Reservado): las horas, el
-  // aforo y las zonas que se pueden ofrecer son solo las de ese negocio.
-  const marca = marcaDeReserva(reserva);
 
-  // Horas: TODOS los cuartos del turno de ese negocio (rejilla interna,
+  // Horas: TODOS los cuartos del turno de Casa Tomás (rejilla interna,
   // reservas-sin-salas 2026-09-29), no las que la escalera ofrecería al
   // público ni filtradas por sala: la sala es asignación interna y no limita
   // la hora. El aforo lo sigue validando el trigger por turno.
@@ -125,7 +121,6 @@ export function ModalVerificacionReserva({
     isError: errorHoras,
   } = useRejillaCuartos({
     fecha,
-    marca,
     comensales,
     hora: horaDecidida,
     excluirReservaId: reserva?.id,
@@ -141,14 +136,16 @@ export function ModalVerificacionReserva({
     return Array.from(set).sort();
   }, [rejilla, horaDecidida]);
 
+  // Las salas activas de Casa Tomás (Touza no admite reservas), más la que ya
+  // tenga la reserva si no está entre ellas (desactivada), para no perderla.
   const opcionesEspacio = useMemo(() => {
-    const activos = (espacios ?? []).filter((e: any) => e.activa && marcaDeEspacio(e) === marca);
+    const activos = (espacios ?? []).filter((e: any) => e.activa && salaAdmiteReservas(e));
     if (salaAsignada && !activos.some((e: any) => e.id === salaAsignada)) {
       const actual = (espacios ?? []).find((e: any) => e.id === salaAsignada);
       if (actual) return [...activos, actual];
     }
     return activos;
-  }, [espacios, salaAsignada, marca]);
+  }, [espacios, salaAsignada]);
 
   if (!reserva) return null;
 
@@ -197,10 +194,7 @@ export function ModalVerificacionReserva({
           vuelvan a sacar barra horizontal. */}
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            Verificar solicitud
-            <NegocioBadge marca={marca} />
-          </DialogTitle>
+          <DialogTitle className="flex items-center gap-2">Verificar solicitud</DialogTitle>
           <DialogDescription>
             {reserva.nombre || "Cliente sin nombre"} ·{" "}
             {fecha ? format(new Date(`${fecha}T00:00:00`), "d MMM yyyy", { locale: es }) : "sin fecha"}
@@ -304,7 +298,6 @@ export function ModalVerificacionReserva({
           {/* Cómo queda el turno de 15 en 15: pulsar una hora la elige. */}
           <DisponibilidadCuartos
             fecha={fecha}
-            marca={marca}
             comensales={comensales}
             hora={horaDecidida}
             excluirReservaId={reserva.id}

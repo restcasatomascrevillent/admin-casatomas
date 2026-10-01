@@ -7,7 +7,6 @@ import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import { useConfiguracionTurnos } from "@/hooks/useConfiguracionTurnos";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
-import { etiquetaNegocio, normalizarMarca } from "@/lib/reservas/negocios";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
 import {
   ETIQUETA_NIVEL,
@@ -38,12 +37,14 @@ import {
 //
 // Se usa en: ModalVerificacionReserva, SolicitudGestionPanel,
 // FormularioReserva, VistaHoy (plegable) y DetalleDiaEspacios.
+//
+// Una sola rejilla, la de Casa Tomás: Touza no admite reservas (decisión del
+// dueño, 2026-10-01) y sus datos ya llegan descartados de `useOcupacionSalasDia`.
 // ============================================================================
 
 export interface OpcionesRejillaCuartos {
   /** "yyyy-MM-dd" */
   fecha: string | null | undefined;
-  marca?: string | null;
   /** Tamaño del grupo que se quiere colocar (se prueba en el aforo de su turno). */
   comensales?: number | null;
   /** Hora elegida ahora mismo (se marca en la rejilla). */
@@ -59,30 +60,28 @@ export interface OpcionesRejillaCuartos {
  */
 export function useRejillaCuartos({
   fecha,
-  marca,
   comensales,
   hora,
   excluirReservaId,
   enabled = true,
 }: OpcionesRejillaCuartos) {
-  const m = normalizarMarca(marca);
-  const ocupacion = useOcupacionSalasDia(fecha, { marca: m, enabled });
+  const ocupacion = useOcupacionSalasDia(fecha, { enabled });
   const turnos = useConfiguracionTurnos();
   const { data: config } = useConfiguracionReservas();
-  const negocio = ocupacion.negocio;
+  const dia = ocupacion.data;
 
   const rejilla = useMemo<RejillaCuartos | null>(() => {
-    if (!fecha || !negocio || !turnos.data) return null;
+    if (!fecha || !dia || !turnos.data) return null;
     const servicio = configServicioSalaDesde(config);
     return construirRejillaCuartos({
-      periodos: periodosDelDia(fecha, m, turnos.data, negocio.espacios),
-      reservas: negocio.reservas,
-      capacidadTurno: negocio.espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0),
+      periodos: periodosDelDia(fecha, turnos.data),
+      reservas: dia.reservas,
+      capacidadTurno: dia.espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0),
       estancia: { comida: servicio.estanciaComidaMinutos, cena: servicio.estanciaCenaMinutos },
       propuesta: { hora, comensales },
       excluirReservaId,
     });
-  }, [fecha, m, negocio, turnos.data, config, hora, comensales, excluirReservaId]);
+  }, [fecha, dia, turnos.data, config, hora, comensales, excluirReservaId]);
 
   return {
     rejilla,
@@ -111,27 +110,35 @@ const MOTIVO_ORIGEN: Record<FranjaCuarto["origen"], string> = {
   propuesta: "Fuera del horario del turno: es la hora elegida ahora mismo.",
 };
 
+const TITULO = "Disponibilidad por cuartos de hora";
+
 export interface DisponibilidadCuartosProps extends Omit<OpcionesRejillaCuartos, "enabled"> {
   /** Si se pasa, cada hora es un botón que la elige. */
   onSeleccionarHora?: (hora: string) => void;
   /** Sin cabecera larga ni notas: para espacios estrechos (Hoy, diálogos). */
   compacto?: boolean;
+  /**
+   * El contenedor ya enseña este mismo título (en «Hoy», el botón del plegable dice «Disponibilidad por
+   * cuartos de hora»): no se repite a la vista. La sección conserva su nombre para los lectores de pantalla.
+   * Va aparte de `compacto` porque en el panel del día y en la verificación la rejilla compacta no tiene
+   * otro título que el suyo.
+   */
+  ocultarTitulo?: boolean;
   className?: string;
 }
 
 export function DisponibilidadCuartos({
   fecha,
-  marca,
   comensales,
   hora,
   excluirReservaId,
   onSeleccionarHora,
   compacto = false,
+  ocultarTitulo = false,
   className,
 }: DisponibilidadCuartosProps) {
   const { rejilla, isLoading, isError, isFetching, refetch } = useRejillaCuartos({
     fecha,
-    marca,
     comensales,
     hora,
     excluirReservaId,
@@ -139,7 +146,6 @@ export function DisponibilidadCuartos({
   const idTitulo = useId();
   const horaSel = horaCorta(hora);
   const pax = Math.max(0, Number(comensales) || 0);
-  const m = normalizarMarca(marca);
 
   const porTurno = useMemo(() => {
     const salida = { comida: [] as FranjaCuarto[], cena: [] as FranjaCuarto[] };
@@ -148,20 +154,27 @@ export function DisponibilidadCuartos({
   }, [rejilla]);
 
   return (
-    <section aria-labelledby={idTitulo} className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id={idTitulo} className="text-sm font-semibold">
-          Disponibilidad por cuartos de hora
-          <span className="ml-1 font-normal text-muted-foreground">· {etiquetaNegocio(m)}</span>
-        </h3>
-        {!compacto && (
-          <p className="text-xs text-muted-foreground">
-            {fecha ? fechaLegible(fecha) : "Sin día elegido"}
-            {pax > 0 && <> · para {pax} pers.</>}
-            {isFetching && !isLoading && <span className="ml-1">· actualizando…</span>}
-          </p>
-        )}
-      </div>
+    <section
+      aria-labelledby={ocultarTitulo ? undefined : idTitulo}
+      aria-label={ocultarTitulo ? TITULO : undefined}
+      className={cn("space-y-2", className)}
+    >
+      {(!ocultarTitulo || !compacto) && (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          {!ocultarTitulo && (
+            <h3 id={idTitulo} className="text-sm font-semibold">
+              {TITULO}
+            </h3>
+          )}
+          {!compacto && (
+            <p className="text-xs text-muted-foreground">
+              {fecha ? fechaLegible(fecha) : "Sin día elegido"}
+              {pax > 0 && <> · para {pax} pers.</>}
+              {isFetching && !isLoading && <span className="ml-1">· actualizando…</span>}
+            </p>
+          )}
+        </div>
+      )}
 
       {!fecha ? (
         <EstadoVacio>Elige un día para ver cómo se reparte el turno.</EstadoVacio>
@@ -184,7 +197,7 @@ export function DisponibilidadCuartos({
           </Button>
         </div>
       ) : !rejilla || rejilla.franjas.length === 0 ? (
-        <EstadoVacio>Ese día no hay turnos configurados para este negocio (cerrado).</EstadoVacio>
+        <EstadoVacio>Ese día no hay turnos configurados (cerrado).</EstadoVacio>
       ) : (
         <>
           {TURNOS.filter((t) => porTurno[t].length > 0).map((t) => (

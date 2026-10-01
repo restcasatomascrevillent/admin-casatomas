@@ -13,9 +13,9 @@
  *   de reserva de Casa Tomás que la lista enseña al filtrar por ese estado (se
  *   comprueba contra `filtrarFilasUnificadas`, el filtro de la propia lista).
  * · TOUZA NO ADMITE RESERVAS (decisión del dueño, 2026-10-01): las reservas de
- *   `marca = 'touza'` no cuentan nunca, con cualquier filtro; la regla es
- *   `esDeCasaTomas`, que aquí no se vuelve a escribir (ni se prueba el filtro de
- *   negocio de la lista, que se retira en otro encargo).
+ *   `marca = 'touza'` no cuentan nunca, con cualquier filtro, y la lista tampoco las
+ *   enseña: la regla es la común, `admiteReservas` (negocios.ts), aplicada en
+ *   `unificarReservasYSolicitudes`. Ya no hay filtro «Negocio» en la lista.
  * · `alcanceCifrasDeLaLista`: cómo se rotulan esas cifras («cifras de la lista»,
  *   «…de hoy», «…del 3 oct 2026»), y el aviso de que el filtro de estado no cuenta.
  */
@@ -23,7 +23,7 @@ import { describe, it, expect } from "vitest";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ALCANCE_HOY, alcanceCifrasDeLaLista, cifrasDeLaLista, contarPorEstado } from "../cifrasPorEstado";
-import { esDeCasaTomas } from "../ocupacionCalendario";
+import { admiteReservas } from "../negocios";
 import {
   FILTRO_SOLICITUDES,
   FILTRO_SOLICITUDES_CERRADAS,
@@ -194,16 +194,18 @@ describe("cifrasDeLaLista", () => {
       expect(cifrasDeLaLista(sinMarca, {})).toEqual(con({ pendiente: 4 }));
     });
 
-    it("la regla es la de `esDeCasaTomas` (el único sitio donde se decide), para cualquier marca", () => {
+    // Touza no admite reservas (decisión del dueño 2026-10-01): antes la regla era el filtro local `esDeCasaTomas`.
+    it("la regla es la común, `admiteReservas` (el único sitio donde se decide), para cualquier marca", () => {
       for (const marca of ["casa_tomas", "touza", "otra", "", null, undefined]) {
         const cuenta = cifrasDeLaLista([reserva("x", "pendiente", { marca })], {}).pendiente === 1;
-        expect(cuenta, String(marca)).toBe(esDeCasaTomas(marca));
+        expect(cuenta, String(marca)).toBe(admiteReservas(marca));
       }
     });
   });
 
   describe("coherencia con la lista (el filtro de la propia lista, `filtrarFilasUnificadas`)", () => {
-    // Sin filtro de negocio: se retira de la lista en otro encargo y las de Touza ya no cuentan.
+    // Touza no admite reservas (decisión del dueño 2026-10-01): la lista ya no tiene filtro «Negocio» ni enseña
+    // las filas de Touza, así que cifras y filas cuadran SIEMPRE (antes la tabla podía tener alguna fila más).
     const filtros: Record<string, FiltrosListaUnificada> = {
       "sin filtros": {},
       "un día": { fecha: "2026-10-02" },
@@ -212,11 +214,17 @@ describe("cifrasDeLaLista", () => {
       "día + canal": { fecha: "2026-10-01", canal: "web" },
       "todo a la vez": { fecha: "2026-10-01", canal: "web", busqueda: "ber" },
     };
-    /** Las filas de RESERVA de Casa Tomás que la lista enseña con esos filtros. */
+    /** Las filas de RESERVA que la lista enseña con esos filtros (todas de Casa Tomás: ver el test siguiente). */
     const reservasQueEnseña = (f: FiltrosListaUnificada) =>
-      filtrarFilasUnificadas(unificarReservasYSolicitudes(LISTA, []), f).filter(
-        (fila) => fila.tipo === "reserva" && esDeCasaTomas(fila.reserva.marca),
-      );
+      filtrarFilasUnificadas(unificarReservasYSolicitudes(LISTA, []), f).filter((fila) => fila.tipo === "reserva");
+
+    it("la lista no enseña la reserva de Touza («c») con ningún filtro", () => {
+      for (const f of Object.values(filtros)) {
+        const filas = reservasQueEnseña({ ...f, estado: "all" });
+        expect(filas.every((fila) => fila.tipo === "reserva" && admiteReservas(fila.reserva.marca))).toBe(true);
+        expect(filas.some((fila) => fila.id === "c")).toBe(false);
+      }
+    });
 
     for (const [nombre, f] of Object.entries(filtros)) {
       it(`${nombre}: la cifra de cada estado es las filas que la lista enseña al filtrar por ese estado`, () => {

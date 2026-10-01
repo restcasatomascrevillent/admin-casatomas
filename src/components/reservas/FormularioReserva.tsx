@@ -31,14 +31,8 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVerificarBlacklist, BlacklistEntry } from "@/hooks/useBlacklist";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
-import { useOcupacionSalasDia, datosDeNegocio } from "@/hooks/useOcupacionSalasDia";
-import {
-  espacioUnicoDeNegocio,
-  etiquetaNegocio,
-  MARCA_POR_DEFECTO,
-  NEGOCIOS_PANEL,
-  normalizarMarca,
-} from "@/lib/reservas/negocios";
+import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
+import { MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
 import {
   calcularOcupacionSalas,
   ETIQUETA_TURNO,
@@ -112,14 +106,8 @@ const formSchema = z.object({
     .int("El número de comensales debe ser entero")
     .min(1, "Mínimo 1 comensal"),
   notas_cliente: z.string().optional(),
-  /**
-   * Negocio de la reserva, OBLIGATORIO y elegido a mano (reservas-sin-salas,
-   * 2026-09-29). Antes lo decidía la sala; ahora la sala es interna y
-   * opcional, así que no puede decidir de qué negocio es la reserva.
-   */
-  marca: z
-    .string({ required_error: "Elige el negocio" })
-    .refine((m) => NEGOCIOS_PANEL.some((n) => n.marca === m), "Elige el negocio"),
+  // Sin campo «Negocio»: solo Casa Tomás admite reservas (decisión del dueño,
+  // 2026-10-01). El alta escribe siempre `marca: MARCA_POR_DEFECTO` (ver `onSubmit`).
   /** Sala asignada (null = sin asignar). Interna y opcional. */
   espacio_id: z.string().nullable().optional(),
   /** Solo al EDITAR: marca de «importante» (en el alta no existe). */
@@ -184,7 +172,7 @@ async function pedirAvisoModificacion(
 }
 
 // Las horas del desplegable son TODOS los cuartos de hora de los turnos del
-// negocio (`configuracion_turnos`, sin escalera: rejilla interna de
+// restaurante (`configuracion_turnos`, sin escalera: rejilla interna de
 // `lib/reservas/rejillaCuartos.ts`, reservas-sin-salas). El personal puede
 // además escribir una hora fuera de franja ("Otra hora..."). El aforo lo
 // sigue validando el trigger por turno.
@@ -215,6 +203,9 @@ interface ReservaMismoDia {
 /**
  * Reservas vivas ese día con el mismo teléfono (en cualquier formato) o email.
  * `excluirId`: al EDITAR una reserva, que no salga ella misma como «duplicado».
+ * Solo de Casa Tomás (`marca`): Touza no admite reservas (decisión del dueño,
+ * 2026-10-01) y una reserva suya que quede en la base de datos no es un
+ * duplicado de un alta de aquí.
  */
 async function buscarReservasMismoDia(
   telefono: string | undefined,
@@ -236,6 +227,7 @@ async function buscarReservasMismoDia(
   let consulta = (supabase.from("reservas" as any) as any)
     .select("hora, estado, nombre")
     .eq("fecha", fecha)
+    .eq("marca", MARCA_POR_DEFECTO)
     .not("estado", "in", "(cancelada,no_show)")
     .or(filtros.join(","));
   if (excluirId) consulta = consulta.neq("id", excluirId);
@@ -273,15 +265,12 @@ interface FormularioReservaProps {
     canal?: "telefono" | "manual";
     /** Solicitud del bot de la que sale (reservas.solicitud_id). */
     solicitud_id?: string | null;
-    /** Negocio de la reserva (valor inicial del selector "Negocio"). Sin
-     * valor, Casa Tomás. */
-    marca?: string | null;
   } | null;
   /**
    * MODO EDICIÓN: la fila de `reservas` a modificar. Sin ella el formulario es
    * el alta de siempre. Al editar: se guarda con UPDATE y solo las columnas que
    * cambian, sirve para cualquier estado, canal y fecha (también pasada), el
-   * estado y el negocio no se tocan, y `onSuccess` se llama sin argumentos.
+   * estado y la marca no se tocan, y `onSuccess` se llama sin argumentos.
    * Ver `src/lib/reservas/edicionReserva.ts`.
    */
   reservaAEditar?: ReservaEditable | null;
@@ -332,7 +321,6 @@ export const FormularioReserva = ({
           numero_comensales: 2,
           fecha: datosPreseleccionados?.fecha,
           hora: datosPreseleccionados?.hora ?? "",
-          marca: datosPreseleccionados?.marca ?? MARCA_POR_DEFECTO,
           espacio_id: datosPreseleccionados?.espacio_id ?? null,
         },
   });
@@ -354,7 +342,6 @@ export const FormularioReserva = ({
     if (datosPreseleccionados?.notas_cliente) {
       form.setValue("notas_cliente", datosPreseleccionados.notas_cliente);
     }
-    if (datosPreseleccionados?.marca != null) form.setValue("marca", datosPreseleccionados.marca);
     if (datosPreseleccionados?.espacio_id !== undefined) {
       form.setValue("espacio_id", datosPreseleccionados.espacio_id);
     }
@@ -368,22 +355,14 @@ export const FormularioReserva = ({
   const sinEmail = !emailParaGuardar(watchedEmail);
   const watchedTelefono = form.watch("telefono");
   const watchedEspacio = form.watch("espacio_id") ?? null;
-  const watchedMarca = form.watch("marca");
   const fechaStr = watchedFecha ? format(watchedFecha, "yyyy-MM-dd") : null;
 
-  // Reservas + salas del día (una sola consulta, compartida con las rejillas
-  // por la clave de React Query), de TODOS los negocios. El negocio de la
-  // reserva lo elige el personal en "Negocio" (obligatorio): la sala es
-  // asignación interna y ya no lo decide. El aforo del turno, las horas y la
-  // evaluación de la sala son las de ESE negocio.
+  // Reservas + salas del día de Casa Tomás (una sola consulta, compartida con
+  // las rejillas por la clave de React Query). La sala es asignación interna.
   const { data: datosDia } = useOcupacionSalasDia(fechaStr);
-  const todosLosEspacios = useMemo(() => (datosDia?.negocios ?? []).flatMap((n) => n.espacios), [datosDia]);
-  const marcaAlta = normalizarMarca(watchedMarca);
-  const datosNegocio = useMemo(() => datosDeNegocio(datosDia, marcaAlta), [datosDia, marcaAlta]);
-  const salasDelNegocio = datosNegocio?.espacios ?? [];
+  const salas = useMemo(() => datosDia?.espacios ?? [], [datosDia]);
   const { rejilla } = useRejillaCuartos({
     fecha: fechaStr,
-    marca: marcaAlta,
     comensales: Number(watchedComensales) || 0,
     hora: watchedHora || null,
     // Al editar, la reserva no cuenta contra sí misma en la rejilla.
@@ -399,32 +378,22 @@ export const FormularioReserva = ({
   // a cualquier hora; el aforo lo sigue validando el trigger.
   const horaFueraDeFranja = !!rejilla && !!watchedHora && !horariosDisponibles.includes(watchedHora);
 
-  /** Cambiar de negocio: la sala de otro negocio no vale; la única sala de
-   * un negocio que solo tiene una (Touza: El Reservado) se preselecciona. */
-  const cambiarMarca = (marca: string) => {
-    form.setValue("marca", marca, { shouldValidate: true });
-    const actual = form.getValues("espacio_id") ?? null;
-    const actualEsDeOtro = !!actual && !todosLosEspacios.some((e) => e.id === actual && normalizarMarca(e.marca) === marca);
-    if (actualEsDeOtro || !actual) form.setValue("espacio_id", espacioUnicoDeNegocio(marca, todosLosEspacios));
-  };
-  const nombreSalaElegida = watchedEspacio
-    ? todosLosEspacios.find((e) => e.id === watchedEspacio)?.nombre ?? "Sala"
-    : "sin sala";
+  const nombreSalaElegida = watchedEspacio ? salas.find((e) => e.id === watchedEspacio)?.nombre ?? "Sala" : "sin sala";
   const mostrarInputHora = modoOtraHora || horaFueraDeFranja;
 
   // Aviso (no bloqueo) si la sala elegida se pasa de su capacidad en el
   // turno: mismo criterio que el Kanban al mover de espacio.
   const evaluacionSala = useMemo(() => {
-    if (!datosNegocio || !watchedHora) return null;
+    if (!datosDia || !watchedHora) return null;
     const ocupacion = calcularOcupacionSalas({
-      espacios: datosNegocio.espacios,
-      reservas: datosNegocio.reservas,
-      horasBase: datosNegocio.horasBase,
+      espacios: datosDia.espacios,
+      reservas: datosDia.reservas,
+      horasBase: datosDia.horasBase,
       comensales: Number(watchedComensales) || 0,
       excluirReservaId: reservaAEditar?.id,
     });
     return evaluarUbicacion(ocupacion, watchedEspacio, watchedHora);
-  }, [datosNegocio, watchedHora, watchedComensales, watchedEspacio, reservaAEditar?.id]);
+  }, [datosDia, watchedHora, watchedComensales, watchedEspacio, reservaAEditar?.id]);
 
   const superaMaximoAutomatico =
     !!configReservas && Number(watchedComensales) > configReservas.max_comensales_por_reserva;
@@ -454,14 +423,15 @@ export const FormularioReserva = ({
     const comprobar = async () => {
       setVerificando(true);
       try {
-        // Aforo del turno DEL NEGOCIO de la reserva (igual que el trigger). Al
-        // editar se pasa la reserva ANTERIOR entera: no se cuenta contra sí misma
-        // (el trigger tampoco la cuenta) y se aplica la regla del UPDATE («editar
-        // no puede subir la ocupación»: si el cambio no suma, se puede guardar).
+        // Aforo del turno de Casa Tomás (igual que el trigger, que lo cuenta por
+        // marca). Al editar se pasa la reserva ANTERIOR entera: no se cuenta
+        // contra sí misma (el trigger tampoco la cuenta) y se aplica la regla del
+        // UPDATE («editar no puede subir la ocupación»: si el cambio no suma, se
+        // puede guardar).
         const fechaAforo = format(watchedFecha, "yyyy-MM-dd");
         const resultado = reservaAEditar
-          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta, reservaAEditar)
-          : await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, marcaAlta);
+          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, MARCA_POR_DEFECTO, reservaAEditar)
+          : await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, MARCA_POR_DEFECTO);
         if (!cancelado) {
           setDisponibilidadInfo({ disponible: resultado.disponible, mensaje: resultado.mensaje });
         }
@@ -492,7 +462,6 @@ export const FormularioReserva = ({
     watchedFecha,
     watchedHora,
     watchedComensales,
-    marcaAlta,
     comprobarAforo,
     reservaAEditar?.id,
     reservaAEditar?.fecha,
@@ -553,6 +522,8 @@ export const FormularioReserva = ({
   // en todas sus formas (+34..., 0034..., con espacios): las reservas del bot
   // se guardan como "+34XXXXXXXXX" y las antiguas del panel tal cual.
   // `excluirId`: al EDITAR, la propia reserva no cuenta contra sí misma.
+  // Solo cuentan las reservas de Casa Tomás (`marca`): las que queden de Touza,
+  // que ya no admite reservas, no gastan el cupo de nadie.
   const verificarLimites = async (
     telefono: string | undefined,
     email: string | null | undefined,
@@ -568,6 +539,7 @@ export const FormularioReserva = ({
         .select("id", { count: "exact", head: true })
         .in("telefono", variantes)
         .eq("fecha", fecha)
+        .eq("marca", MARCA_POR_DEFECTO)
         .not("estado", "in", "(cancelada,no_show)");
       if (excluirId) consulta = consulta.neq("id", excluirId);
       const { count, error } = await consulta;
@@ -586,6 +558,7 @@ export const FormularioReserva = ({
         .select("id", { count: "exact", head: true })
         .in("email", Array.from(new Set([emailLimpio, emailLimpio.toLowerCase()])))
         .eq("fecha", fecha)
+        .eq("marca", MARCA_POR_DEFECTO)
         .not("estado", "in", "(cancelada,no_show)");
       if (excluirId) consulta = consulta.neq("id", excluirId);
       const { count, error } = await consulta;
@@ -874,9 +847,10 @@ export const FormularioReserva = ({
         numero_comensales: values.numero_comensales,
         notas_cliente: values.notas_cliente?.trim() || null,
         espacio_id: values.espacio_id || null,
-        // Negocio: el elegido en el formulario (obligatorio). Ya no sale de
-        // la sala: una reserva de Touza sin sala sigue siendo de Touza.
-        marca: values.marca,
+        // Negocio: siempre Casa Tomás, el único que admite reservas (decisión del
+        // dueño, 2026-10-01). Se sigue escribiendo: la BD tiene un CHECK sobre
+        // `marca` y el trigger de aforo cuenta por marca.
+        marca: MARCA_POR_DEFECTO,
         estado: estadoInicial,
         // 'telefono' al convertir una solicitud del bot (el cliente llamó);
         // 'manual' para un alta del personal.
@@ -929,7 +903,7 @@ export const FormularioReserva = ({
         numero_comensales: values.numero_comensales,
         espacio_id: values.espacio_id || null,
       };
-      form.reset({ numero_comensales: 2, hora: "", marca: values.marca, espacio_id: null });
+      form.reset({ numero_comensales: 2, hora: "", espacio_id: null });
       setModoOtraHora(false);
       setLimiteAlcanzado(null);
       setDisponibilidadInfo(null);
@@ -1155,47 +1129,6 @@ export const FormularioReserva = ({
             )}
           />
 
-          {!isPublic && (
-            <FormField
-              control={form.control}
-              name="marca"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Negocio</FormLabel>
-                  {editando ? (
-                    // Una reserva no salta de negocio (cambiaría de aforo): igual
-                    // que en el Kanban, que no deja moverla a una sala del otro.
-                    // Además el trigger de aforo no mira `marca` al actualizar.
-                    // (desfasado tras aplicar 20260930212000)
-                    <FormControl>
-                      <Input value={etiquetaNegocio(field.value)} disabled readOnly />
-                    </FormControl>
-                  ) : (
-                    <Select value={field.value || undefined} onValueChange={cambiarMarca}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Elige el negocio" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {NEGOCIOS_PANEL.map((n) => (
-                          <SelectItem key={n.marca} value={n.marca}>
-                            {n.etiqueta}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <p className="text-[11px] text-muted-foreground">
-                    {editando
-                      ? "El negocio no se puede cambiar: cancela la reserva y crea otra."
-                      : "Cada negocio tiene su propio aforo. La sala no lo decide."}
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
         </div>
 
         {!isPublic && superaMaximoAutomatico && configReservas && (
@@ -1212,7 +1145,6 @@ export const FormularioReserva = ({
           <div className="rounded-lg border p-3">
             <DisponibilidadCuartos
               fecha={fechaStr}
-              marca={marcaAlta}
               comensales={Number(watchedComensales) || 0}
               hora={watchedHora || null}
               excluirReservaId={reservaAEditar?.id}
@@ -1225,8 +1157,8 @@ export const FormularioReserva = ({
         )}
 
         {/* La sala es asignación INTERNA y opcional (reservas-sin-salas):
-            plegada, con la rejilla de salas para decidir. Solo las salas del
-            negocio elegido. */}
+            plegada, con la rejilla de salas para decidir. Solo las salas
+            activas de Casa Tomás. */}
         {!isPublic && (
           <Collapsible className="space-y-3 rounded-lg border p-3">
             <CollapsibleTrigger asChild>
@@ -1257,7 +1189,7 @@ export const FormularioReserva = ({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
-                        {salasDelNegocio.map((e) => (
+                        {salas.map((e) => (
                           <SelectItem key={e.id} value={e.id}>
                             {e.nombre} ({e.capacidad_maxima} plazas)
                           </SelectItem>
@@ -1265,7 +1197,7 @@ export const FormularioReserva = ({
                         {/* Al editar, la sala que ya tenía puede estar desactivada
                             o fuera de esta lista: se sigue mostrando (y se conserva
                             si no se toca), no queda el desplegable en blanco. */}
-                        {editando && field.value && !salasDelNegocio.some((e) => e.id === field.value) && (
+                        {editando && field.value && !salas.some((e) => e.id === field.value) && (
                           <SelectItem value={field.value}>Sala actual (no disponible)</SelectItem>
                         )}
                       </SelectContent>
@@ -1282,7 +1214,6 @@ export const FormularioReserva = ({
                 comensales={Number(watchedComensales) || 0}
                 hora={watchedHora || null}
                 espacioId={watchedEspacio}
-                marca={marcaAlta}
                 excluirReservaId={reservaAEditar?.id}
                 onSeleccionar={(espacioId, hora) => {
                   setModoOtraHora(false);
@@ -1342,11 +1273,11 @@ export const FormularioReserva = ({
           </Alert>
         )}
 
-        {!isPublic && datosNegocio?.cerrado && (
+        {!isPublic && datosDia?.cerrado && (
           <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Ese día no tiene turnos configurados ({etiquetaNegocio(marcaAlta)} cierra). Se puede {editando ? "guardar" : "crear"} con "Otra hora…", pero
+              Ese día no tiene turnos configurados (el restaurante cierra). Se puede {editando ? "guardar" : "crear"} con "Otra hora…", pero
               revisa que sea correcto.
             </AlertDescription>
           </Alert>

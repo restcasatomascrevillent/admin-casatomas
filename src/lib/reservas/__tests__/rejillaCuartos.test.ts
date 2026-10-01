@@ -17,12 +17,6 @@ const TURNOS_GENERALES = [
   { hora_inicio: "20:00:00", hora_fin: "23:00:00", activo: true, espacio_id: null, dias_semana: [] },
 ];
 
-const ESPACIOS = [
-  { id: "comedor", marca: "casa_tomas" },
-  { id: "salon", marca: "casa_tomas" },
-  { id: "reservado", marca: "touza" },
-];
-
 const ESTANCIA = { comida: 105, cena: 120 };
 
 const reserva = (hora: string, pax: number, extra: Partial<ReservaCuarto> = {}): ReservaCuarto => ({
@@ -35,7 +29,7 @@ const reserva = (hora: string, pax: number, extra: Partial<ReservaCuarto> = {}):
 
 function rejilla(reservas: ReservaCuarto[], extra: Partial<Parameters<typeof construirRejillaCuartos>[0]> = {}) {
   return construirRejillaCuartos({
-    periodos: periodosDelDia(FECHA, "casa_tomas", TURNOS_GENERALES, ESPACIOS),
+    periodos: periodosDelDia(FECHA, TURNOS_GENERALES),
     reservas,
     capacidadTurno: 170,
     estancia: ESTANCIA,
@@ -47,7 +41,7 @@ const franja = (r: ReturnType<typeof rejilla>, hora: string) => r.franjas.find((
 
 describe("periodosDelDia", () => {
   it("Casa Tomás usa los turnos generales", () => {
-    const periodos = periodosDelDia(FECHA, "casa_tomas", TURNOS_GENERALES, ESPACIOS);
+    const periodos = periodosDelDia(FECHA, TURNOS_GENERALES);
     expect(periodos).toEqual([
       { inicio: 13 * 60, fin: 16 * 60 },
       { inicio: 20 * 60, fin: 23 * 60 },
@@ -56,17 +50,17 @@ describe("periodosDelDia", () => {
 
   it("respeta dias_semana: un turno que no abre ese día no sale", () => {
     const soloMartes = [{ ...TURNOS_GENERALES[0], dias_semana: [2] }];
-    expect(periodosDelDia(FECHA, "casa_tomas", soloMartes, ESPACIOS)).toEqual([]);
+    expect(periodosDelDia(FECHA, soloMartes)).toEqual([]);
   });
 
-  it("Touza: unión de los turnos de sus espacios (propios si los tiene, si no los generales)", () => {
+  // Touza no admite reservas (decisión del dueño 2026-10-01): ya no hay periodos por negocio (la unión de los
+  // turnos propios de las salas de Touza). Un turno propio de una sala no cambia los periodos del día.
+  it("un turno propio de una sala (espacio_id) no entra: solo cuentan los generales", () => {
     const configs = [
       ...TURNOS_GENERALES,
       { hora_inicio: "19:00", hora_fin: "21:00", activo: true, espacio_id: "reservado", dias_semana: [] },
     ];
-    expect(periodosDelDia(FECHA, "touza", configs, ESPACIOS)).toEqual([{ inicio: 19 * 60, fin: 21 * 60 }]);
-    // Sin turnos propios cae en los generales.
-    expect(periodosDelDia(FECHA, "touza", TURNOS_GENERALES, ESPACIOS)).toHaveLength(2);
+    expect(periodosDelDia(FECHA, configs)).toEqual(periodosDelDia(FECHA, TURNOS_GENERALES));
   });
 });
 
@@ -163,21 +157,6 @@ describe("construirRejillaCuartos", () => {
     expect(franja(r, "13:30")?.nivel).toBe("lleno");
   });
 
-  it("Touza: su propia franja por espacio y su propio aforo", () => {
-    const configs = [
-      ...TURNOS_GENERALES,
-      { hora_inicio: "19:00", hora_fin: "21:00", activo: true, espacio_id: "reservado", dias_semana: [] },
-    ];
-    const r = construirRejillaCuartos({
-      periodos: periodosDelDia(FECHA, "touza", configs, ESPACIOS),
-      reservas: [reserva("19:30", 20)],
-      capacidadTurno: 30,
-      estancia: ESTANCIA,
-    });
-    expect(r.franjas.map((f) => f.hora)).toEqual([
-      "19:00", "19:15", "19:30", "19:45", "20:00", "20:15", "20:30", "20:45",
-    ]);
-    expect(franja(r as ReturnType<typeof rejilla>, "20:45")).toMatchObject({ enSala: 20, restanteTurno: 10 });
-    expect(r.aforo.cena).toMatchObject({ ocupados: 20, capacidad: 30 });
-  });
+  // Touza no admite reservas (decisión del dueño 2026-10-01): se retira el caso «Touza: su propia franja por
+  // espacio y su propio aforo». La rejilla es siempre la de Casa Tomás (turnos generales, aforo 170).
 });

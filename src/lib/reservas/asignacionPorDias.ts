@@ -20,8 +20,8 @@
 //     del resumen del día, para que cuadren con lo que se está viendo.
 //   · Insignia 0 con reservas = «todo asignado». Día sin reservas = sin insignia.
 //   · Negocio: solo Casa Tomás (Touza ya no admite reservas). Estas funciones no filtran por
-//     negocio: el panel descarta antes las reservas de otra marca, así que ni se muestran ni
-//     se cuentan.
+//     negocio: el panel descarta antes las reservas de otra marca (`admiteReservas`), así que
+//     ni se muestran ni se cuentan.
 //   · Día «en ventana»: el día en el que cae algún momento de [ahora, ahora + N horas],
 //     contado en hora de Madrid. Con 48 h son siempre tres días naturales (hoy, mañana y
 //     pasado, aunque pasado solo hasta la misma hora de ahora). Es una propiedad del
@@ -167,7 +167,7 @@ export interface ResumenPestana {
 
 /**
  * Una entrada por pestaña, en orden, también para los días sin reservas. Recibe las filas ya
- * filtradas por negocio y reducidas a las que siguen por venir (`reservasPorVenir`); NO
+ * de Casa Tomás (`admiteReservas`) y reducidas a las que siguen por venir (`reservasPorVenir`); NO
  * depende de «Ocultar las que ya tienen mesa» (ver la cabecera del fichero).
  */
 export function resumirPestanas<T extends ReservaVentana>(
@@ -196,8 +196,8 @@ export function diaPorDefecto(resumenes: readonly ResumenPestana[], hoy: string)
 }
 
 /**
- * Pestaña activa: la que eligió la persona mientras siga existiendo (cambiar de negocio o de
- * rango no la mueve); si ya no está entre los días, la de por defecto.
+ * Pestaña activa: la que eligió la persona mientras siga existiendo (cambiar de rango no la
+ * mueve); si ya no está entre los días, la de por defecto.
  */
 export function resolverDiaActivo(args: {
   dias: readonly string[];
