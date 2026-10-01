@@ -34,6 +34,7 @@ import {
   type FilaAsignacionDia,
 } from "@/hooks/useReservasPorAsignar";
 import { configAsignacionDesde, fechaMadrid, sumarDias } from "@/lib/reservas/ventanaAsignacion";
+import { LIMITE_FILAS } from "@/lib/reservas/paginarConsulta";
 import {
   agruparPorFecha,
   construirDia,
@@ -85,12 +86,11 @@ import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacio
 const OPCIONES_DIAS = [7, 14, 30] as const;
 
 /**
- * Tope de filas por petición de la API de Supabase (PostgREST `max-rows`: 1000 por defecto en los
- * proyectos alojados). `useReservasPorAsignar` pide todo el rango de una vez: si llegan justo
- * tantas, lo normal es que falte el final del rango y las cuentas de las últimas pestañas se
- * queden cortas. Se avisa en pantalla; la solución de fondo es paginar ese hook.
+ * PostgREST corta cada petición a 1000 filas, pero `useReservasPorAsignar` lee el rango ENTERO por
+ * lotes, así que ya no hay aviso por «llegan justo 1000». Solo se avisa si el rango pasa del tope de
+ * seguridad de esa lectura (`LIMITE_FILAS`, 10.000 reservas): el hook lo dice con `truncado`.
  */
-const TOPE_FILAS_POR_CONSULTA = 1000;
+const LIMITE_FILAS_TEXTO = new Intl.NumberFormat("es-ES").format(LIMITE_FILAS);
 
 /**
  * Dónde se recuerda el último día abierto. «Mesas» abre el plano de una sala y `Reservas` pinta
@@ -149,7 +149,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const desde = fechaMadrid(ahora);
   // Al menos toda la ventana, aunque se elija un rango más corto.
   const hasta = sumarDias(desde, Math.max(dias, Math.ceil(asignacion.ventanaHoras / 24) + 1));
-  const { data: filas, isLoading, isError, refetch } = useReservasPorAsignar(desde, hasta);
+  const { data: filas, isLoading, isError, refetch, truncado } = useReservasPorAsignar(desde, hasta);
 
   // Una pestaña por cada día del rango. Las reservas son las vivas que aún no han empezado; la
   // insignia de cada pestaña cuenta las que NO tienen mesa y no depende de «Ocultar las que ya
@@ -288,16 +288,16 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
         </CardContent>
       </Card>
 
-      {!isError && !isLoading && (filas?.length ?? 0) >= TOPE_FILAS_POR_CONSULTA && (
+      {!isError && !isLoading && truncado && (
         <div
           role="status"
           className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
-            <span className="font-medium">Puede que falten reservas.</span> La consulta devuelve como máximo{" "}
-            {TOPE_FILAS_POR_CONSULTA} y este rango las alcanza: las cuentas de los últimos días pueden quedarse
-            cortas. Elige menos días en «Mostrar».
+            <span className="font-medium">Puede que falten reservas.</span> Este rango tiene más de{" "}
+            {LIMITE_FILAS_TEXTO} reservas y solo se han cargado las primeras {LIMITE_FILAS_TEXTO}, por fecha y hora:
+            las cuentas de los últimos días pueden quedarse cortas. Elige menos días en «Mostrar».
           </p>
         </div>
       )}
