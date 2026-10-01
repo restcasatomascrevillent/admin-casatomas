@@ -48,6 +48,13 @@ set client_encoding = 'UTF8';
 --
 -- ESTADO: escrito el 2026-10-01 y SIN EJECUTAR (la migración tampoco está
 -- aplicada).
+--
+-- ACTUALIZADO el 2026-10-01 por 20261001190000_storage_agujeros_menores:
+-- esa migración quita a anon la lectura por API de los buckets de contenido
+-- y de temp-pdfs (las webs siguen con sus URLs públicas). S1e pasa a exigir
+-- la lectura solo para authenticated y S2b comprueba lo que toque según
+-- esté o no aplicada (lo detecta por contenido_lectura_autenticados), así
+-- que este test vale antes y después de 20261001190000.
 -- ===========================================================================
 
 begin;
@@ -98,15 +105,16 @@ begin
   assert (select public from storage.buckets where id = 'facturas-originales') = false,
     'S1d: el bucket facturas-originales ha dejado de ser privado (sus objetos se servirían por URL pública sin RLS)';
 
+  -- Desde 20261001190000 la lectura por API es solo de authenticated (anon
+  -- usa URLs públicas, que no pasan por la RLS): basta con que la tenga él.
   foreach b in array array['platos', 'plato', 'vinos', 'bebidas', 'cocteles', 'ecommerce', 'novedades'] loop
     assert exists (
       select 1 from pg_policies p
        where p.schemaname = 'storage' and p.tablename = 'objects'
          and p.cmd in ('SELECT', 'ALL') and p.permissive = 'PERMISSIVE'
-         and ('public' = any (p.roles)
-              or ('anon' = any (p.roles) and 'authenticated' = any (p.roles)))
+         and ('public' = any (p.roles) or 'authenticated' = any (p.roles))
          and p.qual ~ ('bucket_id = (''' || b || '''|ANY \(ARRAY\[[^]]*''' || b || ''')')),
-      format('S1e %s: el bucket se ha quedado sin SELECT propia para anon/authenticated', b);
+      format('S1e %s: el bucket se ha quedado sin SELECT propia para authenticated', b);
   end loop;
 end;
 $$;
@@ -144,6 +152,13 @@ begin
   select count(*) into n from storage.objects where bucket_id = 'facturas-originales';
   assert n >= 1, 'fixture: no se ha podido crear el objeto de prueba en facturas-originales';
   perform set_config('storage_test.total_facturas', n::text, true);
+
+  -- Para S2b: ¿está aplicada 20261001190000?
+  perform set_config('storage_test.con_190000',
+                     exists (select 1 from pg_policies
+                              where schemaname = 'storage' and tablename = 'objects'
+                                and policyname = 'contenido_lectura_autenticados')::text,
+                     true);
 end;
 $$;
 
@@ -155,15 +170,24 @@ set local request.jwt.claims = '{"role":"anon"}';
 
 do $$
 declare b text; n bigint;
+  -- ¿Está aplicada 20261001190000 (anon ya no lista los buckets públicos)?
+  -- Se calculó como postgres en el fixture.
+  con_190000 boolean := current_setting('storage_test.con_190000')::boolean;
 begin
   -- Ni el objeto de prueba ni NINGUNO de los reales (hoy 14 facturas).
   select count(*) into n from storage.objects where bucket_id = 'facturas-originales';
   assert n = 0, format('S2a: anon ve %s objetos de facturas-originales (LA FUGA SIGUE ABIERTA)', n);
 
   foreach b in array array['platos', 'plato', 'vinos', 'bebidas', 'cocteles', 'ecommerce', 'novedades', 'temp-pdfs'] loop
-    assert exists (select 1 from storage.objects
-                    where bucket_id = b and name = 'zz-test-rls-storage/fixture.pdf'),
-      format('S2b %s: anon ha dejado de ver los objetos de un bucket público', b);
+    if con_190000 then
+      assert not exists (select 1 from storage.objects
+                          where bucket_id = b and name = 'zz-test-rls-storage/fixture.pdf'),
+        format('S2b %s: anon sigue listando un bucket público por API (20261001190000 aplicada)', b);
+    else
+      assert exists (select 1 from storage.objects
+                      where bucket_id = b and name = 'zz-test-rls-storage/fixture.pdf'),
+        format('S2b %s: anon ha dejado de ver los objetos de un bucket público', b);
+    end if;
   end loop;
 end;
 $$;
