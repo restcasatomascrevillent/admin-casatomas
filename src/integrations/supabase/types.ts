@@ -1189,6 +1189,30 @@ export type Database = {
           },
         ]
       }
+      configuracion_web: {
+        Row: {
+          id: boolean
+          mostrar_fotos_platos_casa_tomas: boolean
+          mostrar_fotos_platos_touza: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          mostrar_fotos_platos_casa_tomas?: boolean
+          mostrar_fotos_platos_touza?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          mostrar_fotos_platos_casa_tomas?: boolean
+          mostrar_fotos_platos_touza?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       consultas_chatbot: {
         Row: {
           created_at: string | null
