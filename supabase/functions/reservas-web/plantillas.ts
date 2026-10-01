@@ -24,10 +24,14 @@
 //
 // CÓMO SE DECIDE LA MARCA DE UNA RESERVA NUEVA (ver `resolverMarca` más
 // abajo, y su uso en `handleCrear` de index.ts) — por prioridad:
-//   1. `marca` explícita en el body de `/crear` (NINGÚN frontend la manda
-//      hoy — ni Reservado.tsx ni ReservationForm.tsx — pero es el camino
-//      limpio para cuando touza-restaurant-website se actualice; entonces
-//      esto deja de depender de los puntos 2 y 3).
+//   1. `marca` explícita en el body de `/crear`. Reservado.tsx
+//      (touza-restaurant-website) SÍ la manda: `marca: "touza"`, así que la
+//      web de Touza ya no depende de los puntos 2 y 3. Desde el 2026-10-01
+//      Touza no admite reservas y `handleCrear` rechaza esa petición con
+//      HTTP 409 `touza_sin_reservas` antes de registrar nada (ver
+//      `rechazoTouzaSinReservas` en reglas.ts). ReservationForm.tsx
+//      (casa-tomas-story) NO la manda: la web de Casa Tomás cae en los
+//      puntos siguientes y, en la práctica, en el 4 (casa_tomas).
 //   2. La `marca` etiquetada en `espacios_reserva.caracteristicas` del
 //      espacio pedido (si se manda `espacio_id`/`sala`). La migración
 //      `20260922150000_espacio_el_reservado_touza.sql` (NO aplicada, de
@@ -39,15 +43,16 @@
 //   3. Texto de `notas_cliente`. Reservado.tsx (touza-restaurant-website)
 //      compone SIEMPRE la nota con la frase fija `MARCADOR_TOUZA_EN_NOTAS`
 //      como primera línea (no es texto libre del cliente: lo escribe el
-//      propio código del formulario, ver Reservado.tsx líneas 106-111) — es
-//      el ÚNICO dato que hoy distingue una solicitud de El Reservado de una
-//      del restaurante, y por eso es el puente real mientras 1 y 2 no
-//      apliquen. Es intencionadamente el ÚLTIMO recurso: si esa cadena
-//      cambia en touza-restaurant-website (repo fuera de este territorio)
-//      la detección deja de funcionar EN SILENCIO — no lanza error, cae al
-//      punto 4 — que es exactamente la red de seguridad que pide el encargo
-//      (nunca un correo sin marca), aunque significa que ese cambio no se
-//      notaría solo. Ver informe de la tarea.
+//      propio código del formulario, en su `handleSubmit`). Hasta que
+//      Reservado.tsx empezó a mandar `marca` (punto 1) era el ÚNICO dato que
+//      distinguía una solicitud de El Reservado de una del restaurante; hoy
+//      queda como respaldo del punto 1 (p. ej. para una petición sin
+//      `marca` de una versión vieja de esa web). Es intencionadamente el
+//      ÚLTIMO recurso: si esa cadena cambia en touza-restaurant-website
+//      (repo fuera de este territorio) la detección deja de funcionar EN
+//      SILENCIO — no lanza error, cae al punto 4 — que es exactamente la red
+//      de seguridad que pide el encargo (nunca un correo sin marca), aunque
+//      significa que ese cambio no se notaría solo. Ver informe de la tarea.
 //   4. Por defecto, 'casa_tomas' — el caso mayoritario y el seguro.
 //
 // Una vez creada la reserva, `marca` queda GUARDADA en la fila (columna
