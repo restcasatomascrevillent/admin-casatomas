@@ -9,6 +9,7 @@ set client_encoding = 'UTF8';
 -- ##   (pg_policies, pg_get_functiondef, user_permissions; solo lectura).  ##
 -- ##   No se ha ejecutado en ningún sitio. Los pasos del dueño, en orden:  ##
 -- ##   al final de esta cabecera (PASOS DEL DUEÑO).                        ##
+-- ##   Requisito previo: desplegar ANTES admin-create-user (paso 1).       ##
 -- ##                                                                       ##
 -- ===========================================================================
 --
@@ -34,16 +35,25 @@ set client_encoding = 'UTF8';
 --   una caída, no una mejora. El plan escrito: pasar a 'edit' JUNTO con el
 --   arreglo del frontend, nunca por separado.
 --
---   Estado el 2026-10-01 (medido en producción, solo lectura):
+--   Estado el 2026-10-01 (medido en producción, solo lectura; puesto al
+--   día esa misma noche):
 --     · YA se cumple: el panel de reservas exige can_edit para escribir
---       (useCanAccessSection('reservas', 'edit')).
---     · NO se cumple: user_permissions tiene 0 filas con can_edit = true
---       (en las 13 secciones), y la pantalla Usuarios sigue forzando
---       can_edit: false al guardar (useUsersManagement.ts:224, 253 y 349;
---       useUserRolePresets.ts:26 y 45; ListaUsuarios.tsx, InvitarUsuario.tsx
---       y ConfigurarRolesModal.tsx). can_edit solo se puede dar por SQL, y
---       la interfaz lo vuelve a poner a false en cuanto alguien guarda los
---       permisos de ese usuario.
+--       (useCanAccessSection('reservas', 'edit')), salvo «Nueva Reserva»
+--       (ver la NOTA al final de PASOS DEL DUEÑO).
+--     · YA se cumple también: la pantalla Usuarios enseña «Ver» y «Puede
+--       editar» por sección (en Permisos, en el alta y en Configurar roles)
+--       y CONSERVA can_edit al guardar; antes lo forzaba a false. Commit
+--       «feat(usuarios): conceder y conservar el permiso de edicion por
+--       seccion» (be8616e en origin/main), ya en producción de Vercel.
+--       Solo un super admin puede cambiar permisos (la RLS de
+--       user_permissions solo deja escribir a super admins).
+--     · can_edit en `reservas`: al escribir esta migración había 0 filas
+--       con can_edit = true (en las 13 secciones); el mismo 2026-10-01 se
+--       les dio a los dos usuarios que no son super admin (el `admin` y el
+--       `staff`). El paso (2) comprueba que lo siguen teniendo.
+--     · admin-create-user: el arreglo que solo deja a un super admin crear
+--       usuarios con can_edit (403 a cualquier otro) está en origin/main
+--       (5ddff1d), que se commiteó SIN desplegar: paso (1).
 --     · Cambió después: el acceso incondicional ya no es el rol `admin`
 --       sino la tabla super_admins (20260926060716). Un `admin` que no es
 --       super admin se rige por sus filas de user_permissions.
@@ -78,17 +88,21 @@ set client_encoding = 'UTF8';
 --
 --   · 2 super admins: siguen escribiendo (has_section_permission devuelve
 --     true para super_admins sin mirar can_edit).
---   · 2 usuarios PIERDEN la escritura en `reservas` y siguen leyendo: el
---     `admin` que no es super admin (última sesión hace 2 días) y el
---     `staff` (hace 6). Los dos tienen can_view sin can_edit.
---   · En el panel, para ellos casi todo ya sale deshabilitado. Lo que
---     escribe en `reservas` SIN mirar can_edit:
+--   · Los otros 2, el `admin` que no es super admin y el `staff`, tenían
+--     can_view sin can_edit al escribir esto y habrían PERDIDO la
+--     escritura. Desde el 2026-10-01 tienen can_edit en `reservas`: si lo
+--     conservan (paso 2), siguen escribiendo. En general, pierde la
+--     escritura en `reservas` (y sigue leyendo) quien tenga can_view sin
+--     can_edit el día que se aplique.
+--   · En el panel, para quien no tenga can_edit casi todo ya sale
+--     deshabilitado. Al escribir esta migración, lo que escribía en
+--     `reservas` SIN mirar can_edit era:
 --       - «Nueva Reserva» (src/pages/Reservas.tsx): el alta fallará con
---         «No tienes permiso para crear reservas.» (42501).
---       - Solo hasta desplegar 8c8ace2 (refactor de la Lista, ya en main):
---         la estrella de la Lista avisará «no tienes permiso para cambiar
---         esta reserva, o ya no existe» y se deshará sola. Con 8c8ace2 sale
---         deshabilitada sin permiso, igual que «Verificar» y «Lista negra».
+--         «No tienes permiso para crear reservas.» (42501). Sigue igual
+--         (comprobado el 2026-10-01 por la noche).
+--       - La estrella de la Lista, hasta 8c8ace2 (refactor de la Lista).
+--         8c8ace2 ya está desplegado: sale deshabilitada sin permiso,
+--         igual que «Verificar» y «Lista negra».
 --     «Lista negra» escribe en `blacklist`, no en `reservas`: no cambia.
 --   · fn_aceptar_propuesta_solicitud (SECURITY INVOKER) inserta en
 --     `reservas` con los permisos de quien la llama: desde el panel
@@ -108,55 +122,68 @@ set client_encoding = 'UTF8';
 --
 -- RIESGO
 --
---   Si alguno de esos dos usuarios da altas con «Nueva Reserva» (48 altas
---   `manual` en los últimos 30 días; la tabla no guarda quién las hizo),
---   deja de poder hacerlo hasta que se le dé can_edit (paso 2). Y si
---   después alguien guarda sus permisos desde Usuarios, can_edit vuelve a
---   false y lo pierde otra vez, sin aviso.
+--   Las altas con «Nueva Reserva» (48 altas `manual` en los últimos 30
+--   días; la tabla no guarda quién las hizo) pasan a exigir can_edit en
+--   `reservas`: quien no lo tenga deja de poder darlas. Guardar permisos
+--   desde Usuarios ya NO borra can_edit (be8616e), pero un super admin
+--   puede quitar «Puede editar» (o «Ver», que lo apaga) desde ahí: por eso
+--   el paso (2) va justo antes de aplicar.
+--   Y si se aplica sin el paso (1), un `admin` que no es super admin
+--   podría, por API directa, crear con la versión vieja de
+--   admin-create-user un usuario con can_edit y escribir con él en
+--   `reservas`.
 --
--- PASOS DEL DUEÑO (en este orden)
+-- PASOS DEL DUEÑO (en este orden; desde la carpeta adminpanelct y una orden
+-- por línea: PowerShell no admite `&&`)
 --
---   (1) Antes, solo lectura: quién perderá la escritura en reservas.
+--   (1) ANTES de nada, desplegar la Edge Function admin-create-user con el
+--       commit «fix(seguridad): admin-create-user solo deja a un super admin
+--       conceder edicion» (5ddff1d en origin/main): si algún permiso del
+--       alta pide can_edit y quien crea no es super admin, responde 403 sin
+--       crear nada. Sin ella, la separación ver/editar de esta migración se
+--       salta por API directa (ver RIESGO). Volver a desplegarla, si ya lo
+--       estaba, no hace daño:
+--         npx supabase functions deploy admin-create-user
+--   (2) Comprobar (solo lectura) que quien deba escribir en `reservas` tiene
+--       can_edit. El 2026-10-01 ya se les dio a los dos usuarios que no son
+--       super admin (`admin` y `staff`): aquí solo se mira que lo conservan.
 --         select u.email, ur.role,
 --                public.has_section_permission(u.id, 'reservas', 'view') as ve,
 --                public.has_section_permission(u.id, 'reservas', 'edit') as edita
 --         from auth.users u left join public.user_roles ur on ur.user_id = u.id
 --         order by 1;
 --         -- ve = true y edita = false -> la pierde (y sigue viendo).
---   (2) Solo si alguno de ellos debe seguir escribiendo (decisión del dueño):
---         update public.user_permissions
---            set can_edit = true, updated_at = now()
---          where section_key = 'reservas' and can_view
---            and user_id = (select id from auth.users where email = '<email>')
---         returning user_id;
---         -- -> una fila por usuario. Si no devuelve ninguna, el email no
---         --    coincide (o no tiene la sección): no se ha cambiado nada.
---       Después, repetir el SELECT del paso (1): quien deba seguir
---       escribiendo tiene que salir con edita = true.
---       Y no tocar sus permisos desde la pantalla Usuarios hasta que deje de
---       forzar can_edit: false (ver RIESGO).
---   (3) Ninguna transacción larga abierta (las políticas toman un candado
---       exclusivo sobre `reservas` hasta el commit):
+--         -- El 2026-10-01 por la noche salían los 4 con edita = true.
+--       Si alguien que deba seguir escribiendo sale con edita = false
+--       (decisión del dueño): un super admin le marca «Puede editar» en
+--       Reservas desde la pantalla Usuarios (ya se conserva al guardar) y
+--       se repite el SELECT hasta que salga con edita = true.
+--   (3) Aplicar. Antes, ninguna transacción larga abierta (las políticas
+--       toman un candado exclusivo sobre `reservas` hasta el commit):
 --         select pid, usename, state, now() - xact_start as abierta_desde
 --         from pg_stat_activity
 --         where xact_start < now() - interval '1 minute' and pid <> pg_backend_pid();
 --         -- -> ninguna fila.
---   (4) Aplicar:
+--       Después, a mano y sin registrarla en el historial:
 --         npx supabase db query --linked -f supabase/migrations/20261001170000_rls_reservas_exige_edicion.sql
+--       NUNCA `supabase db push` (el historial remoto no está al día:
+--       volvería a ejecutar las migraciones aplicadas a mano) ni
+--       `supabase migration repair` (registrarla suelta lo desordena).
 --       Si falla con 55P03 (lock_not_available), no se ha aplicado nada:
 --       reintentar al rato. Si aborta con «MIGRACIÓN ABORTADA», alguien ha
 --       cambiado las políticas o la función desde el 01/10: no forzar,
---       revisar.
---   (5) Verificar con las consultas del pie (VERIFICACIÓN).
---   (6) Probar (todo dentro de BEGIN … ROLLBACK; no deja nada):
+--       revisar. Si termina bien, verificar con las consultas del pie
+--       (VERIFICACIÓN).
+--   (4) Probar (todo dentro de BEGIN … ROLLBACK; no deja nada):
 --         npx supabase db query --linked -f supabase/tests/rls_reservas_edicion.sql
---   (7) Panel (no bloquea esta migración; evita botones activos que dan
---       error de permiso): exigir can_edit también en «Nueva Reserva»
---       (src/pages/Reservas.tsx) y desplegar 8c8ace2 si aún no lo está.
---   (8) Si hiciera falta, revertir (deja las políticas exactamente como
+--   (5) Si hiciera falta, revertir (deja las políticas exactamente como
 --       estaban; aborta sin tocar nada si ya no son ni estas ni las de
 --       antes):
 --         npx supabase db query --linked -f supabase/rollbacks/20261001170000_rls_reservas_exige_edicion_ROLLBACK.sql
+--
+--   NOTA, panel (no bloquea esta migración; evita un botón activo que da
+--   error de permiso): exigir can_edit también en «Nueva Reserva»
+--   (src/pages/Reservas.tsx), que sigue sin mirarlo.
 -- ===========================================================================
 
 begin;
