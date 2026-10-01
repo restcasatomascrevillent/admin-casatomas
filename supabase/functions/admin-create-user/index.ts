@@ -16,6 +16,16 @@ const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
 const isSuperAdminEmail = (email?: string | null) =>
   !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 
+// ¿El payload pide «Puede editar» en alguna sección? Cuenta cualquier can_edit
+// que no sea false, null o ausente: Postgres guardaría como true también
+// "true", "t", "yes", 1… El body no es de fiar (se puede llamar por API).
+const pideEdicion = (permissions: unknown): boolean =>
+  Array.isArray(permissions) &&
+  permissions.some((p) => {
+    const canEdit = (p as { can_edit?: unknown } | null | undefined)?.can_edit;
+    return canEdit !== undefined && canEdit !== null && canEdit !== false;
+  });
+
 interface CreateUserRequest {
   username: string;
   password: string;
@@ -118,6 +128,44 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // «Puede editar» (can_edit) solo lo concede un super admin, la misma regla
+    // que la RLS de user_permissions (escribir exige is_super_admin(auth.uid())).
+    // Esta función escribe con la service role y la puede llamar cualquier
+    // admin: sin esta comprobación, un admin que no es super admin podría crear
+    // por API un usuario con edición y entrar con él. Se rechaza (403) en vez
+    // de quitar la edición en silencio, y antes de crear nada. Solo se mira si
+    // se pide edición: sin can_edit todo sigue igual. Super admin = tabla
+    // super_admins o SUPER_ADMIN_EMAILS, como en admin-set-super-admin.
+    if (pideEdicion(permissions)) {
+      let puedeConcederEdicion = currentUserIsSuperAdmin;
+
+      if (!puedeConcederEdicion) {
+        const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin
+          .rpc("is_super_admin", { _user_id: currentUser.id });
+
+        if (superAdminCheckError) {
+          console.error("Error checking super admin status:", superAdminCheckError);
+          return new Response(
+            JSON.stringify({ error: "Error verificando permisos" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        puedeConcederEdicion = isSuperAdminResult === true;
+      }
+
+      if (!puedeConcederEdicion) {
+        console.error("Non-super-admin tried to grant can_edit:", currentUser.id);
+        return new Response(
+          JSON.stringify({
+            error:
+              "Solo un super admin puede conceder el permiso de edición («Puede editar»). Crea el usuario sin edición o pídeselo a un super admin.",
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Generate internal email from username
