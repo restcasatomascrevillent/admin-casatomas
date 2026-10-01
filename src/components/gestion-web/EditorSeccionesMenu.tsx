@@ -54,6 +54,13 @@ import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 
 type Secciones = Record<SeccionMenu, ItemMenu[]>;
 
+/**
+ * Base flexible de cada sección: 3 columnas con el editor a ≥62rem, una por
+ * fila por debajo (ver el comentario en `EditorSeccionesMenu`). Va como clase
+ * literal completa para que Tailwind la genere.
+ */
+const UMBRAL_TRES_COLUMNAS = "basis-[calc((62rem_-_100%)_*_999)]";
+
 /** `object-position` a partir de `imagen_posicion_y` (0..100, 50 por defecto). */
 const posicionImagen = (y: number | null) => `50% ${typeof y === "number" ? y : 50}%`;
 
@@ -263,7 +270,8 @@ function SelectorPlato({ platos, cargando, onElegir }: SelectorPlatoProps) {
           De la carta
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[22rem] p-0">
+      {/* En un móvil de 375px los 22rem iban pegados al borde derecho. */}
+      <PopoverContent align="start" collisionPadding={12} className="w-[min(22rem,calc(100vw-1.5rem))] p-0">
         <Command>
           <CommandInput placeholder="Buscar en la carta..." />
           <CommandList>
@@ -467,9 +475,23 @@ export function EditorSeccionesMenu({
   const actualizarSeccion = (seccion: SeccionMenu, items: ItemMenu[]) =>
     onChange({ ...secciones, [seccion]: items });
 
+  // Las tres secciones van EN FILA solo si el hueco REAL del editor da para
+  // ello; si no, una debajo de otra. No vale un breakpoint de viewport
+  // (`lg:grid-cols-3`): el editor vive en la columna izquierda de
+  // EditorMenuTapasWeb y desde `xl` comparte fila con la vista previa (340px),
+  // así que con el viewport MÁS ancho tenía MENOS sitio. A 1280px cada sección
+  // se quedaba en ~190px, y una línea necesita 44px de foto + 92px de botones +
+  // márgenes: el nombre (o el input de «A mano») se quedaba a 0px y los botones
+  // se salían de la tarjeta, montándose sobre la sección de al lado.
+  //
+  // Truco de «flex-basis negativo» (holy albatross): con el contenedor por
+  // encima de UMBRAL_TRES_COLUMNAS la base sale negativa → 0 y las tres crecen
+  // a partes iguales; por debajo sale enorme y cada una ocupa su propia fila.
+  // Nunca hay un 2 + 1 descolgado. 62rem ≈ 3 columnas de 320px + 2 huecos de
+  // 12px: lo justo para que el nombre de una línea tenga ~120px.
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div className="flex flex-wrap gap-3">
         {SECCIONES_MENU.map((seccion) => {
           const items = secciones[seccion];
 
@@ -479,7 +501,11 @@ export function EditorSeccionesMenu({
           const añadirAMano = () => actualizarSeccion(seccion, [...items, itemLibre("")]);
 
           return (
-            <section key={seccion} className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0">
+            <section
+              key={seccion}
+              data-testid={`seccion-menu-${seccion}`}
+              className={`rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0 grow ${UMBRAL_TRES_COLUMNAS}`}
+            >
               <header className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-semibold">{ETIQUETA_SECCION[seccion]}</h4>
                 <Tooltip>

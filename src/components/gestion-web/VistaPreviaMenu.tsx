@@ -39,7 +39,7 @@ function LineaPrevia({ item }: { item: ItemMenu }) {
     <li className="flex items-start gap-2.5">
       <FotoPlato item={item} />
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-snug">{item.nombre}</p>
+        <p className="text-sm leading-snug break-words">{item.nombre}</p>
         {item.descripcion && (
           <p className="text-xs text-muted-foreground leading-snug mt-0.5 line-clamp-2">{item.descripcion}</p>
         )}

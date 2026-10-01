@@ -633,8 +633,11 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                 <ul className="space-y-1">
                   {lineas(tapasTexto).map((t, i) => (
                     <li key={i} className="flex gap-2">
-                      <span className="text-primary">•</span>
-                      {t}
+                      <span className="text-primary shrink-0">•</span>
+                      {/* Envuelto en un span con min-w-0: como texto suelto era un
+                          item flex con min-width:auto y una palabra larga se salía
+                          de la tarjeta (que tiene overflow-hidden) y salía cortada. */}
+                      <span className="min-w-0 break-words">{t}</span>
                     </li>
                   ))}
                 </ul>
