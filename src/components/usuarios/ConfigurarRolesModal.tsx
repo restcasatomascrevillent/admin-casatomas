@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { SECTIONS } from "@/hooks/useUserRole";
 import {
   PresetBaseRole,
   RolePresetPermission,
@@ -8,7 +7,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -25,27 +23,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Loader2, Pencil, Settings2, Trash2 } from "lucide-react";
+import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
+import { cambiarEditar, cambiarVer, permisosParaEditar } from "@/components/usuarios/permisosSecciones";
 
-const EDITABLE_SECTIONS = SECTIONS.filter((section) => section.key !== "usuarios");
-
+// Los roles preconfigurados llevan también «Puede editar» (2026-10-01): el
+// borrador copia el can_edit real de los permisos actuales o de la plantilla, en
+// vez de forzarlo a false.
 const normalizePermissions = (incomingPermissions: RolePresetPermission[]): RolePresetPermission[] =>
-  EDITABLE_SECTIONS.map((section) => {
-    const existing = incomingPermissions.find((permission) => permission.section_key === section.key);
-    return {
-      section_key: section.key,
-      can_view: existing?.can_edit ? true : (existing?.can_view ?? false),
-      can_edit: false,
-    };
-  });
+  permisosParaEditar(incomingPermissions);
 
 interface ConfigurarRolesModalProps {
   currentPermissions: RolePresetPermission[];
@@ -63,6 +49,8 @@ interface ConfigurarRolesModalProps {
     permissions: RolePresetPermission[]
   ) => Promise<UserRolePreset | null>;
   onDeletePreset: (presetId: string) => Promise<boolean>;
+  /** Solo un super admin concede o retira «Puede editar» (también en las plantillas). */
+  puedeConcederEdicion?: boolean;
 }
 
 export function ConfigurarRolesModal({
@@ -72,6 +60,7 @@ export function ConfigurarRolesModal({
   onCreatePreset,
   onUpdatePreset,
   onDeletePreset,
+  puedeConcederEdicion = false,
 }: ConfigurarRolesModalProps) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -99,18 +88,13 @@ export function ConfigurarRolesModal({
     resetEditor(currentPermissions);
   }, [open, currentPermissions]);
 
-  const handlePermissionChange = (sectionKey: string, value: boolean) => {
-    setDraftPermissions((prev) =>
-      prev.map((permission) =>
-        permission.section_key === sectionKey
-          ? {
-              ...permission,
-              can_view: value,
-              can_edit: false,
-            }
-          : permission
-      )
-    );
+  const handleVerChange = (sectionKey: string, value: boolean) => {
+    setDraftPermissions((prev) => cambiarVer(prev, sectionKey, value));
+  };
+
+  const handleEditarChange = (sectionKey: string, value: boolean) => {
+    if (!puedeConcederEdicion) return;
+    setDraftPermissions((prev) => cambiarEditar(prev, sectionKey, value));
   };
 
   const startEditingPreset = (preset: UserRolePreset) => {
@@ -201,49 +185,13 @@ export function ConfigurarRolesModal({
 
                 <div className="space-y-2">
                   <Label>Permisos</Label>
-                  <div className="space-y-2 sm:hidden max-h-[34vh] overflow-y-auto rounded-md border border-border/70 p-2">
-                    {EDITABLE_SECTIONS.map((section) => {
-                      const permission = draftPermissions.find((item) => item.section_key === section.key);
-                      return (
-                        <div
-                          key={section.key}
-                          className="flex items-center justify-between rounded-md border border-border/70 bg-card px-3 py-2"
-                        >
-                          <span className="text-sm font-medium">{section.label}</span>
-                          <Checkbox
-                            checked={permission?.can_view ?? false}
-                            onCheckedChange={(checked) => handlePermissionChange(section.key, Boolean(checked))}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="hidden sm:block rounded-md border border-border/70 overflow-auto max-h-[42vh]">
-                    <Table className="min-w-[420px]">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Sección</TableHead>
-                          <TableHead className="text-center">Acceso</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {EDITABLE_SECTIONS.map((section) => {
-                          const permission = draftPermissions.find((item) => item.section_key === section.key);
-                          return (
-                            <TableRow key={section.key}>
-                              <TableCell className="font-medium">{section.label}</TableCell>
-                              <TableCell className="text-center">
-                                <Checkbox
-                                  checked={permission?.can_view ?? false}
-                                  onCheckedChange={(checked) => handlePermissionChange(section.key, Boolean(checked))}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                  <div className="max-h-[42vh] overflow-y-auto pr-1">
+                    <TablaPermisosSecciones
+                      permisos={draftPermissions}
+                      onCambiarVer={handleVerChange}
+                      onCambiarEditar={handleEditarChange}
+                      puedeConcederEdicion={puedeConcederEdicion}
+                    />
                   </div>
                 </div>
 
@@ -291,6 +239,7 @@ export function ConfigurarRolesModal({
                   <div className="space-y-2 max-h-[56vh] overflow-y-auto pr-1">
                     {presets.map((preset) => {
                       const presetAccessCount = preset.permissions.filter((permission) => permission.can_view).length;
+                      const presetEditCount = preset.permissions.filter((permission) => permission.can_edit).length;
                       const editingThisPreset = editingPresetId === preset.id;
 
                       return (
@@ -311,6 +260,7 @@ export function ConfigurarRolesModal({
                           <p className="text-xs text-muted-foreground">
                             <Badge variant="outline" className="mr-1 text-[10px] px-1.5 py-0">{preset.base_role}</Badge>
                             {presetAccessCount} secciones con acceso
+                            {presetEditCount > 0 && ` · ${presetEditCount} con edición`}
                           </p>
                           <div className="flex items-center justify-end gap-2">
                             <Button

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { SECTIONS, AppRole } from "@/hooks/useUserRole";
+import { AppRole } from "@/hooks/useUserRole";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,29 +12,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRolePresets, UserRolePreset, PresetBaseRole } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
+import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
+import {
+  cambiarEditar,
+  cambiarVer,
+  permisosParaEditar,
+  sinEdicion,
+  type PermisoSeccion,
+} from "@/components/usuarios/permisosSecciones";
 
-const EDITABLE_SECTIONS = SECTIONS.filter((section) => section.key !== "usuarios");
 const MANUAL_OPTION = "manual";
 const PRESET_OPTION_PREFIX = "preset:";
 
-const DEFAULT_STAFF_PERMISSIONS = EDITABLE_SECTIONS.map((section) => ({
-  section_key: section.key,
-  can_view: section.key === "dashboard",
-  can_edit: false,
-}));
+// Un usuario nuevo empieza viendo solo el Dashboard y SIN edición en ninguna sección.
+const DEFAULT_STAFF_PERMISSIONS: PermisoSeccion[] = permisosParaEditar([
+  { section_key: "dashboard", can_view: true, can_edit: false },
+]);
 
 interface InvitarUsuarioProps {
   onSuccess?: () => void;
@@ -43,6 +42,11 @@ interface InvitarUsuarioProps {
 }
 
 export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUsuarioProps) {
+  // El alta va por la Edge Function admin-create-user, que escribe los permisos
+  // con la service role y la puede llamar cualquier admin. Por eso la regla
+  // «solo un super admin concede edición» (la de la RLS de user_permissions) se
+  // aplica aquí: quien no es super admin crea usuarios sin edición, como antes.
+  const { isSuperAdmin } = useSuperAdmin();
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -50,39 +54,27 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
   const [loading, setLoading] = useState(false);
   const [selectedAccessConfig, setSelectedAccessConfig] = useState(MANUAL_OPTION);
   const [createAsSuperAdmin, setCreateAsSuperAdmin] = useState(false);
-  const [permissions, setPermissions] = useState<
-    { section_key: string; can_view: boolean; can_edit: boolean }[]
-  >(DEFAULT_STAFF_PERMISSIONS);
+  const [permissions, setPermissions] = useState<PermisoSeccion[]>(DEFAULT_STAFF_PERMISSIONS);
 
-  const applyPermissions = (incomingPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
-    setPermissions(
-      EDITABLE_SECTIONS.map((section) => {
-        const existing = incomingPermissions.find((permission) => permission.section_key === section.key);
-        return {
-          section_key: section.key,
-          can_view: existing?.can_edit ? true : (existing?.can_view ?? false),
-          can_edit: false,
-        };
-      })
-    );
+  const applyPermissions = (incomingPermissions: PermisoSeccion[]) => {
+    const permisos = permisosParaEditar(incomingPermissions);
+    setPermissions(isSuperAdmin ? permisos : sinEdicion(permisos));
   };
 
-  const handlePermissionChange = (sectionKey: string, value: boolean) => {
+  const handleVerChange = (sectionKey: string, value: boolean) => {
     if (selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX)) {
       setSelectedAccessConfig(MANUAL_OPTION);
     }
+    // Quitar «Ver» quita también «Puede editar».
+    setPermissions((prev) => cambiarVer(prev, sectionKey, value));
+  };
 
-    setPermissions((prev) =>
-      prev.map((p) =>
-        p.section_key === sectionKey
-          ? {
-              ...p,
-              can_view: value,
-              can_edit: false,
-            }
-          : p
-      )
-    );
+  const handleEditarChange = (sectionKey: string, value: boolean) => {
+    if (!isSuperAdmin) return;
+    if (selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX)) {
+      setSelectedAccessConfig(MANUAL_OPTION);
+    }
+    setPermissions((prev) => cambiarEditar(prev, sectionKey, value));
   };
 
   const applyPreset = (preset: UserRolePreset) => {
@@ -121,7 +113,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
     presetId: string,
     name: string,
     baseRole: PresetBaseRole,
-    presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
+    presetPermissions: PermisoSeccion[]
   ) => {
     const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
     if (!updatedPreset) return null;
@@ -187,7 +179,8 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
           username,
           password,
           role,
-          permissions,
+          // La función respeta el can_edit que le llega: solo un super admin lo envía.
+          permissions: isSuperAdmin ? permissions : sinEdicion(permissions),
         },
       });
 
@@ -288,6 +281,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
             onCreatePreset={handleCreatePresetOnly}
             onUpdatePreset={handleUpdatePresetOnly}
             onDeletePreset={handleDeletePresetOnly}
+            puedeConcederEdicion={isSuperAdmin}
           />
         </div>
         <Select value={selectedAccessConfig} onValueChange={handleAccessConfigChange} disabled={presetsLoading}>
@@ -310,32 +304,12 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
 
       <div className={`space-y-2 ${createAsSuperAdmin ? "opacity-50 pointer-events-none" : ""}`}>
         <Label>Permisos por Sección</Label>
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sección</TableHead>
-                <TableHead className="text-center w-24">Acceso</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {EDITABLE_SECTIONS.map((section) => {
-                const perm = permissions.find((p) => p.section_key === section.key);
-                return (
-                  <TableRow key={section.key}>
-                    <TableCell className="font-medium">{section.label}</TableCell>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={perm?.can_view ?? false}
-                        onCheckedChange={(checked) => handlePermissionChange(section.key, checked as boolean)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <TablaPermisosSecciones
+          permisos={permissions}
+          onCambiarVer={handleVerChange}
+          onCambiarEditar={handleEditarChange}
+          puedeConcederEdicion={isSuperAdmin}
+        />
       </div>
 
       <Button type="submit" disabled={loading} className="w-full md:w-auto">

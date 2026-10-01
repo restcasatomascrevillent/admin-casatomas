@@ -19,12 +19,20 @@ export interface UserRolePreset {
   updated_at: string;
 }
 
+// Las plantillas guardan también «Puede editar» (2026-10-01; antes se forzaba
+// can_edit: false al leer y al escribir, y aplicar una plantilla quitaba la
+// edición). Editar implica ver. Las plantillas ya guardadas tienen can_edit =
+// false, así que para ellas nada cambia. Aplicarlas sigue sujeto a quién puede
+// conceder edición (solo un super admin): ver ListaUsuarios / InvitarUsuario.
 const normalizePermissions = (permissions: RolePresetPermission[]): RolePresetPermission[] =>
-  permissions.map((permission) => ({
-    section_key: permission.section_key,
-    can_view: permission.can_edit ? true : permission.can_view,
-    can_edit: false,
-  }));
+  permissions.map((permission) => {
+    const canEdit = Boolean(permission.can_edit);
+    return {
+      section_key: permission.section_key,
+      can_view: canEdit || Boolean(permission.can_view),
+      can_edit: canEdit,
+    };
+  });
 
 const parsePermissions = (value: unknown): RolePresetPermission[] => {
   if (!Array.isArray(value)) return [];
@@ -42,7 +50,7 @@ const parsePermissions = (value: unknown): RolePresetPermission[] => {
       return {
         section_key: sectionKey,
         can_view: canView,
-        can_edit: false,
+        can_edit: canEdit,
       };
     })
     .filter((item): item is RolePresetPermission => item !== null);

@@ -220,8 +220,11 @@ export function useUsersManagement() {
           {
             user_id: userId,
             section_key: sectionKey,
+            // Editar implica ver. can_edit se escribe tal cual (hasta el
+            // 2026-10-01 se forzaba a false y la edición no se podía dar desde
+            // el panel). Solo un super admin puede escribir aquí (RLS).
             can_view: canEdit ? true : canView,
-            can_edit: false,
+            can_edit: canEdit,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "user_id,section_key" }
@@ -246,12 +249,18 @@ export function useUsersManagement() {
         .eq("user_id", userId);
       if (deleteError) throw deleteError;
 
-      const normalizedPermissions = permissions.map((p) => ({
-        user_id: userId,
-        section_key: p.section_key,
-        can_view: p.can_edit ? true : p.can_view,
-        can_edit: false,
-      }));
+      // Se guarda el can_edit que llega del diálogo «Permisos» (antes se forzaba
+      // a false: guardar los permisos de alguien le quitaba la edición). Editar
+      // implica ver.
+      const normalizedPermissions = permissions.map((p) => {
+        const canEdit = Boolean(p.can_edit);
+        return {
+          user_id: userId,
+          section_key: p.section_key,
+          can_view: canEdit || Boolean(p.can_view),
+          can_edit: canEdit,
+        };
+      });
 
       if (normalizedPermissions.length > 0) {
         const { error } = await supabase
@@ -341,7 +350,8 @@ export function useUsersManagement() {
 
       if (error) throw error;
 
-      // Asignar permisos por defecto según rol
+      // Asignar permisos por defecto según rol. Un usuario nuevo empieza SIN
+      // edición en ninguna sección: la da después un super admin en «Permisos».
       const defaultPermissions = SECTIONS.map((s) => ({
         user_id: userId,
         section_key: s.key,

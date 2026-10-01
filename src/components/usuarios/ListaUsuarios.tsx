@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useUsersManagement, ManagedUser } from "@/hooks/useUsersManagement";
-import { SECTIONS, AppRole } from "@/hooks/useUserRole";
+import { AppRole } from "@/hooks/useUserRole";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +32,14 @@ import {
 import { Loader2, Settings, Shield, ShieldAlert, ShieldCheck, User, Trash2, Key } from "lucide-react";
 import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
+import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
+import {
+  cambiarEditar,
+  cambiarVer,
+  mismosPermisos,
+  permisosParaEditar,
+  type PermisoSeccion,
+} from "@/components/usuarios/permisosSecciones";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -60,18 +68,18 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     fetchUsers,
   } = useUsersManagement();
   const { user: currentUser } = useAuth();
+  // Solo un super admin concede o retira «Puede editar» (2026-10-01). Es la misma
+  // regla que la BD: la RLS de user_permissions solo deja escribir a super admins.
+  const { isSuperAdmin } = useSuperAdmin();
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
-  const [editingPermissions, setEditingPermissions] = useState<
-    { section_key: string; can_view: boolean; can_edit: boolean }[]
-  >([]);
+  const [editingPermissions, setEditingPermissions] = useState<PermisoSeccion[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] = useState<ManagedUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updatingPassword, setUpdatingPassword] = useState(false);
-  const editableSections = SECTIONS.filter((s) => s.key !== "usuarios");
 
   const getUserDisplayName = (user: ManagedUser | null) => {
     if (!user) return "usuario";
@@ -83,32 +91,16 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   // Si los permisos actuales del usuario coinciden exactamente con un rol
-  // preconfigurado (mismo rol base y mismo acceso en cada sección), se
-  // selecciona ese preset en vez de dejarlo en "Sin rol preconfigurado".
-  const findMatchingPreset = (
-    role: AppRole | null,
-    perms: { section_key: string; can_view: boolean }[]
-  ) =>
-    presets.find((preset) => {
-      if (preset.base_role !== role) return false;
-      return editableSections.every((section) => {
-        const actual = perms.find((p) => p.section_key === section.key)?.can_view ?? false;
-        const enPreset = preset.permissions.find((p) => p.section_key === section.key)?.can_view ?? false;
-        return actual === enPreset;
-      });
-    });
+  // preconfigurado (mismo rol base y mismos «Ver» y «Puede editar» en cada
+  // sección), se selecciona ese preset en vez de dejarlo en "Sin rol preconfigurado".
+  const findMatchingPreset = (role: AppRole | null, perms: PermisoSeccion[]) =>
+    presets.find((preset) => preset.base_role === role && mismosPermisos(perms, preset.permissions));
 
   const openPermissionsDialog = (user: ManagedUser) => {
     setSelectedUser(user);
-    // Inicializar con permisos existentes o defaults
-    const perms = editableSections.map((s) => {
-      const existing = user.permissions.find((p) => p.section_key === s.key);
-      return {
-        section_key: s.key,
-        can_view: existing?.can_view ?? false,
-        can_edit: false,
-      };
-    });
+    // Inicializar con los permisos guardados, edición incluida (hasta el
+    // 2026-10-01 se cargaba can_edit: false y al guardar se perdía).
+    const perms = permisosParaEditar(user.permissions);
     setEditingPermissions(perms);
     const matchingPreset = findMatchingPreset(user.role, perms);
     setSelectedPresetId(matchingPreset?.id ?? "manual");
@@ -120,22 +112,20 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     setSelectedPresetId("manual");
   };
 
-  const handlePermissionChange = (sectionKey: string, value: boolean) => {
+  const handleVerChange = (sectionKey: string, value: boolean) => {
     if (selectedPresetId !== "manual") {
       setSelectedPresetId("manual");
     }
+    // Quitar «Ver» quita también «Puede editar».
+    setEditingPermissions((prev) => cambiarVer(prev, sectionKey, value));
+  };
 
-    setEditingPermissions((prev) =>
-      prev.map((p) =>
-        p.section_key === sectionKey
-          ? {
-              ...p,
-              can_view: value,
-              can_edit: false,
-            }
-          : p
-      )
-    );
+  const handleEditarChange = (sectionKey: string, value: boolean) => {
+    if (!isSuperAdmin) return;
+    if (selectedPresetId !== "manual") {
+      setSelectedPresetId("manual");
+    }
+    setEditingPermissions((prev) => cambiarEditar(prev, sectionKey, value));
   };
 
   const savePermissions = async () => {
@@ -204,20 +194,11 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     }
   };
 
+  // Aplicar un rol preconfigurado copia su «Ver» y su «Puede editar». Guardarlo
+  // solo funciona para un super admin (RLS de user_permissions), igual que antes.
   const applyPresetToEditing = (selectedPreset: UserRolePreset) => {
     setSelectedPresetId(selectedPreset.id);
-    setEditingPermissions(
-      editableSections.map((section) => {
-        const existing = selectedPreset.permissions.find(
-          (permission) => permission.section_key === section.key
-        );
-        return {
-          section_key: section.key,
-          can_view: existing?.can_edit ? true : (existing?.can_view ?? false),
-          can_edit: false,
-        };
-      })
-    );
+    setEditingPermissions(permisosParaEditar(selectedPreset.permissions));
   };
 
   const handlePresetChange = (presetId: string) => {
@@ -244,7 +225,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     presetId: string,
     name: string,
     baseRole: "manager" | "staff",
-    presetPermissions: { section_key: string; can_view: boolean; can_edit: boolean }[]
+    presetPermissions: PermisoSeccion[]
   ) => {
     const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
     if (!updatedPreset) return null;
@@ -297,6 +278,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
           {users.map((user) => {
             const roleInfo = user.role ? ROLE_LABELS[user.role] : null;
             const accessCount = user.permissions.filter((p) => p.can_view).length;
+            const editCount = user.permissions.filter((p) => p.can_edit).length;
 
             return (
               <TableRow key={user.id}>
@@ -331,8 +313,9 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                   {user.role === "admin" ? (
                     <span className="text-sm text-muted-foreground">Acceso completo</span>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Badge variant="outline">{accessCount} secciones</Badge>
+                      {editCount > 0 && <Badge variant="outline">{editCount} con edición</Badge>}
                     </div>
                   )}
                 </TableCell>
@@ -360,7 +343,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                 Permisos de {getUserDisplayName(selectedUser)}
                               </DialogTitle>
                               <DialogDescription>
-                                Configura a qué secciones tiene acceso este usuario
+                                Elige qué secciones ve este usuario y en cuáles puede editar
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-2 sm:py-4">
@@ -374,6 +357,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                     onCreatePreset={createPreset}
                                     onUpdatePreset={handleUpdatePresetOnly}
                                     onDeletePreset={handleDeletePresetOnly}
+                                    puedeConcederEdicion={isSuperAdmin}
                                   />
                                 </div>
                                 <Select
@@ -397,61 +381,12 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                 </Select>
                               </div>
                               <div className="max-h-[52vh] overflow-y-auto pr-1">
-                                <div className="space-y-2 sm:hidden">
-                                  {editableSections.map((section) => {
-                                    const perm = editingPermissions.find(
-                                      (p) => p.section_key === section.key
-                                    );
-                                    return (
-                                      <div key={section.key} className="rounded-md border border-border/70 bg-card p-3">
-                                        <p className="text-sm font-medium">{section.label}</p>
-                                        <div className="mt-2 space-y-2">
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-sm text-muted-foreground">Acceso</span>
-                                            <Checkbox
-                                              checked={perm?.can_view ?? false}
-                                              onCheckedChange={(checked) =>
-                                                handlePermissionChange(section.key, checked as boolean)
-                                              }
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                <div className="hidden sm:block rounded-md border border-border/70 overflow-auto">
-                                  <Table className="min-w-[520px]">
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Sección</TableHead>
-                                        <TableHead className="text-center">Acceso</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {editableSections.map((section) => {
-                                        const perm = editingPermissions.find(
-                                          (p) => p.section_key === section.key
-                                        );
-                                        return (
-                                          <TableRow key={section.key}>
-                                            <TableCell className="font-medium">
-                                              {section.label}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                              <Checkbox
-                                                checked={perm?.can_view ?? false}
-                                                onCheckedChange={(checked) =>
-                                                  handlePermissionChange(section.key, checked as boolean)
-                                                }
-                                              />
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
-                                </div>
+                                <TablaPermisosSecciones
+                                  permisos={editingPermissions}
+                                  onCambiarVer={handleVerChange}
+                                  onCambiarEditar={handleEditarChange}
+                                  puedeConcederEdicion={isSuperAdmin}
+                                />
                               </div>
                               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                                 <Button variant="outline" onClick={closePermissionsDialog}>
