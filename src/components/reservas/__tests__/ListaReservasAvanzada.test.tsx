@@ -20,10 +20,15 @@
  * en una reserva estaba siempre deshabilitada— es el editor de las reservas (en
  * las solicitudes sigue siendo «Gestionar»). Se comprueba al final del fichero.
  *
+ * Y lo que pidió el 2026-10-01 («este timeline ponlo en la lista también»): arriba
+ * de la lista va «Cómo avanza una reserva», el mismo timeline de la pestaña Hoy,
+ * pero con las cifras de LO QUE SE VE EN LA LISTA (sus filtros menos el de estado)
+ * y con los estados pulsables como filtro. Se comprueba al final del fichero.
+ *
  * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
  * diseño): eso se mide en el navegador con datos reales.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
@@ -910,5 +915,386 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     fireEvent.click(estrellas.find((b) => !b.closest("table"))!);
     await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ importante: true }));
     expect(supa.eq).toHaveBeenCalledWith("id", "res-c");
+  });
+});
+
+// «Cómo avanza una reserva» también en la Lista (2026-10-01, petición del dueño). Es el timeline de la pestaña
+// Hoy (`TimelineEstadosReserva`) con otras cifras: las de lo que se ve en ESTA lista. Cuenta las reservas que
+// pasan los filtros de la lista —fecha, búsqueda, canal y negocio— y NO el de estado, para que al filtrar por
+// uno los demás sigan dando su cifra. No cuenta las solicitudes del bot (no son reservas) ni las reservas de
+// Touza (no admite reservas: `esDeCasaTomas`), y no hace consultas propias: usa las reservas que la lista ya
+// tiene cargadas.
+// Tiempo límite holgado (30 s) para todo el bloque: cada test monta la lista entera (tabla + tarjetas) y,
+// con la máquina cargada, alguno pasa de los 5 s por defecto sin que haya ningún problema.
+describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras de la lista", { timeout: 30_000 }, () => {
+  const CLAVE_ABIERTO = "reservas:timeline-estados:abierto";
+  /** Orden del timeline: pendiente, verificada, confirmada, llegó, cancelada, no vino. */
+  const ESTADOS_EN_ORDEN = ["pendiente", "verificada", "confirmada", "completada", "cancelada", "no_show"] as const;
+  const NOMBRES_EN_ORDEN = ["Pendiente", "Verificada", "Confirmada", "Llegó", "Cancelada", "No vino"];
+
+  const region = () => screen.getByRole("region", { name: /Cómo avanza una reserva/ });
+  const nodos = () => within(region()).getAllByRole("listitem");
+  const cifras = () => nodos().map((li) => li.querySelector("[data-cifra]")?.getAttribute("data-cifra") ?? null);
+  const pulsados = () => nodos().map((li) => within(li).getByRole("button").getAttribute("aria-pressed"));
+  const botonDeEstado = (nombre: string) => within(region()).getByRole("button", { name: new RegExp(`^${nombre}`) });
+  /** Filas de la tabla con datos (sin la fila «No se encontraron reservas…», que ocupa las seis columnas). */
+  const filasDeDatos = (tabla: HTMLElement) =>
+    ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).filter((f) => !f.querySelector("td[colspan]"));
+  const buscador = () => screen.getByRole("textbox", { name: "Buscar reservas y solicitudes" });
+  const desplegableDeEstado = () => screen.getByRole("combobox", { name: "Filtrar por estado" });
+  /** Los desplegables de la lista que aquí se usan, en orden de pantalla: estado y canal. */
+  const desplegable = (i: 0 | 1) => screen.getAllByRole("combobox")[i];
+  async function elegirOpcion(trigger: HTMLElement, opcion: string | RegExp) {
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("option", { name: opcion }));
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
+  }
+  const SEIS_SIN_PULSAR = ["false", "false", "false", "false", "false", "false"];
+
+  // Radix Select necesita estos métodos, que jsdom no implementa (mismo apaño que el resto de tests). Y
+  // `scrollTo`, que usa el cambio de página (`irAPagina`) y tampoco existe en los elementos de jsdom.
+  beforeAll(() => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    window.HTMLElement.prototype.scrollTo = vi.fn();
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+  });
+  // La preferencia de plegado vive en el almacenamiento del navegador y se comparte entre tests: se limpia.
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("va arriba de la lista, antes de los filtros y de la tabla, con los seis estados en su orden", async () => {
+    const { tabla } = await montar();
+
+    expect(nodos()).toHaveLength(6);
+    expect(nodos().map((li) => li.getAttribute("data-estado"))).toEqual([...ESTADOS_EN_ORDEN]);
+    nodos().forEach((li, i) => expect(within(li).getByText(NOMBRES_EN_ORDEN[i])).toBeInTheDocument());
+    // En el documento va antes que el buscador (los filtros) y que la tabla.
+    expect(region().compareDocumentPosition(buscador()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(region().compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("las cifras son las de la lista: reservas por estado (canceladas incluidas) y SIN las solicitudes del bot", async () => {
+    // El fixture trae 5 reservas (pendiente, verificada, 2 confirmadas, cancelada) y 1 solicitud del bot.
+    await montar();
+
+    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
+    expect(region()).toHaveTextContent("cifras de la lista");
+    expect(region()).not.toHaveTextContent("cifras de hoy");
+  });
+
+  it("suman lo que dice el contador «N reservas» de los filtros (solicitudes aparte)", async () => {
+    await montar();
+
+    const contador = screen.getByText(/^5 reservas/);
+    expect(contador).toHaveTextContent("5 reservas · 1 solicitud");
+    expect(cifras().reduce((suma, n) => suma + Number(n), 0)).toBe(5);
+  });
+
+  it("no hace ninguna consulta nueva: usa las reservas que la lista ya tiene cargadas", async () => {
+    await montar();
+
+    // La única carga es la de la propia lista (`reservas-lista`).
+    expect(supa.cargas).toHaveBeenCalledTimes(1);
+  });
+
+  it("con la lista sin reservas pinta seis ceros (dato real) aunque haya solicitudes del bot", async () => {
+    supa.filas = [];
+    await montar();
+
+    expect(cifras()).toEqual(["0", "0", "0", "0", "0", "0"]);
+  });
+
+  it("las cifras siguen la búsqueda", async () => {
+    await montar();
+
+    // («Diana Cancelada» también lleva «ana»: por eso se busca el nombre entero.)
+    fireEvent.change(buscador(), { target: { value: "Ana Pendiente" } });
+    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
+
+    fireEvent.change(buscador(), { target: { value: "ana" } });
+    expect(cifras()).toEqual(["1", "0", "0", "0", "1", "0"]);
+    expect(region()).toHaveTextContent("cifras de la lista");
+  });
+
+  it("las cifras siguen el día elegido, y el rótulo lo dice", async () => {
+    supa.filas = [
+      reserva("hoy-1", "pendiente", "Hoy Pendiente"),
+      reserva("hoy-2", "confirmada", "Hoy Confirmada"),
+      { ...reserva("man-1", "pendiente", "Manana Pendiente"), fecha: MANANA },
+      { ...reserva("man-2", "cancelada", "Manana Cancelada"), fecha: MANANA },
+      { ...reserva("man-3", "cancelada", "Manana OtraCancelada"), fecha: MANANA },
+    ];
+    await montar();
+    expect(cifras()).toEqual(["2", "0", "1", "0", "2", "0"]);
+
+    // El atajo «Hoy» de los filtros.
+    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
+
+    expect(cifras()).toEqual(["1", "0", "1", "0", "0", "0"]);
+    expect(region()).toHaveTextContent("cifras de la lista de hoy");
+  });
+
+  it("también desde la URL: con el día de hoy ya elegido al abrir, las cifras son las de hoy", async () => {
+    supa.filas = [
+      reserva("hoy-1", "pendiente", "Hoy Pendiente"),
+      { ...reserva("man-1", "pendiente", "Manana Pendiente"), fecha: MANANA },
+    ];
+    await montar({ initialDateFilter: new Date() });
+
+    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
+    expect(region()).toHaveTextContent("cifras de la lista de hoy");
+  });
+
+  it("las cifras siguen el canal", async () => {
+    supa.filas = [
+      reserva("tel", "pendiente", "Por Telefono"),
+      { ...reserva("web-1", "verificada", "Por Web"), canal: "web" },
+      { ...reserva("web-2", "confirmada", "Tambien Web"), canal: "web" },
+    ];
+    await montar();
+    expect(cifras()).toEqual(["1", "1", "1", "0", "0", "0"]);
+
+    await elegirOpcion(desplegable(1), /Web/);
+
+    expect(cifras()).toEqual(["0", "1", "1", "0", "0", "0"]);
+  });
+
+  it("TOUZA NO ADMITE RESERVAS: las reservas de `marca = 'touza'` no cuentan en ninguna cifra", async () => {
+    // Decisión del dueño (2026-10-01; en los datos de demo hay 5 de Touza). La regla es `esDeCasaTomas`, que la
+    // lista no repite: lo comprueba aquí solo el resultado. (No se prueba el filtro de negocio de la lista, que
+    // se retira en otro encargo.) Una reserva sin marca es de Casa Tomás y sí cuenta.
+    supa.filas = [
+      reserva("ct", "pendiente", "De Casa Tomas"),
+      { ...reserva("sin-marca", "verificada", "Sin Marca"), marca: null },
+      { ...reserva("tz-1", "confirmada", "De Touza Uno"), marca: "touza" },
+      { ...reserva("tz-2", "confirmada", "De Touza Dos"), marca: "touza" },
+      { ...reserva("tz-3", "cancelada", "De Touza Tres"), marca: "touza" },
+    ];
+    await montar();
+
+    expect(cifras()).toEqual(["1", "1", "0", "0", "0", "0"]);
+  });
+
+  it("los filtros se combinan: día + búsqueda", async () => {
+    supa.filas = [
+      reserva("a", "pendiente", "Ana Hoy"),
+      reserva("b", "confirmada", "Berta Hoy"),
+      { ...reserva("c", "pendiente", "Ana Manana"), fecha: MANANA },
+    ];
+    await montar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
+    fireEvent.change(buscador(), { target: { value: "ana" } });
+
+    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
+  });
+
+  it("el filtro de estado NO cambia las cifras: filtrando por «Pendiente» la tabla enseña solo esa fila y los demás estados siguen dando la suya", async () => {
+    const { tabla } = await montar({ initialStatusFilter: "pendiente" });
+
+    expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([expect.stringContaining("Ana Pendiente")]);
+    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
+    // Y el rótulo avisa de que las cifras no son las de las filas visibles.
+    expect(region()).toHaveTextContent("cifras de la lista, sin el filtro de estado");
+    expect(pulsados()).toEqual(["true", "false", "false", "false", "false", "false"]);
+  });
+
+  it("lo mismo con el filtro de «Solicitudes sin resolver»: la tabla enseña solo la solicitud y las cifras de reservas se quedan", async () => {
+    const { tabla } = await montar({ initialStatusFilter: "solicitudes" });
+
+    expect(filasDeDatos(tabla)).toHaveLength(1);
+    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
+    expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
+  });
+
+  it("sin filtro de estado el rótulo no avisa de nada y ningún estado sale pulsado", async () => {
+    await montar();
+
+    expect(region()).not.toHaveTextContent("sin el filtro de estado");
+    expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
+  });
+
+  it("la cifra de cada estado es justo las filas que la lista enseña al pulsarlo", async () => {
+    supa.filas = [
+      reserva("p1", "pendiente", "Pe Uno"),
+      reserva("p2", "pendiente", "Pe Dos"),
+      reserva("p3", "pendiente", "Pe Tres"),
+      reserva("v1", "verificada", "Ve Uno"),
+      reserva("c1", "confirmada", "Co Uno"),
+      reserva("c2", "confirmada", "Co Dos"),
+      reserva("l1", "completada", "Ll Uno"),
+      reserva("x1", "cancelada", "Ca Uno"),
+      reserva("x2", "cancelada", "Ca Dos"),
+    ];
+    const { tabla } = await montar();
+    const antes = cifras();
+    expect(antes).toEqual(["3", "1", "2", "1", "2", "0"]);
+
+    for (const [i, estado] of ESTADOS_EN_ORDEN.entries()) {
+      fireEvent.click(botonDeEstado(NOMBRES_EN_ORDEN[i]));
+
+      expect(filasDeDatos(tabla), estado).toHaveLength(Number(antes[i]));
+      // Pulsar un estado no cambia ninguna cifra, y solo ese queda pulsado.
+      expect(cifras(), estado).toEqual(antes);
+      expect(pulsados(), estado).toEqual(SEIS_SIN_PULSAR.map((_, j) => (j === i ? "true" : "false")));
+    }
+  });
+
+  it("pulsar un estado filtra la lista, y el desplegable «Estado» de los filtros lo refleja", async () => {
+    const { tabla } = await montar();
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+
+    fireEvent.click(botonDeEstado("Confirmada"));
+
+    expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([
+      expect.stringContaining("Carlos Confirmado"),
+      expect.stringContaining("Elena ConSala"),
+    ]);
+    expect(desplegableDeEstado()).toHaveTextContent("Confirmada");
+    expect(botonDeEstado("Confirmada")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("«Llegó» filtra por «completada» (la clave de la base de datos) y el desplegable lo llama «Llegó / completada»", async () => {
+    supa.filas = [reserva("l1", "completada", "Elena Llegó"), reserva("p1", "pendiente", "Ana Pendiente")];
+    const { tabla } = await montar();
+
+    fireEvent.click(botonDeEstado("Llegó"));
+
+    expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([expect.stringContaining("Elena Llegó")]);
+    expect(desplegableDeEstado()).toHaveTextContent("Llegó / completada");
+  });
+
+  it("volver a pulsar el estado pulsado quita el filtro y la lista vuelve a enseñarlo todo", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botonDeEstado("Pendiente"));
+    expect(filasDeDatos(tabla)).toHaveLength(1);
+
+    fireEvent.click(botonDeEstado("Pendiente"));
+
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+    expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
+    expect(desplegableDeEstado()).toHaveTextContent("Todos");
+    expect(region()).not.toHaveTextContent("sin el filtro de estado");
+  });
+
+  it("pulsar otro estado cambia el filtro (no suma): solo uno a la vez, como el desplegable", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botonDeEstado("Pendiente"));
+    fireEvent.click(botonDeEstado("Verificada"));
+
+    expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([expect.stringContaining("Berta Verificada")]);
+    expect(pulsados()).toEqual(["false", "true", "false", "false", "false", "false"]);
+  });
+
+  it("si venía filtrado por «Solicitudes sin resolver», pulsar un estado lo sustituye", async () => {
+    const { tabla } = await montar({ initialStatusFilter: "solicitudes" });
+    expect(filasDeDatos(tabla)).toHaveLength(1);
+
+    fireEvent.click(botonDeEstado("Cancelada"));
+
+    expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([expect.stringContaining("Diana Cancelada")]);
+  });
+
+  it("el desplegable «Estado» también mueve el timeline: elegir «Confirmada» ahí la deja pulsada aquí", async () => {
+    await montar();
+
+    await elegirOpcion(desplegableDeEstado(), "Confirmada");
+
+    expect(pulsados()).toEqual(["false", "false", "true", "false", "false", "false"]);
+    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
+  });
+
+  it("un estado sin reservas se puede pulsar: la lista dice que no hay ninguna y se deshace igual", async () => {
+    const { tabla } = await montar();
+
+    fireEvent.click(botonDeEstado("No vino"));
+    expect(filasDeDatos(tabla)).toHaveLength(0);
+    expect(tabla).toHaveTextContent("No se encontraron reservas con los filtros aplicados");
+    expect(botonDeEstado("No vino")).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(botonDeEstado("No vino"));
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+  });
+
+  // Pesado a propósito (50 filas por página, en tabla y en tarjetas).
+  it("filtrar por estado no se salta la paginación: al pulsar un estado se vuelve a la primera página", async () => {
+    // 52 pendientes + 3 verificadas (+ la solicitud del bot): con 50 filas por página, «Todos» tiene dos páginas.
+    supa.filas = [
+      ...Array.from({ length: 52 }, (_, i) => reserva(`p-${i}`, "pendiente", `Pen ${String(i).padStart(2, "0")}`)),
+      ...Array.from({ length: 3 }, (_, i) => reserva(`v-${i}`, "verificada", `Ver ${i}`)),
+    ];
+    const { tabla } = await montar();
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+    expect(screen.getByText(/Página 2 de 2/)).toBeInTheDocument();
+
+    fireEvent.click(botonDeEstado("Verificada"));
+
+    // 3 filas: ya no hay paginación y se ven todas.
+    expect(filasDeDatos(tabla)).toHaveLength(3);
+    expect(screen.queryByText(/Página \d+ de/)).not.toBeInTheDocument();
+    expect(cifras()).toEqual(["52", "3", "0", "0", "0", "0"]);
+  });
+
+  it("al recargar la lista (p. ej. tras «Aceptar») las cifras se recalculan solas", async () => {
+    const { tabla } = await montar();
+    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
+    // Lo que dirá el servidor al recargar tras aceptar a Ana: ahora es «verificada».
+    supa.filas = supa.filas.map((f) => (f.id === "res-pendiente" ? { ...f, estado: "verificada" } : f));
+
+    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
+
+    await waitFor(() => expect(cifras()).toEqual(["0", "2", "2", "0", "1", "0"]));
+  });
+
+  it("se pliega, recuerda la elección y NO cambia lo que enseña la lista", async () => {
+    const { tabla } = await montar();
+    const disparador = () => screen.getByRole("button", { name: /Cómo avanza una reserva/ });
+    expect(disparador()).toHaveAttribute("aria-expanded", "true");
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+
+    fireEvent.click(disparador());
+
+    expect(disparador()).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+  });
+
+  it("COMPARTE la preferencia de plegado con la pestaña Hoy: si ahí se plegó, la Lista sale plegada", async () => {
+    // Lo mismo que deja escrito el timeline de Hoy al plegarse (misma clave: es el mismo componente).
+    window.localStorage.setItem(CLAVE_ABIERTO, "0");
+    const { tabla } = await montar();
+
+    expect(screen.getByRole("button", { name: /Cómo avanza una reserva/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("list", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
+    // La lista y sus filtros están a la vista, como siempre.
+    expect(filasDeDatos(tabla)).toHaveLength(6);
+    expect(buscador()).toBeInTheDocument();
+  });
+
+  it("y al revés: lo que se pliega aquí lo recuerda el timeline de Hoy (misma clave, mismo valor)", async () => {
+    await montar();
+
+    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
+
+    // Plegar y desplegar dejan «1»: es lo que lee Hoy (`!== "0"` = abierto).
+    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("1");
+  });
+
+  it("deja intactos los filtros de siempre: un solo buscador, el atajo «Hoy» y el desplegable «Estado»", async () => {
+    await montar();
+
+    expect(screen.getAllByRole("textbox", { name: "Buscar reservas y solicitudes" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Hoy" })).toHaveLength(1);
+    expect(desplegableDeEstado()).toHaveTextContent("Todos");
   });
 });

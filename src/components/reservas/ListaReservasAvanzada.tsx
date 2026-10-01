@@ -92,7 +92,12 @@ import {
   esSolicitudAbierta,
   filtrarFilasUnificadas,
   unificarReservasYSolicitudes,
+  type FiltrosListaUnificada,
 } from "@/lib/reservas/vistaUnificada";
+// «Cómo avanza una reserva» (2026-10-01): el timeline de la pestaña Hoy, con las cifras de lo que se ve
+// aquí (los filtros de la lista menos el de estado) y los estados pulsables como filtro.
+import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
+import { alcanceCifrasDeLaLista, cifrasDeLaLista } from "@/lib/reservas/cifrasPorEstado";
 // Quién puede saltar al plano de su sala para que le den mesa, y con qué
 // texto cuando no puede. Módulo compartido con la pestaña Hoy a propósito: el
 // dueño pidió que las dos pantallas digan exactamente lo mismo.
@@ -667,20 +672,41 @@ export function ListaReservasAvanzada({
   // src/lib/reservas/vistaUnificada.ts). La fecha se compara como texto
   // "yyyy-MM-dd": antes se hacía `new Date(r.fecha)` (medianoche UTC) contra
   // una fecha local, lo que en husos negativos casaba con el día anterior.
+  //
+  // Los filtros van en UN solo objeto porque los leen dos cosas a la vez: las filas que se ven y las
+  // cifras de «Cómo avanza una reserva». Así no pueden desincronizarse: si mañana se añade un filtro,
+  // lo usan las dos.
+  const filtrosLista = useMemo<FiltrosListaUnificada>(
+    () => ({
+      busqueda: searchQuery,
+      estado: statusFilter,
+      canal: canalFilter,
+      fecha: dateFilter ? format(dateFilter, "yyyy-MM-dd") : null,
+      negocio: negocioFilter,
+      marcaDeSolicitud: (s) => marcaDeSolicitud(s, espacios),
+    }),
+    [searchQuery, statusFilter, canalFilter, dateFilter, negocioFilter, espacios],
+  );
   const filas = useMemo(
-    () =>
-      filtrarFilasUnificadas(unificarReservasYSolicitudes(reservations, solicitudes), {
-        busqueda: searchQuery,
-        estado: statusFilter,
-        canal: canalFilter,
-        fecha: dateFilter ? format(dateFilter, "yyyy-MM-dd") : null,
-        negocio: negocioFilter,
-        marcaDeSolicitud: (s) => marcaDeSolicitud(s, espacios),
-      }),
-    [reservations, solicitudes, searchQuery, statusFilter, canalFilter, dateFilter, negocioFilter, espacios],
+    () => filtrarFilasUnificadas(unificarReservasYSolicitudes(reservations, solicitudes), filtrosLista),
+    [reservations, solicitudes, filtrosLista],
   );
   const filteredReservations = filas.flatMap((f) => (f.tipo === "reserva" ? [f.reserva] : []));
   const numSolicitudesVisibles = filas.length - filteredReservations.length;
+
+  // Cifras de «Cómo avanza una reserva»: las RESERVAS de esta lista (las que ya hay cargadas, sin consulta
+  // propia) con los mismos filtros que las filas PERO SIN el de estado, para que al filtrar por un estado los
+  // demás sigan dando su cifra y el timeline sirva de referencia. No cuenta las solicitudes del bot ni las
+  // reservas de Touza (no admite reservas, decisión del dueño: la regla es `esDeCasaTomas`, que se aplica
+  // dentro de `cifrasDeLaLista` y no se repite aquí; mientras la lista siga enseñando esas filas, la tabla
+  // puede tener alguna más que las cifras). La cifra de cada estado es el número de filas de Casa Tomás que
+  // la lista enseña al filtrar por él. Detalle en `src/lib/reservas/cifrasPorEstado.ts`.
+  const cifrasPorEstado = useMemo(() => cifrasDeLaLista(reservations, filtrosLista), [reservations, filtrosLista]);
+  // Cómo se rotulan: «cifras de la lista», «…de hoy», «…del 3 oct 2026»; y avisa si hay filtro de estado.
+  const alcanceCifras = useMemo(
+    () => alcanceCifrasDeLaLista({ fecha: dateFilter, filtroDeEstado: statusFilter !== "all" }),
+    [dateFilter, statusFilter],
+  );
 
   // --- Paginación -----------------------------------------------------------
   // Medido en el navegador con las 375 reservas + 2 solicitudes reales:
@@ -781,6 +807,20 @@ export function ListaReservasAvanzada({
 
   return (
     <div ref={raizRef} className="space-y-4">
+      {/* Cómo avanza una reserva (2026-10-01, petición del dueño: «este timeline ponlo en la lista también»).
+          Arriba de todo, como una banda de estados sobre los filtros y la tabla (el mismo patrón que las
+          pestañas de estado de un listado), y plegable: la preferencia es la MISMA que la de la pestaña Hoy.
+          Cifras: las reservas de ESTA lista con sus filtros menos el de estado (`cifrasPorEstado`); sin
+          consulta propia. Cada estado es además un botón que activa/desactiva el filtro «Estado»: volver a
+          pulsar el que está puesto lo quita («Todos»). Va dentro de `raizRef`, así que el alto de la tabla
+          (que se mide en caliente) ya descuenta lo que ocupe y lo recalcula al plegarlo. */}
+      <TimelineEstadosReserva
+        cifras={cifrasPorEstado}
+        alcance={alcanceCifras}
+        estadoActivo={statusFilter}
+        onElegirEstado={(estado) => setStatusFilter((actual) => (actual === estado ? "all" : estado))}
+      />
+
       {/* Filtros */}
       <Card>
         <CardContent className="p-4">

@@ -13,6 +13,14 @@
  * · Plegable, y la elección se recuerda en el navegador.
  * · Montado dentro de `VistaHoy`: recibe las cifras de las reservas de hoy que
  *   la pestaña YA carga (sin consulta propia).
+ *
+ * Y lo que se añadió al montarlo también en la pestaña Lista (2026-10-01):
+ * · `cifras` (ya contadas por quien llama) y `alcance` (cómo se rotulan: «cifras
+ *   de hoy» / «cifras de la lista»…). Sin ellos, la pestaña Hoy sale exactamente
+ *   como antes.
+ * · Nodos pulsables (`onElegirEstado` + `estadoActivo`): solo si quien monta el
+ *   timeline los pide. Son botones de alternancia (`aria-pressed`); sin el
+ *   callback —la pestaña Hoy— el timeline sigue siendo una leyenda, sin botones.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
@@ -229,6 +237,159 @@ describe("TimelineEstadosReserva — plegado", () => {
 
     getItem.mockRestore();
     setItem.mockRestore();
+  });
+});
+
+describe("TimelineEstadosReserva — cifras ya contadas y alcance (pestaña Lista)", () => {
+  // La Lista cuenta ella (con sus filtros, sin el de estado) y le pasa al timeline las seis cifras hechas.
+  const CIFRAS = { pendiente: 5, verificada: 0, confirmada: 12, completada: 30, cancelada: 2, no_show: 1 };
+  const ALCANCE_LISTA = { cabecera: "cifras de la lista", lectura: "en la lista" };
+  const pastilla = (li: HTMLElement) => li.querySelector("[data-cifra]");
+
+  it("con `cifras` pinta esas cifras tal cual, sin contar nada", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} alcance={ALCANCE_LISTA} />);
+
+    expect(cifras()).toEqual(["5", "0", "12", "30", "2", "1"]);
+  });
+
+  it("`cifras` manda sobre `reservas` y `canceladas`, que son la vía de la pestaña Hoy", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} reservas={filas("pendiente", 9)} canceladas={7} />);
+
+    expect(cifras()).toEqual(["5", "0", "12", "30", "2", "1"]);
+  });
+
+  it("el alcance rotula la cabecera y la lectura de cada cifra", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} alcance={ALCANCE_LISTA} />);
+
+    expect(screen.getByText(/cifras de la lista/)).toBeInTheDocument();
+    expect(screen.queryByText(/cifras de hoy/)).not.toBeInTheDocument();
+    const items = nodos();
+    expect(pastilla(items[0])).toHaveTextContent("5 reservas en la lista");
+    expect(pastilla(items[3])).toHaveTextContent("30 reservas en la lista");
+    expect(pastilla(items[5])).toHaveTextContent("1 reserva en la lista");
+    expect(pastilla(items[1])).toHaveTextContent("0 reservas en la lista");
+  });
+
+  it("sin `alcance` sigue diciendo «cifras de hoy» y «reservas hoy»: la pestaña Hoy no cambia", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} />);
+
+    expect(screen.getByText(/cifras de hoy/)).toBeInTheDocument();
+    expect(pastilla(nodos()[2])).toHaveTextContent("12 reservas hoy");
+  });
+
+  it("sin cifras no hay rótulo de alcance: no hay nada que rotular", () => {
+    render(<TimelineEstadosReserva alcance={ALCANCE_LISTA} />);
+
+    expect(screen.queryByText(/cifras de la lista/)).not.toBeInTheDocument();
+    expect(document.querySelectorAll("[data-cifra]")).toHaveLength(0);
+  });
+});
+
+describe("TimelineEstadosReserva — nodos pulsables (el filtro por estado de la Lista)", () => {
+  const CIFRAS = { pendiente: 5, verificada: 0, confirmada: 12, completada: 30, cancelada: 2, no_show: 1 };
+  const ALCANCE_LISTA = { cabecera: "cifras de la lista", lectura: "en la lista" };
+  /** El botón de cada nodo, o `null` si el nodo no lo tiene. */
+  const botones = () => nodos().map((li) => within(li).queryByRole("button"));
+  const pulsados = () => botones().map((b) => b?.getAttribute("aria-pressed") ?? null);
+
+  it("sin `onElegirEstado` los nodos son una leyenda: ni un botón (así sale en la pestaña Hoy)", () => {
+    // Aunque llegue un estado activo, sin callback no hay nada que pulsar ni que marcar.
+    render(<TimelineEstadosReserva cifras={CIFRAS} estadoActivo="pendiente" />);
+
+    expect(botones()).toEqual([null, null, null, null, null, null]);
+    expect(document.querySelector("[aria-pressed]")).toBeNull();
+    // Y los nodos siguen siendo los de siempre: ni `title` ni nada que los distinga.
+    for (const li of nodos()) expect(li).not.toHaveAttribute("title");
+  });
+
+  it("con `onElegirEstado` cada estado es un botón de alternancia (`aria-pressed`), ninguno pulsado de entrada", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} onElegirEstado={vi.fn()} />);
+
+    // `type="button"`: nunca envía un formulario si algún día se monta dentro de uno.
+    for (const b of botones()) {
+      expect(b?.tagName).toBe("BUTTON");
+      expect(b).toHaveAttribute("type", "button");
+    }
+    expect(pulsados()).toEqual(["false", "false", "false", "false", "false", "false"]);
+  });
+
+  it("`estadoActivo` marca como pulsado SOLO ese estado", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} estadoActivo="completada" onElegirEstado={vi.fn()} />);
+
+    expect(pulsados()).toEqual(["false", "false", "false", "true", "false", "false"]);
+  });
+
+  it("un valor del filtro que no es uno de los seis («all», «solicitudes»…) no deja ninguno pulsado", () => {
+    for (const valor of ["all", "solicitudes", "solicitudes_cerradas", "", null, undefined]) {
+      const { unmount } = render(
+        <TimelineEstadosReserva cifras={CIFRAS} estadoActivo={valor} onElegirEstado={vi.fn()} />,
+      );
+      expect(pulsados(), String(valor)).toEqual(["false", "false", "false", "false", "false", "false"]);
+      unmount();
+    }
+  });
+
+  it("pulsar un estado avisa con su CLAVE de la base de datos (completada, no «Llegó»)", () => {
+    const alElegir = vi.fn();
+    render(<TimelineEstadosReserva cifras={CIFRAS} onElegirEstado={alElegir} />);
+
+    botones().forEach((b) => fireEvent.click(b!));
+
+    expect(alElegir.mock.calls.map(([estado]) => estado)).toEqual(ESTADOS);
+  });
+
+  it("no decide nada por su cuenta: el estado pulsado lo manda quien lo monta (`estadoActivo`)", () => {
+    const alElegir = vi.fn();
+    const { rerender } = render(<TimelineEstadosReserva cifras={CIFRAS} onElegirEstado={alElegir} />);
+
+    fireEvent.click(botones()[0]!);
+    // Sin que quien lo monta cambie `estadoActivo`, sigue sin haber nada pulsado.
+    expect(pulsados()).toEqual(["false", "false", "false", "false", "false", "false"]);
+
+    rerender(<TimelineEstadosReserva cifras={CIFRAS} estadoActivo="pendiente" onElegirEstado={alElegir} />);
+    expect(pulsados()).toEqual(["true", "false", "false", "false", "false", "false"]);
+  });
+
+  it("el botón se nombra con el estado y su cifra, y se enfoca con el teclado como cualquier botón", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} alcance={ALCANCE_LISTA} onElegirEstado={vi.fn()} />);
+
+    const llego = screen.getByRole("button", { name: "Llegó 30 reservas en la lista" });
+    expect(llego).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "No vino 1 reserva en la lista" })).toBeInTheDocument();
+    llego.focus();
+    expect(llego).toHaveFocus();
+    expect(llego).not.toHaveAttribute("tabindex", "-1");
+  });
+
+  it("sin cifras (cargando) el botón se nombra solo con el estado", () => {
+    render(<TimelineEstadosReserva onElegirEstado={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Pendiente" })).toBeInTheDocument();
+  });
+
+  it("el título del botón dice qué hace pulsarlo, según esté pulsado o no", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} estadoActivo="no_show" onElegirEstado={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /^Pendiente/ })).toHaveAttribute("title", "Ver solo las reservas «Pendiente»");
+    expect(screen.getByRole("button", { name: /^No vino/ })).toHaveAttribute("title", "Quitar el filtro «No vino»");
+  });
+
+  it("el paso del camino lo sigue leyendo el lector de pantalla, delante del botón", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} onElegirEstado={vi.fn()} />);
+
+    const items = nodos();
+    expect(items[0]).toHaveTextContent("Paso 1 de 4");
+    expect(items[4]).toHaveTextContent("Salida");
+    // El paso queda FUERA del botón: el nombre del botón es el estado, no «Paso 1 de 4: Pendiente…».
+    expect(within(items[0]).getByRole("button").textContent).not.toMatch(/Paso/);
+  });
+
+  it("el plegado sigue funcionando igual con los nodos pulsables", () => {
+    render(<TimelineEstadosReserva cifras={CIFRAS} onElegirEstado={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
   });
 });
 
