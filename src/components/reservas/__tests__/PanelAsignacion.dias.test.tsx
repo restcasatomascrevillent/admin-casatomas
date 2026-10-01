@@ -19,6 +19,8 @@ const h = vi.hoisted(() => ({
   filas: [] as Array<Record<string, unknown>>,
   cargando: false,
   error: false,
+  /** Lo que dice el hook cuando el rango pasa del tope de seguridad de la lectura por lotes. */
+  truncado: false,
   refetch: vi.fn(),
   canEdit: true,
   editarReserva: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock("@/hooks/useReservasPorAsignar", () => ({
   ErrorSinPermisoSala: class ErrorSinPermisoSala extends Error {},
   useReservasPorAsignar: () => ({
     data: h.cargando ? undefined : h.filas,
+    truncado: h.truncado,
     isLoading: h.cargando,
     isError: h.error,
     refetch: h.refetch,
@@ -138,6 +141,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-01T10:00:00+02:00"));
   h.cargando = false;
   h.error = false;
+  h.truncado = false;
   h.canEdit = true;
   h.filas = datosBase();
 });
@@ -698,13 +702,55 @@ describe("PanelAsignacion · tope de la consulta", () => {
   const relleno = (n: number) =>
     Array.from({ length: n }, (_, i) => fila(`r${i}`, "2026-10-14", i % 2 ? "21:00:00" : "13:30:00", "con_mesa"));
 
-  it("avisa cuando llegan justo 1000 filas: puede faltar el final del rango", () => {
+  // `useReservasPorAsignar` lee el rango ENTERO por lotes (`paginarConsulta`; sus tests están en
+  // `useReservasPorAsignar.test.tsx`): llegar justo a 1000 filas ya no quiere decir que falte el final,
+  // así que el aviso de antes («puede que falten reservas» con 1000 filas) desapareció. Solo sale
+  // si el hook dice `truncado`, o sea, si el rango pasa del tope de seguridad de esa lectura.
+  it("con justo 1000 filas NO avisa: la lectura por lotes trae el rango entero", () => {
     h.filas = [...relleno(999), fila("p", MANANA, "21:00:00", "sin_sala")];
+    montar();
+
+    expect(screen.queryByText("Puede que falten reservas.")).toBeNull();
+    expect(screen.queryByText(/Elige menos días en «Mostrar»/)).toBeNull();
+    expect(diaAbierto()).toBe(MANANA);
+  });
+
+  it("con más de 1000 filas tampoco avisa y las cuentas de los últimos días son las reales", () => {
+    // 2.500 reservas sin mesa un día lejano (no se pintan: solo se pinta el día abierto) y una mañana.
+    h.filas = [
+      fila("p", MANANA, "21:00:00", "sin_sala"),
+      ...Array.from({ length: 2500 }, (_, i) => fila(`r${i}`, "2026-10-14", i % 2 ? "21:00:00" : "13:30:00", "sin_sala")),
+    ];
+    montar();
+
+    expect(screen.queryByText("Puede que falten reservas.")).toBeNull();
+    expect(diaAbierto()).toBe(MANANA);
+    expect(pestanaDe("2026-10-14").getAttribute("aria-label")).toMatch(/^Mié 14, 2500 reservas sin mesa/);
+  });
+
+  it("avisa solo si el hook dice `truncado` (pasó del tope de seguridad) y dice cuál es el tope", () => {
+    h.filas = [...relleno(999), fila("p", MANANA, "21:00:00", "sin_sala")];
+    h.truncado = true;
     montar();
 
     expect(screen.getByText("Puede que falten reservas.")).toBeInTheDocument();
     expect(screen.getByText(/Elige menos días en «Mostrar»/)).toBeInTheDocument();
+    expect(screen.getByText(/más de 10\.000 reservas y solo se han cargado las primeras 10\.000/)).toBeInTheDocument();
     expect(diaAbierto()).toBe(MANANA);
+  });
+
+  it("el aviso de tope no sale mientras carga ni si la carga falla", () => {
+    h.truncado = true;
+
+    h.cargando = true;
+    const cargando = montar();
+    expect(screen.queryByText("Puede que falten reservas.")).toBeNull();
+    cargando.unmount();
+
+    h.cargando = false;
+    h.error = true;
+    montar();
+    expect(screen.queryByText("Puede que falten reservas.")).toBeNull();
   });
 
   it("no avisa con una carga normal", () => {
