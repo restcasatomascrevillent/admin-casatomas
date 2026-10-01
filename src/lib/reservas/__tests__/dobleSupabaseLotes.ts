@@ -19,6 +19,9 @@
  *     lote concreto, que no se vean datos a medias mientras faltan lotes y el máximo de
  *     peticiones simultáneas;
  *   · lotes que llegan CORTOS (`recortar`) aunque el recuento diga que hay más;
+ *   · `conservarOrdenDeLaTabla`: NO ordena (ignora `order()` y devuelve las filas como están en la
+ *     tabla; el orden pedido queda anotado igualmente en `peticiones`). Es para tests de pantallas
+ *     cuyo fixture ya está en el orden que esperan y que no prueban el orden de la consulta;
  *   · la CANCELACIÓN: `.abortSignal(signal)` anota la señal en la petición y, si está abortada
  *     cuando se contesta, la respuesta es el error que saca `postgrest-js` de un `fetch` abortado
  *     (`AbortError`), salvo con `noAbortarEnVuelo`, que contesta igual: así se puede comprobar que
@@ -58,6 +61,8 @@ export interface OpcionesDoble {
   maxFilas?: number;
   /** Los empates salen en otro orden en cada petición (ver la cabecera). */
   desordenarEmpates?: boolean;
+  /** No ordena: devuelve las filas en el orden de la tabla, aunque se pida otro (ver la cabecera). */
+  conservarOrdenDeLaTabla?: boolean;
   /** Responde sin recuento aunque se pida (`count: null`), para probar ese camino. */
   sinRecuento?: boolean;
   /**
@@ -217,13 +222,15 @@ export class ConsultaDoble implements PromiseLike<RespuestaDoble> {
       // La respuesta se calcula ahora, con las tablas tal como están en este momento.
       const filtradas = (this.doble.tablas[this.tabla] ?? []).filter((fila) => this.filtros.every((f) => f.pasa(fila)));
       const desordenar = !!this.doble.opciones.desordenarEmpates;
-      const ordenadas = [...filtradas].sort((a, b) => {
-        for (const { columna, ascendente } of this.orden) {
-          const c = comparar(a[columna], b[columna]);
-          if (c !== 0) return ascendente ? c : -c;
-        }
-        return desordenar ? hash(`${JSON.stringify(a)}#${peticion.numero}`) - hash(`${JSON.stringify(b)}#${peticion.numero}`) : 0;
-      });
+      const ordenadas = this.doble.opciones.conservarOrdenDeLaTabla
+        ? [...filtradas]
+        : [...filtradas].sort((a, b) => {
+            for (const { columna, ascendente } of this.orden) {
+              const c = comparar(a[columna], b[columna]);
+              if (c !== 0) return ascendente ? c : -c;
+            }
+            return desordenar ? hash(`${JSON.stringify(a)}#${peticion.numero}`) - hash(`${JSON.stringify(b)}#${peticion.numero}`) : 0;
+          });
 
       const tope = this.doble.opciones.maxFilas ?? 1000;
       const delRango = (this.rango ? ordenadas.slice(this.rango[0], this.rango[1] + 1) : ordenadas).slice(0, tope);
