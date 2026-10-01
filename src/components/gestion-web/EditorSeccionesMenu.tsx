@@ -6,19 +6,23 @@
 //     alérgenos, su foto y sus traducciones. Cero tecleo.
 //   - «A mano»: el menú del día lleva a menudo platos que no están en la carta.
 //     Se escribe el nombre y SE LE PUEDEN PONER ALÉRGENOS IGUAL, que es lo que
-//     pidió el dueño: "poner alérgenos como cualquier plato".
+//     pidió el dueño: "poner alérgenos como cualquier plato". Y FOTO: el hueco
+//     de la miniatura de un plato «A mano» se pulsa para subir una (ver
+//     `src/lib/foto-menu-dia.ts`). Los de la carta llevan la de la carta.
 //
 // Los alérgenos salen de `src/lib/alergenos.ts` (los 14 de la UE + los
 // personalizados que ya usa la carta). No hay aquí un sistema paralelo.
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
   ImageOff,
+  ImagePlus,
   Info,
+  Loader2,
   Pencil,
   Plus,
   RefreshCw,
@@ -40,6 +44,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import { ALERGENOS_OFICIALES, combinarAlergenos, etiquetaAlergeno, normalizarAlergeno } from "@/lib/alergenos";
 import {
   ETIQUETA_SECCION,
@@ -50,6 +61,7 @@ import {
   type ItemMenu,
   type SeccionMenu,
 } from "@/lib/menu-dia";
+import { ACCEPT_FOTO_MENU, subirFotoMenu, validarFotoMenu } from "@/lib/foto-menu-dia";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 
 type Secciones = Record<SeccionMenu, ItemMenu[]>;
@@ -96,6 +108,171 @@ function Miniatura({ item }: { item: ItemMenu }) {
       className="h-11 w-11 shrink-0 rounded-md border object-cover bg-muted"
       style={{ objectPosition: posicionImagen(item.imagenPosicionY) }}
     />
+  );
+}
+
+/** Mismo tamaño que `Miniatura` (44px): la fila no se ensancha ni un píxel. */
+const HUECO_FOTO =
+  "relative h-11 w-11 shrink-0 overflow-hidden rounded-md border flex items-center justify-center transition-colors " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 " +
+  "disabled:cursor-wait";
+
+interface FotoPlatoLibreProps {
+  item: ItemMenu;
+  /** URL pública de la foto nueva, o `null` para quitarla. */
+  onFoto: (imagenUrl: string | null) => void;
+}
+
+/**
+ * La miniatura de un plato «A mano», pulsable: sin foto, abre el selector de
+ * archivos para subir una; con foto, un menú para cambiarla o quitarla.
+ */
+function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  // Se recuerda QUÉ url falló, no un booleano: al subir otra se reintenta sola.
+  const [urlRota, setUrlRota] = useState<string | null>(null);
+
+  // La subida tarda: al terminar hay que aplicar la foto sobre la línea TAL Y
+  // COMO ESTÉ ENTONCES (quizá ya se le cambió el nombre o se movió), no sobre la
+  // de cuando se eligió el fichero. Por eso se llama a la última `onFoto`.
+  const onFotoRef = useRef(onFoto);
+  useEffect(() => {
+    onFotoRef.current = onFoto;
+  });
+
+  // El hueco cambia de botón (subir ↔ menú) y se deshabilita mientras sube:
+  // sin esto, quien va con teclado se queda con el foco en <body> tras subir
+  // o quitar la foto. Solo se devuelve si nadie se lo llevó a otra parte (p. ej.
+  // a escribir el nombre mientras subía).
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const devolverFoco = useRef(false);
+  useEffect(() => {
+    if (!devolverFoco.current || subiendo) return;
+    devolverFoco.current = false;
+    const activo = document.activeElement;
+    if (!activo || activo === document.body) botonRef.current?.focus();
+  }, [subiendo, item.imagenUrl]);
+
+  const nombre = item.nombre.trim() || "este plato";
+  const falló = item.imagenUrl !== null && urlRota === item.imagenUrl;
+
+  const elegirArchivo = () => inputRef.current?.click();
+
+  const quitarFoto = () => {
+    devolverFoco.current = true;
+    onFoto(null);
+  };
+
+  const alElegir = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Permite volver a elegir el mismo fichero (p. ej. tras un error).
+    e.target.value = "";
+    if (!file) return;
+
+    const error = validarFotoMenu(file);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
+    devolverFoco.current = document.activeElement === botonRef.current;
+    setSubiendo(true);
+    try {
+      const url = await subirFotoMenu(file);
+      onFotoRef.current(url);
+    } catch (err) {
+      console.error("Error subiendo la foto del plato del menú:", err);
+      toast.error("No se pudo subir la foto. Inténtalo de nuevo.");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={ACCEPT_FOTO_MENU}
+      className="hidden"
+      tabIndex={-1}
+      aria-hidden="true"
+      data-testid="input-foto-plato"
+      onChange={alElegir}
+    />
+  );
+
+  const spinner = subiendo && (
+    <span className="absolute inset-0 flex items-center justify-center bg-background/70">
+      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+    </span>
+  );
+
+  if (!item.imagenUrl) {
+    return (
+      <>
+        <button
+          ref={botonRef}
+          type="button"
+          onClick={elegirArchivo}
+          disabled={subiendo}
+          aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Subir foto de ${nombre}`}
+          aria-busy={subiendo}
+          title="Subir foto"
+          className={`${HUECO_FOTO} border-dashed bg-muted/40 text-muted-foreground/60 hover:border-primary/60 hover:bg-muted hover:text-foreground`}
+        >
+          {subiendo ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <ImagePlus className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
+        {input}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            ref={botonRef}
+            type="button"
+            disabled={subiendo}
+            aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Cambiar o quitar la foto de ${nombre}`}
+            aria-busy={subiendo}
+            title="Foto del plato"
+            className={`${HUECO_FOTO} bg-muted hover:opacity-90`}
+          >
+            {falló ? (
+              <ImageOff className="h-4 w-4 text-muted-foreground/60" aria-hidden="true" />
+            ) : (
+              <img
+                src={item.imagenUrl}
+                alt=""
+                loading="lazy"
+                onError={() => setUrlRota(item.imagenUrl)}
+                className="h-full w-full object-cover"
+                style={{ objectPosition: posicionImagen(item.imagenPosicionY) }}
+              />
+            )}
+            {spinner}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onSelect={elegirArchivo}>
+            <ImagePlus className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+            Cambiar foto
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={quitarFoto} className="text-destructive focus:text-destructive">
+            <Trash2 className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+            Quitar foto
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {input}
+    </>
   );
 }
 
@@ -348,7 +525,17 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
 
   return (
     <li className="flex items-start gap-2.5 rounded-lg border bg-card p-2">
-      <Miniatura item={item} />
+      {/* La foto de un plato de la carta ES la de la carta: no se toca aquí. */}
+      {item.origen === "libre" ? (
+        <FotoPlatoLibre
+          item={item}
+          // Al subir otra foto el encuadre vuelve al centro: el de la anterior
+          // no tiene por qué servir.
+          onFoto={(imagenUrl) => onCambiar({ ...item, imagenUrl, imagenPosicionY: null })}
+        />
+      ) : (
+        <Miniatura item={item} />
+      )}
 
       <div className="min-w-0 flex-1 space-y-1">
         {item.origen === "libre" ? (
