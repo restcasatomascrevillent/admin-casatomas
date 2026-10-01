@@ -20,6 +20,9 @@
 //   (tabla de rutas en ./rutas.ts. `POST /notificar-estado` se RETIRÓ el
 //   2026-09-30: estaba abierta sin secreto y mandaba correos "Estado de
 //   reserva" a cualquier reserva — ver la cabecera de rutas.ts.)
+//   Touza NO admite reservas (2026-10-01): las dos POST responden 409
+//   `touza_sin_reservas` a toda petición de Touza, sin escribir nada — ver
+//   `rechazoTouzaSinReservas` en reglas.ts.
 //
 // Secrets requeridos (Deno.env — nunca hardcodeados en el código):
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  (ya los inyecta la plataforma)
@@ -86,8 +89,9 @@ import {
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
 
-// Reglas de sala del alta (reservas-sin-salas): módulo puro, testeado con vitest.
-import { rechazarPorSala, contarEspaciosQueCaben, salaDelCliente } from "./reglas.ts";
+// Reglas de sala del alta (reservas-sin-salas) y el rechazo de Touza (no admite
+// reservas, 2026-10-01): módulo puro, testeado con vitest.
+import { rechazarPorSala, contarEspaciosQueCaben, salaDelCliente, rechazoTouzaSinReservas } from "./reglas.ts";
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -893,6 +897,13 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     notasCliente: null,
   });
 
+  // Touza NO admite reservas (2026-10-01): tampoco se le calcula
+  // disponibilidad. Con la marca ya resuelta (explícita o la del espacio
+  // pedido) y antes de leer la ocupación. Ver `rechazoTouzaSinReservas` en
+  // reglas.ts.
+  const rechazoTouza = rechazoTouzaSinReservas(marca);
+  if (rechazoTouza) return json(rechazoTouza.cuerpo, rechazoTouza.status);
+
   // Ocupación SIEMPRE desde `reservas`, nunca desde `vista_ocupacion`:
   // en producción 724 de sus 784 filas son huérfanas. Mismo criterio que
   // el webhook telefónico y que el trigger `trg_validar_capacidad`.
@@ -1055,6 +1066,19 @@ async function handleCrear(req: Request): Promise<Response> {
   // `espacio_id`/`sala`). Se refina con el espacio, si lo hay, justo antes
   // del INSERT — ver más abajo — para la reserva que de verdad se guarda.
   const marcaTemprana: Marca = resolverMarca({ marcaExplicita: body?.marca, notasCliente: notas });
+
+  // Touza NO admite reservas (2026-10-01; ver `rechazoTouzaSinReservas` en
+  // reglas.ts). Lo PRIMERO tras saber la marca: antes de validar el
+  // formulario y de cualquier lectura o escritura. La lista negra,
+  // `grupo_grande`, los límites por teléfono/email y el INSERT registran una
+  // solicitud o mandan un correo, y la web de Touza pintaría `grupo_grande`
+  // como «Solicitud recibida» sin que nadie la atendiera.
+  // Basta con `marcaTemprana`: la segunda pasada de `resolverMarca` (antes
+  // del INSERT) solo puede dar Touza si esta ya lo daba, porque
+  // `salaDelCliente` descarta el espacio en Casa Tomás.
+  const rechazoTouza = rechazoTouzaSinReservas(marcaTemprana);
+  if (rechazoTouza) return json(rechazoTouza.cuerpo, rechazoTouza.status);
+
   const negocioTemprano: DatosNegocio = NEGOCIOS[marcaTemprana];
 
   // reservas-sin-salas: en Casa Tomás la sala es interna y la web IGNORA la
