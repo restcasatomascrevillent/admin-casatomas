@@ -881,13 +881,15 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
 
   // Marca (Casa Tomás / Touza) de ESTA consulta de disponibilidad — misma
   // prioridad que `resolverMarca` usa en `handleCrear` (ver plantillas.ts):
-  // 1) `body.marca` explícita (ningún frontend la manda hoy, pero ya se
-  //    acepta); 2) la marca del espacio pedido, si se manda `espacio_id`;
-  // 3) por defecto `NEGOCIO_POR_DEFECTO` ('casa_tomas') — el único caso
-  // real hoy, porque ni Reservado.tsx ni ReservationForm.tsx mandan
-  // `espacio_id` ni `marca` todavía. Sin este paso, el aforo devuelto
-  // seguiría sumando TODOS los espacios activos sin distinguir negocio
-  // (el bug 150->170 que motiva este cambio).
+  // 1) `body.marca` explícita; 2) la marca del espacio pedido, si se manda
+  // `espacio_id`; 3) por defecto `NEGOCIO_POR_DEFECTO` ('casa_tomas').
+  // De las dos webs, solo la de Casa Tomás (ReservationForm.tsx) llama a
+  // esta acción, y sin `marca` ni `espacio_id`: cae siempre en el 3. La de
+  // Touza (Reservado.tsx) no consulta disponibilidad; sí manda
+  // `marca: "touza"`, pero solo a `/crear`. Una consulta que resuelva Touza
+  // recibe el 409 `touza_sin_reservas` de justo debajo. Sin este paso, el
+  // aforo devuelto seguiría sumando TODOS los espacios activos sin
+  // distinguir negocio (el bug 150->170 que motiva este cambio).
   const espacioConsultado = espacioId
     ? (espaciosRaw || []).find((e: { id: string; caracteristicas: Record<string, unknown> | null }) => e.id === espacioId)
     : null;
@@ -1058,13 +1060,17 @@ async function handleCrear(req: Request): Promise<Response> {
   const espacioIdBody = typeof body?.espacio_id === "string" ? body.espacio_id : null;
 
   // Marca (Casa Tomás / Touza) — primera pasada, SIN tocar la BD: solo con
-  // `body.marca` (ningún frontend la manda hoy, pero ya se acepta) y con el
-  // sniff de `notas_cliente` (ver plantillas.ts, resolverMarca). Vale para
-  // TODOS los rechazos de aquí abajo — incluido el de blacklist, el más
-  // rápido — sin añadir una consulta a `espacios_reserva` a un camino que
-  // hoy nunca la necesita (ni Reservado.tsx ni ReservationForm.tsx mandan
-  // `espacio_id`/`sala`). Se refina con el espacio, si lo hay, justo antes
-  // del INSERT — ver más abajo — para la reserva que de verdad se guarda.
+  // `body.marca` y con el sniff de `notas_cliente` (ver plantillas.ts,
+  // resolverMarca). La web de Touza (Reservado.tsx) SÍ manda
+  // `marca: "touza"` (y además el marcador de El Reservado en las notas):
+  // sale Touza y se rechaza justo debajo con el 409 `touza_sin_reservas`.
+  // La de Casa Tomás (ReservationForm.tsx) no manda `marca`: cae en la
+  // marca por defecto, 'casa_tomas'. Vale para TODOS los rechazos de aquí
+  // abajo — incluido el de blacklist, el más rápido — sin añadir una
+  // consulta a `espacios_reserva` a un camino que hoy nunca la necesita (ni
+  // Reservado.tsx ni ReservationForm.tsx mandan `espacio_id`/`sala`). Se
+  // refina con el espacio, si lo hay, justo antes del INSERT — ver más
+  // abajo — para la reserva que de verdad se guarda.
   const marcaTemprana: Marca = resolverMarca({ marcaExplicita: body?.marca, notasCliente: notas });
 
   // Touza NO admite reservas (2026-10-01; ver `rechazoTouzaSinReservas` en
