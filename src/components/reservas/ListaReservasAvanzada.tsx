@@ -67,6 +67,10 @@ import {
 } from "./AccionesReserva";
 import { infoEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
+// La consulta de la lista (`reservas-lista`) lee el histórico por lotes de 1.000 y puede lanzar
+// `ErrorLecturaInconsistente` si los datos cambian mientras se leen (ver el comentario de la `queryFn`).
+import { leerReservasLista } from "@/lib/reservas/leerReservasLista";
+import { ErrorLecturaInconsistente } from "@/lib/reservas/paginarConsulta";
 import type { SolicitudPendiente, useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { SolicitudCard, MOTIVO_LABELS, ESTADO_LABELS } from "./GestionSolicitudes";
 import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./FormularioReserva";
@@ -468,21 +472,34 @@ export function ListaReservasAvanzada({
     refetch,
   } = useQuery({
     queryKey: ["reservas-lista"],
-    queryFn: async () => {
-      // Reservas de TODOS los negocios (Casa Tomás y Touza · El Reservado,
-      // decisión del dueño 2026-09-24): cada fila lleva su insignia de negocio
-      // y el filtro "Negocio" separa una de otra.
-      const { data, error } = await supabase
-        .from("reservas")
-        .select("*")
-        .order("fecha", { ascending: false })
-        .order("hora", { ascending: true });
-      if (error) {
-        toast.error("Error al cargar reservas");
-        console.error(error);
+    queryFn: async ({ signal }) => {
+      try {
+        // TODO el histórico de `reservas`, sin filtro de estado, de fecha ni de negocio: los filtros de la
+        // pantalla se aplican aquí, en el cliente, y lo que quede de Touza en datos antiguos no llega a ser fila
+        // (`unificarReservasYSolicitudes`). PostgREST corta cada petición a 1.000 filas y ya hay más de 1.200
+        // reservas, así que se lee por LOTES de 1.000 (`leerReservasLista` / `paginarConsulta`), de la más
+        // reciente a la más antigua: `fecha` descendente, `hora` ascendente y `id` de desempate. Todo o nada: si
+        // un lote falla, falla la consulta entera. La caché sigue siendo un ARRAY de reservas (`.filas`): los
+        // parches optimistas de `useAccionesServicioReserva` (`Array.isArray(old)`) dependen de ello.
+        //
+        // Sin realtime ni `staleTime` a propósito: cada recarga (una acción, el foco de la ventana) relee el
+        // histórico entero, hoy ~1.241 reservas = 2 peticiones. Si crece mucho habrá que filtrar por fecha en el
+        // servidor en vez de leerlo todo: por encima de `LIMITE_FILAS` (10.000) `leerReservasLista` corta y
+        // devuelve `truncado: true`, que esta pantalla todavía no enseña.
+        const { filas } = await leerReservasLista(supabase, { signal });
+        return filas as unknown as Reservation[];
+      } catch (error) {
+        // Solo los errores REALES avisan. A este `catch` llegan también los ABORTOS (cada acción optimista hace
+        // `cancelQueries(["reservas-lista"])`; también cancelan la lectura una recarga que se vuelve a pedir con
+        // datos ya en caché y desmontar la Lista) y `ErrorLecturaInconsistente` (los datos cambiaron mientras se
+        // leían los lotes): de los dos se ocupa TanStack Query, con sus cancelaciones y sus reintentos, y avisar
+        // sería un falso «error de carga». Siempre se relanza.
+        if (!signal.aborted && !(error instanceof ErrorLecturaInconsistente)) {
+          toast.error("Error al cargar reservas");
+          console.error(error);
+        }
         throw error;
       }
-      return (data as unknown as Reservation[]) || [];
     },
   });
   const reservations = useMemo(() => reservasData ?? [], [reservasData]);

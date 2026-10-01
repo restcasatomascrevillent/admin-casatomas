@@ -25,17 +25,27 @@
  * pero con las cifras de LO QUE SE VE EN LA LISTA (sus filtros menos el de estado)
  * y con los estados pulsables como filtro. Se comprueba al final del fichero.
  *
+ * Y la LECTURA POR LOTES (2026-10-01): PostgREST corta cada consulta a 1000 filas y la Lista pedía todas
+ * las reservas de una vez, así que con 1.241 en la base de datos el histórico más antiguo desaparecía de la
+ * pantalla sin error. Ahora la consulta (`leerReservasLista`) lee por lotes de 1.000: aquí se comprueba, con
+ * un doble de Supabase que respeta `range`, el recuento y el tope de 1000 filas por petición, que la Lista
+ * recibe TODAS, que la caché `reservas-lista` sigue siendo un array de reservas y que solo avisan los errores
+ * reales (ni un aborto —cada acción optimista cancela la consulta— ni una lectura inconsistente). Se
+ * comprueba al final del fichero.
+ *
  * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
  * diseño): eso se mide en el navegador con datos reales.
  */
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, type MockInstance } from "vitest";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
+import { ErrorLecturaInconsistente } from "@/lib/reservas/paginarConsulta";
+import type { DobleSupabase } from "@/lib/reservas/__tests__/dobleSupabaseLotes";
 
 const supa = vi.hoisted(() => ({
   // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
@@ -43,11 +53,21 @@ const supa = vi.hoisted(() => ({
   eq: vi.fn(),
   en: vi.fn(),
   select: vi.fn(),
-  /** Cada vez que la lista pide las reservas (`select` de la consulta de la lista, no el de una escritura). */
+  /**
+   * Cada vez que la lista pide las reservas (`select` de la consulta de la lista, no el de una escritura):
+   * una por LOTE (con 1.000 reservas o menos, una sola).
+   */
   cargas: vi.fn(),
   /** Respuestas de las siguientes escrituras (sin más: éxito con la fila de ESA reserva). */
   respuestas: [] as Array<{ data?: unknown; error?: unknown }>,
+  /** Lo que hay en la tabla `reservas`: la consulta de la lista lo lee por lotes con `range`. */
   filas: [] as Record<string, unknown>[],
+  /**
+   * El doble en memoria que sirve esas LECTURAS (se crea en el `vi.mock` del cliente): aquí se miran sus
+   * `peticiones` (tabla, columnas, filtros, orden, rango, recuento y señal de cada lote) y se le dan
+   * `opciones` (fallos, esperas, lotes cortos, abortos). Se reinicia en cada test.
+   */
+  lecturas: undefined as unknown as DobleSupabase,
   // Props con las que se monta el alta al convertir una solicitud.
   formulario: vi.fn(),
   // Permiso de edición de la sección «reservas» y el editor que abre la ranura de editar.
@@ -57,44 +77,56 @@ const supa = vi.hoisted(() => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => ({
-      select: () => {
-        supa.cargas();
-        return {
-          order: () => ({ order: () => Promise.resolve({ data: supa.filas, error: null }) }),
-        };
-      },
-      update: (valores: unknown) => {
-        supa.update(valores);
-        let id: unknown;
-        const b: Record<string, unknown> = {
-          eq: (col: string, valor: string) => {
-            supa.eq(col, valor);
-            id = valor;
-            return b;
-          },
-          in: (col: string, valores: unknown[]) => {
-            supa.en(col, valores);
-            return b;
-          },
-          select: (columnas: string) => {
-            supa.select(columnas);
-            return b;
-          },
-          then: (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
-            const r = supa.respuestas.shift() ?? {};
-            const data = "data" in r ? r.data : r.error ? null : [{ id }];
-            return Promise.resolve({ data, error: r.error ?? null }).then(ok, ko);
-          },
-        };
-        return b;
-      },
-    }),
-    functions: { invoke: vi.fn().mockResolvedValue({ data: null, error: null }) },
-  },
-}));
+// Las LECTURAS de `reservas` las sirve el doble en memoria de las lecturas por lotes
+// (`src/lib/reservas/__tests__/dobleSupabaseLotes.ts`): respeta `order`, `range`, el recuento exacto, el tope
+// de 1000 filas por petición de PostgREST y `.abortSignal`, sobre `supa.filas`. Así la Lista se prueba con la
+// misma consulta que en producción. Las escrituras (`update`) y las funciones siguen siendo las de siempre.
+vi.mock("@/integrations/supabase/client", async () => {
+  const { crearDobleSupabase } = await import("@/lib/reservas/__tests__/dobleSupabaseLotes");
+  const lecturas = crearDobleSupabase();
+  // `supa.filas` se reasigna en casi todos los tests: la tabla del doble lo lee siempre de ahí.
+  lecturas.tablas = new Proxy({} as Record<string, Record<string, unknown>[]>, {
+    get: (_destino, tabla) => (tabla === "reservas" ? supa.filas : undefined),
+  });
+  supa.lecturas = lecturas;
+
+  return {
+    supabase: {
+      from: () => ({
+        select: (columnas?: string, opciones?: { count?: string }) => {
+          supa.cargas();
+          return lecturas.from("reservas").select(columnas, opciones);
+        },
+        update: (valores: unknown) => {
+          supa.update(valores);
+          let id: unknown;
+          const b: Record<string, unknown> = {
+            eq: (col: string, valor: string) => {
+              supa.eq(col, valor);
+              id = valor;
+              return b;
+            },
+            in: (col: string, valores: unknown[]) => {
+              supa.en(col, valores);
+              return b;
+            },
+            select: (columnas: string) => {
+              supa.select(columnas);
+              return b;
+            },
+            then: (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => {
+              const r = supa.respuestas.shift() ?? {};
+              const data = "data" in r ? r.data : r.error ? null : [{ id }];
+              return Promise.resolve({ data, error: r.error ?? null }).then(ok, ko);
+            },
+          };
+          return b;
+        },
+      }),
+      functions: { invoke: vi.fn().mockResolvedValue({ data: null, error: null }) },
+    },
+  };
+});
 
 vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: supa.canEdit, loading: false }),
@@ -172,7 +204,6 @@ const solicitud: SolicitudPendiente = {
 const estadoSolicitudes = {
   solicitudes: [solicitud],
   loading: false,
-  countPendientes: 1,
   fetchSolicitudes: vi.fn(),
   updateEstado: vi.fn().mockResolvedValue(true),
   updateNotasInternas: vi.fn().mockResolvedValue(true),
@@ -183,21 +214,31 @@ const estadoSolicitudes = {
   marcarConvertida: vi.fn().mockResolvedValue(true),
 } as unknown as Parameters<typeof ListaReservasAvanzada>[0]["solicitudesState"];
 
-async function montar(props: Partial<Parameters<typeof ListaReservasAvanzada>[0]> = {}) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+/**
+ * Monta la lista SIN esperar a la tabla: es lo que hace falta cuando la carga falla o se cancela y la tabla no
+ * llega a pintarse. `reintentos` son los que hace TanStack Query cuando la consulta falla (por defecto, ninguno;
+ * sin espera entre intentos). Devuelve el `client`, para mirar o cancelar la caché `reservas-lista`.
+ */
+function renderizar(props: Partial<Parameters<typeof ListaReservasAvanzada>[0]> = {}, reintentos: number | false = false) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: reintentos, retryDelay: 0, gcTime: 0 } } });
   const vista = render(
     <QueryClientProvider client={client}>
       <ListaReservasAvanzada solicitudesState={estadoSolicitudes} {...props} />
     </QueryClientProvider>,
   );
+  return { ...vista, client };
+}
+
+async function montar(props: Partial<Parameters<typeof ListaReservasAvanzada>[0]> = {}, reintentos: number | false = false) {
+  const montada = renderizar(props, reintentos);
   // En jsdom NO hay media queries, así que se montan a la vez la tabla y las
   // tarjetas de móvil. Todo lo que se mire aquí va acotado a la tabla.
   const tabla = await waitFor(() => {
-    const t = vista.container.querySelector("table");
+    const t = montada.container.querySelector("table");
     if (!t || !t.querySelector("tbody tr td")) throw new Error("tabla sin filas todavía");
     return t;
   });
-  return { ...vista, tabla };
+  return { ...montada, tabla };
 }
 
 /** Botones de la celda de acciones de una fila, en orden de pantalla. */
@@ -217,6 +258,11 @@ const filaDe = (tabla: HTMLElement, texto: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  supa.lecturas.reiniciar(); // sin opciones, sin peticiones anotadas y la numeración de peticiones desde 1
+  // Los fixtures de estos tests ya vienen en el orden en que se espera verlos (varias reservas empatan en día y
+  // hora): el doble no las reordena por `id`, como haría el servidor. Lo que pide la consulta (`fecha` desc,
+  // `hora` asc, `id`) se comprueba en su describe, mirando las peticiones.
+  supa.lecturas.opciones.conservarOrdenDeLaTabla = true;
   supa.respuestas = [];
   supa.canEdit = true;
   supa.filas = [
@@ -1312,5 +1358,229 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     expect(screen.getAllByRole("textbox", { name: "Buscar reservas y solicitudes" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Hoy" })).toHaveLength(1);
     expect(desplegableDeEstado()).toHaveTextContent("Todos");
+  });
+});
+
+// La Lista lee TODO el histórico por lotes de 1.000 (2026-10-01). PostgREST corta cada petición a 1000 filas y la
+// consulta de antes no paginaba: con 1.241 reservas desaparecían las 241 más antiguas, sin error. Aquí el doble de
+// Supabase aplica `order`, `range`, el recuento y el tope de 1000 filas, así que lo que se prueba es la consulta de
+// verdad (`leerReservasLista`) puesta en la pantalla.
+describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
+  const ESTADOS_VARIOS = ["confirmada", "pendiente", "completada", "cancelada", "no_show", "verificada"];
+  /**
+   * `n` reservas repartidas en 14 meses hacia atrás (de 0 a 419 días antes de hoy, a tres horas). La lista va de la
+   * más reciente a la más antigua, así que las últimas en llegar son las más antiguas: justo lo que una consulta
+   * cortada a 1000 filas dejaba fuera.
+   */
+  const historico = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...reserva(`h-${String(i).padStart(5, "0")}`, ESTADOS_VARIOS[i % ESTADOS_VARIOS.length], `Cliente ${i}`),
+      fecha: format(addDays(new Date(), -(i % 420)), "yyyy-MM-dd"),
+      hora: ["13:00:00", "14:30:00", "21:00:00"][i % 3],
+    }));
+
+  const cederTurno = (ms = 0) => new Promise<void>((resolver) => setTimeout(resolver, ms));
+  /** Una promesa que se resuelve cuando el test quiere: retiene una petición en vuelo. */
+  const diferido = () => {
+    let resolver!: () => void;
+    const promesa = new Promise<void>((ok) => {
+      resolver = ok;
+    });
+    return { promesa, resolver };
+  };
+
+  /** `console.error`: se silencia (un error real lo escribe, y es lo que se comprueba) y se mira qué se registró. */
+  let registro: MockInstance;
+  /** Lo que la lista ha registrado de la CARGA (`console.error(error)`: un objeto), sin el ruido de React (avisos de `act`…, que son texto). */
+  const registrosDeCarga = () => registro.mock.calls.filter(([primero]) => typeof primero !== "string");
+  beforeEach(() => {
+    registro = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Aquí SÍ se ordena como el servidor (`fecha` desc, `hora` asc, `id`): los lotes cortan por ese orden.
+    supa.lecturas.opciones.conservarOrdenDeLaTabla = false;
+  });
+  afterEach(() => {
+    registro.mockRestore();
+  });
+
+  const ERROR_REAL = { code: "57014", message: "canceling statement due to statement timeout" };
+  const hayErrorDeCarga = () => screen.findByText(/No se han podido cargar el listado de reservas/);
+
+  // ── Todas las reservas ─────────────────────────────────────────────────────
+
+  it("con 1.241 reservas (más de las 1.000 que corta PostgREST) la Lista las recibe TODAS, también las más antiguas", async () => {
+    supa.filas = historico(1241);
+
+    const { client } = await montar();
+
+    const enCache = client.getQueryData<Array<{ id: string; fecha: string }>>(["reservas-lista"])!;
+    expect(enCache).toHaveLength(1241);
+    expect(new Set(enCache.map((r) => r.id)).size).toBe(1241);
+    // Las más antiguas (las que una consulta de 1.000 dejaba fuera) están: son las dos del día más lejano.
+    const masAntigua = format(addDays(new Date(), -419), "yyyy-MM-dd");
+    expect(enCache.filter((r) => r.fecha === masAntigua).map((r) => r.id).sort()).toEqual(["h-00419", "h-00839"]);
+    // Y la pantalla las cuenta todas (la solicitud del bot, aparte).
+    expect(screen.getByText(/^1241 reservas/)).toHaveTextContent("1241 reservas · 1 solicitud");
+  });
+
+  it("la consulta pide dos lotes de la MISMA consulta: `select(\"*\")`, sin filtros, `fecha` desc, `hora` asc y `id`, el recuento solo en el primero", async () => {
+    supa.filas = historico(1241);
+
+    await montar();
+
+    const lotes = supa.lecturas.peticiones;
+    expect(lotes.map((p) => p.rango)).toEqual([[0, 999], [1000, 1240]]);
+    expect(lotes.map((p) => p.contar)).toEqual([true, false]);
+    expect(supa.cargas).toHaveBeenCalledTimes(2);
+    for (const p of lotes) {
+      expect(p.tabla).toBe("reservas");
+      expect(p.columnas).toBe("*");
+      // Ni por estado, ni por fecha, ni por negocio: la Lista los filtra en pantalla.
+      expect(p.filtros).toEqual([]);
+      expect(p.orden).toEqual([
+        { columna: "fecha", ascendente: false },
+        { columna: "hora", ascendente: true },
+        { columna: "id", ascendente: true },
+      ]);
+      // La señal de cancelación de TanStack Query llega a cada lote.
+      expect(p.signal).toBeInstanceOf(AbortSignal);
+    }
+    expect(new Set(lotes.map((p) => p.signal)).size).toBe(1);
+  });
+
+  it("la caché `reservas-lista` es un ARRAY de reservas, no el resultado de la lectura (los parches optimistas dependen de ello)", async () => {
+    const { client } = await montar();
+
+    const enCache = client.getQueryData<unknown>(["reservas-lista"]);
+    expect(Array.isArray(enCache)).toBe(true);
+    expect((enCache as Array<{ id: string }>).map((r) => r.id).sort()).toEqual(supa.filas.map((f) => String(f.id)).sort());
+  });
+
+  // ── Errores reales: avisan UNA vez ─────────────────────────────────────────
+
+  it("un error REAL de la consulta avisa UNA vez, lo registra y la Lista dice que no se ha podido cargar", async () => {
+    supa.lecturas.opciones.fallar = () => ERROR_REAL;
+
+    const { client } = renderizar();
+
+    expect(await hayErrorDeCarga()).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith("Error al cargar reservas");
+    expect(registro).toHaveBeenCalledWith(ERROR_REAL);
+    expect(client.getQueryData(["reservas-lista"])).toBeUndefined();
+  });
+
+  it("un error real en el SEGUNDO lote también avisa una sola vez y no deja una lista a medias", async () => {
+    supa.filas = historico(1241);
+    supa.lecturas.opciones.fallar = (p) => (p.rango?.[0] === 1000 ? ERROR_REAL : undefined);
+
+    const { client } = renderizar();
+
+    expect(await hayErrorDeCarga()).toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(registro).toHaveBeenCalledWith(ERROR_REAL);
+    expect(client.getQueryData(["reservas-lista"])).toBeUndefined();
+    expect(screen.queryByText(/^\d+ reservas/)).not.toBeInTheDocument();
+  });
+
+  // ── Lo que NO es un error de carga: no avisa ni registra ───────────────────
+
+  it("un ABORTO (`cancelQueries` con la carga en vuelo) no avisa ni registra: la lectura se corta y nada más", async () => {
+    supa.filas = historico(1241);
+    const puerta = diferido();
+    supa.lecturas.opciones.antesDeResponder = (p) => (p.numero === 1 ? puerta.promesa : undefined);
+    const { client } = renderizar();
+    await waitFor(() => expect(supa.lecturas.peticiones).toHaveLength(1));
+    const senal = supa.lecturas.peticiones[0].signal!;
+
+    await act(async () => {
+      await client.cancelQueries({ queryKey: ["reservas-lista"] });
+    });
+    expect(senal.aborted).toBe(true);
+    // El lote en vuelo vuelve abortado: `AbortError`, en el error de la respuesta, como en supabase-js.
+    await act(async () => {
+      puerta.resolver();
+      await cederTurno(30);
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(registrosDeCarga()).toEqual([]);
+    expect(supa.lecturas.peticiones).toHaveLength(1); // y no se pide ningún lote más
+  });
+
+  it("un aborto ENTRE lotes (la lectura vieja ya ha servido uno y iba a pedir otro) tampoco avisa ni registra", async () => {
+    supa.filas = historico(1241);
+    // Sin recuento se lee en serie: tras cada lote decide si pide otro. El 2.º queda en vuelo y NO se aborta solo.
+    supa.lecturas.opciones.sinRecuento = true;
+    supa.lecturas.opciones.noAbortarEnVuelo = true;
+    const puerta = diferido();
+    supa.lecturas.opciones.antesDeResponder = (p) => (p.numero === 2 ? puerta.promesa : undefined);
+    const { client } = renderizar();
+    await waitFor(() => expect(supa.lecturas.peticiones).toHaveLength(2));
+
+    await act(async () => {
+      await client.cancelQueries({ queryKey: ["reservas-lista"] });
+    });
+    // El 2.º lote termina bien; al ir a pedir el 3.º, la lectura ve la cancelación y lanza `signal.reason`.
+    await act(async () => {
+      puerta.resolver();
+      await cederTurno(30);
+    });
+
+    expect(supa.lecturas.peticiones).toHaveLength(2); // el 3.º no se pidió
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(registrosDeCarga()).toEqual([]);
+  });
+
+  it("una ACCIÓN que pilla una recarga en vuelo (el parche optimista cancela `reservas-lista`) no la da por «error de carga»", async () => {
+    const { tabla, client } = await montar();
+    // Una recarga (p. ej. por el foco de la ventana) queda en vuelo, retenida en su primer lote.
+    const puerta = diferido();
+    const numeroDeLaRecarga = supa.lecturas.peticiones.length + 1;
+    supa.lecturas.opciones.antesDeResponder = (p) => (p.numero === numeroDeLaRecarga ? puerta.promesa : undefined);
+    act(() => {
+      void client.invalidateQueries({ queryKey: ["reservas-lista"] });
+    });
+    await waitFor(() => expect(supa.lecturas.peticiones).toHaveLength(numeroDeLaRecarga));
+    const senalDeLaRecarga = supa.lecturas.peticiones[numeroDeLaRecarga - 1].signal!;
+
+    // «Aceptar»: el ejecutor de acciones empieza cancelando las consultas de las listas, entre ellas esta.
+    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
+    await waitFor(() => expect(senalDeLaRecarga.aborted).toBe(true));
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
+    await act(async () => {
+      puerta.resolver();
+      await cederTurno(30);
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(registrosDeCarga()).toEqual([]);
+  });
+
+  it("`ErrorLecturaInconsistente` (los datos cambiaron entre lotes) NO avisa ni registra: la Lista lo dice en su estado de error", async () => {
+    supa.filas = historico(1241);
+    // El 2.º lote llega corto (200 de las 241): lo leído no es lo que el servidor contó.
+    supa.lecturas.opciones.recortar = (p) => (p.rango?.[0] === 1000 ? 200 : undefined);
+
+    const { client } = renderizar();
+
+    expect(await hayErrorDeCarga()).toBeInTheDocument();
+    expect(client.getQueryState(["reservas-lista"])?.error).toBeInstanceOf(ErrorLecturaInconsistente);
+    expect(screen.getByText(/Lectura por lotes inconsistente/)).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(registrosDeCarga()).toEqual([]);
+  });
+
+  it("con un reintento, una lectura inconsistente se recupera sola: la Lista enseña las 1.241 y no hubo ningún aviso", async () => {
+    supa.filas = historico(1241);
+    // Solo el primer intento sale mal: su 2.º lote llega corto.
+    supa.lecturas.opciones.recortar = (p) => (p.numero === 2 ? 200 : undefined);
+
+    const { client } = await montar({}, 1);
+
+    expect(client.getQueryData<unknown[]>(["reservas-lista"])).toHaveLength(1241);
+    expect(screen.getByText(/^1241 reservas/)).toBeInTheDocument();
+    expect(supa.lecturas.peticiones).toHaveLength(4); // los 2 lotes del primer intento y los 2 del reintento
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(registrosDeCarga()).toEqual([]);
   });
 });
