@@ -365,3 +365,41 @@ describe("FormularioReserva · email opcional", () => {
     }
   });
 });
+
+// Crear una reserva exige permiso de EDICIÓN en «Reservas» (RLS de 20261001170000). Si la RLS rechaza el INSERT
+// (también desde «Convertir en reserva», que es este mismo alta), se dice qué pasa y qué hacer, no un error genérico,
+// y el formulario sigue ahí, con lo escrito, para reintentarlo.
+describe("FormularioReserva · sin permiso para crear (RLS)", () => {
+  const RECHAZO_RLS = { code: "42501", message: 'new row violates row-level security policy for table "reservas"' };
+
+  async function crearYQueFalle(error: unknown) {
+    const insert = espiarInsert();
+    consultas.single.mockResolvedValue({ data: null, error });
+    const { onSuccess } = montar({});
+    fireEvent.click(await screen.findByRole("button", { name: "Crear Reserva" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    return { insert, onSuccess };
+  }
+
+  it("42501: «No tienes permiso para crear reservas» y a quién pedirlo; el formulario no se queda bloqueado", async () => {
+    const { insert, onSuccess } = await crearYQueFalle(RECHAZO_RLS);
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "No tienes permiso para crear reservas. Pide a un super admin que te dé «Puede editar» en Reservas.",
+    );
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(notificarCambioReserva).not.toHaveBeenCalled();
+    // Sigue con lo escrito y se puede volver a intentar.
+    expect(screen.getByLabelText("Nombre completo")).toHaveValue("Ana López");
+    const crear = await screen.findByRole("button", { name: "Crear Reserva" });
+    expect(crear).toBeEnabled();
+    fireEvent.click(crear);
+    await waitFor(() => expect(insert).toHaveBeenCalledTimes(2));
+  });
+
+  it("también si el error de la RLS llega sin código, solo con su texto", async () => {
+    await crearYQueFalle({ message: RECHAZO_RLS.message });
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No tienes permiso para crear reservas\. Pide a un super admin/));
+  });
+});

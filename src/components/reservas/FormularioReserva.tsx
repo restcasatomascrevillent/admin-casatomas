@@ -47,7 +47,9 @@ import {
   emailParaGuardar,
   errorEmailOpcional,
   errorTelefono,
+  esErrorSinPermiso,
   estadoInicialAltaPanel,
+  MENSAJE_SIN_PERMISO_ALTA,
   RE_EMAIL,
 } from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
@@ -923,8 +925,9 @@ export const FormularioReserva = ({
         ? "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales."
         : error?.code === "23505" && String(error?.message || "").includes("solicitud")
           ? "Esta solicitud ya se había convertido en una reserva."
-          : error?.code === "42501"
-            ? "No tienes permiso para crear reservas."
+          : esErrorSinPermiso(error)
+            ? // RLS: crear exige permiso de edición en «Reservas» (20261001170000).
+              MENSAJE_SIN_PERMISO_ALTA
             : `Error al crear la reserva: ${error?.message ?? "error desconocido"}`;
       toast.error(mensaje);
     }

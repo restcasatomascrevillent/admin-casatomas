@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   AYUDA_EDICION,
   SECCIONES_CONFIGURABLES,
+  SOLO_SUPER_ADMIN_CAMBIA_PERMISOS,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
 
@@ -17,6 +18,11 @@ interface TablaPermisosSeccionesProps {
    * el valor real guardado pero el interruptor queda bloqueado.
    */
   puedeConcederEdicion: boolean;
+  /**
+   * Diálogo «Permisos» de quien no es super admin: ve los permisos reales sin poder cambiar
+   * nada, tampoco «Ver» (la RLS de user_permissions solo deja escribir a un super admin).
+   */
+  soloLectura?: boolean;
   className?: string;
 }
 
@@ -30,16 +36,23 @@ export function TablaPermisosSecciones({
   onCambiarVer,
   onCambiarEditar,
   puedeConcederEdicion,
+  soloLectura = false,
   className,
 }: TablaPermisosSeccionesProps) {
   const idBase = useId();
 
   return (
     <div className={cn("space-y-2", className)}>
-      {!puedeConcederEdicion && (
+      {soloLectura ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
-          Solo un super admin puede conceder o retirar el permiso de edición.
+          {SOLO_SUPER_ADMIN_CAMBIA_PERMISOS}
         </p>
+      ) : (
+        !puedeConcederEdicion && (
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
+            Solo un super admin puede conceder o retirar el permiso de edición.
+          </p>
+        )
       )}
       <div className="rounded-md border border-border/70">
         <Table>
@@ -68,6 +81,7 @@ export function TablaPermisosSecciones({
                   <TableCell className="px-2 py-2.5 text-center">
                     <Switch
                       checked={ver}
+                      disabled={soloLectura}
                       onCheckedChange={(valor) => onCambiarVer(seccion.key, valor)}
                       aria-label={`Ver ${seccion.label}`}
                     />
@@ -75,7 +89,7 @@ export function TablaPermisosSecciones({
                   <TableCell className="px-2 py-2.5 text-center">
                     <Switch
                       checked={editar}
-                      disabled={!ver || !puedeConcederEdicion}
+                      disabled={!ver || !puedeConcederEdicion || soloLectura}
                       onCheckedChange={(valor) => onCambiarEditar(seccion.key, valor)}
                       aria-label={`Puede editar ${seccion.label}`}
                       aria-describedby={idAyuda}

@@ -549,10 +549,17 @@ describe("edicionReserva · errores legibles", () => {
   });
 
   it("permisos: 42501 y la escritura sin filas (RLS la filtra en silencio)", () => {
+    // Desde el 2026-10-01 dice también qué hacer: «Puede editar» solo lo concede un super admin.
     expect(mensajeErrorEdicion({ code: "42501", message: "permission denied" })).toBe(
-      "No tienes permiso para editar reservas.",
+      "No tienes permiso para editar reservas. Pide a un super admin que te dé «Puede editar» en Reservas.",
     );
     expect(mensajeErrorEdicion(new ErrorSinFilasEdicion())).toMatch(/no tienes permiso para editar esta reserva, o ya no existe/i);
+  });
+
+  it("permisos: el rechazo de la RLS se reconoce también por su texto, aunque llegue sin código", () => {
+    expect(mensajeErrorEdicion({ message: 'new row violates row-level security policy for table "reservas"' })).toMatch(
+      /^No tienes permiso para editar reservas\. Pide a un super admin/,
+    );
   });
 
   it("un error cualquiera conserva su texto; sin texto, dice que es desconocido", () => {

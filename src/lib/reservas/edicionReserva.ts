@@ -36,7 +36,14 @@ import { ESTADOS_QUE_OCUPAN, turnoDeHora } from "../../../supabase/functions/_sh
 // La regla del canal que no recibe «solicitud recibida» (la web) vive en la Edge
 // Function; se importa la misma para que panel y servidor no puedan divergir.
 import { debeEnviarSolicitudRecibida } from "../../../supabase/functions/emails-reserva/plantillas";
-import { debeNotificarAltaPanel, emailParaGuardar, errorEmailOpcional, errorTelefono } from "./altaPanel";
+import {
+  debeNotificarAltaPanel,
+  emailParaGuardar,
+  errorEmailOpcional,
+  errorTelefono,
+  esErrorSinPermiso,
+  PEDIR_PERMISO_EDICION,
+} from "./altaPanel";
 import { horaCorta } from "./ocupacionSalas";
 import { formatearTelefonoReserva } from "./telefono";
 
@@ -596,6 +603,6 @@ export function mensajeErrorEdicion(error: unknown): string {
   if (e.code === "23514" && mensaje.includes("Aforo")) {
     return "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales.";
   }
-  if (e.code === "42501") return "No tienes permiso para editar reservas.";
+  if (esErrorSinPermiso(e)) return `No tienes permiso para editar reservas. ${PEDIR_PERMISO_EDICION}`;
   return `Error al guardar los cambios: ${mensaje || "error desconocido"}`;
 }

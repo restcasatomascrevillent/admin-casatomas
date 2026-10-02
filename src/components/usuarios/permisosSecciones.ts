@@ -49,6 +49,12 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
 };
 
+/**
+ * Por qué el diálogo «Permisos» sale en solo lectura a quien no es super admin: la RLS de
+ * user_permissions solo deja escribir a un super admin (cualquier otro guardado no hace nada).
+ */
+export const SOLO_SUPER_ADMIN_CAMBIA_PERMISOS = "Solo un super admin puede cambiar permisos.";
+
 type PermisoGuardado = { section_key: string; can_view?: boolean | null; can_edit?: boolean | null };
 
 /**
