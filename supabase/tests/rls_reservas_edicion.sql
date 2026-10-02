@@ -59,9 +59,12 @@ set local client_encoding = 'UTF8';
 --     confirmada) y la RLS es lo único que puede rechazar el INSERT.
 --   Revisado el 2026-10-01: ningún trigger de las tablas tocadas ni de su
 --   cascada (ocupacion_diaria, newsletter_suscriptores, asignaciones_mesa…)
---   usa pg_net, http, pg_notify, pgmq ni realtime; ninguna está en una
---   publicación de Realtime; ninguna usa secuencias. Y aunque lo hicieran,
---   nada de eso sale de una transacción que termina en ROLLBACK.
+--   usa pg_net, http, pg_notify, pgmq ni realtime; ninguna usa secuencias.
+--   Y aunque lo hicieran, nada de eso sale de una transacción que termina
+--   en ROLLBACK. Publicación de Realtime: hasta aplicar la migración
+--   20261001200000 ninguna está publicada; después lo estarán reservas,
+--   solicitudes_pendientes, notificaciones_dashboard y asignaciones_mesa, y
+--   los eventos pasan por la RLS: esta prueba no depende de ello.
 --
 -- ESTADO: escrito el 2026-10-01 y SIN EJECUTAR (la migración tampoco está
 -- aplicada). Lo que sí se validó en producción, solo con SELECT: el cuerpo
