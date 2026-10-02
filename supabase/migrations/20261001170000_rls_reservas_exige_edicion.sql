@@ -97,9 +97,14 @@ set client_encoding = 'UTF8';
 --   · En el panel, para quien no tenga can_edit casi todo ya sale
 --     deshabilitado. Al escribir esta migración, lo que escribía en
 --     `reservas` SIN mirar can_edit era:
---       - «Nueva Reserva» (src/pages/Reservas.tsx): el alta fallará con
---         «No tienes permiso para crear reservas.» (42501). Sigue igual
---         (comprobado el 2026-10-01 por la noche).
+--       - «Nueva Reserva» (src/pages/Reservas.tsx). Arreglado el
+--         2026-10-01 en el commit del panel (llega a producción con el
+--         despliegue de Vercel): sin can_edit el botón sale deshabilitado
+--         y explica por qué. «Convertir en reserva» ya lo miraba
+--         (deshabilitado en la fila de la Lista; oculto en la tarjeta de
+--         móvil y en «Gestionar»). Si aun así la RLS rechaza un alta
+--         (42501), el panel dice «No tienes permiso para crear reservas.
+--         Pide a un super admin que te dé «Puede editar» en Reservas.».
 --       - La estrella de la Lista, hasta 8c8ace2 (refactor de la Lista).
 --         8c8ace2 ya está desplegado: sale deshabilitada sin permiso,
 --         igual que «Verificar» y «Lista negra».
@@ -181,9 +186,14 @@ set client_encoding = 'UTF8';
 --       antes):
 --         npx supabase db query --linked -f supabase/rollbacks/20261001170000_rls_reservas_exige_edicion_ROLLBACK.sql
 --
---   NOTA, panel (no bloquea esta migración; evita un botón activo que da
---   error de permiso): exigir can_edit también en «Nueva Reserva»
---   (src/pages/Reservas.tsx), que sigue sin mirarlo.
+--   NOTA, panel (no bloquea esta migración): desde el 2026-10-01 «Nueva
+--   Reserva» (src/pages/Reservas.tsx) también exige can_edit: sin él el
+--   botón sale deshabilitado y lo explica, y un alta rechazada por la RLS
+--   dice «No tienes permiso para crear reservas. Pide a un super admin…».
+--   Va en el commit del panel de ese día y llega con el despliegue de
+--   Vercel; mientras no esté desplegado, el botón sigue activo y el alta
+--   de quien no tenga can_edit falla con «No tienes permiso para crear
+--   reservas.».
 -- ===========================================================================
 
 begin;
