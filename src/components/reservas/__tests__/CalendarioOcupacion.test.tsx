@@ -76,14 +76,29 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
-vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: () => <div data-testid="rejilla-cuartos" />,
-}));
+// La rejilla por cuartos se prueba aparte; aquí solo si queda dentro de `ReservasEnVivoContexto`
+// (así no abre su propio canal a `reservas`).
+vi.mock("@/components/reservas/DisponibilidadCuartos", async () => {
+  const { useContext } = await import("react");
+  const { ReservasEnVivoContexto } = await import("@/hooks/useReservasEnVivo");
+  return {
+    DisponibilidadCuartos: () => (
+      <div data-testid="rejilla-cuartos" data-en-vivo={String(useContext(ReservasEnVivoContexto))} />
+    ),
+  };
+});
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// La suscripción realtime tiene sus tests (useReservasEnVivo.test.tsx); aquí solo se mira que el
+// calendario la monte.
+vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useReservasEnVivo")>()),
+  useReservasEnVivo: vi.fn(),
+}));
 
 import { supabase } from "@/integrations/supabase/client";
 import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
 import { NIVELES_ESCALA, UMBRALES_OCUPACION, estiloNivel, rangoNivel } from "@/lib/reservas/ocupacionCalendario";
 
@@ -144,13 +159,14 @@ const dia = (n: number) => `2026-10-${String(n).padStart(2, "0")}`;
 
 function montar() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const vista = render(
     <MemoryRouter initialEntries={["/reservas?tab=calendario"]}>
       <QueryClientProvider client={qc}>
         <CalendarioOcupacion />
       </QueryClientProvider>
     </MemoryRouter>,
   );
+  return Object.assign(vista, { qc });
 }
 
 /** La casilla de un día de octubre. */
@@ -756,5 +772,40 @@ describe("CalendarioOcupacion · estructura", () => {
     await mesPintado();
     fireEvent.click(casilla(20));
     await waitFor(() => expect(screen.getByTestId("panel-dia")).toHaveTextContent(/20 De Octubre/i));
+  });
+});
+
+// ─── 11. Lo que cambia en OTRO dispositivo ───────────────────────────────────
+
+describe("CalendarioOcupacion · cambios de otros dispositivos", () => {
+  it("monta la suscripción compartida a `reservas` (`useReservasEnVivo`): refresca la cuadrícula y el panel del día", async () => {
+    montar();
+    await mesPintado();
+    expect(vi.mocked(useReservasEnVivo)).toHaveBeenCalled();
+  });
+
+  it("la cuadrícula del mes se relee cada minuto, solo con la pestaña a la vista (respaldo sin realtime)", async () => {
+    const { qc } = montar();
+    await mesPintado();
+    const consulta = qc.getQueryCache().find({ queryKey: ["reservas_mes", "2026-10"] });
+    expect(consulta?.observers[0]?.options).toMatchObject({
+      refetchInterval: 60_000,
+      refetchIntervalInBackground: false,
+    });
+  });
+
+  it("el panel del día (`resumen-asignacion-dia`) también se relee cada minuto, solo con la pestaña a la vista", async () => {
+    const { qc } = montar();
+    await mesPintado();
+    await waitFor(() => expect(qc.getQueryCache().findAll({ queryKey: ["resumen-asignacion-dia"] }).length).toBeGreaterThan(0));
+    for (const consulta of qc.getQueryCache().findAll({ queryKey: ["resumen-asignacion-dia"] })) {
+      expect(consulta.observers[0]?.options).toMatchObject({ refetchInterval: 60_000, refetchIntervalInBackground: false });
+    }
+  });
+
+  it("la rejilla por cuartos del panel del día queda dentro de `ReservasEnVivoContexto`: sin segundo canal a `reservas`", async () => {
+    montar();
+    await mesPintado();
+    expect(await screen.findByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });

@@ -64,6 +64,8 @@ import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { aforoCasaTomas, resumirMes, type ReservaCalendario } from "@/lib/reservas/ocupacionCalendario";
 import { configAsignacionDesde, fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
 import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
@@ -208,8 +210,13 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   // asignación se miden con la hora del restaurante.
   const hoy = fechaMadrid(ahora);
 
+  // Cambios de `reservas` y de mesas hechos en otro dispositivo: refrescan la
+  // cuadrícula (`reservas_mes`) y el panel del día (`resumen-asignacion-dia`).
+  useReservasEnVivo();
+
   // Reservas del mes: la consulta de la CUADRÍCULA y de nadie más. El panel del
-  // día NO come de aquí: lee `vista_asignacion_dia`.
+  // día NO come de aquí: lee `vista_asignacion_dia`. Con el respaldo de cada
+  // minuto (solo con la pestaña a la vista) mientras no llegue realtime.
   const {
     data: reservasMes,
     isLoading,
@@ -218,6 +225,7 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     isFetching,
     refetch,
   } = useQuery({
+    ...REFRESCO_PERIODICO,
     queryKey: ["reservas_mes", format(currentMonth, "yyyy-MM")],
     queryFn: () =>
       leerReservasDelMes(
@@ -358,7 +366,11 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
               `lg`) crece libre, que es lo que evita que se corte nada. */}
           <Card className="flex min-w-0 flex-col lg:max-h-[620px]">
             <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-              <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
+              {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
+                  sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}
+              <ReservasEnVivoContexto.Provider value={true}>
+                <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
+              </ReservasEnVivoContexto.Provider>
             </CardContent>
           </Card>
         </div>

@@ -76,9 +76,20 @@ export interface AsignacionConDetalles extends AsignacionMesa {
  * `asignaciones_mesa.turno` y además funciona ANTES de aplicar la migración. La
  * lista ya viene recortada a un día (y casi siempre a una sala), así que filtrar
  * en memoria no cuesta nada.
+ *
+ * `refresco` (opcional, al final por lo mismo): relectura periódica de respaldo
+ * mientras realtime no entrega `asignaciones_mesa` (`REFRESCO_PERIODICO` de
+ * realtimeCanal.ts). La piden «Hoy» (kanban y «Pendientes de mesa») y el modo
+ * servicio, que pueden pasarse horas a la vista sin que cambie el foco.
  */
-export function useAsignacionesMesa(fecha?: string, espacioId?: string, turno?: Turno) {
+export function useAsignacionesMesa(
+  fecha?: string,
+  espacioId?: string,
+  turno?: Turno,
+  refresco?: { refetchInterval: number | false; refetchIntervalInBackground?: boolean },
+) {
   return useQuery({
+    ...refresco,
     // La clave solo crece cuando hay turno, para que las llamadas antiguas
     // conserven su clave de siempre. Todas empiezan por "asignaciones_mesa", así
     // que un invalidateQueries por ese prefijo sigue alcanzándolas todas.

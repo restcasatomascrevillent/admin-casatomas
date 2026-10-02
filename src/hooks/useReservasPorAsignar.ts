@@ -9,6 +9,7 @@ import { clavesAInvalidar } from "@/lib/reservas/clavesCache";
 import { ErrorSinFilasReserva, escribirReserva } from "@/lib/reservas/escribirReserva";
 import { etiquetaEstadoReserva } from "@/lib/reservas/estadosReserva";
 import { paginarConsulta } from "@/lib/reservas/paginarConsulta";
+import { crearInvalidacionDiferida, REFRESCO_PERIODICO, vigilarCanal } from "@/lib/realtimeCanal";
 
 // ============================================================================
 // RESERVAS POR ASIGNAR — panel "Asignación" (reservas-sin-salas, Fase B)
@@ -50,7 +51,15 @@ import { paginarConsulta } from "@/lib/reservas/paginarConsulta";
 // TanStack Query devuelve la lectura en vuelo y, al terminar, da la consulta por
 // al día. Un cambio que el comprobante de coherencia no detecta (entra una fila y
 // sale otra, o cambia un valor de una fila ya leída) se queda hasta el siguiente
-// evento realtime o foco de la ventana.
+// evento realtime, el refresco periódico o el foco de la ventana.
+//
+// RÁFAGAS: los eventos realtime invalidan DIFERIDO (1 s tras el último, como mucho
+// cada 5 s): con una ráfaga (la carga de la demo, 861 altas en un minuto) cada
+// evento ya no aborta y relanza la lectura por lotes, que así llega a terminar.
+//
+// RESPALDO SIN REALTIME: `REFRESCO_PERIODICO`, cada minuto con la pestaña a la
+// vista (2 peticiones por minuto con la lectura por lotes de hoy). El intervalo de
+// TanStack Query no se solapa con una lectura en curso: si la hay, la reutiliza.
 // ============================================================================
 
 export type { FilaAsignacionDia };
@@ -68,6 +77,7 @@ export function useReservasPorAsignar(desde: string, hasta: string, opciones?: {
   const queryKey = [CLAVE_RESUMEN_ASIGNACION_DIA, "rango", desde, hasta] as const;
 
   const query = useQuery({
+    ...REFRESCO_PERIODICO,
     queryKey,
     enabled,
     queryFn: async ({ signal }): Promise<ResultadoAsignacion> => {
@@ -94,17 +104,33 @@ export function useReservasPorAsignar(desde: string, hasta: string, opciones?: {
   // Realtime: una reserva nueva, un cambio de sala (también el "Deshacer" de
   // otra pantalla) o una mesa asignada desde el plano mueven la reserva de
   // grupo. Nombre de canal único por instancia (ver useOcupacionSalasDia).
+  // UN CANAL POR TABLA: el servidor da de alta las escuchas de un canal en una
+  // sola transacción y, si una tabla no está en la publicación, las deshace
+  // TODAS. Hasta la migración 20261001200000 no lo está ninguna de las dos (la
+  // migración publica ambas); por separado, si algún día una deja de estarlo,
+  // la otra sigue llegando.
+  // `vigilarCanal`: si un canal no recibe cambios lo dice una vez por consola.
   useEffect(() => {
     if (!enabled) return;
-    const refrescar = () =>
+    const diferida = crearInvalidacionDiferida(() => {
       queryClient.invalidateQueries({ queryKey: [CLAVE_RESUMEN_ASIGNACION_DIA, "rango"] });
-    const canal = supabase
-      .channel(`reservas-por-asignar-${idCanal}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "reservas" }, refrescar)
-      .on("postgres_changes", { event: "*", schema: "public", table: "asignaciones_mesa" }, refrescar)
-      .subscribe();
+    });
+    const canales = (["reservas", "asignaciones_mesa"] as const).map((tabla) => {
+      const nombre = `reservas-por-asignar-${tabla}-${idCanal}`;
+      const vigilancia = vigilarCanal(nombre, { tabla });
+      const canal = supabase
+        .channel(nombre)
+        .on("system", {}, vigilancia.alMensajeSistema)
+        .on("postgres_changes", { event: "*", schema: "public", table: tabla }, diferida.programar)
+        .subscribe(vigilancia.alCambiarEstado);
+      return { canal, vigilancia };
+    });
     return () => {
-      supabase.removeChannel(canal);
+      diferida.cancelar();
+      for (const { canal, vigilancia } of canales) {
+        vigilancia.cerrar();
+        supabase.removeChannel(canal);
+      }
     };
   }, [enabled, idCanal, queryClient]);
 

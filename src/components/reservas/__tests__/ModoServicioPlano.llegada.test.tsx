@@ -34,7 +34,7 @@ vi.mock("@/hooks/useMesas", () => ({
   }),
 }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({
-  useAsignacionesMesa: () => ({ data: h.asignaciones, isLoading: false }),
+  useAsignacionesMesa: vi.fn(() => ({ data: h.asignaciones, isLoading: false })),
   useAsignarMesasReserva: () => ({ mutateAsync: vi.fn() }),
 }));
 vi.mock("@/hooks/useReservasServicioDia", () => ({
@@ -55,6 +55,8 @@ vi.mock("@/hooks/useEdicionReserva", () => ({
 }));
 
 import { ModoServicioPlano } from "@/components/reservas/servicio/ModoServicioPlano";
+import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 
 beforeAll(() => {
   // Las 14:00 de un día fijo: turno de comida, sea cuando sea que corra el test.
@@ -111,6 +113,18 @@ beforeEach(() => {
     reserva("r-espera", "confirmada", "Ana Espera"),
     reserva("r-sentada", "completada", "Berta Sentada", { llegada_at: "2026-10-10T13:35:00" }),
   ];
+});
+
+describe("ModoServicioPlano · respaldo sin realtime", () => {
+  it("las mesas asignadas se releen cada minuto (la tablet del servicio nunca cambia de foco)", () => {
+    montar();
+    expect(vi.mocked(useAsignacionesMesa)).toHaveBeenCalledWith(
+      expect.any(String),
+      "salon",
+      expect.anything(),
+      REFRESCO_PERIODICO,
+    );
+  });
 });
 
 describe("ModoServicioPlano · «Ha llegado» (antes «Sentar»)", () => {

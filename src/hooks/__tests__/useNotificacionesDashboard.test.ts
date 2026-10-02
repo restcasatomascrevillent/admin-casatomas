@@ -9,6 +9,10 @@
  * - eliminarNotificacion: quita la notificación de la lista optimistamente
  * - Inserción realtime: nueva notificación se añade al inicio
  * - Suscripción / cleanup del canal realtime
+ * - Realtime (2026-10-01, la tabla no estaba en la publicación y nada avisaba): canal con nombre
+ *   propio de cada campana, relectura en silencio al llegar SUBSCRIBED (también al reconectar),
+ *   lecturas cruzadas, duplicados y pérdidas entre relectura y evento, aviso por consola una vez
+ *   y salida limpia al desmontar.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
@@ -21,7 +25,9 @@ import * as clienteMock from "@/integrations/supabase/client";
 // cliente real: se saca con un cast para no sumar un error de tipos.
 const { supabase } = clienteMock;
 const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
-import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
+import { PREFIJO_CANAL_NOTIFICACIONES, useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
+import { INTERVALO_SONDEO_MS, olvidarAvisosRealtime } from "@/lib/realtimeCanal";
+import { crearDobleCanales, type DobleCanales } from "./dobleCanalRealtime";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -346,8 +352,9 @@ describe("useNotificacionesDashboard", () => {
 
     renderHook(() => useNotificacionesDashboard());
 
+    // El nombre lleva un número propio de cada suscripción (ver «dos campanas» más abajo).
     await waitFor(() => {
-      expect(supabase.channel).toHaveBeenCalledWith("notificaciones_realtime");
+      expect(supabase.channel).toHaveBeenCalledWith(expect.stringMatching(/^notificaciones_realtime-\d+$/));
     });
   });
 
@@ -390,5 +397,208 @@ describe("useNotificacionesDashboard", () => {
 
     expect(result.current.notificaciones[0].id).toBe("n-99");
     expect(result.current.countNoLeidas).toBe(2);
+  });
+});
+
+// ─── Realtime: canal propio, relectura al suscribirse, avisos ─────────────────
+
+/**
+ * Cada `supabase.from(...)` deja una lectura EN VUELO que el test resuelve cuando quiere
+ * (`resolver(i, filas)`), para poder cruzar lecturas con eventos realtime.
+ */
+function lecturasControladas() {
+  const pendientes: Array<(filas: unknown[]) => void> = [];
+  (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    let resolver: (filas: unknown[]) => void = () => {};
+    const respuesta = new Promise<{ data: unknown[]; error: null }>((ok) => {
+      resolver = (filas) => ok({ data: filas, error: null });
+    });
+    pendientes.push(resolver);
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.order = () => b;
+    b.limit = () => b;
+    b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => respuesta.then(ok, ko);
+    return b;
+  });
+  return {
+    /** Cuántas lecturas se han lanzado. */
+    total: () => pendientes.length,
+    resolver: (i: number, filas: unknown[]) => pendientes[i](filas),
+  };
+}
+
+describe("useNotificacionesDashboard · realtime", () => {
+  let canales: DobleCanales;
+  let warn: ReturnType<typeof vi.spyOn>;
+  let visibilidad: DocumentVisibilityState;
+
+  beforeEach(() => {
+    resetSupabaseMocks();
+    olvidarAvisosRealtime();
+    canales = crearDobleCanales();
+    (supabase.channel as ReturnType<typeof vi.fn>).mockImplementation(canales.channel);
+    // Como realtime-js: el CLOSED de la salida llega DENTRO de removeChannel.
+    (supabase.removeChannel as ReturnType<typeof vi.fn>).mockImplementation(canales.removeChannel);
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    visibilidad = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibilidad });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    warn.mockRestore();
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    (supabase.removeChannel as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    vi.clearAllMocks();
+  });
+
+  it("sondeo cada minuto SOLO con la pestaña a la vista, en silencio y nunca encima de otra lectura", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    const { result, unmount } = renderHook(() => useNotificacionesDashboard());
+    await act(async () => lecturas.resolver(0, [makeNotif({ id: "n-1" })]));
+    expect(vi.getTimerCount()).toBe(1); // el sondeo
+
+    visibilidad = "hidden";
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_MS * 3);
+    });
+    expect(lecturas.total()).toBe(1);
+
+    visibilidad = "visible";
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_MS);
+    });
+    expect(lecturas.total()).toBe(2);
+    expect(result.current.loading).toBe(false);
+
+    // Otro minuto con esa lectura aún en vuelo: se salta.
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_MS);
+    });
+    expect(lecturas.total()).toBe(2);
+
+    await act(async () => lecturas.resolver(1, [makeNotif({ id: "n-2" }), makeNotif({ id: "n-1" })]));
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-2", "n-1"]);
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_MS);
+    });
+    expect(lecturas.total()).toBe(3);
+
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(INTERVALO_SONDEO_MS * 3);
+    expect(lecturas.total()).toBe(3);
+  });
+
+  it("dos campanas montadas a la vez (Dashboard en móvil) usan canales DISTINTOS", () => {
+    mockSelectNotifs([]);
+
+    renderHook(() => useNotificacionesDashboard());
+    renderHook(() => useNotificacionesDashboard());
+
+    const nombres = canales.nombres();
+    expect(nombres).toHaveLength(2);
+    expect(new Set(nombres).size).toBe(2);
+    for (const nombre of nombres) expect(nombre.startsWith(`${PREFIJO_CANAL_NOTIFICACIONES}-`)).toBe(true);
+  });
+
+  it("al llegar SUBSCRIBED relee EN SILENCIO (sin volver a «cargando») y aplica lo nuevo", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await act(async () => lecturas.resolver(0, [makeNotif({ id: "n-1" })]));
+    expect(result.current.loading).toBe(false);
+
+    act(() => canales.ultimo().estado("SUBSCRIBED"));
+    expect(lecturas.total()).toBe(2);
+    expect(result.current.loading).toBe(false);
+
+    await act(async () => lecturas.resolver(1, [makeNotif({ id: "n-2" }), makeNotif({ id: "n-1" })]));
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-2", "n-1"]);
+    expect(result.current.countNoLeidas).toBe(2);
+  });
+
+  it("si se cruzan dos lecturas manda la ÚLTIMA: la del montaje, si responde tarde, no pisa a la de SUBSCRIBED", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useNotificacionesDashboard());
+
+    act(() => canales.ultimo().estado("SUBSCRIBED")); // la del montaje sigue en vuelo
+    expect(lecturas.total()).toBe(2);
+
+    await act(async () => lecturas.resolver(1, [makeNotif({ id: "nueva" })]));
+    await act(async () => lecturas.resolver(0, [makeNotif({ id: "vieja" })]));
+
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["nueva"]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("una notificación que ya trajo la relectura y TAMBIÉN llega por realtime no se pinta dos veces ni suma dos", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await act(async () => lecturas.resolver(0, []));
+
+    act(() => canales.ultimo().estado("SUBSCRIBED"));
+    const n99 = makeNotif({ id: "n-99" });
+    await act(async () => lecturas.resolver(1, [n99]));
+    act(() => canales.ultimo().cambio({ eventType: "INSERT", new: n99 }));
+
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-99"]);
+    expect(result.current.countNoLeidas).toBe(1);
+  });
+
+  it("una notificación que llega por realtime MIENTRAS se relee no se pierde al aplicar la relectura", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useNotificacionesDashboard());
+    await act(async () => lecturas.resolver(0, [makeNotif({ id: "n-1" })]));
+
+    act(() => canales.ultimo().estado("SUBSCRIBED")); // relectura en vuelo…
+    act(() => canales.ultimo().cambio({ eventType: "INSERT", new: makeNotif({ id: "n-99" }) })); // …y llega una nueva
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-99", "n-1"]);
+
+    // La relectura se hizo justo antes de que se insertara: no la trae.
+    await act(async () => lecturas.resolver(1, [makeNotif({ id: "n-1" })]));
+
+    expect(result.current.notificaciones.map((n) => n.id)).toEqual(["n-99", "n-1"]);
+    expect(result.current.countNoLeidas).toBe(2);
+  });
+
+  it("avisa por consola UNA vez: el `system` de error del servidor (tabla sin publicar) y luego los fallos del canal", async () => {
+    mockSelectNotifs([]);
+    renderHook(() => useNotificacionesDashboard());
+    const canal = canales.ultimo();
+    expect(canal.alEstado).toBeTypeOf("function");
+
+    act(() => canal.estado("SUBSCRIBED"));
+    act(() =>
+      canal.sistema({
+        extension: "postgres_changes",
+        status: "error",
+        message: "Unable to subscribe to changes with given parameters. Please check Realtime is enabled…",
+      }),
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("[realtime]");
+    expect(String(warn.mock.calls[0][0])).toContain(canal.nombre);
+
+    act(() => {
+      canal.estado("CHANNEL_ERROR", new Error("mismatch between server and client bindings for postgres changes"));
+      canal.estado("TIMED_OUT");
+      canal.estado("CLOSED");
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("al desmontar quita SU canal y el CLOSED de esa salida no avisa", () => {
+    mockSelectNotifs([]);
+    const { unmount } = renderHook(() => useNotificacionesDashboard());
+    const canal = canales.ultimo();
+
+    unmount();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(canal);
+
+    // Lo que hace realtime-js cuando el servidor confirma la salida.
+    canal.estado("CLOSED");
+    expect(warn).not.toHaveBeenCalled();
   });
 });

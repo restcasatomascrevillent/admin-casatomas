@@ -12,6 +12,11 @@
  * - updateNotasInternas: llama a Supabase y recarga
  * - Manejo de errores
  * - Suscripción realtime (setup/cleanup)
+ * - Realtime y su respaldo (2026-10-01, la tabla no estaba en la publicación y nada avisaba):
+ *   canal con nombre propio, relectura al llegar SUBSCRIBED, avisos que se agrupan en UNA
+ *   relectura, sondeo cada minuto solo con la pestaña a la vista y sin pisar otra lectura,
+ *   sin «cargando» ni toasts en las relecturas que llegan solas, aviso por consola una vez y
+ *   salida limpia al desmontar.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
@@ -25,7 +30,13 @@ import * as clienteMock from "@/integrations/supabase/client";
 const { supabase } = clienteMock;
 const { resetSupabaseMocks } = clienteMock as unknown as { resetSupabaseMocks: () => void };
 import { toast } from "sonner";
-import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
+import {
+  INTERVALO_SONDEO_SOLICITUDES_MS,
+  PREFIJO_CANAL_SOLICITUDES,
+  useSolicitudesPendientes,
+} from "@/hooks/useSolicitudesPendientes";
+import { olvidarAvisosRealtime } from "@/lib/realtimeCanal";
+import { crearDobleCanales, type DobleCanales } from "./dobleCanalRealtime";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -334,11 +345,249 @@ describe("useSolicitudesPendientes", () => {
     mockSelectSolicitudes([]);
 
     const { unmount } = renderHook(() => useSolicitudesPendientes());
+    // El nombre lleva un número propio de cada suscripción (ver «dos instancias» más abajo).
     await waitFor(() => {
-      expect(supabase.channel).toHaveBeenCalledWith("solicitudes_realtime");
+      expect(supabase.channel).toHaveBeenCalledWith(expect.stringMatching(/^solicitudes_realtime-\d+$/));
     });
 
     unmount();
     expect(supabase.removeChannel).toHaveBeenCalled();
+  });
+});
+
+// ─── Realtime y respaldo sin realtime ─────────────────────────────────────────
+
+/**
+ * Cada `supabase.from(...)` deja una lectura EN VUELO que el test resuelve cuando quiere
+ * (`resolver(i, filas)` / `fallar(i)`), para poder cruzarlas con eventos realtime y con el sondeo.
+ */
+function lecturasControladas() {
+  const pendientes: Array<(r: { data: unknown[] | null; error: unknown }) => void> = [];
+  (supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
+    let resolver: (r: { data: unknown[] | null; error: unknown }) => void = () => {};
+    const respuesta = new Promise<{ data: unknown[] | null; error: unknown }>((ok) => {
+      resolver = ok;
+    });
+    pendientes.push(resolver);
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.order = () => b;
+    b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) => respuesta.then(ok, ko);
+    return b;
+  });
+  return {
+    /** Cuántas lecturas se han lanzado. */
+    total: () => pendientes.length,
+    resolver: (i: number, filas: unknown[]) => pendientes[i]({ data: filas, error: null }),
+    fallar: (i: number) => pendientes[i]({ data: null, error: { message: "Failed to fetch" } }),
+  };
+}
+
+describe("useSolicitudesPendientes · realtime y respaldo sin realtime", () => {
+  let canales: DobleCanales;
+  let warn: ReturnType<typeof vi.spyOn>;
+  let visibilidad: DocumentVisibilityState;
+
+  beforeEach(() => {
+    resetSupabaseMocks();
+    olvidarAvisosRealtime();
+    canales = crearDobleCanales();
+    (supabase.channel as ReturnType<typeof vi.fn>).mockImplementation(canales.channel);
+    // Como realtime-js: el CLOSED de la salida llega DENTRO de removeChannel.
+    (supabase.removeChannel as ReturnType<typeof vi.fn>).mockImplementation(canales.removeChannel);
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    visibilidad = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibilidad });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    warn.mockRestore();
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    (supabase.removeChannel as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    vi.clearAllMocks();
+  });
+
+  it("dos instancias montadas a la vez usan canales DISTINTOS", () => {
+    mockSelectSolicitudes([]);
+
+    renderHook(() => useSolicitudesPendientes());
+    renderHook(() => useSolicitudesPendientes());
+
+    const nombres = canales.nombres();
+    expect(nombres).toHaveLength(2);
+    expect(new Set(nombres).size).toBe(2);
+    for (const nombre of nombres) expect(nombre.startsWith(`${PREFIJO_CANAL_SOLICITUDES}-`)).toBe(true);
+  });
+
+  it("al llegar SUBSCRIBED relee EN SILENCIO (sin «cargando») y aplica lo nuevo", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useSolicitudesPendientes());
+    await act(async () => lecturas.resolver(0, [makeSolicitud({ id: "sol-1" })]));
+
+    act(() => canales.ultimo().estado("SUBSCRIBED"));
+    expect(lecturas.total()).toBe(2);
+    expect(result.current.loading).toBe(false);
+
+    await act(async () =>
+      lecturas.resolver(1, [makeSolicitud({ id: "sol-hoy", motivo_rechazo: "reserva_hoy" }), makeSolicitud({ id: "sol-1" })]),
+    );
+    expect(result.current.solicitudes.map((s) => s.id)).toEqual(["sol-hoy", "sol-1"]);
+  });
+
+  it("los avisos que llegan con una lectura en curso se agrupan: UNA relectura al terminar, nunca dos a la vez", async () => {
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useSolicitudesPendientes());
+    expect(lecturas.total()).toBe(1); // la del montaje, en vuelo
+
+    act(() => {
+      canales.ultimo().estado("SUBSCRIBED");
+      canales.ultimo().cambio({ eventType: "INSERT" });
+      canales.ultimo().cambio({ eventType: "UPDATE" });
+      canales.ultimo().cambio({ eventType: "DELETE" });
+    });
+    expect(lecturas.total()).toBe(1);
+
+    await act(async () => lecturas.resolver(0, [makeSolicitud({ id: "sol-1" })]));
+    expect(lecturas.total()).toBe(2); // la relectura apuntada, una sola
+
+    await act(async () => lecturas.resolver(1, [makeSolicitud({ id: "sol-2" }), makeSolicitud({ id: "sol-1" })]));
+    expect(lecturas.total()).toBe(2);
+    expect(result.current.solicitudes.map((s) => s.id)).toEqual(["sol-2", "sol-1"]);
+  });
+
+  it("sondeo cada minuto SOLO con la pestaña a la vista, en silencio (sin «cargando»)", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useSolicitudesPendientes());
+    await act(async () => lecturas.resolver(0, [makeSolicitud({ id: "sol-1" })]));
+    expect(lecturas.total()).toBe(1);
+
+    visibilidad = "hidden";
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS * 3);
+    });
+    expect(lecturas.total()).toBe(1);
+
+    visibilidad = "visible";
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS);
+    });
+    expect(lecturas.total()).toBe(2);
+    expect(result.current.loading).toBe(false);
+
+    await act(async () =>
+      lecturas.resolver(1, [makeSolicitud({ id: "sol-hoy", motivo_rechazo: "reserva_hoy" }), makeSolicitud({ id: "sol-1" })]),
+    );
+    expect(result.current.solicitudes.map((s) => s.id)).toEqual(["sol-hoy", "sol-1"]);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("el sondeo no se solapa con una lectura en curso: se salta ese minuto", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    renderHook(() => useSolicitudesPendientes());
+    expect(lecturas.total()).toBe(1); // la del montaje, en vuelo
+
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS * 2);
+    });
+    expect(lecturas.total()).toBe(1);
+
+    await act(async () => lecturas.resolver(0, []));
+    expect(lecturas.total()).toBe(1); // saltarse un minuto no deja nada apuntado
+
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS);
+    });
+    expect(lecturas.total()).toBe(2);
+  });
+
+  it("un sondeo que no trae cambios deja la MISMA lista (la Lista no se recalcula cada minuto)", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useSolicitudesPendientes());
+    await act(async () => lecturas.resolver(0, [makeSolicitud({ id: "sol-1" })]));
+    const antes = result.current.solicitudes;
+
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS);
+    });
+    await act(async () => lecturas.resolver(1, [makeSolicitud({ id: "sol-1" })]));
+    expect(result.current.solicitudes).toBe(antes);
+
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS);
+    });
+    await act(async () => lecturas.resolver(2, [makeSolicitud({ id: "sol-1", estado: "resuelta" })]));
+    expect(result.current.solicitudes).not.toBe(antes);
+    expect(result.current.solicitudes[0].estado).toBe("resuelta");
+  });
+
+  it("si falla una relectura que llega sola (sondeo) no sale toast; si falla la carga que pide alguien, sí", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    const { result } = renderHook(() => useSolicitudesPendientes());
+    await act(async () => lecturas.resolver(0, [makeSolicitud({ id: "sol-1" })]));
+
+    act(() => {
+      vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS);
+    });
+    await act(async () => lecturas.fallar(1));
+    expect(vi.mocked(toast.error)).not.toHaveBeenCalled();
+    expect(result.current.solicitudes.map((s) => s.id)).toEqual(["sol-1"]); // lo de antes sigue
+
+    let pedida: Promise<void> | undefined;
+    act(() => {
+      pedida = result.current.fetchSolicitudes();
+    });
+    await act(async () => {
+      lecturas.fallar(2);
+      await pedida;
+    });
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith("Error al cargar solicitudes pendientes");
+  });
+
+  it("avisa por consola UNA vez: el `system` de error del servidor (tabla sin publicar) y luego los fallos del canal", () => {
+    mockSelectSolicitudes([]);
+    renderHook(() => useSolicitudesPendientes());
+    const canal = canales.ultimo();
+    expect(canal.alEstado).toBeTypeOf("function");
+
+    act(() =>
+      canal.sistema({
+        extension: "postgres_changes",
+        status: "error",
+        message: "Unable to subscribe to changes with given parameters. Please check Realtime is enabled…",
+      }),
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("[realtime]");
+    expect(String(warn.mock.calls[0][0])).toContain(canal.nombre);
+
+    act(() => {
+      canal.estado("CHANNEL_ERROR", new Error("mismatch between server and client bindings for postgres changes"));
+      canal.estado("TIMED_OUT");
+      canal.estado("CLOSED");
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("al desmontar quita SU canal, para el sondeo y el CLOSED de esa salida no avisa", async () => {
+    vi.useFakeTimers();
+    const lecturas = lecturasControladas();
+    const { unmount } = renderHook(() => useSolicitudesPendientes());
+    await act(async () => lecturas.resolver(0, []));
+    const canal = canales.ultimo();
+
+    unmount();
+    expect(supabase.removeChannel).toHaveBeenCalledWith(canal);
+    expect(vi.getTimerCount()).toBe(0); // el sondeo ya no está programado
+
+    vi.advanceTimersByTime(INTERVALO_SONDEO_SOLICITUDES_MS * 3);
+    expect(lecturas.total()).toBe(1);
+
+    canal.estado("CLOSED");
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,12 @@
-import { useEffect, useId } from "react";
+import { useContext, useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ESTADOS_QUE_OCUPAN } from "../../supabase/functions/_shared/disponibilidad";
 import { horasBaseDelDia, type EspacioSala, type ReservaOcupacionSala } from "@/lib/reservas/ocupacionSalas";
 import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { ESTADO_LLEGADA } from "@/lib/reservas/servicioSala";
+import { crearInvalidacionDiferida, REFRESCO_PERIODICO, vigilarCanal } from "@/lib/realtimeCanal";
+import { ReservasEnVivoContexto } from "@/hooks/useReservasEnVivo";
 
 // ============================================================================
 // Datos de UN día para la rejilla "Ocupación de salas".
@@ -50,8 +52,14 @@ export function useOcupacionSalasDia(
 ) {
   const queryClient = useQueryClient();
   const idCanal = useId();
+  // Dentro de una pantalla con `useReservasEnVivo` (Hoy, Calendario) la rejilla
+  // no abre canal propio (ver el efecto de abajo) y, como el resto de esa
+  // pantalla, se relee cada minuto con la pestaña a la vista mientras no llegue
+  // realtime (`REFRESCO_PERIODICO`). Fuera, depende de su propio canal.
+  const cubiertaPorReservasEnVivo = useContext(ReservasEnVivoContexto);
 
   const query = useQuery({
+    ...(cubiertaPorReservasEnVivo ? REFRESCO_PERIODICO : undefined),
     queryKey: [CLAVE_OCUPACION_SALAS_DIA, fecha],
     enabled: !!fecha && (opciones?.enabled ?? true),
     queryFn: async (): Promise<DatosOcupacionSalasDia> => {
@@ -101,22 +109,37 @@ export function useOcupacionSalasDia(
   // Realtime: si alguien crea/mueve/cancela una reserva de ese día, se
   // refresca. Nombre de canal único por instancia (realtime-js reutiliza el
   // canal si el nombre coincide y el primer desmontaje lo cerraría para todos).
+  // `vigilarCanal`: si el canal no recibe cambios (p. ej. `reservas` fuera de la
+  // publicación, hasta la migración 20261001200000) lo dice una vez por consola.
+  // Invalidación DIFERIDA (1 s tras el último evento, como mucho cada 5 s): una
+  // ráfaga de cambios no relee la rejilla una vez por evento.
+  // Sin canal propio dentro de una pantalla con `useReservasEnVivo` (Hoy,
+  // Calendario): ese ya escucha `reservas` y refresca esta clave.
+  // OJO: el filtro `fecha=eq.X` no deja pasar un DELETE (solo trae el id) ni un
+  // UPDATE que saque la reserva de ese día; los cubre `useReservasEnVivo` donde
+  // está montado, y si no, el foco de la ventana o el siguiente cambio.
   useEffect(() => {
-    if (!fecha || opciones?.enabled === false) return;
+    if (!fecha || opciones?.enabled === false || cubiertaPorReservasEnVivo) return;
+    const diferida = crearInvalidacionDiferida(() => {
+      queryClient.invalidateQueries({ queryKey: [CLAVE_OCUPACION_SALAS_DIA, fecha] });
+    });
+    const nombre = `ocupacion-salas-${fecha}-${idCanal}`;
+    const vigilancia = vigilarCanal(nombre, { tabla: "reservas" });
     const canal = supabase
-      .channel(`ocupacion-salas-${fecha}-${idCanal}`)
+      .channel(nombre)
+      .on("system", {}, vigilancia.alMensajeSistema)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservas", filter: `fecha=eq.${fecha}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: [CLAVE_OCUPACION_SALAS_DIA, fecha] });
-        },
+        diferida.programar,
       )
-      .subscribe();
+      .subscribe(vigilancia.alCambiarEstado);
     return () => {
+      diferida.cancelar();
+      vigilancia.cerrar();
       supabase.removeChannel(canal);
     };
-  }, [fecha, idCanal, queryClient, opciones?.enabled]);
+  }, [fecha, idCanal, queryClient, opciones?.enabled, cubiertaPorReservasEnVivo]);
 
   return query;
 }
