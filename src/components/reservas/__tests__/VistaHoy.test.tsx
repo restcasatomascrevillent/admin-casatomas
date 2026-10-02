@@ -67,18 +67,34 @@ vi.mock("@/components/reservas/GestorReservasKanban", () => ({
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
-// La rejilla por cuartos se prueba aparte; aquí solo cuántas se montan y de qué día.
-vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: ({ fecha, ocultarTitulo }: { fecha: string; ocultarTitulo?: boolean }) => (
-    <div data-testid="rejilla-cuartos" data-ocultar-titulo={String(!!ocultarTitulo)}>
-      {fecha}
-    </div>
-  ),
+// La suscripción realtime tiene sus tests (useReservasEnVivo.test.tsx); aquí solo se mira que la
+// pestaña la monte. El resto del módulo (el refresco periódico) es el de verdad.
+vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useReservasEnVivo")>()),
+  useReservasEnVivo: vi.fn(),
 }));
+// La rejilla por cuartos se prueba aparte; aquí solo cuántas se montan, de qué día y si queda
+// dentro de `ReservasEnVivoContexto` (así no abre su propio canal a `reservas`).
+vi.mock("@/components/reservas/DisponibilidadCuartos", async () => {
+  const { useContext } = await import("react");
+  const { ReservasEnVivoContexto } = await import("@/hooks/useReservasEnVivo");
+  return {
+    DisponibilidadCuartos: ({ fecha, ocultarTitulo }: { fecha: string; ocultarTitulo?: boolean }) => {
+      const enVivo = useContext(ReservasEnVivoContexto);
+      return (
+        <div data-testid="rejilla-cuartos" data-ocultar-titulo={String(!!ocultarTitulo)} data-en-vivo={String(enVivo)}>
+          {fecha}
+        </div>
+      );
+    },
+  };
+});
 
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
+import { useReservasEnVivo } from "@/hooks/useReservasEnVivo";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { hoyLocal } from "@/components/reservas/asignacionPlano";
 import { resolverSaltoAsignacion } from "@/lib/reservas/saltoAsignacion";
@@ -518,5 +534,57 @@ describe("VistaHoy — editar desde la pastilla", () => {
 
     expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
+      data: RESUMEN,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
+      typeof useEspaciosReserva
+    >);
+    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
+      typeof useAsignacionesMesa
+    >);
+  });
+
+  it("monta la suscripción compartida a `reservas` (`useReservasEnVivo`) para toda la pestaña", async () => {
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(vi.mocked(useReservasEnVivo)).toHaveBeenCalled();
+  });
+
+  it("«Pendientes de mesa» (y la línea de estados, que come de ella) se relee cada minuto, solo con la pestaña a la vista", async () => {
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const consulta = queryClient.getQueryCache().find({ queryKey: ["reservas-hoy", "pendientes-mesa", HOY] });
+    expect(consulta?.observers[0]?.options).toMatchObject({
+      refetchInterval: 60_000,
+      refetchIntervalInBackground: false,
+    });
+  });
+
+  it("las mesas de hoy también se releen cada minuto: una mesa dada en otro dispositivo saca la reserva de la franja", async () => {
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(vi.mocked(useAsignacionesMesa)).toHaveBeenCalledWith(HOY, undefined, undefined, REFRESCO_PERIODICO);
+  });
+
+  it("la rejilla por cuartos queda dentro de `ReservasEnVivoContexto`: no abre un segundo canal a `reservas`", () => {
+    montar();
+    fireEvent.click(screen.getByRole("button", { name: /disponibilidad por cuartos de hora/i }));
+    expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });

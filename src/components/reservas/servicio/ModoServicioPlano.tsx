@@ -76,6 +76,7 @@ import { cn } from "@/lib/utils";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
 import { useAsignacionesMesa, useAsignarMesasReserva } from "@/hooks/useAsignacionesMesa";
 import { useReservasServicioDia } from "@/hooks/useReservasServicioDia";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
@@ -169,7 +170,9 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   }, []);
 
   const mesasQuery = useMesas(espacioId);
-  const asignacionesQuery = useAsignacionesMesa(fechaSel, espacioId, turnoSel);
+  // `REFRESCO_PERIODICO`: la tablet del modo servicio se queda a la vista toda la noche y nunca
+  // dispara el refresco por foco; sin realtime, las mesas que dé otro dispositivo llegan así.
+  const asignacionesQuery = useAsignacionesMesa(fechaSel, espacioId, turnoSel, REFRESCO_PERIODICO);
   const reservasQuery = useReservasServicioDia(fechaSel, espacioId);
   const configQuery = useConfiguracionReservas();
   const { marcarLlegada, estaEnCurso: estaEnCursoLlegada } = useAccionesServicioReserva();

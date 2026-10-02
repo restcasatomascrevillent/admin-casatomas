@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
+import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { hoyLocal } from "./asignacionPlano";
 import {
   agruparPendientesDeMesa,
@@ -105,11 +107,17 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
 
   // Ojo con el orden: estos hooks van ANTES de los `return` de carga/error de
   // arriba, o React se queda sin hooks a mitad de render.
+  // Cambios de `reservas` y de mesas hechos en otro dispositivo: UNA suscripción
+  // para toda la pestaña (kanban, esta franja, la línea de estados, las cifras y
+  // la rejilla por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
+  useReservasEnVivo();
   const hoy = useMemo(() => hoyLocal(), []);
   const { data: espacios } = useEspaciosReserva();
   // Sin `espacioId`: trae las asignaciones de TODAS las salas del día, que es
-  // justo lo que hace falta para saber quién NO tiene mesa en ninguna.
-  const { data: asignaciones } = useAsignacionesMesa(hoy);
+  // justo lo que hace falta para saber quién NO tiene mesa en ninguna. Con el
+  // respaldo de cada minuto: sin realtime, una mesa dada en otro dispositivo
+  // no sacaría la reserva de la franja hasta volver a la pestaña.
+  const { data: asignaciones } = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
 
   /**
    * Reservas de hoy, sólo las columnas que necesita la franja (y `marca`, para
@@ -133,8 +141,11 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
    * Y la lista de asignaciones se refresca sola: `useAsignacionesMesa` invalida
    * por el prefijo `CLAVE_ASIGNACIONES_MESA` cada vez que alguien sienta a
    * alguien en el plano, así que al darle mesa la reserva sale de la franja.
+   * Lo que cambie OTRO dispositivo llega por `useReservasEnVivo` y, sin
+   * realtime, con el refresco de cada minuto (`REFRESCO_PERIODICO`).
    */
   const { data: reservasHoy } = useQuery({
+    ...REFRESCO_PERIODICO,
     queryKey: ["reservas-hoy", "pendientes-mesa", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -183,60 +194,65 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
   const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      {/* Franja compacta de ocupación: los 4 datos que antes eran 4
-          tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
-          móvil) para que no compitan con el kanban por la pantalla. */}
-      <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
-          <IndicadorHoy
-            icon={CalendarCheck}
-            iconClass="bg-primary/10 text-primary"
-            label="Reservas hoy"
-            value={resumen?.totalReservas ?? 0}
-            detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
-          />
-          <IndicadorHoy
-            icon={Users}
-            iconClass="bg-accent/10 text-accent"
-            label="Comensales"
-            value={resumen?.totalComensales ?? 0}
-          />
-          <IndicadorHoy
-            icon={MapPin}
-            iconClass="bg-secondary/10 text-secondary"
-            label="Capacidad"
-            value={resumen?.capacidadTotal ?? 0}
-          />
-          <IndicadorHoy
-            icon={TrendingUp}
-            iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
-            label="Ocupación"
-            value={`${resumen?.porcentajeTotal ?? 0}%`}
-          />
+    // `ReservasEnVivoContexto`: lo de dentro (la rejilla por cuartos, el editor
+    // del kanban) ya lo refresca `useReservasEnVivo` y no abre su propio canal a
+    // `reservas`.
+    <ReservasEnVivoContexto.Provider value={true}>
+      <div className="space-y-3 sm:space-y-4">
+        {/* Franja compacta de ocupación: los 4 datos que antes eran 4
+            tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
+            móvil) para que no compitan con el kanban por la pantalla. */}
+        <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
+            <IndicadorHoy
+              icon={CalendarCheck}
+              iconClass="bg-primary/10 text-primary"
+              label="Reservas hoy"
+              value={resumen?.totalReservas ?? 0}
+              detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
+            />
+            <IndicadorHoy
+              icon={Users}
+              iconClass="bg-accent/10 text-accent"
+              label="Comensales"
+              value={resumen?.totalComensales ?? 0}
+            />
+            <IndicadorHoy
+              icon={MapPin}
+              iconClass="bg-secondary/10 text-secondary"
+              label="Capacidad"
+              value={resumen?.capacidadTotal ?? 0}
+            />
+            <IndicadorHoy
+              icon={TrendingUp}
+              iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
+              label="Ocupación"
+              value={`${resumen?.porcentajeTotal ?? 0}%`}
+            />
+          </div>
         </div>
+
+        {/* Cómo avanza una reserva (2026-09-30): los seis estados con la cifra
+            de hoy de cada uno. SIN consulta propia: usa las reservas de hoy
+            (`reservasHoy`, que no incluyen las canceladas) que ya carga la
+            franja de pendientes y las canceladas del resumen de arriba. Si esa
+            consulta cambia de filtros, estas cifras cambian con ella. */}
+        <TimelineEstadosReserva reservas={reservasHoy} canceladas={reservasCanceladas} />
+
+        <FranjaPendientesMesa
+          grupos={grupos}
+          fecha={hoy}
+          onEspacioClick={onEspacioClick}
+          onAsignarMesa={onAsignarMesa}
+          onEditar={onEditarReserva}
+          puedeEditar={puedeEditar}
+        />
+
+        <CuartosDeHoy fecha={hoy} />
+
+        <GestorReservasKanban />
       </div>
-
-      {/* Cómo avanza una reserva (2026-09-30): los seis estados con la cifra
-          de hoy de cada uno. SIN consulta propia: usa las reservas de hoy
-          (`reservasHoy`, que no incluyen las canceladas) que ya carga la
-          franja de pendientes y las canceladas del resumen de arriba. Si esa
-          consulta cambia de filtros, estas cifras cambian con ella. */}
-      <TimelineEstadosReserva reservas={reservasHoy} canceladas={reservasCanceladas} />
-
-      <FranjaPendientesMesa
-        grupos={grupos}
-        fecha={hoy}
-        onEspacioClick={onEspacioClick}
-        onAsignarMesa={onAsignarMesa}
-        onEditar={onEditarReserva}
-        puedeEditar={puedeEditar}
-      />
-
-      <CuartosDeHoy fecha={hoy} />
-
-      <GestorReservasKanban />
-    </div>
+    </ReservasEnVivoContexto.Provider>
   );
 }
 

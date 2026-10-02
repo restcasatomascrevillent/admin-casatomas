@@ -97,6 +97,11 @@ vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
   DisponibilidadCuartos: ({ fecha }: { fecha: string }) => <div data-testid="rejilla-cuartos" data-fecha={fecha} />,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// El calendario monta la suscripción realtime compartida; tiene sus tests (useReservasEnVivo.test.tsx).
+vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useReservasEnVivo")>()),
+  useReservasEnVivo: vi.fn(),
+}));
 
 import { useMesas } from "@/hooks/useMesas";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";

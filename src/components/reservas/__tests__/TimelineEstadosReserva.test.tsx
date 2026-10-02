@@ -53,6 +53,11 @@ vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({ DisponibilidadCu
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
+// La suscripción realtime de la pestaña tiene sus tests (useReservasEnVivo.test.tsx).
+vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useReservasEnVivo")>()),
+  useReservasEnVivo: vi.fn(),
+}));
 
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";

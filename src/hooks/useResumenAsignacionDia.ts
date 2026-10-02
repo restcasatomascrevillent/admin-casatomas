@@ -97,6 +97,12 @@ export interface OpcionesResumenAsignacionDia {
   turno?: Turno;
   /** Montar el hook sin lanzar la consulta (reglas de los hooks de React). */
   enabled?: boolean;
+  /**
+   * Relectura periódica de respaldo mientras no llega realtime (`REFRESCO_PERIODICO` de
+   * realtimeCanal.ts: cada minuto, solo con la pestaña a la vista). La pide el panel del día
+   * del Calendario.
+   */
+  refresco?: { refetchInterval: number | false; refetchIntervalInBackground?: boolean };
 }
 
 const RESUMEN_VACIO: DatosResumenAsignacionDia = {
@@ -128,6 +134,7 @@ export function useResumenAsignacionDia(fecha: string, opciones?: OpcionesResume
   const turno = esTurno(opciones?.turno) ? opciones?.turno : undefined;
 
   const query = useQuery({
+    ...opciones?.refresco,
     queryKey: [CLAVE_RESUMEN_ASIGNACION_DIA, fecha, turno ?? null],
     enabled: !!fecha && (opciones?.enabled ?? true),
     queryFn: async (): Promise<FilaAsignacionDia[]> => {

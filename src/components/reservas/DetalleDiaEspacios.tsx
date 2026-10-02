@@ -151,6 +151,7 @@ import {
 } from "@/lib/reservas/asignacionMesas";
 import { aforoCasaTomas, ocupacionPorTurno } from "@/lib/reservas/ocupacionCalendario";
 import { fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 import { OcupacionDelDia } from "./OcupacionDelDia";
 
@@ -405,7 +406,11 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   // botón responde al instante (sin ir al servidor por cada cambio) y además se
   // puede saber si el otro turno tiene reservas, que es lo que evita el
   // "no hay reservas" engañoso cuando el filtro está puesto.
-  const { filas, isLoading, isError, error, isFetching, refetch } = useResumenAsignacionDia(fechaISO);
+  // `REFRESCO_PERIODICO`: sin realtime, una mesa o una sala dada en otro
+  // dispositivo llega como mucho al minuto (con la pestaña a la vista).
+  const { filas, isLoading, isError, error, isFetching, refetch } = useResumenAsignacionDia(fechaISO, {
+    refresco: REFRESCO_PERIODICO,
+  });
 
   // Solo lectura y compartidas con media app: react-query las sirve de caché.
   const { data: espacios } = useEspaciosReserva();

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CLAVE_ASIGNACIONES_MESA } from "@/hooks/useAsignacionesMesa";
 import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
+import { crearInvalidacionDiferida, REFRESCO_PERIODICO, vigilarCanal } from "@/lib/realtimeCanal";
 
 // ============================================================================
 // RESERVAS DE UN DÍA PARA EL MODO SERVICIO
@@ -29,6 +30,14 @@ import type { ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 //     deja filtrar por una columna de otra tabla): mover una reserva de mesa
 //     desde este mismo componente ya invalida por la mutación, así que esta
 //     suscripción cubre sobre todo cambios hechos por OTRA pestaña/persona.
+// Cada canal invalida DIFERIDO (1 s tras el último evento, como mucho cada
+// 5 s): una ráfaga no relee el modo servicio una vez por evento.
+// OJO: el filtro `fecha=eq.X` no deja pasar un DELETE (solo trae el id) ni un
+// UPDATE que saque la reserva de ese día; lo cubre el refresco periódico.
+//
+// RESPALDO SIN REALTIME: `REFRESCO_PERIODICO` (cada minuto con la pestaña a la
+// vista): una tablet siempre encendida en el modo servicio nunca dispara el
+// refresco por foco de la ventana.
 // ============================================================================
 
 export const CLAVE_RESERVAS_SERVICIO_DIA = "reservas-servicio-dia";
@@ -38,6 +47,7 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
   const idCanal = useId();
 
   const query = useQuery({
+    ...REFRESCO_PERIODICO,
     queryKey: [CLAVE_RESERVAS_SERVICIO_DIA, fecha, espacioId ?? null],
     enabled: !!fecha,
     queryFn: async (): Promise<ReservaMesaServicio[]> => {
@@ -68,23 +78,39 @@ export function useReservasServicioDia(fecha: string | null | undefined, espacio
 
   useEffect(() => {
     if (!fecha) return;
+    // `vigilarCanal`: si un canal no recibe cambios lo dice una vez por consola.
+    // Ni `reservas` ni `asignaciones_mesa` están en la publicación
+    // `supabase_realtime` hasta la migración 20261001200000 (publica las dos):
+    // hasta aplicarla, los dos canales avisarán.
+    const diferida = crearInvalidacionDiferida(() => {
+      queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA, fecha] });
+    });
+    const nombre = `servicio-sala-reservas-${fecha}-${idCanal}`;
+    const vigilancia = vigilarCanal(nombre, { tabla: "reservas" });
     const canal = supabase
-      .channel(`servicio-sala-reservas-${fecha}-${idCanal}`)
+      .channel(nombre)
+      .on("system", {}, vigilancia.alMensajeSistema)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "reservas", filter: `fecha=eq.${fecha}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: [CLAVE_RESERVAS_SERVICIO_DIA, fecha] });
-        },
+        diferida.programar,
       )
-      .subscribe();
+      .subscribe(vigilancia.alCambiarEstado);
+    const diferidaAsignaciones = crearInvalidacionDiferida(() => {
+      queryClient.invalidateQueries({ queryKey: [CLAVE_ASIGNACIONES_MESA] });
+    });
+    const nombreAsignaciones = `servicio-sala-asignaciones-${fecha}-${idCanal}`;
+    const vigilanciaAsignaciones = vigilarCanal(nombreAsignaciones, { tabla: "asignaciones_mesa" });
     const canalAsignaciones = supabase
-      .channel(`servicio-sala-asignaciones-${fecha}-${idCanal}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "asignaciones_mesa" }, () => {
-        queryClient.invalidateQueries({ queryKey: [CLAVE_ASIGNACIONES_MESA] });
-      })
-      .subscribe();
+      .channel(nombreAsignaciones)
+      .on("system", {}, vigilanciaAsignaciones.alMensajeSistema)
+      .on("postgres_changes", { event: "*", schema: "public", table: "asignaciones_mesa" }, diferidaAsignaciones.programar)
+      .subscribe(vigilanciaAsignaciones.alCambiarEstado);
     return () => {
+      diferida.cancelar();
+      diferidaAsignaciones.cancelar();
+      vigilancia.cerrar();
+      vigilanciaAsignaciones.cerrar();
       supabase.removeChannel(canal);
       supabase.removeChannel(canalAsignaciones);
     };

@@ -22,6 +22,7 @@ import { turnoDeHora } from "@/hooks/useDisponibilidad";
 import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
@@ -778,7 +779,9 @@ export function GestorReservasKanban() {
   // y `marca`. `as any`: `marca` no está en los tipos generados.
   //
   // La clave empieza por "reservas-kanban": useAccionesServicioReserva hace el
-  // update optimista por prefijo.
+  // update optimista por prefijo. Lo que cambie otro dispositivo llega por
+  // `useReservasEnVivo` (lo monta `VistaHoy`) y, sin realtime, con el refresco
+  // de cada minuto mientras la pestaña está a la vista (`REFRESCO_PERIODICO`).
   const {
     data: reservas,
     isLoading,
@@ -786,6 +789,7 @@ export function GestorReservasKanban() {
     error,
     refetch,
   } = useQuery({
+    ...REFRESCO_PERIODICO,
     queryKey: ["reservas-kanban", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -806,8 +810,9 @@ export function GestorReservasKanban() {
   // consulta —y la misma clave de caché— que ya pide `VistaHoy`, así que no cuesta
   // una petición más; `CLAVE_ASIGNACIONES_MESA` la refresca al cambiar de sala. Si
   // aún no ha llegado (o falla) no se bloquea el movimiento: el trigger tampoco lo
-  // bloquea, para no romper el kanban.
-  const { data: asignacionesDeHoy } = useAsignacionesMesa(hoy);
+  // bloquea, para no romper el kanban. Con el mismo respaldo de cada minuto que
+  // `VistaHoy` (las mesas que dé otro dispositivo, sin realtime).
+  const { data: asignacionesDeHoy } = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
   const mesasPorReserva = useMemo(() => {
     const porReserva = new Map<string, string[]>();
     for (const a of asignacionesDeHoy ?? []) {

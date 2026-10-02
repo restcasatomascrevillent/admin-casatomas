@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ActualizacionSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import { esErrorEsquemaPendiente, mensajeErrorPropuesta } from "@/lib/reservas/propuestaCliente";
 import type { ContactoReserva } from "@/lib/reservas/altaPanel";
 import { notificarYAvisarSiFalla } from "@/lib/reservas/notificarCliente";
+import { INTERVALO_SONDEO_MS, nombreCanalUnico, programarSondeo, vigilarCanal } from "@/lib/realtimeCanal";
 
 export interface SolicitudPendiente {
   id: string;
@@ -46,6 +47,22 @@ export interface ResultadoPropuesta {
   en_blacklist?: boolean;
 }
 
+/** Prefijo del canal realtime; el nombre lleva además un número propio de cada suscripción (`nombreCanalUnico`). */
+export const PREFIJO_CANAL_SOLICITUDES = "solicitudes_realtime";
+
+/**
+ * Respaldo mientras Realtime no entrega cambios de `solicitudes_pendientes` (hasta la migración
+ * 20261001200000 no está en la publicación): relectura silenciosa cada minuto, SOLO con la pestaña
+ * a la vista y nunca encima de otra lectura en curso. El aviso más urgente (`reserva_hoy`: el bot y
+ * la web no crean reservas para hoy, las dejan como solicitud) tarda así como mucho un minuto.
+ */
+export const INTERVALO_SONDEO_SOLICITUDES_MS = INTERVALO_SONDEO_MS;
+
+/** Misma lista campo a campo (PostgREST devuelve siempre las mismas columnas, en el mismo orden). */
+function mismasSolicitudes(a: SolicitudPendiente[], b: SolicitudPendiente[]): boolean {
+  return a === b || (a.length === b.length && JSON.stringify(a) === JSON.stringify(b));
+}
+
 export function useSolicitudesPendientes() {
   const [solicitudes, setSolicitudes] = useState<SolicitudPendiente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,21 +70,69 @@ export function useSolicitudesPendientes() {
   // `contarSolicitudesPendientes` (src/lib/reservas/vistaUnificada.ts), que deja fuera las de otro negocio
   // igual que la lista. Aquí contaba también las de Touza y ya nadie la usaba.
 
-  const fetchSolicitudes = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("solicitudes_pendientes")
-      .select("*")
-      .order("created_at", { ascending: false });
+  // Lecturas: las pide alguien (montaje, tras cada acción: `fetchSolicitudes`) o llegan solas
+  // (evento realtime, SUBSCRIBED, sondeo). Solo aplica su resultado la ÚLTIMA lanzada, y las que
+  // llegan solas nunca se lanzan encima de otra: el sondeo se salta y un aviso realtime deja
+  // apuntada UNA relectura para cuando termine la que está en curso.
+  const ultimaLectura = useRef(0);
+  const lecturasEnCurso = useRef(0);
+  const releerAlTerminar = useRef(false);
+  const activo = useRef(true);
 
-    if (error) {
-      console.error("Error cargando solicitudes:", error);
-      toast.error("Error al cargar solicitudes pendientes");
-    } else {
-      setSolicitudes((data || []) as SolicitudPendiente[]);
-    }
-    setLoading(false);
+  const leer = useCallback(async (silencioso: boolean): Promise<void> => {
+    const unaLectura = async (sinCargando: boolean) => {
+      const lectura = ++ultimaLectura.current;
+      lecturasEnCurso.current += 1;
+      // Las relecturas solas no ponen `loading`: el sondeo de cada minuto no hace parpadear nada.
+      if (!sinCargando) setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("solicitudes_pendientes")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (lectura !== ultimaLectura.current) return; // hay otra lectura más nueva: manda esa
+
+        if (error) {
+          console.error("Error cargando solicitudes:", error);
+          // Solo avisa con un toast la lectura que pide alguien: sin red, el sondeo de cada
+          // minuto llenaría la pantalla de avisos.
+          if (!sinCargando) toast.error("Error al cargar solicitudes pendientes");
+        } else {
+          const filas = (data || []) as SolicitudPendiente[];
+          // Sin cambios, el MISMO array: la Lista no se recalcula cada minuto para nada.
+          setSolicitudes((prev) => (mismasSolicitudes(prev, filas) ? prev : filas));
+        }
+        setLoading(false);
+      } finally {
+        lecturasEnCurso.current -= 1;
+      }
+    };
+
+    await unaLectura(silencioso);
+    // Llegó un aviso mientras se leía: esta lectura puede ser anterior al cambio. Se relee una vez
+    // más, sin hacer esperar a quien pidió esta.
+    void (async () => {
+      while (activo.current && lecturasEnCurso.current === 0 && releerAlTerminar.current) {
+        releerAlTerminar.current = false;
+        await unaLectura(true);
+      }
+    })();
   }, []);
+
+  const fetchSolicitudes = useCallback(() => leer(false), [leer]);
+
+  /** Relectura que llega sola. `saltar`: si ya hay una en curso, nada; `repetir`: otra al terminar. */
+  const refrescarSolo = useCallback(
+    (siHayLectura: "saltar" | "repetir") => {
+      if (!activo.current) return;
+      if (lecturasEnCurso.current > 0) {
+        if (siHayLectura === "repetir") releerAlTerminar.current = true;
+        return;
+      }
+      void leer(true);
+    },
+    [leer],
+  );
 
   const updateEstado = async (id: string, nuevoEstado: string) => {
     const { error } = await supabase
@@ -246,31 +311,49 @@ export function useSolicitudesPendientes() {
   };
 
   useEffect(() => {
+    activo.current = true;
     fetchSolicitudes();
 
     // Suscripción en tiempo real. "*" y no solo INSERT (sesión 2026-09-23):
     // las solicitudes viven ahora dentro de la lista de reservas y, si un
     // compañero la marca resuelta/descartada en otro dispositivo, tiene que
-    // desaparecer también aquí sin recargar.
-    // Ojo: montar este hook DOS veces a la vez rompe el realtime (realtime-js
-    // devuelve el MISMO canal para el mismo nombre y el primer desmontaje lo
-    // cierra para ambos). En /reservas lo instancia solo `Reservas.tsx` y lo
-    // pasa hacia abajo.
+    // desaparecer también aquí sin recargar. Hasta la migración 20261001200000
+    // la tabla no está en la publicación y no llega nada: lo cubren el sondeo y
+    // el aviso `[realtime]` de la consola.
+    // Nombre de canal propio de cada suscripción (`nombreCanalUnico`): ya no
+    // pasa nada por montar el hook dos veces. En /reservas lo sigue
+    // instanciando solo `Reservas.tsx`, que lo pasa hacia abajo.
+    const nombre = nombreCanalUnico(PREFIJO_CANAL_SOLICITUDES);
+    // Cada SUBSCRIBED (también al recuperarse tras una caída) relee: Realtime
+    // no reenvía lo que pasó mientras el canal estaba caído.
+    // Una acción propia (resolver, notas…) trae también su propio evento y una
+    // relectura más: es el eco esperado, y se agrupa con la de la acción.
+    const vigilancia = vigilarCanal(nombre, {
+      tabla: "solicitudes_pendientes",
+      alSuscribirse: () => refrescarSolo("repetir"),
+    });
     const channel = supabase
-      .channel("solicitudes_realtime")
+      .channel(nombre)
+      .on("system", {}, vigilancia.alMensajeSistema)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "solicitudes_pendientes" },
         () => {
-          fetchSolicitudes();
+          refrescarSolo("repetir");
         }
       )
-      .subscribe();
+      .subscribe(vigilancia.alCambiarEstado);
+
+    // Solo con la pestaña a la vista; si ya hay una lectura en curso, ese minuto se salta.
+    const pararSondeo = programarSondeo(() => refrescarSolo("saltar"), INTERVALO_SONDEO_SOLICITUDES_MS);
 
     return () => {
+      activo.current = false;
+      pararSondeo();
+      vigilancia.cerrar();
       supabase.removeChannel(channel);
     };
-  }, [fetchSolicitudes]);
+  }, [fetchSolicitudes, refrescarSolo]);
 
   return {
     solicitudes,
