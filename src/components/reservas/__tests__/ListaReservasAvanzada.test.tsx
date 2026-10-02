@@ -70,6 +70,9 @@ const supa = vi.hoisted(() => ({
   lecturas: undefined as unknown as DobleSupabase,
   // Props con las que se monta el alta al convertir una solicitud.
   formulario: vi.fn(),
+  // Props de la tarjeta de solicitud (móvil) y del panel «Gestionar»: ¿llevan «Convertir»?
+  tarjetaSolicitud: vi.fn(),
+  panelGestion: vi.fn(),
   // Permiso de edición de la sección «reservas» y el editor que abre la ranura de editar.
   canEdit: true,
   editarReserva: vi.fn(),
@@ -139,7 +142,12 @@ vi.mock("@/hooks/useEdicionReserva", () => ({
 }));
 vi.mock("@/components/reservas/ModalVerificacionReserva", () => ({ ModalVerificacionReserva: () => null }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
-vi.mock("@/components/reservas/SolicitudGestionPanel", () => ({ SolicitudGestionPanel: () => null }));
+vi.mock("@/components/reservas/SolicitudGestionPanel", () => ({
+  SolicitudGestionPanel: (props: unknown) => {
+    supa.panelGestion(props);
+    return null;
+  },
+}));
 vi.mock("@/components/reservas/FormularioReserva", () => ({
   FormularioReserva: (props: unknown) => {
     supa.formulario(props);
@@ -147,7 +155,10 @@ vi.mock("@/components/reservas/FormularioReserva", () => ({
   },
 }));
 vi.mock("@/components/reservas/GestionSolicitudes", () => ({
-  SolicitudCard: () => null,
+  SolicitudCard: (props: unknown) => {
+    supa.tarjetaSolicitud(props);
+    return null;
+  },
   MOTIVO_LABELS: {
     grupo_grande: { label: "Grupo grande", color: "" },
     otro: { label: "Otro", color: "" },
@@ -533,6 +544,53 @@ describe("ListaReservasAvanzada · solicitudes: solo Casa Tomás", () => {
     const props = supa.formulario.mock.calls.at(-1)![0] as { datosPreseleccionados: Record<string, unknown> };
     expect(props.datosPreseleccionados).not.toHaveProperty("marca");
     expect(props.datosPreseleccionados).toMatchObject({ canal: "telefono", solicitud_id: "sol-1", espacio_id: null });
+  });
+});
+
+// «Convertir en reserva» es un ALTA: pide permiso de edición en «reservas», como «Nueva Reserva» (con la RLS de
+// 20261001170000 el INSERT de quien solo puede VER falla). Tiene tres entradas: el botón de la fila (escritorio),
+// la tarjeta (móvil) y el panel «Gestionar» (que además crea la reserva al «Registrar que aceptó por teléfono»).
+describe("ListaReservasAvanzada · «Convertir en reserva» pide permiso de edición", () => {
+  const ultimasProps = (espia: ReturnType<typeof vi.fn>) => espia.mock.calls.at(-1)![0] as Record<string, unknown>;
+  const accionesDeLaSolicitud = (tabla: HTMLElement) => botonesDeFila(filaDe(tabla, "Familia Ballester"));
+
+  it("sin permiso: el botón de la fila sale deshabilitado y lo explica, y ni la tarjeta ni «Gestionar» lo ofrecen", async () => {
+    supa.canEdit = false;
+    const { tabla } = await montar();
+    const [convertir, , , gestionar] = accionesDeLaSolicitud(tabla);
+
+    expect(convertir.textContent?.trim()).toBe("Convertir");
+    expect(convertir).toBeDisabled();
+    expect(convertir.parentElement).toHaveAttribute("title", "No tienes permiso para editar reservas");
+    fireEvent.click(convertir);
+    expect(supa.formulario).not.toHaveBeenCalled();
+    expect(ultimasProps(supa.tarjetaSolicitud).onConvertir).toBeUndefined();
+
+    fireEvent.click(gestionar);
+    await waitFor(() => expect(supa.panelGestion).toHaveBeenCalled());
+    expect(ultimasProps(supa.panelGestion).onConvertir).toBeUndefined();
+    expect(ultimasProps(supa.panelGestion).onAceptarTelefono).toBeUndefined();
+  });
+
+  it("con permiso: el botón de la fila abre el alta con la solicitud y la tarjeta también lo ofrece", async () => {
+    const { tabla } = await montar();
+    const [convertir] = accionesDeLaSolicitud(tabla);
+
+    expect(convertir).toBeEnabled();
+    expect(typeof ultimasProps(supa.tarjetaSolicitud).onConvertir).toBe("function");
+    fireEvent.click(convertir);
+    await waitFor(() => expect(supa.formulario).toHaveBeenCalled());
+    expect(ultimasProps(supa.formulario).datosPreseleccionados).toMatchObject({ nombre: "Familia Ballester", solicitud_id: "sol-1" });
+  });
+
+  it("con permiso: «Gestionar» ofrece «Convertir en reserva» y «Registrar que aceptó por teléfono»", async () => {
+    const { tabla } = await montar();
+    const [, , , gestionar] = accionesDeLaSolicitud(tabla);
+
+    fireEvent.click(gestionar);
+    await waitFor(() => expect(supa.panelGestion).toHaveBeenCalled());
+    expect(typeof ultimasProps(supa.panelGestion).onConvertir).toBe("function");
+    expect(typeof ultimasProps(supa.panelGestion).onAceptarTelefono).toBe("function");
   });
 });
 

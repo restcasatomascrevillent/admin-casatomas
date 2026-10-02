@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Settings } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
+import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
@@ -24,6 +25,9 @@ import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { contarSolicitudesPendientes, resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { toast } from "sonner";
+
+/** Por qué «Nueva Reserva» sale deshabilitado (se ve al pasar el ratón). */
+const MOTIVO_SIN_PERMISO_ALTA = "Necesitas permiso de edición en Reservas para crear reservas";
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -314,13 +318,19 @@ export default function Reservas() {
             </div>
           </div>
 
+          {/* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto
+              de acciones que escriben (y la RLS del INSERT, 20261001170000). Sin él
+              el botón sale deshabilitado y explica por qué: el motivo va en el
+              envoltorio (`ConMotivo`), porque un botón deshabilitado no recibe el ratón. */}
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <Button className="shrink-0">
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva Reserva
-              </Button>
-            </DialogTrigger>
+            <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
+              <DialogTrigger asChild>
+                <Button className="shrink-0" disabled={!puedeEditarReservas}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nueva Reserva
+                </Button>
+              </DialogTrigger>
+            </ConMotivo>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Crear Nueva Reserva</DialogTitle>

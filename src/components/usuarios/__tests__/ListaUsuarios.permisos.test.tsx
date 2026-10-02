@@ -7,13 +7,19 @@
  * true y el hook lo volvía a escribir a false: guardar los permisos de alguien le
  * quitaba la edición (y con ella, las acciones de servicio del kanban).
  *
- * Supabase va mockeado (`__mocks__/client.ts` + un builder por tabla): nada toca
- * producción. useAuth / useSuperAdmin / useUserRolePresets van mockeados para
- * fijar quién mira la pantalla y qué roles preconfigurados hay.
+ * Y el guardado SEGURO (2026-10-01): primero un upsert de lo marcado y después el
+ * borrado de lo desmarcado del diálogo, sin tocar las secciones que el diálogo no
+ * gestiona; si falla, el diálogo sigue abierto y el usuario no pierde nada.
+ *
+ * Supabase va mockeado (`__mocks__/client.ts` + `doblePermisosUsuario.ts`, que aplica
+ * las escrituras a unas filas en memoria): nada toca producción. useAuth /
+ * useSuperAdmin / useUserRolePresets van mockeados para fijar quién mira la
+ * pantalla y qué roles preconfigurados hay.
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { UserRolePreset } from "@/hooks/useUserRolePresets";
+import { crearDoblePermisos } from "@/hooks/__tests__/doblePermisosUsuario";
 
 const h = vi.hoisted(() => ({
   esSuperAdmin: true as boolean,
@@ -47,6 +53,7 @@ vi.mock("@/hooks/useUserRolePresets", () => ({
   }),
 }));
 
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 
@@ -68,30 +75,21 @@ const PERMISOS_CAMARERO: Fila[] = [
   { section_key: "facturas", can_view: true, can_edit: false },
 ];
 
-const bd = {
-  tablas: {} as Record<string, unknown[]>,
-  inserts: [] as { tabla: string; payload: unknown }[],
-};
+/** Secciones que el diálogo NO gestiona y que el camarero tiene (como en producción, «Bot Web»). */
+const OTRAS_DEL_CAMARERO: Fila[] = [
+  { section_key: "gestion_bot", can_view: true, can_edit: false },
+  { section_key: "asistente_telefonico", can_view: true, can_edit: true },
+];
 
-function builder(tabla: string) {
-  const b: Record<string, unknown> = {};
-  for (const metodo of ["select", "eq", "delete", "upsert", "order"]) b[metodo] = vi.fn(() => b);
-  b.insert = vi.fn((payload: unknown) => {
-    bd.inserts.push({ tabla, payload });
-    return b;
-  });
-  b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-    Promise.resolve({ data: bd.tablas[tabla] ?? [], error: null }).then(ok, ko);
-  return b;
-}
+let doble: ReturnType<typeof crearDoblePermisos>;
 
 function sembrar(permisosCamarero: Fila[]) {
-  bd.tablas = {
+  doble.bd.tablas = {
     user_roles: [
       { user_id: "u-yo", role: "admin", created_at: "2026-01-01T10:00:00Z" },
       { user_id: CAMARERO, role: "staff", created_at: "2026-09-01T10:00:00Z" },
     ],
-    user_permissions: permisosCamarero.map((p) => ({ user_id: CAMARERO, ...p })),
+    user_permissions: [...permisosCamarero, ...OTRAS_DEL_CAMARERO].map((p) => ({ user_id: CAMARERO, ...p })),
     super_admins: [{ user_id: "u-yo" }],
   };
 }
@@ -109,9 +107,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.esSuperAdmin = true;
   h.presets = [];
-  bd.inserts = [];
+  doble = crearDoblePermisos();
   sembrar(PERMISOS_CAMARERO);
-  vi.mocked(supabase.from).mockImplementation(((tabla: string) => builder(tabla)) as never);
+  vi.mocked(supabase.from).mockImplementation(((tabla: string) => doble.from(tabla)) as never);
   vi.mocked(supabase.functions.invoke).mockResolvedValue({
     data: {
       users: [
@@ -131,13 +129,21 @@ async function abrirPermisosDelCamarero() {
 
 const interruptor = (dialogo: HTMLElement, nombre: string) => within(dialogo).getByRole("switch", { name: nombre });
 
+/**
+ * Pulsa «Guardar Permisos», espera a que termine y devuelve cómo quedan los permisos del
+ * camarero en la BD, sección a sección (sin fila = ni «Ver» ni «Puede editar»).
+ */
 async function guardar(dialogo: HTMLElement) {
   fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
-  await waitFor(() => expect(bd.inserts.filter((i) => i.tabla === "user_permissions")).toHaveLength(1));
-  return bd.inserts.find((i) => i.tabla === "user_permissions")!.payload as Array<Fila & { user_id: string }>;
+  await waitFor(() =>
+    expect(vi.mocked(toast.success).mock.calls.length + vi.mocked(toast.error).mock.calls.length).toBeGreaterThan(0),
+  );
+  const filas = doble.filasDe("user_permissions", CAMARERO);
+  return (clave: string) => {
+    const f = filas.find((x) => x.section_key === clave);
+    return { user_id: CAMARERO, section_key: clave, can_view: Boolean(f?.can_view), can_edit: Boolean(f?.can_edit) };
+  };
 }
-
-const fila = (filas: Array<Fila & { user_id: string }>, clave: string) => filas.find((f) => f.section_key === clave);
 
 describe("ListaUsuarios · «Puede editar» por sección", () => {
   it("muestra el estado real guardado: Reservas con edición, Facturas sin ella", async () => {
@@ -159,9 +165,9 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
   it("guardar sin tocar nada no pierde la edición", async () => {
     const dialogo = await abrirPermisosDelCamarero();
 
-    const filas = await guardar(dialogo);
+    const permiso = await guardar(dialogo);
 
-    expect(fila(filas, "reservas")).toEqual({ user_id: CAMARERO, section_key: "reservas", can_view: true, can_edit: true });
+    expect(permiso("reservas")).toEqual({ user_id: CAMARERO, section_key: "reservas", can_view: true, can_edit: true });
   });
 
   it("conceder: activar «Puede editar Facturas» y guardar envía can_edit = true", async () => {
@@ -169,19 +175,19 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
 
     fireEvent.click(interruptor(dialogo, "Puede editar Facturas"));
     expect(interruptor(dialogo, "Puede editar Facturas")).toBeChecked();
-    const filas = await guardar(dialogo);
+    const permiso = await guardar(dialogo);
 
-    expect(fila(filas, "facturas")).toEqual({ user_id: CAMARERO, section_key: "facturas", can_view: true, can_edit: true });
-    expect(fila(filas, "reservas")?.can_edit).toBe(true);
+    expect(permiso("facturas")).toEqual({ user_id: CAMARERO, section_key: "facturas", can_view: true, can_edit: true });
+    expect(permiso("reservas").can_edit).toBe(true);
   });
 
   it("retirar: desactivar «Puede editar Reservas» y guardar envía can_edit = false y conserva «Ver»", async () => {
     const dialogo = await abrirPermisosDelCamarero();
 
     fireEvent.click(interruptor(dialogo, "Puede editar Reservas"));
-    const filas = await guardar(dialogo);
+    const permiso = await guardar(dialogo);
 
-    expect(fila(filas, "reservas")).toEqual({ user_id: CAMARERO, section_key: "reservas", can_view: true, can_edit: false });
+    expect(permiso("reservas")).toEqual({ user_id: CAMARERO, section_key: "reservas", can_view: true, can_edit: false });
   });
 
   it("dependencia ver→editar: sin «Ver» no se puede editar, y quitar «Ver» quita la edición", async () => {
@@ -198,21 +204,31 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     expect(interruptor(dialogo, "Puede editar Reservas")).not.toBeChecked();
     expect(interruptor(dialogo, "Puede editar Reservas")).toBeDisabled();
 
-    const filas = await guardar(dialogo);
-    expect(fila(filas, "reservas")).toMatchObject({ can_view: false, can_edit: false });
-    expect(fila(filas, "marketing")).toMatchObject({ can_view: true, can_edit: false });
+    const permiso = await guardar(dialogo);
+    expect(permiso("reservas")).toMatchObject({ can_view: false, can_edit: false });
+    expect(permiso("marketing")).toMatchObject({ can_view: true, can_edit: false });
   });
 
-  it("quien no es super admin ve la edición real pero no puede cambiarla (no se amplía quién concede)", async () => {
+  it("quien no es super admin ve los permisos reales en SOLO LECTURA: ni «Ver», ni «Puede editar», ni rol, ni guardar", async () => {
+    // La RLS de user_permissions solo deja escribir a un super admin: cualquier otro guardado
+    // no hace nada (2026-10-01, revisión). Antes «Ver» y «Guardar Permisos» seguían activos.
     h.esSuperAdmin = false;
     const dialogo = await abrirPermisosDelCamarero();
 
     expect(interruptor(dialogo, "Puede editar Reservas")).toBeChecked();
-    expect(interruptor(dialogo, "Puede editar Reservas")).toBeDisabled();
-    expect(interruptor(dialogo, "Puede editar Facturas")).toBeDisabled();
-    expect(within(dialogo).getByText(/solo un super admin puede conceder o retirar/i)).toBeInTheDocument();
-    // «Ver» sigue como estaba.
-    expect(interruptor(dialogo, "Ver Facturas")).toBeEnabled();
+    expect(interruptor(dialogo, "Ver Reservas")).toBeChecked();
+    for (const s of within(dialogo).getAllByRole("switch")) expect(s).toBeDisabled();
+    expect(within(dialogo).getByRole("combobox")).toBeDisabled();
+    const guardarBtn = within(dialogo).getByRole("button", { name: "Guardar Permisos" });
+    expect(guardarBtn).toBeDisabled();
+    // El motivo, a la vista (y en el envoltorio del botón, que deshabilitado no recibe el ratón).
+    expect(within(dialogo).getByText("Solo un super admin puede cambiar permisos.")).toBeInTheDocument();
+    expect(guardarBtn.parentElement).toHaveAttribute("title", "Solo un super admin puede cambiar permisos.");
+
+    fireEvent.click(interruptor(dialogo, "Ver Facturas"));
+    fireEvent.click(guardarBtn);
+    expect(interruptor(dialogo, "Ver Facturas")).toBeChecked();
+    expect(doble.bd.operaciones).toEqual([]);
   });
 
   it("la fila de un super admin (también la propia) no tiene «Permisos»: nadie se quita a sí mismo la gestión", async () => {
@@ -252,7 +268,72 @@ describe("ListaUsuarios · roles preconfigurados y «Puede editar»", () => {
     fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
     expect(interruptor(dialogo, "Puede editar Reservas")).toBeChecked();
 
-    const filas = await guardar(dialogo);
-    expect(fila(filas, "reservas")?.can_edit).toBe(true);
+    const permiso = await guardar(dialogo);
+    expect(permiso("reservas").can_edit).toBe(true);
+  });
+
+  it("si el guardado falla, el rol del preset NO se escribe (user_roles) y el diálogo sigue abierto", async () => {
+    h.presets = [SIN_EDICION, CON_EDICION];
+    const rechazo = { code: "42501", message: 'new row violates row-level security policy for table "user_permissions"' };
+    doble.bd.fallos = { upsert: rechazo, insert: rechazo };
+    const dialogo = await abrirPermisosDelCamarero();
+
+    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "Sala sin edición" }));
+    await guardar(dialogo);
+
+    expect(toast.error).toHaveBeenCalled();
+    expect(doble.escriturasEn("user_roles")).toEqual([]);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+});
+
+describe("ListaUsuarios · el guardado no deja a nadie con menos permisos (2026-10-01)", () => {
+  /** Las filas del camarero de las secciones que el diálogo no gestiona. */
+  const otrasEnBd = () =>
+    doble
+      .filasDe("user_permissions", CAMARERO)
+      .filter((f) => OTRAS_DEL_CAMARERO.some((o) => o.section_key === f.section_key));
+
+  it("guardar no borra ni cambia las secciones que el diálogo no enseña (Bot Web, Asistente telefónico)", async () => {
+    const antes = otrasEnBd();
+    expect(antes).toHaveLength(2);
+    const dialogo = await abrirPermisosDelCamarero();
+
+    fireEvent.click(interruptor(dialogo, "Ver Newsletter"));
+    await guardar(dialogo);
+
+    expect(toast.success).toHaveBeenCalledWith("Permisos actualizados");
+    expect(otrasEnBd()).toEqual(antes);
+  });
+
+  it("si el guardado falla: no se pierde ningún permiso, se avisa y el diálogo sigue abierto con lo elegido", async () => {
+    const antes = doble.filasDe("user_permissions", CAMARERO);
+    const caida = { code: "08006", message: "connection failure" };
+    // Falla la escritura de las filas (upsert ahora; insert en el guardado antiguo).
+    doble.bd.fallos = { upsert: caida, insert: caida };
+    const dialogo = await abrirPermisosDelCamarero();
+
+    fireEvent.click(interruptor(dialogo, "Puede editar Facturas"));
+    await guardar(dialogo);
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no se ha cambiado nada/i), expect.anything());
+    expect(doble.filasDe("user_permissions", CAMARERO)).toEqual(antes);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(interruptor(screen.getByRole("dialog"), "Puede editar Facturas")).toBeChecked();
+  });
+
+  it("si la BD no deja quitar un permiso (DELETE filtrado por la RLS: 0 filas y sin error), avisa y el diálogo sigue abierto", async () => {
+    // P. ej. una sesión que ya no es de super admin para la BD. Antes salía «Permisos actualizados».
+    doble.bd.borradoFiltradoPorRls = true;
+    const dialogo = await abrirPermisosDelCamarero();
+
+    fireEvent.click(interruptor(dialogo, "Ver Facturas"));
+    await guardar(dialogo);
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no se han podido quitar algunos permisos/i), expect.anything());
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(doble.filasDe("user_permissions", CAMARERO).find((f) => f.section_key === "facturas")).toMatchObject({ can_view: true });
   });
 });

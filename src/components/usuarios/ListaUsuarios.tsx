@@ -38,8 +38,10 @@ import {
   cambiarVer,
   mismosPermisos,
   permisosParaEditar,
+  SOLO_SUPER_ADMIN_CAMBIA_PERMISOS,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
+import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -112,7 +114,10 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     setSelectedPresetId("manual");
   };
 
+  // Quien no es super admin ve el diálogo en solo lectura: la RLS de user_permissions
+  // solo deja escribir a un super admin y cualquier otro guardado no haría nada.
   const handleVerChange = (sectionKey: string, value: boolean) => {
+    if (!isSuperAdmin) return;
     if (selectedPresetId !== "manual") {
       setSelectedPresetId("manual");
     }
@@ -129,8 +134,13 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const savePermissions = async () => {
-    if (!selectedUser) return;
-    await setAllPermissions(selectedUser.id, editingPermissions);
+    if (!selectedUser || !isSuperAdmin) return;
+    // «Puede editar» solo lo escribe un super admin. Si el guardado falla, el
+    // diálogo sigue abierto con lo elegido (para reintentar) y el rol no se toca.
+    const guardado = await setAllPermissions(selectedUser.id, editingPermissions, {
+      puedeConcederEdicion: isSuperAdmin,
+    });
+    if (!guardado) return;
     if (selectedPresetId !== "manual") {
       const selectedPreset = presets.find((preset) => preset.id === selectedPresetId);
       if (selectedPreset) {
@@ -363,7 +373,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                 <Select
                                   value={selectedPresetId}
                                   onValueChange={handlePresetChange}
-                                  disabled={presetsLoading}
+                                  disabled={presetsLoading || !isSuperAdmin}
                                 >
                                   <SelectTrigger className="w-full sm:w-[360px]">
                                     <SelectValue
@@ -386,13 +396,19 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                   onCambiarVer={handleVerChange}
                                   onCambiarEditar={handleEditarChange}
                                   puedeConcederEdicion={isSuperAdmin}
+                                  soloLectura={!isSuperAdmin}
                                 />
                               </div>
                               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                                 <Button variant="outline" onClick={closePermissionsDialog}>
                                   Cancelar
                                 </Button>
-                                <Button onClick={savePermissions}>Guardar Permisos</Button>
+                                {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón. */}
+                                <ConMotivo motivo={isSuperAdmin ? undefined : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS}>
+                                  <Button onClick={savePermissions} disabled={!isSuperAdmin} className="w-full sm:w-auto">
+                                    Guardar Permisos
+                                  </Button>
+                                </ConMotivo>
                               </div>
                             </div>
                           </DialogContent>

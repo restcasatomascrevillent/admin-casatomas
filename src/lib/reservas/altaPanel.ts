@@ -72,6 +72,24 @@ export function emailParaGuardar(email: string | null | undefined): string | nul
   return (email ?? "").trim() || null;
 }
 
+/**
+ * ¿La RLS de `reservas` ha rechazado la escritura? Crear o modificar una reserva exige
+ * permiso de EDICIÓN en «Reservas» (migración 20261001170000). Un INSERT o un UPDATE
+ * rechazado llega como 42501 («new row violates row-level security policy…»); se mira
+ * también el texto por si llega sin código. Un UPDATE que la RLS filtra en silencio no
+ * da error, devuelve 0 filas: eso lo resuelven `escribirReserva` y `ErrorSinFilasEdicion`.
+ */
+export function esErrorSinPermiso(error: unknown): boolean {
+  const e = (error ?? {}) as { code?: unknown; message?: unknown };
+  return e.code === "42501" || /row[- ]level security/i.test(String(e.message ?? ""));
+}
+
+/** Qué hacer sin permiso: «Puede editar» solo lo concede un super admin (pantalla Usuarios). */
+export const PEDIR_PERMISO_EDICION = "Pide a un super admin que te dé «Puede editar» en Reservas.";
+
+/** Aviso del alta (también «Convertir en reserva») cuando la RLS no deja crear la reserva. */
+export const MENSAJE_SIN_PERMISO_ALTA = `No tienes permiso para crear reservas. ${PEDIR_PERMISO_EDICION}`;
+
 export interface ContactoReserva {
   /** Formato del bot: "+34XXXXXXXXX". */
   telefono: string;

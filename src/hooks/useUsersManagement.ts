@@ -1,7 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole, AppRole, SECTIONS } from "./useUserRole";
+import { SECCIONES_CONFIGURABLES } from "@/components/usuarios/permisosSecciones";
 import { toast } from "sonner";
+
+/** Secciones que gestiona el diálogo «Permisos»: el guardado no toca ninguna otra. */
+const SECCIONES_DEL_DIALOGO = new Set<string>(SECCIONES_CONFIGURABLES.map((s) => s.key));
+
+const etiquetaSeccion = (clave: string) => SECCIONES_CONFIGURABLES.find((s) => s.key === clave)?.label ?? clave;
+
+/**
+ * ¿Lo ha rechazado la BD (código de Postgres o de PostgREST)? Entonces la escritura no se
+ * ha aplicado. Sin código (se cae la red, error desconocido) pudo llegar a aplicarse.
+ */
+const esRechazoDeLaBd = (error: unknown) => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^(PGRST\d+|[0-9A-Z]{5})$/.test(code);
+};
 
 export interface ManagedUser {
   id: string;
@@ -240,42 +255,97 @@ export function useUsersManagement() {
     }
   };
 
-  const setAllPermissions = async (userId: string, permissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
+  /**
+   * Guarda el diálogo «Permisos» sin transacción y sin dejar NUNCA al usuario con
+   * menos permisos de los que tenía (2026-10-01). Hasta entonces se borraban TODAS
+   * sus filas y se reinsertaban solo las del diálogo: se perdían las secciones que
+   * el diálogo no gestiona (gestion_bot, asistente_telefonico…) y, si el insert
+   * fallaba tras el borrado, se quedaba sin ningún permiso. Ahora:
+   *   1. UPSERT (clave única user_id + section_key) de las secciones del diálogo
+   *      que quedan con «Ver». Es un solo INSERT … ON CONFLICT: entra todo o nada.
+   *   2. DESPUÉS, DELETE solo de las secciones del diálogo que se han desmarcado, y se
+   *      relee: con RLS un DELETE denegado no da error, borra 0 filas.
+   * Si falla 1 no se borra nada; si falla 2, sobran permisos un rato, nunca faltan. Solo
+   * devuelve true si todo ha quedado como se pidió.
+   * Las secciones que no son del diálogo (SECCIONES_CONFIGURABLES) no se tocan.
+   *
+   * «Puede editar» solo lo escribe quien puede concederlo (un super admin, como la
+   * RLS). Si no, no se manda `can_edit` (se queda el que hay; una fila nueva nace
+   * sin edición) ni se borra una fila con edición.
+   */
+  const setAllPermissions = async (
+    userId: string,
+    permissions: { section_key: string; can_view: boolean; can_edit: boolean }[],
+    { puedeConcederEdicion }: { puedeConcederEdicion: boolean }
+  ): Promise<boolean> => {
+    const delDialogo = permissions.filter((p) => SECCIONES_DEL_DIALOGO.has(p.section_key));
+    // Editar implica ver.
+    const marcadas = delDialogo.filter((p) => p.can_view || p.can_edit);
+    const desmarcadas = delDialogo.filter((p) => !p.can_view && !p.can_edit).map((p) => p.section_key);
+    const ahora = new Date().toISOString();
+
     try {
-      // Primero eliminar permisos existentes
-      const { error: deleteError } = await supabase
-        .from("user_permissions")
-        .delete()
-        .eq("user_id", userId);
-      if (deleteError) throw deleteError;
-
-      // Se guarda el can_edit que llega del diálogo «Permisos» (antes se forzaba
-      // a false: guardar los permisos de alguien le quitaba la edición). Editar
-      // implica ver.
-      const normalizedPermissions = permissions.map((p) => {
-        const canEdit = Boolean(p.can_edit);
-        return {
-          user_id: userId,
-          section_key: p.section_key,
-          can_view: canEdit || Boolean(p.can_view),
-          can_edit: canEdit,
-        };
-      });
-
-      if (normalizedPermissions.length > 0) {
-        const { error } = await supabase
-          .from("user_permissions")
-          .insert(normalizedPermissions);
-
+      if (marcadas.length > 0) {
+        const { error } = await supabase.from("user_permissions").upsert(
+          marcadas.map((p) => ({
+            user_id: userId,
+            section_key: p.section_key,
+            can_view: true,
+            ...(puedeConcederEdicion ? { can_edit: Boolean(p.can_edit) } : {}),
+            updated_at: ahora,
+          })),
+          { onConflict: "user_id,section_key" }
+        );
         if (error) throw error;
       }
-
-      toast.success("Permisos actualizados");
-      fetchUsers();
     } catch (error) {
       console.error("Error setting permissions:", error);
-      toast.error("Error al establecer permisos");
+      const description = (error as { message?: string })?.message || undefined;
+      if (esRechazoDeLaBd(error)) {
+        toast.error("No se han guardado los permisos: no se ha cambiado nada", { description });
+      } else {
+        // Pudo aplicarse antes de perder la respuesta: se relee la lista.
+        toast.error("Puede que no se haya guardado: revisa cómo han quedado los permisos", { description });
+        fetchUsers();
+      }
+      return false;
     }
+
+    try {
+      if (desmarcadas.length > 0) {
+        let borrado = supabase
+          .from("user_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .in("section_key", desmarcadas);
+        if (!puedeConcederEdicion) borrado = borrado.eq("can_edit", false);
+        const { error } = await borrado;
+        if (error) throw error;
+        // Un DELETE que la RLS no deja hacer NO da error: borra 0 filas. Se relee lo
+        // desmarcado para no dar por quitado lo que sigue dando acceso.
+        const { data: releidas, error: errorRelectura } = await supabase
+          .from("user_permissions")
+          .select("section_key, can_view, can_edit")
+          .eq("user_id", userId)
+          .in("section_key", desmarcadas);
+        if (errorRelectura) throw errorRelectura;
+        const siguen = (releidas ?? []).filter((f) => f.can_view || f.can_edit);
+        if (siguen.length > 0) {
+          throw new Error(`Siguen activos: ${siguen.map((f) => etiquetaSeccion(f.section_key)).join(", ")}.`);
+        }
+      }
+    } catch (error) {
+      console.error("Error removing unchecked permissions:", error);
+      toast.error("No se han podido quitar algunos permisos: vuelve a guardar", {
+        description: (error as { message?: string })?.message || undefined,
+      });
+      fetchUsers();
+      return false;
+    }
+
+    toast.success("Permisos actualizados");
+    fetchUsers();
+    return true;
   };
 
   const updateUserPassword = async (userId: string, password: string) => {

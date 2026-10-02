@@ -6,7 +6,8 @@
  *
  * También se comprueba que el alta manual no ha cambiado: `datosNuevaReserva` se
  * memoiza con `useMemo([openDialog])` para que el formulario no reescriba la
- * fecha en cada render, y eso NO se puede romper.
+ * fecha en cada render, y eso NO se puede romper. Y que «Nueva Reserva» pide el
+ * permiso de edición de «reservas» (2026-10-01).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -52,7 +53,12 @@ vi.mock("@/hooks/useSolicitudesPendientes", () => ({
 }));
 vi.mock("@/hooks/useUserRole", () => ({
   useUserRole: () => ({ role: "admin" }),
-  useCanAccessSection: () => ({ canAccess: h.canEdit, loading: false }),
+  // Solo el permiso de EDICIÓN de «reservas» sigue a `h.canEdit`; cualquier otro, false: así
+  // la página no puede apoyarse sin querer en «Ver» (o en otra sección) para crear o editar.
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: seccion === "reservas" && tipo === "edit" ? h.canEdit : false,
+    loading: false,
+  }),
 }));
 vi.mock("@/hooks/useEdicionReserva", () => ({
   useEdicionReserva: () => ({
@@ -125,6 +131,32 @@ describe("Reservas (página) · el editor llega a «Hoy»", () => {
     montar();
 
     expect(screen.getAllByTestId("dialogo-edicion")).toHaveLength(1);
+  });
+});
+
+// Crear una reserva exige permiso de EDICIÓN en «reservas» (2026-10-01), como las demás acciones que
+// escriben: con la RLS de 20261001170000 el INSERT de quien solo puede VER falla.
+describe("Reservas (página) · «Nueva Reserva» pide permiso de edición", () => {
+  const botonAlta = () => screen.getByRole("button", { name: /Nueva Reserva/ });
+
+  it("sin permiso de edición el botón sale deshabilitado, explica por qué y no abre el alta", () => {
+    h.canEdit = false;
+    montar();
+
+    expect(botonAlta()).toBeDisabled();
+    expect(botonAlta().parentElement).toHaveAttribute("title", expect.stringMatching(/permiso de edición/i));
+    fireEvent.click(botonAlta());
+    expect(screen.queryByTestId("formulario-alta")).not.toBeInTheDocument();
+    expect(h.formulario).not.toHaveBeenCalled();
+  });
+
+  it("con permiso de edición el botón está habilitado, sin motivo, y abre el alta", async () => {
+    montar();
+
+    expect(botonAlta()).toBeEnabled();
+    expect(botonAlta().parentElement).not.toHaveAttribute("title");
+    fireEvent.click(botonAlta());
+    expect(await screen.findByTestId("formulario-alta")).toBeInTheDocument();
   });
 });
 

@@ -4,13 +4,21 @@
  * Hasta el 2026-10-01 el hook escribía `can_edit: false` a pelo al guardar los
  * permisos de un usuario (setAllPermissions y updateUserPermission): el permiso de
  * edición no se podía dar desde el panel y cualquier guardado borraba el que el
- * dueño hubiera puesto por SQL. Aquí se comprueba el PAYLOAD que llega a la BD.
+ * dueño hubiera puesto por SQL. Aquí se comprueba lo que llega a la BD.
  *
- * Supabase va mockeado entero (`__mocks__/client.ts` + un builder por tabla que
- * apunta lo que se inserta/borra): nada toca producción.
+ * Y el GUARDADO SEGURO (2026-10-01): setAllPermissions borraba TODAS las filas del
+ * usuario y reinsertaba solo las ~6 secciones del diálogo, sin transacción. Perdía
+ * las secciones que el diálogo no gestiona (gestion_bot, asistente_telefonico…) y,
+ * si el insert fallaba tras el borrado, dejaba al usuario sin NINGÚN permiso. Ahora
+ * hace primero un upsert y después borra solo lo desmarcado del diálogo.
+ *
+ * Supabase va mockeado entero (`__mocks__/client.ts` + `doblePermisosUsuario.ts`,
+ * que aplica las escrituras a unas filas en memoria y las anota en orden): nada toca
+ * producción.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+import { crearDoblePermisos, type Fila as FilaBd } from "./doblePermisosUsuario";
 
 vi.mock("@/integrations/supabase/client");
 vi.mock("sonner", () => ({
@@ -24,62 +32,34 @@ vi.mock("@/hooks/useUserRole", async (importOriginal) => {
   };
 });
 
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUsersManagement } from "@/hooks/useUsersManagement";
+import { permisosParaEditar } from "@/components/usuarios/permisosSecciones";
 
 type Fila = { section_key: string; can_view: boolean; can_edit: boolean };
 
 const USUARIO = "u-camarero";
+const OTRO = "u-otro";
 
-/** Lo que el mock "tiene" en cada tabla y lo que se le ha escrito. */
-const bd = {
-  tablas: {} as Record<string, unknown[]>,
-  inserts: [] as { tabla: string; payload: unknown }[],
-  upserts: [] as { tabla: string; payload: unknown; opciones: unknown }[],
-  borrados: [] as { tabla: string; filtro: [string, unknown][] }[],
-};
+let doble: ReturnType<typeof crearDoblePermisos>;
 
-function builder(tabla: string) {
-  let borrando: { tabla: string; filtro: [string, unknown][] } | null = null;
-  const b: Record<string, unknown> = {};
-  b.select = vi.fn(() => b);
-  b.eq = vi.fn((col: string, valor: unknown) => {
-    borrando?.filtro.push([col, valor]);
-    return b;
-  });
-  b.delete = vi.fn(() => {
-    borrando = { tabla, filtro: [] };
-    bd.borrados.push(borrando);
-    return b;
-  });
-  b.insert = vi.fn((payload: unknown) => {
-    bd.inserts.push({ tabla, payload });
-    return b;
-  });
-  b.upsert = vi.fn((payload: unknown, opciones: unknown) => {
-    bd.upserts.push({ tabla, payload, opciones });
-    return b;
-  });
-  b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-    Promise.resolve({ data: bd.tablas[tabla] ?? [], error: null }).then(ok, ko);
-  return b;
-}
-
-function sembrar(permisos: Fila[]) {
-  bd.tablas = {
+function sembrar(permisos: Fila[], otras: FilaBd[] = []) {
+  doble.bd.tablas = {
     user_roles: [{ user_id: USUARIO, role: "staff", created_at: "2026-09-01T10:00:00Z" }],
-    user_permissions: permisos.map((p) => ({ user_id: USUARIO, ...p })),
+    user_permissions: [
+      ...permisos.map((p) => ({ user_id: USUARIO, updated_at: "2026-09-01T10:00:00Z", ...p })),
+      ...otras,
+    ],
     super_admins: [],
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  bd.inserts = [];
-  bd.upserts = [];
-  bd.borrados = [];
+  doble = crearDoblePermisos();
   sembrar([]);
-  vi.mocked(supabase.from).mockImplementation(((tabla: string) => builder(tabla)) as never);
+  vi.mocked(supabase.from).mockImplementation(((tabla: string) => doble.from(tabla)) as never);
   vi.mocked(supabase.functions.invoke).mockResolvedValue({
     data: {
       users: [{ id: USUARIO, email: "camarero1@staff.local", display_name: "camarero1", created_at: "2026-09-01T10:00:00Z" }],
@@ -94,13 +74,21 @@ async function montarHook() {
   return hook;
 }
 
-const insertadoEn = (tabla: string) => {
-  const llamadas = bd.inserts.filter((i) => i.tabla === tabla);
+const COMO_SUPER_ADMIN = { puedeConcederEdicion: true };
+const SIN_CONCEDER_EDICION = { puedeConcederEdicion: false };
+
+/** Filas del único upsert a user_permissions (falla si hay más de uno o ninguno). */
+const upsertadoEn = (tabla: string) => {
+  const llamadas = doble.escriturasEn(tabla).filter((o) => o.tipo === "upsert");
   expect(llamadas).toHaveLength(1);
   return llamadas[0].payload as Array<Fila & { user_id: string }>;
 };
 
 const fila = (filas: Array<Fila & { user_id: string }>, clave: string) => filas.find((f) => f.section_key === clave);
+
+/** Lo que tiene guardado el usuario en una sección (`undefined` si no hay fila). */
+const enBd = (clave: string, userId = USUARIO) =>
+  doble.filasDe("user_permissions", userId).find((f) => f.section_key === clave);
 
 describe("useUsersManagement · lectura", () => {
   it("devuelve el can_edit real guardado en la BD (true sigue siendo true)", async () => {
@@ -125,15 +113,19 @@ describe("useUsersManagement · setAllPermissions (guardar el diálogo «Permiso
     const { result } = await montarHook();
 
     await act(() =>
-      result.current.setAllPermissions(USUARIO, [
-        { section_key: "reservas", can_view: true, can_edit: true },
-        { section_key: "facturas", can_view: true, can_edit: false },
-      ]),
+      result.current.setAllPermissions(
+        USUARIO,
+        [
+          { section_key: "reservas", can_view: true, can_edit: true },
+          { section_key: "facturas", can_view: true, can_edit: false },
+        ],
+        COMO_SUPER_ADMIN,
+      ),
     );
 
-    const filas = insertadoEn("user_permissions");
-    expect(fila(filas, "reservas")).toEqual({ user_id: USUARIO, section_key: "reservas", can_view: true, can_edit: true });
-    expect(fila(filas, "facturas")).toEqual({ user_id: USUARIO, section_key: "facturas", can_view: true, can_edit: false });
+    const filas = upsertadoEn("user_permissions");
+    expect(fila(filas, "reservas")).toMatchObject({ user_id: USUARIO, section_key: "reservas", can_view: true, can_edit: true });
+    expect(fila(filas, "facturas")).toMatchObject({ user_id: USUARIO, section_key: "facturas", can_view: true, can_edit: false });
   });
 
   it("retirar: el payload lleva can_edit = false y conserva «ver»", async () => {
@@ -141,15 +133,16 @@ describe("useUsersManagement · setAllPermissions (guardar el diálogo «Permiso
     const { result } = await montarHook();
 
     await act(() =>
-      result.current.setAllPermissions(USUARIO, [{ section_key: "reservas", can_view: true, can_edit: false }]),
+      result.current.setAllPermissions(USUARIO, [{ section_key: "reservas", can_view: true, can_edit: false }], COMO_SUPER_ADMIN),
     );
 
-    expect(fila(insertadoEn("user_permissions"), "reservas")).toEqual({
+    expect(fila(upsertadoEn("user_permissions"), "reservas")).toMatchObject({
       user_id: USUARIO,
       section_key: "reservas",
       can_view: true,
       can_edit: false,
     });
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: false });
   });
 
   it("guardar lo que se leyó no pierde can_edit (ida y vuelta)", async () => {
@@ -160,41 +153,277 @@ describe("useUsersManagement · setAllPermissions (guardar el diálogo «Permiso
     const { result } = await montarHook();
     const usuario = result.current.users.find((u) => u.id === USUARIO)!;
 
-    await act(() => result.current.setAllPermissions(USUARIO, usuario.permissions));
+    await act(() => result.current.setAllPermissions(USUARIO, usuario.permissions, COMO_SUPER_ADMIN));
 
-    expect(fila(insertadoEn("user_permissions"), "reservas")?.can_edit).toBe(true);
+    expect(fila(upsertadoEn("user_permissions"), "reservas")?.can_edit).toBe(true);
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
   });
 
   it("editar implica ver: una fila con can_edit y sin can_view se guarda con las dos", async () => {
     const { result } = await montarHook();
 
     await act(() =>
-      result.current.setAllPermissions(USUARIO, [{ section_key: "reservas", can_view: false, can_edit: true }]),
+      result.current.setAllPermissions(USUARIO, [{ section_key: "reservas", can_view: false, can_edit: true }], COMO_SUPER_ADMIN),
     );
 
-    expect(fila(insertadoEn("user_permissions"), "reservas")).toMatchObject({ can_view: true, can_edit: true });
+    expect(fila(upsertadoEn("user_permissions"), "reservas")).toMatchObject({ can_view: true, can_edit: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Guardado SEGURO sin transacción en el cliente (2026-10-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Como en producción hoy: el usuario tiene filas de secciones del diálogo y también de
+ * otras que se gestionan en otro sitio (gestion_bot, asistente_telefonico) o que el
+ * diálogo no enseña (usuarios), y una fila «a cero» que dejaba el guardado antiguo.
+ */
+const GUARDADAS: Fila[] = [
+  { section_key: "dashboard", can_view: true, can_edit: false },
+  { section_key: "reservas", can_view: true, can_edit: true },
+  { section_key: "facturas", can_view: true, can_edit: false },
+  { section_key: "marketing", can_view: false, can_edit: false },
+  { section_key: "gestion_bot", can_view: true, can_edit: false },
+  { section_key: "asistente_telefonico", can_view: true, can_edit: true },
+  { section_key: "usuarios", can_view: true, can_edit: false },
+];
+const NO_GESTIONADAS = ["gestion_bot", "asistente_telefonico", "usuarios"];
+/** Fila de OTRO usuario: un guardado de USUARIO no la toca nunca. */
+const DE_OTRO: FilaBd = { user_id: OTRO, section_key: "reservas", can_view: true, can_edit: true, updated_at: "2026-09-01T10:00:00Z" };
+
+/**
+ * Lo que manda el diálogo (sus 6 secciones, `permisosParaEditar`) tras: quitar «Ver» en
+ * Facturas, dar «Ver» en Carta y dejar el resto como estaba.
+ */
+const dialogo = () =>
+  permisosParaEditar(GUARDADAS).map((p) => {
+    if (p.section_key === "facturas") return { ...p, can_view: false, can_edit: false };
+    if (p.section_key === "gestor_carta") return { ...p, can_view: true };
+    return p;
   });
 
-  it("sigue borrando primero las filas del usuario (mismo flujo que antes)", async () => {
+describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario con menos permisos", () => {
+  beforeEach(() => sembrar(GUARDADAS, [DE_OTRO]));
+
+  it("(1) no borra ni reescribe ninguna fila de una sección que el diálogo no gestiona (ni de otro usuario)", async () => {
+    const antes = NO_GESTIONADAS.map((clave) => enBd(clave));
     const { result } = await montarHook();
 
-    await act(() =>
-      result.current.setAllPermissions(USUARIO, [{ section_key: "reservas", can_view: true, can_edit: true }]),
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, dialogo(), COMO_SUPER_ADMIN);
+    });
+
+    expect(ok).toBe(true);
+    expect(NO_GESTIONADAS.map((clave) => enBd(clave))).toEqual(antes);
+    expect(enBd("reservas", OTRO)).toEqual(DE_OTRO);
+    // Ninguna escritura las nombra: ni el upsert las lleva ni el borrado las abarca.
+    for (const op of doble.escriturasEn("user_permissions")) {
+      for (const f of op.payload ?? []) expect(NO_GESTIONADAS).not.toContain(f.section_key);
+      if (op.tipo === "delete") {
+        const enLista = op.filtros.find(([o, columna]) => o === "in" && columna === "section_key");
+        expect(enLista, "el borrado va acotado a secciones concretas").toBeDefined();
+        for (const clave of enLista![2] as string[]) expect(NO_GESTIONADAS).not.toContain(clave);
+      }
+    }
+  });
+
+  it("(2) el upsert va ANTES que cualquier borrado, por la clave única real, y solo se borra lo desmarcado del diálogo", async () => {
+    const { result } = await montarHook();
+
+    await act(() => result.current.setAllPermissions(USUARIO, dialogo(), COMO_SUPER_ADMIN));
+
+    const escrituras = doble.escriturasEn("user_permissions");
+    expect(escrituras.map((o) => o.tipo)).toEqual(["upsert", "delete"]);
+    expect(escrituras[0].opciones).toEqual({ onConflict: "user_id,section_key" });
+    expect(escrituras[0].payload!.map((f) => f.section_key).sort()).toEqual(["dashboard", "gestor_carta", "reservas"]);
+    expect(escrituras[1].filtros).toEqual([
+      ["eq", "user_id", USUARIO],
+      ["in", "section_key", ["gestion_web", "marketing", "facturas"]],
+    ]);
+    // Resultado: lo marcado está, lo desmarcado ya no, y la edición de Reservas sigue.
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
+    expect(enBd("gestor_carta")).toMatchObject({ can_view: true, can_edit: false });
+    expect(enBd("facturas")).toBeUndefined();
+    expect(enBd("marketing")).toBeUndefined();
+  });
+
+  it("(3) si la BD rechaza el upsert no se borra nada, el usuario conserva TODOS sus permisos y se avisa del error", async () => {
+    const antes = doble.filasDe("user_permissions", USUARIO);
+    // La BD rechaza (con su código) la escritura de las filas, sea upsert (ahora) o insert (antes).
+    const rechazo = { code: "42501", message: 'new row violates row-level security policy for table "user_permissions"' };
+    doble.bd.fallos = { upsert: rechazo, insert: rechazo };
+    const { result } = await montarHook();
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, dialogo(), COMO_SUPER_ADMIN);
+    });
+
+    expect(ok).toBe(false);
+    expect(doble.escriturasEn("user_permissions").some((o) => o.tipo === "delete")).toBe(false);
+    expect(doble.filasDe("user_permissions", USUARIO)).toEqual(antes);
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no se ha cambiado nada/i),
+      expect.objectContaining({ description: rechazo.message }),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("si el upsert falla SIN código de la BD (se cae la red) no afirma que no ha cambiado nada: puede que se aplicara, y relee la lista", async () => {
+    // Error de red de supabase-js: `code` vacío. El upsert pudo llegar y aplicarse.
+    doble.bd.fallos = { upsert: { code: "", message: "TypeError: Failed to fetch" } };
+    const { result } = await montarHook();
+    const lecturasAntes = vi.mocked(supabase.functions.invoke).mock.calls.length;
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, dialogo(), COMO_SUPER_ADMIN);
+    });
+
+    expect(ok).toBe(false);
+    expect(doble.escriturasEn("user_permissions").some((o) => o.tipo === "delete")).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/puede que no se haya guardado/i), expect.anything());
+    expect(toast.error).not.toHaveBeenCalledWith(expect.stringMatching(/no se ha cambiado nada/i), expect.anything());
+    await waitFor(() => expect(vi.mocked(supabase.functions.invoke).mock.calls.length).toBeGreaterThan(lecturasAntes));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("si falla el borrado de lo desmarcado, sobran permisos (los desmarcados), nunca faltan, y se avisa", async () => {
+    doble.bd.fallos = { delete: { message: "connection failure" } };
+    const { result } = await montarHook();
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, dialogo(), COMO_SUPER_ADMIN);
+    });
+
+    expect(ok).toBe(false);
+    expect(enBd("gestor_carta")).toMatchObject({ can_view: true });
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
+    expect(enBd("facturas")).toMatchObject({ can_view: true }); // desmarcada, pero no se ha podido quitar
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no se han podido quitar/i), expect.anything());
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("(4) quien no puede conceder edición no cambia «Puede editar»: ni lo da, ni lo quita, ni borra una fila que lo tenga", async () => {
+    const { result } = await montarHook();
+    // Lo que llegaría con «Puede editar» tocado (el diálogo lo bloquea a quien no es super
+    // admin, pero el hook no se fía): quitarlo en Reservas, darlo en Dashboard y en una
+    // sección nueva (Carta).
+    const tocado = permisosParaEditar(GUARDADAS).map((p) => {
+      if (p.section_key === "reservas") return { ...p, can_edit: false };
+      if (p.section_key === "dashboard") return { ...p, can_edit: true };
+      if (p.section_key === "gestor_carta") return { ...p, can_view: true, can_edit: true };
+      return p;
+    });
+
+    await act(() => result.current.setAllPermissions(USUARIO, tocado, SIN_CONCEDER_EDICION));
+
+    for (const f of upsertadoEn("user_permissions")) expect(f).not.toHaveProperty("can_edit");
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
+    expect(enBd("dashboard")).toMatchObject({ can_view: true, can_edit: false });
+    expect(enBd("gestor_carta")).toMatchObject({ can_view: true, can_edit: false });
+
+    // Quitar «Ver» de una sección con edición la quitaría también: tampoco.
+    const sinVerReservas = permisosParaEditar(GUARDADAS).map((p) =>
+      p.section_key === "reservas" ? { ...p, can_view: false, can_edit: false } : p,
+    );
+    await act(() => result.current.setAllPermissions(USUARIO, sinVerReservas, SIN_CONCEDER_EDICION));
+
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
+    const borrado = doble.escriturasEn("user_permissions").filter((o) => o.tipo === "delete").at(-1)!;
+    expect(borrado.filtros).toContainEqual(["eq", "can_edit", false]);
+  });
+
+  it("secciones ajenas al diálogo que lleguen en `permissions` tampoco se tocan (ni marcadas ni desmarcadas)", async () => {
+    const antes = NO_GESTIONADAS.map((clave) => enBd(clave));
+    const { result } = await montarHook();
+    const conAjenas = [
+      ...dialogo(),
+      { section_key: "gestion_bot", can_view: false, can_edit: false },
+      { section_key: "asistente_telefonico", can_view: true, can_edit: false },
+      { section_key: "usuarios", can_view: false, can_edit: false },
+      { section_key: "espacios", can_view: true, can_edit: true },
+    ];
+
+    await act(() => result.current.setAllPermissions(USUARIO, conAjenas, COMO_SUPER_ADMIN));
+
+    expect(NO_GESTIONADAS.map((clave) => enBd(clave))).toEqual(antes);
+    expect(enBd("espacios")).toBeUndefined();
+    const ajenas = [...NO_GESTIONADAS, "espacios"];
+    for (const op of doble.escriturasEn("user_permissions")) {
+      for (const f of op.payload ?? []) expect(ajenas).not.toContain(f.section_key);
+      for (const [, columna, valor] of op.filtros) {
+        if (columna === "section_key") for (const clave of valor as string[]) expect(ajenas).not.toContain(clave);
+      }
+    }
+  });
+});
+
+// Un DELETE que la RLS no deja hacer NO da error: borra 0 filas. Antes eso salía como «Permisos
+// actualizados» y el diálogo se cerraba con los permisos intactos (2026-10-01, revisión).
+describe("useUsersManagement · setAllPermissions no da por quitado lo que sigue ahí", () => {
+  beforeEach(() => sembrar(GUARDADAS, [DE_OTRO]));
+
+  const lecturasDeLaLista = () => vi.mocked(supabase.functions.invoke).mock.calls.length;
+
+  it("el admin que no es super admin desmarca las 6 secciones: la RLS filtra el DELETE (0 filas, sin error) → error, no éxito", async () => {
+    doble.bd.borradoFiltradoPorRls = true;
+    const antes = doble.filasDe("user_permissions", USUARIO);
+    const { result } = await montarHook();
+    const lecturasAntes = lecturasDeLaLista();
+    const todoDesmarcado = permisosParaEditar(GUARDADAS).map((p) => ({ ...p, can_view: false, can_edit: false }));
+
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, todoDesmarcado, SIN_CONCEDER_EDICION);
+    });
+
+    expect(ok).toBe(false);
+    expect(doble.escriturasEn("user_permissions").map((o) => o.tipo)).toEqual(["delete"]); // nada marcado: no hay upsert
+    expect(doble.filasDe("user_permissions", USUARIO)).toEqual(antes); // sigue con «Ver» y «Puede editar»
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no se han podido quitar algunos permisos/i),
+      expect.objectContaining({ description: expect.stringMatching(/Dashboard.*Reservas.*Facturas/) }),
+    );
+    await waitFor(() => expect(lecturasDeLaLista()).toBeGreaterThan(lecturasAntes));
+  });
+
+  it("sin poder conceder edición (p. ej. si falló la consulta a super_admins), quitar «Ver» de una sección con edición no la quita y lo dice", async () => {
+    const { result } = await montarHook();
+    const sinVerReservas = permisosParaEditar(GUARDADAS).map((p) =>
+      p.section_key === "reservas" ? { ...p, can_view: false, can_edit: false } : p,
     );
 
-    expect(bd.borrados).toEqual([{ tabla: "user_permissions", filtro: [["user_id", USUARIO]] }]);
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.setAllPermissions(USUARIO, sinVerReservas, SIN_CONCEDER_EDICION);
+    });
+
+    expect(ok).toBe(false);
+    expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringMatching(/no se han podido quitar algunos permisos/i),
+      expect.objectContaining({ description: "Siguen activos: Reservas." }),
+    );
   });
 });
 
 describe("useUsersManagement · updateUserPermission (una sola sección)", () => {
+  const upserts = () => doble.escriturasEn("user_permissions").filter((o) => o.tipo === "upsert");
+
   it("el upsert lleva el can_edit pedido, no false a pelo", async () => {
     const { result } = await montarHook();
 
     await act(() => result.current.updateUserPermission(USUARIO, "reservas", true, true));
 
-    const llamadas = bd.upserts.filter((u) => u.tabla === "user_permissions");
+    const llamadas = upserts();
     expect(llamadas).toHaveLength(1);
-    expect(llamadas[0].payload).toMatchObject({
+    expect(llamadas[0].payload![0]).toMatchObject({
       user_id: USUARIO,
       section_key: "reservas",
       can_view: true,
@@ -208,7 +437,7 @@ describe("useUsersManagement · updateUserPermission (una sola sección)", () =>
 
     await act(() => result.current.updateUserPermission(USUARIO, "reservas", true, false));
 
-    expect(bd.upserts[0].payload).toMatchObject({ section_key: "reservas", can_view: true, can_edit: false });
+    expect(upserts()[0].payload![0]).toMatchObject({ section_key: "reservas", can_view: true, can_edit: false });
   });
 });
 
@@ -220,7 +449,7 @@ describe("useUsersManagement · usuario nuevo (assignRoleToNewUser)", () => {
       await result.current.assignRoleToNewUser("u-nuevo", "staff");
     });
 
-    const llamada = bd.upserts.find((u) => u.tabla === "user_permissions")!;
+    const llamada = doble.escriturasEn("user_permissions").find((o) => o.tipo === "upsert")!;
     const filas = llamada.payload as Fila[];
     expect(filas.length).toBeGreaterThan(0);
     expect(filas.every((f) => f.can_edit === false)).toBe(true);
