@@ -35,6 +35,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { format, startOfMonth } from "date-fns";
+import { es } from "date-fns/locale";
 
 // ─── Doble en memoria del cliente de Supabase ────────────────────────────────
 //
@@ -258,8 +259,14 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
       await screen.findByRole("button", { name: "Abrir el plano de Comedor" }),
     ).toBeInTheDocument();
     expect(tarjetaSala("Salón")).toBeInTheDocument();
-    // Y la cabecera del panel lleva escrito el día que se está mirando.
-    expect(screen.getByText(new RegExp(`${HOY.getDate()} de `, "i"))).toBeInTheDocument();
+    // Y la cabecera del panel lleva escrito el día que se está mirando. Se busca
+    // por ROL y NOMBRE COMPLETO (el <h4>, «viernes, 2 de octubre») y no con un
+    // «N de » suelto sobre el texto de la pantalla: ese patrón también casa con
+    // el resumen «2 de 5 con mesa» cuando hoy es día 2, y el test pasaba o
+    // fallaba según el día del mes en que se ejecutara.
+    expect(
+      screen.getByRole("heading", { name: format(HOY, "EEEE, d 'de' MMMM", { locale: es }) }),
+    ).toBeInTheDocument();
   });
 
   it("marca la casilla de hoy como seleccionada en la cuadrícula", async () => {
