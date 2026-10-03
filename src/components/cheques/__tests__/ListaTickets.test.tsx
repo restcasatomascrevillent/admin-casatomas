@@ -9,7 +9,7 @@ describe("Listado de tickets", () => {
     rpc.mockResolvedValue({ data: { total: 100, expedidos: 90, canjeados: 12, coincidencias: 100, importe_pagado: 1000, tickets: [{ id: "1", codigo: "CT-ABC", creado_en: null, comprador_nombre: "Ana", importe_eur: 100, estado: "pagado", usado: true }] }, error: null });
     render(<ListaTickets />);
     const codigo = await screen.findByText("CT-ABC");
-    expect(codigo.closest("tr")).toHaveClass("bg-emerald-50");
+    expect(codigo.closest("tr")).toHaveClass("bg-red-50");
     expect(screen.getByText("Tickets canjeados").parentElement).toHaveTextContent("12");
     expect(screen.getByText("Tickets expedidos").parentElement).toHaveTextContent("90");
     fireEvent.change(screen.getByLabelText("Buscar tickets por código o comprador"), { target: { value: " Ana " } });
