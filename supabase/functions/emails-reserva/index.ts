@@ -157,6 +157,9 @@ import {
   esperar,
 } from "./resend-lote.ts";
 import { instanteMadridAFechaUtc, hoyEnMadridIso, ahoraIso } from "./tiempo.ts";
+// Doble opt-in del newsletter (migración 20261003184500): el clic del cliente
+// que ACEPTA desde el correo marca reservas.email_verificado_at.
+import { registrarEmailVerificado, type ClienteVerificacion } from "../_shared/verificacion-email.ts";
 import {
   datosEjemploParaTipo,
   validarPlantillaBorrador,
@@ -1798,6 +1801,14 @@ async function ejecutarContraoferta(ctx: Extract<ContextoEnlace, { tipo: "contra
     return respuestaEnlace(ctx, estado === "pendiente" ? "error" : estado, detalles);
   }
 
+  // Doble opt-in del newsletter: «Confirmo» desde el correo demuestra que el
+  // cliente controla ese buzón (rechazar no: puede ser alguien diciendo «no
+  // es mía»). Antes del correo de confirmación (ver _shared/verificacion-email.ts).
+  // Nunca lanza: si falla, la reserva ya está confirmada y solo se pierde el alta.
+  if (accion === "aceptar") {
+    await registrarEmailVerificado(supabase as unknown as ClienteVerificacion, reserva.id, new Date().toISOString(), "emails-reserva");
+  }
+
   // Correo de confirmación / aviso de rechazo, best-effort: el cambio de
   // estado ya está hecho aunque el envío falle (entra en los reintentos).
   try {
@@ -1853,6 +1864,10 @@ async function ejecutarPropuesta(ctx: Extract<ContextoEnlace, { tipo: "propuesta
   // pendiente por lista negra -> 'solicitud_recibida'). Best-effort: la
   // reserva ya existe aunque el correo falle (entra en los reintentos).
   if (res?.ok && res.reserva_id && !res.ya_aceptada) {
+    // Aceptar desde el correo = email verificado (doble opt-in). La reserva
+    // hereda la casilla del newsletter de la solicitud en la BD (trigger
+    // reservas_proteger_consentimiento_newsletter); esto dispara el alta.
+    await registrarEmailVerificado(supabase as unknown as ClienteVerificacion, res.reserva_id, new Date().toISOString(), "emails-reserva");
     try {
       await enviarCorreoParaReserva(res.reserva_id);
     } catch (err) {

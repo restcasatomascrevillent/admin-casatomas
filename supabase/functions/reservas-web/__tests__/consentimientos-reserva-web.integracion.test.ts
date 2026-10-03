@@ -60,6 +60,8 @@ const ENV: Record<string, string | undefined> = {
   RESEND_API_KEY: "re_falsa",
   RESEND_FROM_EMAIL: "Casa Tomás <reservas@correo.test>",
   // Sin RESERVAS_WEB_CONDICIONES_OBLIGATORIAS: como quedará en producción (se exige).
+  // Para firmar a mano un enlace antiguo de /confirmar (doble opt-in, abajo).
+  RESERVAS_WEB_TOKEN_SECRET: "secreto-tokens-web",
 };
 
 const URL_FUNCION = "https://proyecto.supabase.co/functions/v1/reservas-web";
@@ -541,5 +543,108 @@ describe("lo que NO debe cambiar con las casillas", () => {
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ ok: false, error: "invalid_json" });
     expect(db.accesos).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Doble opt-in del newsletter (migración 20261003184500)
+// ============================================================================
+
+describe("solicitudes pendientes: la casilla del newsletter ya no se pierde", () => {
+  it("grupo grande con la casilla: la solicitud guarda consentimiento_newsletter y condiciones_aceptadas_at", async () => {
+    const r = await crear(reserva({ numero_comensales: 15, consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(422);
+    expect(r.cuerpo.motivo).toBe("grupo_grande");
+    expect(db.tabla("reservas")).toHaveLength(0);
+    expect(db.tabla("solicitudes_pendientes")).toEqual([
+      expect.objectContaining({
+        email: "ana@correo.test",
+        motivo_rechazo: "grupo_grande",
+        consentimiento_newsletter: true,
+        condiciones_aceptadas_at: AHORA.toISOString(),
+      }),
+    ]);
+  });
+
+  it("sin la casilla del newsletter: la solicitud guarda false", async () => {
+    const r = await crear(reserva({ numero_comensales: 15 }));
+
+    expect(r.status).toBe(422);
+    expect(db.tabla("solicitudes_pendientes")).toEqual([
+      expect.objectContaining({ consentimiento_newsletter: false, condiciones_aceptadas_at: AHORA.toISOString() }),
+    ]);
+  });
+
+  it("para hoy (reserva_hoy) también la guarda", async () => {
+    const r = await crear(reserva({ fecha: "2026-10-01", hora: "21:00", consentimiento_newsletter: true }));
+
+    expect(r.cuerpo.motivo).toBe("reserva_hoy");
+    expect(db.tabla("solicitudes_pendientes")).toEqual([expect.objectContaining({ consentimiento_newsletter: true })]);
+  });
+
+  it("función desplegada antes que la migración: la solicitud se guarda igual, sin las casillas", async () => {
+    db.columnasInexistentes.solicitudes_pendientes = ["consentimiento_newsletter", "condiciones_aceptadas_at"];
+
+    const r = await crear(reserva({ numero_comensales: 15, consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(422);
+    expect(db.tabla("solicitudes_pendientes")).toHaveLength(1);
+    const fila = db.tabla("solicitudes_pendientes")[0];
+    expect(fila).not.toHaveProperty("consentimiento_newsletter");
+    expect(fila).not.toHaveProperty("condiciones_aceptadas_at");
+    expect(fila).toMatchObject({ motivo_rechazo: "grupo_grande", email: "ana@correo.test" });
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("20261003184500"));
+  });
+
+  it("crear la reserva con la casilla NO la da por verificada (el alta espera al clic del correo)", async () => {
+    const r = await crear(reserva({ consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")[0]).not.toHaveProperty("email_verificado_at");
+  });
+});
+
+describe("GET /confirmar (enlaces antiguos): el clic del cliente verifica el email", () => {
+  function b64url(bytes: Uint8Array): string {
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function tokenConfirmar(id: string, fp: string): Promise<string> {
+    const carga = b64url(new TextEncoder().encode(JSON.stringify({ id, action: "confirmar", exp: Math.floor(AHORA.getTime() / 1000) + 3600, fp })));
+    const clave = await crypto.subtle.importKey("raw", new TextEncoder().encode("secreto-tokens-web"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const firma = new Uint8Array(await crypto.subtle.sign("HMAC", clave, new TextEncoder().encode(carga)));
+    return `${carga}.${b64url(firma)}`;
+  }
+  async function confirmar(token: string) {
+    const h = estadoPrueba().handler;
+    if (!h) throw new Error("index.ts no ha registrado su handler");
+    return h(new Request(`${URL_FUNCION}/confirmar?token=${encodeURIComponent(token)}`, { method: "GET" }));
+  }
+  const ACTUALIZADA = "2026-09-30T10:00:00.000Z";
+
+  it("verificada -> confirmada y email_verificado_at = ahora", async () => {
+    db.tabla("reservas").push({
+      id: "res-web-1", nombre: "Ana", email: "ana@correo.test", fecha: FECHA, hora: "14:00", numero_comensales: 2,
+      estado: "verificada", updated_at: ACTUALIZADA, consentimiento_newsletter: true, marca: "casa_tomas",
+    });
+
+    const res = await confirmar(await tokenConfirmar("res-web-1", `verificada|${ACTUALIZADA}`));
+
+    expect(res.status).toBe(200);
+    expect(db.tabla("reservas")[0]).toMatchObject({ estado: "confirmada", email_verificado_at: AHORA.toISOString() });
+  });
+
+  it("token inválido: ni se confirma ni se verifica", async () => {
+    db.tabla("reservas").push({
+      id: "res-web-2", nombre: "Ana", email: "ana@correo.test", fecha: FECHA, hora: "14:00", numero_comensales: 2,
+      estado: "verificada", updated_at: ACTUALIZADA, consentimiento_newsletter: true, marca: "casa_tomas",
+    });
+
+    await confirmar(await tokenConfirmar("res-web-2", "verificada|otra-fecha"));
+
+    expect(db.tabla("reservas")[0]).toMatchObject({ estado: "verificada" });
+    expect(db.tabla("reservas")[0]).not.toHaveProperty("email_verificado_at");
   });
 });

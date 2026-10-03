@@ -51,9 +51,11 @@
 //   acepta_condiciones        boolean, obligatoria (=== true) -> si no, 400
 //                             `condiciones_no_aceptadas`
 //   consentimiento_newsletter boolean, opcional (=== true) -> se guarda en
-//                             `reservas.consentimiento_newsletter`; el trigger
-//                             `agregar_suscriptor_al_reservar_consentida` da
-//                             de alta el email en el newsletter
+//                             `reservas.consentimiento_newsletter` (o en la
+//                             solicitud pendiente si no se puede crear). Doble
+//                             opt-in (20261003184500): el alta en el newsletter
+//                             llega cuando el cliente pulsa «Confirmo» en el
+//                             correo (reservas.email_verificado_at), no aquí
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -105,6 +107,8 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
+// Doble opt-in del newsletter (migración 20261003184500): ver handleConfirmar.
+import { registrarEmailVerificado, type ClienteVerificacion } from "../_shared/verificacion-email.ts";
 
 // Reglas de sala del alta (reservas-sin-salas) y el rechazo de Touza (no admite
 // reservas, 2026-10-01): módulo puro, testeado con vitest.
@@ -117,6 +121,9 @@ import {
   condicionesObligatorias,
   rechazoCondicionesNoAceptadas,
   esColumnaInexistente,
+  camposConsentimientoSolicitud,
+  faltaColumnaConsentimientoSolicitud,
+  type ConsentimientosReserva,
 } from "./reglas.ts";
 
 // ------------------------------------------------------------
@@ -286,10 +293,13 @@ interface SolicitudPendienteInput {
   /** Negocio de la solicitud (columna de 20260930100000). Se guarda: ya no
    * se deduce de la sala, que en Casa Tomás es interna. */
   marca: Marca;
+  /** Casillas RGPD del formulario (migración 20261003184500): la del
+   * newsletter pasa a la reserva que salga de la solicitud. */
+  consentimientos?: ConsentimientosReserva;
 }
 async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Promise<void> {
   try {
-    const { error } = await supabase.from("solicitudes_pendientes").insert({
+    const fila: Record<string, unknown> = {
       nombre: input.nombre || null,
       telefono: input.telefono || null,
       email: input.email || null,
@@ -301,7 +311,16 @@ async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Prom
       descripcion_rechazo: input.descripcion || null,
       estado: "pendiente",
       marca: input.marca,
-    });
+      ...camposConsentimientoSolicitud(input.consentimientos, new Date().toISOString()),
+    };
+    let { error } = await supabase.from("solicitudes_pendientes").insert(fila);
+    // Función desplegada antes que la migración 20261003184500: la solicitud
+    // se guarda igual, sin las casillas (se pierden, como antes).
+    if (error && faltaColumnaConsentimientoSolicitud(error)) {
+      console.error("[SOLICITUD] Faltan las columnas de consentimiento en solicitudes_pendientes (¿migración 20261003184500 sin aplicar?). Se guarda sin ellas.");
+      const { consentimiento_newsletter: _c, condiciones_aceptadas_at: _a, ...sinConsentimiento } = fila;
+      ({ error } = await supabase.from("solicitudes_pendientes").insert(sinConsentimiento));
+    }
     if (error) console.error("[SOLICITUD] Error al registrar:", error.message);
   } catch (err) {
     console.error("[SOLICITUD] Error inesperado:", (err as Error)?.message || err);
@@ -1173,7 +1192,7 @@ async function handleCrear(req: Request): Promise<Response> {
   if (config.telefono_obligatorio && !telefono) return json({ ok: false, error: "telefono_requerido" }, 400);
   if (config.email_obligatorio && !email) return json({ ok: false, error: "email_requerido" }, 400);
 
-  const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas, marca: marcaTemprana };
+  const datosSolicitud = { nombre, telefono, email, fecha, hora, comensales: partySize, notas, marca: marcaTemprana, consentimientos };
   // B-3: antes esto devolvía SIEMPRE HTTP 200. El frontend solo mira
   // `response.ok` y nunca lee el cuerpo, así que un cliente RECHAZADO veía
   // el diálogo de "¡Reserva confirmada!" a la vez que recibía el email de
@@ -1558,6 +1577,9 @@ async function handleConfirmar(req: Request): Promise<Response> {
     console.error("[CONFIRMAR] Error actualizando:", error.message);
     return html(pageTokenInvalido());
   }
+  // El cliente ha pulsado el enlace de SU correo: email verificado (doble
+  // opt-in del newsletter, ver _shared/verificacion-email.ts). Nunca lanza.
+  await registrarEmailVerificado(supabase as unknown as ClienteVerificacion, reserva.id, new Date().toISOString(), "CONFIRMAR");
   return html(pageReservaConfirmada(reserva.nombre || "", reserva.fecha, reserva.hora, reserva.numero_comensales));
 }
 

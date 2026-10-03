@@ -113,9 +113,13 @@ export function rechazoTouzaSinReservas(marca: Marca): RechazoTouzaSinReservas |
 //     privacidad y condiciones de la reserva). Sin ella no se crea nada.
 //   · `consentimiento_newsletter` — casilla OPCIONAL (desmarcada por defecto)
 //     para recibir el newsletter. Se guarda en
-//     `reservas.consentimiento_newsletter` y, si es true, el trigger
-//     `agregar_suscriptor_al_reservar_consentida` da de alta (o reactiva) el
-//     email en `newsletter_suscriptores` con `origen_alta = 'reserva_web'`.
+//     `reservas.consentimiento_newsletter` (o en
+//     `solicitudes_pendientes.consentimiento_newsletter` si la reserva no se
+//     puede crear y queda como solicitud). DOBLE OPT-IN (migración
+//     20261003184500): el alta NO es inmediata; el trigger
+//     `newsletter_alta_reserva_verificada_upd` da de alta (o reactiva) el
+//     email cuando el cliente pulsa «Confirmo» en el correo de la propuesta
+//     (`reservas.email_verificado_at`, ver _shared/verificacion-email.ts).
 //
 // SOLO `=== true` cuenta como sí. "true", 1, "on", null o la ausencia del
 // campo son NO: el consentimiento tiene que ser una acción afirmativa e
@@ -195,4 +199,35 @@ export function esColumnaInexistente(
   const mensaje = error.message ?? "";
   if (!mensaje.includes(`'${columna}'`)) return false;
   return error.code === "PGRST204" || /could not find .* column/i.test(mensaje);
+}
+
+// ============================================================================
+// CONSENTIMIENTOS EN solicitudes_pendientes (migración 20261003184500)
+// ============================================================================
+// Cuando /crear no puede crear la reserva (grupo grande, sin aforo, para hoy,
+// corte horario, límites...) la deja en `solicitudes_pendientes`. Antes la
+// casilla del newsletter se perdía ahí; ahora se guarda con la solicitud y la
+// BD la copia a la reserva que salga de ella (mismo email). El alta sigue
+// esperando a que el cliente verifique el email desde el correo.
+// ============================================================================
+
+/** Columnas de la solicitud que solo existen con la migración 20261003184500. */
+export const COLUMNAS_CONSENTIMIENTO_SOLICITUD = ["consentimiento_newsletter", "condiciones_aceptadas_at"] as const;
+
+/** Lo que se guarda en la solicitud. Mismo criterio que en la reserva. */
+export function camposConsentimientoSolicitud(
+  consentimientos: ConsentimientosReserva | null | undefined,
+  ahoraIso: string,
+): { consentimiento_newsletter: boolean; condiciones_aceptadas_at: string | null } {
+  return {
+    consentimiento_newsletter: consentimientos?.consentimientoNewsletter === true,
+    condiciones_aceptadas_at: consentimientos?.aceptaCondiciones === true ? ahoraIso : null,
+  };
+}
+
+/** ¿El error de PostgREST es por una de esas columnas (migración sin aplicar)? */
+export function faltaColumnaConsentimientoSolicitud(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): boolean {
+  return COLUMNAS_CONSENTIMIENTO_SOLICITUD.some((c) => esColumnaInexistente(error, c));
 }

@@ -11,6 +11,7 @@ import {
   ORIGEN_RESEND_WEBHOOK,
   type EstadoEntrega,
 } from "./eventos.ts";
+import { decidirBajaNewsletter, idArchivoEvento, destinatarioArchivo, type DecisionBajaNewsletter } from "./newsletter.ts";
 
 // ============================================================================
 // RESEND-WEBHOOK — recibe los eventos asíncronos de Resend (delivered,
@@ -81,9 +82,15 @@ interface ResendWebhookEvent {
   type: string;
   created_at: string;
   data: {
-    email_id: string;
-    from: string;
-    to: string[];
+    // email_id/from/to solo vienen en los eventos email.*; los contact.*
+    // traen id/email/unsubscribed (ver newsletter.ts).
+    email_id?: string;
+    from?: string;
+    to?: string[];
+    id?: string;
+    email?: string;
+    unsubscribed?: boolean;
+    tags?: unknown;
     subject?: string;
     created_at?: string;
     click?: {
@@ -202,9 +209,9 @@ serve(async (req: Request): Promise<Response> => {
     const { data, error } = await supabase
       .from("email_eventos")
       .insert({
-        email_id: event.data.email_id,
+        email_id: idArchivoEvento(event),
         tipo_evento: tipoEvento,
-        email_destinatario: event.data.to?.[0] || null,
+        email_destinatario: destinatarioArchivo(event),
         timestamp_evento: event.created_at,
         metadata: metadata,
       })
@@ -243,9 +250,26 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // ------------------------------------------------------------------
+    // BAJA AUTOMÁTICA DEL NEWSLETTER (2026-10-03, ver newsletter.ts): queja
+    // de spam, rebote permanente, supresión de Resend o baja en la página de
+    // Resend -> newsletter_suscriptores.activo = false con fecha y origen.
+    // Best-effort como lo de arriba: nunca cambia la respuesta 200.
+    // ------------------------------------------------------------------
+    let bajaNewsletter = 0;
+    const decisionBaja = decidirBajaNewsletter(event);
+    if (decisionBaja) {
+      try {
+        bajaNewsletter = await darDeBajaNewsletter(supabase, decisionBaja);
+      } catch (err) {
+        console.error("[resend-webhook] Error dando de baja del newsletter (evento ya archivado):", err instanceof Error ? err.message : err);
+      }
+    }
+
     return jsonResponse({
       success: true,
       event_id: data.id,
+      baja_newsletter: bajaNewsletter,
       tipo: tipoEvento,
       estado_entrega: estadoEntrega,
       envio_enlazado: envioEnlazado,
@@ -415,4 +439,40 @@ async function actuarSobreEnvio(
   }
 
   return { envioEnlazado: true, avisoCreado: true };
+}
+
+// ==============================================================================
+// BAJA DEL NEWSLETTER — RPC newsletter_registrar_baja (migración
+// 20261003171500: compara el email sin mayúsculas y solo toca filas activas).
+// Si la migración aún no está aplicada, cae a un UPDATE directo (por id si el
+// correo traía la etiqueta `suscriptor`, si no por email exacto) — puede que
+// el CHECK de origen_baja todavía no acepte el valor nuevo y falle: se queda en
+// el log y el evento archivado, igual que el resto de este webhook.
+// ==============================================================================
+
+async function darDeBajaNewsletter(supabase: SupabaseClient, d: DecisionBajaNewsletter): Promise<number> {
+  const { data: filas, error } = await supabase.rpc("newsletter_registrar_baja", {
+    p_email: d.email,
+    p_origen: d.origen,
+    p_suscriptor_id: d.suscriptorId,
+  });
+  if (!error) {
+    const n = typeof filas === "number" ? filas : 0;
+    if (n > 0) console.log(`[resend-webhook] Newsletter: ${n} suscriptor(es) dado(s) de baja (origen=${d.origen}).`);
+    return n;
+  }
+
+  console.error("[resend-webhook] RPC newsletter_registrar_baja no disponible (¿migración 20261003171500 sin aplicar?):", error.message);
+  const ahora = new Date().toISOString();
+  let consulta = supabase
+    .from("newsletter_suscriptores")
+    .update({ activo: false, fecha_baja: ahora, origen_baja: d.origen })
+    .eq("activo", true);
+  consulta = d.suscriptorId ? consulta.eq("id", d.suscriptorId) : consulta.eq("email", d.email);
+  const { data: actualizadas, error: errUpdate } = await consulta.select("id");
+  if (errUpdate) {
+    console.error("[resend-webhook] No se pudo dar de baja del newsletter:", errUpdate.message);
+    return 0;
+  }
+  return actualizadas?.length ?? 0;
 }

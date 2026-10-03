@@ -31,6 +31,8 @@ export class BaseFalsa {
   migracionAplicada = true;
   /** INSERT/UPDATE rechazados por el índice único (para saber que saltó el 23505 y no la comprobación previa). */
   rechazos23505 = 0;
+  /** true = como producción ANTES de 20261003184500 (sin reservas.email_verificado_at). */
+  sinColumnaVerificacion = false;
 
   tabla(nombre: string): Fila[] {
     return (this.tablas[nombre] ??= []);
@@ -57,6 +59,10 @@ export class BaseFalsa {
   }
 
   validar(nombre: string, fila: Fila, idPropio?: unknown): ErrorPg | null {
+    // Como producción ANTES de 20261003184500: no existe reservas.email_verificado_at.
+    if (nombre === "reservas" && this.sinColumnaVerificacion && "email_verificado_at" in fila) {
+      return { code: "PGRST204", message: "Could not find the 'email_verificado_at' column of 'reservas' in the schema cache" };
+    }
     if (nombre !== "envios_email_reserva") return null;
     if (!this.migracionAplicada && ("clave_aviso" in fila || "detalle" in fila)) {
       return { code: "PGRST204", message: "Could not find the 'clave_aviso' column of 'envios_email_reserva'" };
@@ -129,6 +135,11 @@ export class ConsultaFalsa implements PromiseLike<Resultado> {
   }
   neq(c: string, v: unknown) {
     this.filtros.push((f) => f[c] !== v);
+    return this;
+  }
+  /** Solo `.is(col, null)` (lo único que usa _shared/verificacion-email.ts). */
+  is(c: string, v: null) {
+    this.filtros.push((f) => (v === null ? f[c] == null : f[c] === v));
     return this;
   }
   in(c: string, vs: unknown[]) {

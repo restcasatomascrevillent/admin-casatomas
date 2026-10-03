@@ -2249,9 +2249,12 @@ export type Database = {
           id: string
           nombre: string | null
           origen_alta: string | null
+          /** CHECK: enlace_email | cabecera_one_click | panel_manual y, con 20261003171500 aplicada, queja_spam | rebote_permanente | suprimido_resend | resend_baja_nativa (ver src/lib/newsletter/bajas.ts). */
           origen_baja: string | null
           /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
           reserva_consentimiento_id: string | null
+          /** Solo existe si 20261003184500 está aplicada: cuándo verificó el email (doble opt-in). */
+          fecha_verificacion_email: string | null
           updated_at: string
         }
         Insert: {
@@ -2265,6 +2268,7 @@ export type Database = {
           origen_alta?: string | null
           origen_baja?: string | null
           reserva_consentimiento_id?: string | null
+          fecha_verificacion_email?: string | null
           updated_at?: string
         }
         Update: {
@@ -2278,6 +2282,7 @@ export type Database = {
           origen_alta?: string | null
           origen_baja?: string | null
           reserva_consentimiento_id?: string | null
+          fecha_verificacion_email?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3183,6 +3188,9 @@ export type Database = {
           solicitud_id: string | null
           /** Solo existe si 20260926150000_modo_servicio_config_y_salida.sql está aplicada. */
           salida_at: string | null
+          /** Doble opt-in del newsletter: solo existen si 20261003184500_newsletter_doble_optin_y_email_normalizado.sql está aplicada. Las escribe la BD/Edge Functions; el panel no puede cambiarlas. */
+          email_verificado_at: string | null
+          consentimiento_newsletter_at: string | null
         }
         Insert: {
           canal?: string | null
@@ -3204,6 +3212,8 @@ export type Database = {
           updated_at?: string | null
           solicitud_id?: string | null
           salida_at?: string | null
+          email_verificado_at?: string | null
+          consentimiento_newsletter_at?: string | null
         }
         Update: {
           canal?: string | null
@@ -3225,6 +3235,8 @@ export type Database = {
           updated_at?: string | null
           solicitud_id?: string | null
           salida_at?: string | null
+          email_verificado_at?: string | null
+          consentimiento_newsletter_at?: string | null
         }
         Relationships: [
           {
@@ -3353,6 +3365,9 @@ export type Database = {
           propuesta_respondida_at: string | null
           propuesta_respuesta_via: string | null
           reserva_id: string | null
+          /** Solo existen si 20261003184500 está aplicada (casillas del formulario web; las escribe reservas-web). */
+          consentimiento_newsletter: boolean
+          condiciones_aceptadas_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -3377,6 +3392,8 @@ export type Database = {
           propuesta_respondida_at?: string | null
           propuesta_respuesta_via?: string | null
           reserva_id?: string | null
+          consentimiento_newsletter?: boolean
+          condiciones_aceptadas_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -3401,6 +3418,8 @@ export type Database = {
           propuesta_respondida_at?: string | null
           propuesta_respuesta_via?: string | null
           reserva_id?: string | null
+          consentimiento_newsletter?: boolean
+          condiciones_aceptadas_at?: string | null
         }
         Relationships: []
       }
@@ -4689,6 +4708,11 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      /** Solo existe si 20261003171500_newsletter_baja_automatica.sql está aplicada. Solo service_role (resend-webhook). */
+      newsletter_registrar_baja: {
+        Args: { p_email: string; p_origen: string; p_suscriptor_id?: string | null }
+        Returns: number
+      }
       normalizar_nombre_producto: {
         Args: { p_nombre: string }
         Returns: string
