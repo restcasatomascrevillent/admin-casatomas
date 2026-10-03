@@ -11,6 +11,17 @@ import {
   limiteTransaccional,
 } from "./plantillas.ts";
 import { comprobarPermisoNewsletter, type ClientePermiso } from "./permiso.ts";
+import { enviarBroadcast, puedeEnviarBroadcast } from "./broadcast.ts";
+import { crearRegistroEnvios } from "./registro.ts";
+import {
+  canalNewsletter,
+  limiteContactos,
+  remitenteNewsletter,
+  NOMBRE_SEGMENTO_NEWSLETTER,
+} from "../_shared/resend-marketing/config.ts";
+import { ClienteResendMarketing } from "../_shared/resend-marketing/cliente.ts";
+import { RepositorioNewsletterResend } from "../_shared/resend-marketing/repositorio.ts";
+import { sincronizarConCerrojo } from "../_shared/resend-marketing/servicio.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +36,18 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 // NEWSLETTER_FROM_EMAIL (remitente propio para marketing, si se configura) ->
 // RESEND_FROM_EMAIL (el de los correos de reserva, dominio ya verificado) ->
 // sandbox como último recurso.
-const NEWSLETTER_FROM =
-  Deno.env.get("NEWSLETTER_FROM_EMAIL") || Deno.env.get("RESEND_FROM_EMAIL") || "Casa Tomás <onboarding@resend.dev>";
+const NEWSLETTER_FROM = remitenteNewsletter(Deno.env.get("NEWSLETTER_FROM_EMAIL"), Deno.env.get("RESEND_FROM_EMAIL"));
+
+// Canal (fase 2, docs/funcionalidades/newsletter-resend-marketing.md):
+//   NEWSLETTER_CANAL=broadcast     -> un Broadcast de Resend Marketing al Segment
+//                                    del newsletter (cuenta contactos, no correos).
+//   cualquier otro valor / sin él  -> el envío transaccional de siempre (por
+//                                    defecto: desplegar no cambia nada).
+const NEWSLETTER_CANAL = canalNewsletter(Deno.env.get("NEWSLETTER_CANAL"));
+
+// Tiempo que se deja a la sincronización previa al Broadcast (la función tiene
+// ~150 s de reloj; el resto es para crear y enviar el Broadcast).
+const MS_SYNC_ANTES_DE_ENVIAR = 90_000;
 
 // ============================================================================
 // Firma HMAC para los enlaces de baja (RGPD)
@@ -116,7 +137,13 @@ serve(async (req) => {
     const datos = validacion.datos;
 
     const supabase = createClient(supabaseUrl, serviceKey);
+    const registro = crearRegistroEnvios(supabase);
 
+    if (NEWSLETTER_CANAL === "broadcast") {
+      return await enviarPorBroadcast(supabase, registro, datos, user.id);
+    }
+
+    // ---------------- Canal transaccional (el de siempre) ----------------
     // Solo activos: un dado de baja NUNCA recibe envíos.
     const { data: activos, error: dbError } = await supabase
       .from("newsletter_suscriptores")
@@ -151,7 +178,7 @@ serve(async (req) => {
     if (limite !== null && suscriptores.length > limite) {
       return json({
         success: false,
-        error: `Hay ${suscriptores.length} suscriptores y el envío directo está limitado a ${limite} para no agotar la cuota diaria de correos de Resend que comparten las reservas. Hay que enviar este newsletter como Broadcast de Resend Marketing (pendiente de conectar) o, si el plan de Resend es de pago, subir NEWSLETTER_LIMITE_TRANSACCIONAL.`,
+        error: `Hay ${suscriptores.length} suscriptores y el envío directo está limitado a ${limite} para no agotar la cuota diaria de correos de Resend que comparten las reservas. Hay que enviarlo como Broadcast de Resend Marketing (secret NEWSLETTER_CANAL=broadcast, ver docs/funcionalidades/newsletter-resend-marketing.md) o, si el plan de Resend es de pago, subir NEWSLETTER_LIMITE_TRANSACCIONAL.`,
       }, 409);
     }
 
@@ -225,23 +252,16 @@ serve(async (req) => {
 
     console.log(`Newsletter sent: ${exitosos} success, ${fallidos} failed`);
 
-    // Historial del envío (un fallo aquí no tumba la respuesta).
-    try {
-      const estado = fallidos === 0 ? 'completado' : (exitosos === 0 ? 'fallido' : 'parcial');
-      const { error: envioError } = await supabase.from('newsletter_envios').insert({
-        asunto: subject,
-        mensaje: datos.mensaje,
-        total_destinatarios: suscriptores.length,
-        enviado_por: user.id,
-        tipo_newsletter: datos.tipo,
-        estado,
-      });
-      if (envioError) {
-        console.error('No se pudo registrar el envío en newsletter_envios:', envioError);
-      }
-    } catch (logError) {
-      console.error('Error registrando historial de newsletter_envios:', logError);
-    }
+    // Historial del envío (un fallo aquí no tumba la respuesta; ver registro.ts).
+    await registro.insertar({
+      asunto: subject,
+      mensaje: datos.mensaje,
+      total_destinatarios: suscriptores.length,
+      enviado_por: user.id,
+      tipo_newsletter: datos.tipo,
+      estado: fallidos === 0 ? 'completado' : (exitosos === 0 ? 'fallido' : 'parcial'),
+      canal: 'transaccional',
+    });
 
     if (exitosos === 0) {
       return json({
@@ -256,6 +276,7 @@ serve(async (req) => {
 
     return json({
       success: true,
+      canal: 'transaccional',
       message: `Newsletter enviado a ${exitosos} suscriptores`,
       total: suscriptores.length,
       exitosos,
@@ -269,3 +290,95 @@ serve(async (req) => {
     return json({ success: false, error: errorMessage }, 500);
   }
 });
+
+// ============================================================================
+// CANAL BROADCAST (Resend Marketing) — ver broadcast.ts y
+// ../_shared/resend-marketing/{sync,servicio}.ts
+// ----------------------------------------------------------------------------
+// 1. Sincroniza la tabla con Resend DENTRO del cerrojo (bajas a Resend fuera,
+//    altas dentro del Segment, bajas hechas en la página de Resend a la tabla).
+// 2. Si la pasada deja algo que podría hacer llegar el correo a un dado de baja
+//    (puedeEnviarBroadcast), no envía nada.
+// 3. Crea el Broadcast (borrador), lo apunta en newsletter_envios y lo envía.
+// ============================================================================
+
+async function enviarPorBroadcast(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  registro: ReturnType<typeof crearRegistroEnvios>,
+  datos: Parameters<typeof enviarBroadcast>[0]["datos"],
+  usuarioId: string,
+): Promise<Response> {
+  const apiKey = Deno.env.get("RESEND_MARKETING_API_KEY");
+  if (!apiKey) {
+    console.error("enviar-newsletter: NEWSLETTER_CANAL=broadcast pero falta RESEND_MARKETING_API_KEY");
+    return json({ success: false, error: "Falta configurar RESEND_MARKETING_API_KEY (clave de Resend con Full access) para enviar como Broadcast" }, 500);
+  }
+
+  const cliente = new ClienteResendMarketing({ apiKey });
+  const repo = new RepositorioNewsletterResend(supabase);
+  const limite = limiteContactos(Deno.env.get("NEWSLETTER_LIMITE_CONTACTOS"));
+
+  const resultado = await sincronizarConCerrojo(
+    {
+      repo,
+      cliente,
+      origen: "envio",
+      usuarioId,
+      segmentIdConfigurado: Deno.env.get("RESEND_NEWSLETTER_SEGMENT_ID"),
+      nombreSegmento: NOMBRE_SEGMENTO_NEWSLETTER,
+      hastaMs: Date.now() + MS_SYNC_ANTES_DE_ENVIAR,
+    },
+    async (resumen) => {
+      const veredicto = puedeEnviarBroadcast(resumen, limite);
+      if (!veredicto.ok) return { veredicto, envio: null };
+      const envio = await enviarBroadcast({
+        cliente,
+        registro,
+        datos,
+        from: NEWSLETTER_FROM,
+        replyTo: Deno.env.get("NEWSLETTER_REPLY_TO") || null,
+        segmentId: resumen.segmentId!,
+        destinatarios: resumen.destinatarios ?? 0,
+        usuarioId,
+      });
+      return { veredicto, envio };
+    },
+  );
+
+  if (resultado.tipo === "ocupado") {
+    return json({ success: false, error: "Ahora mismo se está sincronizando con Resend (o enviando otro newsletter). Espera un minuto y vuelve a intentarlo." }, 409);
+  }
+  if (resultado.tipo === "error") {
+    console.error("enviar-newsletter: no se pudo iniciar la sincronización:", resultado.mensaje);
+    return json({ success: false, error: resultado.mensaje }, 500);
+  }
+
+  const { resumen, extra } = resultado;
+  console.log(
+    `enviar-newsletter[broadcast]: sync ${resumen.estado} (altas=${resumen.altas}, borrados=${resumen.borrados}, bajas_resend=${resumen.bajasResend}, errores=${resumen.errores.length}, pendientes=${resumen.pendientes}), usuario=${usuarioId}`,
+  );
+  if (!extra || !extra.veredicto.ok) {
+    const v = extra?.veredicto;
+    const status = v && !v.ok ? v.status : 500;
+    return json({ success: false, canal: "broadcast", error: v && !v.ok ? v.error : "No se pudo preparar el envío" }, status);
+  }
+  const envio = extra.envio!;
+  if (!envio.ok) {
+    console.error(`enviar-newsletter[broadcast]: fallo (${envio.status}) broadcast=${envio.broadcastId ?? "-"}: ${envio.error}`);
+    return json({ success: false, canal: "broadcast", error: envio.error, broadcast_id: envio.broadcastId ?? null }, envio.status);
+  }
+
+  const n = resumen.destinatarios ?? 0;
+  console.log(`enviar-newsletter[broadcast]: enviado broadcast=${envio.broadcastId} a ${n} contactos`);
+  return json({
+    success: true,
+    canal: "broadcast",
+    message: `Newsletter enviado como Broadcast de Resend a ${n} suscriptores`,
+    total: n,
+    exitosos: n,
+    fallidos: 0,
+    broadcast_id: envio.broadcastId,
+    sincronizacion: { altas: resumen.altas, borrados: resumen.borrados, bajas_resend: resumen.bajasResend, errores: resumen.errores.length },
+  });
+}
