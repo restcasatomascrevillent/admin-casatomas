@@ -203,7 +203,7 @@ export function EditorFacturacion() {
             <p className="text-xs text-muted-foreground">Cada línea corresponde al periodo indicado en su descripción. La periodicidad sirve para calcular la cuota mensual; no multiplica el importe de la factura.</p>
           </CardContent></Card>
           </>}
-          {paso === 2 && <Card><CardHeader><CardTitle className="text-base">3. Descuentos e impuestos</CardTitle></CardHeader><CardContent className="space-y-4">
+          {paso === 2 && <><Card><CardHeader><CardTitle className="text-base">3. Descuentos e impuestos</CardTitle></CardHeader><CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3"><label htmlFor="aplicar-iva" className="text-sm font-medium">Aplicar IVA</label>
               <Switch id="aplicar-iva" checked={f.aplicarIva!==false} onCheckedChange={v=>cambiar({...f,aplicarIva:v})} /></div>
             {f.aplicarIva===false && <p className="text-xs text-muted-foreground">La factura se calcula sin IVA. Los porcentajes de los conceptos se conservan si vuelves a activarlo.</p>}
@@ -218,15 +218,15 @@ export function EditorFacturacion() {
             <p className="text-sm">Descuento total: <strong>{euros(total.descuentosLineas+total.descuentoGlobal)}</strong></p>
             <Campo titulo="Retención (%)"><Input className="max-w-40" type="number" min={0} max={100} step="0.01" value={f.retencion} onChange={e => cambiar({...f,retencion:Number(e.target.value)})} /></Campo>
           </CardContent></Card>
-          }
-          {paso === 3 && <><Card><CardHeader><CardTitle className="text-base">4. Pago y observaciones</CardTitle></CardHeader><CardContent className="space-y-3">
+          <Card><CardHeader><CardTitle className="text-base">Pago y observaciones</CardTitle></CardHeader><CardContent className="space-y-3">
             <Campo titulo="Forma de pago / IBAN"><textarea className={areaClass} maxLength={500} value={f.pago} onChange={e => cambiar({...f,pago:e.target.value})} /></Campo>
             <Campo titulo="Observaciones / periodo de facturación"><textarea className={areaClass} maxLength={2000} value={f.notas} onChange={e => cambiar({...f,notas:e.target.value})} /></Campo>
           </CardContent></Card>
-        <div className="min-w-0 space-y-3">
+          </>}
+          {paso === 3 && <div className="min-w-0 space-y-3">
           <p className="text-sm font-medium">Vista previa de la hoja de factura</p><VistaFactura factura={f} />
           <p className="text-xs text-muted-foreground">El PDF usa formato A4 y añade páginas cuando sea necesario.</p>
-        </div></>}
+        </div>}
         </fieldset>
       </div>
     )}
