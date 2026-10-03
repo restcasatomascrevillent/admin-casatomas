@@ -1,0 +1,59 @@
+{
+  "_LEEME": [
+    "CONTRATO web <-> backend de POST /functions/v1/reservas-web/crear.",
+    "Este fichero existe DUPLICADO y BYTE A BYTE IGUAL en dos repos:",
+    "  - casa-tomas-story: src/__tests__/contratos/reserva-web-crear.contrato.json",
+    "    (test: src/__tests__/contrato-reserva-web.test.tsx -> el formulario ENVIA exactamente estos cuerpos)",
+    "  - adminpanelct:     supabase/functions/reservas-web/__tests__/contrato/reserva-web-crear.contrato.json",
+    "    (test: supabase/functions/reservas-web/__tests__/contrato-reserva-web.integracion.test.ts -> la funcion ACEPTA estos cuerpos)",
+    "Si cambias un nombre o un tipo, cambialo en LOS DOS ficheros y en los dos lados del codigo, y sube la version.",
+    "Comprobar que siguen iguales (desde codigo-restaurante/): diff casa-tomas-story/src/__tests__/contratos/reserva-web-crear.contrato.json adminpanelct/supabase/functions/reservas-web/__tests__/contrato/reserva-web-crear.contrato.json",
+    "fecha: el formulario la elige en el calendario; los tests comparan todo lo demas literalmente y la fecha solo por formato yyyy-MM-dd."
+  ],
+  "version": 1,
+  "endpoint": "POST /functions/v1/reservas-web/crear",
+  "tipos": {
+    "nombre": "string",
+    "telefono": "string",
+    "email": "string",
+    "fecha": "string",
+    "hora": "string",
+    "numero_comensales": "number",
+    "notas_cliente": "string",
+    "estado": "string",
+    "acepta_condiciones": "boolean",
+    "consentimiento_newsletter": "boolean"
+  },
+  "casos": {
+    "con_newsletter": {
+      "descripcion": "Las dos casillas marcadas: reserva creada, consentimiento_newsletter true y condiciones_aceptadas_at con la hora.",
+      "cuerpo": {
+        "nombre": "Marta Ruiz",
+        "telefono": "+34 612345678",
+        "email": "marta@example.com",
+        "fecha": "2026-10-15",
+        "hora": "13:00",
+        "numero_comensales": 2,
+        "notas_cliente": "",
+        "estado": "pendiente",
+        "acepta_condiciones": true,
+        "consentimiento_newsletter": true
+      }
+    },
+    "sin_newsletter": {
+      "descripcion": "Solo la casilla obligatoria: reserva creada, consentimiento_newsletter false.",
+      "cuerpo": {
+        "nombre": "Marta Ruiz",
+        "telefono": "+34 612345678",
+        "email": "marta@example.com",
+        "fecha": "2026-10-15",
+        "hora": "13:00",
+        "numero_comensales": 2,
+        "notas_cliente": "",
+        "estado": "pendiente",
+        "acepta_condiciones": true,
+        "consentimiento_newsletter": false
+      }
+    }
+  }
+}
