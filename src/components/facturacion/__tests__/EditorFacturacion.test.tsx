@@ -77,15 +77,17 @@ describe("editor simplificado",()=>{
     const documento=mock.data!.config!.documento;
     mock.data!.facturas=[{id:"emitida",numero:documento.numero,documento,creado_en:"2026-10-03",actualizado_en:"2026-10-03"}];
     mock.eliminar.mockResolvedValue({...mock.data,facturas:[]});
-    const confirmar=vi.spyOn(window,"confirm").mockReturnValue(false);
     render(<EditorFacturacion/>);
     fireEvent.mouseDown(screen.getByRole("tab",{name:"Facturas"}),{button:0,ctrlKey:false});
     fireEvent.click(screen.getByRole("button",{name:"Eliminar factura FO-2026-010"}));
     expect(mock.eliminar).not.toHaveBeenCalled();
-    confirmar.mockReturnValue(true);
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("FO-2026-010");
+    fireEvent.click(screen.getByRole("button",{name:"Cancelar"}));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Eliminar factura FO-2026-010"}));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar"}));
     await waitFor(()=>expect(mock.eliminar).toHaveBeenCalledWith(expect.objectContaining({id:"emitida"}),"emitida"));
-    confirmar.mockRestore();
+
   });
 
 });

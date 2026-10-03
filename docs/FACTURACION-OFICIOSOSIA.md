@@ -94,3 +94,5 @@ El catálogo y los conceptos no ofrecen IVA individual. El paso 3 permite activa
 ### Eliminar documentos
 
 Cada factura y borrador tiene una acción Eliminar con confirmación irreversible. La RPC comprueba acceso de superadmin y versión del documento antes de borrar. Los borradores vinculados a una factura eliminada se conservan sin vínculo y actualizan su versión. Aplicar `20261003190000_facturacion_eliminar.sql` después de las migraciones de facturación y borradores.
+
+Las confirmaciones de eliminación y descarte de cambios usan un diálogo integrado accesible, con Cancelar y acción explícita, en lugar de la confirmación nativa del navegador.

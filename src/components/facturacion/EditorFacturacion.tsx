@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { useFacturacionOficiososia, type BorradorGuardado, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 import { categorias, periodicidades, nuevaFactura, nuevaLinea, totalesFactura, erroresFactura, facturaSchema, euros, type Factura, type ParteFactura, type LineaFactura } from "./modelo";
@@ -41,6 +42,9 @@ export function EditorFacturacion() {
   const inicioEditor = useRef<HTMLDivElement>(null);
   const irPaso = (n: number) => { setPaso(n); inicioEditor.current?.scrollIntoView?.({block:"start",behavior:"smooth"}); };
   const [tab, setTab] = useState("nueva");
+  const [confirmacion,setConfirmacion] = useState<{titulo:string;descripcion:string;accion:string;destructiva:boolean;resolver:(valor:boolean)=>void}|null>(null);
+  const confirmar = (titulo:string,descripcion:string,accion:string,destructiva=true) => new Promise<boolean>(resolver=>setConfirmacion({titulo,descripcion,accion,destructiva,resolver}));
+  const cerrarConfirmacion = (valor:boolean) => {confirmacion?.resolver(valor);setConfirmacion(null);};
   const iniciado = useRef(false);
   useEffect(() => {
     if (!q.data || iniciado.current) return;
@@ -64,30 +68,30 @@ export function EditorFacturacion() {
   }, [dirty]);
   const cambiar = (next: Factura) => { setF(next); setDirty(true); setFacturaModificada(true); };
   const linea = (id: string, cambio: Partial<LineaFactura>) => cambiar({...f,lineas:f.lineas.map(l => l.id === id ? {...l,...cambio} : l)});
-  const puedeCambiar = () => !dirty || window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?");
-  const abrir = (guardada: FacturaGuardada) => {
-    if (!puedeCambiar()) return;
+  const puedeCambiar = async () => !dirty || await confirmar("Cambios sin guardar", "Hay cambios sin guardar. ¿Quieres descartarlos para continuar?", "Descartar cambios");
+  const abrir = async (guardada: FacturaGuardada) => {
+    if (!await puedeCambiar()) return;
     setBorrador(null);
     setF({...guardada.documento,ivaGlobal:guardada.documento.ivaGlobal ?? 21,catalogo:f.catalogo ?? catalogoInicial()}); setActual({id:guardada.id,version:guardada.actualizado_en});
     setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null); setDirty(false); setFacturaModificada(false);
   };
-  const abrirBorrador = (b:BorradorGuardado) => {
-    if (!puedeCambiar()) return;
+  const abrirBorrador = async (b:BorradorGuardado) => {
+    if (!await puedeCambiar()) return;
     const emitida=q.data?.facturas.find(g=>g.id===b.factura_id);
     setF({...b.documento,ivaGlobal:b.documento.ivaGlobal ?? 21,catalogo:f.catalogo ?? catalogoInicial()});
     setBorrador({id:b.id,version:b.actualizado_en,facturaId:b.factura_id});
     setActual(emitida?{id:emitida.id,version:emitida.actualizado_en}:null);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);setDirty(false);setFacturaModificada(true);setTab("nueva");setPaso(0);
   };
-  const nuevo = () => {
-    if (!puedeCambiar()) return;
+  const nuevo = async () => {
+    if (!await puedeCambiar()) return;
     setBorrador(null);
     setF(prepararNuevaFactura(f,[...(q.data?.facturas ?? []),...(q.data?.borradores ?? [])])); setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);
   };
-  const duplicar = (g:FacturaGuardada) => {
-    if (!puedeCambiar()) return;
+  const duplicar = async (g:FacturaGuardada) => {
+    if (!await puedeCambiar()) return;
     setBorrador(null);
     const base = prepararNuevaFactura(f,[...(q.data?.facturas ?? []),...(q.data?.borradores ?? [])]);
     setF({...g.documento,ivaGlobal:g.documento.ivaGlobal ?? 21,numero:base.numero,fecha:base.fecha,vencimiento:base.vencimiento,catalogo:base.catalogo,
@@ -102,7 +106,7 @@ export function EditorFacturacion() {
     finally {setBusy(false);}
   };
   const eliminar = async (g:FacturaGuardada,estado:"emitida"|"borrador") => {
-    if(!window.confirm(`¿Eliminar ${estado==="emitida"?"la factura":"el borrador"} ${g.numero || "sin número"}? Esta acción no se puede deshacer.`))return;
+    if(!await confirmar(estado==="emitida"?"Eliminar factura":"Eliminar borrador", `Vas a eliminar ${g.numero || "el documento sin número"}. Esta acción no se puede deshacer.`, "Eliminar"))return;
     setBusy(true);
     try {
       const resultado=await q.eliminar(g,estado);
@@ -142,7 +146,7 @@ export function EditorFacturacion() {
     finally { setBusy(false); }
   };
   const recargar = async () => {
-    if (!puedeCambiar()) return;
+    if (!await puedeCambiar()) return;
     const r = await q.refetch();
     if (!r.data || r.error) return;
     const documento = r.data.config ? {...r.data.config.documento,ivaGlobal:r.data.config.documento.ivaGlobal ?? 21,catalogo:r.data.config.documento.catalogo ?? catalogoInicial()} : prepararNuevaFactura(nuevaFactura(),r.data.facturas);
@@ -159,6 +163,12 @@ export function EditorFacturacion() {
   const clientes = [...(q.data?.facturas ?? [])].sort((a,b)=>b.documento.fecha.localeCompare(a.documento.fecha))
     .filter((g,i,lista)=>lista.findIndex(v=>normalizar(v.documento.cliente.nif)===normalizar(g.documento.cliente.nif))===i);
   return <div className="space-y-5">
+    <AlertDialog open={!!confirmacion} onOpenChange={abierto=>{if(!abierto)cerrarConfirmacion(false);}}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{confirmacion?.titulo}</AlertDialogTitle><AlertDialogDescription className="break-words">{confirmacion?.descripcion}</AlertDialogDescription></AlertDialogHeader>
+        <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className={confirmacion?.destructiva ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined} onClick={()=>cerrarConfirmacion(true)}>{confirmacion?.accion}</AlertDialogAction></AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold">Facturación · OficiosOsIA</h1>
         <p className="mt-1 text-sm text-muted-foreground">Instalación, licencias, módulos y soporte.</p>
