@@ -78,7 +78,7 @@ export async function crearPdfFactura(f: Factura) {
     espacio(10);
     doc.setFillColor(238, 236, 231); doc.rect(izquierda, y - 5, 178, 9, "F");
     texto("CONCEPTO", 18, y, 8, true); texto("UD.", 105, y, 8, true);
-    texto("PRECIO", 119, y, 8, true); if (f.aplicarIva!==false) texto("IVA", 151, y, 8, true);
+    texto("PRECIO", 119, y, 8, true); if (f.aplicarIva!==false && f.ivaGlobal===undefined) texto("IVA", 151, y, 8, true);
     texto("BASE", 170, y, 8, true); y += 10;
   };
   const derechaTexto = (v: string, x: number, pos: number, maxWidth: number) => {
@@ -97,7 +97,7 @@ export async function crearPdfFactura(f: Factura) {
     texto(detalle, 18, y + descripcion.length * 4.5 + 1, 7);
     derechaTexto(String(l.cantidad), 115, y, 13);
     derechaTexto(euros(l.precio), 146, y, 27);
-    if (f.aplicarIva!==false) derechaTexto(l.iva + "%", 162, y, 14);
+    if (f.aplicarIva!==false && f.ivaGlobal===undefined) derechaTexto(l.iva + "%", 162, y, 14);
     derechaTexto(euros(l.baseAntesGlobal), 192, y, 28);
     y += alto;
     doc.setDrawColor(220,220,220); doc.line(izquierda, y-4, derecha, y-4);

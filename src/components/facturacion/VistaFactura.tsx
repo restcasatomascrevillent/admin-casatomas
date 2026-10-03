@@ -27,12 +27,12 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[430px] text-left text-xs">
-            <thead className="bg-[#eeece7]"><tr>{["Concepto","Ud.","Precio",...(f.aplicarIva===false ? [] : ["IVA"]),"Base"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
+            <thead className="bg-[#eeece7]"><tr>{["Concepto","Ud.","Precio",...(f.aplicarIva===false || f.ivaGlobal!==undefined ? [] : ["IVA"]),"Base"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
             <tbody>{t.lineas.map(l => <tr key={l.id} className="border-b border-[#dedbd4] align-top">
               <td className="max-w-[210px] break-words px-2 py-3"><p className="font-medium">{l.concepto || "Concepto pendiente"}</p>
                 <p className="mt-1 text-[10px] text-[#666]">{l.categoria} · {l.periodicidad}{l.descuento > 0 ? " · Dto. " + l.descuento + "%" : ""}</p></td>
               <td className="px-2 py-3 text-right">{l.cantidad}</td><td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.precio)}</td>
-              {f.aplicarIva!==false && <td className="px-2 py-3 text-right">{l.iva}%</td>}<td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.baseAntesGlobal)}</td>
+              {f.aplicarIva!==false && f.ivaGlobal===undefined && <td className="px-2 py-3 text-right">{l.iva}%</td>}<td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.baseAntesGlobal)}</td>
             </tr>)}</tbody>
           </table>
         </div>

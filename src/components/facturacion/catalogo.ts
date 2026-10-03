@@ -10,10 +10,10 @@ export function catalogoInicial(): CatalogoFacturacion {
     ["resenas","Reseñas Google"],["trafico","Tráfico web"],["emails","Plantillas de email"],
   ];
   return {productos:[
-    {id:"instalacion",nombre:"Instalación y puesta en marcha",categoria:"Instalación",precio:0,periodicidad:"Puntual",iva:21},
-    {id:"licencia",nombre:"Licencia del panel",categoria:"Licencia",precio:0,periodicidad:"Mensual",iva:21},
-    ...modulos.map(([id,nombre]) => ({id,nombre,categoria:"Módulo" as const,precio:0,periodicidad:"Mensual" as const,iva:21})),
-    {id:"soporte",nombre:"Soporte y mantenimiento",categoria:"Soporte",precio:0,periodicidad:"Mensual",iva:21},
+    {id:"instalacion",nombre:"Instalación y puesta en marcha",categoria:"Instalación",precio:0,periodicidad:"Puntual"},
+    {id:"licencia",nombre:"Licencia del panel",categoria:"Licencia",precio:0,periodicidad:"Mensual"},
+    ...modulos.map(([id,nombre]) => ({id,nombre,categoria:"Módulo" as const,precio:0,periodicidad:"Mensual" as const})),
+    {id:"soporte",nombre:"Soporte y mantenimiento",categoria:"Soporte",precio:0,periodicidad:"Mensual"},
   ],paquetes:[
     {id:"esencial",nombre:"Panel esencial",productoIds:["licencia","web","reservas"]},
     {id:"ia",nombre:"Panel con IA",productoIds:["licencia","web","reservas","bot","facturas"]},
@@ -27,7 +27,7 @@ export function productosSeleccionados(lineas: LineaFactura[], catalogo: Catalog
 export function agregarProductos(f: Factura, catalogo: CatalogoFacturacion, ids: string[], paqueteId?: string): Factura {
   const seleccionados = productosSeleccionados(f.lineas,catalogo);
   const nuevos = catalogo.productos.filter(p => ids.includes(p.id) && !seleccionados.has(p.id)).map(p => ({
-    ...nuevaLinea(p.categoria),concepto:p.nombre,precio:p.precio,periodicidad:p.periodicidad,iva:p.iva,productoId:p.id,
+    ...nuevaLinea(p.categoria),concepto:p.nombre,precio:p.precio,periodicidad:p.periodicidad,iva:21,productoId:p.id,
     ...(paqueteId ? {paqueteId} : {}),
   }));
   if (!nuevos.length) return f;

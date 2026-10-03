@@ -86,3 +86,7 @@ El editor muestra un único paso cada vez: Cliente, Servicios, Ajustes y Revisar
 La pestaña Facturas reúne las emitidas y los borradores, identificados por estado. Permite filtrar por estado, cliente/NIF/número y rango de fechas y limpiar los filtros. Los importes emitidos y en borrador se muestran por separado. Los borradores pueden continuarse o duplicarse; el PDF corresponde a facturas emitidas. Cada borrador se guarda independientemente y desaparece de la lista de pendientes al emitirse, sin eliminar otros borradores.
 
 Aplicar `20261003181000_facturacion_borradores.sql` después de la migración inicial. Añade la tabla de borradores y la RPC v2, recupera el borrador previo y conserva acceso exclusivo del superadmin y control de versiones.
+
+### IVA general de la factura
+
+El catálogo y los conceptos no ofrecen IVA individual. El paso 3 permite activar/desactivar el impuesto y fijar un único porcentaje, aplicado y redondeado sobre la base total después de descuentos. Las facturas nuevas usan el 21% como valor inicial editable. Los PDF históricos sin `ivaGlobal` conservan su cálculo anterior; al editar y guardar se adopta el porcentaje general mostrado. No requiere migración adicional.

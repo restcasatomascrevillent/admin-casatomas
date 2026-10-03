@@ -7,7 +7,7 @@ const porcentajeSchema = z.number().finite().min(0).max(100);
 export const catalogoSchema = z.object({
   productos: z.array(z.object({
     id: z.string(), nombre: z.string().min(1).max(160), categoria: z.enum(categorias),
-    precio: precioSchema, periodicidad: z.enum(periodicidades), iva: porcentajeSchema,
+    precio: precioSchema, periodicidad: z.enum(periodicidades), iva: porcentajeSchema.optional(),
   })).max(100),
   paquetes: z.array(z.object({id:z.string(), nombre:z.string().min(1).max(120), productoIds:z.array(z.string()).max(100)})).max(30),
 });
@@ -33,6 +33,7 @@ export const facturaSchema = z.object({
   retencion: porcentajeSchema,
   descuentoGlobal: porcentajeSchema.optional(),
   aplicarIva: z.boolean().optional(),
+  ivaGlobal: porcentajeSchema.optional(),
   catalogo: catalogoSchema.optional(),
   pago: texto, notas: z.string().max(2000),
 });
@@ -53,7 +54,7 @@ export function nuevaFactura(emisor?: ParteFactura): Factura {
   const vacio = { nombre: "", nif: "", direccion: "", email: "" };
   return { numero: "", fecha: localDate(hoy), vencimiento: localDate(vence),
     emisor: emisor ?? { ...vacio, nombre: "OficiosOsIA" }, cliente: { ...vacio },
-    lineas: [{...nuevaLinea("Otros"),concepto:""}], retencion: 0, descuentoGlobal: 0, aplicarIva: true, pago: "", notas: "" };
+    lineas: [{...nuevaLinea("Otros"),concepto:""}], retencion: 0, descuentoGlobal: 0, aplicarIva: true, ivaGlobal: 21, pago: "", notas: "" };
 }
 export function totalesFactura(f: Factura) {
   const lineas = f.lineas.map(l => {
@@ -62,13 +63,13 @@ export function totalesFactura(f: Factura) {
     const baseAntesGlobal = redondear(bruto - descuento);
     const descuentoGlobalImporte = redondear(baseAntesGlobal * (f.descuentoGlobal ?? 0) / 100);
     const base = redondear(baseAntesGlobal - descuentoGlobalImporte);
-    const impuesto = f.aplicarIva === false ? 0 : redondear(base * l.iva / 100);
-    return { ...l, bruto, descuentoImporte: descuento, baseAntesGlobal, descuentoGlobalImporte, base, impuesto, total: redondear(base + impuesto) };
+    const impuesto = f.aplicarIva === false ? 0 : redondear(base * (f.ivaGlobal ?? l.iva) / 100);
+    return { ...l, iva:f.ivaGlobal ?? l.iva, bruto, descuentoImporte: descuento, baseAntesGlobal, descuentoGlobalImporte, base, impuesto, total: redondear(base + impuesto) };
   });
   const base = redondear(lineas.reduce((s, l) => s + l.base, 0));
-  const iva = redondear(lineas.reduce((s, l) => s + l.impuesto, 0));
+  const iva = f.aplicarIva === false ? 0 : f.ivaGlobal !== undefined ? redondear(base * f.ivaGlobal / 100) : redondear(lineas.reduce((s, l) => s + l.impuesto, 0));
   const retencion = redondear(base * f.retencion / 100);
-  const grupos = f.aplicarIva === false ? [] : [...new Set(lineas.map(l => l.iva))].sort((a,b) => a-b).map(tipo => ({
+  const grupos = f.aplicarIva === false ? [] : f.ivaGlobal !== undefined ? [{tipo:f.ivaGlobal,base,importe:iva}] : [...new Set(lineas.map(l => l.iva))].sort((a,b) => a-b).map(tipo => ({
     tipo, base: redondear(lineas.filter(l => l.iva === tipo).reduce((s,l) => s + l.base, 0)),
     importe: redondear(lineas.filter(l => l.iva === tipo).reduce((s,l) => s + l.impuesto, 0)),
   }));

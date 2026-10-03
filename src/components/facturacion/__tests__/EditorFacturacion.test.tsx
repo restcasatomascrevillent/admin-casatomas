@@ -44,14 +44,15 @@ describe("editor simplificado",()=>{
     fireEvent.click(aplicar);
     fireEvent.click(screen.getByRole("button",{name:"4. Revisar"}));
     expect(within(screen.getByRole("article",{name:"Vista previa de factura"})).queryByRole("columnheader",{name:"IVA"})).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
-    let iva=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("IVA (%)",{exact:true});
-    expect(iva).toBeDisabled();expect(iva).toHaveValue(0);
     fireEvent.click(screen.getByRole("button",{name:"3. Ajustes"}));
+    let iva=screen.getByLabelText("IVA de la factura (%)");
+    expect(iva).toBeDisabled();expect(iva).toHaveValue(21);
     fireEvent.click(screen.getByRole("switch",{name:"Aplicar IVA"}));
-    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
-    iva=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("IVA (%)",{exact:true});
+    iva=screen.getByLabelText("IVA de la factura (%)");
     expect(iva).toBeEnabled();expect(iva).toHaveValue(21);
+    fireEvent.change(iva,{target:{value:"10"}});
+    fireEvent.click(screen.getByRole("button",{name:"4. Revisar"}));
+    expect(screen.getByRole("article",{name:"Vista previa de factura"})).toHaveTextContent("IVA 10%");
   });
   it("muestra solo el paso actual y conserva el cliente y el precio al navegar",()=>{
     render(<EditorFacturacion/>);

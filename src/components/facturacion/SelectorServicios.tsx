@@ -47,10 +47,9 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
         <label className="text-xs">Servicio<Input aria-label={"Nombre de " + p.nombre} maxLength={160} value={p.nombre} onChange={e=>producto(p.id,{nombre:e.target.value})} className="mt-1" /></label>
         <label className="text-xs">Precio (€)<Input aria-label={"Precio de " + p.nombre} type="number" min={0} max={1000000} step="0.01" value={p.precio} onChange={e=>producto(p.id,{precio:Number(e.target.value)})} className="mt-1" /></label>
         <label className="text-xs">Periodicidad<select className={selectClass+" mt-1"} value={p.periodicidad} onChange={e=>producto(p.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v=><option key={v}>{v}</option>)}</select></label>
-        <label className="text-xs">IVA (%)<Input aria-label={"IVA de " + p.nombre} type="number" min={0} max={100} step="0.01" value={p.iva} onChange={e=>producto(p.id,{iva:Number(e.target.value)})} className="mt-1" /></label>
         <label className="text-xs">Tipo<select className={selectClass+" mt-1"} value={p.categoria} onChange={e=>producto(p.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v=><option key={v}>{v}</option>)}</select></label>
       </div>)}
-      <Button type="button" variant="outline" disabled={catalogo.productos.length>=100} onClick={()=>cambiar({...catalogo,productos:[...catalogo.productos,{id:crypto.randomUUID(),nombre:"Nuevo servicio",categoria:"Módulo",precio:0,periodicidad:"Mensual",iva:21}]})}><Plus className="mr-2 h-4 w-4" />Añadir servicio al catálogo</Button>
+      <Button type="button" variant="outline" disabled={catalogo.productos.length>=100} onClick={()=>cambiar({...catalogo,productos:[...catalogo.productos,{id:crypto.randomUUID(),nombre:"Nuevo servicio",categoria:"Módulo",precio:0,periodicidad:"Mensual"}]})}><Plus className="mr-2 h-4 w-4" />Añadir servicio al catálogo</Button>
     </CardContent></Card>
     <Card><CardHeader><CardTitle className="text-base">Paquetes</CardTitle>
       <p className="text-sm text-muted-foreground">Agrupa módulos para añadirlos juntos. Se mantienen sus precios y periodicidades y no se duplican servicios ya incluidos.</p>

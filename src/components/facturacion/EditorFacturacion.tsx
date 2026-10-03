@@ -46,7 +46,7 @@ export function EditorFacturacion() {
     if (!q.data || iniciado.current) return;
     iniciado.current = true;
     if (q.data.config) {
-      setF({...q.data.config.documento,catalogo:q.data.config.documento.catalogo ?? catalogoInicial()}); setVersionConfig(q.data.config.actualizado_en);
+      setF({...q.data.config.documento,ivaGlobal:q.data.config.documento.ivaGlobal ?? 21,catalogo:q.data.config.documento.catalogo ?? catalogoInicial()}); setVersionConfig(q.data.config.actualizado_en);
       const pendiente = q.data.borradores?.find(b=>JSON.stringify(b.documento)===JSON.stringify(q.data?.config?.documento));
       if(pendiente)setBorrador({id:pendiente.id,version:pendiente.actualizado_en,facturaId:pendiente.factura_id});
       const archivada = q.data.facturas.find(g => pendiente ? g.id===pendiente.factura_id : g.numero === q.data.config?.documento.numero.trim());
@@ -68,14 +68,14 @@ export function EditorFacturacion() {
   const abrir = (guardada: FacturaGuardada) => {
     if (!puedeCambiar()) return;
     setBorrador(null);
-    setF({...guardada.documento,catalogo:f.catalogo ?? catalogoInicial()}); setActual({id:guardada.id,version:guardada.actualizado_en});
+    setF({...guardada.documento,ivaGlobal:guardada.documento.ivaGlobal ?? 21,catalogo:f.catalogo ?? catalogoInicial()}); setActual({id:guardada.id,version:guardada.actualizado_en});
     setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null); setDirty(false); setFacturaModificada(false);
   };
   const abrirBorrador = (b:BorradorGuardado) => {
     if (!puedeCambiar()) return;
     const emitida=q.data?.facturas.find(g=>g.id===b.factura_id);
-    setF({...b.documento,catalogo:f.catalogo ?? catalogoInicial()});
+    setF({...b.documento,ivaGlobal:b.documento.ivaGlobal ?? 21,catalogo:f.catalogo ?? catalogoInicial()});
     setBorrador({id:b.id,version:b.actualizado_en,facturaId:b.factura_id});
     setActual(emitida?{id:emitida.id,version:emitida.actualizado_en}:null);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);setDirty(false);setFacturaModificada(true);setTab("nueva");setPaso(0);
@@ -90,7 +90,7 @@ export function EditorFacturacion() {
     if (!puedeCambiar()) return;
     setBorrador(null);
     const base = prepararNuevaFactura(f,[...(q.data?.facturas ?? []),...(q.data?.borradores ?? [])]);
-    setF({...g.documento,numero:base.numero,fecha:base.fecha,vencimiento:base.vencimiento,catalogo:base.catalogo,
+    setF({...g.documento,ivaGlobal:g.documento.ivaGlobal ?? 21,numero:base.numero,fecha:base.fecha,vencimiento:base.vencimiento,catalogo:base.catalogo,
       lineas:g.documento.lineas.map(l=>({...l,id:crypto.randomUUID()}))});
     setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);
@@ -130,7 +130,7 @@ export function EditorFacturacion() {
     if (!puedeCambiar()) return;
     const r = await q.refetch();
     if (!r.data || r.error) return;
-    const documento = r.data.config ? {...r.data.config.documento,catalogo:r.data.config.documento.catalogo ?? catalogoInicial()} : prepararNuevaFactura(nuevaFactura(),r.data.facturas);
+    const documento = r.data.config ? {...r.data.config.documento,ivaGlobal:r.data.config.documento.ivaGlobal ?? 21,catalogo:r.data.config.documento.catalogo ?? catalogoInicial()} : prepararNuevaFactura(nuevaFactura(),r.data.facturas);
     const pendiente=r.data.borradores?.find(b=>JSON.stringify(b.documento)===JSON.stringify(documento));
     const archivada = r.data.facturas.find(g => pendiente ? g.id===pendiente.factura_id : g.numero === documento.numero.trim());
     setBorrador(pendiente?{id:pendiente.id,version:pendiente.actualizado_en,facturaId:pendiente.factura_id}:null);
@@ -213,9 +213,9 @@ export function EditorFacturacion() {
                 <Campo titulo="Precio unitario (€)"><Input type="number" min={0} max={1000000} step="0.01" value={l.precio} onChange={e=>linea(l.id,{precio:Number(e.target.value)})} /></Campo>
                 <p className="pb-2 text-right text-sm font-medium">{euros(total.lineas[i].base)}</p>
               </div>
-              <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Tipo, periodicidad e IVA · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
+              <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Tipo y periodicidad · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
                 <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
-              <Campo titulo="IVA (%)"><Input type="number" disabled={f.aplicarIva===false} min={0} max={100} step="0.01" value={f.aplicarIva===false ? 0 : l.iva} onChange={e=>linea(l.id,{iva:Number(e.target.value)})} /></Campo></details>
+              </details>
             </fieldset>)}
             </div><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
             <p className="text-xs text-muted-foreground">Cada línea corresponde al periodo indicado en su descripción. La periodicidad sirve para calcular la cuota mensual; no multiplica el importe de la factura.</p>
@@ -224,7 +224,9 @@ export function EditorFacturacion() {
           {paso === 2 && <><Card><CardHeader><CardTitle className="text-base">3. Descuentos e impuestos</CardTitle></CardHeader><CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3"><label htmlFor="aplicar-iva" className="text-sm font-medium">Aplicar IVA</label>
               <Switch id="aplicar-iva" checked={f.aplicarIva!==false} onCheckedChange={v=>cambiar({...f,aplicarIva:v})} /></div>
-            {f.aplicarIva===false && <p className="text-xs text-muted-foreground">La factura se calcula sin IVA. Los porcentajes de los conceptos se conservan si vuelves a activarlo.</p>}
+            {f.aplicarIva===false && <p className="text-xs text-muted-foreground">La factura se calcula sin IVA. El porcentaje general se conserva si vuelves a activarlo.</p>}
+            <Campo titulo="IVA de la factura (%)"><Input className="max-w-40" type="number" disabled={f.aplicarIva===false} min={0} max={100} step="0.01" value={f.ivaGlobal ?? 21} onChange={e=>cambiar({...f,ivaGlobal:Number(e.target.value)})} /></Campo>
+            <p className="text-xs text-muted-foreground">Se aplica a toda la base de la factura, después de los descuentos.</p>
             <Campo titulo="Descuento global (%)"><Input className="max-w-40" type="number" min={0} max={100} step="0.01" value={f.descuentoGlobal ?? 0} onChange={e=>cambiar({...f,descuentoGlobal:Number(e.target.value)})} /></Campo>
             <p className="text-xs text-muted-foreground">Se aplica después de los descuentos por concepto y antes de los impuestos.</p>
             <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-medium">Descuentos por concepto</summary>

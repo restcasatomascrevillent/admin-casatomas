@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { nuevaFactura, nuevaLinea, totalesFactura, mensualFactura, erroresFactura, facturaSchema } from "../modelo";
 
 describe("facturación comercial", () => {
-  it("calcula descuentos, varios tipos de IVA y retención por separado", () => {
+  it("conserva el cálculo de facturas antiguas con varios tipos de IVA", () => {
     const f = nuevaFactura();
+    delete f.ivaGlobal;
     f.lineas = [
       {...nuevaLinea("Instalación"),cantidad:2,precio:100,descuento:10,iva:21},
       {...nuevaLinea("Soporte"),precio:50,iva:10},
@@ -31,6 +32,7 @@ describe("facturación comercial", () => {
   });
   it("redondea importes por línea sin acumular decimales binarios", () => {
     const f = nuevaFactura();
+    delete f.ivaGlobal;
     f.lineas = [{...nuevaLinea(),cantidad:3,precio:0.1},{...nuevaLinea(),precio:1.005,iva:0}];
     expect(totalesFactura(f).base).toBe(1.31);
     expect(totalesFactura(f).total).toBe(1.37);
@@ -72,8 +74,8 @@ describe("facturación comercial", () => {
     f.descuentoGlobal=10; f.retencion=15;
     const t = totalesFactura(f);
     expect(t.subtotal).toBe(250); expect(t.descuentoGlobal).toBe(25);
-    expect(t.base).toBe(225); expect(t.iva).toBe(38.52);
-    expect(t.retencion).toBe(33.75); expect(t.total).toBe(229.77);
+    expect(t.base).toBe(225); expect(t.iva).toBe(47.25);
+    expect(t.retencion).toBe(33.75); expect(t.total).toBe(238.5);
     expect(t.lineas[0].baseAntesGlobal).toBe(180);
   });
   it("quita el IVA completo sin borrar los porcentajes y los recupera al activarlo", () => {
@@ -85,7 +87,7 @@ describe("facturación comercial", () => {
     expect(totalesFactura(f).total).toBe(150);
     expect(f.lineas.map(l=>l.iva)).toEqual([21,10]);
     f.aplicarIva=true;
-    expect(totalesFactura(f).total).toBe(176);
+    expect(totalesFactura(f).total).toBe(181.5);
   });
   it("un descuento global del 100% deja a cero base, impuestos y retención", () => {
     const f=nuevaFactura(); f.lineas=[{...nuevaLinea(),precio:125.99}];
@@ -93,4 +95,14 @@ describe("facturación comercial", () => {
     expect(totalesFactura(f).total).toBe(0);
     expect(mensualFactura(f)).toBe(0);
   });
+  it("aplica un único porcentaje al total neto e ignora el IVA antiguo de los módulos",()=>{
+    const f=nuevaFactura();f.ivaGlobal=10;
+    f.lineas=[{...nuevaLinea(),precio:100,iva:21},{...nuevaLinea(),precio:50,iva:0}];
+    f.descuentoGlobal=10;
+    expect(totalesFactura(f).grupos).toEqual([{tipo:10,base:135,importe:13.5}]);
+    expect(totalesFactura(f).total).toBe(148.5);
+    f.lineas=[{...nuevaLinea(),precio:0.03},{...nuevaLinea(),precio:0.03}];f.ivaGlobal=21;f.descuentoGlobal=0;
+    expect(totalesFactura(f).iva).toBe(0.01);
+  });
+
 });
