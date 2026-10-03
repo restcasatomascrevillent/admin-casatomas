@@ -44,7 +44,7 @@ describe("facturación comercial", () => {
     const f = nuevaFactura();
     expect(facturaSchema.safeParse(f).success).toBe(true);
     expect(erroresFactura(f)).toContain("Indica el número de factura.");
-    expect(erroresFactura(f)).toHaveLength(3);
+    expect(erroresFactura(f)).toHaveLength(4);
   });
   it("rechaza cantidades inválidas, impuestos fuera de rango y fechas imposibles", () => {
     const f = nuevaFactura();
@@ -61,5 +61,36 @@ describe("facturación comercial", () => {
     expect(facturaSchema.safeParse(f).success).toBe(false);
     f.lineas[0].iva = 21; f.lineas[0].precio = Infinity;
     expect(facturaSchema.safeParse(f).success).toBe(false);
+  });
+  it("aplica el descuento global después de los descuentos por línea y antes del IVA y retención", () => {
+    const f = nuevaFactura();
+    f.lineas = [
+      {...nuevaLinea("Instalación"),cantidad:2,precio:100,descuento:10,iva:21},
+      {...nuevaLinea("Soporte"),precio:50,iva:10},
+      {...nuevaLinea("Módulo"),precio:20,iva:0},
+    ];
+    f.descuentoGlobal=10; f.retencion=15;
+    const t = totalesFactura(f);
+    expect(t.subtotal).toBe(250); expect(t.descuentoGlobal).toBe(25);
+    expect(t.base).toBe(225); expect(t.iva).toBe(38.52);
+    expect(t.retencion).toBe(33.75); expect(t.total).toBe(229.77);
+    expect(t.lineas[0].baseAntesGlobal).toBe(180);
+  });
+  it("quita el IVA completo sin borrar los porcentajes y los recupera al activarlo", () => {
+    const f=nuevaFactura();
+    f.lineas=[{...nuevaLinea(),precio:100,iva:21},{...nuevaLinea(),precio:50,iva:10}];
+    f.aplicarIva=false;
+    expect(totalesFactura(f).grupos).toEqual([]);
+    expect(totalesFactura(f).iva).toBe(0);
+    expect(totalesFactura(f).total).toBe(150);
+    expect(f.lineas.map(l=>l.iva)).toEqual([21,10]);
+    f.aplicarIva=true;
+    expect(totalesFactura(f).total).toBe(176);
+  });
+  it("un descuento global del 100% deja a cero base, impuestos y retención", () => {
+    const f=nuevaFactura(); f.lineas=[{...nuevaLinea(),precio:125.99}];
+    f.descuentoGlobal=100; f.retencion=15;
+    expect(totalesFactura(f).total).toBe(0);
+    expect(mensualFactura(f)).toBe(0);
   });
 });

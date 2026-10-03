@@ -2,6 +2,32 @@
 
 Ruta: /super-admin/gestor-gasto. El acceso sigue protegido por SuperAdminRoute.
 
+## Pestañas y creación rápida
+
+- Facturas emitidas: búsqueda por número, cliente o NIF, filtro de fechas,
+  edición, duplicado con un nuevo número y descarga directa sin modificar
+  el documento guardado.
+- Nueva factura: número sugerido, datos del emisor reutilizables, selección
+  de clientes guardados y módulos o paquetes en un clic.
+- Módulos y paquetes: catálogo de servicios con tarifas, periodicidad e IVA
+  editables, servicios personalizados y agrupación de módulos en paquetes.
+
+El catálogo inicial usa los módulos existentes del panel y precios a cero
+para que el superadmin defina sus tarifas. Los paquetes añaden sus servicios
+sin duplicar conceptos ya seleccionados ni cambiar precios editados en la
+factura. El catálogo se conserva dentro del documento de configuración JSON;
+no requiere una migración adicional.
+
+La detección de servicios del cliente usa su NIF y su última factura por
+fecha. Recupera los conceptos recurrentes con sus precios y descuentos,
+excluyendo los cargos puntuales. No deduce contratación a partir de permisos.
+
+La sección de descuentos permite aplicar un porcentaje global y porcentajes
+por concepto. El global se calcula después del descuento de cada concepto
+y antes de impuestos. «Aplicar IVA» permite desactivar el impuesto completo
+sin borrar los porcentajes: se recuperan al activarlo. La vista previa y el
+PDF omiten la columna y el desglose de IVA cuando está desactivado.
+
 El gestor permite editar emisor, cliente, número, fechas, instalación, licencias,
 módulos, soporte, cantidades, precios, descuentos, IVA por concepto, retención,
 forma de pago y observaciones. Los borradores pueden tener datos pendientes;

@@ -78,7 +78,7 @@ export async function crearPdfFactura(f: Factura) {
     espacio(10);
     doc.setFillColor(238, 236, 231); doc.rect(izquierda, y - 5, 178, 9, "F");
     texto("CONCEPTO", 18, y, 8, true); texto("UD.", 105, y, 8, true);
-    texto("PRECIO", 119, y, 8, true); texto("IVA", 151, y, 8, true);
+    texto("PRECIO", 119, y, 8, true); if (f.aplicarIva!==false) texto("IVA", 151, y, 8, true);
     texto("BASE", 170, y, 8, true); y += 10;
   };
   const derechaTexto = (v: string, x: number, pos: number, maxWidth: number) => {
@@ -97,18 +97,22 @@ export async function crearPdfFactura(f: Factura) {
     texto(detalle, 18, y + descripcion.length * 4.5 + 1, 7);
     derechaTexto(String(l.cantidad), 115, y, 13);
     derechaTexto(euros(l.precio), 146, y, 27);
-    derechaTexto(l.iva + "%", 162, y, 14);
-    derechaTexto(euros(l.base), 192, y, 28);
+    if (f.aplicarIva!==false) derechaTexto(l.iva + "%", 162, y, 14);
+    derechaTexto(euros(l.baseAntesGlobal), 192, y, 28);
     y += alto;
     doc.setDrawColor(220,220,220); doc.line(izquierda, y-4, derecha, y-4);
   }
-  const altoTotales = 22 + t.grupos.length * 7 + (f.retencion ? 7 : 0);
+  const altoTotales = 22 + t.grupos.length * 7 + (f.retencion ? 7 : 0) + ((f.descuentoGlobal??0)>0 ? 14 : 0);
   espacio(altoTotales); y += 4;
   const totalFila = (label: string, importe: number, destacado = false) => {
     if (destacado) { doc.setFillColor(255,179,0); doc.rect(108,y-5,86,10,"F"); }
     texto(label, 111, y, destacado ? 10 : 9, destacado);
     derechaTexto(euros(importe), 192, y, 40); y += destacado ? 14 : 7;
   };
+  if ((f.descuentoGlobal??0)>0) {
+    totalFila("Subtotal",t.subtotal);
+    totalFila("Descuento global " + f.descuentoGlobal + "%",-t.descuentoGlobal);
+  }
   totalFila("Base imponible", t.base);
   t.grupos.forEach(g => totalFila("IVA " + g.tipo + "%", g.importe));
   if (f.retencion) totalFila("Retención " + f.retencion + "%", -t.retencion);

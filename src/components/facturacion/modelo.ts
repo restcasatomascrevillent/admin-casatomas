@@ -2,6 +2,16 @@ import { z } from "zod";
 
 export const categorias = ["Instalación", "Licencia", "Módulo", "Soporte", "Otros"] as const;
 export const periodicidades = ["Puntual", "Mensual", "Anual"] as const;
+const precioSchema = z.number().finite().min(0).max(1000000);
+const porcentajeSchema = z.number().finite().min(0).max(100);
+export const catalogoSchema = z.object({
+  productos: z.array(z.object({
+    id: z.string(), nombre: z.string().min(1).max(160), categoria: z.enum(categorias),
+    precio: precioSchema, periodicidad: z.enum(periodicidades), iva: porcentajeSchema,
+  })).max(100),
+  paquetes: z.array(z.object({id:z.string(), nombre:z.string().min(1).max(120), productoIds:z.array(z.string()).max(100)})).max(30),
+});
+export type CatalogoFacturacion = z.infer<typeof catalogoSchema>;
 const texto = z.string().max(500);
 const parteSchema = z.object({
   nombre: z.string().max(120), nif: z.string().max(30), direccion: texto,
@@ -13,13 +23,17 @@ export const facturaSchema = z.object({
   emisor: parteSchema, cliente: parteSchema,
   lineas: z.array(z.object({
     id: z.string(), categoria: z.enum(categorias), concepto: z.string().max(300),
+    productoId: z.string().optional(), paqueteId: z.string().optional(),
     periodicidad: z.enum(periodicidades),
     cantidad: z.number().finite().positive().max(100000),
     precio: z.number().finite().min(0).max(1000000),
     descuento: z.number().finite().min(0).max(100),
     iva: z.number().finite().min(0).max(100),
   })).min(1).max(100),
-  retencion: z.number().finite().min(0).max(100),
+  retencion: porcentajeSchema,
+  descuentoGlobal: porcentajeSchema.optional(),
+  aplicarIva: z.boolean().optional(),
+  catalogo: catalogoSchema.optional(),
   pago: texto, notas: z.string().max(2000),
 });
 export type Factura = z.infer<typeof facturaSchema>;
@@ -39,24 +53,29 @@ export function nuevaFactura(emisor?: ParteFactura): Factura {
   const vacio = { nombre: "", nif: "", direccion: "", email: "" };
   return { numero: "", fecha: localDate(hoy), vencimiento: localDate(vence),
     emisor: emisor ?? { ...vacio, nombre: "OficiosOsIA" }, cliente: { ...vacio },
-    lineas: categorias.slice(0, 4).map(c => nuevaLinea(c)), retencion: 0, pago: "", notas: "" };
+    lineas: [{...nuevaLinea("Otros"),concepto:""}], retencion: 0, descuentoGlobal: 0, aplicarIva: true, pago: "", notas: "" };
 }
 export function totalesFactura(f: Factura) {
   const lineas = f.lineas.map(l => {
     const bruto = redondear(l.cantidad * l.precio);
     const descuento = redondear(bruto * l.descuento / 100);
-    const base = redondear(bruto - descuento);
-    const impuesto = redondear(base * l.iva / 100);
-    return { ...l, bruto, descuentoImporte: descuento, base, impuesto, total: redondear(base + impuesto) };
+    const baseAntesGlobal = redondear(bruto - descuento);
+    const descuentoGlobalImporte = redondear(baseAntesGlobal * (f.descuentoGlobal ?? 0) / 100);
+    const base = redondear(baseAntesGlobal - descuentoGlobalImporte);
+    const impuesto = f.aplicarIva === false ? 0 : redondear(base * l.iva / 100);
+    return { ...l, bruto, descuentoImporte: descuento, baseAntesGlobal, descuentoGlobalImporte, base, impuesto, total: redondear(base + impuesto) };
   });
   const base = redondear(lineas.reduce((s, l) => s + l.base, 0));
   const iva = redondear(lineas.reduce((s, l) => s + l.impuesto, 0));
   const retencion = redondear(base * f.retencion / 100);
-  const grupos = [...new Set(lineas.map(l => l.iva))].sort((a,b) => a-b).map(tipo => ({
+  const grupos = f.aplicarIva === false ? [] : [...new Set(lineas.map(l => l.iva))].sort((a,b) => a-b).map(tipo => ({
     tipo, base: redondear(lineas.filter(l => l.iva === tipo).reduce((s,l) => s + l.base, 0)),
     importe: redondear(lineas.filter(l => l.iva === tipo).reduce((s,l) => s + l.impuesto, 0)),
   }));
-  return { lineas, base, iva, retencion, total: redondear(base + iva - retencion), grupos };
+  const subtotal = redondear(lineas.reduce((s,l) => s + l.baseAntesGlobal, 0));
+  const descuentoGlobal = redondear(lineas.reduce((s,l) => s + l.descuentoGlobalImporte, 0));
+  const descuentosLineas = redondear(lineas.reduce((s,l) => s + l.descuentoImporte, 0));
+  return { lineas, base, subtotal, descuentoGlobal, descuentosLineas, iva, retencion, total: redondear(base + iva - retencion), grupos };
 }
 /** Importe contratado mensual sin impuestos; instalaciones puntuales quedan fuera. */
 export function mensualFactura(f: Factura) {

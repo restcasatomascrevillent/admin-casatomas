@@ -27,16 +27,18 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[430px] text-left text-xs">
-            <thead className="bg-[#eeece7]"><tr>{["Concepto","Ud.","Precio","IVA","Base"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
+            <thead className="bg-[#eeece7]"><tr>{["Concepto","Ud.","Precio",...(f.aplicarIva===false ? [] : ["IVA"]),"Base"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
             <tbody>{t.lineas.map(l => <tr key={l.id} className="border-b border-[#dedbd4] align-top">
               <td className="max-w-[210px] break-words px-2 py-3"><p className="font-medium">{l.concepto || "Concepto pendiente"}</p>
                 <p className="mt-1 text-[10px] text-[#666]">{l.categoria} · {l.periodicidad}{l.descuento > 0 ? " · Dto. " + l.descuento + "%" : ""}</p></td>
               <td className="px-2 py-3 text-right">{l.cantidad}</td><td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.precio)}</td>
-              <td className="px-2 py-3 text-right">{l.iva}%</td><td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.base)}</td>
+              {f.aplicarIva!==false && <td className="px-2 py-3 text-right">{l.iva}%</td>}<td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.baseAntesGlobal)}</td>
             </tr>)}</tbody>
           </table>
         </div>
         <dl className="ml-auto max-w-xs space-y-2 text-sm">
+          {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Subtotal</dt><dd>{euros(t.subtotal)}</dd></div>
+            <div className="flex justify-between gap-4"><dt>Descuento global {f.descuentoGlobal}%</dt><dd>−{euros(t.descuentoGlobal)}</dd></div></>}
           <div className="flex justify-between gap-4"><dt>Base imponible</dt><dd>{euros(t.base)}</dd></div>
           {t.grupos.map(g => <div key={g.tipo} className="flex justify-between gap-4"><dt>IVA {g.tipo}%</dt><dd>{euros(g.importe)}</dd></div>)}
           {f.retencion > 0 && <div className="flex justify-between gap-4"><dt>Retención {f.retencion}%</dt><dd>−{euros(t.retencion)}</dd></div>}
