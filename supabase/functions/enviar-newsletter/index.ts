@@ -13,6 +13,7 @@ import {
 import { comprobarPermisoNewsletter, type ClientePermiso } from "./permiso.ts";
 import { enviarBroadcast, puedeEnviarBroadcast } from "./broadcast.ts";
 import { crearRegistroEnvios } from "./registro.ts";
+import { enviarPrueba } from "./prueba.ts";
 import {
   canalNewsletter,
   limiteContactos,
@@ -135,6 +136,12 @@ serve(async (req) => {
     const validacion = validarPayload(cuerpo);
     if (!validacion.ok) return json({ success: false, error: validacion.error }, 400);
     const datos = validacion.datos;
+
+    // Prueba segura por Resend Marketing (ver prueba.ts): a un Segment que solo
+    // tiene la dirección de prueba (delivered@resend.dev). Nunca a clientes.
+    if ((cuerpo as { prueba?: unknown }).prueba === true) {
+      return await enviarPruebaBroadcast(datos, user.id);
+    }
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const registro = crearRegistroEnvios(supabase);
@@ -380,5 +387,34 @@ async function enviarPorBroadcast(
     fallidos: 0,
     broadcast_id: envio.broadcastId,
     sincronizacion: { altas: resumen.altas, borrados: resumen.borrados, bajas_resend: resumen.bajasResend, errores: resumen.errores.length },
+  });
+}
+
+async function enviarPruebaBroadcast(datos: Parameters<typeof enviarPrueba>[0]["datos"], usuarioId: string): Promise<Response> {
+  const apiKey = Deno.env.get("RESEND_MARKETING_API_KEY");
+  if (!apiKey) {
+    return json({ success: false, error: "Falta configurar RESEND_MARKETING_API_KEY (clave de Resend con Full access) para la prueba por Resend Marketing" }, 500);
+  }
+  const r = await enviarPrueba({
+    cliente: new ClienteResendMarketing({ apiKey }),
+    datos,
+    from: NEWSLETTER_FROM,
+    emailPrueba: Deno.env.get("NEWSLETTER_EMAIL_PRUEBA"),
+    segmentPruebaConfigurado: Deno.env.get("RESEND_NEWSLETTER_SEGMENT_ID_PRUEBA"),
+    segmentNewsletterConfigurado: Deno.env.get("RESEND_NEWSLETTER_SEGMENT_ID"),
+  });
+  if (!r.ok) {
+    console.error(`enviar-newsletter[prueba]: fallo (${r.status}): ${r.error}`);
+    return json({ success: false, prueba: true, error: r.error }, r.status);
+  }
+  console.log(`enviar-newsletter[prueba]: broadcast=${r.broadcastId} segment=${r.segmentId} usuario=${usuarioId}`);
+  return json({
+    success: true,
+    prueba: true,
+    message: `Prueba enviada como Broadcast a ${r.destinatario} (no llega a ningún cliente). Mírala en Resend → Broadcasts.`,
+    broadcast_id: r.broadcastId,
+    total: 1,
+    exitosos: 1,
+    fallidos: 0,
   });
 }
