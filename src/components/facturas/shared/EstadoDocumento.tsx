@@ -57,7 +57,7 @@ interface EstadoDocumentoProps {
  * Insignias tocables: el texto mide 12 px y la caja 28 px, pero un `::before`
  * agranda la zona sensible hasta 44 px de alto sin mover nada del diseño.
  */
-const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-2 before:content-['']`;
+const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']`;
 
 export function EstadoDocumento({ alertas, verificada, onRevisar, compacto = true }: EstadoDocumentoProps) {
   const lista = alertas ?? [];

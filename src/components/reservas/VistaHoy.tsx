@@ -267,7 +267,7 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
 function CuartosDeHoy({ fecha }: { fecha: string }) {
   return (
     <Collapsible className="rounded-xl border bg-card/50 px-3 py-2">
-      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-md py-1 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-md py-1 pointer-coarse:min-h-11 text-left text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
           Disponibilidad por cuartos de hora
