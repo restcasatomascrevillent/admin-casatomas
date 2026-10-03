@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), edit: true, toast: vi.fn(), plantillaError: null as null | { code: string; message: string } }));
+vi.mock("@/components/cheques/ListaTickets", () => ({ ListaTickets: () => <div>Listado de tickets</div> }));
 vi.mock("@/components/DashboardLayout", () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: mock.edit }) }));
 vi.mock("sonner", () => ({ toast: { error: mock.toast, success: vi.fn() } }));
@@ -11,7 +12,11 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: {
 } }));
 import Cheques from "../Cheques";
 const valido = { encontrado: true, codigo: "CT-ABCDEFGH", importe_eur: 100, estado: "pagado", usado: false, valido: true };
+function abrirVerificador() {
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Verificar cheque" }), { button: 0, ctrlKey: false });
+}
 async function buscar() {
+  abrirVerificador();
   fireEvent.change(screen.getByLabelText("Código del cheque"), { target: { value: " ct-abcdefgh " } });
   fireEvent.click(screen.getByRole("button", { name: "Verificar cheque" }));
   await screen.findByText("Cheque válido para canjear");
@@ -51,6 +56,7 @@ describe("Verificación y canje", () => {
   it("muestra el fallo de Supabase y no confunde un validador ausente con un cheque inválido", async () => {
     mock.rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Function missing" } });
     render(<Cheques />);
+    abrirVerificador();
     fireEvent.change(screen.getByLabelText("Código del cheque"), { target: { value: "CT-ABCDEFGH" } });
     fireEvent.click(screen.getByRole("button", { name: "Verificar cheque" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("todavía no está instalada en Supabase");

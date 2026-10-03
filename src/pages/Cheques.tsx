@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { toast } from "sonner";
 import { CASA_TOMAS, LOGO_CASA_TOMAS } from "@/lib/cheques/casaTomas";
+import { ListaTickets } from "@/components/cheques/ListaTickets";
 import { VistaFacturaCheque } from "@/components/cheques/VistaFacturaCheque";
 
 // Estas tablas/RPC se incorporan mediante la migración de Cheques.
@@ -49,6 +50,7 @@ const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", 
 
 export default function Cheques() {
   const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
+  const [pestana, setPestana] = useState("expedicion");
   const [codigo, setCodigo] = useState("CT-");
   const [errorVerificacion, setErrorVerificacion] = useState("");
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -135,20 +137,22 @@ export default function Cheques() {
 
   return <DashboardLayout>
     <div className="space-y-6">
-      <Tabs defaultValue="verificar">
-        <TabsList className="grid w-full max-w-lg grid-cols-2 h-auto rounded-xl p-1.5 bg-muted/60">
+      <Tabs value={pestana} onValueChange={setPestana}>
+        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto rounded-xl p-1.5 bg-muted/60">
+          <TabsTrigger value="expedicion" className="min-h-11 whitespace-normal text-xs sm:text-sm rounded-lg">Expedición de tickets</TabsTrigger>
           <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
           <TabsTrigger value="plantilla" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
         </TabsList>
-        <TabsContent value="verificar" className="mt-6 space-y-4">
-          <Card className="max-w-xl rounded-2xl shadow-sm"><CardHeader><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#795440]/10 text-[#795440]"><ShieldCheck className="h-5 w-5" /></div><CardTitle>Comprobar un cheque regalo</CardTitle><p className="text-sm text-muted-foreground">Introduce el código que aparece en el email del cliente.</p></CardHeader><CardContent>
-            <form onSubmit={verificar} className="space-y-4">
-              <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); setErrorVerificacion(""); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
-              <Button type="submit" disabled={ocupado || !codigo.trim() || codigo.trim().toUpperCase() === "CT-"} className="w-full h-12 rounded-xl bg-[#795440] hover:bg-[#654432] text-white">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
+        <TabsContent value="expedicion" className="mt-6"><ListaTickets verificar={codigo => { setCodigo(codigo); setResultado(null); setErrorVerificacion(""); setPestana("verificar"); }} /></TabsContent>
+        <TabsContent value="verificar" className="mt-6 space-y-5 max-w-4xl">
+          <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
+            <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="space-y-2 flex-1 min-w-0"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); setErrorVerificacion(""); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
+              <Button type="submit" disabled={ocupado || !codigo.trim() || codigo.trim().toUpperCase() === "CT-"} className="w-full sm:w-auto sm:min-w-48 h-14 rounded-xl bg-[#795440] hover:bg-[#654432] text-white shrink-0">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
             </form>
           </CardContent></Card>
-          {errorVerificacion && <Card className="max-w-xl border-destructive/50"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
-          {resultado && <Card className={`max-w-xl ${resultado.valido ? "border-emerald-500" : "border-destructive/50"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
+          {errorVerificacion && <Card className="border-destructive/50 rounded-2xl"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
+          {resultado && <Card className={`rounded-2xl ${resultado.valido ? "border-emerald-300 bg-emerald-50/40" : "border-destructive/30"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
             <h2 className={`flex items-center gap-2 font-semibold ${resultado.valido ? "text-emerald-700" : "text-destructive"}`}>{resultado.valido ? <CheckCircle2 /> : <XCircle />}{estado}</h2>
             {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{resultado.valido && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{resultado.valido && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
           </CardContent></Card>}
