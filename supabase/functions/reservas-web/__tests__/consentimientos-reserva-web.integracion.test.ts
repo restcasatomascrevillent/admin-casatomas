@@ -285,3 +285,261 @@ describe("función desplegada antes que la migración 20261003143000", () => {
     expect(console.error).toHaveBeenCalledWith(expect.stringContaining("condiciones_aceptadas_at"));
   });
 });
+
+// ============================================================================
+// Batería ampliada (2026-10-03): casos límite que no cubría lo de arriba.
+// ============================================================================
+
+async function disponibilidad(body: Fila) {
+  const h = estadoPrueba().handler;
+  if (!h) throw new Error("index.ts no ha registrado su handler");
+  const res = await h(
+    new Request(`${URL_FUNCION}/disponibilidad`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+  const texto = await res.text();
+  return { status: res.status, cuerpo: texto ? JSON.parse(texto) : null };
+}
+
+/** Intentos de INSERT en `reservas` (incluidos los que fallaron con PGRST204). */
+const insertsEnReservas = () => db.accesos.filter((a) => a.tabla === "reservas" && a.op === "insert").length;
+
+describe("acepta_condiciones no válida: la petición muere ANTES de tocar nada", () => {
+  it.each([
+    ["ausente", undefined],
+    ["false", false],
+    ['"true"', "true"],
+    ["1", 1],
+    ["0", 0],
+    ['""', ""],
+    ['"on"', "on"],
+    ["null", null],
+    ["{}", {}],
+    ["[true]", [true]],
+  ])("acepta_condiciones %s: 400, cero lecturas/escrituras, cero solicitudes y cero correos", async (_etiqueta, valor) => {
+    const cuerpo = reserva({ consentimiento_newsletter: true });
+    if (valor === undefined) delete cuerpo.acepta_condiciones;
+    else cuerpo.acepta_condiciones = valor;
+
+    const r = await crear(cuerpo);
+
+    expect(r.status).toBe(400);
+    expect(r.cuerpo).toEqual(RECHAZO_CONDICIONES);
+    expect(db.accesos).toEqual([]);
+    expect(db.tabla("reservas")).toHaveLength(0);
+    expect(db.tabla("solicitudes_pendientes")).toHaveLength(0);
+    expect(estadoPrueba().correos).toEqual([]);
+  });
+
+  it("teléfono en la lista negra y sin la casilla: 400 (no el 403), sin consultar siquiera la lista negra", async () => {
+    db.tabla("blacklist").push({ tipo: "telefono", valor: "611222333", motivo: "No se presentó" });
+
+    const r = await crear(reserva({ acepta_condiciones: false }));
+
+    expect(r.status).toBe(400);
+    expect(r.cuerpo).toEqual(RECHAZO_CONDICIONES);
+    expect(db.accesos).toEqual([]);
+    expect(estadoPrueba().correos).toEqual([]);
+  });
+
+  it("límite de reservas por teléfono ya alcanzado y sin la casilla: 400, sin solicitud «max_reservas_telefono»", async () => {
+    for (const id of ["r-1", "r-2"]) {
+      db.tabla("reservas").push({ id, telefono: "+34611222333", fecha: FECHA, hora: "21:00:00", numero_comensales: 2, estado: "pendiente", marca: "casa_tomas" });
+    }
+
+    const r = await crear(reserva({ acepta_condiciones: false }));
+
+    expect(r.status).toBe(400);
+    expect(db.accesos).toEqual([]);
+    expect(db.tabla("reservas")).toHaveLength(2);
+    expect(db.tabla("solicitudes_pendientes")).toHaveLength(0);
+    expect(estadoPrueba().correos).toEqual([]);
+  });
+
+  it("reserva para HOY sin la casilla: 400, sin solicitud «reserva_hoy» ni correo", async () => {
+    const r = await crear(reserva({ acepta_condiciones: false, fecha: "2026-10-01", hora: "21:00" }));
+
+    expect(r.status).toBe(400);
+    expect(db.accesos).toEqual([]);
+    expect(db.tabla("solicitudes_pendientes")).toHaveLength(0);
+    expect(estadoPrueba().correos).toEqual([]);
+  });
+
+  it("aceptar la newsletter NO sustituye a las condiciones", async () => {
+    const r = await crear(reserva({ acepta_condiciones: false, consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(400);
+    expect(db.tabla("reservas")).toHaveLength(0);
+  });
+});
+
+describe("consentimiento_newsletter — tabla completa de valores", () => {
+  it.each([
+    [true, true],
+    [false, false],
+    ["true", false],
+    ["false", false],
+    [1, false],
+    [0, false],
+    ["on", false],
+    ["yes", false],
+    [null, false],
+    [{}, false],
+    [[true], false],
+  ])("consentimiento_newsletter = %j -> se guarda %j (solo el booleano true es un sí)", async (valor, esperado) => {
+    const r = await crear(reserva({ consentimiento_newsletter: valor }));
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")).toEqual([
+      expect.objectContaining({ consentimiento_newsletter: esperado, condiciones_aceptadas_at: AHORA.toISOString() }),
+    ]);
+  });
+
+  it("se guarda siempre como booleano, nunca el valor crudo del cuerpo", async () => {
+    await crear(reserva({ consentimiento_newsletter: "true" }));
+
+    expect(typeof db.tabla("reservas")[0].consentimiento_newsletter).toBe("boolean");
+  });
+
+  it("sin email y con la casilla marcada: la reserva entra y guarda el consentimiento (el trigger de la BD no da de alta sin email)", async () => {
+    const r = await crear(reserva({ email: "", consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")).toEqual([expect.objectContaining({ email: null, consentimiento_newsletter: true })]);
+  });
+
+  it("la reserva de un grupo grande (422) no guarda ninguna reserva, así que no puede dar de alta a nadie", async () => {
+    const r = await crear(reserva({ numero_comensales: 15, consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(422);
+    expect(db.tabla("reservas")).toHaveLength(0);
+  });
+});
+
+describe("interruptor RESERVAS_WEB_CONDICIONES_OBLIGATORIAS — valores mal escritos NO lo apagan", () => {
+  it.each([["0"], ["no"], ["off"], ["fasle"], ["falso"], ["true"], [""], ["   "], ["false;"], ["'false'"]])(
+    "secret = %j: se sigue exigiendo la casilla (400 sin ella)",
+    async (valor) => {
+      ENV.RESERVAS_WEB_CONDICIONES_OBLIGATORIAS = valor;
+
+      const r = await crear(reserva({ acepta_condiciones: undefined }));
+
+      expect(r.status).toBe(400);
+      expect(r.cuerpo).toEqual(RECHAZO_CONDICIONES);
+      expect(db.accesos).toEqual([]);
+    },
+  );
+
+  // Comportamiento DOCUMENTADO en reglas.ts (`condicionesObligatorias`):
+  // "false" se compara sin distinguir mayúsculas ni espacios. Se fija aquí
+  // para que un cambio de criterio sea consciente (ver informe de la batería).
+  it.each([["false"], ["FALSE"], ["False"], [" false "]])("secret = %j: la desactiva (201 sin la casilla, condiciones_aceptadas_at null)", async (valor) => {
+    ENV.RESERVAS_WEB_CONDICIONES_OBLIGATORIAS = valor;
+
+    const r = await crear(reserva({ acepta_condiciones: undefined }));
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")).toEqual([expect.objectContaining({ condiciones_aceptadas_at: null })]);
+  });
+
+  it("con el interruptor apagado y la casilla marcada, se sigue guardando la hora de aceptación", async () => {
+    ENV.RESERVAS_WEB_CONDICIONES_OBLIGATORIAS = "false";
+
+    const r = await crear(reserva());
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")).toEqual([expect.objectContaining({ condiciones_aceptadas_at: AHORA.toISOString() })]);
+  });
+});
+
+describe("reintento sin condiciones_aceptadas_at (PGRST204) — solo para ESA columna y una sola vez", () => {
+  it("casilla de newsletter desmarcada: reintenta una vez y guarda false", async () => {
+    db.columnasInexistentes.reservas = ["condiciones_aceptadas_at"];
+
+    const r = await crear(reserva());
+
+    expect(r.status).toBe(201);
+    expect(insertsEnReservas()).toBe(2);
+    expect(db.tabla("reservas")).toEqual([expect.objectContaining({ consentimiento_newsletter: false })]);
+    expect(db.tabla("reservas")[0]).not.toHaveProperty("condiciones_aceptadas_at");
+  });
+
+  it("interruptor apagado y sin casilla (condiciones_aceptadas_at = null también va en la fila): reintenta y entra", async () => {
+    ENV.RESERVAS_WEB_CONDICIONES_OBLIGATORIAS = "false";
+    db.columnasInexistentes.reservas = ["condiciones_aceptadas_at"];
+
+    const r = await crear(reserva({ acepta_condiciones: undefined }));
+
+    expect(r.status).toBe(201);
+    expect(insertsEnReservas()).toBe(2);
+  });
+
+  it("si falta OTRA columna (p. ej. consentimiento_newsletter) NO se reintenta: 500 y ningún dato a medias", async () => {
+    db.columnasInexistentes.reservas = ["consentimiento_newsletter"];
+
+    const r = await crear(reserva({ consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(500);
+    expect(r.cuerpo).toEqual({ ok: false, error: "internal_error" });
+    expect(insertsEnReservas()).toBe(1);
+    expect(db.tabla("reservas")).toHaveLength(0);
+  });
+
+  it("si el reintento también falla, no hay un tercer intento: 500", async () => {
+    db.columnasInexistentes.reservas = ["condiciones_aceptadas_at", "consentimiento_newsletter"];
+
+    const r = await crear(reserva());
+
+    expect(r.status).toBe(500);
+    expect(insertsEnReservas()).toBe(2);
+    expect(db.tabla("reservas")).toHaveLength(0);
+  });
+});
+
+describe("lo que NO debe cambiar con las casillas", () => {
+  it("Touza con acepta_condiciones false y newsletter true: 409 de Touza, sin guardar consentimiento alguno", async () => {
+    const r = await crear(reserva({ marca: "touza", acepta_condiciones: false, consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(409);
+    expect(r.cuerpo.motivo).toBe("touza_sin_reservas");
+    expect(db.accesos).toEqual([]);
+  });
+
+  it("Touza CON las dos casillas: sigue siendo 409 (aceptar condiciones no reabre las reservas de Touza)", async () => {
+    const r = await crear(reserva({ marca: "touza", consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(409);
+    expect(db.tabla("reservas")).toHaveLength(0);
+  });
+
+  it("un `canal` en el cuerpo se ignora: la reserva es siempre canal 'web' y la casilla se exige igual", async () => {
+    expect((await crear(reserva({ canal: "telefono", acepta_condiciones: undefined }))).status).toBe(400);
+
+    const r = await crear(reserva({ canal: "telefono", consentimiento_newsletter: true }));
+
+    expect(r.status).toBe(201);
+    expect(db.tabla("reservas")).toEqual([expect.objectContaining({ canal: "web", consentimiento_newsletter: true })]);
+  });
+
+  it("/disponibilidad no pide casillas (la usan también el panel y otros canales): 200 sin acepta_condiciones", async () => {
+    const r = await disponibilidad({ fecha: FECHA, numero_comensales: 4 });
+
+    expect(r.status).toBe(200);
+    expect(Array.isArray(r.cuerpo)).toBe(true);
+    expect(db.escrituras()).toEqual([]);
+  });
+
+  it("cuerpo que no es JSON: 400 invalid_json (antes de mirar las casillas)", async () => {
+    const h = estadoPrueba().handler!;
+    const res = await h(
+      new Request(`${URL_FUNCION}/crear`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{no-json" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ ok: false, error: "invalid_json" });
+    expect(db.accesos).toEqual([]);
+  });
+});
