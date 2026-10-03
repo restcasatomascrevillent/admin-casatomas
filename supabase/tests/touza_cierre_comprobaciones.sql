@@ -17,7 +17,7 @@ set client_encoding = 'UTF8';
 -- QUÉ DEVUELVE: una fila por comprobación con el valor de AHORA, el esperado
 -- ANTES y DESPUÉS de su script, y `ok` según la fase que detecta sola (01
 -- aplicado ⇔ 0 salas de Touza activas; 02 aplicado ⇔ no queda ninguna de las
--- 5 reservas demo). La fila 99 cuenta las `ok = false`: tiene que dar 0.
+-- 5 reservas demo; 04 aplicado ⇔ no queda ninguna sala con marca touza). La fila 99 cuenta las `ok = false`: tiene que dar 0.
 -- `ok` vacío = fila informativa. El 03 no deja huella, así que su fila (18,
 -- avisos de Touza sin leer) es informativa: antes del 03 puede no ser 0 (justo
 -- el caso para el que existe el 03) sin que nada vaya mal, y por eso no tiene
@@ -30,7 +30,8 @@ set client_encoding = 'UTF8';
 -- VALORES ESPERADOS (comprobados con SELECT el 02/10/2026 a las 16:30; los de
 -- Casa Tomás suponen que nadie cambia sus salas entretanto):
 --                                                     antes      tras su script
---   01  salas con marca touza (total)                   3          3
+--   04  salas con marca touza (total)                   3          0  (las borra la migración
+--                                                                    20261003120000; sin ella, 3)
 --   01  salas de Touza activas                          3          0
 --   01  aforo activo de Touza                          80          0
 --   01  aforo activo total (los 2 bots de origin/main) 250       170
@@ -74,8 +75,9 @@ begin
   select coalesce(array_agg(e.id order by e.id), '{}'::uuid[]) into v_salas
     from public.espacios_reserva e
    where e.caracteristicas->>'marca' = 'touza';
-  if v_salas is distinct from c_salas then
-    raise exception 'FALLO: las salas con marca touza no son las 3 esperadas (%).', v_salas;
+  -- Las 3 esperadas, o ninguna (04 aplicado: migración 20261003120000 las borra).
+  if v_salas <> '{}'::uuid[] and v_salas is distinct from c_salas then
+    raise exception 'FALLO: las salas con marca touza no son las 3 esperadas ni ninguna (%).', v_salas;
   end if;
 
   select count(*) into v_activas
@@ -201,13 +203,14 @@ with m as (
       where jobname = 'reservas-aviso-sin-asignar')                                      as cron_aviso_activo
 ),
 f as (
-  select m.*, (m.salas_touza_activas = 0) as s01, (m.lote = 0) as s02 from m
+  select m.*, (m.salas_touza_activas = 0) as s01, (m.lote = 0) as s02, (m.salas_touza = 0) as s04 from m
 ),
 t (n, script, comprobacion, ahora, esperado_antes, esperado_despues) as (
   select 0, '-', 'Fase detectada',
          case when s01 then '01 aplicado' else '01 sin aplicar' end || ' / '
-           || case when s02 then '02 aplicado' else '02 sin aplicar' end, '-', '-' from f
-  union all select 1,  '01', 'Salas con marca touza (total)',                    salas_touza::text,          '3',   '3'   from f
+           || case when s02 then '02 aplicado' else '02 sin aplicar' end || ' / '
+           || case when s04 then '04 aplicado (salas borradas)' else '04 sin aplicar' end, '-', '-' from f
+  union all select 1,  '04', 'Salas con marca touza (total; las borra la migración 20261003120000)', salas_touza::text, '3', '0' from f
   union all select 2,  '01', 'Salas de Touza activas',                           salas_touza_activas::text,  '3',   '0'   from f
   union all select 3,  '01', 'Aforo activo de Touza',                            aforo_touza::text,          '80',  '0'   from f
   union all select 4,  '01', 'Aforo activo total (lo que suma el bot de origin/main)', aforo_total::text,    '250', '170' from f
@@ -251,6 +254,7 @@ r as (
            else t.ahora = case t.script
                             when '01' then case when f.s01 then t.esperado_despues else t.esperado_antes end
                             when '02' then case when f.s02 then t.esperado_despues else t.esperado_antes end
+                            when '04' then case when f.s04 then t.esperado_despues else t.esperado_antes end
                             else t.esperado_antes
                           end
          end as ok

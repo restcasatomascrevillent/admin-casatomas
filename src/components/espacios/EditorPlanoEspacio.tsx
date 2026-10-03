@@ -514,6 +514,33 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     setZoomLevel(fitZoom);
   }, [fitZoom]);
 
+  // Aviso al ABRIR el editor: mesas activas cuya caja cae fuera del plano. La
+  // causa típica son filas guardadas con `pos_x/pos_y` en píxeles (el editor
+  // las lee como metros: salen a cientos de metros y no se ven). No se mueve
+  // nada solo —recolocarlas le cambiaría el plano al dueño sin pedirlo—; se
+  // avisa UNA vez por espacio para que las busque y las arrastre.
+  const avisoFueraDelPlanoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loadingPlano || loadingMesas || !plano?.ancho_metros || !plano?.alto_metros) return;
+    if (avisoFueraDelPlanoRef.current === espacioId) return;
+    avisoFueraDelPlanoRef.current = espacioId;
+    const fuera = mesasFueraDelPlano(
+      mesas
+        .filter((m) => m.activa !== false && !m.is_merged)
+        .map((m) => ({ nombre: m.nombre, posX: m.pos_x ?? 0, posY: m.pos_y ?? 0, ancho: m.ancho ?? 80, alto: m.alto ?? 80 })),
+      { width: plano.ancho_metros, height: plano.alto_metros },
+    );
+    if (fuera.length === 0) return;
+    const listado = fuera.slice(0, 8).join(", ");
+    const resto = fuera.length > 8 ? ` y ${fuera.length - 8} más` : "";
+    toast.warning(
+      `${fuera.length === 1 ? "La mesa" : "Las mesas"} ${listado}${resto} ` +
+        `${fuera.length === 1 ? "está" : "están"} fuera del plano de ${plano.ancho_metros}m × ${plano.alto_metros}m ` +
+        "y no se ve" + (fuera.length === 1 ? "" : "n") + " en el lienzo (suelen ser coordenadas antiguas en píxeles).",
+      { duration: 12000 },
+    );
+  }, [espacioId, plano, mesas, loadingPlano, loadingMesas]);
+
   // Aplicar nuevas dimensiones reales.
   //
   // ÚNICO camino para cambiar el ancho/alto del espacio. No persiste por su

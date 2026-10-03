@@ -161,6 +161,7 @@ import {
   SquarePen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { posicionInicialMesaNueva } from "./posicionMesaNueva";
 import { cn } from "@/lib/utils";
 import {
   aabbRectFabric,
@@ -1621,16 +1622,35 @@ export function PlanoEspacio2D({
       toast.error("Introduce un nombre para la mesa");
       return;
     }
+    // `pos_x/pos_y` van en METROS. Antes se daba `50, 50` (parecía píxeles de
+    // escena pero se leía como 50 m): la mesa nacía fuera del plano y el editor
+    // no la mostraba. Ahora se coge el primer hueco libre dentro de la sala.
+    const posicion = posicionInicialMesaNueva({
+      anchoCm: newMesa.ancho,
+      altoCm: newMesa.alto,
+      forma: newMesa.forma,
+      espacio: { width: realWidth, height: realHeight },
+      mesas: localMesas,
+      elementos: elementosPlano,
+      pixelsPerMeter: PIXELS_PER_METER,
+    });
     await crearMesa.mutateAsync({
       espacio_id: espacioId,
       nombre: newMesa.nombre.trim(),
       capacidad: newMesa.capacidad,
       forma: newMesa.forma,
       ancho: newMesa.ancho,
-      alto: newMesa.alto,
-      pos_x: 50,
-      pos_y: 50,
+      alto: newMesa.forma === "circular" ? newMesa.ancho : newMesa.alto,
+      pos_x: posicion.pos_x,
+      pos_y: posicion.pos_y,
     });
+    if (posicion.sinHueco) {
+      toast.warning(
+        `No quedaba ningún hueco libre: la mesa ${newMesa.nombre.trim()} se ha colocado en ` +
+          `(${posicion.pos_x} m, ${posicion.pos_y} m) y puede estar encima de otra o de una pared. ` +
+          "Muévela a su sitio en el editor de plano.",
+      );
+    }
     setNewMesa({ nombre: "", capacidad: 4, forma: "rectangular", ancho: 80, alto: 80 });
     setShowAddMesa(false);
   };

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { salaAdmiteReservas } from "@/lib/reservas/negocios";
 
 export interface EspacioReserva {
   id: string;
@@ -12,11 +13,17 @@ export interface EspacioReserva {
 }
 
 /**
- * TODAS las filas de `espacios_reserva`, también las salas de Touza que siguen
- * en la base de datos. Solo Casa Tomás admite reservas (decisión del dueño,
- * 2026-10-01): cada pantalla enseña y suma únicamente las salas que pasan
- * `salaAdmiteReservas` (`src/lib/reservas/negocios.ts`), que decide por
- * `caracteristicas.marca`, nunca por el nombre (hay dos «Terraza»).
+ * Las salas de CASA TOMÁS (`salaAdmiteReservas`, `src/lib/reservas/negocios.ts`).
+ * Touza no admite reservas ni gestiona espacios ni mesas con este sistema
+ * (decisión del dueño, 2026-10-01; 2026-10-03: «nunca»): sus tres salas siguen
+ * en la base de datos (desactivadas) hasta que se aplique la migración
+ * `20261003120000_touza_retirar_espacios_reserva.sql`. Este es el hook de
+ * lectura de la lista de salas del panel, así que ninguna pantalla que lo use
+ * (selectores de sala, Espacios, plano, mesas, asignación…) puede ofrecerlas ni
+ * abrirlas por id; los demás hooks que leen la tabla por su cuenta aplican la
+ * misma regla en su queryFn. La regla decide por `caracteristicas.marca`, nunca por el
+ * nombre (hay dos «Terraza»). Los filtros que cada pantalla aplica además se
+ * quedan como segunda red.
  */
 export const useEspaciosReserva = () => {
   return useQuery({
@@ -28,7 +35,7 @@ export const useEspaciosReserva = () => {
         .order("nombre");
 
       if (error) throw error;
-      return data as any;
+      return ((data ?? []) as any[]).filter((e) => salaAdmiteReservas(e)) as any;
     },
   });
 };

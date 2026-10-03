@@ -25,6 +25,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 
 import { supabase } from "@/integrations/supabase/client";
 import type { DobleTablas } from "@/hooks/__tests__/dobleSupabaseTablas";
+import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useOcupacionSalasDia } from "@/hooks/useOcupacionSalasDia";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import {
@@ -166,5 +167,35 @@ describe("useDashboardStats y las reservas de hoy del Dashboard", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data!.map((r: { id: string }) => r.id)).toEqual(["ct-confirmada"]);
+  });
+});
+
+describe("useEspaciosReserva (la lista de salas que usan los selectores, Espacios, plano y mesas)", () => {
+  it("devuelve solo las salas de Casa Tomás (también la desactivada), nunca las de Touza", async () => {
+    const { result } = renderHook(() => useEspaciosReserva(), { wrapper: envoltorio() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // Touza, activas o no, ni una: decisión del dueño 2026-10-03 («Touza nunca gestiona reservas»).
+    expect((result.current.data as Array<{ id: string }>).map((e) => e.id)).toEqual([
+      "ct-bodega",
+      "ct-comedor",
+      "ct-reservado",
+      "ct-salon",
+      "ct-terraza",
+    ]);
+  });
+
+  it("con las salas de Touza ya desactivadas (estado de producción desde el 02/10) tampoco salen", async () => {
+    doble.tablas = {
+      ...doble.tablas,
+      espacios_reserva: ESPACIOS.map((e) =>
+        (e.caracteristicas as { marca?: string } | null)?.marca === "touza" ? { ...e, activa: false } : e,
+      ),
+    };
+    const { result } = renderHook(() => useEspaciosReserva(), { wrapper: envoltorio() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect((result.current.data as Array<{ id: string }>).some((e) => e.id.startsWith("tz-"))).toBe(false);
+    expect((result.current.data as unknown[]).length).toBe(5);
   });
 });

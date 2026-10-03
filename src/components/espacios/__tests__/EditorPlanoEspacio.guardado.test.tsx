@@ -841,3 +841,36 @@ describe("EditorPlanoEspacio — las otras dos lecturas de 'cero filas'", () => 
     expect(mensaje).toContain("Otra sesión las ha borrado");
   });
 });
+
+describe("EditorPlanoEspacio — aviso de mesas fuera del plano al abrir", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.cadenas.length = 0;
+    h.canvasProps.current = null;
+    h.responder.current = responderTodoOk;
+    contadorInsert = 0;
+  });
+
+  it("avisa de las mesas activas guardadas en píxeles (fuera del plano de 12 x 8 m)", async () => {
+    montar([
+      filaDB("m-1", "1", 4),
+      filaDB("m-9", "9", 6, { pos_x: 239.26, pos_y: 100.17, ancho: 150, alto: 150 }),
+      // Inactiva y fusionada: no se dibujan, no cuentan.
+      filaDB("m-x", "x", 4, { pos_x: 300, pos_y: 300, activa: false }),
+      filaDB("m-f", "f", 4, { pos_x: 300, pos_y: 300, is_merged: true }),
+    ]);
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalledTimes(1));
+    const aviso = String(vi.mocked(toast.warning).mock.calls[0][0]);
+    expect(aviso).toContain("La mesa 9");
+    expect(aviso).toContain("12m × 8m");
+    expect(aviso).not.toMatch(/\bx\b|\bf\b/);
+  });
+
+  it("no avisa si todas las mesas caben en el plano", async () => {
+    montar([filaDB("m-1", "1", 4), filaDB("m-2", "2", 4, { pos_x: 3, pos_y: 3 })]);
+    // Deja pasar los efectos.
+    await act(async () => {});
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+});
