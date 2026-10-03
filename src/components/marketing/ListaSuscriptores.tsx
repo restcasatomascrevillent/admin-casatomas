@@ -60,7 +60,7 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
       <TabsContent value="bajas">
         <p className="text-xs text-muted-foreground mb-2">
           No reciben ningún envío. No se pueden volver a activar desde aquí: solo vuelven si marcan otra vez la
-          casilla del newsletter en una reserva nueva.
+          casilla del newsletter en una reserva nueva y la confirman desde su correo.
         </p>
         {bajas.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">Nadie se ha dado de baja.</p>

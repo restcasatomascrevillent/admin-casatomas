@@ -12,21 +12,25 @@ export function GestionCorreos() {
 
   return (
     <div className="space-y-4">
-      {/* Origen de los suscriptores. Altas: trigger agregar_suscriptor_al_reservar_consentida
-          sobre `reservas`, solo si la reserva trae consentimiento_newsletter = true (lo rellena
-          reservas-web desde la casilla del formulario web; ver
-          supabase/migrations/20261003143000_reserva_web_prueba_consentimiento.sql). */}
+      {/* Origen de los suscriptores. Altas (doble opt-in): triggers newsletter_alta_reserva_verificada_*
+          sobre `reservas`, solo si la reserva trae consentimiento_newsletter = true (casilla del formulario
+          web, también si la reserva sale de una solicitud) Y el cliente ha verificado el email pulsando
+          «Confirmo» en el correo (email_verificado_at). Ver
+          supabase/migrations/20261003184500_newsletter_doble_optin_y_email_normalizado.sql. */}
       <Card className="border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
             <Info className="h-5 w-5 text-sky-600 mt-0.5 shrink-0" />
             <div className="text-sm text-sky-900 dark:text-sky-200">
-              <p className="font-medium">Altas solo desde la reserva web, con consentimiento explícito</p>
+              <p className="font-medium">Altas solo desde la reserva web, con consentimiento explícito y email confirmado</p>
               <p className="mt-1">
                 Solo se da de alta quien, al reservar en la web de Casa Tomás, marca la casilla opcional
-                para recibir el newsletter. La propia reserva guarda la constancia de ese consentimiento.
-                Si alguien que se había dado de baja vuelve a marcarla en una reserva nueva, se le
-                reactiva; si no la marca, no se le vuelve a suscribir.
+                para recibir el newsletter y después pulsa «Confirmo» en el correo de su reserva. Así nadie
+                puede apuntar el email de otra persona. Si la reserva la confirmáis vosotros a mano (por
+                teléfono o desde el panel), no se da de alta. La reserva guarda la constancia del
+                consentimiento y de la confirmación. Si alguien que se había dado de baja vuelve a marcarla
+                en una reserva nueva y la confirma desde su correo, se le reactiva; si no, no se le vuelve a
+                suscribir.
               </p>
               <p className="mt-1">
                 Por teléfono todavía no se pide el consentimiento y este panel no tiene alta manual. Hasta
@@ -55,7 +59,7 @@ export function GestionCorreos() {
               <p className="mt-1">
                 Las bajas aparecen aquí solas (en un minuto como mucho), con su fecha y el motivo. Los dados de baja
                 no reciben ningún envío y no se pueden volver a activar desde el panel: solo vuelven si marcan otra
-                vez la casilla del newsletter en una reserva nueva.
+                vez la casilla del newsletter en una reserva nueva y la confirman desde su correo.
               </p>
             </div>
           </div>
