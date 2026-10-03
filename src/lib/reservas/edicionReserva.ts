@@ -45,6 +45,7 @@ import {
   PEDIR_PERMISO_EDICION,
 } from "./altaPanel";
 import { horaCorta } from "./ocupacionSalas";
+import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "./salaPrivada";
 import { formatearTelefonoReserva } from "./telefono";
 
 /** La fila de `reservas` que necesita el editor (el resto de columnas ni se lee ni se escribe). */
@@ -599,6 +600,8 @@ export function mensajeErrorEdicion(error: unknown): string {
   if (error instanceof ErrorSinFilasEdicion) return error.message;
   const e = (error ?? {}) as { code?: string; message?: string };
   const mensaje = String(e.message ?? "");
+  // Sala privada (el Reservado) ya reservada en ese turno: el mensaje lleva el nombre de la sala.
+  if (esErrorSalaPrivadaOcupada(e)) return mensajeSalaPrivadaOcupada(e);
   // 23514 = check_violation: lo lanza el trigger de aforo, pero también los CHECK de la tabla.
   if (e.code === "23514" && mensaje.includes("Aforo")) {
     return "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales.";

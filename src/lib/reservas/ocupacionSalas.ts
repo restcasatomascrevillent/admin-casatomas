@@ -15,6 +15,11 @@
 //     (pendiente, verificada, confirmada) del turno, contra la suma de
 //     `capacidad_maxima` de los espacios del negocio. Es EXACTAMENTE la cuenta
 //     del trigger: si aquí "no cabe", el INSERT fallará con 23514.
+//   · SALA PRIVADA (el Reservado, `caracteristicas.privada`; 20261003130000): una
+//     reserva viva se queda la sala ENTERA. En el aforo del turno pesa
+//     `capacidad_maxima` de la sala (GREATEST con sus comensales), no sus
+//     comensales — es la cuenta del trigger —, y la fila de la sala sale llena
+//     en ese turno en cuanto tiene una reserva.
 //   · OCUPACIÓN DE CADA SALA (orientativa, la BD no la valida): mismo turno,
 //     pero con `ocupaEspacio` de `servicioSala.ts` — los mismos estados MÁS
 //     'completada' (un cliente que ya llegó está sentado en esa sala). Es el
@@ -70,6 +75,8 @@ export interface EspacioSala {
   id: string;
   nombre: string;
   capacidad_maxima: number;
+  /** Sala privada (`caracteristicas.privada`): una reserva viva se queda la sala entera en su turno. */
+  privada?: boolean;
 }
 
 export interface ReservaOcupacionSala {
@@ -248,11 +255,15 @@ function construirFila(
   capacidad: number | null,
   reservas: ReservaOcupacionSala[],
   comensales: number,
+  privada = false,
 ): FilaSala {
   const propias = reservas.filter((r) => (r.espacio_id ?? null) === espacioId && ocupaEspacio(r.estado));
   const turnos = {} as Record<Turno, CeldaTurno>;
   for (const turno of TURNOS) {
-    const ocupados = propias.filter((r) => turnoDeHora(r.hora) === turno).reduce((s, r) => s + pax(r), 0);
+    const delTurno = propias.filter((r) => turnoDeHora(r.hora) === turno);
+    const suma = delTurno.reduce((s, r) => s + pax(r), 0);
+    // Sala privada: con una reserva en el turno, la sala está llena (no admite una segunda).
+    const ocupados = privada && delTurno.length > 0 ? Math.max(suma, capacidad ?? 0) : suma;
     turnos[turno] = celdaTurno(ocupados, capacidad, comensales);
   }
   const porHora: Record<string, CeldaHora> = {};
@@ -296,7 +307,7 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
 
   const espacios = [...entrada.espacios].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   const salas = espacios.map((e) =>
-    construirFila(e.id, e.nombre, Number(e.capacidad_maxima) || 0, reservas, comensales),
+    construirFila(e.id, e.nombre, Number(e.capacidad_maxima) || 0, reservas, comensales, !!e.privada),
   );
 
   const idsConocidos = new Set(espacios.map((e) => e.id));
@@ -309,11 +320,15 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
   const haySinAsignar = TURNOS.some((t) => filaSinAsignar.turnos[t].ocupados > 0);
 
   const capacidadTotal = espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0);
+  // Salas privadas: la reserva pesa la sala entera en el aforo (como el trigger de la BD).
+  const privadas = new Map(espacios.filter((e) => e.privada).map((e) => [e.id, Number(e.capacidad_maxima) || 0]));
+  const pesoAforo = (r: ReservaOcupacionSala) =>
+    r.espacio_id && privadas.has(r.espacio_id) ? Math.max(privadas.get(r.espacio_id) as number, pax(r)) : pax(r);
   const aforo = {} as Record<Turno, AforoTurnoDia>;
   for (const turno of TURNOS) {
     const ocupados = reservas
       .filter((r) => ocupaAforo(r.estado) && turnoDeHora(r.hora) === turno)
-      .reduce((s, r) => s + pax(r), 0);
+      .reduce((s, r) => s + pesoAforo(r), 0);
     const tras = ocupados + comensales;
     aforo[turno] = {
       ocupados,

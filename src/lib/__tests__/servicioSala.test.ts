@@ -123,3 +123,43 @@ describe("utilidades", () => {
     expect(mensajeErrorServicio({ message: "boom" }, "mover la reserva")).toBe("No se pudo mover la reserva: boom");
   });
 });
+
+describe("sala privada (el Reservado)", () => {
+  const ocupante = r({ id: "primera", nombre: "Ana", espacio_id: "reservado", numero_comensales: 5, estado: "confirmada" });
+  const entrante = r({ id: "segunda", nombre: "Luis", espacio_id: null, numero_comensales: 2 });
+
+  it("bloquea mover a la sala privada si ya hay otra reserva en el turno", () => {
+    const ev = evaluarMovimiento(entrante, "reservado", [ocupante, entrante], 20, { nombre: "Reservado" });
+    expect(ev.tipo).toBe("bloqueado");
+    expect(ev).toMatchObject({ motivo: expect.stringContaining("«Reservado»") });
+    expect(ev).toMatchObject({ motivo: expect.stringContaining("Ya la tiene Ana") });
+  });
+
+  it("deja mover si la sala está libre en ese turno (otro turno, cancelada, «No vino»)", () => {
+    const comida = r({ id: "c", espacio_id: "reservado", hora: "14:00:00" });
+    expect(evaluarMovimiento(entrante, "reservado", [comida, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+    const cancelada = { ...ocupante, estado: "cancelada" };
+    expect(evaluarMovimiento(entrante, "reservado", [cancelada, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+    const noShow = { ...ocupante, estado: "no_show" };
+    expect(evaluarMovimiento(entrante, "reservado", [noShow, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+  });
+
+  it("una reserva que ya está en la sala y vuelve a 'moverse' ahí es sin_cambio, no un choque consigo misma", () => {
+    expect(evaluarMovimiento(ocupante, "reservado", [ocupante], 20, { nombre: "Reservado" })).toEqual({ tipo: "sin_cambio" });
+  });
+
+  it("sin el flag (sala normal) no cambia nada: caben varias", () => {
+    const ev = evaluarMovimiento(entrante, "reservado", [ocupante, entrante], 20);
+    expect(ev.tipo).toBe("ok");
+  });
+
+  it("mensajeErrorServicio traduce el error de la sala privada y no lo confunde con un aforo lleno", () => {
+    const m = mensajeErrorServicio(
+      { code: "23514", message: "Sala privada ocupada: «Reservado» ya tiene una reserva el 04/10/2026 en el turno de cena." },
+      "mover la reserva",
+    );
+    expect(m).toContain("No se pudo mover la reserva.");
+    expect(m).toContain("«Reservado»");
+    expect(m).not.toMatch(/aforo/i);
+  });
+});

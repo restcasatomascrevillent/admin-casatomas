@@ -30,6 +30,8 @@ const h = vi.hoisted(() => ({
   almacen: undefined as unknown as AlmacenDoble,
   /** Permiso de edición de «reservas». */
   canEdit: true,
+  /** El Reservado lleva `caracteristicas.privada = true` (una reserva se queda la sala entera). */
+  reservadoPrivado: false,
   /** Props con las que se ha pintado el plano, en orden. */
   plano: vi.fn(),
   /** Props con las que se ha pintado el `DndContext` del kanban (para soltar una tarjeta sin geometría). */
@@ -46,7 +48,13 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({
   useEspaciosReserva: () => ({
     data: [
       { id: "salon", nombre: "Salón", capacidad_maxima: 60, activa: true, caracteristicas: { marca: "casa_tomas" } },
-      { id: "reservado", nombre: "Reservado", capacidad_maxima: 20, activa: true, caracteristicas: { marca: "casa_tomas" } },
+      {
+        id: "reservado",
+        nombre: "Reservado",
+        capacidad_maxima: 20,
+        activa: true,
+        caracteristicas: h.reservadoPrivado ? { marca: "casa_tomas", privada: true } : { marca: "casa_tomas" },
+      },
       { id: "terraza", nombre: "Terraza", capacidad_maxima: 30, activa: true, caracteristicas: { marca: "casa_tomas" } },
     ],
   }),
@@ -237,6 +245,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vaciarAlmacen(h.almacen);
   h.canEdit = true;
+  h.reservadoPrivado = false;
   h.almacen.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-berta", "confirmada", "Berta", { hora: "21:30:00", numero_comensales: 2 })];
   h.almacen.mesas = MESAS.map((m) => ({ ...m }));
   consolaError = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -605,5 +614,45 @@ describe("darle mesa desde el mapa", () => {
     expect(h.almacen.asignaciones).toHaveLength(1);
     expect(h.almacen.escrituras).toHaveLength(1);
     expect(h.almacen.invocaciones).toEqual([]);
+  });
+});
+
+describe("Reservado como sala PRIVADA: una reserva se queda la sala entera", () => {
+  it("mover una segunda reserva al Reservado en el mismo turno se bloquea con un aviso, sin escribir ni abrir el mapa", async () => {
+    h.reservadoPrivado = true;
+    // Berta (2 comensales, cena) ya tiene el Reservado: Ana (cena) no puede entrar.
+    h.almacen.reservas = [
+      reserva("r-ana", "confirmada", "Ana"),
+      reserva("r-berta", "confirmada", "Berta", { espacio_id: "reservado", numero_comensales: 2 }),
+    ];
+    montar();
+    await conTablero();
+
+    await moverA("Ana", /^Reservado/);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+    const aviso = String(vi.mocked(toast.error).mock.calls[0][0]);
+    expect(aviso).toContain("La sala privada «Reservado» ya está reservada en ese turno");
+    expect(aviso).toContain("Ya la tiene Berta");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(h.almacen.escrituras).toEqual([]);
+    expect(h.plano).not.toHaveBeenCalled();
+  });
+
+  it("si el Reservado está libre en ese turno (la otra es de la comida), sí se mueve y se abre el mapa", async () => {
+    h.reservadoPrivado = true;
+    h.almacen.reservas = [
+      reserva("r-ana", "confirmada", "Ana"),
+      reserva("r-berta", "confirmada", "Berta", { espacio_id: "reservado", numero_comensales: 2, hora: "14:00:00" }),
+    ];
+    montar();
+    await conTablero();
+
+    await moverA("Ana", /^Reservado/);
+
+    await mapaDe("Ana", "Reservado");
+    expect(h.almacen.escrituras).toEqual([{ tabla: "reservas", payload: { espacio_id: "reservado" }, ids: ["r-ana"] }]);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

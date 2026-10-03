@@ -142,3 +142,14 @@ describe("actualizacionPropuesta con sala", () => {
     expect("espacio_propuesto_id" in upd!).toBe(false);
   });
 });
+
+describe("mensajeErrorPropuesta · sala privada", () => {
+  it("datos_invalidos con el mensaje del trigger de la sala privada: frase en claro, sin el texto crudo de la BD", () => {
+    const m = mensajeErrorPropuesta(
+      "datos_invalidos",
+      "Sala privada ocupada: «Reservado» ya tiene una reserva el 04/10/2026 en el turno de cena.",
+    );
+    expect(m).toMatch(/^La sala privada «Reservado» ya está reservada en ese turno/);
+    expect(m).not.toMatch(/base de datos/i);
+  });
+});

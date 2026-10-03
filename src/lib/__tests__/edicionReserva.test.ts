@@ -774,3 +774,14 @@ describe("edicionReserva · ¿el enlace «Confirma tu reserva» se queda roto tr
     expect(enlaceQuedaRoto(verificada, { numero_comensales: 6 }, { hoy, avisoModificacion: null })).toBe(false);
   });
 });
+
+describe("mensajeErrorEdicion · sala privada", () => {
+  it("explica que el Reservado ya está reservado en ese turno (y no habla de aforo)", () => {
+    const m = mensajeErrorEdicion({
+      code: "23514",
+      message: "Sala privada ocupada: «Reservado» ya tiene una reserva el 04/10/2026 en el turno de cena.",
+    });
+    expect(m).toMatch(/La sala privada «Reservado» ya está reservada en ese turno/);
+    expect(m).not.toMatch(/aforo/i);
+  });
+});

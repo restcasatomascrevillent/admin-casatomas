@@ -1,4 +1,6 @@
-# Cierre de reservas de Touza: fase de datos (NO APLICADO)
+# Cierre de reservas de Touza: fase de datos
+
+**Estado a 2026-10-03: APLICADO.** 01 (02/10), 02, 03 y 04 (03/10) aplicados por el dueño; `touza_cierre_comprobaciones.sql` dio RESUMEN = 0 con «01 aplicado / 02 aplicado / 04 aplicado (salas borradas)». Touza ya no tiene salas, reservas ni sugerencias en el sistema de reservas.
 
 Decisión del dueño (01/10/2026): Touza no admite reservas. Estos scripts cierran la parte de base de datos. Los aplica **el dueño a mano**, desde `adminpanelct/`, **una orden por línea** (PowerShell no admite `&&`). Nunca `supabase db push` ni `migration repair`. Ninguno cambia funciones, triggers ni crons.
 

@@ -4,6 +4,8 @@
 // espacio.sql + supabase/functions/emails-reserva/propuesta-solicitud.ts.
 // ============================================================================
 
+import { esMensajeSalaPrivadaOcupada, nombreSalaDelError, textoSalaPrivadaOcupada } from "./salaPrivada";
+
 export type EstadoPropuesta = "borrador" | "enviada" | "aceptada" | "rechazada" | "caducada";
 
 export interface SolicitudConPropuesta {
@@ -141,6 +143,7 @@ export function mensajeErrorPropuesta(error: string | null | undefined, detalle?
     case "propuesta_no_vigente":
       return "La propuesta ha cambiado desde que se envió.";
     case "datos_invalidos":
+      if (esMensajeSalaPrivadaOcupada(detalle)) return textoSalaPrivadaOcupada(nombreSalaDelError(detalle));
       return `La base de datos rechazó la reserva${detalle ? `: ${detalle}` : "."}`;
     default:
       return `No se pudo completar la operación${detalle ? `: ${detalle}` : error ? ` (${error})` : "."}`;

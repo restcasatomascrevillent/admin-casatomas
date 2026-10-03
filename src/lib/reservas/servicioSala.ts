@@ -35,6 +35,7 @@ import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad"
 // (`esperandoLlegada` = `esEstadoVivo`, `puedeMoverReserva` = `ocupaEspacio`) y
 // las reexportaciones que nadie usaba se quitaron en el paso 4 del refactor.
 import { ESTADO_LLEGADA, ESTADO_NO_SHOW, esEstadoVivo, ocupaEspacio } from "./estadosReserva";
+import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada, salaPrivadaOcupadaPor, textoSalaPrivadaOcupada } from "./salaPrivada";
 
 export { ESTADO_LLEGADA, ocupaEspacio };
 
@@ -294,6 +295,12 @@ export function evaluarMovimiento(
   destinoId: string | null,
   todas: ReservaServicio[],
   capacidadDestino: number | null | undefined,
+  /**
+   * El destino es una sala PRIVADA (`caracteristicas.privada`, el Reservado): una reserva se la queda
+   * entera, así que si ya hay otra en ese turno el movimiento se BLOQUEA (la BD lo rechazaría igual
+   * con 23514 «Sala privada ocupada»). `nombre`: para escribir el aviso.
+   */
+  salaPrivadaDestino?: { nombre?: string | null } | null,
 ): EvaluacionMovimiento {
   if (!ocupaEspacio(reserva.estado)) {
     return {
@@ -305,6 +312,18 @@ export function evaluarMovimiento(
     };
   }
   if ((reserva.espacio_id ?? null) === destinoId) return { tipo: "sin_cambio" };
+
+  if (destinoId && salaPrivadaDestino) {
+    const ocupante = salaPrivadaOcupadaPor(todas, destinoId, reserva.hora, reserva.id);
+    if (ocupante) {
+      return {
+        tipo: "bloqueado",
+        motivo: ocupante.nombre
+          ? `${textoSalaPrivadaOcupada(salaPrivadaDestino.nombre)} Ya la tiene ${ocupante.nombre}.`
+          : textoSalaPrivadaOcupada(salaPrivadaDestino.nombre),
+      };
+    }
+  }
 
   const turno = turnoDeHora(reserva.hora);
   const capacidad = destinoId && capacidadDestino ? Number(capacidadDestino) : null;
@@ -358,6 +377,8 @@ export function formatearHoraLlegada(llegadaAt: string | null | undefined): stri
 /** Mensaje legible para un fallo del trigger de aforo (23514) al deshacer. */
 export function mensajeErrorServicio(error: unknown, accion: string): string {
   const e = (error ?? {}) as { code?: string; message?: string };
+  // Sala privada (el Reservado) ya reservada en ese turno: la frase lleva el nombre de la sala.
+  if (esErrorSalaPrivadaOcupada(e)) return `No se pudo ${accion}. ${mensajeSalaPrivadaOcupada(e)}`;
   if (e.code === "23514" && String(e.message ?? "").includes("Aforo")) {
     return `No se pudo ${accion}: el turno ya está completo (aforo superado).`;
   }

@@ -48,6 +48,7 @@ import {
 import { PanelDia } from "./asignacion/PanelDia";
 import { TiraDias } from "./asignacion/TiraDias";
 import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "@/lib/reservas/salaPrivada";
 import {
   ETIQUETA_TURNO,
   calcularOcupacionSalas,
@@ -218,7 +219,11 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
     } catch (error) {
       console.error("[asignacion] Error al cambiar la sala:", error);
       toast.error(
-        error instanceof ErrorSinPermisoSala ? error.message : "No se pudo cambiar la sala. Inténtalo de nuevo.",
+        error instanceof ErrorSinPermisoSala
+          ? error.message
+          : esErrorSalaPrivadaOcupada(error)
+            ? mensajeSalaPrivadaOcupada(error) // el Reservado ya tiene otra reserva en ese turno
+            : "No se pudo cambiar la sala. Inténtalo de nuevo.",
       );
     }
   };

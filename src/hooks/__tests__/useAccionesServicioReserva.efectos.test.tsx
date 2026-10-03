@@ -1204,6 +1204,29 @@ describe("cuando la escritura falla", () => {
     );
   });
 
+  it("mover al Reservado cuando otra reserva ya lo tiene en ese turno: el trigger lo rechaza y el aviso lo explica (sin hablar de aforo)", async () => {
+    mockEscrituras([
+      {
+        error: {
+          code: "23514",
+          message: "Sala privada ocupada: «Reservado» ya tiene una reserva el 04/10/2026 en el turno de cena.",
+        },
+      },
+    ]);
+    const { result } = montar();
+
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.moverEspacio(reserva(), "reservado", "Reservado");
+    });
+
+    expect(ok).toBe(false);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    const aviso = String(vi.mocked(toast.error).mock.calls[0][0]);
+    expect(aviso).toContain("La sala privada «Reservado» ya está reservada en ese turno");
+    expect(aviso).not.toMatch(/aforo/i);
+  });
+
   it("un fallo de una reserva no deja «en curso» a nadie", async () => {
     mockEscrituras([{ error: { message: "boom" } }]);
     const { result } = montar();

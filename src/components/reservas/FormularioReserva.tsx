@@ -53,6 +53,7 @@ import {
   RE_EMAIL,
 } from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
+import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "@/lib/reservas/salaPrivada";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import { notificarAlCliente } from "@/lib/reservas/notificarCliente";
@@ -921,7 +922,10 @@ export const FormularioReserva = ({
       console.error("Error creando reserva:", error);
       // 23514 = check_violation. Lo lanza el trigger `trg_validar_capacidad` cuando
       // se supera el aforo del turno, y también los CHECK de la tabla.
-      const mensaje = error?.code === "23514" && String(error?.message || "").includes("Aforo")
+      const mensaje = esErrorSalaPrivadaOcupada(error)
+        ? // La sala privada (el Reservado) ya tiene una reserva en ese turno: se queda la sala entera.
+          mensajeSalaPrivadaOcupada(error)
+        : error?.code === "23514" && String(error?.message || "").includes("Aforo")
         ? "No hay aforo suficiente en ese turno. Elige otra hora o reduce los comensales."
         : error?.code === "23505" && String(error?.message || "").includes("solicitud")
           ? "Esta solicitud ya se había convertido en una reserva."

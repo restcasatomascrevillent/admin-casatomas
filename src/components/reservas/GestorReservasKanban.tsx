@@ -23,6 +23,7 @@ import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
+import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
@@ -92,6 +93,8 @@ interface Columna {
   id: string;
   title: string;
   capacidadMax?: number;
+  /** Sala privada (`caracteristicas.privada`, el Reservado): una reserva se queda la sala entera. */
+  privada?: boolean;
 }
 
 /** Columna en la que se pinta una reserva: su sala si está entre las columnas; si no, "Sin asignar". */
@@ -835,7 +838,12 @@ export function GestorReservasKanban() {
   const columnas = useMemo<Columna[]>(
     () => [
       { id: SIN_ASIGNAR, title: "Sin asignar" },
-      ...espaciosActivos.map((e: any) => ({ id: e.id, title: e.nombre, capacidadMax: e.capacidad_maxima })),
+      ...espaciosActivos.map((e: any) => ({
+        id: e.id,
+        title: e.nombre,
+        capacidadMax: e.capacidad_maxima,
+        privada: esSalaPrivada(e),
+      })),
     ],
     [espaciosActivos],
   );
@@ -903,7 +911,15 @@ export function GestorReservasKanban() {
   const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
     const destinoId = esSinAsignar(columnaId) ? null : columnaId;
     const col = columnas.find((c) => c.id === columnaId);
-    const evaluacion = evaluarMovimiento(reserva, destinoId, reservas || [], col?.capacidadMax);
+    // Sala privada (el Reservado): una reserva se la queda entera; si ya hay otra en ese turno, se avisa aquí
+    // en vez de dejar que la BD lo rechace (23514 «Sala privada ocupada»).
+    const evaluacion = evaluarMovimiento(
+      reserva,
+      destinoId,
+      reservas || [],
+      col?.capacidadMax,
+      col?.privada ? { nombre: col.title } : null,
+    );
 
     switch (evaluacion.tipo) {
       case "sin_cambio":

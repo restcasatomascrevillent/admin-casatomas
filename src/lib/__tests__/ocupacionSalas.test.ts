@@ -283,3 +283,58 @@ describe("el caso del dueño: 15:30 y 21:30 con el día casi vacío", () => {
     expect(o.aforo.cena.ocupados).toBe(20);
   });
 });
+
+describe("sala privada (el Reservado): una reserva se queda la sala entera", () => {
+  const ESPACIOS_PRIV: EspacioSala[] = [
+    { id: "comedor", nombre: "Comedor", capacidad_maxima: 50 },
+    { id: "reservado", nombre: "Reservado", capacidad_maxima: 20, privada: true },
+  ];
+  const calcularPriv = (reservas: ReservaOcupacionSala[], comensales = 2) =>
+    calcularOcupacionSalas({ espacios: ESPACIOS_PRIV, reservas, horasBase: HORAS, comensales });
+  const fila = (o: ReturnType<typeof calcularPriv>, id: string) => o.salas.find((s) => s.espacioId === id)!;
+
+  it("una reserva de 5 llena el Reservado (20/20) en su turno y no en el otro", () => {
+    const o = calcularPriv([r({ espacio_id: "reservado", numero_comensales: 5, hora: "21:00:00" })]);
+    expect(fila(o, "reservado").turnos.cena.ocupados).toBe(20);
+    expect(fila(o, "reservado").turnos.cena.nivel).toBe("lleno");
+    expect(fila(o, "reservado").turnos.cena.cabe).toBe(false);
+    expect(fila(o, "reservado").turnos.comida.ocupados).toBe(0);
+    expect(fila(o, "reservado").turnos.comida.cabe).toBe(true);
+  });
+
+  it("en el aforo del turno pesa la capacidad de la sala (20), no los comensales (5)", () => {
+    const o = calcularPriv([
+      r({ espacio_id: "reservado", numero_comensales: 5, hora: "21:00:00" }),
+      r({ espacio_id: "comedor", numero_comensales: 10, hora: "21:00:00" }),
+    ]);
+    expect(o.aforo.cena.ocupados).toBe(30); // 20 + 10, no 5 + 10
+    expect(o.aforo.cena.capacidad).toBe(70);
+    expect(o.aforo.comida.ocupados).toBe(0);
+  });
+
+  it("si trae más comensales que la sala, cuentan los comensales (nunca de menos)", () => {
+    const o = calcularPriv([r({ espacio_id: "reservado", numero_comensales: 25, hora: "21:00:00" })]);
+    expect(o.aforo.cena.ocupados).toBe(25);
+  });
+
+  it("canceladas y «No vino» no llenan la sala", () => {
+    const o = calcularPriv([
+      r({ espacio_id: "reservado", numero_comensales: 5, hora: "21:00:00", estado: "cancelada" }),
+      r({ espacio_id: "reservado", numero_comensales: 5, hora: "21:30:00", estado: "no_show" }),
+    ]);
+    expect(fila(o, "reservado").turnos.cena.ocupados).toBe(0);
+    expect(o.aforo.cena.ocupados).toBe(0);
+  });
+
+  it("sin el flag, la misma sala cuenta por comensales como siempre", () => {
+    const sinFlag: EspacioSala[] = [{ id: "reservado", nombre: "Reservado", capacidad_maxima: 20 }];
+    const o = calcularOcupacionSalas({
+      espacios: sinFlag,
+      reservas: [r({ espacio_id: "reservado", numero_comensales: 5, hora: "21:00:00" })],
+      horasBase: HORAS,
+      comensales: 2,
+    });
+    expect(o.salas[0].turnos.cena.ocupados).toBe(5);
+    expect(o.aforo.cena.ocupados).toBe(5);
+  });
+});

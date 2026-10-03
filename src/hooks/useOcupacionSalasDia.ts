@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ESTADOS_QUE_OCUPAN } from "../../supabase/functions/_shared/disponibilidad";
 import { horasBaseDelDia, type EspacioSala, type ReservaOcupacionSala } from "@/lib/reservas/ocupacionSalas";
 import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { ESTADO_LLEGADA } from "@/lib/reservas/servicioSala";
 import { crearInvalidacionDiferida, REFRESCO_PERIODICO, vigilarCanal } from "@/lib/realtimeCanal";
 import { ReservasEnVivoContexto } from "@/hooks/useReservasEnVivo";
@@ -86,6 +87,7 @@ export function useOcupacionSalasDia(
           id: e.id as string,
           nombre: e.nombre as string,
           capacidad_maxima: Number(e.capacidad_maxima) || 0,
+          privada: esSalaPrivada(e),
         }));
 
       const reservas: ReservaOcupacionSala[] = ((reservasRes.data ?? []) as any[])
