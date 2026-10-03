@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Mail, AlertTriangle, UserMinus } from "lucide-react";
+import { Users, Mail, Info, UserMinus } from "lucide-react";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,18 +26,26 @@ export function GestionCorreos() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+      {/* Origen de los suscriptores. Altas: trigger agregar_suscriptor_al_reservar_consentida
+          sobre `reservas`, solo si la reserva trae consentimiento_newsletter = true (lo rellena
+          reservas-web desde la casilla del formulario web; ver
+          supabase/migrations/20261003143000_reserva_web_prueba_consentimiento.sql). */}
+      <Card className="border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950">
         <CardContent className="py-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-            <div className="text-sm text-amber-900 dark:text-amber-200">
-              <p className="font-medium">Hoy no hay alta de suscriptores</p>
+            <Info className="h-5 w-5 text-sky-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-sky-900 dark:text-sky-200">
+              <p className="font-medium">Altas solo desde la reserva web, con consentimiento explícito</p>
               <p className="mt-1">
-                Hasta enero se añadía automáticamente a todo el que reservaba mesa, sin pedirle permiso
-                para recibir el newsletter. Se quitó por RGPD (no había consentimiento explícito) y no se
-                ha sustituido por nada: hoy no existe ni alta automática ni un formulario manual en este
-                panel. Para reactivar la captación hace falta una casilla de consentimiento explícita en
-                el formulario de reserva (web y teléfono) — pendiente de decidir e implementar.
+                Solo se da de alta quien, al reservar en la web de Casa Tomás, marca la casilla opcional
+                para recibir el newsletter. La propia reserva guarda la constancia de ese consentimiento.
+                Si alguien que se había dado de baja vuelve a marcarla en una reserva nueva, se le
+                reactiva; si no la marca, no se le vuelve a suscribir.
+              </p>
+              <p className="mt-1">
+                Por teléfono todavía no se pide el consentimiento y este panel no tiene alta manual. Hasta
+                enero se añadía automáticamente a todo el que reservaba mesa, sin pedirle permiso; se quitó
+                por RGPD.
               </p>
             </div>
           </div>

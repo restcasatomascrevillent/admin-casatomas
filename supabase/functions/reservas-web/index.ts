@@ -39,6 +39,21 @@
 //                                 de funciones de este proyecto)
 //   RESERVAS_WEB_PUBLIC_URL      (base para los enlaces de los emails; por
 //                                 defecto se deriva de SUPABASE_URL)
+//   RESERVAS_WEB_CONDICIONES_OBLIGATORIAS (por defecto se EXIGE la casilla
+//                                 `acepta_condiciones` en POST /crear; solo
+//                                 "false" lo desactiva. Interruptor de
+//                                 transición/emergencia: se lee en cada
+//                                 petición, así que cambiar el secret no
+//                                 obliga a redesplegar. Ver
+//                                 `condicionesObligatorias` en reglas.ts)
+//
+// Cuerpo de POST /crear — casillas RGPD (2026-10-03, ver reglas.ts):
+//   acepta_condiciones        boolean, obligatoria (=== true) -> si no, 400
+//                             `condiciones_no_aceptadas`
+//   consentimiento_newsletter boolean, opcional (=== true) -> se guarda en
+//                             `reservas.consentimiento_newsletter`; el trigger
+//                             `agregar_suscriptor_al_reservar_consentida` da
+//                             de alta el email en el newsletter
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -93,7 +108,16 @@ import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
 
 // Reglas de sala del alta (reservas-sin-salas) y el rechazo de Touza (no admite
 // reservas, 2026-10-01): módulo puro, testeado con vitest.
-import { rechazarPorSala, contarEspaciosQueCaben, salaDelCliente, rechazoTouzaSinReservas } from "./reglas.ts";
+import {
+  rechazarPorSala,
+  contarEspaciosQueCaben,
+  salaDelCliente,
+  rechazoTouzaSinReservas,
+  leerConsentimientos,
+  condicionesObligatorias,
+  rechazoCondicionesNoAceptadas,
+  esColumnaInexistente,
+} from "./reglas.ts";
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -1121,6 +1145,19 @@ async function handleCrear(req: Request): Promise<Response> {
   if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) return json({ ok: false, error: "email_invalido" }, 400);
   if (telefonoRaw && !/^\d{9,15}$/.test(normalizePhone(telefonoRaw))) return json({ ok: false, error: "telefono_invalido" }, 400);
 
+  // Casillas RGPD del formulario (ver reglas.ts). `acepta_condiciones` es
+  // obligatoria: se rechaza aquí, con el resto de datos obligatorios y ANTES
+  // de cualquier lectura o escritura — sin ella no se registra solicitud ni
+  // se manda correo. El secret se lee en cada petición a propósito: cambiarlo
+  // (`supabase secrets set RESERVAS_WEB_CONDICIONES_OBLIGATORIAS=false`)
+  // surte efecto sin redesplegar.
+  const consentimientos = leerConsentimientos(body);
+  const rechazoCondiciones = rechazoCondicionesNoAceptadas(
+    consentimientos,
+    condicionesObligatorias(Deno.env.get("RESERVAS_WEB_CONDICIONES_OBLIGATORIAS")),
+  );
+  if (rechazoCondiciones) return json(rechazoCondiciones.cuerpo, rechazoCondiciones.status);
+
   const config = await getReservationConfig();
   const maxComensales = config.max_comensales_por_reserva || 12;
   const minComensales = config.min_comensales_por_reserva || 1;
@@ -1407,25 +1444,48 @@ async function handleCrear(req: Request): Promise<Response> {
     notasCliente: notas,
   });
 
-  const { data: inserted, error: insertError } = await supabase
+  const filaReserva: Record<string, unknown> = {
+    nombre,
+    telefono,
+    email,
+    fecha,
+    hora,
+    numero_comensales: partySize,
+    notas_cliente: notas,
+    estado: "pendiente",
+    espacio_id: espacioId,
+    canal: "web",
+    en_blacklist: false,
+    importante: false,
+    marca,
+    // Prueba de consentimiento (RGPD art. 7.1), INMUTABLE por reserva. La
+    // fecha del consentimiento al newsletter es `created_at` de esta misma
+    // fila; la de la aceptación de las condiciones va en su propia columna
+    // porque, con el interruptor de transición apagado, puede faltar.
+    consentimiento_newsletter: consentimientos.consentimientoNewsletter,
+    condiciones_aceptadas_at: consentimientos.aceptaCondiciones ? new Date().toISOString() : null,
+  };
+
+  let { data: inserted, error: insertError } = await supabase
     .from("reservas")
-    .insert({
-      nombre,
-      telefono,
-      email,
-      fecha,
-      hora,
-      numero_comensales: partySize,
-      notas_cliente: notas,
-      estado: "pendiente",
-      espacio_id: espacioId,
-      canal: "web",
-      en_blacklist: false,
-      importante: false,
-      marca,
-    })
+    .insert(filaReserva)
     .select("id")
     .single();
+
+  // Red de seguridad de despliegue: si la función sale ANTES de aplicar la
+  // migración 20261003143000 (que crea `condiciones_aceptadas_at`), PostgREST
+  // rechaza el INSERT entero por columna desconocida y se caerían TODAS las
+  // reservas web. Se reintenta sin esa columna y se deja rastro en los logs;
+  // `consentimiento_newsletter` ya existe en producción y se conserva.
+  if (insertError && esColumnaInexistente(insertError, "condiciones_aceptadas_at")) {
+    console.error("[CREAR] Falta la columna reservas.condiciones_aceptadas_at (¿migración 20261003143000 sin aplicar?). Se guarda la reserva sin ella.");
+    const { condiciones_aceptadas_at: _sinColumna, ...filaSinCondiciones } = filaReserva;
+    ({ data: inserted, error: insertError } = await supabase
+      .from("reservas")
+      .insert(filaSinCondiciones)
+      .select("id")
+      .single());
+  }
 
   if (insertError) {
     // Red de seguridad: si `trg_validar_capacidad` salta por una carrera

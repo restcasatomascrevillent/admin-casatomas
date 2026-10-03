@@ -123,9 +123,12 @@ function solicitudTouza(over: Fila = {}): Fila {
   };
 }
 
-/** Lo que manda casa-tomas-story (ReservationForm.tsx): sin `marca`. */
+/** Lo que manda casa-tomas-story (ReservationForm.tsx): sin `marca` y, desde el
+ * 2026-10-03, con la casilla obligatoria `acepta_condiciones` (sin ella, 400 —
+ * ver consentimientos-reserva-web.integracion.test.ts). */
 function reservaCasaTomas(over: Fila = {}): Fila {
   return {
+    acepta_condiciones: true,
     nombre: "Ana López",
     telefono: "+34 611 222 333",
     email: "ana@correo.test",

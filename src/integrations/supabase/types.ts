@@ -2243,27 +2243,52 @@ export type Database = {
           activo: boolean
           created_at: string
           email: string
+          fecha_baja: string | null
+          /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
+          fecha_consentimiento: string | null
           id: string
           nombre: string | null
+          origen_alta: string | null
+          origen_baja: string | null
+          /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
+          reserva_consentimiento_id: string | null
           updated_at: string
         }
         Insert: {
           activo?: boolean
           created_at?: string
           email: string
+          fecha_baja?: string | null
+          fecha_consentimiento?: string | null
           id?: string
           nombre?: string | null
+          origen_alta?: string | null
+          origen_baja?: string | null
+          reserva_consentimiento_id?: string | null
           updated_at?: string
         }
         Update: {
           activo?: boolean
           created_at?: string
           email?: string
+          fecha_baja?: string | null
+          fecha_consentimiento?: string | null
           id?: string
           nombre?: string | null
+          origen_alta?: string | null
+          origen_baja?: string | null
+          reserva_consentimiento_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_suscriptores_reserva_consentimiento_id_fkey"
+            columns: ["reserva_consentimiento_id"]
+            isOneToOne: false
+            referencedRelation: "reservas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notificaciones_dashboard: {
         Row: {
@@ -3138,6 +3163,9 @@ export type Database = {
       reservas: {
         Row: {
           canal: string | null
+          /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
+          condiciones_aceptadas_at: string | null
+          consentimiento_newsletter: boolean
           created_at: string | null
           email: string | null
           en_blacklist: boolean | null
@@ -3158,6 +3186,8 @@ export type Database = {
         }
         Insert: {
           canal?: string | null
+          condiciones_aceptadas_at?: string | null
+          consentimiento_newsletter?: boolean
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
@@ -3177,6 +3207,8 @@ export type Database = {
         }
         Update: {
           canal?: string | null
+          condiciones_aceptadas_at?: string | null
+          consentimiento_newsletter?: boolean
           created_at?: string | null
           email?: string | null
           en_blacklist?: boolean | null
