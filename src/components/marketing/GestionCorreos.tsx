@@ -1,28 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Mail, Info, UserMinus } from "lucide-react";
+import { Users, Mail, Info, UserMinus, ShieldCheck } from "lucide-react";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { ListaSuscriptores } from "./ListaSuscriptores";
 
 export function GestionCorreos() {
-  const { suscriptores, totalSuscriptores, isLoading } = useNewsletterSuscriptores();
-
-  // Bajas registradas (RGPD). Antes la baja no escribía nada en la base de datos
-  // (el "webhook de baja" solo devolvía una página de HTML); ahora
-  // newsletter-baja deja fecha_baja y origen_baja en cada suscriptor dado de baja.
-  const { data: totalBajas, isLoading: isLoadingBajas } = useQuery({
-    queryKey: ["newsletter-bajas-count"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("newsletter_suscriptores")
-        .select("id", { count: "exact", head: true })
-        .eq("activo", false);
-      if (error) throw error;
-      return count ?? 0;
-    },
-  });
+  // Activos y bajas en una sola consulta (se refresca sola cada minuto). Las
+  // bajas las escriben newsletter-baja y resend-webhook con fecha_baja y
+  // origen_baja; el personal no da de baja ni reactiva a nadie.
+  const { suscriptores, totalSuscriptores, bajas, totalBajas, isLoading } = useNewsletterSuscriptores();
 
   return (
     <div className="space-y-4">
@@ -46,6 +32,30 @@ export function GestionCorreos() {
                 Por teléfono todavía no se pide el consentimiento y este panel no tiene alta manual. Hasta
                 enero se añadía automáticamente a todo el que reservaba mesa, sin pedirle permiso; se quitó
                 por RGPD.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Baja automática (encargo del dueño, 2026-10-03). Pie y cabeceras: enviar-newsletter/plantillas.ts;
+          baja: newsletter-baja y resend-webhook; protección: migración 20261003171500. */}
+      <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
+        <CardContent className="py-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-emerald-900 dark:text-emerald-200">
+              <p className="font-medium">La baja es automática</p>
+              <p className="mt-1">
+                Todos los newsletters llevan, sin que tengas que añadir nada, un enlace personal para darse de baja
+                en el pie y el botón «Cancelar suscripción» de Gmail, Outlook o Yahoo. Quien lo pulsa queda dado de
+                baja al momento. También se da de baja solo a quien marca un correo nuestro como spam o tiene una
+                dirección que no existe.
+              </p>
+              <p className="mt-1">
+                Las bajas aparecen aquí solas (en un minuto como mucho), con su fecha y el motivo. Los dados de baja
+                no reciben ningún envío y no se pueden volver a activar desde el panel: solo vuelven si marcan otra
+                vez la casilla del newsletter en una reserva nueva.
               </p>
             </div>
           </div>
@@ -76,10 +86,10 @@ export function GestionCorreos() {
             </div>
             <div className="mt-4 pt-4 border-t flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <UserMinus className="h-4 w-4" />
-              {isLoadingBajas ? (
+              {isLoading ? (
                 <Skeleton className="h-4 w-24" />
               ) : (
-                <span>{totalBajas ?? 0} bajas registradas</span>
+                <span>{totalBajas} dados de baja (no reciben nada)</span>
               )}
             </div>
           </CardContent>
@@ -96,35 +106,7 @@ export function GestionCorreos() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-              </div>
-            ) : suscriptores.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aún no hay suscriptores activos.
-              </p>
-            ) : (
-              <ScrollArea className="h-[300px]">
-                <div className="space-y-2">
-                  {suscriptores.map((suscriptor) => (
-                    <div
-                      key={suscriptor.id}
-                      className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{suscriptor.email}</p>
-                        {suscriptor.nombre && (
-                          <p className="text-xs text-muted-foreground">{suscriptor.nombre}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
+            <ListaSuscriptores activos={suscriptores} bajas={bajas} isLoading={isLoading} />
           </CardContent>
         </Card>
       </div>
