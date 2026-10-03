@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useFacturacionOficiososia, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
-import { categorias, periodicidades, nuevaFactura, nuevaLinea, mensualFactura, totalesFactura, erroresFactura, facturaSchema, euros, type Factura, type ParteFactura, type LineaFactura } from "./modelo";
+import { categorias, periodicidades, nuevaFactura, nuevaLinea, totalesFactura, erroresFactura, facturaSchema, euros, type Factura, type ParteFactura, type LineaFactura } from "./modelo";
 import { VistaFactura } from "./VistaFactura";
 import { SelectorServicios, EditarCatalogo } from "./SelectorServicios";
 import { FacturasEmitidas } from "./FacturasEmitidas";
@@ -15,17 +15,17 @@ import { catalogoInicial, prepararNuevaFactura, agregarProductos, ultimaFacturaC
 
 const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 const areaClass = "min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
-const accionClass = "h-auto min-h-14 min-w-0 flex-col gap-1 whitespace-normal px-2 py-2 text-[11px] sm:h-10 sm:min-h-0 sm:flex-row sm:gap-0 sm:px-4 sm:text-sm";
+const accionClass = "h-10 min-w-0 gap-2 whitespace-normal px-3 text-xs sm:text-sm";
 function Campo({ titulo, children }: { titulo: string; children: ReactNode }) {
   return <label className="block min-w-0 space-y-1.5"><span className="text-xs font-medium text-muted-foreground">{titulo}</span>{children}</label>;
 }
 function DatosParte({ titulo, parte, cambiar }: { titulo: string; parte: ParteFactura; cambiar: (p: ParteFactura) => void }) {
-  return <fieldset className="min-w-0 space-y-3 rounded-lg border p-4">
+  return <fieldset className="min-w-0 space-y-3 rounded-lg border p-3">
     <legend className="px-2 text-sm font-semibold">{titulo}</legend>
-    <Campo titulo="Nombre / razón social"><Input maxLength={120} value={parte.nombre} onChange={e => cambiar({...parte,nombre:e.target.value})} /></Campo>
-    <Campo titulo="NIF / CIF"><Input maxLength={30} value={parte.nif} onChange={e => cambiar({...parte,nif:e.target.value})} /></Campo>
-    <Campo titulo="Dirección fiscal"><textarea className={areaClass} maxLength={500} value={parte.direccion} onChange={e => cambiar({...parte,direccion:e.target.value})} /></Campo>
-    <Campo titulo="Email"><Input type="email" maxLength={120} value={parte.email} onChange={e => cambiar({...parte,email:e.target.value})} /></Campo>
+    <div className="grid gap-3 sm:grid-cols-2"><Campo titulo="Nombre / razón social"><Input maxLength={120} value={parte.nombre} onChange={e => cambiar({...parte,nombre:e.target.value})} /></Campo>
+    <Campo titulo="NIF / CIF"><Input maxLength={30} value={parte.nif} onChange={e => cambiar({...parte,nif:e.target.value})} /></Campo></div>
+    <div className="grid gap-3 sm:grid-cols-2"><Campo titulo="Dirección fiscal"><textarea className={areaClass} maxLength={500} value={parte.direccion} onChange={e => cambiar({...parte,direccion:e.target.value})} /></Campo>
+    <Campo titulo="Email"><Input type="email" maxLength={120} value={parte.email} onChange={e => cambiar({...parte,email:e.target.value})} /></Campo></div>
   </fieldset>;
 }
 export function EditorFacturacion() {
@@ -36,7 +36,9 @@ export function EditorFacturacion() {
   const [dirty, setDirty] = useState(false);
   const [facturaModificada, setFacturaModificada] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [vista, setVista] = useState(false);
+  const [paso, setPaso] = useState(0);
+  const inicioEditor = useRef<HTMLDivElement>(null);
+  const irPaso = (n: number) => { setPaso(n); inicioEditor.current?.scrollIntoView?.({block:"start",behavior:"smooth"}); };
   const [tab, setTab] = useState("nueva");
   const iniciado = useRef(false);
   useEffect(() => {
@@ -63,12 +65,12 @@ export function EditorFacturacion() {
   const abrir = (guardada: FacturaGuardada) => {
     if (!puedeCambiar()) return;
     setF({...guardada.documento,catalogo:f.catalogo ?? catalogoInicial()}); setActual({id:guardada.id,version:guardada.actualizado_en});
-    setTab("nueva"); setVista(false);
+    setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null); setDirty(false); setFacturaModificada(false);
   };
   const nuevo = () => {
     if (!puedeCambiar()) return;
-    setF(prepararNuevaFactura(f,q.data?.facturas ?? [])); setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setVista(false);
+    setF(prepararNuevaFactura(f,q.data?.facturas ?? [])); setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);
   };
   const duplicar = (g:FacturaGuardada) => {
@@ -76,7 +78,7 @@ export function EditorFacturacion() {
     const base = prepararNuevaFactura(f,q.data?.facturas ?? []);
     setF({...g.documento,numero:base.numero,fecha:base.fecha,vencimiento:base.vencimiento,catalogo:base.catalogo,
       lineas:g.documento.lineas.map(l=>({...l,id:crypto.randomUUID()}))});
-    setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setVista(false);
+    setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);
   };
   const descargarEmitida = async (g:FacturaGuardada) => {
@@ -150,16 +152,16 @@ export function EditorFacturacion() {
       </TabsContent>
       <TabsContent value="nueva" className="space-y-5 pt-3">
       {actual && <p className="text-sm font-medium">Editando factura {f.numero}</p>}
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      {[["Base de esta factura", euros(total.base)],["Total con impuestos",euros(total.total)],["Servicios recurrentes / mes",euros(mensualFactura(f))]].map(([label,v]) =>
-        <Card key={label}><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 break-words text-xl font-semibold">{v}</p></CardContent></Card>)}
-    </div>
-    <div className="flex flex-wrap items-end gap-3">
-      <Button variant="outline" onClick={() => setVista(!vista)} className="xl:hidden">{vista ? "Editar factura" : "Ver factura"}</Button>
+    <div ref={inicioEditor} className="scroll-mt-4 space-y-3">
+      <nav aria-label="Pasos de la factura" className="grid grid-cols-4 gap-1 rounded-lg border bg-muted/30 p-1">
+        {["Cliente", "Servicios", "Ajustes", "Revisar"].map((nombre,i)=><Button key={nombre} variant={paso===i ? "default" : "ghost"} className="h-10 min-w-0 px-1 text-xs sm:text-sm" aria-current={paso===i ? "step" : undefined} onClick={()=>irPaso(i)}>{i+1}. {nombre}</Button>)}
+      </nav>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="text-muted-foreground">{f.cliente.nombre || "Selecciona un cliente"} · {f.lineas.filter(l=>l.concepto.trim()).length} conceptos</span><span>Total: <strong>{euros(total.total)}</strong></span></div>
     </div>
     {q.isLoading ? <p role="status" className="py-10 text-center text-muted-foreground">Cargando facturación…</p> : (
-      <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <fieldset disabled={busy} className={vista ? "hidden min-w-0 space-y-5 xl:block" : "min-w-0 space-y-5"}>
+      <div className="min-w-0">
+        <fieldset disabled={busy} className="min-w-0 space-y-4">
+          {paso === 0 && <>
           <Card><CardHeader><CardTitle className="text-base">1. Cliente y datos de la factura</CardTitle></CardHeader><CardContent className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-3">
               <Campo titulo="Número de factura"><Input placeholder={siguienteNumero(q.data?.facturas ?? [],f.fecha)} maxLength={60} value={f.numero} onChange={e => cambiar({...f,numero:e.target.value})} /></Campo>
@@ -179,24 +181,29 @@ export function EditorFacturacion() {
               <div className="mt-3"><DatosParte titulo="Emisor" parte={f.emisor} cambiar={p => cambiar({...f,emisor:p})} /></div>
             </details>
           </CardContent></Card>
-          <SelectorServicios catalogo={f.catalogo ?? catalogoInicial()} lineas={f.lineas} agregar={agregar} />
-          <Card><CardHeader><CardTitle className="text-base">2. Conceptos de la factura</CardTitle></CardHeader><CardContent className="space-y-4">
+          </>}
+          {paso === 1 && <>
+          <details className="rounded-lg border p-3" open={!f.lineas.some(l=>l.concepto.trim())}><summary className="cursor-pointer text-sm font-medium">Añadir módulos o paquetes</summary><div className="mt-3"><SelectorServicios catalogo={f.catalogo ?? catalogoInicial()} lineas={f.lineas} agregar={agregar} /></div></details>
+          <Card><CardHeader><CardTitle className="text-base">2. Conceptos de la factura</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid items-start gap-3 lg:grid-cols-2">
             {f.lineas.map((l,i) => <fieldset key={l.id} className="min-w-0 space-y-3 rounded-lg border p-3">
               <legend className="px-2 text-xs font-semibold">Concepto {i+1}</legend>
               <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><Campo titulo="Descripción"><Input maxLength={300} value={l.concepto} onChange={e => linea(l.id,{concepto:e.target.value})} /></Campo></div>
                 <Button className="mt-6 shrink-0" size="icon" variant="ghost" disabled={f.lineas.length === 1} aria-label={"Eliminar concepto " + (i+1)} onClick={() => cambiar({...f,lineas:f.lineas.filter(v => v.id !== l.id)})}><Trash2 className="h-4 w-4" /></Button></div>
-              <div className="grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
-                <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {([["cantidad","Cantidad",0.01,100000],["precio","Precio unitario (€)",0,1000000],["iva","IVA (%)",0,100]] as const).map(([key,label,min,max]) =>
-                  <Campo key={key} titulo={label}><Input type="number" disabled={key==="iva" && f.aplicarIva===false} min={min} max={max} step="0.01" value={key==="iva" && f.aplicarIva===false ? 0 : l[key]} onChange={e => linea(l.id,{[key]:Number(e.target.value)})} /></Campo>)}
+
+              <div className="grid grid-cols-3 items-end gap-2">
+                <Campo titulo="Cantidad"><Input type="number" min={0.01} max={100000} step="0.01" value={l.cantidad} onChange={e=>linea(l.id,{cantidad:Number(e.target.value)})} /></Campo>
+                <Campo titulo="Precio unitario (€)"><Input type="number" min={0} max={1000000} step="0.01" value={l.precio} onChange={e=>linea(l.id,{precio:Number(e.target.value)})} /></Campo>
+                <p className="pb-2 text-right text-sm font-medium">{euros(total.lineas[i].base)}</p>
               </div>
-              <p className="text-right text-xs text-muted-foreground">Base del concepto: <strong>{euros(total.lineas[i].base)}</strong></p>
+              <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Tipo, periodicidad e IVA · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
+                <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
+              <Campo titulo="IVA (%)"><Input type="number" disabled={f.aplicarIva===false} min={0} max={100} step="0.01" value={f.aplicarIva===false ? 0 : l.iva} onChange={e=>linea(l.id,{iva:Number(e.target.value)})} /></Campo></details>
             </fieldset>)}
-            <Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
+            </div><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
             <p className="text-xs text-muted-foreground">Cada línea corresponde al periodo indicado en su descripción. La periodicidad sirve para calcular la cuota mensual; no multiplica el importe de la factura.</p>
           </CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">3. Descuentos e impuestos</CardTitle></CardHeader><CardContent className="space-y-4">
+          </>}
+          {paso === 2 && <Card><CardHeader><CardTitle className="text-base">3. Descuentos e impuestos</CardTitle></CardHeader><CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3"><label htmlFor="aplicar-iva" className="text-sm font-medium">Aplicar IVA</label>
               <Switch id="aplicar-iva" checked={f.aplicarIva!==false} onCheckedChange={v=>cambiar({...f,aplicarIva:v})} /></div>
             {f.aplicarIva===false && <p className="text-xs text-muted-foreground">La factura se calcula sin IVA. Los porcentajes de los conceptos se conservan si vuelves a activarlo.</p>}
@@ -211,21 +218,27 @@ export function EditorFacturacion() {
             <p className="text-sm">Descuento total: <strong>{euros(total.descuentosLineas+total.descuentoGlobal)}</strong></p>
             <Campo titulo="Retención (%)"><Input className="max-w-40" type="number" min={0} max={100} step="0.01" value={f.retencion} onChange={e => cambiar({...f,retencion:Number(e.target.value)})} /></Campo>
           </CardContent></Card>
-          <Card><CardHeader><CardTitle className="text-base">4. Pago y observaciones</CardTitle></CardHeader><CardContent className="space-y-3">
+          }
+          {paso === 3 && <><Card><CardHeader><CardTitle className="text-base">4. Pago y observaciones</CardTitle></CardHeader><CardContent className="space-y-3">
             <Campo titulo="Forma de pago / IBAN"><textarea className={areaClass} maxLength={500} value={f.pago} onChange={e => cambiar({...f,pago:e.target.value})} /></Campo>
             <Campo titulo="Observaciones / periodo de facturación"><textarea className={areaClass} maxLength={2000} value={f.notas} onChange={e => cambiar({...f,notas:e.target.value})} /></Campo>
           </CardContent></Card>
-        </fieldset>
-        <div className={vista ? "min-w-0 space-y-3" : "hidden min-w-0 space-y-3 xl:block"}>
+        <div className="min-w-0 space-y-3">
           <p className="text-sm font-medium">Vista previa de la hoja de factura</p><VistaFactura factura={f} />
           <p className="text-xs text-muted-foreground">El PDF usa formato A4 y añade páginas cuando sea necesario.</p>
-        </div>
+        </div></>}
+        </fieldset>
       </div>
     )}
-    <div className="sticky bottom-0 z-10 grid grid-cols-3 gap-2 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex sm:flex-wrap sm:justify-end">
+    <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex sm:flex-wrap sm:justify-end">
+      <div className="flex w-full items-center justify-between gap-2 border-b pb-2 sm:mr-auto sm:w-auto sm:border-0 sm:pb-0">
+        <Button variant="outline" disabled={paso===0 || busy} onClick={()=>irPaso(paso-1)}>Anterior</Button>
+        <span className="px-2 text-xs text-muted-foreground">Paso {paso+1} de 4</span>
+        {paso<3 && <Button disabled={busy} onClick={()=>irPaso(paso+1)}>Siguiente</Button>}
+      </div>
       <Button className={accionClass} variant="outline" disabled={deshabilitado} onClick={() => void guardar(false)}><Save className="h-4 w-4 shrink-0 sm:mr-2" />Guardar borrador</Button>
-      <Button className={accionClass} disabled={deshabilitado} onClick={() => void guardar(true)}><Save className="h-4 w-4 shrink-0 sm:mr-2" />{actual ? "Actualizar factura" : "Emitir factura"}</Button>
-      <Button className={accionClass} disabled={deshabilitado} onClick={() => void guardar(true,true)}><Download className="h-4 w-4 shrink-0 sm:mr-2" />{busy ? "Procesando…" : "Descargar PDF"}</Button>
+      {paso === 3 && <><Button className={accionClass} disabled={deshabilitado} onClick={() => void guardar(true)}><Save className="h-4 w-4 shrink-0 sm:mr-2" />{actual ? "Actualizar factura" : "Emitir factura"}</Button>
+      <Button className={accionClass} disabled={deshabilitado} onClick={() => void guardar(true,true)}><Download className="h-4 w-4 shrink-0 sm:mr-2" />{busy ? "Procesando…" : "Descargar PDF"}</Button></>}
     </div>
       </TabsContent>
       <TabsContent value="catalogo" className="space-y-4 pt-3">

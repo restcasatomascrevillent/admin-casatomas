@@ -76,3 +76,7 @@ negro, amarillo y papel claro. No se inventan NIF, dirección fiscal ni IBAN.
 El editor limita a 100 conceptos por documento. No envía facturas ni cobra.
 El PDF es una hoja comercial; no implementa firma, registro fiscal ni
 comunicación con servicios de la Administración.
+
+### Nueva factura compacta
+
+El editor muestra un único paso cada vez: Cliente, Servicios, Ajustes y Revisar. Se puede navegar con Anterior/Siguiente o directamente por la barra de pasos sin perder los datos. El total permanece visible; los conceptos se distribuyen en dos columnas en escritorio y ocultan tipo, periodicidad e IVA tras un desplegable. La selección de paquetes se pliega al añadir servicios. Emitir y descargar están en el paso Revisar, junto con el pago y la vista previa; el borrador puede guardarse desde cualquier paso.

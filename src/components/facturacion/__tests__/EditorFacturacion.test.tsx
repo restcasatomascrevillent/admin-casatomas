@@ -28,6 +28,7 @@ describe("editor simplificado",()=>{
   });
   it("rellena un paquete con precios guardados y evita añadirlo dos veces",()=>{
     render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
     const paquete=screen.getByRole("button",{name:/Panel esencial/});
     fireEvent.click(paquete);
     expect(screen.getAllByRole("group",{name:/^Concepto [0-9]+$/})).toHaveLength(3);
@@ -36,14 +37,39 @@ describe("editor simplificado",()=>{
   });
   it("quita el IVA de la vista previa, deshabilita su edición y restaura el porcentaje al activarlo",()=>{
     render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
     fireEvent.click(screen.getByRole("button",{name:/Panel esencial/}));
+    fireEvent.click(screen.getByRole("button",{name:"3. Ajustes"}));
     const aplicar=screen.getByRole("switch",{name:"Aplicar IVA"});
-    const preview=screen.getByRole("article",{name:"Vista previa de factura"});
     fireEvent.click(aplicar);
-    expect(within(preview).queryByRole("columnheader",{name:"IVA"})).not.toBeInTheDocument();
-    const iva=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("IVA (%)",{exact:true});
+    fireEvent.click(screen.getByRole("button",{name:"4. Revisar"}));
+    expect(within(screen.getByRole("article",{name:"Vista previa de factura"})).queryByRole("columnheader",{name:"IVA"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    let iva=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("IVA (%)",{exact:true});
     expect(iva).toBeDisabled();expect(iva).toHaveValue(0);
-    fireEvent.click(aplicar);
+    fireEvent.click(screen.getByRole("button",{name:"3. Ajustes"}));
+    fireEvent.click(screen.getByRole("switch",{name:"Aplicar IVA"}));
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    iva=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("IVA (%)",{exact:true});
     expect(iva).toBeEnabled();expect(iva).toHaveValue(21);
   });
+  it("muestra solo el paso actual y conserva el cliente y el precio al navegar",()=>{
+    render(<EditorFacturacion/>);
+    const cliente=within(screen.getByRole("group",{name:"Cliente"}));
+    fireEvent.change(cliente.getByLabelText("Nombre / razón social"),{target:{value:"Cliente prueba"}});
+    expect(screen.queryByText("2. Conceptos de la factura")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Siguiente"}));
+    expect(screen.queryByRole("group",{name:"Cliente"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:/Panel esencial/}));
+    fireEvent.change(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Precio unitario (€)"),{target:{value:"175"}});
+    fireEvent.click(screen.getByRole("button",{name:"Anterior"}));
+    expect(within(screen.getByRole("group",{name:"Cliente"})).getByLabelText("Nombre / razón social")).toHaveValue("Cliente prueba");
+    fireEvent.click(screen.getByRole("button",{name:"4. Revisar"}));
+    expect(screen.getByRole("article",{name:"Vista previa de factura"})).toHaveTextContent("Cliente prueba");
+    expect(screen.getByRole("button",{name:"Emitir factura"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Precio unitario (€)")).toHaveValue(175);
+  });
+
 });
