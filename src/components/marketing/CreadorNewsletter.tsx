@@ -11,6 +11,7 @@ import { PreviewNewsletter } from "./PreviewNewsletter";
 import { SelectorImagenGaleria } from "./SelectorImagenGaleria";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { useEnviarNewsletter } from "@/hooks/useEnviarNewsletter";
+import { CanalEnvio } from "./SincronizacionResend";
 
 export function CreadorNewsletter() {
   const [tipo, setTipo] = useState<TipoNewsletter | null>(null);
@@ -110,6 +111,9 @@ export function CreadorNewsletter() {
                 imagenSeleccionada={imagenUrl}
                 onSeleccionar={setImagenUrl}
               />
+
+              {/* Canal del envío (NEWSLETTER_CANAL: directo o Broadcast de Resend Marketing) */}
+              <CanalEnvio />
 
               {/* Recipients Count */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">

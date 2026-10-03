@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreadorNewsletter } from "@/components/marketing/CreadorNewsletter";
 import { GestionCorreos } from "@/components/marketing/GestionCorreos";
 import { EstadisticasNewsletter } from "@/components/marketing/EstadisticasNewsletter";
+import { HistorialEnvios } from "@/components/marketing/HistorialEnvios";
 import { Send, Users, BarChart3 } from "lucide-react";
 
 export default function Marketing() {
@@ -36,8 +37,9 @@ export default function Marketing() {
             <GestionCorreos />
           </TabsContent>
 
-          <TabsContent value="estadisticas">
+          <TabsContent value="estadisticas" className="space-y-6">
             <EstadisticasNewsletter />
+            <HistorialEnvios />
           </TabsContent>
         </Tabs>
       </div>

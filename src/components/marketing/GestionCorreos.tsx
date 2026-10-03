@@ -3,6 +3,7 @@ import { Users, Mail, Info, UserMinus, ShieldCheck } from "lucide-react";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListaSuscriptores } from "./ListaSuscriptores";
+import { SincronizacionResend } from "./SincronizacionResend";
 
 export function GestionCorreos() {
   // Activos y bajas en una sola consulta (se refresca sola cada minuto). Las
@@ -110,6 +111,9 @@ export function GestionCorreos() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Fase 2: conexión con Resend Marketing (newsletter-sync-resend). */}
+      <SincronizacionResend />
     </div>
   );
 }

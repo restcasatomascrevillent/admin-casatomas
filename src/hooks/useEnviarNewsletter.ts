@@ -57,6 +57,9 @@ export function useEnviarNewsletter() {
         toast.success(data?.message || 'Newsletter enviado correctamente');
       }
       queryClient.invalidateQueries({ queryKey: ["newsletter-suscriptores"] });
+      // Historial y estado de Resend (useResendMarketing): el envío por Broadcast sincroniza antes.
+      queryClient.invalidateQueries({ queryKey: ["newsletter-envios-historial"] });
+      queryClient.invalidateQueries({ queryKey: ["newsletter-resend-estado"] });
     },
     onError: (error: Error) => {
       toast.error(`Error: ${error.message}`);
