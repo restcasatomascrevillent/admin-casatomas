@@ -2208,31 +2208,39 @@ export type Database = {
       newsletter_envios: {
         Row: {
           asunto: string
+          /** 'transaccional' | 'broadcast'. Solo existe si 20261003193000_newsletter_resend_broadcasts.sql está aplicada. */
+          canal: string
           created_at: string
           enviado_por: string | null
           estado: string | null
           id: string
           mensaje: string
+          /** Id del Broadcast de Resend (canal = broadcast). Migración 20261003193000. */
+          resend_broadcast_id: string | null
           tipo_newsletter: string | null
           total_destinatarios: number
         }
         Insert: {
           asunto: string
+          canal?: string
           created_at?: string
           enviado_por?: string | null
           estado?: string | null
           id?: string
           mensaje: string
+          resend_broadcast_id?: string | null
           tipo_newsletter?: string | null
           total_destinatarios?: number
         }
         Update: {
           asunto?: string
+          canal?: string
           created_at?: string
           enviado_por?: string | null
           estado?: string | null
           id?: string
           mensaje?: string
+          resend_broadcast_id?: string | null
           tipo_newsletter?: string | null
           total_destinatarios?: number
         }
@@ -2253,6 +2261,10 @@ export type Database = {
           origen_baja: string | null
           /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
           reserva_consentimiento_id: string | null
+          /** Id del contacto en Resend Marketing; lo escribe newsletter-sync-resend. Migración 20261003193000. */
+          resend_contact_id: string | null
+          /** Última vez que newsletter-sync-resend lo dejó cuadrado. Migración 20261003193000. */
+          resend_sincronizado_at: string | null
           updated_at: string
         }
         Insert: {
@@ -2266,6 +2278,8 @@ export type Database = {
           origen_alta?: string | null
           origen_baja?: string | null
           reserva_consentimiento_id?: string | null
+          resend_contact_id?: string | null
+          resend_sincronizado_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -2279,6 +2293,8 @@ export type Database = {
           origen_alta?: string | null
           origen_baja?: string | null
           reserva_consentimiento_id?: string | null
+          resend_contact_id?: string | null
+          resend_sincronizado_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2290,6 +2306,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      newsletter_sincronizaciones_resend: {
+        /** Una fila por pasada de newsletter-sync-resend (estado del panel + cerrojo). Solo lectura para el panel. Migración 20261003193000. */
+        Row: {
+          actualizados: number
+          altas: number
+          bajas_resend: number
+          borrados: number
+          contactos_ajenos: number | null
+          contactos_resend: number | null
+          contactos_segmento: number | null
+          destinatarios: number | null
+          detalle: Json | null
+          ejecutada_por: string | null
+          errores: number
+          estado: string
+          id: string
+          iniciada_at: string
+          mensaje_error: string | null
+          origen: string
+          pendientes: number
+          segment_id: string | null
+          terminada_at: string | null
+        }
+        Insert: {
+          actualizados?: number
+          altas?: number
+          bajas_resend?: number
+          borrados?: number
+          contactos_ajenos?: number | null
+          contactos_resend?: number | null
+          contactos_segmento?: number | null
+          destinatarios?: number | null
+          detalle?: Json | null
+          ejecutada_por?: string | null
+          errores?: number
+          estado?: string
+          id?: string
+          iniciada_at?: string
+          mensaje_error?: string | null
+          origen: string
+          pendientes?: number
+          segment_id?: string | null
+          terminada_at?: string | null
+        }
+        Update: {
+          actualizados?: number
+          altas?: number
+          bajas_resend?: number
+          borrados?: number
+          contactos_ajenos?: number | null
+          contactos_resend?: number | null
+          contactos_segmento?: number | null
+          destinatarios?: number | null
+          detalle?: Json | null
+          ejecutada_por?: string | null
+          errores?: number
+          estado?: string
+          id?: string
+          iniciada_at?: string
+          mensaje_error?: string | null
+          origen?: string
+          pendientes?: number
+          segment_id?: string | null
+          terminada_at?: string | null
+        }
+        Relationships: []
       }
       notificaciones_dashboard: {
         Row: {
@@ -4691,6 +4774,19 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       /** Solo existe si 20261003171500_newsletter_baja_automatica.sql está aplicada. Solo service_role (resend-webhook). */
+      newsletter_estadisticas_broadcasts: {
+        Args: { p_broadcast_ids: string[] }
+        Returns: {
+          broadcast_id: string
+          destinatarios: number
+          eventos: number
+          tipo_evento: string
+        }[]
+      }
+      newsletter_marcar_sincronizados: {
+        Args: { p_items: Json }
+        Returns: number
+      }
       newsletter_registrar_baja: {
         Args: { p_email: string; p_origen: string; p_suscriptor_id?: string | null }
         Returns: number
