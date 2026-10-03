@@ -72,13 +72,13 @@ export function TablaPermisosSecciones({
 
               return (
                 <TableRow key={seccion.key}>
-                  <TableCell className="px-3 py-2.5">
+                  <TableCell className="px-3 py-3">
                     <p className="font-medium">{seccion.label}</p>
                     <p id={idAyuda} className="mt-0.5 text-xs text-muted-foreground">
                       Editar: {AYUDA_EDICION[seccion.key]}
                     </p>
                   </TableCell>
-                  <TableCell className="px-2 py-2.5 text-center">
+                  <TableCell className="px-2 py-3 text-center">
                     <Switch
                       checked={ver}
                       disabled={soloLectura}
@@ -86,7 +86,7 @@ export function TablaPermisosSecciones({
                       aria-label={`Ver ${seccion.label}`}
                     />
                   </TableCell>
-                  <TableCell className="px-2 py-2.5 text-center">
+                  <TableCell className="px-2 py-3 text-center">
                     <Switch
                       checked={editar}
                       disabled={!ver || !puedeConcederEdicion || soloLectura}

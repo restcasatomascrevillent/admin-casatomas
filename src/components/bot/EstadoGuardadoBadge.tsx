@@ -22,10 +22,12 @@ export function EstadoGuardadoBadge({ dirty, saving, error }: EstadoGuardadoBadg
   }
   if (error) {
     return (
-      <Badge variant="destructive" className="gap-1.5 whitespace-nowrap" title={error}>
-        <AlertCircle className="h-3 w-3" aria-hidden="true" />
-        Error al guardar
-        <span className="sr-only">: {error}</span>
+      // El motivo se lee en pantalla (antes solo en `title`/lector de pantalla: con el dedo no se veía).
+      <Badge variant="destructive" className="max-w-full items-start gap-1.5 whitespace-normal text-left">
+        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+        <span>
+          Error al guardar<span className="font-normal">: {error}</span>
+        </span>
       </Badge>
     );
   }

@@ -69,81 +69,94 @@ export function CarritoTPV({
             {lineas.map((linea, index) => (
               <div
                 key={`${linea.producto_id}-${index}`}
-                className="flex items-center gap-2 p-2 bg-muted/50 rounded-md"
+                className="space-y-1 p-2 bg-muted/50 rounded-md"
               >
-                {/* Icono */}
-                <div className="w-8 h-8 rounded bg-background flex items-center justify-center shrink-0">
-                  {linea.producto_tipo === 'bebida' ? (
-                    <Wine className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Utensils className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{linea.nombre}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(linea.precio)} x {linea.cantidad}
-                    {linea.descuento && linea.descuento > 0 && (
-                      <span className="text-destructive ml-1">(-{linea.descuento}%)</span>
+                {/* Fila 1: qué es, cuánto cuesta y quitarlo */}
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded bg-background flex items-center justify-center shrink-0">
+                    {linea.producto_tipo === 'bebida' ? (
+                      <Wine className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Utensils className="h-4 w-4 text-muted-foreground" />
                     )}
-                  </p>
-                </div>
+                  </div>
 
-                {/* Controles cantidad */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onUpdateCantidad(index, linea.cantidad - 1)}
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {linea.cantidad}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{linea.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCurrency(linea.precio)} x {linea.cantidad}
+                      {linea.descuento && linea.descuento > 0 && (
+                        <span className="text-destructive ml-1">(-{linea.descuento}%)</span>
+                      )}
+                    </p>
+                  </div>
+
+                  <span className="text-sm font-bold text-right whitespace-nowrap">
+                    {formatCurrency(
+                      linea.precio * linea.cantidad * (1 - (linea.descuento || 0) / 100)
+                    )}
                   </span>
+
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onUpdateCantidad(index, linea.cantidad + 1)}
+                    className="h-11 w-11 shrink-0 text-destructive"
+                    onClick={() => onRemoveLinea(index)}
+                    aria-label={`Quitar ${linea.nombre}`}
                   >
-                    <Plus className="h-3 w-3" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
 
-                {/* Total línea */}
-                <span className="text-sm font-bold w-16 text-right">
-                  {formatCurrency(
-                    linea.precio * linea.cantidad * (1 - (linea.descuento || 0) / 100)
-                  )}
-                </span>
+                {/* Fila 2: cantidad y descuento, con botones de 44 px (se pulsan con el dedo) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11"
+                      onClick={() => onUpdateCantidad(index, linea.cantidad - 1)}
+                      aria-label={`Quitar una unidad de ${linea.nombre}`}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-9 text-center text-base font-semibold tabular-nums" aria-live="polite">
+                      {linea.cantidad}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11"
+                      onClick={() => onUpdateCantidad(index, linea.cantidad + 1)}
+                      aria-label={`Añadir una unidad de ${linea.nombre}`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
 
-                {/* Acciones */}
-                <div className="flex gap-1">
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Percent className="h-3 w-3" />
+                      <Button variant="outline" className="h-11 gap-1.5 px-3" aria-label={`Descuento de ${linea.nombre}`}>
+                        <Percent className="h-4 w-4" />
+                        Descuento
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-48 p-2">
+                    <PopoverContent className="w-64 p-3" collisionPadding={12}>
                       <div className="space-y-2">
-                        <p className="text-xs font-medium">Descuento %</p>
-                        <div className="flex gap-1">
+                        <p className="text-sm font-medium">Descuento %</p>
+                        <div className="flex gap-2">
                           <Input
                             type="number"
+                            inputMode="decimal"
                             min="0"
                             max="100"
                             value={descuentoTemp?.index === index ? descuentoTemp.valor : (linea.descuento || '')}
                             onChange={(e) => setDescuentoTemp({ index, valor: e.target.value })}
-                            className="h-8"
+                            className="h-11 text-base md:text-base"
+                            aria-label="Porcentaje de descuento"
                           />
                           <Button
-                            size="sm"
-                            className="h-8"
+                            className="h-11 px-5"
                             onClick={() => handleDescuentoLinea(index)}
                           >
                             OK
@@ -152,14 +165,6 @@ export function CarritoTPV({
                       </div>
                     </PopoverContent>
                   </Popover>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => onRemoveLinea(index)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
                 </div>
               </div>
             ))}
@@ -175,11 +180,13 @@ export function CarritoTPV({
           <div className="flex items-center gap-1">
             <Input
               type="number"
+              inputMode="decimal"
               min="0"
               max="100"
               value={descuentoGlobal || ''}
               onChange={(e) => onSetDescuentoGlobal(parseFloat(e.target.value) || 0)}
-              className="w-16 h-7 text-right"
+              className="w-20 h-11 text-right text-base md:text-base"
+              aria-label="Descuento global en porcentaje"
             />
             <span>%</span>
           </div>

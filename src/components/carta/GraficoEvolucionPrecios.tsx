@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { useHistorialAjustes } from "@/hooks/useHistorialAjustes";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { TrendingUp, BarChart3, LineChart as LineChartIcon, Info } from "lucide-react";
+import { TrendingUp, BarChart3, LineChart as LineChartIcon } from "lucide-react";
 
 export function GraficoEvolucionPrecios() {
   const { historial } = useHistorialAjustes();
@@ -103,13 +103,8 @@ export function GraficoEvolucionPrecios() {
                   <TrendingUp className="h-5 w-5 text-primary" />
                   Evolución de Precios Promedio
                 </CardTitle>
-                <HoverCard>
-                  <HoverCardTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </HoverCardTrigger>
-                  <HoverCardContent className="w-80" align="start">
+                {/* Popover (se abre con un toque) en vez de HoverCard: en una tablet no hay hover. */}
+                <AyudaPopover etiqueta="Sobre este gráfico" className="ml-1" contentClassName="w-80">
                     <div className="space-y-2">
                       <h4 className="text-sm font-semibold">Sobre este gráfico</h4>
                       <p className="text-sm text-muted-foreground">
@@ -122,11 +117,10 @@ export function GraficoEvolucionPrecios() {
                         <p><strong>Líneas/Barras de colores:</strong> Cada color representa una categoría diferente</p>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2">
-                        💡 <strong>Tip:</strong> Pasa el cursor sobre los puntos para ver valores exactos
+                        💡 <strong>Tip:</strong> Toca los puntos para ver valores exactos
                       </p>
                     </div>
-                  </HoverCardContent>
-                </HoverCard>
+                </AyudaPopover>
               </div>
               <CardDescription className="mt-1">
                 Histórico de precios promedio por categoría
@@ -135,7 +129,7 @@ export function GraficoEvolucionPrecios() {
             
             <div className="flex flex-col sm:flex-row gap-3">
               <Select value={tipoCartaSeleccionado} onValueChange={(v: any) => setTipoCartaSeleccionado(v)}>
-                <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectTrigger className="h-11 w-full sm:w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

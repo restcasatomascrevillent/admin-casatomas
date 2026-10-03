@@ -157,7 +157,7 @@ export function ListaPedidos() {
                         cambiarEstado.mutate({ id: pedido.id, estado: nuevoEstado as EstadoPedido });
                       }}
                     >
-                      <SelectTrigger className="w-36 h-8">
+                      <SelectTrigger className="h-11 w-44">
                         <Badge className={`${ESTADO_COLORES[pedido.estado || 'pendiente']} text-white flex items-center gap-1`}>
                           {ESTADO_ICONOS[pedido.estado || 'pendiente']}
                           <span className="capitalize">{pedido.estado}</span>
@@ -179,7 +179,9 @@ export function ListaPedidos() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-11 w-11"
                       onClick={() => setPedidoSeleccionado(pedido.id)}
+                      aria-label="Ver el detalle del pedido"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -192,7 +194,7 @@ export function ListaPedidos() {
       )}
 
       <Dialog open={!!pedidoSeleccionado} onOpenChange={() => setPedidoSeleccionado(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalle del Pedido</DialogTitle>
           </DialogHeader>

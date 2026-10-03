@@ -58,12 +58,12 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.callType ?? "all"}
                 onValueChange={(v) => onChange({ ...value, callType: v as any })}
             >
-                <SelectTrigger className="h-8 w-auto min-w-[150px] text-xs">
+                <SelectTrigger className="h-11 w-auto min-w-[150px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                     {CALL_TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                        <SelectItem key={o.value} value={o.value} className="min-h-11 text-sm">
                             {o.label}
                         </SelectItem>
                     ))}
@@ -74,12 +74,12 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.intent ?? "all"}
                 onValueChange={(v) => onChange({ ...value, intent: v })}
             >
-                <SelectTrigger className="h-8 w-auto min-w-[180px] text-xs">
+                <SelectTrigger className="h-11 w-auto min-w-[180px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                     {INTENT_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                        <SelectItem key={o.value} value={o.value} className="min-h-11 text-sm">
                             {o.label}
                         </SelectItem>
                     ))}
@@ -90,12 +90,12 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.sentiment ?? "all"}
                 onValueChange={(v) => onChange({ ...value, sentiment: v })}
             >
-                <SelectTrigger className="h-8 w-auto min-w-[180px] text-xs">
+                <SelectTrigger className="h-11 w-auto min-w-[180px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                     {SENTIMENT_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                        <SelectItem key={o.value} value={o.value} className="min-h-11 text-sm">
                             {o.label}
                         </SelectItem>
                     ))}
@@ -106,12 +106,12 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.success ?? "all"}
                 onValueChange={(v) => onChange({ ...value, success: v as any })}
             >
-                <SelectTrigger className="h-8 w-auto min-w-[150px] text-xs">
+                <SelectTrigger className="h-11 w-auto min-w-[150px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                     {SUCCESS_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                        <SelectItem key={o.value} value={o.value} className="min-h-11 text-sm">
                             {o.label}
                         </SelectItem>
                     ))}
@@ -122,7 +122,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs gap-1"
+                    className="h-11 px-4 text-sm gap-1"
                     onClick={() =>
                         onChange({
                             intent: "all",
@@ -132,7 +132,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                         })
                     }
                 >
-                    <X className="h-3 w-3" />
+                    <X className="h-4 w-4" />
                     Limpiar
                 </Button>
             )}

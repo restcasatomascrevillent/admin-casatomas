@@ -434,7 +434,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="space-y-2">
                     <p>No se pudo cargar la lista: {errorCarga}</p>
-                    <Button size="sm" variant="outline" className="bg-background" onClick={() => cargarDatos()}>
+                    <Button size="sm" variant="outline" className="h-11 bg-background" onClick={() => cargarDatos()}>
                       Reintentar
                     </Button>
                   </AlertDescription>
@@ -464,7 +464,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                         <button
                           type="button"
                           onClick={() => editar(registro)}
-                          className="min-w-0 flex-1 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="min-h-11 min-w-0 flex-1 rounded-md py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <p className="text-sm font-medium flex items-center gap-2">
                             <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -476,22 +476,20 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8"
+                          className="h-11 w-11 shrink-0"
                           onClick={() => editar(registro)}
                           aria-label="Editar"
-                          title="Editar"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
                           onClick={() => setRegistroAEliminar(registro)}
                           aria-label="Eliminar"
-                          title="Eliminar"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </li>
                     );
@@ -523,7 +521,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                   type="date"
                   value={fecha}
                   onChange={(e) => setFecha(e.target.value)}
-                  className="h-9"
+                  className="h-11 text-base md:text-base"
                 />
               </div>
 
@@ -555,7 +553,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="bg-background"
+                          className="h-11 bg-background"
                           onClick={() => queryClient.invalidateQueries({ queryKey: ["platos-para-menu"] })}
                         >
                           Reintentar
@@ -589,7 +587,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     value={tapasTexto}
                     onChange={(e) => setTapasTexto(e.target.value)}
                     placeholder={"Ensaladilla rusa\nCroquetas de jamón\nPulpo a feira"}
-                    className="min-h-40"
+                    className="min-h-40 text-base md:text-base"
                   />
                 </div>
               )}

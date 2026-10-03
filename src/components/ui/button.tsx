@@ -9,18 +9,24 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        // `active:` da feedback al toque en tablet (el hover no existe con dedo).
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:bg-destructive/80",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/70",
+        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent active:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // Con dedo (`pointer-coarse`) todos los tamaños suben a >= 44 px (h-11 /
+      // w-11) aunque el llamador fuerce `h-7 w-7`: la variante táctil gana. Para
+      // un caso que de verdad deba seguir pequeño en táctil (p. ej. dentro de un
+      // lienzo): `pointer-coarse:h-auto pointer-coarse:w-auto`.
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-10 px-4 py-2 pointer-coarse:h-11",
+        sm: "h-9 rounded-md px-3 pointer-coarse:h-11 pointer-coarse:px-4",
+        lg: "h-11 rounded-md px-8 pointer-coarse:h-12",
+        icon: "h-10 w-10 pointer-coarse:h-11 pointer-coarse:w-11",
       },
     },
     defaultVariants: {

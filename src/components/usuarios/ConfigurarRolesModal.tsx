@@ -134,13 +134,13 @@ export function ConfigurarRolesModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+        <Button type="button" variant="outline" size="sm" className="h-11 px-4">
           <Settings2 className="h-4 w-4 mr-1" />
           Configurar roles
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[min(96vw,1080px)] max-w-[min(96vw,1080px)] max-h-[92vh] overflow-hidden p-0 gap-0">
-        <div className="flex max-h-[92vh] flex-col">
+      <DialogContent className="w-[min(96vw,1080px)] max-w-[min(96vw,1080px)] max-h-[92dvh] overflow-hidden p-0 gap-0">
+        <div className="flex max-h-[92dvh] flex-col">
           <DialogHeader className="border-b px-4 py-4 pr-10 sm:px-6">
             <DialogTitle>Configurar Roles</DialogTitle>
             <DialogDescription>
@@ -165,6 +165,7 @@ export function ConfigurarRolesModal({
                     value={presetName}
                     onChange={(event) => setPresetName(event.target.value)}
                     placeholder="Ej: Sala principal"
+                    className="h-11"
                   />
                   <p className="text-xs text-muted-foreground">{accessCount} secciones con acceso</p>
                 </div>
@@ -172,7 +173,7 @@ export function ConfigurarRolesModal({
                 <div className="space-y-2">
                   <Label>Rol base</Label>
                   <Select value={draftBaseRole} onValueChange={(v) => setDraftBaseRole(v as PresetBaseRole)}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="h-11 w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -185,7 +186,7 @@ export function ConfigurarRolesModal({
 
                 <div className="space-y-2">
                   <Label>Permisos</Label>
-                  <div className="max-h-[42vh] overflow-y-auto pr-1">
+                  <div className="max-h-[42dvh] overflow-y-auto pr-1">
                     <TablaPermisosSecciones
                       permisos={draftPermissions}
                       onCambiarVer={handleVerChange}
@@ -200,6 +201,7 @@ export function ConfigurarRolesModal({
                     <Button
                       type="button"
                       variant="outline"
+                      className="h-11 px-5"
                       disabled={saving}
                       onClick={() => resetEditor(currentPermissions)}
                     >
@@ -210,7 +212,7 @@ export function ConfigurarRolesModal({
                     type="button"
                     onClick={handleSavePreset}
                     disabled={saving || !presetName.trim()}
-                    className="sm:min-w-[170px]"
+                    className="h-11 px-5 sm:min-w-[170px]"
                   >
                     {saving ? (
                       <>
@@ -236,7 +238,7 @@ export function ConfigurarRolesModal({
                 ) : presets.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Todavía no hay roles preconfigurados.</p>
                 ) : (
-                  <div className="space-y-2 max-h-[56vh] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[56dvh] overflow-y-auto pr-1">
                     {presets.map((preset) => {
                       const presetAccessCount = preset.permissions.filter((permission) => permission.can_view).length;
                       const presetEditCount = preset.permissions.filter((permission) => permission.can_edit).length;
@@ -258,7 +260,7 @@ export function ConfigurarRolesModal({
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            <Badge variant="outline" className="mr-1 text-[10px] px-1.5 py-0">{preset.base_role}</Badge>
+                            <Badge variant="outline" className="mr-1 text-xs px-1.5 py-0">{preset.base_role}</Badge>
                             {presetAccessCount} secciones con acceso
                             {presetEditCount > 0 && ` · ${presetEditCount} con edición`}
                           </p>
@@ -267,6 +269,7 @@ export function ConfigurarRolesModal({
                               type="button"
                               size="sm"
                               variant="outline"
+                              className="h-11 px-4"
                               disabled={saving}
                               onClick={() => startEditingPreset(preset)}
                             >
@@ -277,8 +280,9 @@ export function ConfigurarRolesModal({
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="text-destructive hover:text-destructive"
+                              className="h-11 w-11 px-0 text-destructive hover:text-destructive"
                               disabled={saving}
+                              aria-label={`Eliminar el rol ${preset.name}`}
                               onClick={() => handleDeletePreset(preset)}
                             >
                               <Trash2 className="h-4 w-4" />

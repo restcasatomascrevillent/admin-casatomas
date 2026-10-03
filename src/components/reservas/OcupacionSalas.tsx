@@ -438,6 +438,7 @@ function FilaRejilla({
             );
             const clases = cn(
               "flex h-8 w-full min-w-[3rem] items-center justify-center gap-1 rounded border text-xs",
+              onSeleccionar && "pointer-coarse:h-11 pointer-coarse:min-w-[3.25rem] pointer-coarse:text-sm",
               cabe
                 ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30"
                 : "border-red-200 bg-red-50/60 text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200",

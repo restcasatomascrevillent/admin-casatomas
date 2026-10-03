@@ -59,10 +59,11 @@ export function EstadoTraduccionBadges({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {errorTraduccion && !traduciendo && (
-        <Badge variant="destructive" className="gap-1 whitespace-nowrap font-normal" title={errorTraduccion}>
-          <AlertCircle className="h-3 w-3" aria-hidden="true" />
-          Traducción pendiente
-          <span className="sr-only">: {errorTraduccion}</span>
+        <Badge variant="destructive" className="max-w-full items-start gap-1 whitespace-normal text-left font-normal">
+          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>
+            Traducción pendiente: {errorTraduccion}
+          </span>
         </Badge>
       )}
       {estados.map((e) => (
@@ -83,7 +84,7 @@ export function EstadoTraduccionBadges({
           type="button"
           size="sm"
           variant="outline"
-          className="h-7 px-2 text-xs"
+          className="h-11 px-3 text-sm"
           onClick={onReintentar}
           disabled={!puedeReintentar}
           title={puedeReintentar ? "Traducir de nuevo lo último guardado en español" : "Guarda primero los cambios en español"}

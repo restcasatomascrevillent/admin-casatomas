@@ -343,14 +343,14 @@ export default function AsistenteTelefonico() {
         if (isLoadingConfig) return null;
         const mode = (config as any)?.mode;
         return (
-            <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5">
+            <div className="flex min-h-11 items-center gap-3 rounded-md border bg-card px-3 py-1.5">
                 <Switch
                     id="mode-switch-header"
                     checked={mode === "bot"}
                     onCheckedChange={handleModeChange}
                     disabled={updateModeMutation.isPending}
                 />
-                <Label htmlFor="mode-switch-header" className="text-xs font-medium">
+                <Label htmlFor="mode-switch-header" className="cursor-pointer py-2 text-sm font-medium">
                     {mode === "bot" ? "🤖 Bot IA" : "👤 Humano"}
                 </Label>
             </div>
@@ -371,16 +371,16 @@ export default function AsistenteTelefonico() {
 
                 <Tabs defaultValue="resumen" className="w-full">
                     <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
-                        <TabsTrigger value="resumen" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                        <TabsTrigger value="resumen" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
                             <BarChart3 className="h-4 w-4" /> Resumen
                         </TabsTrigger>
-                        <TabsTrigger value="llamadas" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                        <TabsTrigger value="llamadas" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
                             <PhoneCall className="h-4 w-4" /> Llamadas
                         </TabsTrigger>
-                        <TabsTrigger value="alertas" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                        <TabsTrigger value="alertas" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
                             <BellRing className="h-4 w-4" /> Alertas
                         </TabsTrigger>
-                        <TabsTrigger value="configuracion" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
+                        <TabsTrigger value="configuracion" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
                             <Settings className="h-4 w-4" /> Configuración
                         </TabsTrigger>
                     </TabsList>
@@ -464,7 +464,7 @@ export default function AsistenteTelefonico() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                <span className="text-xs text-muted-foreground whitespace-nowrap">
                                                     {new Intl.DateTimeFormat("es-ES", {
                                                         day: "2-digit",
                                                         month: "short",
@@ -485,7 +485,7 @@ export default function AsistenteTelefonico() {
                         {/* Horario programado */}
                         <Card>
                             <CardHeader>
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
                                             <Calendar className="h-5 w-5" /> Horario Programado
@@ -496,8 +496,8 @@ export default function AsistenteTelefonico() {
                                         </CardDescription>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Switch checked={scheduleEnabled} onCheckedChange={handleScheduleToggle} />
-                                        <Label className="text-sm">{scheduleEnabled ? "Activo" : "Inactivo"}</Label>
+                                        <Switch id="horario-activo" checked={scheduleEnabled} onCheckedChange={handleScheduleToggle} />
+                                        <Label htmlFor="horario-activo" className="cursor-pointer py-3 text-sm">{scheduleEnabled ? "Activo" : "Inactivo"}</Label>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -510,8 +510,8 @@ export default function AsistenteTelefonico() {
                                             <div key={dayIndex} className={`p-4 rounded-lg border bg-card transition-opacity ${!scheduleEnabled ? "opacity-50" : ""}`}>
                                                 <div className="flex items-center justify-between mb-3">
                                                     <h4 className="font-medium text-sm sm:text-base">{name}</h4>
-                                                    <Button variant="outline" size="sm" onClick={() => addRange(dayIndex)} disabled={!scheduleEnabled} className="h-8 shadow-sm">
-                                                        <Plus className="w-3 h-3 mr-1" /> Añadir franja
+                                                    <Button variant="outline" size="sm" onClick={() => addRange(dayIndex)} disabled={!scheduleEnabled} className="h-11 px-4 shadow-sm">
+                                                        <Plus className="w-4 h-4 mr-1" /> Añadir franja
                                                     </Button>
                                                 </div>
                                                 {(!rule.ranges || rule.ranges.length === 0) ? (
@@ -524,18 +524,18 @@ export default function AsistenteTelefonico() {
                                                         {rule.ranges.map((r: any) => (
                                                             <div key={r.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${r.mode === "bot" ? "bg-blue-50/50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/40" : "bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900/40"}`}>
                                                                 <Select value={r.mode} onValueChange={(v) => updateRangeRule(dayIndex, r.id, "mode", v)} disabled={!scheduleEnabled}>
-                                                                    <SelectTrigger className="w-full sm:w-[140px] h-9 bg-background"><SelectValue /></SelectTrigger>
+                                                                    <SelectTrigger className="w-full sm:w-[160px] h-11 bg-background"><SelectValue /></SelectTrigger>
                                                                     <SelectContent>
                                                                         <SelectItem value="human">👤 Humano</SelectItem>
                                                                         <SelectItem value="bot">🤖 Bot IA</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
                                                                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                                                                    <Input type="time" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-9 w-full sm:w-auto bg-background" />
+                                                                    <Input type="time" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                     <span className="text-muted-foreground text-sm">a</span>
-                                                                    <Input type="time" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-9 w-full sm:w-auto bg-background" />
+                                                                    <Input type="time" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                 </div>
-                                                                <Button variant="ghost" size="icon" className="text-destructive h-9 w-9 sm:ml-auto hover:bg-destructive/10" onClick={() => removeRange(dayIndex, r.id)} disabled={!scheduleEnabled}>
+                                                                <Button variant="ghost" size="icon" className="text-destructive h-11 w-11 sm:ml-auto hover:bg-destructive/10" onClick={() => removeRange(dayIndex, r.id)} disabled={!scheduleEnabled} aria-label="Quitar franja">
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </Button>
                                                             </div>
@@ -547,7 +547,7 @@ export default function AsistenteTelefonico() {
                                     })}
                                 </div>
                                 {scheduleDirty && (
-                                    <Button className="mt-6 w-full shadow-sm" onClick={saveSchedule} disabled={updateScheduleMutation.isPending}>
+                                    <Button className="mt-6 h-12 w-full shadow-sm" onClick={saveSchedule} disabled={updateScheduleMutation.isPending}>
                                         {updateScheduleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                                         Guardar horarios
                                     </Button>
@@ -555,14 +555,14 @@ export default function AsistenteTelefonico() {
                             </CardContent>
                         </Card>
 
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-6 xl:grid-cols-2">
                             <VapiCallSimulator assistantId={(config as any)?.vapi_assistant_id} />
                             <VapiPromptEditor config={config} />
                         </div>
 
                         <Card>
                             <CardHeader>
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div>
                                         <CardTitle className="flex items-center gap-2">
                                             <MessageSquare className="h-5 w-5" /> Respuestas del Bot
@@ -572,7 +572,7 @@ export default function AsistenteTelefonico() {
                                         </CardDescription>
                                     </div>
                                     {botResponsesDirty && (
-                                        <Button onClick={() => updateBotResponsesMutation.mutate(botResponses)} disabled={updateBotResponsesMutation.isPending} className="shrink-0">
+                                        <Button onClick={() => updateBotResponsesMutation.mutate(botResponses)} disabled={updateBotResponsesMutation.isPending} className="h-11 shrink-0 px-5">
                                             {updateBotResponsesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                                             Guardar respuestas
                                         </Button>
@@ -583,7 +583,7 @@ export default function AsistenteTelefonico() {
                                 {BOT_RESPONSE_GROUPS.map((group) => (
                                     <div key={group.label} className="border rounded-lg overflow-hidden">
                                         <button
-                                            className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
+                                            className="w-full flex min-h-11 items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/70 transition-colors text-left"
                                             onClick={() => setOpenBotGroup(openBotGroup === group.label ? null : group.label)}
                                         >
                                             <span className="font-medium text-sm">{group.label}</span>
@@ -605,14 +605,14 @@ export default function AsistenteTelefonico() {
                                                                 )}
                                                             </div>
                                                             {botResponses[key] && (
-                                                                <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                                                                <Button variant="ghost" size="sm" className="h-11 px-3 text-sm shrink-0 text-muted-foreground hover:text-foreground"
                                                                     onClick={() => {
                                                                         const newBR = { ...botResponses };
                                                                         delete newBR[key];
                                                                         setBotResponses(newBR);
                                                                         setBotResponsesDirty(true);
                                                                     }}>
-                                                                    <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
+                                                                    <RotateCcw className="h-4 w-4 mr-1" /> Restaurar
                                                                 </Button>
                                                             )}
                                                         </div>
@@ -624,7 +624,7 @@ export default function AsistenteTelefonico() {
                                                                 setBotResponses(prev => ({ ...prev, [key]: e.target.value }));
                                                                 setBotResponsesDirty(true);
                                                             }}
-                                                            className="text-sm resize-none"
+                                                            className="text-base md:text-base resize-none"
                                                         />
                                                     </div>
                                                 ))}

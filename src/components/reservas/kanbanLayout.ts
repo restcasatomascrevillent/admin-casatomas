@@ -75,6 +75,16 @@ export const GAP_KANBAN = 16;
 export const ANCHO_MIN_COLUMNA = 112;
 
 /**
+ * Ancho mínimo de una columna con DEDO (`pointer: coarse`), 232px. 112px es válido para
+ * ratón (se ve todo el tablero de un vistazo), pero en una tablet las 5-6 columnas se quedaban
+ * en 115-165px: nombre ilegible, botones apretados y arrastrar a una columna de 120px es tirar
+ * a ciegas. A 232px la tarjeta lleva texto en los botones y en 772px útiles (iPad vertical,
+ * menú en hoja) entran 3 columnas, y 4 en 1084px; el resto se recorre con el imán de siempre.
+ * Se pasa como 3er argumento de `calcularDisposicion`.
+ */
+export const ANCHO_MIN_COLUMNA_TACTIL = 232;
+
+/**
  * A partir de este ancho de columna la botonera de la tarjeta lleva texto
  * («Ha llegado»); por debajo se queda en iconos (ver `accionesSoloIcono`).
  *
@@ -161,13 +171,16 @@ export function columnasQueCaben(ancho: number, anchoMinimo = ANCHO_MIN_COLUMNA)
  * Ancho útil mínimo para que TODAS las columnas quepan a la vez. Sirve para
  * razonar (y testear) sobre el punto exacto en el que deja de ser posible.
  */
-export function anchoParaQueQuepanTodas(items: readonly ItemColumna[]): number {
+export function anchoParaQueQuepanTodas(
+  items: readonly ItemColumna[],
+  anchoMin: number = ANCHO_MIN_COLUMNA,
+): number {
   if (items.length === 0) return 0;
   const plegadas = items.filter((i) => i.plegada).length;
   const expandidas = items.length - plegadas;
   return (
     plegadas * ANCHO_COLUMNA_PLEGADA +
-    expandidas * ANCHO_MIN_COLUMNA +
+    expandidas * anchoMin +
     GAP_KANBAN * (items.length - 1)
   );
 }
@@ -179,11 +192,12 @@ export function anchoParaQueQuepanTodas(items: readonly ItemColumna[]): number {
 export function calcularDisposicion(
   items: readonly ItemColumna[],
   anchoDisponible: number,
+  anchoMin: number = ANCHO_MIN_COLUMNA,
 ): DisposicionKanban {
   if (items.length === 0) {
     return {
       modo: "ajustado",
-      anchoColumna: ANCHO_MIN_COLUMNA,
+      anchoColumna: anchoMin,
       paradas: [],
       visiblesPorParada: [],
       margenes: {},
@@ -195,7 +209,7 @@ export function calcularDisposicion(
   // Antes del primer ResizeObserver no sabemos el ancho: se pinta con el
   // mínimo legible y sin desplazamiento; al llegar la medida se recalcula.
   if (!Number.isFinite(anchoDisponible) || anchoDisponible <= 0) {
-    return ajustado(items, ANCHO_MIN_COLUMNA);
+    return ajustado(items, anchoMin);
   }
 
   const plegadas = items.filter((i) => i.plegada).length;
@@ -205,15 +219,15 @@ export function calcularDisposicion(
 
   // Todo plegado a mano: los carriles son estrechos, casi siempre caben de sobra.
   if (expandidas === 0) {
-    if (anchoCarriles + gaps <= anchoDisponible) return ajustado(items, ANCHO_MIN_COLUMNA);
-    return paginar(items, ANCHO_MIN_COLUMNA, anchoDisponible);
+    if (anchoCarriles + gaps <= anchoDisponible) return ajustado(items, anchoMin);
+    return paginar(items, anchoMin, anchoDisponible);
   }
 
   // EL CASO QUE MANDA: ¿caben TODAS repartiéndose el hueco? Con el mínimo en
   // 112px esto es cierto en cualquier escritorio, así que el kanban se queda
   // en "ajustado" y no hay ni scroll ni columnas escondidas.
   const anchoSiCaben = (anchoDisponible - anchoCarriles - gaps) / expandidas;
-  if (anchoSiCaben >= ANCHO_MIN_COLUMNA) {
+  if (anchoSiCaben >= anchoMin) {
     return ajustado(items, Math.floor(Math.min(anchoSiCaben, ANCHO_MAX_COLUMNA)));
   }
 
@@ -222,7 +236,7 @@ export function calcularDisposicion(
   // ridículamente estrechas se permite bajar del mínimo antes que dejar una
   // columna más ancha que la pantalla, que sí se vería cortada.
   const anchoMinimo = Math.min(
-    ANCHO_MIN_COLUMNA,
+    anchoMin,
     Math.max(ANCHO_MIN_EMERGENCIA, anchoDisponible - GAP_KANBAN),
   );
   const porVista = Math.min(items.length, columnasQueCaben(anchoDisponible, anchoMinimo));

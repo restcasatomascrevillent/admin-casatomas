@@ -91,12 +91,12 @@ export function EditorPesoPaginas() {
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="h-11 gap-2 px-4">
           <Scale className="h-4 w-4" aria-hidden />
           Pesos por página
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Peso transferido por visita</DialogTitle>
           <DialogDescription>
@@ -120,15 +120,17 @@ export function EditorPesoPaginas() {
                   <TableHead>Ruta</TableHead>
                   <TableHead className="text-right">Peso</TableHead>
                   <TableHead className="hidden sm:table-cell">Actualizado</TableHead>
-                  <TableHead className="w-[84px]" />
+                  <TableHead className="w-[100px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(data ?? []).map((p) => (
                   <TableRow key={`${p.proyecto}|${p.ruta}`}>
                     <TableCell className="text-xs">{NOMBRE_PROYECTO[p.proyecto as ProyectoTrafico] ?? p.proyecto}</TableCell>
-                    <TableCell className="font-mono text-xs" title={p.nota ?? undefined}>
+                    <TableCell className="font-mono text-xs">
                       {p.ruta === "*" ? "* (media)" : p.ruta}
+                      {/* La nota se lee escrita: antes solo salía en un `title` (hover). */}
+                      {p.nota && <span className="block max-w-[16rem] whitespace-normal font-sans text-xs text-muted-foreground">{p.nota}</span>}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-xs">{fmtBytes(p.bytes_por_visita)}</TableCell>
                     <TableCell className="hidden text-xs text-muted-foreground sm:table-cell">
@@ -136,19 +138,19 @@ export function EditorPesoPaginas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editar(p)} aria-label={`Editar ${p.ruta}`}>
-                          <Pencil className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => editar(p)} aria-label={`Editar ${p.ruta}`}>
+                          <Pencil className="h-4 w-4" />
                         </Button>
                         {p.ruta !== "*" && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive"
+                            className="h-11 w-11 text-destructive"
                             onClick={() => onBorrar(p)}
                             disabled={borrar.isPending}
                             aria-label={`Borrar ${p.ruta}`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -171,7 +173,7 @@ export function EditorPesoPaginas() {
                 value={borrador.proyecto}
                 onValueChange={(v) => setBorrador((b) => ({ ...b, proyecto: v as ProyectoTrafico }))}
               >
-                <SelectTrigger id="peso-proyecto">
+                <SelectTrigger id="peso-proyecto" className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -192,7 +194,10 @@ export function EditorPesoPaginas() {
                 placeholder="/carta"
                 value={borrador.ruta}
                 onChange={(e) => setBorrador((b) => ({ ...b, ruta: e.target.value }))}
-                className="font-mono"
+                className="h-11 font-mono text-base md:text-base"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 maxLength={2048}
               />
             </div>
@@ -206,6 +211,7 @@ export function EditorPesoPaginas() {
                 placeholder="450"
                 value={borrador.kb}
                 onChange={(e) => setBorrador((b) => ({ ...b, kb: e.target.value }))}
+                className="h-11 text-base md:text-base"
               />
             </div>
           </div>
@@ -218,13 +224,14 @@ export function EditorPesoPaginas() {
               placeholder="Cómo y cuándo se midió"
               value={borrador.nota}
               onChange={(e) => setBorrador((b) => ({ ...b, nota: e.target.value }))}
+              className="h-11 text-base md:text-base"
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setBorrador(VACIO)}>
+            <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={() => setBorrador(VACIO)}>
               Limpiar
             </Button>
-            <Button type="submit" size="sm" disabled={guardar.isPending} className="gap-2">
+            <Button type="submit" size="sm" disabled={guardar.isPending} className="h-11 gap-2 px-5">
               {guardar.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Guardar
             </Button>

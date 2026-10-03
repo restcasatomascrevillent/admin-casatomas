@@ -29,14 +29,14 @@ export function InterruptoresFotosPlatos() {
         {WEBS.map(({ web, etiqueta }) => {
           const id = `${baseId}-${web}`;
           return (
-            <div key={web} className="flex items-center gap-2">
+            <div key={web} className="flex min-h-11 items-center gap-2">
               <Switch
                 id={id}
                 checked={mostrarFotosPlatos[web]}
                 disabled={deshabilitado}
                 onCheckedChange={(mostrar) => cambiarFotosPlatos.mutate({ web, mostrar })}
               />
-              <Label htmlFor={id} className="cursor-pointer text-sm font-normal">
+              <Label htmlFor={id} className="cursor-pointer py-3 text-sm font-normal">
                 {etiqueta}
               </Label>
             </div>

@@ -201,9 +201,9 @@ export default function TabCarta() {
         {/* Barra: secciones + acciones */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="max-w-full overflow-x-auto">
-            <TabsList className="w-auto">
+            <TabsList className="h-auto w-auto">
               {(Object.keys(secciones) as Seccion[]).map((seccion) => (
-                <TabsTrigger key={seccion} value={seccion} className="gap-1.5">
+                <TabsTrigger key={seccion} value={seccion} className="min-h-11 gap-1.5 px-4">
                   {secciones[seccion].etiqueta}
                   <span className="text-xs text-muted-foreground tabular-nums">{secciones[seccion].total}</span>
                 </TabsTrigger>
@@ -230,14 +230,14 @@ export default function TabCarta() {
               placeholder="Buscar por nombre o descripción..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-10 pr-10"
+              className="pl-10 pr-11"
             />
             {busqueda && (
               <button
                 type="button"
                 onClick={() => setBusqueda("")}
                 aria-label="Limpiar búsqueda"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -288,6 +288,7 @@ export default function TabCarta() {
               <Button
                 variant="outline"
                 size="icon"
+                className="h-11 w-11"
                 aria-label="Expandir todos"
                 title="Expandir todos"
                 onClick={() => {
@@ -301,6 +302,7 @@ export default function TabCarta() {
               <Button
                 variant="outline"
                 size="icon"
+                className="h-11 w-11"
                 aria-label="Contraer todos"
                 title="Contraer todos"
                 onClick={() => {

@@ -1,5 +1,5 @@
 import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, LogOut, Shield, Settings } from "lucide-react";
-import type { ComponentType, SVGProps } from "react";
+import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -44,7 +44,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,7 +54,14 @@ export function AppSidebar() {
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
   const isActive = (path: string) => currentPath === path;
-  const isCollapsed = state === "collapsed";
+  // En el panel deslizante (tablet vertical) `state` sigue siendo el del menú de escritorio,
+  // pero dentro del Sheet siempre se ve expandido: no confundir con el carril de iconos.
+  const isCollapsed = state === "collapsed" && !isMobile;
+
+  // Al navegar, el panel deslizante se cierra solo (si no, tapaba la página nueva).
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [currentPath, setOpenMobile]);
 
   // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
@@ -70,7 +77,7 @@ export function AppSidebar() {
   });
 
   return (
-    <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
+    <Sidebar collapsible="icon">
       {/* El plegador vivía en la cabecera de página, que se eliminó para
           recuperar alto (ver DashboardLayout.tsx); aquí no gasta ni un píxel
           del área de contenido y sigue presente en TODAS las secciones.
@@ -86,11 +93,11 @@ export function AppSidebar() {
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
               <h2 className="text-lg font-semibold text-sidebar-foreground truncate">Admin Panel</h2>
-              <span className="text-xs text-muted-foreground truncate">Gestión del Restaurante</span>
+              <span className="text-xs text-sidebar-foreground/70 truncate">Gestión del Restaurante</span>
             </div>
           )}
           <SidebarTrigger
-            className={`text-sidebar-foreground hover:bg-sidebar-accent shrink-0 ${!isCollapsed ? "ml-auto" : ""}`}
+            className={`text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent shrink-0 ${!isCollapsed ? "ml-auto" : ""}`}
           />
         </div>
       </SidebarHeader>
@@ -107,7 +114,7 @@ export function AppSidebar() {
                       to={item.url}
                       className="flex items-center gap-3 hover:bg-sidebar-accent rounded-md transition-colors"
                     >
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
@@ -125,7 +132,7 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size={isCollapsed ? "icon" : "default"}
-            className={`text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? "" : "flex-1 justify-start"}`}
+            className={`text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent ${isCollapsed ? "" : "flex-1 justify-start"}`}
             onClick={() => signOut()}
           >
             <LogOut className="h-4 w-4 shrink-0" />
@@ -134,7 +141,7 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-sidebar-foreground hover:bg-sidebar-accent shrink-0"
+            className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent shrink-0"
             onClick={() => navigate("/super-admin/login")}
             title="Super Admin"
             aria-label="Super Admin"

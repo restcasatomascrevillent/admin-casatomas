@@ -74,7 +74,7 @@ export default function Espacios() {
   if (espacioConfigurando) {
     return (
       <SuperAdminLayout>
-        <div className="h-[calc(100vh-120px)] flex flex-col">
+        <div className="h-[calc(100dvh-120px)] min-h-[32rem] flex flex-col">
           <EditorPlanoEspacio
             espacioId={espacioConfigurando.id}
             espacioNombre={espacioConfigurando.nombre}
@@ -92,7 +92,7 @@ export default function Espacios() {
             el menú lateral ya dice dónde estás. Se conserva el botón, que sí
             es una acción. */}
         <div className="flex justify-end">
-          <Button onClick={() => setShowForm(true)}>
+          <Button className="h-11 touch-manipulation" onClick={() => setShowForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nuevo Espacio
           </Button>
@@ -124,7 +124,7 @@ export default function Espacios() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <CardTitle className="flex items-center gap-2">
+                          <CardTitle className="flex flex-wrap items-center gap-2">
                             {espacio.nombre}
                             {espacio.activa ? (
                               <Badge variant="default">Activo</Badge>
@@ -140,19 +140,23 @@ export default function Espacios() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-11 w-11 touch-manipulation"
+                            aria-label={`Editar ${espacio.nombre}`}
                             onClick={() => {
                               setEspacioEditando(espacio);
                               setShowForm(true);
                             }}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-5 w-5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-11 w-11 touch-manipulation"
+                            aria-label={`Eliminar ${espacio.nombre}`}
                             onClick={() => setEspacioAEliminar(espacio.id)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-5 w-5" />
                           </Button>
                         </div>
                       </div>
@@ -174,7 +178,7 @@ export default function Espacios() {
                         {/* Botón de configurar plano */}
                         <Button
                           variant="outline"
-                          className="w-full"
+                          className="w-full h-11 touch-manipulation"
                           onClick={() => {
                             console.log("[Espacios] abrir editor plano", {
                               espacioId: espacio.id,

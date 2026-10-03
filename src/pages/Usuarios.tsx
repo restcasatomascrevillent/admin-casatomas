@@ -26,12 +26,12 @@ export default function Usuarios() {
         <div className="flex justify-end">
           <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="flex h-11 items-center gap-2 px-5">
                 <UserPlus className="h-4 w-4" />
                 Añadir Usuario
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Añadir Nuevo Usuario</DialogTitle>
                 <DialogDescription>

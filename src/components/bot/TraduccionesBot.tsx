@@ -41,7 +41,7 @@ export function TraduccionesBot({ configs, traduciendo, puedeRetraducir, onRetra
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-sm text-base font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-h-11 items-center gap-1.5 rounded-sm text-base font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronDown className={cn("h-4 w-4 transition-transform", abierto && "rotate-180")} aria-hidden="true" />
               Ver traducciones
@@ -51,7 +51,7 @@ export function TraduccionesBot({ configs, traduciendo, puedeRetraducir, onRetra
             type="button"
             size="sm"
             variant="outline"
-            className="h-7 px-2 text-xs"
+            className="h-11 px-3 text-sm"
             onClick={onRetraducir}
             disabled={traduciendo || !puedeRetraducir}
             title={puedeRetraducir ? "Traducir de nuevo lo último guardado en español" : "Guarda primero los cambios en español"}

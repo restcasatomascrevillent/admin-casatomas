@@ -36,7 +36,7 @@ export function ConversacionesList({
       <div className="p-3 border-b border-border/60">
         <Button
           onClick={onNueva}
-          className="w-full gap-2 text-xs font-semibold"
+          className="h-11 w-full gap-2 text-sm font-semibold"
           size="sm"
           style={{
             background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))",
@@ -70,7 +70,7 @@ export function ConversacionesList({
               <div
                 key={conv.id}
                 className={cn(
-                  "group relative flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-all duration-150",
+                  "group relative flex min-h-11 items-start gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer transition-all duration-150",
                   isActive
                     ? "bg-accent/10 text-foreground"
                     : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
@@ -87,17 +87,17 @@ export function ConversacionesList({
 
                 <MessageSquare
                   className={cn(
-                    "h-3.5 w-3.5 shrink-0 mt-0.5",
+                    "h-4 w-4 shrink-0 mt-0.5",
                     isActive ? "text-[hsl(38,59%,45%)]" : "text-muted-foreground/50"
                   )}
                 />
 
-                <div className="flex-1 min-w-0 pr-6"> {/* pr-6 deja hueco para el botón de borrar al hacer hover sin tapar el texto */}
+                <div className="flex-1 min-w-0 pr-11"> {/* pr-11 deja hueco para el botón de borrar (siempre visible: con el dedo no hay hover) */}
                   {/* Quitado 'truncate' para permitir multilínea, y añadido break-words/whitespace-normal */}
-                  <p className="text-xs font-medium leading-tight whitespace-normal break-words">
+                  <p className="text-sm font-medium leading-tight whitespace-normal break-words">
                     {conv.titulo || "Sin título"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground/50 mt-1">{fecha}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{fecha}</p>
                 </div>
 
                 <AlertDialog>
@@ -105,12 +105,13 @@ export function ConversacionesList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="absolute right-1 top-2 h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                      className="absolute right-0 top-0 h-11 w-11 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      aria-label={`Eliminar conversación ${conv.titulo || "sin título"}`}
                       onClick={(e) => {
                         e.stopPropagation();
                       }}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent onClick={(e) => e.stopPropagation()}>

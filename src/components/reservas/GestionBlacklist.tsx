@@ -82,6 +82,40 @@ export function GestionBlacklist() {
     await eliminarBlacklist.mutateAsync(id);
   };
 
+  const accionesEntrada = (entry: NonNullable<typeof blacklist>[number]) => (
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(entry)}
+                        aria-label={`Editar la entrada ${entry.valor}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Eliminar ${entry.valor} de la lista negra`}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar de la lista negra?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción permitirá que este {entry.tipo === "email" ? "email" : "teléfono"} pueda realizar reservas nuevamente.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(entry.id)}>
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+  );
+
   if (isLoading) {
     return (
       <Card>
@@ -199,6 +233,49 @@ export function GestionBlacklist() {
             No hay entradas en la lista negra
           </div>
         ) : (
+          <>
+          {/* Tablet vertical / portátil pequeño: tarjetas. Siete columnas no caben y «Acciones» quedaba
+              a la derecha, fuera de la vista; el motivo se cortaba sin forma de leerlo entero. */}
+          <div className="space-y-3 xl:hidden">
+            {blacklist.map((entry) => (
+              <div key={entry.id} className="space-y-2 rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 space-y-1">
+                    <Badge variant="outline" className="gap-1">
+                      {entry.tipo === "email" ? <Mail className="h-3 w-3" /> : <Phone className="h-3 w-3" />}
+                      {entry.tipo === "email" ? "Email" : "Teléfono"}
+                    </Badge>
+                    <p className="break-all font-mono text-sm">{entry.valor}</p>
+                    {entry.nombre && <p className="text-sm">{entry.nombre}</p>}
+                  </div>
+                  {accionesEntrada(entry)}
+                </div>
+                {entry.motivo && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{entry.motivo}</p>}
+                {entry.aprobada_en && (
+                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <ShieldCheck className="h-3 w-3 shrink-0" />
+                    Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Desde {format(new Date(entry.created_at), "dd MMM yyyy", { locale: es })}</span>
+                  {entry.caduca_el ? (
+                    <Badge variant="outline" className="gap-1 border-amber-300 font-normal text-amber-700 dark:text-amber-400">
+                      <ShieldCheck className="h-3 w-3" />
+                      Caduca {format(new Date(`${entry.caduca_el}T00:00:00`), "dd MMM yyyy", { locale: es })}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                      <CalendarOff className="h-3 w-3" />
+                      Sin caducidad
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden xl:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -252,41 +329,14 @@ export function GestionBlacklist() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(entry)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar de la lista negra?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción permitirá que este {entry.tipo === "email" ? "email" : "teléfono"} pueda realizar reservas nuevamente.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(entry.id)}>
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
+                    {accionesEntrada(entry)}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          </div>
+          </>
         )}
       </CardContent>
       </Card>

@@ -63,8 +63,9 @@ export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: Sel
           <Button
             variant="destructive"
             size="icon"
-            className="absolute top-2 right-2 h-6 w-6"
+            className="absolute top-1 right-1 h-11 w-11"
             onClick={() => onSeleccionar(undefined)}
+            aria-label="Quitar la imagen"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -77,18 +78,18 @@ export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: Sel
               <span className="text-sm text-muted-foreground">Seleccionar imagen</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-h-[92dvh] max-w-2xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Seleccionar imagen</DialogTitle>
             </DialogHeader>
             
             <div className="flex justify-end mb-2">
-              <Button variant="ghost" size="sm" onClick={() => handleSelect(undefined)}>
+              <Button variant="ghost" size="sm" className="h-11 px-4" onClick={() => handleSelect(undefined)}>
                 Sin imagen
               </Button>
             </div>
 
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[min(400px,55dvh)]">
               {isLoading ? (
                 <div className="grid grid-cols-3 gap-3">
                   {[...Array(6)].map((_, i) => (
@@ -101,7 +102,7 @@ export function SelectorImagenGaleria({ imagenSeleccionada, onSeleccionar }: Sel
                     <div
                       key={index}
                       className={cn(
-                        "relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:opacity-80",
+                        "relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all active:opacity-80",
                         imagenSeleccionada === url ? "border-primary" : "border-transparent"
                       )}
                       onClick={() => handleSelect(url)}

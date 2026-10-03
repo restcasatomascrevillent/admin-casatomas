@@ -51,21 +51,21 @@ export function SelectorVariable({ targetRef, valor, onChange }: SelectorVariabl
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
-          <Braces className="h-3 w-3" />
+        <Button type="button" variant="outline" size="sm" className="h-11 gap-1.5 px-3 text-sm">
+          <Braces className="h-4 w-4" />
           Variable
         </Button>
       </DropdownMenuTrigger>
       {/* Se evita que Radix devuelva el foco al botón al cerrar: así el foco
           que ponemos nosotros en el campo de destino (arriba) no se pisa. */}
-      <DropdownMenuContent align="end" className="w-72" onCloseAutoFocus={(e) => e.preventDefault()}>
+      <DropdownMenuContent align="end" collisionPadding={12} className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-72 max-w-[calc(100vw-1.5rem)] overflow-y-auto" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DropdownMenuLabel className="text-xs text-muted-foreground">Insertar variable aquí</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {TOKENS_DISPONIBLES.map((token) => (
           <DropdownMenuItem
             key={token.clave}
             onSelect={() => insertar(token.clave)}
-            className="flex flex-col items-start gap-0.5 py-2"
+            className="flex min-h-11 flex-col items-start gap-0.5 py-2"
           >
             <span className="font-mono text-xs font-semibold text-primary">{`{{${token.clave}}}`}</span>
             <span className="text-xs text-muted-foreground">{token.descripcion}</span>

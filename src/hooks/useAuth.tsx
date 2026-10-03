@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,6 +33,23 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
+ * Conserva la REFERENCIA del usuario previo si es la misma persona (mismo id).
+ *
+ * supabase-js emite SIGNED_IN / TOKEN_REFRESHED cada vez que la pestaña o la
+ * app vuelve a primer plano (p. ej. al volver de la cámara en la tablet), y
+ * getUser() devuelve un objeto nuevo cada vez. Si se guardara tal cual, todo
+ * lo que depende de la identidad de `user` (roles, super admin, efectos de
+ * ProtectedRoute) se relanzaría con loading=true y desmontaría la página.
+ * Solo un cambio real (otro id, o cambio de email) renueva la referencia.
+ */
+function conservarUsuario(previo: User | null, nuevo: User | null): User | null {
+  if (previo && nuevo && previo.id === nuevo.id && previo.email === nuevo.email) {
+    return previo;
+  }
+  return nuevo;
+}
+
+/**
  * Única suscripción a Supabase Auth para toda la app (2026-09-25).
  *
  * Antes, cada componente que llamaba a useAuth() creaba su propio
@@ -54,6 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    // Solo cuenta la validación más reciente: evita que una respuesta lenta
+    // (getUser) de un evento anterior pise a la de uno posterior (p. ej.
+    // SIGNED_OUT justo después de un SIGNED_IN).
+    let ultimaSincronizacion = 0;
 
     const clearLocalSession = async () => {
       await supabase.auth.signOut({ scope: "local" });
@@ -64,8 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const syncValidatedSession = async (incomingSession: Session | null) => {
+      const miSincronizacion = ++ultimaSincronizacion;
+      const esVigente = () => isMounted && miSincronizacion === ultimaSincronizacion;
+
       if (!incomingSession) {
-        if (!isMounted) return;
+        if (!esVigente()) return;
         setSession(null);
         setUser(null);
         setLoading(false);
@@ -73,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (!esVigente()) return;
       const status = typeof userError === "object" && userError !== null && "status" in userError
         ? Number((userError as { status?: unknown }).status)
         : null;
@@ -84,16 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userError) {
         // Si hay un fallo temporal de red/servicio, mantenemos la sesión local.
-        if (!isMounted) return;
         setSession(incomingSession);
-        setUser(incomingSession.user ?? null);
+        setUser((previo) => conservarUsuario(previo, incomingSession.user ?? null));
         setLoading(false);
         return;
       }
 
-      if (!isMounted) return;
       setSession(incomingSession);
-      setUser(userData.user);
+      setUser((previo) => conservarUsuario(previo, userData.user));
       setLoading(false);
     };
 
@@ -115,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = async (
+  const signUp = useCallback(async (
     email: string,
     password: string,
     nombre_restaurante: string,
@@ -162,9 +185,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.error("Error inesperado al registrar");
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const validatedData = signInSchema.parse({ email, password });
 
@@ -210,9 +233,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.error("Error inesperado al iniciar sesión");
       return { error: error as Error };
     }
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       const status = typeof error === "object" && error !== null && "status" in error
@@ -231,9 +254,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     toast.success("Sesión cerrada correctamente");
     return { error: null };
-  };
+  }, []);
 
-  const value: AuthContextValue = { user, session, loading, signUp, signIn, signOut };
+  // Valor estable: solo cambia si cambia user/session/loading (los métodos son
+  // estables), así los consumidores no se re-renderizan por nada más.
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, session, loading, signUp, signIn, signOut }),
+    [user, session, loading, signUp, signIn, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

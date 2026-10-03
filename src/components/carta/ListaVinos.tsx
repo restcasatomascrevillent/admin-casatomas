@@ -99,7 +99,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {vinos.map((vino) => (
           <Card 
             key={vino.id} 
@@ -145,7 +145,9 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-11 w-11"
                       title="Ajustar posición de imagen"
+                      aria-label="Ajustar posición de imagen"
                       onClick={() => setPosicionVino(vino)}
                     >
                       <Move className="h-4 w-4" />
@@ -155,7 +157,9 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
+                    className="h-11 w-11"
                     title={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
                     onClick={() => toggleFotoVisible(vino.id)}
                   >
                     {fotosOcultas.has(vino.id) ? (
@@ -185,15 +189,15 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 isActivadoPending={toggleActivado.isPending}
                 compact
               />
-              <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
-                <span className="text-xs text-muted-foreground">Foto expandida en carta web</span>
+              <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
+                <span className="text-sm text-muted-foreground">Foto expandida en carta web</span>
                 <Switch
                   checked={vino.expanded ?? false}
                   onCheckedChange={(checked) => handleToggleExpanded(vino, checked)}
                   disabled={toggleExpanded.isPending}
-                  className="scale-90 data-[state=checked]:bg-amber-600"
+                  className="data-[state=checked]:bg-amber-600"
                 />
-              </div>
+              </label>
               {vino.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {vino.descripcion}
@@ -244,7 +248,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="h-11 flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   onClick={() => setVinoAEditar(vino)}
                 >
                   <Pencil className="h-4 w-4 mr-2" />
@@ -255,7 +259,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="h-11 flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Eliminar
@@ -307,7 +311,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
             <img
               src={fotoAVisualizar.url}
               alt={fotoAVisualizar.nombre}
-              className="max-h-[75vh] w-full rounded-md object-contain"
+              className="max-h-[75dvh] w-full rounded-md object-contain"
             />
           )}
         </DialogContent>

@@ -31,6 +31,18 @@
 // comensales, la barra se cierra sola y se puede pasar a la siguiente reserva.
 //
 // ----------------------------------------------------------------------------
+// CON EL DEDO (2026-10-03: el panel tiene que funcionar en una tablet táctil)
+// ----------------------------------------------------------------------------
+//   · Tocar una mesa = elegirla (modo sentar) o seleccionarla. Todo llega como
+//     `click`, que el navegador sólo emite si el dedo NO se ha movido: así un
+//     pellizco o un arrastre del plano encima de una mesa ya no la elige.
+//   · Un dedo sobre el vacío arrastra el plano; dos dedos hacen zoom y pan
+//     (`crearGestosTactiles`, la misma lógica que el editor de plano).
+//   · Recolocar una mesa arrastrándola tiene zona muerta de 6 px (un dedo nunca
+//     está quieto) y no escribe en BBDD si la mesa no se ha movido.
+//   · Todo control mide ≥ 44 px, los textos ≥ 12 px y los campos 16 px.
+//
+// ----------------------------------------------------------------------------
 // ENTRAR SEÑALANDO UNA RESERVA (`reservaId` / `?reserva=`)
 // ----------------------------------------------------------------------------
 // El plano se puede abrir apuntando a UNA reserva concreta, lista para sentar
@@ -168,6 +180,7 @@ import {
   rectFabricDesdeElemento,
   type RectFabric,
 } from "@/components/espacios/puertaGeometria";
+import { crearGestosTactiles, type Vpt } from "@/components/espacios/gestosTactiles";
 
 interface PlanoEspacio2DProps {
   espacioId: string;
@@ -383,7 +396,8 @@ function TarjetaReserva({
       // señalando la reserva (ver el salto de `?reserva=`).
       data-reserva-fila={reserva.id}
       className={cn(
-        "flex items-center gap-2 rounded-lg border p-2 transition-colors",
+        // `flex-wrap`: con controles de 44 px no caben en una línea en un panel de 320 px.
+        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-2 transition-colors",
         tieneMesa
           ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30"
           : "border-border bg-card",
@@ -398,20 +412,20 @@ function TarjetaReserva({
         {...attributes}
         aria-label={`Arrastrar ${reserva.nombre} al plano`}
         title="Arrastrar al plano"
-        className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        className="flex h-11 w-9 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
         style={{ touchAction: "none" }}
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-5 w-5" />
       </button>
 
       {/* Datos */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[8rem] flex-1 basis-[8rem]">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-sm font-semibold" title={reserva.nombre}>
             {reserva.nombre}
           </span>
           {mostrarTurno && (
-            <Badge variant="outline" className="h-4 shrink-0 whitespace-nowrap px-1 py-0 text-[10px] font-medium">
+            <Badge variant="outline" className="h-5 shrink-0 whitespace-nowrap px-1.5 py-0 text-xs font-medium">
               {turnoDeHora(reserva.hora) === "comida" ? "Comida" : "Cena"}
             </Badge>
           )}
@@ -426,13 +440,13 @@ function TarjetaReserva({
               onClick={() => onEditar(reserva)}
               aria-label={`Editar la reserva de ${reserva.nombre}`}
               title={puedeEditar ? "Editar la reserva" : "No tienes permiso para editar reservas"}
-              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <SquarePen className="h-3.5 w-3.5" aria-hidden="true" />
+              <SquarePen className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
-        <div className="mt-0.5 flex items-center gap-2.5 text-[11px] text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
           <span className="flex shrink-0 items-center gap-1 tabular-nums">
             <Clock className="h-3 w-3" />
             {horaCorta(reserva.hora)}
@@ -459,7 +473,7 @@ function TarjetaReserva({
       {tieneMesa && (
         <Badge
           variant="outline"
-          className={cn("h-5 shrink-0 whitespace-nowrap px-1.5 py-0 text-[10px] tabular-nums", ajuste.tono)}
+          className={cn("h-6 shrink-0 whitespace-nowrap px-1.5 py-0 text-xs tabular-nums", ajuste.tono)}
           title={`${plazasAsignadas} plazas asignadas para ${reserva.numero_comensales} comensales`}
         >
           {plazasAsignadas}/{reserva.numero_comensales}
@@ -469,11 +483,12 @@ function TarjetaReserva({
       {/* Acciones — posición y ancho FIJOS en todas las filas.
           El texto visible es corto para que quepa; el nombre completo de la
           acción vive en `aria-label` (mismo criterio que ListaReservasAvanzada). */}
+      <div className="ml-auto flex shrink-0 items-center gap-1">
       <Button
         type="button"
         size="sm"
         variant={activa ? "default" : tieneMesa ? "outline" : "secondary"}
-        className="h-7 w-[72px] shrink-0 px-0 text-xs"
+        className="h-11 min-w-[84px] shrink-0 touch-manipulation px-3 text-sm"
         aria-label={
           activa
             ? `Dejar de elegir mesa para ${reserva.nombre}`
@@ -490,16 +505,15 @@ function TarjetaReserva({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+          className="h-11 w-11 shrink-0 touch-manipulation text-muted-foreground hover:text-destructive"
           aria-label={`Quitar mesas de ${reserva.nombre}`}
           title="Quitar mesas"
           onClick={() => onQuitarMesas(reserva)}
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-4 w-4" />
         </Button>
-      ) : (
-        <span aria-hidden className="h-7 w-7 shrink-0" />
-      )}
+      ) : null}
+      </div>
     </div>
   );
 }
@@ -555,7 +569,7 @@ function MesaPlano({
   });
 
   const minDimension = Math.min(mesa.ancho || 60, mesa.alto || 60);
-  const fontSize = Math.max(9, Math.min(14, minDimension * 0.18));
+  const fontSize = Math.max(11, Math.min(14, minDimension * 0.18));
   const iconSize = Math.max(8, Math.min(12, minDimension * 0.12));
 
   const ocupada = !!asignacion;
@@ -572,10 +586,13 @@ function MesaPlano({
     return "sobra" as const;
   }, [modoAsignacion, comensalesActivos, ocupadaPorOtra, mesaOriginal.capacidad]);
 
-  const minHitArea = 50 * scale;
   const mesaWidth = mesa.ancho || 60;
   const mesaHeight = mesa.alto || 60;
-  const hitAreaPadding = Math.max(8, (minHitArea - Math.min(mesaWidth, mesaHeight)) / 2);
+  // Zona sensible de 44 px REALES como mínimo (el mínimo táctil), no escalada
+  // por el zoom del plano: con el plano alejado una mesa de 80 cm mide 20-30 px.
+  // El relleno se limita a 14 px por lado para que la zona de una mesa no se
+  // coma el borde de la vecina.
+  const hitAreaPadding = Math.min(14, Math.max(4, (44 - Math.min(mesaWidth, mesaHeight)) / 2));
 
   const baseScale = minDimension < 40 ? 1.6 : minDimension < 60 ? 1.4 : 1.2;
   const hoverScale = isOver ? baseScale : 1;
@@ -604,12 +621,11 @@ function MesaPlano({
   };
 
   const manejarTouchStart = (e: React.TouchEvent) => {
-    if (modoAsignacion) {
-      e.preventDefault();
-      e.stopPropagation();
-      onAlternar(mesaOriginal);
-      return;
-    }
+    // Sentando: NO se actúa al apoyar el dedo. El navegador convierte un toque
+    // que no se mueve en `click` (y manejarClic lo atiende), mientras que un
+    // pellizco o un arrastre del plano que empiece encima de una mesa no lo
+    // hace — antes elegía/soltaba la mesa al apoyar el primer dedo.
+    if (modoAsignacion) return;
     e.stopPropagation();
     onDragStart(e, mesaOriginal);
   };
@@ -618,6 +634,10 @@ function MesaPlano({
     <div
       ref={setNodeRef}
       className="absolute"
+      data-mesa-id={mesaOriginal.id}
+      onMouseDown={manejarMouseDown}
+      onTouchStart={manejarTouchStart}
+      onClick={manejarClic}
       style={{
         left: (mesa.pos_x || 0) - hitAreaPadding,
         top: (mesa.pos_y || 0) - hitAreaPadding,
@@ -664,9 +684,6 @@ function MesaPlano({
                   ? "box-shadow 100ms ease"
                   : "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease",
               }}
-              onMouseDown={manejarMouseDown}
-              onTouchStart={manejarTouchStart}
-              onClick={manejarClic}
             >
               <span
                 className="pointer-events-none break-words text-center font-bold leading-tight"
@@ -711,7 +728,10 @@ function MesaPlano({
       {asignacion && esPrimeraDelGrupo && (
         <div
           className="pointer-events-auto absolute left-1/2 z-20 min-w-max -translate-x-1/2 rounded-md bg-emerald-600 px-2 py-1 text-white shadow-lg"
-          style={{ top: -30, maxWidth: Math.max(130, mesaWidth * 1.6) }}
+          style={{ top: -34, maxWidth: Math.max(130, mesaWidth * 1.6) }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           {onQuitarMesas && (
             <button
@@ -722,15 +742,18 @@ function MesaPlano({
               }}
               aria-label={`Liberar las mesas de ${asignacion.reservas.nombre}`}
               title="Quitar mesas"
-              className="absolute -right-1.5 -top-1.5 z-30 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow-md transition-transform hover:scale-110"
+              // Zona de 44x44 px alrededor de una X visible de 20 px.
+              className="absolute -right-5 -top-5 z-30 flex h-11 w-11 items-center justify-center touch-manipulation"
             >
-              <X className="h-2.5 w-2.5" />
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md">
+                <X className="h-3 w-3" />
+              </span>
             </button>
           )}
-          <p className="pointer-events-none truncate text-center text-[11px] font-semibold leading-tight">
+          <p className="pointer-events-none truncate text-center text-xs font-semibold leading-tight">
             {asignacion.reservas.nombre}
           </p>
-          <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[9px] opacity-95 tabular-nums">
+          <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[11px] opacity-95 tabular-nums">
             <span>{horaCorta(asignacion.reservas.hora)}</span>
             <span>·</span>
             <span>{asignacion.reservas.numero_comensales} pax</span>
@@ -750,8 +773,8 @@ function MesaPlano({
       {/* Mesas juntas que no llevan cartel: se marca que son parte de un grupo */}
       {asignacion && !esPrimeraDelGrupo && (
         <div
-          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[9px] font-semibold text-white shadow"
-          style={{ top: -16 }}
+          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[11px] font-semibold text-white shadow"
+          style={{ top: -18 }}
         >
           Junta
         </div>
@@ -763,7 +786,7 @@ function MesaPlano({
           className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
           style={{ top: hitAreaPadding + mesaHeight + 4 }}
         >
-          <div className="whitespace-nowrap rounded border border-amber-500 bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-800 shadow-sm">
+          <div className="whitespace-nowrap rounded border border-amber-500 bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 shadow-sm">
             {mesaOriginal.etiqueta}
           </div>
         </div>
@@ -958,6 +981,8 @@ export function PlanoEspacio2D({
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  /** El dedo/ratón ya ha pasado la zona muerta de 6 px: la mesa empieza a seguirlo. */
+  const arrastreArmadoRef = useRef(false);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     mesaId: null,
@@ -1455,7 +1480,10 @@ export function PlanoEspacio2D({
     });
     resizeObserver.observe(containerRef.current);
     return () => resizeObserver.disconnect();
-  }, []);
+    // Depende de `loadingMesas`: el contenedor del plano no existe mientras se
+    // muestra el spinner de carga, y con `[]` el observador nunca llegaba a
+    // engancharse (el plano se encuadraba para 800x500 en cualquier pantalla).
+  }, [loadingMesas]);
 
   const autoScale = useMemo(() => {
     if (containerSize.width <= 0 || containerSize.height <= 0) return 1;
@@ -1559,6 +1587,7 @@ export function PlanoEspacio2D({
   const handleMesaDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => {
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    arrastreArmadoRef.current = false;
     setDragState({
       isDragging: true,
       mesaId: mesa.id,
@@ -1573,6 +1602,12 @@ export function PlanoEspacio2D({
   const handleMesaMove = useCallback(
     (clientX: number, clientY: number) => {
       if (!dragState.isDragging || !dragState.mesaId) return;
+      // Zona muerta: un dedo nunca está quieto, y tocar una mesa para
+      // seleccionarla no debe moverla ni guardar nada.
+      if (!arrastreArmadoRef.current) {
+        if (Math.hypot(clientX - dragState.startX, clientY - dragState.startY) < 6) return;
+        arrastreArmadoRef.current = true;
+      }
       const deltaX = (clientX - dragState.startX) / (PIXELS_PER_METER * scale);
       const deltaY = (clientY - dragState.startY) / (PIXELS_PER_METER * scale);
 
@@ -1609,12 +1644,62 @@ export function PlanoEspacio2D({
   const handleMesaDragEnd = useCallback(() => {
     if (dragState.isDragging && dragState.mesaId) {
       const mesa = localMesas.find((m) => m.id === dragState.mesaId);
-      if (mesa) {
+      // Sólo se escribe si la mesa se ha movido de verdad (un toque suelto no).
+      if (mesa && (mesa.pos_x !== dragState.offsetX || mesa.pos_y !== dragState.offsetY)) {
         actualizarMesasSilent.mutate([{ id: mesa.id, pos_x: mesa.pos_x, pos_y: mesa.pos_y }]);
       }
     }
+    arrastreArmadoRef.current = false;
     setDragState({ isDragging: false, mesaId: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   }, [dragState, localMesas, actualizarMesasSilent]);
+
+  // ── Gestos táctiles del plano: pellizco (zoom), dos dedos (pan), un dedo sobre
+  // el vacío (pan). Los valores vivos se leen de refs para no re-crear los
+  // listeners en cada render. El "viewport" equivalente es una matriz
+  // [escala,0,0,escala,x,y] con el origen en el CENTRO del contenido, que es
+  // donde el plano lo ancla (`left: 50% + pan`).
+  const escalaViva = useRef(1);
+  const panVivo = useRef({ x: 0, y: 0 });
+  const arrastreVivo = useRef<DragState | null>(null);
+  escalaViva.current = manualZoom !== null ? manualZoom : autoScale;
+  panVivo.current = panOffset;
+  arrastreVivo.current = dragState;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const controlador = crearGestosTactiles({
+      elemento: el,
+      zoomMin: 0.2,
+      zoomMax: 5,
+      obtenerVpt: () => {
+        const r = el.getBoundingClientRect();
+        const z = escalaViva.current;
+        return [z, 0, 0, z, r.width / 2 + panVivo.current.x, r.height / 2 + panVivo.current.y] as Vpt;
+      },
+      aplicarVpt: (v) => {
+        const r = el.getBoundingClientRect();
+        setManualZoom(v[0]);
+        setPanOffset({ x: v[4] - r.width / 2, y: v[5] - r.height / 2 });
+      },
+      // Sobre una mesa manda la mesa (tocar / recolocar); sobre el vacío, el plano.
+      decidirUnDedo: (e) => ((e.target as HTMLElement | null)?.closest?.("[data-mesa-id]") ? "no" : "pan-umbral"),
+      // Un segundo dedo = pellizco: si había una mesa a medio recolocar, vuelve a su sitio.
+      alIniciarPellizco: () => {
+        const arrastre = arrastreVivo.current;
+        if (arrastre?.isDragging && arrastre.mesaId) {
+          setLocalMesas((prev) =>
+            prev.map((m) =>
+              m.id === arrastre.mesaId ? { ...m, pos_x: arrastre.offsetX, pos_y: arrastre.offsetY } : m,
+            ),
+          );
+        }
+        arrastreArmadoRef.current = false;
+        setDragState({ isDragging: false, mesaId: null, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
+      },
+    });
+    return controlador.destruir;
+  }, [loadingMesas]);
 
   // ── Alta y baja de mesas ──────────────────────────────────────────────────
   const handleAddMesa = async () => {
@@ -2242,11 +2327,11 @@ export function PlanoEspacio2D({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex min-h-[calc(100vh-220px)] flex-col gap-3">
+      <div className="flex min-h-[calc(100dvh-220px)] flex-col gap-3">
         {/* ── Cabecera ────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack}>
+            <Button variant="ghost" size="sm" className="h-11 touch-manipulation" onClick={onBack}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Volver
             </Button>
@@ -2259,11 +2344,11 @@ export function PlanoEspacio2D({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={deshacer} disabled={!ultimoCambio}>
+            <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={deshacer} disabled={!ultimoCambio}>
               <Undo2 className="mr-2 h-4 w-4" />
               Deshacer
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowAddMesa(true)}>
+            <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={() => setShowAddMesa(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Mesa
             </Button>
@@ -2273,6 +2358,7 @@ export function PlanoEspacio2D({
             <Button
               variant="outline"
               size="sm"
+              className="h-11 touch-manipulation"
               onClick={handleCalcularDistribucion}
               disabled={repartiendo || reservasPendientes.length === 0}
               title={
@@ -2284,7 +2370,7 @@ export function PlanoEspacio2D({
               <Wand2 className="mr-2 h-4 w-4" />
               {repartiendo ? "Repartiendo…" : "Repartir"}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={handleExportPDF}>
               <FileDown className="mr-2 h-4 w-4" />
               PDF
             </Button>
@@ -2299,7 +2385,7 @@ export function PlanoEspacio2D({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11 touch-manipulation"
                 aria-label="Día anterior"
                 onClick={() => moverDia(-1)}
               >
@@ -2309,7 +2395,7 @@ export function PlanoEspacio2D({
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 min-w-[150px] justify-start px-3 font-normal"
+                    className="h-11 min-w-[150px] touch-manipulation justify-start px-3 font-normal"
                     aria-label={`Cambiar día · ${fechaLegible(fechaSel)}`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
@@ -2330,7 +2416,7 @@ export function PlanoEspacio2D({
               <Button
                 variant="outline"
                 size="icon"
-                className="h-9 w-9"
+                className="h-11 w-11 touch-manipulation"
                 aria-label="Día siguiente"
                 onClick={() => moverDia(1)}
               >
@@ -2339,7 +2425,7 @@ export function PlanoEspacio2D({
               <Button
                 variant={esHoy ? "default" : "outline"}
                 size="sm"
-                className="h-9"
+                className="h-11 touch-manipulation"
                 onClick={() => cambiarFecha(hoyLocal())}
               >
                 Hoy
@@ -2348,7 +2434,7 @@ export function PlanoEspacio2D({
 
             {/* Turno */}
             <div className="flex shrink-0 items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">Turno</span>
+              <span className="text-sm font-medium text-muted-foreground">Turno</span>
               <ToggleGroup
                 type="single"
                 value={filtroTurno}
@@ -2362,7 +2448,7 @@ export function PlanoEspacio2D({
                     key={o.valor}
                     value={o.valor}
                     title={o.detalle}
-                    className="h-9 whitespace-nowrap px-3 text-xs data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    className="h-11 min-w-[4.5rem] touch-manipulation whitespace-nowrap px-4 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
                     {o.etiqueta}
                   </ToggleGroupItem>
@@ -2387,7 +2473,7 @@ export function PlanoEspacio2D({
               <div className="flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant="outline"
-                  className="h-6 gap-1 whitespace-nowrap border-emerald-300 bg-emerald-50 px-2 text-[11px] text-emerald-700 tabular-nums dark:bg-emerald-950/40 dark:text-emerald-300"
+                  className="h-7 gap-1 whitespace-nowrap border-emerald-300 bg-emerald-50 px-2 text-xs text-emerald-700 tabular-nums dark:bg-emerald-950/40 dark:text-emerald-300"
                   title="Reservas que ya tienen mesa"
                 >
                   <CheckCircle2 className="h-3 w-3" />
@@ -2395,7 +2481,7 @@ export function PlanoEspacio2D({
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  className="h-7 gap-1 whitespace-nowrap px-2 text-xs tabular-nums"
                   title="Tienen sala pero todavía no mesa. Es normal: se van cerrando poco a poco."
                 >
                   <CircleDashed className="h-3 w-3" />
@@ -2403,7 +2489,7 @@ export function PlanoEspacio2D({
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  className="h-7 gap-1 whitespace-nowrap px-2 text-xs tabular-nums"
                   title="Mesas de esta sala libres en este turno"
                 >
                   <Armchair className="h-3 w-3" />
@@ -2411,14 +2497,14 @@ export function PlanoEspacio2D({
                 </Badge>
                 <Badge
                   variant="outline"
-                  className="h-6 gap-1 whitespace-nowrap px-2 text-[11px] tabular-nums"
+                  className="h-7 gap-1 whitespace-nowrap px-2 text-xs tabular-nums"
                   title="Comensales del turno"
                 >
                   <Users className="h-3 w-3" />
                   {resumen.comensales} comensales
                 </Badge>
                 {resumen.cerrado && (
-                  <Badge className="h-6 gap-1 whitespace-nowrap bg-emerald-600 px-2 text-[11px] text-white hover:bg-emerald-600">
+                  <Badge className="h-7 gap-1 whitespace-nowrap bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-600">
                     <CheckCircle2 className="h-3 w-3" />
                     Servicio cerrado
                   </Badge>
@@ -2441,7 +2527,7 @@ export function PlanoEspacio2D({
           <Card className="border-primary/50 bg-primary/5">
             <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="shrink-0 text-sm">
+                <span className="shrink-0 text-base">
                   Sentando a <strong>{reservaActiva.nombre}</strong>
                 </span>
                 <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums">
@@ -2454,7 +2540,7 @@ export function PlanoEspacio2D({
                 {mesaIdsActivos.length > 0 ? (
                   <span className="flex min-w-0 flex-wrap items-center gap-1">
                     {mesaIdsActivos.map((id) => (
-                      <Badge key={id} variant="secondary" className="h-6 gap-1 whitespace-nowrap px-2 text-[11px]">
+                      <Badge key={id} variant="secondary" className="h-7 gap-1 whitespace-nowrap px-2 text-xs">
                         {mesasPorId.get(id)?.nombre ?? "Mesa"}
                         <span className="text-muted-foreground tabular-nums">
                           {mesasPorId.get(id)?.capacidad ?? 0}
@@ -2468,7 +2554,7 @@ export function PlanoEspacio2D({
                     {ajusteActivo && (
                       <Badge
                         variant="outline"
-                        className={cn("h-6 whitespace-nowrap px-2 text-[11px]", ajusteActivo.tono)}
+                        className={cn("h-7 whitespace-nowrap px-2 text-xs", ajusteActivo.tono)}
                       >
                         {ajusteActivo.etiqueta}
                       </Badge>
@@ -2476,7 +2562,7 @@ export function PlanoEspacio2D({
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    Haz clic en una mesa del plano. Puedes elegir varias para juntarlas.
+                    Toca una mesa del plano. Puedes elegir varias para juntarlas.
                   </span>
                 )}
               </div>
@@ -2486,14 +2572,14 @@ export function PlanoEspacio2D({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8"
+                    className="h-11 touch-manipulation"
                     onClick={() => pedirQuitarMesas(reservaActiva)}
                   >
                     <X className="mr-1.5 h-3.5 w-3.5" />
                     Quitar mesas
                   </Button>
                 )}
-                <Button size="sm" className="h-8" onClick={() => setReservaActivaId(null)}>
+                <Button size="sm" className="h-11 touch-manipulation px-5" onClick={() => setReservaActivaId(null)}>
                   Listo
                 </Button>
               </div>
@@ -2509,7 +2595,8 @@ export function PlanoEspacio2D({
               <div
                 ref={containerRef}
                 className={cn(
-                  "relative min-h-[340px] w-full flex-1 overflow-hidden",
+                  // `touch-none`: ni scroll ni zoom de página encima del plano (los gestos son suyos).
+                  "relative min-h-[340px] w-full flex-1 touch-none select-none overflow-hidden md:min-h-[min(56dvh,36rem)]",
                   isSpacePressed && "cursor-grab",
                   isPanning && "cursor-grabbing",
                 )}
@@ -2623,51 +2710,56 @@ export function PlanoEspacio2D({
                     <div className="absolute left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-lg">
                       <span className="flex items-center gap-1.5">
                         <Utensils className="h-3 w-3" />
-                        Clic en las mesas de {reservaActiva.nombre}
+                        Toca las mesas de {reservaActiva.nombre}
                       </span>
                     </div>
                   )}
                 </div>
 
                 {/* Leyenda: libre / ocupada de un vistazo */}
-                <div className="absolute left-2 top-2 flex items-center gap-2 rounded-md border border-border bg-background/90 px-2 py-1 text-[10px] shadow-sm backdrop-blur-sm">
-                  <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded border-2 border-slate-300 bg-white" />
+                <div className="pointer-events-none absolute left-2 top-2 flex items-center gap-3 rounded-md border border-border bg-background/90 px-2.5 py-1.5 text-xs shadow-sm backdrop-blur-sm">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded border-2 border-slate-300 bg-white" />
                     Libre
                   </span>
-                  <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded border-2 border-emerald-500 bg-emerald-100" />
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded border-2 border-emerald-500 bg-emerald-100" />
                     Ocupada
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Link2 className="h-3 w-3 text-emerald-600" />
+                  <span className="flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5 text-emerald-600" />
                     Juntas
                   </span>
                 </div>
 
+                {/* Zoom: botones de 44 px (además del pellizco y la rueda) y «Ajustar»
+                    para volver al encuadre. */}
                 <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg border border-border bg-background/90 p-1 shadow-sm backdrop-blur-sm">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleZoomOut} aria-label="Alejar">
-                    <ZoomOut className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-11 w-11 touch-manipulation" onClick={handleZoomOut} aria-label="Alejar">
+                    <ZoomOut className="h-5 w-5" />
                   </Button>
-                  <span className="min-w-[40px] text-center text-xs font-medium tabular-nums">
+                  <span className="min-w-[48px] text-center text-sm font-medium tabular-nums">
                     {Math.round(scale * 100)}%
                   </span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleZoomIn} aria-label="Acercar">
-                    <ZoomIn className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" className="h-11 w-11 touch-manipulation" onClick={handleZoomIn} aria-label="Acercar">
+                    <ZoomIn className="h-5 w-5" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
+                    className="h-11 touch-manipulation gap-1.5 px-3"
                     onClick={handleCenterView}
                     aria-label="Centrar plano"
                   >
-                    <Maximize2 className="h-4 w-4" />
+                    <Maximize2 className="h-5 w-5" />
+                    <span className="text-sm">Ajustar</span>
                   </Button>
                 </div>
 
-                <div className="absolute bottom-2 left-2 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground tabular-nums">
-                  {realWidth}m × {realHeight}m
+                <div className="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground tabular-nums">
+                  <span>
+                    {realWidth}m × {realHeight}m
+                  </span>
+                  <span className="hidden [@media(pointer:coarse)]:inline">Pellizca para zoom · arrastra para mover</span>
                 </div>
               </div>
             </CardContent>
@@ -2683,7 +2775,7 @@ export function PlanoEspacio2D({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0"
+                      className="h-11 w-11 shrink-0 touch-manipulation"
                       aria-label="Cerrar detalle de mesa"
                       onClick={() => setSelectedMesa(null)}
                     >
@@ -2733,7 +2825,7 @@ export function PlanoEspacio2D({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="w-full text-destructive hover:bg-destructive/10"
+                    className="h-11 w-full touch-manipulation text-destructive hover:bg-destructive/10"
                     onClick={() => setMesaABorrar(selectedMesa)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -2775,7 +2867,7 @@ export function PlanoEspacio2D({
                       {reservasPendientes.length > 0 && (
                         <div>
                           <div className="mb-2 flex items-center gap-2">
-                            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               <CircleDashed className="h-3.5 w-3.5" />
                               Pendientes de mesa
                             </span>
@@ -2804,7 +2896,7 @@ export function PlanoEspacio2D({
                       {reservasConMesa.length > 0 && (
                         <div>
                           <div className="mb-2 flex items-center gap-2">
-                            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               Con mesa
                             </span>
@@ -2838,9 +2930,9 @@ export function PlanoEspacio2D({
                 )}
 
                 <div className="border-t bg-muted/40 px-3 py-2">
-                  <p className="text-[11px] leading-snug text-muted-foreground">
-                    <strong className="font-medium text-foreground">Sentar:</strong> clic en la reserva y clic en la
-                    mesa. Para juntar mesas, sigue haciendo clic en más mesas.{" "}
+                  <p className="text-xs leading-snug text-muted-foreground">
+                    <strong className="font-medium text-foreground">Sentar:</strong> toca la reserva y toca la mesa.
+                    Para juntar mesas, sigue tocando más mesas.{" "}
                     <strong className="font-medium text-foreground">Sin mesa no es un error:</strong> la reserva sigue
                     en pie y se le puede dar mesa cuando toque.
                   </p>
@@ -2855,7 +2947,7 @@ export function PlanoEspacio2D({
             <div className="flex -rotate-1 scale-90 items-center gap-1.5 rounded-lg border-2 border-primary bg-primary px-2 py-1 text-primary-foreground opacity-90 shadow-xl">
               <Users className="h-3 w-3" />
               <span className="max-w-[80px] truncate text-xs font-bold">{activeReserva.nombre}</span>
-              <span className="text-[10px] tabular-nums opacity-80">{activeReserva.numero_comensales}p</span>
+              <span className="text-xs tabular-nums opacity-80">{activeReserva.numero_comensales}p</span>
             </div>
           )}
         </DragOverlay>
@@ -2902,7 +2994,7 @@ export function PlanoEspacio2D({
 
         {/* ── Alta rápida de mesa ─────────────────────────────────────────── */}
         <Dialog open={showAddMesa} onOpenChange={setShowAddMesa}>
-          <DialogContent>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Añadir nueva mesa</DialogTitle>
             </DialogHeader>
@@ -2914,6 +3006,7 @@ export function PlanoEspacio2D({
                   value={newMesa.nombre}
                   onChange={(e) => setNewMesa({ ...newMesa, nombre: e.target.value })}
                   placeholder="Ej: Mesa 1, Terraza A..."
+                  className="h-11 text-base"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2922,6 +3015,7 @@ export function PlanoEspacio2D({
                   <Input
                     id="mesa-plazas"
                     type="number"
+                    className="h-11 text-base"
                     value={newMesa.capacidad}
                     onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 4 })}
                     min={1}
@@ -2931,7 +3025,7 @@ export function PlanoEspacio2D({
                 <div>
                   <Label>Forma</Label>
                   <Select value={newMesa.forma} onValueChange={(v) => setNewMesa({ ...newMesa, forma: v })}>
-                    <SelectTrigger aria-label="Forma de la mesa">
+                    <SelectTrigger aria-label="Forma de la mesa" className="h-11 text-base">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2948,6 +3042,7 @@ export function PlanoEspacio2D({
                   <Input
                     id="mesa-ancho"
                     type="number"
+                    className="h-11 text-base"
                     value={newMesa.ancho}
                     onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
                     min={50}
@@ -2959,6 +3054,7 @@ export function PlanoEspacio2D({
                   <Input
                     id="mesa-alto"
                     type="number"
+                    className="h-11 text-base"
                     value={newMesa.alto}
                     onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 80 })}
                     min={50}
@@ -2967,10 +3063,10 @@ export function PlanoEspacio2D({
                 </div>
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAddMesa(false)}>
+                <Button variant="outline" className="h-11 touch-manipulation" onClick={() => setShowAddMesa(false)}>
                   Cancelar
                 </Button>
-                <Button onClick={handleAddMesa} disabled={crearMesa.isPending}>
+                <Button className="h-11 touch-manipulation" onClick={handleAddMesa} disabled={crearMesa.isPending}>
                   <Plus className="mr-2 h-4 w-4" />
                   Crear mesa
                 </Button>

@@ -616,8 +616,8 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-200">
-                  Todavía no se han repartido por sala. Se hace arrastrando sus
-                  tarjetas en la pestaña Hoy.
+                  Todavía no se han repartido por sala. Se hace en la pestaña Hoy,
+                  arrastrando sus tarjetas o con ⋮ → «Mover a…».
                 </p>
               </div>
             )}

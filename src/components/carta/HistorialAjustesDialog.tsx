@@ -75,7 +75,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh]">
+      <DialogContent className="sm:max-w-[900px] max-h-[94dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Historial de Ajustes de Precios</DialogTitle>
           <DialogDescription>
@@ -84,9 +84,9 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
         </DialogHeader>
 
         <Tabs defaultValue="historial" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="historial">Historial</TabsTrigger>
-            <TabsTrigger value="grafico">Evolución</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-2">
+            <TabsTrigger value="historial" className="min-h-11">Historial</TabsTrigger>
+            <TabsTrigger value="grafico" className="min-h-11">Evolución</TabsTrigger>
           </TabsList>
 
           <TabsContent value="historial" className="mt-4">
@@ -100,14 +100,14 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                 </AlertDescription>
               </Alert>
             ) : (
-              <ScrollArea className="h-[500px] pr-4">
+              <ScrollArea className="h-[min(500px,55dvh)] pr-4">
                 <div className="space-y-4">
                   {historial.map((ajuste) => (
                     <div
                       key={ajuste.id}
                       className="border rounded-lg p-4 space-y-3 hover:border-primary/50 transition-colors"
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">{getTipoCartaLabel(ajuste.tipo_carta)}</Badge>
@@ -128,7 +128,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                             variant="outline"
                             size="sm"
                             onClick={() => handleAbrirRestauracionParcial(ajuste)}
-                            className="gap-2"
+                            className="h-11 gap-2 px-3"
                           >
                             <CheckSquare className="h-4 w-4" />
                             Parcial
@@ -137,7 +137,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                             variant="outline"
                             size="sm"
                             onClick={() => handleAbrirConfirmacion(ajuste)}
-                            className="gap-2"
+                            className="h-11 gap-2 px-3"
                           >
                             <RotateCcw className="h-4 w-4" />
                             Restaurar
@@ -145,6 +145,8 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="h-11 w-11 px-0"
+                            aria-label="Eliminar este ajuste del historial"
                             onClick={() => eliminarAjuste.mutate(ajuste.id)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -153,7 +155,7 @@ export function HistorialAjustesDialog({ open, onOpenChange }: HistorialAjustesD
                       </div>
 
                       <details className="text-xs">
-                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        <summary className="flex min-h-11 cursor-pointer items-center text-sm text-muted-foreground hover:text-foreground">
                           Ver detalles ({ajuste.snapshot.length} items)
                         </summary>
                         <div className="mt-2 space-y-1 pl-4 border-l-2 border-muted">

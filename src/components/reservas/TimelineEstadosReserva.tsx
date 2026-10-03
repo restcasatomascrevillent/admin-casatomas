@@ -226,7 +226,7 @@ export function TimelineEstadosReserva({
         <h3 id={idTitulo}>
           <CollapsibleTrigger
             className={cn(
-              "group flex min-h-7 w-full items-center justify-between gap-2 rounded-md text-left touch-manipulation",
+              "group flex min-h-7 w-full items-center justify-between gap-2 rounded-md text-left touch-manipulation pointer-coarse:min-h-11",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             )}
           >
@@ -377,7 +377,7 @@ function Nodo({
               title={activo ? `Quitar el filtro «${nodo.nombre}»` : `Ver solo las reservas «${nodo.nombre}»`}
               onClick={() => onElegir(nodo.estado)}
               className={cn(
-                "flex min-w-0 cursor-pointer touch-manipulation items-center gap-1.5 text-left",
+                "flex min-w-0 cursor-pointer touch-manipulation items-center gap-1.5 text-left pointer-coarse:min-h-11",
                 "after:absolute after:-inset-x-1 after:-top-0.5 after:-bottom-1 after:rounded-lg",
                 "hover:after:ring-1 hover:after:ring-inset hover:after:ring-border",
                 "focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-ring",

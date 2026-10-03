@@ -101,20 +101,30 @@ function AccionIcono({
   etiqueta,
   onClick,
   destructiva = false,
+  textoVisible,
   children,
 }: {
   etiqueta: string;
   onClick?: () => void;
   destructiva?: boolean;
+  /**
+   * Texto corto visible junto al icono (tarjeta de tablet vertical). Con dedo no hay
+   * `title` que valga: cinco iconos pegados no se saben distinguir. `undefined` = solo icono
+   * (la tabla, donde no cabe el texto).
+   */
+  textoVisible?: string;
   children: ReactNode;
 }) {
   const deshabilitada = !onClick;
   return (
-    <ConMotivo className="shrink-0" motivo={deshabilitada ? etiqueta : undefined}>
+    <ConMotivo
+      className={cn("shrink-0", textoVisible === "Cancelar" && "sm:ml-auto")}
+      motivo={deshabilitada ? etiqueta : undefined}
+    >
       <Button
         type="button"
         variant="outline"
-        size="icon"
+        size={textoVisible ? "sm" : "icon"}
         // `title` nativo en vez de <Tooltip> de Radix a propósito: con 375+
         // filas había ~750 tooltips montados y repintar la lista entera (p. ej.
         // al vaciar el buscador) costaba ~590 ms. Con `title` baja a ~250 ms sin
@@ -129,11 +139,12 @@ function AccionIcono({
           // ranuras (5 iconos + 6 huecos) son ~32 px los que se ahorran aquí
           // en `lg`, y se los queda la columna Cliente, que es la que peor lo
           // pasa en pantalla estrecha.
-          "h-6 w-6 shrink-0 [&_svg]:size-3.5 xl:h-7 xl:w-7",
+          textoVisible ? "shrink-0 gap-1.5 px-3" : "h-6 w-6 shrink-0 [&_svg]:size-3.5 xl:h-7 xl:w-7",
           destructiva && "border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground",
         )}
       >
         {children}
+        {textoVisible && <span>{textoVisible}</span>}
       </Button>
     </ConMotivo>
   );
@@ -144,7 +155,9 @@ function AccionIcono({
 // los iconos de al lado caerían en una X distinta según la fila. Si algún día
 // apareciera scroll horizontal a 1024 px, esto (o el hueco entre ranuras) es lo
 // primero que se aprieta; "Confirmar" es la etiqueta más larga y ya va justa.
-const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px]";
+// En táctil el botón sube a 44 px y `ui/button` le pone `px-4`: 76 px ya no dejaban sitio a
+// «Confirmar», que se salía por los lados. Ahí manda el contenido (con un mínimo).
+const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px] pointer-coarse:w-auto pointer-coarse:min-w-[5.5rem]";
 
 /**
  * Acción PRINCIPAL de la fila: la única con texto, para que se distinga de un
@@ -175,7 +188,7 @@ function AccionPrincipal({
         title={titulo}
         disabled={deshabilitada}
         onClick={onClick}
-        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
+        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-sm [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
       >
         {cargando ? <Loader2 className="animate-spin" /> : children}
         {etiqueta}
@@ -191,7 +204,7 @@ function AccionPrincipal({
  * botones de todas las filas empiecen en la misma X.
  */
 export function RanuraSeleccion({ children }: { children?: ReactNode }) {
-  return <span className="inline-flex w-4 shrink-0 items-center justify-center">{children}</span>;
+  return <span className="inline-flex w-4 shrink-0 items-center justify-center pointer-coarse:w-6">{children}</span>;
 }
 
 /**
@@ -209,7 +222,10 @@ export function RanurasDeAcciones({
   gestionar,
   cancelar,
   listaNegra,
+  conTexto = false,
 }: {
+  /** Texto corto visible junto a cada icono (tarjetas; ver `AccionIcono`). */
+  conTexto?: boolean;
   /** `undefined` = no hay ranura de selección en toda la lista (sin permiso de edición). */
   seleccion?: ReactNode;
   principal: RanuraAccion & { etiqueta: string; icono: ReactNode };
@@ -217,7 +233,7 @@ export function RanurasDeAcciones({
   darMesa: RanuraAccion;
   verificar: RanuraAccion;
   /** En una SOLICITUD es «Gestionar» (engranaje); en una RESERVA es el editor (lápiz, vía `icono`). */
-  gestionar: RanuraAccion & { icono?: ReactNode };
+  gestionar: RanuraAccion & { icono?: ReactNode; etiqueta?: string };
   cancelar: RanuraAccion;
   listaNegra: RanuraAccion;
 }) {
@@ -236,19 +252,19 @@ export function RanurasDeAcciones({
           trabajo pendiente normal, no un error, y el rojo diría lo contrario (ver
           el encabezado de `saltoAsignacion.ts`). El sillón es el mismo icono con
           el que el plano dibuja las mesas. */}
-      <AccionIcono etiqueta={darMesa.titulo} onClick={darMesa.onClick}>
+      <AccionIcono etiqueta={darMesa.titulo} onClick={darMesa.onClick} textoVisible={conTexto ? "Mesa" : undefined}>
         <Armchair />
       </AccionIcono>
-      <AccionIcono etiqueta={verificar.titulo} onClick={verificar.onClick}>
+      <AccionIcono etiqueta={verificar.titulo} onClick={verificar.onClick} textoVisible={conTexto ? "Verificar" : undefined}>
         <ClipboardCheck />
       </AccionIcono>
-      <AccionIcono etiqueta={gestionar.titulo} onClick={gestionar.onClick}>
+      <AccionIcono etiqueta={gestionar.titulo} onClick={gestionar.onClick} textoVisible={conTexto ? gestionar.etiqueta ?? "Gestionar" : undefined}>
         {gestionar.icono ?? <Settings2 />}
       </AccionIcono>
-      <AccionIcono destructiva etiqueta={cancelar.titulo} onClick={cancelar.onClick}>
+      <AccionIcono destructiva etiqueta={cancelar.titulo} onClick={cancelar.onClick} textoVisible={conTexto ? "Cancelar" : undefined}>
         {cancelar.cargando ? <Loader2 className="animate-spin" /> : <XCircle />}
       </AccionIcono>
-      <AccionIcono destructiva etiqueta={listaNegra.titulo} onClick={listaNegra.onClick}>
+      <AccionIcono destructiva etiqueta={listaNegra.titulo} onClick={listaNegra.onClick} textoVisible={conTexto ? "Blacklist" : undefined}>
         <ShieldBan />
       </AccionIcono>
     </>
@@ -322,8 +338,10 @@ export function EstrellaImportante({
         disabled={!habilitada}
         aria-label={nombre}
         className={cn(
+          // Con dedo: 44x44 de verdad en la tarjeta (va suelta en su cabecera) y área ampliada
+          // en la tabla (no se puede ensanchar la fila por una estrella).
           "shrink-0 disabled:pointer-events-none disabled:opacity-50",
-          variante === "fila" && "transition-transform hover:scale-110",
+          variante === "fila" ? "touch-hit transition-transform hover:scale-110" : "touch-target inline-flex items-center justify-center",
         )}
       >
         <Star
@@ -408,11 +426,12 @@ export function AccionesReserva({
         onClick: destino && onAsignarMesa ? () => onAsignarMesa(destino) : undefined,
       }}
       verificar={ranura(acc.verificar, al.verificar)}
-      gestionar={{ ...ranura(acc.editar, al.editar), icono: <SquarePen /> }}
+      gestionar={{ ...ranura(acc.editar, al.editar), icono: <SquarePen />, etiqueta: "Editar" }}
+      conTexto={variante === "tarjeta"}
       cancelar={{ ...ranura(acc.cancelar, ocupada ? undefined : al.cancelar), cargando: ocupada }}
       listaNegra={ranura(acc.listaNegra, al.listaNegra)}
     />
   );
 
-  return variante === "tarjeta" ? <div className="flex items-center gap-1 pt-1">{ranuras}</div> : ranuras;
+  return variante === "tarjeta" ? <div className="flex flex-wrap items-center gap-2 pt-1">{ranuras}</div> : ranuras;
 }

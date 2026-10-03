@@ -169,7 +169,7 @@ export function SeccionProteccion() {
               ? `No se pudo cargar: ${error instanceof Error ? error.message : "error desconocido"}`
               : "No hay fila de configuración en chat_web_config."}
           </p>
-          <Button size="sm" variant="outline" onClick={() => refetch()}>
+          <Button size="sm" variant="outline" className="h-11" onClick={() => refetch()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
             Reintentar
           </Button>
@@ -359,7 +359,7 @@ function FormularioLimites({ config, guardar }: FormularioLimitesProps) {
 
   return (
     <Collapsible open={abierto} onOpenChange={setAbierto} className="rounded-md border">
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <CollapsibleTrigger className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="flex items-center gap-1.5">
           <ChevronRight className={cn("h-4 w-4 transition-transform", abierto && "rotate-90")} aria-hidden="true" />
           Límites
@@ -389,9 +389,9 @@ function FormularioLimites({ config, guardar }: FormularioLimitesProps) {
                     onChange={(e) => set(c.clave, e.target.value)}
                     aria-invalid={!!err}
                     aria-describedby={`${id}-ayuda`}
-                    className={cn("h-8 tabular-nums", err && "border-destructive focus-visible:ring-destructive")}
+                    className={cn("h-11 tabular-nums", err && "border-destructive focus-visible:ring-destructive")}
                   />
-                  <p id={`${id}-ayuda`} className={cn("text-[11px]", err ? "text-destructive" : "text-muted-foreground")}>
+                  <p id={`${id}-ayuda`} className={cn("text-xs", err ? "text-destructive" : "text-muted-foreground")}>
                     {err ?? c.ayuda}
                   </p>
                 </div>
@@ -412,11 +412,11 @@ function FormularioLimites({ config, guardar }: FormularioLimitesProps) {
                 onChange={(e) => set("telefono", e.target.value)}
                 aria-invalid={!!errores.telefono}
                 aria-describedby={`${campoId("telefono")}-ayuda`}
-                className={cn("h-8", errores.telefono && "border-destructive focus-visible:ring-destructive")}
+                className={cn("h-11", errores.telefono && "border-destructive focus-visible:ring-destructive")}
               />
               <p
                 id={`${campoId("telefono")}-ayuda`}
-                className={cn("text-[11px]", errores.telefono ? "text-destructive" : "text-muted-foreground")}
+                className={cn("text-xs", errores.telefono ? "text-destructive" : "text-muted-foreground")}
               >
                 {errores.telefono ?? "El bot lo da cuando está apagado, sin presupuesto o al limitar."}
               </p>
@@ -435,11 +435,11 @@ function FormularioLimites({ config, guardar }: FormularioLimitesProps) {
                 onChange={(e) => set("url_reservas", e.target.value)}
                 aria-invalid={!!errores.url_reservas}
                 aria-describedby={`${campoId("url")}-ayuda`}
-                className={cn("h-8", errores.url_reservas && "border-destructive focus-visible:ring-destructive")}
+                className={cn("h-11", errores.url_reservas && "border-destructive focus-visible:ring-destructive")}
               />
               <p
                 id={`${campoId("url")}-ayuda`}
-                className={cn("text-[11px]", errores.url_reservas ? "text-destructive" : "text-muted-foreground")}
+                className={cn("text-xs", errores.url_reservas ? "text-destructive" : "text-muted-foreground")}
               >
                 {errores.url_reservas ?? "Enlace que ofrece el bot para reservar."}
               </p>
@@ -448,11 +448,11 @@ function FormularioLimites({ config, guardar }: FormularioLimitesProps) {
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {dirty && (
-              <Button type="button" variant="ghost" size="sm" onClick={descartar} disabled={guardando}>
+              <Button type="button" variant="ghost" size="sm" className="h-11" onClick={descartar} disabled={guardando}>
                 Descartar
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={!dirty || hayErrores || guardando}>
+            <Button type="submit" size="sm" className="h-11" disabled={!dirty || hayErrores || guardando}>
               {guardando ? (
                 <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (

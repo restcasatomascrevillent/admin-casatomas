@@ -240,6 +240,14 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            // En la tablet el teclado pondría la primera letra en mayúscula y
+            // corregiría el nombre: el usuario es minúsculas, sin corrector.
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            enterKeyHint="next"
+            className="h-11"
           />
           <p className="text-xs text-muted-foreground">
             Solo letras, números, puntos y guiones bajos
@@ -254,18 +262,22 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            autoComplete="new-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            className="h-11"
           />
         </div>
       </div>
 
       {allowSuperAdmin && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
+        <div className="flex min-h-11 items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
           <Checkbox
             id="create-as-super-admin"
             checked={createAsSuperAdmin}
             onCheckedChange={(checked) => setCreateAsSuperAdmin(checked as boolean)}
           />
-          <Label htmlFor="create-as-super-admin" className="cursor-pointer font-normal">
+          <Label htmlFor="create-as-super-admin" className="cursor-pointer py-1 font-normal">
             Crear como Super Admin (acceso total; la configuración de permisos de abajo no aplica)
           </Label>
         </div>
@@ -285,7 +297,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
           />
         </div>
         <Select value={selectedAccessConfig} onValueChange={handleAccessConfigChange} disabled={presetsLoading}>
-          <SelectTrigger className="w-full md:w-[360px]">
+          <SelectTrigger className="h-11 w-full md:w-[360px]">
             <SelectValue placeholder={presetsLoading ? "Cargando roles..." : "Sin rol preconfigurado"} />
           </SelectTrigger>
           <SelectContent>
@@ -312,7 +324,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
         />
       </div>
 
-      <Button type="submit" disabled={loading} className="w-full md:w-auto">
+      <Button type="submit" disabled={loading} className="h-11 w-full px-6 md:w-auto">
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />

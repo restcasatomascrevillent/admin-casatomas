@@ -64,7 +64,7 @@ export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro, onEdit }:
                 <img
                   src={comida.imagen_url}
                   alt={comida.nombre}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="w-full h-full object-cover transition-transform duration-300 "
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -140,22 +140,20 @@ export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro, onEdit }:
 
               <div className="flex items-center justify-between pt-3 border-t">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2">
                     <Switch
                       checked={comida.activado ?? false}
                       onCheckedChange={(checked) => toggleActivado(comida.id, checked)}
-                      className="scale-90"
                     />
-                    <span className="text-xs text-muted-foreground">Activo</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-muted-foreground">Activo</span>
+                  </label>
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2">
                     <Switch
                       checked={comida.featured ?? false}
                       onCheckedChange={(checked) => toggleFeatured(comida.id, checked)}
-                      className="scale-90"
                     />
-                    <span className="text-xs text-muted-foreground">★</span>
-                  </div>
+                    <span className="text-sm text-muted-foreground">★</span>
+                  </label>
                 </div>
 
                 <div className="flex items-center gap-0.5">
@@ -163,14 +161,15 @@ export function ListaComidaVenta({ comidas, busqueda, categoriaFiltro, onEdit }:
                     variant="ghost" 
                     size="icon" 
                     onClick={() => onEdit?.(comida)}
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    className="h-11 w-11 text-muted-foreground hover:text-foreground"
+                    aria-label={`Editar ${comida.nombre}`}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                      <Button variant="ghost" size="icon" className="h-11 w-11 text-muted-foreground hover:text-destructive" aria-label={`Eliminar ${comida.nombre}`}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>

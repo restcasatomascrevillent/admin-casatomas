@@ -120,7 +120,7 @@ export default function GestorWeb() {
                 {pestanasVisibles.map((p) => {
                   const Icono = ICONOS[p.id];
                   return (
-                    <TabsTrigger key={p.id} value={p.id} className="gap-2 px-3 py-2">
+                    <TabsTrigger key={p.id} value={p.id} className="min-h-11 gap-2 px-4 py-2">
                       <Icono className="h-4 w-4" />
                       {p.label}
                     </TabsTrigger>

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, addDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, ShieldBan } from "lucide-react";
+import { AlertTriangle, Armchair, CalendarIcon, CheckCircle, ChevronDown, Info, MapPin, Minus, Plus, ShieldBan } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -962,7 +962,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Nombre completo</FormLabel>
                 <FormControl>
-                  <Input placeholder="Juan Pérez" {...field} />
+                  <Input placeholder="Juan Pérez" autoComplete="name" autoCapitalize="words" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -976,7 +976,7 @@ export const FormularioReserva = ({
               <FormItem>
                 <FormLabel>Teléfono</FormLabel>
                 <FormControl>
-                  <Input placeholder="612345678" {...field} />
+                  <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="612345678" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -991,7 +991,7 @@ export const FormularioReserva = ({
             <FormItem>
               <FormLabel>Email (opcional)</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="juan@email.com" {...field} />
+                <Input type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="juan@email.com" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -1116,9 +1116,31 @@ export const FormularioReserva = ({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Número de comensales</FormLabel>
+                {/* Con dedo, teclear en un `type=number` es lo más lento: − / + de 44 px a los lados
+                    (solo táctil; con ratón/teclado el campo se queda solo, como siempre). */}
+                <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="hidden pointer-coarse:inline-flex"
+                  aria-label="Un comensal menos"
+                  onClick={() =>
+                    field.onChange(
+                      Math.max(
+                        editando ? 1 : configReservas?.min_comensales_por_reserva || 1,
+                        (Number(field.value) || 0) - 1,
+                      ),
+                    )
+                  }
+                >
+                  <Minus className="h-4 w-4" aria-hidden />
+                </Button>
                 <FormControl>
                   <Input
                     type="number"
+                    inputMode="numeric"
+                    className="pointer-coarse:text-center"
                     // Al editar, el navegador no debe bloquear el envío por el mínimo
                     // configurado: una reserva antigua con menos comensales tiene que
                     // poder cambiar de nombre. El mínimo se exige en `guardarEdicion`,
@@ -1131,6 +1153,17 @@ export const FormularioReserva = ({
                     onChange={(e) => field.onChange(parseInt(e.target.value))}
                   />
                 </FormControl>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="hidden pointer-coarse:inline-flex"
+                  aria-label="Un comensal más"
+                  onClick={() => field.onChange((Number(field.value) || 0) + 1)}
+                >
+                  <Plus className="h-4 w-4" aria-hidden />
+                </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -1256,7 +1289,7 @@ export const FormularioReserva = ({
             control={form.control}
             name="importante"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-center gap-2 space-y-0">
+              <FormItem className="flex min-h-11 flex-row items-center gap-2 space-y-0">
                 <FormControl>
                   <Checkbox checked={!!field.value} onCheckedChange={(valor) => field.onChange(valor === true)} />
                 </FormControl>
@@ -1360,7 +1393,7 @@ export const FormularioReserva = ({
             por correo («reserva modificada», emails-reserva). Deshabilitada, con
             el motivo, si no se le puede avisar. */}
         {editando && avisoModificacion?.mostrar && (
-          <div className="flex items-start gap-2 rounded-lg border p-3">
+          <div className="flex items-start gap-2 rounded-lg border p-3 pointer-coarse:gap-3">
             <Checkbox
               id="avisar-cliente-cambio"
               checked={avisaraCambio}
@@ -1427,6 +1460,9 @@ export const FormularioReserva = ({
           </p>
         )}
 
+        {/* Pegado abajo del diálogo (que hace scroll): con el teclado abierto o un formulario largo
+            el botón sigue a mano. */}
+        <div className="sticky bottom-0 z-10 -mx-6 -mb-6 border-t bg-background px-6 py-3">
         <Button
           type="submit"
           className="w-full"
@@ -1449,6 +1485,7 @@ export const FormularioReserva = ({
                 ? "Guardar cambios"
                 : "Crear Reserva"}
         </Button>
+        </div>
       </form>
     </Form>
   );

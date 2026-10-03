@@ -214,3 +214,141 @@ All colors MUST be HSL.
     scrollbar-width: none;
   }
 }
+
+/* ==========================================================================
+   TABLET TÁCTIL (03/10/2026) — base global
+   Convenciones (detalle en engram `ui/tablet-armazon`):
+   - Variantes Tailwind `pointer-coarse:` / `pointer-fine:` / `no-hover:`
+     (tailwind.config.ts). El escritorio con ratón no cambia.
+   - Objetivo táctil >= 44x44 px: los componentes de src/components/ui ya suben
+     solos a 44 px con `pointer-coarse:` (Button, Input, Select, Tabs, Checkbox,
+     Switch, menús...). Aunque el llamador ponga `h-7 w-7`, en táctil manda el
+     `pointer-coarse:h-11 pointer-coarse:w-11` del componente base.
+   - Controles pequeños que no son un componente de ui (un <button> suelto, un
+     icono clicable): clase `touch-target` (mínimo 44x44 real) o `touch-hit`
+     (el dibujo no cambia, pero el área pulsable llega a 44x44).
+   ========================================================================== */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Sin "tirar para recargar" accidental en Android con un formulario a medias. */
+  overscroll-behavior-y: contain;
+}
+
+@layer base {
+  /* Pestañas (ui/tabs): centradas pero, si no caben, alineadas al inicio para
+     poder llegar a todas con scroll horizontal. En la capa base para que
+     cualquier `justify-*` del llamador (capa utilities) gane. */
+  [role="tablist"] {
+    justify-content: safe center;
+  }
+
+  /* Sin retardo de 300 ms ni zoom por doble toque en controles; el zoom con
+     pellizco sigue disponible (no se bloquea en el viewport). */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [role="checkbox"],
+  [role="switch"],
+  [role="combobox"] {
+    touch-action: manipulation;
+  }
+
+  @media (pointer: coarse) {
+    /* iOS hace zoom al enfocar un campo con fuente < 16 px. Red de seguridad
+       para TODOS los campos, también los <input> sueltos fuera de ui/. */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+
+    /* Feedback al toque en lugar del tono gris por defecto del navegador. */
+    * {
+      -webkit-tap-highlight-color: hsl(var(--foreground) / 0.08);
+    }
+  }
+}
+
+@layer utilities {
+  /* Mínimo 44x44 px SOLO con dedo. Para un botón/enlace suelto fuera de ui/. */
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    .touch-target-y {
+      min-height: 44px;
+    }
+
+    /* Ampliar el área pulsable sin cambiar el dibujo ni el layout: un pseudo-
+       elemento centrado de al menos 44x44. El elemento debe poder ser contenedor
+       posicionado (se le pone position: relative si no lo es). */
+    .touch-hit {
+      position: relative;
+    }
+    .touch-hit::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  /* Alto de pantalla que SÍ descuenta la barra del navegador en iPad/Android
+     (`dvh`), con `vh` de respaldo para navegadores antiguos. Tailwind emite
+     `h-dvh` ANTES de `h-screen`, por lo que combinarlos no sirve. */
+  .h-app {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .min-h-app {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Contenedor de scroll horizontal pensado para el dedo (tablas anchas, filas
+     de pestañas, selectores de sala): inercia en iOS, no encadena el scroll con
+     la página y deja el scroll vertical al navegador. */
+  .scroll-x-touch {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+}
+
+/* Acciones que solo se revelan con hover (`opacity-0 group-hover:opacity-100`):
+   un dedo no puede hacer hover, así que en dispositivos sin hover se muestran
+   siempre. Evita que desaparezcan botones de editar/eliminar en la tablet. */
+@media (hover: none), (pointer: coarse) {
+  [class*="group-hover"][class*=":opacity-100"],
+  [class*="peer-hover"][class*=":opacity-100"] {
+    opacity: 1 !important;
+  }
+}
+
+/* Toasts (sonner) con botones de acción pulsables con el dedo. */
+@media (pointer: coarse) {
+  [data-sonner-toast] [data-button] {
+    height: 40px;
+    padding-inline: 14px;
+    font-size: 14px;
+  }
+  [data-sonner-toast] [data-close-button] {
+    width: 28px;
+    height: 28px;
+  }
+}

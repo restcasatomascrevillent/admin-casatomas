@@ -5,7 +5,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Search, FileText, Package, Sparkles, Pencil } from "lucide-react";
 import { EditarFacturaDialog } from "./EditarFacturaDialog";
@@ -20,6 +19,7 @@ import {
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
 import { BotonOriginal, AccionesDocumento } from "./shared/BotonOriginal";
+import { TextoLargoPopover } from "./shared/TextoLargoPopover";
 import { EstadoDocumento, ResumenRevision, type FiltroRevision } from "./shared/EstadoDocumento";
 import {
   CELDA,
@@ -109,10 +109,10 @@ const FilaFacturaMobile = ({
               <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <div className="min-w-0">
-              <CardTitle className="truncate text-sm font-semibold text-foreground">
+              <CardTitle className="break-words text-sm font-semibold text-foreground">
                 {factura.numero_documento}
               </CardTitle>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground" title={factura.proveedor ?? undefined}>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground" title={factura.proveedor ?? undefined}>
                 {factura.proveedor || "Sin proveedor"}
               </p>
               <div className="mt-1.5">
@@ -145,25 +145,25 @@ const FilaFacturaMobile = ({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 w-full min-w-0 justify-center gap-1 border border-border/40 px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50"
+          className="h-11 w-full min-w-0 justify-center gap-1.5 border border-border/40 px-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
           onClick={(e) => {
             e.stopPropagation();
             onEdit(factura);
           }}
         >
-          <Pencil className="h-3 w-3" /> Editar
+          <Pencil className="h-4 w-4" /> Editar
         </Button>
         {onPreguntarIA && (
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-full min-w-0 justify-center gap-1 border border-[hsl(38,59%,45%)/0.2] bg-[hsl(38,59%,45%)/0.05] px-2 text-[11px] font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.15] hover:text-[hsl(38,59%,45%)]"
+            className="h-11 w-full min-w-0 justify-center gap-1.5 border border-[hsl(38,59%,45%)/0.2] bg-[hsl(38,59%,45%)/0.05] px-2 text-sm font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.15] hover:text-[hsl(38,59%,45%)]"
             onClick={(e) => {
               e.stopPropagation();
               onPreguntarIA(factura);
             }}
           >
-            <Sparkles className="h-3 w-3" /> IA
+            <Sparkles className="h-4 w-4" /> IA
           </Button>
         )}
       </div>
@@ -293,18 +293,7 @@ const FilaFacturaDesktop = ({
         {visibles.observaciones && (
           <TableCell className={`${CELDA} ${ANCHO_OBSERVACIONES}`}>
             {factura.observaciones && factura.observaciones.length > 24 ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="block cursor-help truncate text-sm text-muted-foreground">
-                      {truncateText(factura.observaciones, 24)}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-sm">
-                    <p className="text-sm">{factura.observaciones}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <TextoLargoPopover completo={factura.observaciones} corto={truncateText(factura.observaciones, 24)} />
             ) : (
               <span className="block truncate text-sm text-muted-foreground">{factura.observaciones || "-"}</span>
             )}
@@ -475,8 +464,8 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
             filtro={filtro}
             onFiltro={setFiltro}
           />
-          {/* El selector solo aplica a la tabla, que no existe por debajo de `lg`. */}
-          <div className="hidden lg:block">
+          {/* El selector solo aplica a la tabla, que no existe por debajo de `xl`. */}
+          <div className="hidden xl:block">
             <SelectorColumnas columnas={COLUMNAS_FACTURAS} visibles={columnasVisibles} onChange={toggleColumna} />
           </div>
         </div>
@@ -490,14 +479,17 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
         </div>
       ) : (
         <>
-          {/* Tarjetas apiladas: TODO lo que no llega a 1024 px. El menu lateral
-              aparece a 768 px y se lleva 16rem, asi que entre 768 y 1023 px a
-              la tabla le quedan ~397 px utiles: ocho columnas no caben de
-              ninguna manera. Ver el bloque de `shared/tabla.ts`. */}
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 custom-scrollbar lg:hidden">
-            {facturasFiltradas.length === 0
-              ? vacio
-              : facturasFiltradas.map((f) => (
+          {/* Tarjetas: TODO lo que no llega a 1280 px (2026-10-03, tablet). Antes el
+              corte estaba en 1024 px, pero con el menu lateral (16rem) a la tabla
+              le quedan ~650 px y las acciones de fila eran iconos de 24x28 px:
+              imposibles de pulsar con el dedo. Las tarjetas llevan botones de
+              44 px y, entre 1024 y 1279 px, van en dos columnas. */}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 custom-scrollbar xl:hidden">
+            {facturasFiltradas.length === 0 ? (
+              vacio
+            ) : (
+              <div className="grid items-start gap-x-3 lg:grid-cols-2">
+                {facturasFiltradas.map((f) => (
                   <FilaFacturaMobile
                     key={f.id}
                     factura={f}
@@ -507,10 +499,12 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
                     todasFacturas={todas}
                   />
                 ))}
+              </div>
+            )}
           </div>
 
           {facturasFiltradas.length === 0 ? (
-            <div className="hidden lg:block">{vacio}</div>
+            <div className="hidden xl:block">{vacio}</div>
           ) : (
             /* Sin `min-w`: la tabla nunca es mas ancha que su contenedor. Lo
                que se ajusta es el contenido. El `overflow-x-hidden` es un
@@ -518,7 +512,7 @@ export const TablaFacturas = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factura
                mas de lo que hay, se vera recortada en la pantalla —y se
                arreglara— pero NUNCA reaparecera la barra que escondia los
                importes. El scroll vertical se queda. */
-            <div className="relative hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-background shadow-sm custom-scrollbar lg:block">
+            <div className="relative hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-background shadow-sm custom-scrollbar xl:block">
               <Table>
                 <TableHeader className="sticky top-0 z-20 bg-muted/95 shadow-[0_1px_3px_rgba(0,0,0,0.05)] backdrop-blur supports-[backdrop-filter]:bg-muted/80">
                   <TableRow className="border-b-border/60 hover:bg-transparent">

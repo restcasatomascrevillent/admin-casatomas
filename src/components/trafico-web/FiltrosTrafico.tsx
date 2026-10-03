@@ -19,7 +19,7 @@ export function FiltrosTrafico({ proyecto, onProyectoChange, dias, onDiasChange 
           Web
         </Label>
         <Select value={proyecto} onValueChange={(v) => onProyectoChange(v as FiltroProyecto)}>
-          <SelectTrigger id="trafico-proyecto" className="w-full sm:w-[220px]">
+          <SelectTrigger id="trafico-proyecto" className="h-11 w-full sm:w-[220px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -44,7 +44,7 @@ export function FiltrosTrafico({ proyecto, onProyectoChange, dias, onDiasChange 
           className="justify-start"
         >
           {RANGOS_DIAS.map((d) => (
-            <ToggleGroupItem key={d} value={String(d)} className="px-3 text-sm">
+            <ToggleGroupItem key={d} value={String(d)} className="min-h-11 px-4 text-sm">
               {d} días
             </ToggleGroupItem>
           ))}

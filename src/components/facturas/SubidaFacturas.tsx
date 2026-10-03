@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy, Camera, FolderOpen } from "lucide-react";
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 
 interface ArchivoFactura {
@@ -51,15 +50,38 @@ export function SubidaFacturas() {
     nombreActual: string;
   }>({ total: 0, actual: 0, nombreActual: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Segundo input solo para la cámara de la tablet/móvil (`capture`): abre la
+  // cámara directamente en vez del selector de archivos.
+  const camaraInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
+    // Se copia la lista ANTES de vaciar el input: `files` es una referencia viva
+    // y al limpiar el input se vacía.
 
     const nuevosArchivos: ArchivoFactura[] = [];
+    const nombresUsados = new Set(archivos.map((a) => a.nombre));
 
-    Array.from(files).forEach((file) => {
+    // La cámara del iPad/móvil llama "image.jpg" a TODAS las fotos, y el resto
+    // del flujo (resultados, reintentos, limpieza) identifica cada archivo por su
+    // nombre: dos fotos seguidas se pisaban. Se les da un nombre único.
+    const conNombreUnico = (file: File): File => {
+      const punto = file.name.lastIndexOf('.');
+      const ext = punto > 0 ? file.name.slice(punto) : '';
+      const generico = /^image\.[a-z0-9]+$/i.test(file.name) || file.name === '';
+      const base = generico
+        ? `foto-${new Date().toISOString().slice(0, 16).replace('T', '-').replace(':', '')}`
+        : punto > 0 ? file.name.slice(0, punto) : file.name;
+      let candidato = `${base}${ext}`;
+      for (let n = 2; nombresUsados.has(candidato); n += 1) candidato = `${base}-${n}${ext}`;
+      nombresUsados.add(candidato);
+      return candidato === file.name ? file : new File([file], candidato, { type: file.type, lastModified: file.lastModified });
+    };
+
+    Array.from(files).forEach((original) => {
+      const file = original;
       // Validar tipo de archivo
       const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
       if (!tiposPermitidos.includes(file.type)) {
@@ -77,18 +99,22 @@ export function SubidaFacturas() {
         return;
       }
 
+      const unico = conNombreUnico(file);
       nuevosArchivos.push({
-        file,
-        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
-        nombre: file.name,
+        file: unico,
+        preview: unico.type.startsWith('image/') ? URL.createObjectURL(unico) : '',
+        nombre: unico.name,
       });
     });
 
     setArchivos(prev => [...prev, ...nuevosArchivos]);
 
-    // Limpiar input
+    // Limpiar los inputs (permite volver a elegir el mismo archivo)
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    if (camaraInputRef.current) {
+      camaraInputRef.current.value = '';
     }
   };
 
@@ -302,12 +328,11 @@ export function SubidaFacturas() {
         {/* Zona de carga */}
         <div
           className={[
-            "border-2 border-dashed rounded-lg p-4 sm:p-8 text-center cursor-pointer transition-all duration-200",
+            "border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-all duration-200",
             isDragging
               ? "border-primary bg-primary/5 scale-[1.01] shadow-md"
               : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",
           ].join(" ")}
-          onClick={() => fileInputRef.current?.click()}
           onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
@@ -330,11 +355,35 @@ export function SubidaFacturas() {
               isDragging ? "text-primary scale-110" : "text-muted-foreground",
             ].join(" ")}
           />
-          <p className="text-sm text-muted-foreground mb-2">
-            {isDragging ? "Suelta aquí para añadir" : "Arrastra tus facturas o albaranes aquí o haz clic para seleccionar"}
+          <p className="text-sm text-muted-foreground mb-4">
+            {isDragging ? "Suelta aquí para añadir" : "Haz una foto del documento o elige archivos de la galería o de Archivos"}
           </p>
-          <p className="text-xs text-muted-foreground">
-            PDF, JPG, PNG o WEBP (máximo 10MB por archivo)
+          {/* Dos botones grandes en vez de una zona entera "clicable": en la tablet
+              se toca, no se arrastra. El de la cámara usa `capture` para abrir la
+              cámara trasera directamente; el otro admite PDF y varias imágenes. */}
+          <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              className="h-12 gap-2 px-6 text-base"
+              onClick={() => camaraInputRef.current?.click()}
+              disabled={isSubmitting}
+            >
+              <Camera className="h-5 w-5" aria-hidden="true" />
+              Hacer foto
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 gap-2 px-6 text-base"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSubmitting}
+            >
+              <FolderOpen className="h-5 w-5" aria-hidden="true" />
+              Elegir archivos
+            </Button>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            PDF, JPG, PNG o WEBP (máximo 10MB por archivo). En un ordenador también puedes arrastrarlos aquí.
           </p>
           <Input
             ref={fileInputRef}
@@ -342,6 +391,16 @@ export function SubidaFacturas() {
             accept=".pdf,image/jpeg,image/png,image/webp"
             multiple
             className="hidden"
+            aria-label="Elegir facturas o albaranes (PDF o imágenes)"
+            onChange={handleFileChange}
+          />
+          <Input
+            ref={camaraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            aria-label="Hacer una foto de la factura o albarán"
             onChange={handleFileChange}
           />
         </div>
@@ -371,10 +430,10 @@ export function SubidaFacturas() {
                     <img
                       src={archivo.preview}
                       alt={archivo.nombre}
-                      className="h-12 w-12 object-cover rounded"
+                      className="h-14 w-14 shrink-0 object-cover rounded"
                     />
                   ) : (
-                    <div className="h-12 w-12 bg-primary/10 rounded flex items-center justify-center">
+                    <div className="h-14 w-14 shrink-0 bg-primary/10 rounded flex items-center justify-center">
                       <FileText className="h-6 w-6 text-primary" />
                     </div>
                   )}
@@ -387,8 +446,10 @@ export function SubidaFacturas() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-11 w-11 shrink-0"
                     onClick={() => eliminarArchivo(index)}
                     disabled={isSubmitting}
+                    aria-label={`Quitar ${archivo.nombre}`}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -402,10 +463,10 @@ export function SubidaFacturas() {
         {resultados.length > 0 && (
           <div className="space-y-3">
             <Label>Resultados del procesamiento</Label>
-            <ScrollArea className="h-[200px] rounded-md border p-4">
-              <div className="space-y-2">
+            <div className="max-h-[50dvh] overflow-y-auto rounded-md border p-4">
+              <div className="space-y-3">
                 {resultados.map((r, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {!r.success ? (
                       <XCircle className="h-4 w-4 text-destructive shrink-0" />
                     ) : r.duplicado ? (
@@ -436,39 +497,39 @@ export function SubidaFacturas() {
                       </div>
                     )}
                     {!r.success && r.error && (
-                      <span className="text-xs text-muted-foreground truncate">
-                        - {r.error}
+                      <span className="basis-full pl-6 text-xs text-muted-foreground break-words">
+                        {r.error}
                       </span>
                     )}
+                    {/* Los motivos van escritos en la propia fila: antes estaban solo en
+                        un `title` (hover) y con el dedo no se podían leer. */}
                     {r.success && r.duplicado && (
-                      <span
-                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-blue-600"
-                        title="Ya existia un documento con el mismo numero, proveedor, fecha y total: no se ha creado uno nuevo"
-                      >
-                        <Copy className="h-3 w-3" /> ya existía
+                      <span className="basis-full pl-6 flex items-start gap-1 text-xs font-medium text-blue-600">
+                        <Copy className="mt-0.5 h-3 w-3 shrink-0" /> Ya existía un documento con el mismo número, proveedor, fecha y total: no se ha creado uno nuevo.
                       </span>
                     )}
                     {r.success && r.archivoGuardado === false && (
-                      <span
-                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-destructive"
-                        title="Los datos se han guardado, pero el fichero original no se ha podido archivar"
-                      >
-                        <FileWarning className="h-3 w-3" /> sin archivar
+                      <span className="basis-full pl-6 flex items-start gap-1 text-xs font-medium text-destructive">
+                        <FileWarning className="mt-0.5 h-3 w-3 shrink-0" /> Los datos se han guardado, pero el fichero original no se ha podido archivar.
                       </span>
                     )}
                     {r.success && (r.alertas?.length ?? 0) > 0 && (
-                      <span
-                        className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600"
-                        title={r.alertas!.map(a => `· ${a.mensaje}`).join("\n")}
-                      >
-                        <AlertTriangle className="h-3 w-3" />
-                        {r.alertas!.length} aviso{r.alertas!.length > 1 ? 's' : ''}
-                      </span>
+                      <div className="basis-full pl-6 text-xs font-medium text-amber-600">
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          {r.alertas!.length} aviso{r.alertas!.length > 1 ? 's' : ''}
+                        </span>
+                        <ul className="mt-0.5 list-disc space-y-0.5 pl-8 font-normal">
+                          {r.alertas!.map((a, j) => (
+                            <li key={j}>{a.mensaje}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Botones de acción para resultados */}
             <div className="flex gap-2">
@@ -477,7 +538,7 @@ export function SubidaFacturas() {
                   variant="outline"
                   onClick={reintentarFallidos}
                   disabled={isSubmitting}
-                  className="flex-1"
+                  className="h-11 flex-1"
                 >
                   Reintentar fallidos
                 </Button>
@@ -486,7 +547,7 @@ export function SubidaFacturas() {
                 variant="outline"
                 onClick={limpiarTodo}
                 disabled={isSubmitting}
-                className="flex-1"
+                className="h-11 flex-1"
               >
                 Limpiar todo
               </Button>
@@ -499,7 +560,7 @@ export function SubidaFacturas() {
           <Button
             onClick={enviarFacturas}
             disabled={archivos.length === 0 || isSubmitting}
-            className="w-full"
+            className="h-12 w-full text-base"
           >
             {isSubmitting ? (
               <>

@@ -61,7 +61,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {bebidas.map((bebida) => (
           <Card
             key={bebida.id}
@@ -95,7 +95,9 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-11 w-11"
                       title={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
+                      aria-label={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
                       onClick={() => toggleFotoVisible(bebida.id)}
                     >
                       {fotosOcultas.has(bebida.id) ? (
@@ -152,7 +154,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="h-11 flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   onClick={() => setBebidaAEditar(bebida)}
                 >
                   <Pencil className="h-4 w-4 mr-2" />
@@ -163,7 +165,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="h-11 flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Eliminar

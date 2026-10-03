@@ -103,7 +103,10 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
             placeholder="Buscar producto..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9"
+            className="h-11 pl-9 text-base md:text-base"
+            type="search"
+            autoComplete="off"
+            aria-label="Buscar producto"
           />
         </div>
 
@@ -112,6 +115,7 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           <Button
             variant={tipoFiltro === 'todos' ? 'default' : 'outline'}
             size="sm"
+            className="h-11 px-4"
             onClick={() => { setTipoFiltro('todos'); setCategoriaFiltro(null); setPagina(0); }}
           >
             Todos
@@ -120,18 +124,18 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
             variant={tipoFiltro === 'bebida' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setTipoFiltro('bebida'); setCategoriaFiltro(null); setPagina(0); }}
-            className="gap-1"
+            className="h-11 gap-1.5 px-4"
           >
-            <Wine className="h-3 w-3" />
+            <Wine className="h-4 w-4" />
             Bebidas
           </Button>
           <Button
             variant={tipoFiltro === 'comida' ? 'default' : 'outline'}
             size="sm"
             onClick={() => { setTipoFiltro('comida'); setCategoriaFiltro(null); setPagina(0); }}
-            className="gap-1"
+            className="h-11 gap-1.5 px-4"
           >
-            <Utensils className="h-3 w-3" />
+            <Utensils className="h-4 w-4" />
             Comida
           </Button>
         </div>
@@ -139,23 +143,28 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
         {/* Filtros de categoría */}
         {categorias.length > 0 && (
           <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-1 pb-2">
-              <Badge
+            <div className="flex gap-2 pb-2">
+              {/* Botones de 44 px (antes eran Badges de ~22 px con onClick) */}
+              <Button
+                type="button"
+                size="sm"
                 variant={categoriaFiltro === null ? "default" : "outline"}
-                className="cursor-pointer shrink-0"
+                className="h-11 shrink-0 rounded-full px-4"
                 onClick={() => { setCategoriaFiltro(null); setPagina(0); }}
               >
                 Todas
-              </Badge>
+              </Button>
               {categorias.map(cat => (
-                <Badge
+                <Button
                   key={cat}
+                  type="button"
+                  size="sm"
                   variant={categoriaFiltro === cat ? "default" : "outline"}
-                  className="cursor-pointer shrink-0"
+                  className="h-11 shrink-0 rounded-full px-4"
                   onClick={() => { setCategoriaFiltro(cat); setPagina(0); }}
                 >
                   {cat}
-                </Badge>
+                </Button>
               ))}
             </div>
           </ScrollArea>
@@ -172,11 +181,12 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3 content-start">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 p-3 content-start overflow-y-auto">
               {productosDisponibles
                 .slice(pagina * PRODUCTOS_POR_PAGINA, (pagina + 1) * PRODUCTOS_POR_PAGINA)
                 .map((producto) => (
                 <button
+                  type="button"
                   key={`${producto.tipo}-${producto.id}`}
                   onClick={() => handleSelectProducto(producto)}
                   className="flex flex-col items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent transition-colors text-left h-[130px] w-full"
@@ -198,13 +208,13 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
                       </div>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-center line-clamp-1 mb-1">
+                  <span className="text-sm font-medium text-center line-clamp-1 mb-1">
                     {producto.nombre}
                   </span>
                   <span className="text-sm font-bold text-primary">
                     {formatCurrency(producto.precio_eur || 0)}
                   </span>
-                  <Badge variant="secondary" className="text-[10px] mt-1">
+                  <Badge variant="secondary" className="text-xs mt-1">
                     Stock: {producto.stock}
                   </Badge>
                 </button>
@@ -215,17 +225,19 @@ export function ProductoPicker({ onSelectProducto }: ProductoPickerProps) {
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-11 px-4"
                   disabled={pagina === 0}
                   onClick={() => setPagina(p => p - 1)}
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                 </Button>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   {pagina + 1} / {Math.ceil(productosDisponibles.length / PRODUCTOS_POR_PAGINA)}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-11 px-4"
                   disabled={(pagina + 1) * PRODUCTOS_POR_PAGINA >= productosDisponibles.length}
                   onClick={() => setPagina(p => p + 1)}
                 >

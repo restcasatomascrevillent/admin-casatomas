@@ -44,7 +44,7 @@ export function GestionCorreos() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -77,7 +77,7 @@ export function GestionCorreos() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />

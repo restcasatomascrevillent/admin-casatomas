@@ -35,6 +35,7 @@ import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import { cn } from "@/lib/utils";
+import { ConMotivo } from "./ConMotivo";
 
 interface VistaHoyProps {
   onEspacioClick: (espacioId: string) => void;
@@ -335,7 +336,7 @@ function FranjaPendientesMesa({
           (la parte de arriba llenando la pantalla y el kanban sin verse).
           `flex-wrap` para que en 1024px las pastillas bajen de línea en vez de
           desbordar a lo ancho. */}
-      <div className="max-h-24 space-y-1 overflow-y-auto sm:max-h-28">
+      <div className="max-h-24 space-y-1 overflow-y-auto pointer-coarse:max-h-56 pointer-coarse:space-y-2 sm:max-h-28 pointer-coarse:sm:max-h-56">
         {grupos.map((grupo) => (
           <div
             key={grupo.espacioId ?? "__sin_sala__"}
@@ -389,7 +390,7 @@ function CabeceraGrupo({
       title={`Abrir el plano de ${nombre} para repartir mesas`}
       className={cn(
         base,
-        "inline-flex items-center gap-0.5 rounded px-1 py-0.5 -ml-1 text-foreground",
+        "inline-flex items-center gap-0.5 rounded px-1 py-0.5 -ml-1 text-foreground pointer-coarse:min-h-11 pointer-coarse:px-2 pointer-coarse:text-sm",
         "hover:bg-background hover:underline underline-offset-2",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       )}
@@ -446,7 +447,7 @@ function PastillaPendiente({
           `AccionIcono` en la lista: un botón deshabilitado no dispara eventos de
           ratón, así que su propio `title` no llega a enseñarse — y justo el caso
           deshabilitado (sin sala) es el que más necesita explicarse. */}
-      <span className="inline-flex min-w-0" title={salto.titulo}>
+      <ConMotivo className="min-w-0" motivo={destino ? undefined : salto.titulo}>
         <button
           type="button"
           disabled={!destino}
@@ -454,7 +455,9 @@ function PastillaPendiente({
           onClick={destino ? () => onAsignarMesa(destino) : undefined}
           className={cn(
             "inline-flex min-w-0 max-w-[14rem] items-center gap-1.5 rounded-full border px-2 py-0.5",
-            "text-xs text-foreground/90 transition-colors",
+            "text-xs text-foreground/90 transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3 pointer-coarse:text-sm pointer-coarse:max-w-[18rem]",
+            // Un botón nativo deshabilitado no recibe el toque: que caiga en `ConMotivo` y avise.
+            "disabled:pointer-events-none",
             destino
               ? "bg-background hover:bg-secondary hover:text-secondary-foreground"
               : "cursor-not-allowed border-dashed bg-transparent text-muted-foreground opacity-70",
@@ -474,8 +477,9 @@ function PastillaPendiente({
             <span className="sr-only">comensales</span>
           </span>
         </button>
-      </span>
+      </ConMotivo>
       {onEditar && (
+        <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
         <button
           type="button"
           disabled={!puedeEditar}
@@ -485,14 +489,15 @@ function PastillaPendiente({
             puedeEditar ? "Editar la reserva: datos, día, hora, comensales y sala" : "No tienes permiso para editar reservas"
           }
           className={cn(
-            "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors",
+            "touch-hit inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors pointer-coarse:h-11 pointer-coarse:w-11",
             "hover:bg-secondary hover:text-secondary-foreground",
-            "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent",
+            "disabled:pointer-events-none disabled:opacity-50 disabled:hover:bg-transparent",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           )}
         >
           <SquarePen className="h-3 w-3" aria-hidden="true" />
         </button>
+        </ConMotivo>
       )}
     </span>
   );

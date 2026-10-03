@@ -62,7 +62,7 @@ export function TelefoniaDateRangePicker({ value, preset = "7d", onChange }: Pro
                         key={p.key}
                         variant={preset === p.key ? "default" : "ghost"}
                         size="sm"
-                        className="h-8 px-3 text-xs"
+                        className="h-11 px-4 text-sm"
                         onClick={() => onChange(presetRange(p.key), p.key)}
                     >
                         {p.label}
@@ -75,15 +75,15 @@ export function TelefoniaDateRangePicker({ value, preset = "7d", onChange }: Pro
                     <Button
                         variant={preset === "custom" ? "default" : "outline"}
                         size="sm"
-                        className={cn("h-8 gap-2 text-xs")}
+                        className={cn("h-11 gap-2 px-4 text-sm")}
                     >
-                        <CalendarIcon className="h-3.5 w-3.5" />
+                        <CalendarIcon className="h-4 w-4" />
                         {preset === "custom"
                             ? `${format(value.dateFrom, "d MMM", { locale: es })} – ${format(value.dateTo, "d MMM", { locale: es })}`
                             : "Rango"}
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
+                <PopoverContent className="w-auto max-w-[calc(100vw-1.5rem)] overflow-x-auto p-0" align="end" collisionPadding={12}>
                     <Calendar
                         mode="range"
                         locale={es}

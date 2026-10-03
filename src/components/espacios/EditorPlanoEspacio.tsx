@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, Save, Download, Trash2, ZoomIn, ZoomOut, ChevronUp, ChevronDown, PanelBottom } from "lucide-react";
 import { usePlanoEspacio, useCrearOActualizarPlano } from "@/hooks/usePlanosEspacio";
 import { useMesas, useEliminarMesa } from "@/hooks/useMesas";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,6 +107,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
   const [zoomLevel, setZoomLevel] = useState(1);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 500 });
   const [showMeasurements, setShowMeasurements] = useState(true);
+  // Alternativas táctiles a Espacio / Mayús / Mayús+clic / doble clic (ver ToolbarDibujo).
+  const [modoMano, setModoMano] = useState(false);
+  const [seleccionMultiple, setSeleccionMultiple] = useState(false);
+  const [anguloLibre, setAnguloLibre] = useState(false);
+  const [puntosPared, setPuntosPared] = useState(0);
+  // Panel lateral: en pantallas anchas (≥ lg) siempre está a la derecha; por
+  // debajo (tablet en vertical) va ABAJO y plegable para no comerse el lienzo.
+  const [panelAbierto, setPanelAbierto] = useState(false);
 
   // Mesa recién dibujada con la herramienta del lienzo: su número es solo el
   // PRIMER NÚMERO LIBRE propuesto, así que el panel lateral enfoca su campo de
@@ -473,31 +481,41 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     [],
   );
 
-  // Medir el contenedor
+  // Medir el contenedor.
+  //
+  // Depende de la carga: el div del lienzo NO existe mientras se muestra el
+  // spinner (más abajo hay un `return` anticipado), así que con `[]` el
+  // observador no llegaba a engancharse y `containerSize` se quedaba para
+  // siempre en el valor de arranque 800x500 — el zoom de ajuste salía mal en
+  // cualquier pantalla que no fuera de ese tamaño. Y se ignoran las medidas 0:
+  // son el aviso de un contenedor que acaba de desmontarse, no un tamaño real.
   useEffect(() => {
     if (!containerRef.current) return;
-    
+
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) {
+      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
         setContainerSize({
           width: entry.contentRect.width,
           height: entry.contentRect.height
         });
       }
     });
-    
+
     resizeObserver.observe(containerRef.current);
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [loadingPlano, loadingMesas]);
 
   // Calcular zoom para ajustar al contenedor (sin límite máximo)
   const canvasRealWidth = realDimensions.width * PIXELS_PER_METER;
   const canvasRealHeight = realDimensions.height * PIXELS_PER_METER;
   
-  const fitZoom = Math.min(
-    (containerSize.width - 40) / canvasRealWidth,
-    (containerSize.height - 40) / canvasRealHeight
+  const fitZoom = Math.max(
+    0.1,
+    Math.min(
+      (containerSize.width - 40) / canvasRealWidth,
+      (containerSize.height - 40) / canvasRealHeight
+    )
   );
 
   // Cargar dimensiones guardadas del plano (prioridad: columnas dedicadas, fallback: configuracion)
@@ -509,10 +527,10 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
     }
   }, [plano]);
 
-  // Auto-ajustar zoom cuando cambian las dimensiones o el contenedor
-  useEffect(() => {
-    setZoomLevel(fitZoom);
-  }, [fitZoom]);
+  // El % de zoom lo comunica el propio lienzo (`onZoomChange`) cada vez que
+  // reencuadra o el usuario hace zoom. Antes aquí se copiaba `fitZoom` al
+  // cambiar el contenedor, y con la vista ya tocada (pellizco) el número dejaba
+  // de coincidir con lo que se veía al abrir o cerrar el panel de abajo.
 
   // Aviso al ABRIR el editor: mesas activas cuya caja cae fuera del plano. La
   // causa típica son filas guardadas con `pos_x/pos_y` en píxeles (el editor
@@ -1178,22 +1196,24 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
 
   if (loadingPlano || loadingMesas) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-center h-[calc(100dvh-120px)]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] gap-4">
+    // `dvh` (y no `vh`): en iPad/Android la barra del navegador cambia la altura
+    // visible, y con `vh` la parte de abajo del editor quedaba tapada.
+    <div className="flex flex-col h-[calc(100dvh-120px)] min-h-[32rem] gap-3">
       {/* Header */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-card to-card/80 rounded-xl p-4 border shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gradient-to-r from-card to-card/80 rounded-xl p-3 border shadow-sm">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Volver a los espacios" className="rounded-full h-11 w-11 shrink-0 touch-manipulation">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h2 className="text-xl font-semibold">{espacioNombre}</h2>
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold truncate">{espacioNombre}</h2>
             <p className="text-sm text-muted-foreground">
               Editor de plano •{" "}
               {areaReal
@@ -1202,52 +1222,53 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Controles de zoom */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Controles de zoom (el pellizco con dos dedos y la rueda hacen lo mismo) */}
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 touch-manipulation"
+              aria-label="Alejar"
               onClick={() => {
-                const newZoom = Math.max(0.25, zoomLevel / 1.15);
+                const newZoom = Math.max(0.25, zoomLevel / 1.25);
                 canvasRef.current?.setZoom(newZoom);
                 setZoomLevel(newZoom);
               }}
             >
-              <ZoomOut className="h-4 w-4" />
+              <ZoomOut className="h-5 w-5" />
             </Button>
-            <span className="text-xs font-medium w-12 text-center">
+            <span className="text-sm font-medium w-14 text-center tabular-nums" aria-live="polite">
               {Math.round(zoomLevel * 100)}%
             </span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-7 w-7"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 touch-manipulation"
+              aria-label="Acercar"
               onClick={() => {
-                const newZoom = Math.min(3, zoomLevel * 1.15);
+                const newZoom = Math.min(3, zoomLevel * 1.25);
                 canvasRef.current?.setZoom(newZoom);
                 setZoomLevel(newZoom);
               }}
             >
-              <ZoomIn className="h-4 w-4" />
+              <ZoomIn className="h-5 w-5" />
             </Button>
           </div>
-          
-          <Button variant="outline" size="sm" onClick={handleExport} className="rounded-lg">
+
+          <Button variant="outline" onClick={handleExport} className="rounded-lg h-11 touch-manipulation">
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={handleAbrirClearDialog}
-            className="rounded-lg text-destructive hover:text-destructive"
+            className="rounded-lg h-11 touch-manipulation text-destructive hover:text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" />
             Limpiar
           </Button>
-          <Button onClick={handleSave} disabled={isSaving} className="rounded-lg">
+          <Button onClick={handleSave} disabled={isSaving} className="rounded-lg h-11 touch-manipulation">
             <Save className="h-4 w-4 mr-2" />
             {isSaving ? "Guardando..." : "Guardar"}
           </Button>
@@ -1267,14 +1288,24 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
         onRedo={handleRedo}
         puedeDeshacer={history.puedeDeshacer && !isSaving}
         puedeRehacer={history.puedeRehacer && !isSaving}
+        modoMano={modoMano}
+        onToggleModoMano={() => setModoMano((v) => !v)}
+        seleccionMultiple={seleccionMultiple}
+        onToggleSeleccionMultiple={() => setSeleccionMultiple((v) => !v)}
+        anguloLibre={anguloLibre}
+        onToggleAnguloLibre={() => setAnguloLibre((v) => !v)}
+        puntosPared={puntosPared}
+        onTerminarPared={() => canvasRef.current?.terminarPared()}
+        onCancelarDibujo={() => canvasRef.current?.cancelarDibujo()}
       />
 
       {/* Main content */}
-      <div className="flex gap-4 flex-1 min-h-0 h-full">
-        {/* Canvas - zoom nativo de Fabric.js */}
-        <div 
+      <div className="flex flex-col lg:flex-row gap-3 flex-1 min-h-0 h-full">
+        {/* Canvas - zoom nativo de Fabric.js. `touch-none`: ni scroll ni zoom de
+            página encima del plano; los gestos los gestiona CanvasPlano. */}
+        <div
           ref={containerRef}
-          className="flex-1 h-full rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-lg relative overflow-hidden"
+          className="flex-1 min-h-[16rem] lg:h-full rounded-xl border-2 border-border/30 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 shadow-lg relative overflow-hidden touch-none select-none"
         >
           <CanvasPlano
             ref={canvasRef}
@@ -1295,19 +1326,50 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             onToolChange={setActiveTool}
             onZoomChange={setZoomLevel}
             onRoomDrawn={handleRoomDrawn}
+            modoMano={modoMano}
+            seleccionMultiple={seleccionMultiple}
+            anguloLibre={anguloLibre}
+            onParedEnCursoChange={setPuntosPared}
             onMesaCreada={(mesaId, nombre) => {
               setMesaRecienCreadaId(mesaId);
+              setPanelAbierto(true);
               toast.info(`Mesa ${nombre} (primer número libre). Escribe el número real de la sala.`);
             }}
           />
           {/* Indicador de modo pan: compacto y semitransparente por defecto para
               no tapar cotas u otros elementos cerca de la esquina inferior. */}
-          <div className="absolute bottom-2 left-2 text-[10px] leading-none text-muted-foreground bg-background/70 px-1.5 py-0.5 rounded opacity-60 pointer-events-none">
-            🖱️ Rueda: Zoom • Espacio+Arrastrar: Mover
+          <div className="absolute bottom-2 left-2 text-xs leading-none text-muted-foreground bg-background/80 px-2 py-1 rounded pointer-events-none">
+            <span className="hidden [@media(pointer:coarse)]:inline">Pellizca para zoom · Dos dedos mueven el plano</span>
+            <span className="[@media(pointer:coarse)]:hidden">Rueda: zoom · Espacio+arrastrar o «Mano»: mover</span>
           </div>
         </div>
 
-        {/* Panel lateral */}
+        {/* Panel lateral: a la derecha en ≥ lg; debajo y plegable en tablet vertical */}
+        <div className="shrink-0 lg:h-full lg:w-72 flex flex-col min-h-0">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full justify-between touch-manipulation lg:hidden"
+            aria-expanded={panelAbierto}
+            aria-controls="panel-lateral-plano"
+            onClick={() => setPanelAbierto((v) => !v)}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <PanelBottom className="h-5 w-5 shrink-0" />
+              <span className="truncate">
+                {selectedElement
+                  ? selectedElement.tipo === "mesa"
+                    ? `Mesa ${selectedElement.nombre ?? ""} seleccionada`
+                    : `Seleccionado: ${selectedElement.tipo}`
+                  : "Mesas y propiedades"}
+              </span>
+            </span>
+            {panelAbierto ? <ChevronDown className="h-5 w-5 shrink-0" /> : <ChevronUp className="h-5 w-5 shrink-0" />}
+          </Button>
+          <div
+            id="panel-lateral-plano"
+            className={`${panelAbierto ? "flex" : "hidden"} lg:flex min-h-0 flex-col max-h-[34dvh] lg:max-h-none lg:h-full overflow-y-auto pt-2 lg:pt-0`}
+          >
         <PanelLateral
           espacioId={espacioId}
           selectedElement={selectedElement}
@@ -1366,6 +1428,8 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             canvasRef.current?.updateMesaBocadillo(mesaId, etiqueta);
           }}
         />
+          </div>
+        </div>
       </div>
 
 
@@ -1404,13 +1468,14 @@ export function EditorPlanoEspacio({ espacioId, espacioNombre, onBack }: EditorP
             </AlertDialogDescription>
           </AlertDialogHeader>
           {clearCounts && clearCounts.futuras > 0 && (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+            <div className="flex min-h-11 items-center gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
               <Checkbox
+                className="h-6 w-6 shrink-0"
                 id="confirmar-limpiar-futuras"
                 checked={clearConfirmChecked}
                 onCheckedChange={(checked) => setClearConfirmChecked(checked === true)}
               />
-              <Label htmlFor="confirmar-limpiar-futuras" className="text-sm font-normal">
+              <Label htmlFor="confirmar-limpiar-futuras" className="text-sm font-normal flex-1 py-1 cursor-pointer">
                 Entiendo que se perderán {clearCounts.futuras} reserva(s) de hoy o futuras con mesa asignada
               </Label>
             </div>

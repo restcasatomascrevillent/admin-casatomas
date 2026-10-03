@@ -127,6 +127,7 @@ export function VapiCallSimulator({ assistantId }: { assistantId: string }) {
                                 variant="outline"
                                 size="icon"
                                 className="h-12 w-12 rounded-full"
+                                aria-label={isMuted ? "Activar el micrófono" : "Silenciar el micrófono"}
                                 onClick={() => {
                                     vapi.setMuted(!isMuted);
                                     setIsMuted(!isMuted);

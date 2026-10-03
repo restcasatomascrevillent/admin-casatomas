@@ -60,7 +60,7 @@ export function CreadorNewsletter() {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         {/* Left Column - Form */}
         <div className="space-y-6">
           <Card>
@@ -89,6 +89,7 @@ export function CreadorNewsletter() {
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   disabled={!tipo}
+                  className="h-11 text-base md:text-base"
                 />
               </div>
 
@@ -102,6 +103,7 @@ export function CreadorNewsletter() {
                   onChange={(e) => setMensaje(e.target.value)}
                   disabled={!tipo}
                   rows={6}
+                  className="text-base md:text-base"
                 />
               </div>
 
@@ -119,7 +121,7 @@ export function CreadorNewsletter() {
 
               {/* Send Button */}
               <Button
-                className="w-full"
+                className="h-12 w-full"
                 size="lg"
                 onClick={handleEnviar}
                 disabled={!isFormValid || isPending}
@@ -137,7 +139,7 @@ export function CreadorNewsletter() {
 
         {/* Right Column - Preview */}
         <div>
-          <div className="sticky top-6">
+          <div className="xl:sticky xl:top-6">
             <Label className="mb-3 block">Vista previa del email</Label>
             <PreviewNewsletter
               tipo={tipo}
@@ -159,8 +161,8 @@ export function CreadorNewsletter() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarEnvio} disabled={isPending}>
+            <AlertDialogCancel disabled={isPending} className="h-11">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarEnvio} disabled={isPending} className="h-11">
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}

@@ -79,7 +79,7 @@ export function MetodoPagoModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Método de Pago</DialogTitle>
         </DialogHeader>
@@ -97,7 +97,7 @@ export function MetodoPagoModal({
               <RadioGroupItem value="efectivo" id="efectivo" className="peer sr-only" />
               <Label
                 htmlFor="efectivo"
-                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                className="flex min-h-[76px] flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
               >
                 <Banknote className="mb-2 h-6 w-6" />
                 <span className="text-sm font-medium">Efectivo</span>
@@ -108,7 +108,7 @@ export function MetodoPagoModal({
               <RadioGroupItem value="tarjeta" id="tarjeta" className="peer sr-only" />
               <Label
                 htmlFor="tarjeta"
-                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                className="flex min-h-[76px] flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
               >
                 <CreditCard className="mb-2 h-6 w-6" />
                 <span className="text-sm font-medium">Tarjeta</span>
@@ -119,7 +119,7 @@ export function MetodoPagoModal({
               <RadioGroupItem value="bizum" id="bizum" className="peer sr-only" />
               <Label
                 htmlFor="bizum"
-                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                className="flex min-h-[76px] flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
               >
                 <Smartphone className="mb-2 h-6 w-6" />
                 <span className="text-sm font-medium">Bizum</span>
@@ -130,7 +130,7 @@ export function MetodoPagoModal({
               <RadioGroupItem value="mixto" id="mixto" className="peer sr-only" />
               <Label
                 htmlFor="mixto"
-                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                className="flex min-h-[76px] flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
               >
                 <Shuffle className="mb-2 h-6 w-6" />
                 <span className="text-sm font-medium">Mixto</span>
@@ -146,12 +146,13 @@ export function MetodoPagoModal({
                 <Input
                   id="recibido"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min={totales.total}
                   placeholder={formatCurrency(totales.total)}
                   value={importeRecibido}
                   onChange={(e) => setImporteRecibido(e.target.value)}
-                  className="text-lg"
+                  className="h-12 text-lg"
                 />
               </div>
               {importeRecibido && parseFloat(importeRecibido) >= totales.total && (
@@ -172,36 +173,42 @@ export function MetodoPagoModal({
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <Label htmlFor="mixtoEfectivo" className="text-xs">Efectivo</Label>
+                  <Label htmlFor="mixtoEfectivo" className="text-sm">Efectivo</Label>
                   <Input
                     id="mixtoEfectivo"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={mixtoEfectivo}
                     onChange={(e) => setMixtoEfectivo(e.target.value)}
+                    className="h-11 text-base md:text-base"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="mixtoTarjeta" className="text-xs">Tarjeta</Label>
+                  <Label htmlFor="mixtoTarjeta" className="text-sm">Tarjeta</Label>
                   <Input
                     id="mixtoTarjeta"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={mixtoTarjeta}
                     onChange={(e) => setMixtoTarjeta(e.target.value)}
+                    className="h-11 text-base md:text-base"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="mixtoBizum" className="text-xs">Bizum</Label>
+                  <Label htmlFor="mixtoBizum" className="text-sm">Bizum</Label>
                   <Input
                     id="mixtoBizum"
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={mixtoBizum}
                     onChange={(e) => setMixtoBizum(e.target.value)}
+                    className="h-11 text-base md:text-base"
                   />
                 </div>
               </div>
@@ -214,10 +221,10 @@ export function MetodoPagoModal({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+          <Button variant="outline" className="h-12 px-5" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirmar} disabled={!puedeConfirmar}>
+          <Button className="h-12 px-5" onClick={handleConfirmar} disabled={!puedeConfirmar}>
             {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

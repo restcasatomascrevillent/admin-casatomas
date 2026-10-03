@@ -194,7 +194,10 @@ function etiquetaPropuestaCorta(vista: EstadoPropuestaVista, enviadaAt: string |
 //     "Confirmar" es la etiqueta más larga y ya va justa) o el `gap-0.5` de
 //     CeldaAcciones.
 //     NUNCA recortar insignias ni dejar que aparezca el scroll horizontal.
-const ANCHO_ACCIONES = "w-[250px] xl:w-[276px]";
+// Con dedo (`pointer-coarse`) los 5 iconos suben a 44 px y la casilla a 24: 12 + 24 + 88 + 5×44 + 6×2
+// + 1 = ~369 px con huecos de 4 px (`xl`, relleno de 16: ~373). Sin esto la columna se quedaba en
+// 250 px y los botones se montaban unos sobre otros.
+const ANCHO_ACCIONES = "w-[250px] xl:w-[276px] pointer-coarse:w-[372px] pointer-coarse:xl:w-[380px]";
 const ANCHO_FECHA = "w-[74px] xl:w-[116px]";
 // OJO con el `max-w` de Cliente: el nombre lleva `truncate`, o sea
 // `white-space: nowrap`, y en una tabla de reparto automático eso hace que la
@@ -266,7 +269,7 @@ function CeldaAcciones({
         fondo,
       )}
     >
-      <div className="flex items-center justify-start gap-0.5 xl:gap-1">{children}</div>
+      <div className="flex items-center justify-start gap-0.5 xl:gap-1 pointer-coarse:gap-1">{children}</div>
     </TableCell>
   );
 }

@@ -93,7 +93,9 @@ export const ANCHO_OBSERVACIONES = "min-w-[80px] max-w-[104px] xl:max-w-[190px]"
 export const ANCHO_ITEMS = "w-[40px] xl:w-[56px]";
 export const ANCHO_FECHA_LARGA = "w-[96px] xl:w-[124px]";
 /** Acciones: Escaneo + Editar + IA. Solo iconos en `lg`, con texto en `xl`. */
-export const ANCHO_ACCIONES = "w-[92px] xl:w-[132px] 2xl:w-[176px]";
+// 2026-10-03 (tablet): los tres botones miden 44x44 (antes 24x28) y la tabla
+// solo se pinta desde `xl`; por debajo se usan las tarjetas, que son tactiles.
+export const ANCHO_ACCIONES = "w-[148px] 2xl:w-[190px]";
 
 // ---------------------------------------------------------------------------
 // Presupuesto del selector "Columnas"

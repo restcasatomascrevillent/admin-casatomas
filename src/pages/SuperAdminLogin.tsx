@@ -51,14 +51,14 @@ export default function SuperAdminLogin() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-app flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-destructive/5 p-4">
+    <div className="min-h-app flex items-center justify-center bg-gradient-to-br from-background via-background to-destructive/5 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-destructive/10 mb-4">
@@ -106,6 +106,9 @@ export default function SuperAdminLogin() {
                   <Input
                     id="super-admin-email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="username"
+                    enterKeyHint="next"
                     placeholder="tu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -120,6 +123,8 @@ export default function SuperAdminLogin() {
                   <Input
                     id="super-admin-password"
                     type="password"
+                    autoComplete="current-password"
+                    enterKeyHint="go"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

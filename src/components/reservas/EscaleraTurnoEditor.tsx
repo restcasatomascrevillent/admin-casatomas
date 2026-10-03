@@ -212,7 +212,7 @@ export function EscaleraTurnoEditor({
                   <Label className="text-xs">Cada</Label>
                   <div className="flex items-center gap-1.5">
                     <Input
-                      type="number"
+                      type="number" inputMode="numeric"
                       min={1}
                       max={1440}
                       step={1}
@@ -232,6 +232,7 @@ export function EscaleraTurnoEditor({
                     onClick={() => eliminarNivel(index)}
                     disabled={niveles.length <= MIN_NIVELES}
                     title={niveles.length <= MIN_NIVELES ? "Tiene que quedar al menos un nivel" : "Quitar nivel"}
+                    aria-label="Quitar nivel"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

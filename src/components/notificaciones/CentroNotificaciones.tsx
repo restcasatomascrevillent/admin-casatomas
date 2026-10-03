@@ -91,7 +91,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs gap-1 transition-colors"
+              className="h-7 text-xs gap-1 transition-colors pointer-coarse:text-sm"
               onClick={marcarTodasLeidas}
             >
               <CheckCheck className="h-3 w-3" />

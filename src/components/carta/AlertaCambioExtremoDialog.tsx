@@ -40,7 +40,7 @@ export function AlertaCambioExtremoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {esExtremo ? (
@@ -117,7 +117,7 @@ export function AlertaCambioExtremoDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-11 w-full sm:w-auto">
             Cancelar
           </Button>
           <Button 
@@ -126,7 +126,7 @@ export function AlertaCambioExtremoDialog({
               onOpenChange(false);
             }}
             variant={esExtremoMuyAlto ? "destructive" : "default"}
-            className="w-full sm:w-auto"
+            className="h-11 w-full sm:w-auto"
           >
             Confirmar Ajuste
           </Button>

@@ -1,9 +1,17 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
+  // Con `hoverOnlyWhenSupported` todo `hover:` / `group-hover:` va envuelto en
+  // `@media (hover: hover)`: en una tablet táctil un toque ya no deja el
+  // estado :hover "pegado" (un botón se queda resaltado hasta tocar otro sitio).
+  // OJO: lo que solo aparece con hover (`opacity-0 group-hover:opacity-100`) NO
+  // se activaría nunca en táctil; index.css lo fuerza visible con
+  // `@media (hover: none)`. Aun así, preferible no esconder acciones tras hover.
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     container: {
       center: true,
@@ -103,5 +111,18 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Variantes para diseñar PARA TABLET TÁCTIL sin tocar el aspecto de escritorio
+    // (convención del panel, 03/10/2026):
+    //   pointer-coarse:  dedo (iPad/Android). Ej.: `pointer-coarse:h-11` = 44 px solo en táctil.
+    //   pointer-fine:    ratón / trackpad principal.
+    //   no-hover:        sin hover real (dedo). Ej.: `no-hover:opacity-100`.
+    plugin(({ addVariant }) => {
+      addVariant("pointer-coarse", "@media (pointer: coarse)");
+      addVariant("pointer-fine", "@media (pointer: fine)");
+      // Complemento exacto de la condición con la que `hoverOnlyWhenSupported` activa `hover:`.
+      addVariant("no-hover", "@media (hover: none), (pointer: coarse)");
+    }),
+  ],
 } satisfies Config;

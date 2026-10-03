@@ -96,3 +96,20 @@ describe("Espacios · solo las salas de Casa Tomás", () => {
     expect(screen.getByTestId("editor-plano")).toHaveTextContent("ct-terraza|Terraza");
   });
 });
+
+describe("Espacios · táctil", () => {
+  it("cada sala tiene botones de editar y eliminar con nombre accesible y tamaño de dedo (≥ 44 px)", () => {
+    montar();
+    for (const nombre of ["Comedor", "Salón", "Terraza", "Reservado", "Bodega"]) {
+      for (const verbo of ["Editar", "Eliminar"]) {
+        const boton = screen.getByRole("button", { name: `${verbo} ${nombre}` });
+        expect(boton.className, `${verbo} ${nombre}`).toMatch(/\bh-11\b/);
+        expect(boton.className, `${verbo} ${nombre}`).toMatch(/\bw-11\b/);
+      }
+    }
+    expect(screen.getByRole("button", { name: /Nuevo Espacio/ }).className).toMatch(/\bh-11\b/);
+    for (const boton of screen.getAllByRole("button", { name: /Configurar Plano y Mesas/ })) {
+      expect(boton.className).toMatch(/\bh-11\b/);
+    }
+  });
+});

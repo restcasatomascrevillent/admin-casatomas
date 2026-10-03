@@ -292,7 +292,7 @@ function TablaTurno({
                         aria-label={`Elegir las ${f.hora}. ${f.enSala} en sala, ${f.llegan} llegan.${
                           fuera ? ` ${MOTIVO_ORIGEN[f.origen]}` : ""
                         }`}
-                        className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="rounded px-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:px-2 pointer-coarse:text-sm"
                       >
                         {etiqueta}
                       </button>

@@ -323,7 +323,7 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
             </Button>
             <div className="flex items-center gap-1.5 px-2 text-sm font-medium">
               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              {fechaSel}
+              {fechaSel.split("-").reverse().join("/")}
             </div>
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => cambiarDia(1)} aria-label="Día siguiente">
               <ChevronRight className="h-4 w-4" />

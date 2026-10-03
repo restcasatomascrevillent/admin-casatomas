@@ -47,8 +47,6 @@ export default function Reservas() {
   // como siempre. Ver `src/lib/reservas/saltoAsignacion.ts`.
   const [saltoAsignacion, setSaltoAsignacion] = useState<Omit<DestinoAsignacion, "espacioId"> | null>(null);
   const [activeTab, setActiveTab] = useState<string>("hoy");
-  const [tabsOverflow, setTabsOverflow] = useState(false);
-  const tabsContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { data: espacios } = useEspaciosReserva();
   const { role } = useUserRole();
@@ -114,37 +112,6 @@ export default function Reservas() {
     }, 150);
     return () => window.clearTimeout(t);
   }, [activeTab, hayPresetLista, statusFromUrl, dateFromUrl]);
-
-  useEffect(() => {
-    const el = tabsContainerRef.current;
-    if (!el) return;
-
-    const checkOverflow = () => {
-      // En móvil ya usamos el Select directamente.
-      if (window.innerWidth < 640) {
-        setTabsOverflow(false);
-        return;
-      }
-
-      setTabsOverflow(el.scrollWidth > el.clientWidth + 4);
-    };
-
-    checkOverflow();
-
-    const resizeObserver = new ResizeObserver(checkOverflow);
-    resizeObserver.observe(el);
-
-    const tabsList = el.firstElementChild;
-    if (tabsList instanceof HTMLElement) {
-      resizeObserver.observe(tabsList);
-    }
-
-    window.addEventListener("resize", checkOverflow);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", checkOverflow);
-    };
-  }, [isAdmin]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -264,8 +231,10 @@ export default function Reservas() {
               queda junto al botón — de eso vive `checkOverflow` para decidir si
               cambia al desplegable. Sin esto no encogerían nunca. */}
           <div className="flex-1 min-w-0">
-            {/* Muy estrecho: selector desplegable */}
-            <div className={tabsOverflow ? "block" : "sm:hidden"}>
+            {/* Muy estrecho (móvil): selector desplegable. En tablet las pestañas se quedan
+                visibles aunque no quepan todas (la fila hace scroll horizontal): para una
+                sección que se usa todo el día, dos toques por cambio de vista era peor. */}
+            <div className="sm:hidden">
               <Select value={activeTab} onValueChange={handleTabChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecciona vista" />
@@ -273,7 +242,7 @@ export default function Reservas() {
                 <SelectContent>
                   <SelectItem value="hoy">Hoy</SelectItem>
                   <SelectItem value="reservas">
-                    Lista de solicitudes de reserva{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
+                    Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
                   </SelectItem>
                   <SelectItem value="calendario">Calendario</SelectItem>
                   <SelectItem value="asignacion">Próximas reservas</SelectItem>
@@ -284,16 +253,11 @@ export default function Reservas() {
             </div>
 
             {/* Tablet/desktop: pestañas */}
-            <div
-              ref={tabsContainerRef}
-              className={`hidden sm:block overflow-x-auto no-scrollbar ${
-                tabsOverflow ? "sm:h-0 sm:overflow-hidden sm:opacity-0 sm:pointer-events-none" : ""
-              }`}
-            >
+            <div className="hidden sm:block scroll-x-touch no-scrollbar">
               <TabsList className="w-max min-w-max justify-start gap-1 p-1">
-                <TabsTrigger value="hoy" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Hoy</TabsTrigger>
-                <TabsTrigger value="reservas" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4 gap-1">
-                  Lista de solicitudes de reserva
+                <TabsTrigger value="hoy" className="flex-shrink-0 text-sm lg:text-base">Hoy</TabsTrigger>
+                <TabsTrigger value="reservas" className="flex-shrink-0 text-sm lg:text-base gap-1">
+                  Lista
                   {countPendientes > 0 && (
                     <span
                       className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
@@ -304,11 +268,11 @@ export default function Reservas() {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="calendario" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Calendario</TabsTrigger>
-                <TabsTrigger value="asignacion" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Próximas reservas</TabsTrigger>
-                <TabsTrigger value="blacklist" className="flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">Blacklist</TabsTrigger>
+                <TabsTrigger value="calendario" className="flex-shrink-0 text-sm lg:text-base">Calendario</TabsTrigger>
+                <TabsTrigger value="asignacion" className="flex-shrink-0 text-sm lg:text-base">Próximas reservas</TabsTrigger>
+                <TabsTrigger value="blacklist" className="flex-shrink-0 text-sm lg:text-base">Blacklist</TabsTrigger>
                 {isAdmin && (
-                  <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-xs md:text-sm lg:text-base px-2 md:px-3 lg:px-4">
+                  <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-sm lg:text-base">
                     <Settings className="h-4 w-4" />
                     <span className="hidden sm:inline">Configuración</span>
                     <span className="sm:hidden">Config</span>

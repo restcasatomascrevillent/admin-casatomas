@@ -203,7 +203,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={0}
                             max={1440}
                             className="w-24"
@@ -228,7 +228,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={1}
                             max={365}
                             className="w-24"
@@ -267,7 +267,7 @@ export function ConfiguracionGeneralReservas() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="number" inputMode="numeric"
                           min={1}
                           max={50}
                           className="w-24"
@@ -292,7 +292,7 @@ export function ConfiguracionGeneralReservas() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="number" inputMode="numeric"
                           min={1}
                           max={50}
                           className="w-24"
@@ -314,7 +314,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormLabel>Mínimo de comensales</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="number" inputMode="numeric"
                           min={1}
                           max={50}
                           className="w-24"
@@ -333,7 +333,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormLabel>Máximo de comensales</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="number" inputMode="numeric"
                           min={1}
                           max={100}
                           className="w-24"
@@ -434,7 +434,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={15}
                             max={480}
                             className="w-24"
@@ -462,7 +462,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={15}
                             max={480}
                             className="w-24"
@@ -490,7 +490,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="number" inputMode="numeric"
                             min={0}
                             max={180}
                             className="w-24"
@@ -595,7 +595,7 @@ function SeccionAsignacion({
                 <FormControl>
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
+                      type="number" inputMode="numeric"
                       min={VENTANA_HORAS_MIN}
                       max={VENTANA_HORAS_MAX}
                       step={1}

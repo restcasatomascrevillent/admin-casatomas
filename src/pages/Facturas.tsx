@@ -14,9 +14,9 @@ const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
   const [activeTab, setActiveTab] = useState<string>("documentos");
   const topTabClass =
-    "flex items-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 transition-colors hover:bg-background/70 hover:text-foreground data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary";
+    "flex min-h-11 items-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 transition-colors hover:bg-background/70 hover:text-foreground data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary";
   const docsTabClass =
-    "relative h-9 sm:h-10 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-colors hover:bg-muted/30 hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap";
+    "relative h-11 rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 pb-2 sm:pb-3 pt-2 font-semibold text-xs sm:text-sm text-muted-foreground shadow-none transition-colors hover:bg-muted/30 hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none whitespace-nowrap";
 
   // Contadores para los badges de las pestañas
   const { data: facturas } = useFacturas();
@@ -81,7 +81,7 @@ const Facturas = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-6rem)] space-y-2 sm:space-y-4">
+      <div className="flex flex-col h-[calc(100vh-6rem)] supports-[height:100dvh]:h-[calc(100dvh-6rem)] space-y-2 sm:space-y-4">
 
         <Tabs
           value={activeTab}
@@ -90,7 +90,7 @@ const Facturas = () => {
         >
           {/* Botonera de navegación superior */}
           <div className="shrink-0 mb-2 sm:mb-4 bg-card rounded-lg border border-border/50 shadow-sm p-1 w-full sm:inline-block sm:max-w-3xl">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-10 sm:h-11">
+            <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-11 sm:h-12">
               <TabsTrigger
                 value="documentos"
                 className={topTabClass}
@@ -133,7 +133,7 @@ const Facturas = () => {
               <div className="flex-1 bg-card rounded-xl border border-border/50 shadow-sm flex flex-col min-h-0 overflow-hidden">
                 <Tabs defaultValue="facturas" className="w-full flex-1 flex flex-col">
                   <div className="shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-0 bg-muted/5 border-b border-border/30">
-                    <TabsList className="flex h-9 sm:h-10 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
+                    <TabsList className="flex h-11 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
                       <TabsTrigger
                         value="facturas"
                         className={docsTabClass}

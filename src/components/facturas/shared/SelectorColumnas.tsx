@@ -40,7 +40,7 @@ export const SelectorColumnas = ({
         <Button
           variant="outline"
           size="sm"
-          className="gap-1.5 border-border/50 shadow-sm transition-colors hover:bg-muted/50"
+          className="h-11 gap-1.5 border-border/50 px-4 shadow-sm transition-colors hover:bg-muted/50"
         >
           <Settings2 className="h-4 w-4" />
           Columnas
@@ -51,7 +51,7 @@ export const SelectorColumnas = ({
         <p className="mb-3 mt-1 text-xs text-muted-foreground">
           Solo caben las que se puedan leer enteras. Para añadir otra, quita una antes.
         </p>
-        <div className="space-y-2">
+        <div className="space-y-0.5">
           {columnas.map((col) => {
             const activa = visibles[col.key] === true;
             const cabe = cabeColumna(visibles, col.key);
@@ -64,7 +64,7 @@ export const SelectorColumnas = ({
                     ? `"${col.label}" necesita ${PESOS[col.key] ?? 0} px y solo quedan ${libre} px. Quita otra columna primero.`
                     : undefined
                 }
-                className={`flex items-center gap-2 text-sm ${
+                className={`flex min-h-11 items-center gap-3 text-sm ${
                   bloqueada ? "cursor-not-allowed opacity-40" : "cursor-pointer"
                 }`}
               >

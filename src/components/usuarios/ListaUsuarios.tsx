@@ -330,7 +330,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
                     {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
                         <Dialog
                           open={selectedUser?.id === user.id}
@@ -340,13 +340,14 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                             <Button
                               variant="outline"
                               size="sm"
+                              className="h-11 px-4"
                               onClick={() => openPermissionsDialog(user)}
                             >
                               <Settings className="h-4 w-4 mr-1" />
                               Permisos
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
+                          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
                             <DialogHeader className="pr-6">
                               <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
                                 <Shield className="h-5 w-5" />
@@ -375,7 +376,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                   onValueChange={handlePresetChange}
                                   disabled={presetsLoading || !isSuperAdmin}
                                 >
-                                  <SelectTrigger className="w-full sm:w-[360px]">
+                                  <SelectTrigger className="h-11 w-full sm:w-[360px]">
                                     <SelectValue
                                       placeholder={presetsLoading ? "Cargando roles..." : "Sin rol preconfigurado"}
                                     />
@@ -390,7 +391,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="max-h-[52vh] overflow-y-auto pr-1">
+                              <div className="max-h-[52dvh] overflow-y-auto pr-1">
                                 <TablaPermisosSecciones
                                   permisos={editingPermissions}
                                   onCambiarVer={handleVerChange}
@@ -400,12 +401,13 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                                 />
                               </div>
                               <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                                <Button variant="outline" onClick={closePermissionsDialog}>
+                                <Button variant="outline" className="h-11 px-5" onClick={closePermissionsDialog}>
                                   Cancelar
                                 </Button>
-                                {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón. */}
+                                {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón.
+                                    (El motivo también está escrito arriba, en la tabla: con el dedo no hay hover.) */}
                                 <ConMotivo motivo={isSuperAdmin ? undefined : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS}>
-                                  <Button onClick={savePermissions} disabled={!isSuperAdmin} className="w-full sm:w-auto">
+                                  <Button onClick={savePermissions} disabled={!isSuperAdmin} className="h-11 w-full px-5 sm:w-auto">
                                     Guardar Permisos
                                   </Button>
                                 </ConMotivo>
@@ -418,6 +420,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-11 px-4"
                         onClick={() => openPasswordDialog(user)}
                       >
                         <Key className="h-4 w-4 mr-1" />
@@ -428,6 +431,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-11 px-4"
                         disabled={user.id === currentUser?.id}
                         title={
                           user.id === currentUser?.id
@@ -440,13 +444,19 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                         {user.is_super_admin ? "Quitar Super Admin" : "Hacer Super Admin"}
                       </Button>
                     )}
+                    {canManageSuperAdmins && user.id === currentUser?.id && (
+                      <p className="basis-full text-right text-xs text-muted-foreground">
+                        No puedes quitarte a ti mismo el acceso de super admin.
+                      </p>
+                    )}
                     {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-destructive hover:text-destructive"
+                        className="h-11 w-11 px-0 text-destructive hover:text-destructive"
                         disabled={user.id === currentUser?.id}
                         title={user.id === currentUser?.id ? "No puedes eliminar tu propio usuario" : undefined}
+                        aria-label={`Eliminar a ${getUserDisplayName(user)}`}
                         onClick={() => handleDeleteUser(user.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -492,10 +502,10 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={closePasswordDialog} disabled={updatingPassword}>
+              <Button variant="outline" className="h-11 px-5" onClick={closePasswordDialog} disabled={updatingPassword}>
                 Cancelar
               </Button>
-              <Button onClick={handleChangePassword} disabled={updatingPassword}>
+              <Button className="h-11 px-5" onClick={handleChangePassword} disabled={updatingPassword}>
                 {updatingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                 Actualizar contraseña
               </Button>

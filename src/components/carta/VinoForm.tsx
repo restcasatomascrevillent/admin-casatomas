@@ -190,7 +190,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Añadir Vino</DialogTitle>
           <DialogDescription>
@@ -242,7 +242,6 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                 ref={fileInputRef}
                 onChange={handleImageChange}
                 accept="image/*"
-                capture="environment"
                 className="hidden"
               />
               
@@ -257,7 +256,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 h-11 w-11"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
@@ -283,7 +282,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                 <FormItem>
                   <FormLabel>Precio (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -393,7 +392,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
             <div className="space-y-3">
               <FormLabel>Alérgenos</FormLabel>
 
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {ALERGENOS_OFICIALES.map((alergeno) => {
                   const isSelected = alergenosSeleccionados.includes(alergeno.id);
                   return (
@@ -402,7 +401,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                       type="button"
                       onClick={() => toggleAlergeno(alergeno.id)}
                       className={`
-                        flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium
+                        flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium
                         transition-all duration-200 border
                         ${isSelected
                           ? "bg-primary text-primary-foreground border-primary"
@@ -421,7 +420,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   value={nuevoAlergeno}
                   onChange={(e) => setNuevoAlergeno(e.target.value)}
                   placeholder="Añadir alérgeno personalizado..."
-                  className="flex-1"
+                  className="h-11 flex-1 text-base md:text-base"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -433,6 +432,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-11 w-11 shrink-0"
+                  aria-label="Añadir alérgeno"
                   onClick={addAlergenoPersonalizado}
                   disabled={!nuevoAlergeno.trim()}
                 >
@@ -444,14 +445,15 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
               {alergenosPersonalizados.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {alergenosPersonalizados.map((alergeno) => (
-                    <Badge key={alergeno} variant="secondary" className="gap-1 pr-1">
+                    <Badge key={alergeno} variant="secondary" className="gap-0 py-0 pl-3 pr-0 text-sm">
                       {alergeno}
                       <button
                         type="button"
                         onClick={() => removeAlergenoPersonalizado(alergeno)}
-                        className="ml-1 hover:text-destructive"
+                        className="flex h-11 w-11 items-center justify-center hover:text-destructive"
+                        aria-label={`Quitar ${alergeno}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </button>
                     </Badge>
                   ))}
@@ -481,11 +483,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
               <Button
                 type="button"
                 variant="outline"
+                className="h-11 px-5"
                 onClick={() => onOpenChange(false)}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={crearVino.isPending || isUploading}>
+              <Button type="submit" className="h-11 px-5" disabled={crearVino.isPending || isUploading}>
                 {crearVino.isPending || isUploading ? "Guardando..." : "Guardar Vino"}
               </Button>
             </div>

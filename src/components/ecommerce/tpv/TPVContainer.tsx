@@ -81,14 +81,16 @@ export function TPVContainer() {
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden">
       {/* Contenido principal */}
-      <div className="flex-1 flex gap-4 overflow-hidden">
+      {/* Por debajo de 1024 px (tablet vertical, con el menú lateral) los dos paneles
+          no caben en fila: productos arriba y carrito debajo. */}
+      <div className="flex-1 flex flex-col gap-4 overflow-hidden lg:flex-row">
         {/* Panel izquierdo: Productos */}
-        <div className="flex-1 border rounded-lg overflow-hidden bg-card">
+        <div className="min-h-0 flex-1 border rounded-lg overflow-hidden bg-card">
           <ProductoPicker onSelectProducto={addProducto} />
         </div>
 
         {/* Panel derecho: Carrito */}
-        <div className="w-[350px] lg:w-[400px] shrink-0">
+        <div className="h-[45%] min-h-0 shrink-0 lg:h-auto lg:w-[400px]">
           <CarritoTPV
             lineas={lineas}
             totales={totales}
@@ -102,7 +104,7 @@ export function TPVContainer() {
       </div>
 
       {/* Barra inferior */}
-      <div className="h-16 mt-4 flex items-center justify-between gap-4 px-4 bg-card border rounded-lg">
+      <div className="min-h-16 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 bg-card border rounded-lg">
         <div className="flex items-center gap-2 text-muted-foreground">
           <ShoppingCart className="h-5 w-5" />
           <span>
@@ -113,6 +115,7 @@ export function TPVContainer() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            className="h-12 px-5"
             onClick={cancelar}
             disabled={lineas.length === 0 || isProcessing}
           >
@@ -123,7 +126,7 @@ export function TPVContainer() {
             size="lg"
             onClick={handleCobrar}
             disabled={lineas.length === 0 || isProcessing}
-            className="min-w-[200px]"
+            className="h-12 min-w-[200px]"
           >
             <Receipt className="mr-2 h-5 w-5" />
             Cobrar {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(totales.total)}
@@ -142,7 +145,7 @@ export function TPVContainer() {
 
       {/* Dialog con ticket impreso */}
       <Dialog open={!!ticketData} onOpenChange={() => setTicketData(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[92dvh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5" />
@@ -166,11 +169,11 @@ export function TPVContainer() {
               </div>
 
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={handleImprimir}>
+                <Button variant="outline" className="h-11 flex-1" onClick={handleImprimir}>
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimir
                 </Button>
-                <Button className="flex-1" onClick={handleNuevoTicket}>
+                <Button className="h-11 flex-1" onClick={handleNuevoTicket}>
                   Nuevo Ticket
                 </Button>
               </div>

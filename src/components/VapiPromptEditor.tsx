@@ -96,25 +96,28 @@ export function VapiPromptEditor({ config }: { config: any }) {
                             Edita el comportamiento y la personalidad del asistente que recibe las llamadas.
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsConfigOpen(!isConfigOpen)}
-                            className={isConfigOpen ? "bg-slate-200" : ""}
+                            className={`h-11 w-11 px-0 ${isConfigOpen ? "bg-slate-200" : ""}`}
+                            aria-label="Configurar la URL del proxy VAPI"
+                            aria-expanded={isConfigOpen}
                         >
                             <Settings className="h-4 w-4 text-slate-500" />
                         </Button>
                         <Button
                             variant="outline"
                             size="sm"
+                            className="h-11 px-4"
                             onClick={() => loadPrompt(webhookUrl, config?.vapi_assistant_id)}
                             disabled={isLoading}
                         >
                             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                             Recargar
                         </Button>
-                        <Button size="sm" onClick={savePrompt} disabled={isSaving || !systemPrompt}>
+                        <Button size="sm" className="h-11 px-4" onClick={savePrompt} disabled={isSaving || !systemPrompt}>
                             <Save className="h-4 w-4 mr-2" />
                             {isSaving ? "Guardando..." : "Guardar Cerebro"}
                         </Button>
@@ -130,9 +133,13 @@ export function VapiPromptEditor({ config }: { config: any }) {
                                 value={webhookUrl}
                                 onChange={(e) => setWebhookUrl(e.target.value)}
                                 placeholder="https://restaurante-bot.vercel.app"
-                                className="bg-white"
+                                className="h-11 bg-white text-base md:text-base"
+                                type="url"
+                                inputMode="url"
+                                autoCapitalize="none"
+                                autoCorrect="off"
                             />
-                            <Button variant="secondary" onClick={() => loadPrompt(webhookUrl, config?.vapi_assistant_id)}>
+                            <Button variant="secondary" className="h-11 px-5" onClick={() => loadPrompt(webhookUrl, config?.vapi_assistant_id)}>
                                 Conectar
                             </Button>
                         </div>
@@ -144,7 +151,7 @@ export function VapiPromptEditor({ config }: { config: any }) {
                 <Textarea
                     value={systemPrompt}
                     onChange={(e) => setSystemPrompt(e.target.value)}
-                    className="min-h-[400px] border-0 rounded-none focus-visible:ring-0 font-mono text-sm leading-relaxed p-6 bg-slate-50/30 resize-y"
+                    className="min-h-[400px] border-0 rounded-none focus-visible:ring-0 font-mono text-base leading-relaxed p-6 bg-slate-50/30 resize-y"
                     placeholder={isLoading ? "Cargando instrucciones desde la IA..." : "Escribe las instrucciones detalladas del asistente aquí (Prompt de Sistema)..."}
                     disabled={isLoading}
                 />

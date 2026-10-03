@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
+import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
@@ -36,6 +37,12 @@ import SuperAdminBotWeb from "./pages/SuperAdminBotWeb";
 
 const queryClient = new QueryClient();
 
+/** Publica --vv-h/--vv-top/--vv-bottom (viewport visual, sin teclado) para diálogos y hojas en tablet. */
+function VisualViewportVars() {
+  useVisualViewportVars();
+  return null;
+}
+
 /**
  * Barrera de errores de nivel página: cada ruta tiene la suya, ligada al pathname,
  * de modo que un fallo en Facturas no se lleva por delante Reservas y al navegar
@@ -58,6 +65,7 @@ const paginaSuperAdmin = (contenido: ReactNode) => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <VisualViewportVars />
     <AuthProvider>
       <UserRoleProvider>
         <SuperAdminProvider>

@@ -1,5 +1,5 @@
-import { Check, Info, X } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Check, X } from "lucide-react";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import { cn } from "@/lib/utils";
 import { detectaInfoContacto } from "./constantesBot";
 
@@ -13,7 +13,7 @@ interface AvisoHorarioContactoProps {
 // Solo se comprueba el español: EN/FR se traducen automáticamente de él.
 // Antes era un Alert amarillo enorme encima de todo; ahora es una línea de
 // comprobación compacta pegada al campo al que se refiere, con la
-// explicación larga en un tooltip.
+// explicación larga en un popover (se abre con un toque).
 export function AvisoHorarioContacto({ texto }: AvisoHorarioContactoProps) {
   const deteccion = detectaInfoContacto(texto);
 
@@ -29,23 +29,12 @@ export function AvisoHorarioContacto({ texto }: AvisoHorarioContactoProps) {
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="flex items-center gap-1 text-xs font-medium">
             Información básica
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label="Por qué importa la información básica"
-                >
-                  <Info className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                Nada de esto viene programado en el bot: si un cliente pregunta "¿a qué hora abrís?" o "¿dónde
-                estáis?", solo responde bien si la respuesta está escrita aquí (se traduce sola a inglés y francés). Si no, dirá
-                que no lo sabe. Con las reservas igual: no puede reservar, solo remitir a llamar o escribir si se lo
-                indicas. La detección es automática y aproximada — revísalo tú.
-              </TooltipContent>
-            </Tooltip>
+            <AyudaPopover etiqueta="Por qué importa la información básica" className="ml-1">
+              Nada de esto viene programado en el bot: si un cliente pregunta "¿a qué hora abrís?" o "¿dónde
+              estáis?", solo responde bien si la respuesta está escrita aquí (se traduce sola a inglés y francés). Si no, dirá
+              que no lo sabe. Con las reservas igual: no puede reservar, solo remitir a llamar o escribir si se lo
+              indicas. La detección es automática y aproximada — revísalo tú.
+            </AyudaPopover>
           </span>
           <ul className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Información detectada en las instrucciones">
             {items.map((i) => (

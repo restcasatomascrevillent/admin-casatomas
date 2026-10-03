@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useUpdateProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import { TableRow, TableCell } from "@/components/ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
-import { Pencil, AlertCircle, Check } from "lucide-react";
+import { Pencil, AlertCircle, Check, X } from "lucide-react";
 import { formatCurrency } from "./formatters";
 
 export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isMobile?: boolean, allDocs: Factura[] }) => {
@@ -48,23 +48,23 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
     if (isEditing) {
       return (
         <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
-          <Input className="h-7 text-xs" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" />
+          <Input className="h-11 text-base md:text-base" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" aria-label="Nombre del producto" />
           <div className="flex gap-2">
-            <Input className="h-7 text-xs w-full" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-            <Input className="h-7 text-xs w-full" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
+            <Input className="h-11 w-full text-base md:text-base" type="number" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" aria-label="Cantidad" />
+            <Input className="h-11 w-full text-base md:text-base" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" aria-label="Unidad" />
           </div>
           <div className="flex gap-2 items-center">
-            <span className="w-12 text-muted-foreground">P. Unit:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+            <span className="w-14 shrink-0 text-sm text-muted-foreground">P. Unit:</span>
+            <Input className="h-11 w-full text-base md:text-base" type="number" inputMode="decimal" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} aria-label="Precio unitario" />
           </div>
           <div className="flex gap-2 items-center">
-            <span className="w-12 font-medium">Total:</span>
-            <Input className="h-7 text-xs w-full" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
+            <span className="w-14 shrink-0 text-sm font-medium">Total:</span>
+            <Input className="h-11 w-full text-base md:text-base" type="number" inputMode="decimal" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} aria-label="Total" />
           </div>
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium">⚠️ Anomalía: Precio disparado respecto al original</p>}
+          {showAnomalyWarning && <p className="text-xs text-red-500 font-medium">⚠️ Anomalía: Precio disparado respecto al original</p>}
           <div className="flex gap-2 mt-1 justify-end">
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setIsEditing(false)}>Cancelar</Button>
-            <Button size="sm" variant="default" className="h-7 text-xs" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
+            <Button size="sm" variant="ghost" className="h-11 px-4 text-sm" onClick={() => setIsEditing(false)}>Cancelar</Button>
+            <Button size="sm" variant="default" className="h-11 px-4 text-sm" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
           </div>
         </div>
       );
@@ -72,14 +72,15 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
 
     return (
       <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod hover:border-[hsl(38,59%,45%)/0.3] transition-colors">
-        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover/prod:opacity-100 bg-background/80 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(true)}>
-          <Pencil className="h-3 w-3 text-muted-foreground" />
+        {/* Siempre visible: antes solo aparecía al pasar el ratón y con el dedo no había forma de editar. */}
+        <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-11 w-11" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
+          <Pencil className="h-4 w-4 text-muted-foreground" />
         </Button>
-        <span className="font-medium text-foreground mb-1 pr-6">{p.producto_nombre}</span>
+        <span className="font-medium text-foreground mb-1 min-h-6 pr-11">{p.producto_nombre}</span>
         <div className="flex justify-between text-muted-foreground items-center">
           <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
           <div className="flex items-center gap-1.5">
-            {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+            {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
             <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
           </div>
         </div>
@@ -89,22 +90,46 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
 
   // Desktop View
   if (isEditing) {
+    // Una sola celda a todo el ancho con los campos en línea (y saltando de línea
+    // si no caben): la tabla del desglose es `table-fixed` y meter ahí inputs de
+    // 44 px de alto más dos botones en columnas de ~100 px los desbordaba.
+    const campo = (etiqueta: string, control: ReactNode, clases = "") => (
+      <label className={`flex flex-col gap-1 text-xs text-muted-foreground ${clases}`}>
+        {etiqueta}
+        {control}
+      </label>
+    );
     return (
       <TableRow className="bg-muted/30">
-        <TableCell className="py-2">
-          <Input className="h-7 text-xs max-w-[200px]" value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          {showAnomalyWarning && <p className="text-[10px] text-red-500 font-medium mt-1">⚠️ Precio anómalo vs historial</p>}
-        </TableCell>
-        <TableCell className="py-2 text-right opacity-100 flex justify-end gap-1">
-          <Input className="h-7 text-xs w-16 text-right" type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" />
-          <Input className="h-7 text-xs w-16" value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Unidad" />
-        </TableCell>
-        <TableCell className="py-2 text-right">
-          <Input className="h-7 text-xs text-right w-20 ml-auto" type="number" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
-        </TableCell>
-        <TableCell className="py-2 text-right flex justify-end gap-1 items-center">
-          <Input className="h-7 text-xs text-right w-20" type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          <Button size="icon" className="h-7 w-7 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending}><Check className="h-3.5 w-3.5" /></Button>
+        <TableCell colSpan={4} className="py-2">
+          <div className="flex flex-wrap items-end gap-2">
+            {campo(
+              "Producto",
+              <Input className="h-11 text-base md:text-base" value={nombre} onChange={(e) => setNombre(e.target.value)} />,
+              "min-w-[10rem] flex-1",
+            )}
+            {campo(
+              "Cant.",
+              <Input className="h-11 w-20 text-right text-base md:text-base" type="number" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />,
+            )}
+            {campo(
+              "Unidad",
+              <Input className="h-11 w-24 text-base md:text-base" value={unidad} onChange={(e) => setUnidad(e.target.value)} />,
+            )}
+            {campo(
+              "P. unitario",
+              <Input className="h-11 w-28 text-right text-base md:text-base" type="number" inputMode="decimal" step="0.01" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />,
+            )}
+            {campo(
+              "Total",
+              <Input className="h-11 w-28 text-right text-base md:text-base" type="number" inputMode="decimal" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />,
+            )}
+            <div className="flex gap-1">
+              <Button size="icon" className="h-11 w-11 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending} aria-label="Guardar producto"><Check className="h-4 w-4" /></Button>
+              <Button size="icon" className="h-11 w-11 shrink-0" variant="ghost" onClick={() => setIsEditing(false)} aria-label="Cancelar edición"><X className="h-4 w-4" /></Button>
+            </div>
+          </div>
+          {showAnomalyWarning && <p className="text-xs text-red-500 font-medium mt-1">⚠️ Precio anómalo vs historial</p>}
         </TableCell>
       </TableRow>
     );
@@ -119,8 +144,8 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
           segundo scroll horizontal dentro de la fila desplegada. */}
       <TableCell className="py-2.5 font-medium">
         <div className="flex min-w-0 items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 shrink-0 group-hover/prod:opacity-100 transition-opacity" onClick={() => setIsEditing(true)}>
-            <Pencil className="h-3 w-3" />
+          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
+            <Pencil className="h-4 w-4" />
           </Button>
           <span className="truncate" title={p.producto_nombre}>{p.producto_nombre}</span>
         </div>
@@ -131,7 +156,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <TooltipProvider><Tooltip><TooltipTrigger><AlertCircle className="h-3.5 w-3.5 text-orange-500" /></TooltipTrigger><TooltipContent>Anomalía: Media histórica {formatCurrency(avgPrice!)}</TooltipContent></Tooltip></TooltipProvider>}
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
           <span>{formatCurrency(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>

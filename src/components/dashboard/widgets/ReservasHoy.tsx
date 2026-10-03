@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock, SquarePen } from "lucide-react";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
+import { useIsCompactNav } from "@/hooks/use-mobile";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +55,9 @@ const getStatusColor = (p: number) => {
 
 export function ReservasHoy() {
   const navigate = useNavigate();
+  // En tablet vertical / móvil (< 1024px) la campana ya está en la barra superior de
+  // DashboardLayout: aquí no se monta una segunda (doble suscripción realtime).
+  const navCompacta = useIsCompactNav();
   // Editar una reserva desde el popup de notas (2026-09-30). El popup pasa a ser
   // controlado para poder cerrarlo al abrir el editor (dos diálogos uno encima
   // de otro no se entienden). Hooks ANTES del `return` de error de más abajo.
@@ -147,10 +152,15 @@ export function ReservasHoy() {
           {reservasConNotas.length > 0 && (
             <Dialog open={notasAbiertas} onOpenChange={setNotasAbiertas}>
               <DialogTrigger asChild>
-                <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-secondary/80 transition-colors">
+                {/* Un <button> real (antes un <div> de Badge): enfocable, con área pulsable de 44px en táctil. */}
+                <button
+                  type="button"
+                  aria-label={`Ver notas y peticiones especiales (${reservasConNotas.length})`}
+                  className={cn(badgeVariants({ variant: "secondary" }), "touch-hit gap-1 cursor-pointer hover:bg-secondary/80 active:bg-secondary/70 transition-colors")}
+                >
                   <MessageSquare className="h-3 w-3" />
                   {reservasConNotas.length}
-                </Badge>
+                </button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -213,7 +223,7 @@ export function ReservasHoy() {
           {/* La campana vivía en la cabecera del menú lateral (AppSidebar.tsx);
               se mudó aquí para que el cubierto decorativo del sidebar pudiera
               volver, a petición del dueño. */}
-          <CentroNotificaciones className="h-7 w-7" />
+          {!navCompacta && <CentroNotificaciones className="h-7 w-7" />}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -223,7 +233,7 @@ export function ReservasHoy() {
             <div className="flex items-center justify-between mb-1.5 gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`text-2xl font-bold ${colors.text}`}>{porcentaje}%</span>
-                <Badge variant="outline" className={`${colors.text} border-current text-[10px]`}>
+                <Badge variant="outline" className={`${colors.text} border-current text-xs`}>
                   {colors.label}
                 </Badge>
               </div>
@@ -238,7 +248,7 @@ export function ReservasHoy() {
               />
             </div>
           </div>
-          <p className="text-[10px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {reservasActivas.length} reservas activas ({comensalesActivos} pax, sin canceladas) = {numConfirmadas} confirmadas
             + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
           </p>
@@ -250,13 +260,13 @@ export function ReservasHoy() {
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
               <Utensils className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
               <span className="text-xs sm:text-sm font-medium">Comida</span>
-              {horaActual < 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
+              {horaActual < 17 && <Badge variant="default" className="text-xs px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
               <span className="text-xl sm:text-2xl font-bold">{reservasComida.length}</span>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
+              <span className="text-xs text-muted-foreground">reservas</span>
             </div>
-            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 sm:mt-1">
               <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               {comensalesComida} comensales
             </div>
@@ -266,13 +276,13 @@ export function ReservasHoy() {
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
               <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
               <span className="text-xs sm:text-sm font-medium">Cena</span>
-              {horaActual >= 17 && <Badge variant="default" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0">Ahora</Badge>}
+              {horaActual >= 17 && <Badge variant="default" className="text-xs px-1 sm:px-1.5 py-0">Ahora</Badge>}
             </div>
             <div className="flex items-baseline gap-1.5 sm:gap-2">
               <span className="text-xl sm:text-2xl font-bold">{reservasCena.length}</span>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">reservas</span>
+              <span className="text-xs text-muted-foreground">reservas</span>
             </div>
-            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 sm:mt-1">
               <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               {comensalesCena} comensales
             </div>
@@ -283,18 +293,26 @@ export function ReservasHoy() {
         <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
           <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
             <div className="text-lg sm:text-2xl font-bold text-primary">{reservasActivas.length}</div>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Activas</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Activas</p>
           </div>
           <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
             <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas}</div>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Confirmadas</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Confirmadas</p>
           </div>
           <div
-            className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 transition-colors"
+            role="link"
+            tabIndex={0}
+            className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 active:bg-amber-500/20 transition-colors"
             onClick={() => navigate('/reservas?tab=reservas&status=pendiente&date=today')}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate('/reservas?tab=reservas&status=pendiente&date=today');
+              }
+            }}
           >
             <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Pendientes</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Pendientes</p>
           </div>
           {proximaReserva ? (
             <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
@@ -302,12 +320,12 @@ export function ReservasHoy() {
                 <Clock className="h-3 w-3 text-muted-foreground" />
               </div>
               <div className="text-lg sm:text-xl font-bold">{proximaReserva.hora.slice(0, 5)}</div>
-              <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Próxima</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Próxima</p>
             </div>
           ) : (
             <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
               <div className="text-lg sm:text-2xl font-bold text-muted-foreground">—</div>
-              <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">Próxima</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Próxima</p>
             </div>
           )}
         </div>

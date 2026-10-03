@@ -42,8 +42,9 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
       {/* Body: área a pantalla completa con las dos sub-columnas (Historial / Chat) */}
       <div className="flex-1 flex min-h-0 bg-background border border-border/50 rounded-lg overflow-hidden shadow-sm">
 
-        {/* Panel lateral conversaciones — solo visible en desktop */}
-        <div className="w-64 shrink-0 hidden md:block border-r border-border/60 bg-muted/10">
+        {/* Panel lateral conversaciones — solo desde 1280 px. Entre 768 y 1279 px el menú de la
+            app ya se lleva 16rem y un segundo panel de 16rem dejaba ~200 px al chat. */}
+        <div className="w-64 shrink-0 hidden xl:block border-r border-border/60 bg-muted/10">
           <ConversacionesList
             conversaciones={conversaciones}
             conversacionActiva={conversacionActiva}
@@ -57,18 +58,18 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
         <div className="flex-1 flex flex-col min-h-0">
 
           {/* Barra superior móvil con botón de historial (Sheet drawer) */}
-          <div className="flex md:hidden items-center gap-2 px-3 pt-2 pb-1 shrink-0 border-b border-border/40">
+          <div className="flex xl:hidden items-center gap-2 px-3 py-1 shrink-0 border-b border-border/40">
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-8"
+                  className="gap-1.5 text-sm text-muted-foreground hover:text-foreground h-11"
                 >
                   <History className="h-4 w-4" />
                   Historial
                   {conversaciones.length > 0 && (
-                    <span className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold px-1.5 py-0.5 leading-none">
+                    <span className="rounded-full bg-muted text-muted-foreground text-xs font-semibold px-2 py-0.5 leading-none">
                       {conversaciones.length}
                     </span>
                   )}

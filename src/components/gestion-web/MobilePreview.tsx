@@ -117,7 +117,7 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
             value={i.value}
             aria-label={i.nombre}
             title={i.nombre}
-            className="h-7 px-3 text-xs font-semibold text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+            className="h-11 min-w-11 px-4 text-sm font-semibold text-muted-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
           >
             {i.label}
           </ToggleGroupItem>

@@ -247,7 +247,7 @@ export function ElegirMesaDialog({ reserva, fecha, espacioId, espacioNombre, onC
             <Button
               type="button"
               variant={conMesa ? "default" : "outline"}
-              className="h-11 w-full shrink-0 touch-manipulation sm:h-9 sm:w-auto"
+              className="h-11 w-full shrink-0 touch-manipulation sm:w-auto sm:min-w-[7rem]"
               onClick={cerrar}
             >
               {conMesa ? "Listo" : "Ahora no"}

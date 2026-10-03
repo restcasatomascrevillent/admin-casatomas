@@ -588,7 +588,7 @@ function OpcionesSala({
                 disabled={actual}
                 aria-current={actual ? "true" : undefined}
                 onClick={() => onElegir(sala.id)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted pointer-coarse:min-h-11 disabled:cursor-default disabled:hover:bg-transparent"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
                   {actual ? <Check className="h-4 w-4 text-primary" aria-hidden="true" /> : <span className="w-4" />}

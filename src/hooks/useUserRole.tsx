@@ -56,6 +56,12 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<UserPermissions[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Se depende de valores primitivos (id, email), NO del objeto `user`:
+  // supabase-js re-emite SIGNED_IN / TOKEN_REFRESHED al volver a la app y eso
+  // no debe relanzar la consulta ni poner loading=true (desmontaría la página
+  // protegida, con sus formularios y diálogos). Un usuario distinto sí cambia
+  // el id y recarga rol y permisos.
+  const userId = user?.id ?? null;
   const isSuperAdminUser = checkIsSuperAdmin(user?.email);
 
   useEffect(() => {
@@ -69,12 +75,19 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     // "página y luego spinner" era exactamente esta carrera.
     if (authLoading) return;
 
-    if (!user) {
+    if (!userId) {
       setRole(null);
       setPermissions([]);
       setLoading(false);
       return;
     }
+
+    let isMounted = true;
+
+    // Este efecto solo corre al cargar o al cambiar de usuario (nunca en un
+    // refresco de token), así que es seguro descartar lo del usuario anterior.
+    setRole(null);
+    setPermissions([]);
 
     // Si es super admin, acceso inmediato
     if (isSuperAdminUser) {
@@ -91,8 +104,9 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         const { data: roleData } = await supabase
           .from("user_roles")
           .select("role")
-          .eq("user_id", user.id)
+          .eq("user_id", userId)
           .single();
+        if (!isMounted) return;
 
         if (roleData) {
           setRole(roleData.role as AppRole);
@@ -104,7 +118,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         const { data: permData } = await supabase
           .from("user_permissions")
           .select("section_key, can_view, can_edit")
-          .eq("user_id", user.id);
+          .eq("user_id", userId);
+        if (!isMounted) return;
 
         if (permData) {
           setPermissions(permData);
@@ -112,12 +127,16 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error("Error fetching role/permissions:", error);
       } finally {
-        if (!isSuperAdminUser) setLoading(false);
+        if (isMounted && !isSuperAdminUser) setLoading(false);
       }
     };
 
     fetchRoleAndPermissions();
-  }, [user, authLoading, isSuperAdminUser]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, authLoading, isSuperAdminUser]);
 
   const isAdmin = role === "admin" || isSuperAdminUser;
 

@@ -293,7 +293,7 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
                   <FormLabel>Capacidad máxima</FormLabel>
                   <FormControl>
                     <Input
-                      type="number"
+                      type="number" inputMode="numeric"
                       min="1"
                       max="500"
                       disabled={guardando}

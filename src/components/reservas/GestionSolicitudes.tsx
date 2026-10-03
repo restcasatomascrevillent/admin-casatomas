@@ -120,7 +120,7 @@ export function SolicitudCard({
           {solicitud.telefono && (
             <span className="flex items-center gap-1 text-muted-foreground">
               <Phone className="h-3 w-3" />
-              <a href={`tel:${solicitud.telefono}`} className="hover:underline">
+              <a href={`tel:${solicitud.telefono}`} className="hover:underline touch-target-y inline-flex items-center">
                 {solicitud.telefono}
               </a>
             </span>
@@ -301,7 +301,7 @@ export function SolicitudCard({
             {solicitud.telefono && (
               <a
                 href={`tel:${solicitud.telefono}`}
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                className="touch-target-y inline-flex items-center gap-1 text-xs text-primary hover:underline pointer-coarse:text-sm"
               >
                 <Phone className="h-3 w-3" />
                 Llamar al {solicitud.telefono}

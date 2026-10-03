@@ -29,7 +29,7 @@ export function CampoColorMarca({ id, etiqueta, valor, onChange, disabled }: Cam
           value={esValido ? valor : "#000000"}
           onChange={(e) => onChange(e.target.value.toUpperCase())}
           disabled={disabled}
-          className="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-11 w-14 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Input
           id={id}
@@ -38,7 +38,10 @@ export function CampoColorMarca({ id, etiqueta, valor, onChange, disabled }: Cam
           readOnly={disabled}
           placeholder="#RRGGBB"
           maxLength={7}
-          className="font-mono uppercase"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          className="h-11 font-mono uppercase text-base md:text-base"
         />
       </div>
       {!esValido && <p className="text-xs text-destructive">Tiene que ser un color hexadecimal de 6 dígitos, p.ej. #B8936A.</p>}

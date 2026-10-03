@@ -217,7 +217,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Ajuste Masivo de Precios</DialogTitle>
           <DialogDescription>
@@ -233,7 +233,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
               setCategoriaSeleccionada("todas");
               setItemSeleccionado("todos");
             }}>
-              <SelectTrigger id="tipo-carta">
+              <SelectTrigger id="tipo-carta" className="h-11">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -250,7 +250,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
               setCategoriaSeleccionada(value);
               setItemSeleccionado("todos");
             }}>
-              <SelectTrigger id="categoria">
+              <SelectTrigger id="categoria" className="h-11">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -268,7 +268,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
             <div className="space-y-2">
               <Label htmlFor="item">Item a Modificar</Label>
               <Select value={itemSeleccionado} onValueChange={setItemSeleccionado}>
-                <SelectTrigger id="item">
+                <SelectTrigger id="item" className="h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -290,12 +290,13 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
                 <Input
                   id="precio-exacto"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   placeholder="Ej: 12.50"
                   value={precioExacto}
                   onChange={(e) => setPrecioExacto(e.target.value)}
-                  className="pr-8"
+                  className="h-11 pr-8 text-base md:text-base"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   €
@@ -316,7 +317,7 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
                   placeholder="Ej: 5 para subir 5%, -10 para bajar 10%"
                   value={porcentaje}
                   onChange={(e) => setPorcentaje(e.target.value)}
-                  className="pr-10"
+                  className="h-11 pr-10 text-base md:text-base"
                 />
                 <Percent className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
@@ -327,21 +328,22 @@ export function AjustePreciosModal({ open, onOpenChange }: AjustePreciosModalPro
           )}
         </div>
 
-        <div className="flex justify-between items-center gap-3">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <Button 
             variant="outline" 
             onClick={() => setHistorialOpen(true)}
-            className="gap-2"
+            className="h-11 gap-2 px-4"
           >
             <History className="h-4 w-4" />
             Ver Historial
           </Button>
           
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" className="h-11 px-4" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
             <Button 
+              className="h-11 px-4"
               onClick={handleAplicar} 
               disabled={esEdicionIndividual ? !precioExacto : !porcentaje}
             >

@@ -44,7 +44,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -221,32 +220,27 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
     // «Foto». Con el gris tenue de antes nadie adivinaba que se podía pulsar.
     return (
       <>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              ref={botonRef}
-              type="button"
-              onClick={elegirArchivo}
-              disabled={subiendo}
-              aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Subir foto de ${nombre}`}
-              aria-busy={subiendo}
-              data-testid="boton-subir-foto"
-              className={`${HUECO_FOTO} flex-col gap-0.5 border-dashed border-primary/50 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10`}
-            >
-              {subiendo ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <>
-                  <Camera className="h-4 w-4" aria-hidden="true" />
-                  <span className="text-[10px] font-medium leading-none" aria-hidden="true">
-                    Foto
-                  </span>
-                </>
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{subiendo ? "Subiendo foto..." : "Subir foto"}</TooltipContent>
-        </Tooltip>
+        <button
+          ref={botonRef}
+          type="button"
+          onClick={elegirArchivo}
+          disabled={subiendo}
+          aria-label={subiendo ? `Subiendo foto de ${nombre}` : `Subir foto de ${nombre}`}
+          aria-busy={subiendo}
+          data-testid="boton-subir-foto"
+          className={`${HUECO_FOTO} flex-col gap-0.5 border-dashed border-primary/50 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10`}
+        >
+          {subiendo ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <>
+              <Camera className="h-4 w-4" aria-hidden="true" />
+              <span className="text-[10px] font-medium leading-none" aria-hidden="true">
+                Foto
+              </span>
+            </>
+          )}
+        </button>
         {input}
       </>
     );
@@ -281,11 +275,11 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem onSelect={elegirArchivo}>
+          <DropdownMenuItem onSelect={elegirArchivo} className="min-h-11 text-base md:text-sm">
             <ImagePlus className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
             Cambiar foto
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={quitarFoto} className="text-destructive focus:text-destructive">
+          <DropdownMenuItem onSelect={quitarFoto} className="min-h-11 text-base text-destructive focus:text-destructive md:text-sm">
             <Trash2 className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
             Quitar foto
           </DropdownMenuItem>
@@ -341,15 +335,18 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          className="h-11 gap-1.5 px-3 text-xs"
           aria-label={`Alérgenos de ${item.nombre || "este plato"}`}
-          title="Alérgenos"
         >
-          <Pencil className="h-3.5 w-3.5" />
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+          Alérgenos
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[var(--radix-popover-content-available-height)] space-y-3 overflow-y-auto"
+      >
         <div>
           <p className="text-sm font-medium leading-none">Alérgenos</p>
           <p className="text-xs text-muted-foreground mt-1 truncate">{item.nombre || "Sin nombre"}</p>
@@ -364,7 +361,7 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
                 type="button"
                 aria-pressed={marcado}
                 onClick={() => alternar(alergeno.id)}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border transition-colors text-left ${
+                className={`flex min-h-11 items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-colors text-left ${
                   marcado
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
@@ -386,7 +383,7 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
               value={nuevo}
               onChange={(e) => setNuevo(e.target.value)}
               placeholder="Ej: marisco"
-              className="h-8 text-sm"
+              className="h-11 text-base md:text-base"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -394,17 +391,22 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
                 }
               }}
             />
-            <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={añadirPersonalizado} disabled={!nuevo.trim()} aria-label="Añadir alérgeno">
+            <Button type="button" variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={añadirPersonalizado} disabled={!nuevo.trim()} aria-label="Añadir alérgeno">
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
           {personalizados.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
               {personalizados.map((a) => (
-                <span key={a} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs">
+                <span key={a} className="inline-flex items-center rounded-full bg-secondary pl-3 text-sm">
                   {a}
-                  <button type="button" onClick={() => quitar(a)} className="hover:text-destructive" aria-label={`Quitar ${a}`}>
-                    <X className="h-3 w-3" />
+                  <button
+                    type="button"
+                    onClick={() => quitar(a)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full hover:text-destructive"
+                    aria-label={`Quitar ${a}`}
+                  >
+                    <X className="h-4 w-4" />
                   </button>
                 </span>
               ))}
@@ -462,7 +464,7 @@ function SelectorPlato({ platos, cargando, onElegir }: SelectorPlatoProps) {
   return (
     <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="h-8">
+        <Button type="button" variant="outline" size="sm" className="h-11 px-4">
           <Search className="h-3.5 w-3.5 mr-1.5" />
           De la carta
         </Button>
@@ -484,7 +486,7 @@ function SelectorPlato({ platos, cargando, onElegir }: SelectorPlatoProps) {
                     onElegir(plato);
                     setAbierto(false);
                   }}
-                  className="gap-2.5 items-start"
+                  className="min-h-11 gap-2.5 items-start"
                 >
                   {plato.imagen_url ? (
                     <img
@@ -544,7 +546,7 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
   };
 
   return (
-    <li className="flex items-start gap-2.5 rounded-lg border bg-card p-2">
+    <li className="flex flex-wrap items-start gap-x-2.5 gap-y-1 rounded-lg border bg-card p-2">
       {/* La foto de un plato de la carta ES la de la carta: no se toca aquí. */}
       {item.origen === "libre" ? (
         <FotoPlatoLibre
@@ -557,17 +559,17 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         <Miniatura item={item} />
       )}
 
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="min-w-[8rem] flex-1 space-y-1">
         {item.origen === "libre" ? (
           <Input
             value={item.nombre}
             onChange={(e) => onCambiar({ ...item, nombre: e.target.value })}
             placeholder="Nombre del plato"
             aria-label={`Nombre del plato ${indice + 1}`}
-            className="h-8 text-sm"
+            className="h-11 text-base md:text-base"
           />
         ) : (
-          <p className="text-sm font-medium leading-tight truncate" title={item.nombre}>
+          <p className="min-h-11 py-2.5 text-sm font-medium leading-tight">
             {item.nombre}
           </p>
         )}
@@ -593,7 +595,7 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         {/* Un plato copiado no cambia solo: el aviso deja la decisión en manos
             de quien edita, que es justo lo que se quiere de un menú publicado. */}
         {desaparecido && (
-          <p className="text-[11px] text-amber-600 dark:text-amber-500 flex items-center gap-1">
+          <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
             <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
             Ya no está en la carta. El menú conserva la copia.
           </p>
@@ -602,11 +604,11 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
             El texto no presume cuál de las dos: solo constata que difieren. */}
         {desactualizado && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
               <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
               No coincide con la carta.
             </p>
-            <Button type="button" variant="link" size="sm" className="h-auto p-0 text-[11px]" onClick={actualizarDesdeLaCarta}>
+            <Button type="button" variant="link" size="sm" className="h-11 px-2 text-xs" onClick={actualizarDesdeLaCarta}>
               <RefreshCw className="h-3 w-3 mr-1" />
               Traer de la carta
             </Button>
@@ -614,33 +616,31 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         )}
       </div>
 
-      <div className="flex shrink-0 items-center">
-        <div className="flex flex-col">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-4 w-7"
-            disabled={indice === 0}
-            onClick={() => onMover(-1)}
-            aria-label="Subir"
-            title="Subir"
-          >
-            <ChevronUp className="h-3 w-3" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-4 w-7"
-            disabled={indice === total - 1}
-            onClick={() => onMover(1)}
-            aria-label="Bajar"
-            title="Bajar"
-          >
-            <ChevronDown className="h-3 w-3" />
-          </Button>
-        </div>
+      {/* Si no cabe junto al nombre, los botones pasan a una segunda línea
+          (en vez de aplastar el nombre). Cada uno mide 44x44, también en táctil. */}
+      <div className="ml-auto flex shrink-0 items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          disabled={indice === 0}
+          onClick={() => onMover(-1)}
+          aria-label="Subir"
+        >
+          <ChevronUp className="h-5 w-5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11"
+          disabled={indice === total - 1}
+          onClick={() => onMover(1)}
+          aria-label="Bajar"
+        >
+          <ChevronDown className="h-5 w-5" />
+        </Button>
 
         <EditorAlergenos item={item} onChange={(alergenos) => onCambiar({ ...item, alergenos })} />
 
@@ -648,12 +648,11 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-destructive hover:text-destructive"
+          className="h-11 w-11 text-destructive hover:text-destructive"
           onClick={onQuitar}
           aria-label={`Quitar ${item.nombre || "plato"}`}
-          title="Quitar"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     </li>
@@ -703,7 +702,7 @@ export function EditorSeccionesMenu({
   // contenido (min/max-content), la base se calcula sin él y las secciones
   // pueden acabar en fila, más anchas que la pantalla.
   return (
-    <TooltipProvider delayDuration={300}>
+    <>
       <div className={CONTENEDOR_SECCIONES} data-testid="contenedor-secciones-menu">
         <div className={REJILLA_SECCIONES}>
           {SECCIONES_MENU.map((seccion) => {
@@ -722,16 +721,9 @@ export function EditorSeccionesMenu({
               >
                 <header className="flex items-center justify-between gap-2">
                   <h4 className="text-sm font-semibold">{ETIQUETA_SECCION[seccion]}</h4>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs text-muted-foreground tabular-nums cursor-default">
-                        {items.length}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {items.length === 1 ? "1 plato" : `${items.length} platos`}
-                    </TooltipContent>
-                  </Tooltip>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {items.length === 1 ? "1 plato" : `${items.length} platos`}
+                  </span>
                 </header>
 
                 {items.length === 0 ? (
@@ -768,7 +760,7 @@ export function EditorSeccionesMenu({
 
                 <div className="flex flex-wrap gap-2">
                   <SelectorPlato platos={platos} cargando={cargandoPlatos} onElegir={añadirDeCarta} />
-                  <Button type="button" variant="ghost" size="sm" className="h-8" onClick={añadirAMano}>
+                  <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={añadirAMano}>
                     <Plus className="h-3.5 w-3.5 mr-1.5" />
                     A mano
                   </Button>
@@ -778,6 +770,6 @@ export function EditorSeccionesMenu({
           })}
         </div>
       </div>
-    </TooltipProvider>
+    </>
   );
 }

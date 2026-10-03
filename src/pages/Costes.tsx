@@ -64,7 +64,7 @@ function FiltrosCostes({ dias, onDiasChange, funcion, onFuncionChange, funciones
           className="justify-start"
         >
           {RANGOS_DIAS.map((d) => (
-            <ToggleGroupItem key={d} value={String(d)} className="px-3 text-sm">
+            <ToggleGroupItem key={d} value={String(d)} className="min-h-11 px-4 text-sm">
               {d} días
             </ToggleGroupItem>
           ))}
@@ -75,7 +75,7 @@ function FiltrosCostes({ dias, onDiasChange, funcion, onFuncionChange, funciones
           Función
         </Label>
         <Select value={funcion} onValueChange={onFuncionChange}>
-          <SelectTrigger id="costes-funcion" className="w-full sm:w-[260px]">
+          <SelectTrigger id="costes-funcion" className="h-11 w-full sm:w-[260px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

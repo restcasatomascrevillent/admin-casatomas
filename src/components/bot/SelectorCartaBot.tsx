@@ -43,7 +43,7 @@ export function SelectorCartaBot({
           {seleccionados.map((nombre) => (
             <li
               key={nombre}
-              className="inline-flex max-w-full items-center gap-1 rounded-full border border-primary/20 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary"
+              className="inline-flex max-w-full items-center rounded-full border border-primary/20 bg-primary/10 pl-3 text-sm font-medium text-primary"
             >
               <span className="truncate">{nombre}</span>
               {canEdit && (
@@ -51,9 +51,9 @@ export function SelectorCartaBot({
                   type="button"
                   onClick={() => onToggle(nombre)}
                   aria-label={`Quitar ${nombre}`}
-                  className="rounded-full p-0.5 hover:bg-primary/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-primary/15 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <X className="h-3 w-3" aria-hidden="true" />
+                  <X className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
             </li>
@@ -71,7 +71,7 @@ export function SelectorCartaBot({
           autoComplete="off"
           value={buscar}
           onChange={(e) => onBuscarChange(e.target.value)}
-          className="h-9 pl-9"
+          className="h-11 pl-9"
         />
       </div>
 
@@ -85,14 +85,14 @@ export function SelectorCartaBot({
         ) : (
           categorias.map(([cat, items]) => (
             <div key={cat}>
-              <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{cat}</p>
+              <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cat}</p>
               <div className="space-y-0.5">
                 {items.map((item) => {
                   const nombre = item.nombre || "";
                   return (
                     <label
                       key={item.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
+                      className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50"
                     >
                       <Checkbox
                         checked={seleccionados.includes(nombre)}

@@ -91,7 +91,7 @@ function CampoInput({ id, etiqueta, valor, onChange, disabled, opcional, ayuda }
         </Label>
         {!disabled && <SelectorVariable targetRef={ref} valor={valor} onChange={onChange} />}
       </div>
-      <Input id={id} ref={ref} value={valor} onChange={(e) => onChange(e.target.value)} readOnly={disabled} />
+      <Input id={id} ref={ref} value={valor} onChange={(e) => onChange(e.target.value)} readOnly={disabled} className="h-11 text-base md:text-base" />
       {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
     </div>
   );
@@ -108,7 +108,7 @@ function CampoTextarea({ id, etiqueta, valor, onChange, disabled, opcional, ayud
         </Label>
         {!disabled && <SelectorVariable targetRef={ref} valor={valor} onChange={onChange} />}
       </div>
-      <Textarea id={id} ref={ref} value={valor} onChange={(e) => onChange(e.target.value)} readOnly={disabled} rows={5} />
+      <Textarea id={id} ref={ref} value={valor} onChange={(e) => onChange(e.target.value)} readOnly={disabled} rows={5} className="text-base md:text-base" />
       {ayuda && <p className="text-xs text-muted-foreground">{ayuda}</p>}
     </div>
   );
@@ -137,6 +137,10 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
   // Cerrada por defecto: la marca (colores + logo) se configura una vez y
   // no debería competir por espacio con el contenido, que se edita a diario.
   const [marcaAbierta, setMarcaAbierta] = useState(false);
+  // Por debajo de 1280 px la vista previa no cabe al lado del formulario (con el
+  // menú lateral quedan ~430 px para el formulario y ~280 para la vista): va en un
+  // desplegable encima del formulario, cerrado por defecto.
+  const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false);
 
   // Se re-sincroniza SOLO cuando cambia de verdad la versión actual cargada
   // (carga inicial, guardado nuevo o restauración) — nunca en cada tecla que
@@ -224,10 +228,24 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
         largo interesa que la vista previa quede pegada en una región propia
         acotada en vez de perseguir todo el scroll de la página.
       */}
-      <div className="lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
-      <div className="grid gap-6 lg:grid-cols-5 lg:items-start">
+      <Collapsible
+        open={vistaPreviaAbierta}
+        onOpenChange={setVistaPreviaAbierta}
+        className="rounded-lg border xl:hidden"
+      >
+        <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between gap-2 p-3 text-left text-sm font-medium">
+          Vista previa del correo
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-2 pb-3">
+          {vistaPreviaAbierta && <VistaPreviaEmail tipo={tipo} campos={campos} />}
+        </CollapsibleContent>
+      </Collapsible>
+
+      <div className="xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
+      <div className="grid gap-6 xl:grid-cols-5 xl:items-start">
         {/* Columna izquierda: formulario — más ancha, es lo que se edita a diario */}
-        <div className="space-y-4 lg:col-span-3">
+        <div className="space-y-4 xl:col-span-3">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Contenido</CardTitle>
@@ -287,7 +305,7 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
 
           <Card>
             <Collapsible open={marcaAbierta} onOpenChange={setMarcaAbierta}>
-              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 p-6 pb-3 text-left">
+              <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between gap-2 p-6 pb-3 text-left">
                 <div className="space-y-1">
                   <CardTitle className="text-base">Marca</CardTitle>
                   <CardDescription>Colores y logo del correo — se configuran una vez y casi nunca cambian.</CardDescription>
@@ -320,6 +338,10 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
                       onChange={(e) => actualizarCampo("logo_url", e.target.value || null)}
                       readOnly={!puedeEditar}
                       placeholder="https://.../logo.png"
+                      type="url"
+                      inputMode="url"
+                      autoCapitalize="none"
+                      className="h-11 text-base md:text-base"
                     />
                     <p className="text-xs text-muted-foreground">
                       Si se deja vacío, se muestra el nombre "Casa Tomás" en su lugar.
@@ -337,9 +359,11 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
             </CardHeader>
             <CardContent className="space-y-3">
               {BLOQUES_DISPONIBLES.map((bloque) => (
-                <div key={bloque.clave} className="flex items-center justify-between rounded-lg border p-3">
+                // <label> entero: tocar el texto también activa el interruptor (el
+                // interruptor solo mide 44x24).
+                <label key={bloque.clave} className="flex min-h-11 cursor-pointer items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5 pr-4">
-                    <Label>{bloque.etiqueta}</Label>
+                    <span className="text-sm font-medium leading-none">{bloque.etiqueta}</span>
                     <p className="text-xs text-muted-foreground">{bloque.descripcion}</p>
                   </div>
                   <Switch
@@ -348,8 +372,9 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
                       actualizarCampo("bloques", { ...(campos.bloques ?? {}), [bloque.clave]: checked })
                     }
                     disabled={!puedeEditar}
+                    aria-label={bloque.etiqueta}
                   />
-                </div>
+                </label>
               ))}
               <p className="text-xs text-muted-foreground">
                 {tipo === "reserva_modificada"
@@ -372,13 +397,14 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
                     value={notaVersion}
                     onChange={(e) => setNotaVersion(e.target.value)}
                     placeholder="Ej: cambio de tono, nuevo color de marca..."
+                    className="h-11 text-base md:text-base"
                   />
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs text-muted-foreground">
                     {sucio ? "Hay cambios sin guardar." : "No hay cambios sin guardar."}
                   </p>
-                  <Button onClick={handleGuardar} disabled={!sucio || guardar.isPending}>
+                  <Button onClick={handleGuardar} disabled={!sucio || guardar.isPending} className="h-11 px-5">
                     {guardar.isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -404,9 +430,12 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
                     value={destinatario}
                     onChange={(e) => setDestinatario(e.target.value)}
                     placeholder="tu@correo.com"
-                    className="sm:max-w-xs"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    aria-label="Correo al que enviar la prueba"
+                    className="h-11 sm:max-w-xs"
                   />
-                  <Button variant="outline" onClick={handleEnviarPrueba} disabled={enviarPrueba.isPending}>
+                  <Button variant="outline" onClick={handleEnviarPrueba} disabled={enviarPrueba.isPending} className="h-11 px-5">
                     {enviarPrueba.isPending ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -428,8 +457,8 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
             vea sin desplazarse mientras se edita el formulario, más largo, de
             la izquierda. Las variables ya no viven aquí como lista aparte:
             cada campo tiene su propio botón "{ } Variable" justo al lado. */}
-        <div className="lg:col-span-2">
-          <div className="lg:sticky lg:top-0">
+        <div className="hidden xl:col-span-2 xl:block">
+          <div className="xl:sticky xl:top-0">
             <VistaPreviaEmail tipo={tipo} campos={campos} />
           </div>
         </div>

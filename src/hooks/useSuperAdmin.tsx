@@ -20,6 +20,10 @@ const SuperAdminContext = createContext<SuperAdminData | null>(null);
  */
 export function SuperAdminProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
+  // Se depende del id (un string), NO del objeto `user`: supabase-js re-emite
+  // SIGNED_IN / TOKEN_REFRESHED al volver a la app y eso no debe relanzar la
+  // consulta ni poner loading=true (desmontaría la página protegida).
+  const userId = user?.id ?? null;
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +32,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
 
     if (authLoading) return;
 
-    if (!user) {
+    if (!userId) {
       setIsSuperAdmin(false);
       setLoading(false);
       return;
@@ -38,7 +42,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
     supabase
       .from("super_admins")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (!isMounted) return;
@@ -49,7 +53,7 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [user, authLoading]);
+  }, [userId, authLoading]);
 
   const value: SuperAdminData = { isSuperAdmin, loading: authLoading || loading };
 

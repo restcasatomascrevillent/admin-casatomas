@@ -26,6 +26,16 @@ import {
   type SegmentoPared,
 } from "./planoUtils";
 import { calcularPuertaEnMuro, centroRectFabric } from "./puertaGeometria";
+import {
+  crearGestosTactiles,
+  limitarZoom,
+  puntoEnAreaAmpliada,
+  vptZoomHaciaPunto,
+  UMBRAL_PULSACION_PX,
+  type DecisionUnDedo,
+  type EstadoGestos,
+  type Vpt,
+} from "./gestosTactiles";
 
 // Estilo arquitectónico de paredes: gris carbón uniforme (antes se coloreaban
 // en verde/amarillo/naranja/rojo según la desviación respecto a 0°, pero sin
@@ -44,6 +54,18 @@ const DOOR_LEAF_THICKNESS_PX = 6;
 // de escena — si no, con zoom alejado el imán "se encoge" y con zoom
 // acercado "se agranda" en términos de lo que el usuario percibe en pantalla.
 const DOOR_WALL_SNAP_PX = 25;
+
+// ── Táctil ───────────────────────────────────────────────────────────────────
+// Semi-lado mínimo (px de PANTALLA) del área que responde al dedo. Una pared
+// mide 7,5 px de grosor a 50 px/m y una mesa de 80 cm solo 40 px a zoom 1.
+const TOQUE_MITAD_MESA_PX = 22; // 44 px de lado, el mínimo táctil
+const TOQUE_MITAD_FINA_PX = 16; // paredes y puertas: 32 px de banda
+// Tamaño de los puntos de control: visual y zona sensible al dedo.
+const CORNER_SIZE_PX = 20;
+const TOUCH_CORNER_SIZE_PX = 52;
+// Distancia del asa de giro a la mesa (por defecto 40): con el dedo encima
+// tapaba la propia mesa.
+const ASA_GIRO_OFFSET_PX = 56;
 
 /**
  * Proximidad (en px de escena; a 50 px/m son 30 cm) a la que dos mesas se
@@ -134,6 +156,26 @@ interface CanvasPlanoProps {
    * quedan como estaban.
    */
   onRoomDrawn?: (widthMeters: number, heightMeters: number) => void;
+  /**
+   * Modo «mano» (alternativa táctil a mantener Espacio): arrastrar con UN dedo
+   * (o con el ratón) mueve el plano en vez de seleccionar/dibujar.
+   */
+  modoMano?: boolean;
+  /**
+   * Selección múltiple sin teclado (alternativa táctil a Mayús+clic): con el
+   * modo activo, tocar otra mesa la AÑADE a la selección en vez de sustituirla.
+   * Hace falta para poder elegir dos mesas y ofrecer «Unir mesas».
+   */
+  seleccionMultiple?: boolean;
+  /**
+   * Paredes sin imán de ángulo (alternativa táctil a mantener Mayús).
+   */
+  anguloLibre?: boolean;
+  /**
+   * Nº de puntos de la pared en curso (0 = no hay pared a medias). Con ≥ 2 el
+   * editor enseña «Terminar pared»: sin ratón no hay doble clic.
+   */
+  onParedEnCursoChange?: (puntos: number) => void;
 }
 
 export interface CanvasPlanoRef {
@@ -153,6 +195,10 @@ export interface CanvasPlanoRef {
   updateMesaNombre: (mesaId: string, nombre: string) => void;
   updateMesaBocadillo: (mesaId: string, etiqueta: string | null) => void;
   centerOnContent: () => void;
+  /** Cierra la pared en curso (equivale al doble clic). */
+  terminarPared: () => void;
+  /** Descarta lo que se esté dibujando (pared a medias o sala en arrastre). */
+  cancelarDibujo: () => void;
   /** Renombra el id (temporal -> real de BBDD) de una mesa ya presente en el canvas, en su objeto y en su etiqueta/bocadillo asociados. */
   renameMesaId: (oldId: string, newId: string) => void;
   /**
@@ -187,13 +233,32 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   onZoomChange,
   onMesaCreada,
   onRoomDrawn,
+  modoMano = false,
+  seleccionMultiple = false,
+  anguloLibre = false,
+  onParedEnCursoChange,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
-  const [isPanning, setIsPanning] = useState(false);
   const spacePressed = useRef(false);
-  const lastPanPos = useRef({ x: 0, y: 0 });
+  // Gestos táctiles (ver gestosTactiles.ts) y modos que vienen del editor.
+  const gestosRef = useRef<EstadoGestos | null>(null);
+  const modoManoRef = useRef(modoMano);
+  const seleccionMultipleRef = useRef(seleccionMultiple);
+  const anguloLibreRef = useRef(anguloLibre);
+  const onParedEnCursoChangeRef = useRef(onParedEnCursoChange);
+  const onZoomChangeRef = useRef(onZoomChange);
+  const initialZoomRef = useRef(initialZoom);
+  /** Pulsación táctil pendiente: con el dedo la herramienta actúa al LEVANTARLO, no al apoyarlo. */
+  const toquePendienteRef = useRef<{ tool: ToolType; x: number; y: number } | null>(null);
+  /** El usuario ha movido/ampliado la vista a mano: ya no se reencuadra sola al cambiar el tamaño. */
+  const vistaManualRef = useRef(false);
+  /** Funciones que viven dentro del efecto de creación del canvas y que el resto necesita. */
+  const abortarInteraccionRef = useRef<() => void>(() => {});
+  /** Objeto activo justo ANTES de apoyar el primer dedo (para devolverlo si el toque resulta ser un pellizco). */
+  const activoAntesDelToqueRef = useRef<FabricObject | null>(null);
+  const aplicarModoInteraccionRef = useRef<() => void>(() => {});
   
   const measureTextRef = useRef<FabricText | null>(null);
   
@@ -227,23 +292,51 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   const roomStartRef = useRef<Punto | null>(null);
   const roomPreviewRef = useRef<InstanceType<typeof Rect> | null>(null);
 
+  /** Cambia los puntos de la pared en curso y avisa al editor (para «Terminar pared»). */
+  const establecerPuntosPared = (puntos: Array<{ x: number; y: number }>) => {
+    wallPointsRef.current = puntos;
+    onParedEnCursoChangeRef.current?.(puntos.length);
+  };
+
   // Sincronizar refs
   useEffect(() => {
     activeToolRef.current = activeTool;
   }, [activeTool]);
 
-  // MODO DIBUJO: con cualquier herramienta que no sea "Seleccionar", el
-  // lienzo deja de buscar objetos bajo el cursor. Antes daba igual porque la
-  // herramienta se desarmaba sola tras cada objeto; ahora que sigue armada
-  // (ver `finishWallDrawing`), sin esto un clic sobre una mesa ya dibujada
-  // crearía otra encima Y además arrastraría la de debajo.
+  useEffect(() => {
+    modoManoRef.current = modoMano;
+    seleccionMultipleRef.current = seleccionMultiple;
+    anguloLibreRef.current = anguloLibre;
+    onParedEnCursoChangeRef.current = onParedEnCursoChange;
+    onZoomChangeRef.current = onZoomChange;
+    initialZoomRef.current = initialZoom;
+  }, [modoMano, seleccionMultiple, anguloLibre, onParedEnCursoChange, onZoomChange, initialZoom]);
+
+  // MODO DE INTERACCIÓN del lienzo. Combina tres cosas:
+  //   · herramienta de dibujo armada (≠ «Seleccionar»): el lienzo deja de buscar
+  //     objetos bajo el cursor. Antes daba igual porque la herramienta se
+  //     desarmaba sola tras cada objeto; ahora que sigue armada (ver
+  //     `finishWallDrawing`), sin esto un clic sobre una mesa ya dibujada
+  //     crearía otra encima Y además arrastraría la de debajo.
+  //   · pan forzado (Espacio pulsado, o el modo «mano» de la barra, que es la
+  //     alternativa táctil): tampoco debe agarrar objetos ni dibujar el
+  //     rectángulo de selección.
+  const aplicarModoInteraccion = () => {
+    if (!fabricCanvas) return;
+    const dibujando = activeToolRef.current !== "select";
+    const panForzado = spacePressed.current || modoManoRef.current;
+    fabricCanvas.selection = !dibujando && !panForzado;
+    fabricCanvas.skipTargetFind = dibujando || panForzado;
+    const cursor = panForzado ? "grab" : dibujando ? "crosshair" : "default";
+    fabricCanvas.defaultCursor = cursor;
+    fabricCanvas.hoverCursor = panForzado ? "grab" : dibujando ? "crosshair" : "move";
+    fabricCanvas.requestRenderAll();
+  };
+  aplicarModoInteraccionRef.current = aplicarModoInteraccion;
+
   useEffect(() => {
     if (!fabricCanvas) return;
-    const dibujando = activeTool !== "select";
-    fabricCanvas.selection = !dibujando;
-    fabricCanvas.skipTargetFind = dibujando;
-    fabricCanvas.defaultCursor = dibujando ? "crosshair" : "default";
-    fabricCanvas.hoverCursor = dibujando ? "crosshair" : "move";
+    aplicarModoInteraccion();
 
     // Cambiar de herramienta a mitad de un trazo no debe dejar restos: antes
     // salir de "Pared" con una polilínea a medias dejaba sus líneas
@@ -251,9 +344,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     // herramientas siguen armadas se cambia de una a otra mucho más a menudo.
     if (activeTool !== "wall") cancelWallDrawing();
     if (activeTool !== "room") cancelRoomDrawing();
-
-    fabricCanvas.requestRenderAll();
-  }, [fabricCanvas, activeTool]);
+    toquePendienteRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fabricCanvas, activeTool, modoMano]);
 
   useEffect(() => {
     elementosRef.current = elementos;
@@ -316,7 +409,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       
       // Limpiar refs internos
       tempLinesRef.current = [];
-      wallPointsRef.current = [];
+      establecerPuntosPared([]);
       if (previewLineRef.current) {
         previewLineRef.current = null;
       }
@@ -418,10 +511,23 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     },
     setZoom: (zoom: number) => {
       if (!fabricCanvas) return;
-      const clampedZoom = Math.max(0.25, Math.min(3, zoom));
-      fabricCanvas.setZoom(clampedZoom);
-      fabricCanvas.renderAll();
+      const clampedZoom = limitarZoom(zoom);
+      // Hacia el CENTRO de lo que se ve (antes `setZoom` escalaba respecto a la
+      // esquina (0,0) de la escena y los botones +/- hacían saltar el plano).
+      const vpt = fabricCanvas.viewportTransform as unknown as Vpt;
+      fabricCanvas.setViewportTransform(
+        vptZoomHaciaPunto(vpt, { x: fabricCanvas.getWidth() / 2, y: fabricCanvas.getHeight() / 2 }, clampedZoom) as any,
+      );
+      vistaManualRef.current = true;
+      fabricCanvas.requestRenderAll();
       onZoomChange?.(clampedZoom);
+    },
+    terminarPared: () => {
+      finishWallDrawing();
+    },
+    cancelarDibujo: () => {
+      cancelWallDrawing();
+      cancelRoomDrawing();
     },
     unmergeMesa: (mesaId: string) => {
       if (!fabricCanvas) return null;
@@ -550,7 +656,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // Cancelar cualquier dibujo en curso (pared a medio trazar, etc.): un
       // undo/redo a media acción de dibujo la descarta sin dejar basura.
       tempLinesRef.current = [];
-      wallPointsRef.current = [];
+      establecerPuntosPared([]);
       previewLineRef.current = null;
       measureTextRef.current = null;
       setSnapIndicator(fabricCanvas, null);
@@ -916,6 +1022,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
         // Aplicar nuevo viewport
         fabricCanvas.setViewportTransform([zoom, 0, 0, zoom, tx, ty] as any);
+        vistaManualRef.current = true;
         fabricCanvas.requestRenderAll();
         onZoomChange?.(zoom);
 
@@ -1145,7 +1252,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
 
     // Nunca en silencio: se dice qué ha pasado y cómo volver atrás.
     toast.success(`Mesas ${mesa1.nombre} y ${mesa2.nombre} unidas en «${newNombre}»`, {
-      description: `Ahora es una sola mesa de ${newCapacidad} comensales. Si no era lo que querías, pulsa Ctrl+Z para deshacerlo.`,
+      description: `Ahora es una sola mesa de ${newCapacidad} comensales. Si no era lo que querías, pulsa «Deshacer» en la barra de herramientas.`,
       duration: 10000,
     });
   };
@@ -1192,6 +1299,9 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         },
       },
       cancel: { label: "No", onClick: () => {} },
+      // Botones del aviso con tamaño de dedo (los de serie miden ~24 px).
+      actionButtonStyle: { height: 44, minWidth: 96, padding: "0 16px", fontSize: 14 },
+      cancelButtonStyle: { height: 44, minWidth: 56, padding: "0 16px", fontSize: 14 },
     });
   };
 
@@ -1338,11 +1448,77 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       selectionColor: "rgba(37, 99, 235, 0.08)",
       selectionBorderColor: WALL_COLOR_SELECTED,
       selectionLineWidth: 1,
+      // Eventos de puntero (ratón, dedo y lápiz por la misma vía). Con el
+      // modo por defecto Fabric escucha `touchstart` y entrega TouchEvents sin
+      // `clientX`, y los gestos de dos dedos no se pueden seguir con fiabilidad.
+      enablePointerEvents: true,
     });
     fabric.FabricObject.ownDefaults.borderColor = WALL_COLOR_SELECTED;
     fabric.FabricObject.ownDefaults.cornerColor = WALL_COLOR_SELECTED;
     fabric.FabricObject.ownDefaults.cornerStyle = "circle";
     fabric.FabricObject.ownDefaults.transparentCorners = false;
+    // Puntos de control para DEDO: 13 px de serie son indistinguibles de la
+    // yema. `touchCornerSize` solo cuenta con eventos táctiles (Fabric lo usa
+    // cuando `pointerType === "touch"`), así que el ratón no pierde precisión.
+    fabric.FabricObject.ownDefaults.cornerSize = CORNER_SIZE_PX;
+    fabric.FabricObject.ownDefaults.touchCornerSize = TOUCH_CORNER_SIZE_PX;
+    fabric.FabricObject.ownDefaults.borderScaleFactor = 2;
+
+    // ── Táctil ────────────────────────────────────────────────────────────
+    // Sin esto, una pulsación larga en iPadOS arranca un «arrastrar imagen»
+    // HTML5 (el canvas superior es `draggable` por el texto de Fabric, que
+    // aquí no se usa) y cancela la secuencia de punteros a mitad de gesto.
+    canvas.upperCanvasEl.removeAttribute("draggable");
+    const envoltorio = canvas.wrapperEl as HTMLElement;
+    envoltorio.style.touchAction = "none";
+    (envoltorio.style as any).webkitTouchCallout = "none";
+    const impedirPorDefecto = (ev: Event) => ev.preventDefault();
+    envoltorio.addEventListener("contextmenu", impedirPorDefecto);
+    // Safari iPadOS: aunque `touch-action: none`, el pellizco puede disparar el
+    // zoom de PÁGINA vía eventos propios `gesture*`.
+    envoltorio.addEventListener("gesturestart", impedirPorDefecto, { passive: false });
+    envoltorio.addEventListener("gesturechange", impedirPorDefecto, { passive: false });
+
+    // Área de toque ampliada: ver `puntoEnAreaAmpliada`. Se engancha a la
+    // comprobación interna de Fabric (v6.9) de «¿cae el puntero dentro del
+    // objeto?» para no tocar las decisiones de selección de cada objeto. Solo
+    // con el dedo: con ratón la precisión se queda como estaba.
+    const comprobarAreaOriginal = (canvas as any)._pointIsInObjectSelectionArea?.bind(canvas);
+    if (typeof comprobarAreaOriginal === "function") {
+      (canvas as any)._pointIsInObjectSelectionArea = (obj: FabricObject, punto: Point) => {
+        if (comprobarAreaOriginal(obj, punto)) return true;
+        if (!gestosRef.current?.esToque) return false;
+        const tipo = (obj as any).customData?.tipo;
+        const mitadPx =
+          tipo === "mesa" ? TOQUE_MITAD_MESA_PX : tipo === "wall" || tipo === "door" ? TOQUE_MITAD_FINA_PX : 0;
+        if (!mitadPx) return false;
+        return puntoEnAreaAmpliada(
+          punto,
+          {
+            matriz: obj.calcTransformMatrix(),
+            width: obj.width ?? 0,
+            height: obj.height ?? 0,
+            strokeWidth: obj.strokeWidth ?? 0,
+            scaleX: obj.scaleX ?? 1,
+            scaleY: obj.scaleY ?? 1,
+          },
+          mitadPx / (canvas.getZoom() || 1),
+        );
+      };
+    }
+
+    // Selección múltiple sin Mayús (modo «varias mesas» de la barra).
+    const seleccionOriginal = (canvas as any)._isSelectionKeyPressed?.bind(canvas);
+    if (typeof seleccionOriginal === "function") {
+      (canvas as any)._isSelectionKeyPressed = (ev: Event) =>
+        seleccionMultipleRef.current || seleccionOriginal(ev);
+    }
+
+    // El asa de giro, más separada (el dedo que la sujeta tapaba la mesa).
+    canvas.on("object:added", (ev) => {
+      const mtr = (ev.target as any)?.controls?.mtr;
+      if (mtr) mtr.offsetY = -ASA_GIRO_OFFSET_PX;
+    });
 
     // Event handlers - Limitar selección a máximo 2 elementos
     const limitSelection = (selected: FabricObject[]) => {
@@ -1481,9 +1657,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     };
 
     // Mostrar guías y mover etiquetas mientras se mueven las mesas
-    canvas.on("object:moving", (e) => {
-      const target = e.target;
-      if (!target) return;
+    const alMoverObjeto = (target: FabricObject) => {
       
       showAlignmentGuides(canvas, target);
       
@@ -1550,7 +1724,53 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
         // Es un objeto individual
         updateMesaPositionDuringMove(target);
       }
+    };
+
+    canvas.on("object:moving", (e) => {
+      const target = e.target;
+      if (!target) return;
+
+      // ZONA MUERTA TÁCTIL. Un dedo nunca está quieto: sin esto, TOCAR una mesa
+      // para seleccionarla la desplazaba 1-3 px y registraba un paso de
+      // «mover» en el historial en cada pulsación. Hasta que el dedo no pasa del
+      // umbral, el objeto se devuelve a donde estaba.
+      const g = gestosRef.current;
+      if (g?.esToque && !g.arrastreArmado) {
+        const original = (canvas as any)._currentTransform?.original;
+        if (original) {
+          target.set({ left: original.left, top: original.top });
+          target.setCoords();
+          canvas.requestRenderAll();
+        }
+        return;
+      }
+
+      alMoverObjeto(target);
     });
+
+    // Un pellizco que empieza con un dedo ya apoyado sobre una mesa no debe
+    // dejar la mesa movida ni la transformación de Fabric colgada (con
+    // `_currentTransform` vivo, Fabric ignora TODOS los toques siguientes).
+    abortarInteraccionRef.current = () => {
+      const transform = (canvas as any)._currentTransform;
+      const obj = transform?.target as FabricObject | undefined;
+      if (obj && transform.original) {
+        obj.set({
+          left: transform.original.left,
+          top: transform.original.top,
+          angle: transform.original.angle,
+          scaleX: transform.original.scaleX,
+          scaleY: transform.original.scaleY,
+        });
+        obj.setCoords();
+        (obj as any).isMoving = false;
+        alMoverObjeto(obj);
+      }
+      (canvas as any)._currentTransform = null;
+      (canvas as any)._groupSelector = null;
+      clearAlignmentGuides(canvas);
+      canvas.requestRenderAll();
+    };
 
     canvas.on("object:modified", (e) => {
       const target = e.target;
@@ -1675,15 +1895,25 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           renderSillasMesa(canvas, target);
           canvas.renderAll();
 
-          // Actualizar estado guardando posición en METROS y la rotación
+          // Actualizar estado guardando posición en METROS y la rotación.
+          // Si no ha cambiado nada (una pulsación con el dedo sin arrastrar),
+          // no se toca el estado: no hay paso de historial ni «cambios sin guardar».
           const currentMesas = mesasCanvasRef.current;
-          onMesasChange(
-            currentMesas.map((m) =>
-              m.id === customData.id
-                ? { ...m, posX: newPosXMeters, posY: newPosYMeters, rotacion: anguloAjustado }
-                : m
-            )
-          );
+          const previa = currentMesas.find((m) => m.id === customData.id);
+          const sinCambios =
+            !!previa &&
+            Math.abs(previa.posX - newPosXMeters) < 1e-4 &&
+            Math.abs(previa.posY - newPosYMeters) < 1e-4 &&
+            Math.abs((previa.rotacion ?? 0) - anguloAjustado) < 0.01;
+          if (!sinCambios) {
+            onMesasChange(
+              currentMesas.map((m) =>
+                m.id === customData.id
+                  ? { ...m, posX: newPosXMeters, posY: newPosYMeters, rotacion: anguloAjustado }
+                  : m
+              )
+            );
+          }
 
           // AQUÍ YA NO SE FUSIONA NADA. Antes había un
           // `setTimeout(() => checkAndMergeTables(canvas, target), 50)` que
@@ -1802,18 +2032,64 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       }
     });
 
+    // Depuración (mismo interruptor que `centerOnContent`): deja el canvas de Fabric en `window`.
+    if (
+      import.meta.env.DEV &&
+      typeof window !== "undefined" &&
+      ((window as any).__DEBUG_PLANO__ === true || localStorage.getItem("debug-plano") === "1")
+    ) {
+      (window as any).__fabricPlano = canvas;
+    }
+
     setFabricCanvas(canvas);
 
-    // Aplicar zoom inicial
-    if (initialZoom !== 1) {
-      canvas.setZoom(initialZoom);
+    // Zoom inicial (encuadre). Se reaplica solo mientras el usuario no toque la
+    // vista (ver el efecto de tamaño de más abajo).
+    const zoomInicial = initialZoomRef.current;
+    if (Number.isFinite(zoomInicial) && zoomInicial > 0 && zoomInicial !== 1) {
+      canvas.setZoom(zoomInicial);
     }
 
     return () => {
+      envoltorio.removeEventListener("contextmenu", impedirPorDefecto);
+      envoltorio.removeEventListener("gesturestart", impedirPorDefecto);
+      envoltorio.removeEventListener("gesturechange", impedirPorDefecto);
+      abortarInteraccionRef.current = () => {};
       canvas.dispose();
     };
-  }, [canvasWidth, canvasHeight]);
+    // Se crea UNA vez. Antes se recreaba en cada cambio de tamaño del contenedor
+    // (girar la tablet, abrirse el teclado en Android...) y eso tiraba por tierra
+    // el zoom, el pan y la selección en mitad del trabajo; ahora el tamaño se
+    // ajusta «en caliente» (efecto de más abajo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Tamaño del lienzo «en caliente» + reencuadre.
+  //  · Vista tocada por el usuario: se conserva y se mantiene en el centro lo que
+  //    estaba en el centro (al girar la tablet no se pierde de vista lo que se miraba).
+  //  · Vista sin tocar: se reencuadra al zoom de ajuste del editor.
+  useEffect(() => {
+    if (!fabricCanvas) return;
+    const anteriorW = fabricCanvas.getWidth();
+    const anteriorH = fabricCanvas.getHeight();
+    if (anteriorW !== canvasWidth || anteriorH !== canvasHeight) {
+      fabricCanvas.setDimensions({ width: canvasWidth, height: canvasHeight });
+      if (vistaManualRef.current) {
+        const v = fabricCanvas.viewportTransform as unknown as Vpt;
+        fabricCanvas.setViewportTransform([
+          v[0], 0, 0, v[3],
+          v[4] + (canvasWidth - anteriorW) / 2,
+          v[5] + (canvasHeight - anteriorH) / 2,
+        ] as any);
+      }
+    }
+    if (!vistaManualRef.current && Number.isFinite(initialZoom) && initialZoom > 0) {
+      fabricCanvas.setViewportTransform([initialZoom, 0, 0, initialZoom, 0, 0] as any);
+    }
+    fabricCanvas.requestRenderAll();
+    // El % que enseña el editor es SIEMPRE el real del lienzo.
+    onZoomChangeRef.current?.(fabricCanvas.getZoom());
+  }, [fabricCanvas, canvasWidth, canvasHeight, initialZoom]);
 
   // Zoom con rueda del ratón
   useEffect(() => {
@@ -1825,25 +2101,22 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       e.stopPropagation();
 
       const delta = e.deltaY;
-      let zoom = fabricCanvas.getZoom();
-      zoom *= 0.999 ** delta;
-      
-      // Limitar zoom entre 0.25x y 3x
-      if (zoom > 3) zoom = 3;
-      if (zoom < 0.25) zoom = 0.25;
-      
+      // Límite de 0,25x a 3x (el mismo que el pellizco y los botones +/-).
+      const zoom = limitarZoom(fabricCanvas.getZoom() * 0.999 ** delta);
+
       // Zoom hacia el punto del cursor
       fabricCanvas.zoomToPoint(new Point(e.offsetX, e.offsetY), zoom);
-      onZoomChange?.(zoom);
+      vistaManualRef.current = true;
+      onZoomChangeRef.current?.(zoom);
     };
 
     fabricCanvas.on('mouse:wheel', handleWheel);
     return () => {
       fabricCanvas.off('mouse:wheel', handleWheel);
     };
-  }, [fabricCanvas, onZoomChange]);
+  }, [fabricCanvas]);
 
-  // Pan con Espacio + click
+  // Pan con Espacio (teclado). La alternativa táctil es el modo «mano» de la barra.
   useEffect(() => {
     if (!fabricCanvas) return;
 
@@ -1851,83 +2124,99 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       // Ignorar si el foco está en un input o textarea
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-      
+
       if (e.code === 'Space' && !spacePressed.current) {
         e.preventDefault();
         spacePressed.current = true;
-        fabricCanvas.defaultCursor = 'grab';
-        fabricCanvas.hoverCursor = 'grab';
-        fabricCanvas.selection = false;
+        aplicarModoInteraccionRef.current();
       }
-      
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         spacePressed.current = false;
-        setIsPanning(false);
         // Restaurar según la herramienta activa, no a pelo: si hay una
         // herramienta de dibujo armada, el lienzo debe seguir en modo dibujo
         // tras soltar el Espacio.
-        const dibujando = activeToolRef.current !== "select";
-        fabricCanvas.defaultCursor = dibujando ? 'crosshair' : 'default';
-        fabricCanvas.hoverCursor = dibujando ? 'crosshair' : 'move';
-        fabricCanvas.selection = !dibujando;
+        aplicarModoInteraccionRef.current();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [fabricCanvas]);
 
-  // Eventos de mouse para pan
+  // Gestos con el dedo (pellizco, pan con 1 y 2 dedos) y pan con ratón en
+  // modo mano / Espacio. Toda la lógica está en `gestosTactiles.ts`.
   useEffect(() => {
     if (!fabricCanvas) return;
 
-    const handleMouseDownPan = (opt: any) => {
-      if (spacePressed.current) {
-        setIsPanning(true);
-        fabricCanvas.defaultCursor = 'grabbing';
-        lastPanPos.current = { x: opt.e.clientX, y: opt.e.clientY };
-      }
-    };
+    const controlador = crearGestosTactiles({
+      elemento: fabricCanvas.wrapperEl as HTMLElement,
+      obtenerVpt: () => (fabricCanvas.viewportTransform as unknown as Vpt),
+      aplicarVpt: (vpt) => {
+        // `setViewportTransform` (y no mutar `vpt[4]` a mano) recalcula las
+        // coordenadas de los controles del objeto activo; sin eso, tras mover
+        // el plano con una mesa seleccionada el asa de giro seguía en su sitio
+        // antiguo y no se podía agarrar.
+        fabricCanvas.setViewportTransform(vpt as any);
+        fabricCanvas.requestRenderAll();
+      },
+      decidirUnDedo: (e): DecisionUnDedo => {
+        // Se apunta qué había seleccionado: Fabric selecciona al APOYAR el dedo,
+        // y si el toque acaba siendo un pellizco esa selección no la ha pedido nadie.
+        activoAntesDelToqueRef.current = fabricCanvas.getActiveObject() ?? null;
+        if (modoManoRef.current) return 'pan';
+        const herramienta = activeToolRef.current;
+        // Sala: se dibuja ARRASTRANDO, así que el dedo es del dibujo (el plano se
+        // mueve con dos dedos o con el modo mano).
+        if (herramienta === 'room') return 'no';
+        if (herramienta !== 'select') return 'pan-umbral';
+        // Seleccionar: si el dedo cae sobre un objeto (o sobre sus asas) lo
+        // arrastra Fabric; sobre el vacío mueve el plano. Para que Fabric no
+        // dibuje además un rectángulo de selección, se apaga mientras dure el toque.
+        const objetivo = fabricCanvas.findTarget(e);
+        if (objetivo) return 'no';
+        fabricCanvas.selection = false;
+        return 'pan-umbral';
+      },
+      alIniciarPellizco: () => {
+        abortarInteraccionRef.current();
+        cancelRoomDrawing();
+        toquePendienteRef.current = null;
 
-    const handleMouseMovePan = (opt: any) => {
-      if (isPanning && spacePressed.current) {
-        const vpt = fabricCanvas.viewportTransform;
-        if (vpt) {
-          vpt[4] += opt.e.clientX - lastPanPos.current.x;
-          vpt[5] += opt.e.clientY - lastPanPos.current.y;
+        // Devolver la selección que había antes de apoyar el primer dedo.
+        const previo = activoAntesDelToqueRef.current;
+        const actual = fabricCanvas.getActiveObject() ?? null;
+        if (actual !== previo) {
+          if (previo && (previo as any).type?.toLowerCase() !== 'activeselection' && fabricCanvas.getObjects().includes(previo)) {
+            fabricCanvas.setActiveObject(previo);
+          } else if (!previo) {
+            fabricCanvas.discardActiveObject();
+          }
           fabricCanvas.requestRenderAll();
-          lastPanPos.current = { x: opt.e.clientX, y: opt.e.clientY };
         }
-      }
-    };
+      },
+      alCambiarZoom: (zoom) => onZoomChangeRef.current?.(zoom),
+      alMoverVista: () => {
+        vistaManualRef.current = true;
+      },
+      alTerminarSecuencia: () => aplicarModoInteraccionRef.current(),
+      panConRaton: () => spacePressed.current || modoManoRef.current,
+    });
+    gestosRef.current = controlador.estado;
 
-    const handleMouseUpPan = () => {
-      if (isPanning) {
-        setIsPanning(false);
-        if (spacePressed.current) {
-          fabricCanvas.defaultCursor = 'grab';
-        }
-      }
-    };
-
-    fabricCanvas.on('mouse:down', handleMouseDownPan);
-    fabricCanvas.on('mouse:move', handleMouseMovePan);
-    fabricCanvas.on('mouse:up', handleMouseUpPan);
-    
     return () => {
-      fabricCanvas.off('mouse:down', handleMouseDownPan);
-      fabricCanvas.off('mouse:move', handleMouseMovePan);
-      fabricCanvas.off('mouse:up', handleMouseUpPan);
+      controlador.destruir();
+      gestosRef.current = null;
     };
-  }, [fabricCanvas, isPanning]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fabricCanvas]);
 
   // Dibujar grid que cubre todo el espacio visible del canvas
   useEffect(() => {
@@ -2243,21 +2532,41 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
   useEffect(() => {
     if (!fabricCanvas) return;
 
+    // Lo que hace cada herramienta de «colocar» al pulsar en (x, y).
+    const accionHerramienta = (tool: ToolType, x: number, y: number, libre: boolean) => {
+      if (tool === "wall") {
+        handleWallClick(x, y, libre);
+      } else if (tool === "area") {
+        handleAreaClick(x, y);
+      } else if (tool === "mesa-rect") {
+        handleMesaClick(x, y, "rectangular");
+      } else if (tool === "mesa-circular") {
+        handleMesaClick(x, y, "circular");
+      } else if (tool === "door") {
+        handleDoorClick(x, y);
+      }
+    };
+
+    const esPanForzado = () => spacePressed.current || modoManoRef.current;
+
     const handleMouseDown = (opt: any) => {
       // Ignorar clics de dibujo mientras se está paneando con Espacio+arrastrar
-      // (antes handleMouseDown no comprobaba spacePressed y cada click con
-      // Espacio pulsado añadía un punto de pared/mesa/etc. de todos modos).
-      if (spacePressed.current) return;
+      // o con el modo mano (antes handleMouseDown no comprobaba spacePressed y
+      // cada click con Espacio pulsado añadía un punto de pared/mesa/etc.).
+      if (esPanForzado()) return;
 
-      const e = opt.e as MouseEvent | undefined;
-      // e.detail > 1 es el 2º/3er click de un doble/triple clic: ya lo procesa
-      // handleDblClick (finishWallDrawing). Sin este filtro, terminar una
-      // pared con doble clic añadía también un punto duplicado en el mismo sitio.
+      const e = opt.e as PointerEvent | undefined;
+      // e.detail > 1 es el 2º/3er click de un doble/triple clic. (Con eventos de
+      // puntero `detail` vale 0 en el pointerdown, así que el doble clic de
+      // «terminar pared» se absorbe además en `handleWallClick`, que ignora un
+      // punto repetido.)
       if (e && e.detail > 1) return;
+
+      const tool = activeToolRef.current;
+      if (tool === "select") return;
 
       // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
       const pointer = fabricCanvas.getScenePoint(opt.e);
-      const tool = activeToolRef.current;
 
       if (tool === "room") {
         // Arrastre: aquí solo se marca la esquina de partida.
@@ -2266,41 +2575,70 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
           pixelsPerMeterRef.current,
           GRID_SNAP_METERS
         );
-      } else if (tool === "wall") {
-        handleWallClick(pointer.x, pointer.y, !!e?.shiftKey);
-      } else if (tool === "area") {
-        handleAreaClick(pointer.x, pointer.y);
-      } else if (tool === "mesa-rect") {
-        handleMesaClick(pointer.x, pointer.y, "rectangular");
-      } else if (tool === "mesa-circular") {
-        handleMesaClick(pointer.x, pointer.y, "circular");
-      } else if (tool === "door") {
-        handleDoorClick(pointer.x, pointer.y);
+        return;
       }
+
+      // CON EL DEDO la herramienta actúa al LEVANTARLO, no al apoyarlo: así un
+      // pellizco, un arrastre del plano o un dedo que se apoya sin querer no
+      // dejan puntos de pared ni mesas perdidas.
+      if (e?.pointerType === "touch") {
+        toquePendienteRef.current = { tool, x: pointer.x, y: pointer.y };
+        return;
+      }
+
+      accionHerramienta(tool, pointer.x, pointer.y, !!e?.shiftKey || anguloLibreRef.current);
     };
 
     const handleMouseMove = (opt: any) => {
-      if (spacePressed.current) return;
+      if (esPanForzado()) return;
       const tool = activeToolRef.current;
+      const gestos = gestosRef.current;
 
       if (tool === "room") {
         if (!roomStartRef.current) return;
+        if (gestos?.esToque && gestos.gestoEnCurso) return;
         const pointer = fabricCanvas.getScenePoint(opt.e);
         updateRoomPreview(pointer.x, pointer.y);
         return;
       }
 
       if (tool !== "wall" || wallPointsRef.current.length === 0) return;
+      // El dedo no «pasa por encima» de nada: arrastrarlo es mover el plano, no
+      // estirar la pared. (La previsualización es para el ratón.)
+      if (gestos?.esToque) return;
 
       // Usar getScenePoint para obtener coordenadas correctas del canvas (con zoom/pan)
       const pointer = fabricCanvas.getScenePoint(opt.e);
       const e = opt.e as MouseEvent | undefined;
-      updatePreviewLine(pointer.x, pointer.y, !!e?.shiftKey);
+      updatePreviewLine(pointer.x, pointer.y, !!e?.shiftKey || anguloLibreRef.current);
     };
 
     const handleMouseUp = (opt: any) => {
-      if (spacePressed.current) return;
+      if (esPanForzado()) {
+        toquePendienteRef.current = null;
+        return;
+      }
+      const gestos = gestosRef.current;
+      const huboGesto = !!gestos?.esToque && gestos.gestoEnCurso;
+
+      // Pulsación táctil pendiente de una herramienta de colocar.
+      const pendiente = toquePendienteRef.current;
+      toquePendienteRef.current = null;
+      if (
+        pendiente &&
+        !huboGesto &&
+        (gestos?.movimientoMax ?? 0) < UMBRAL_PULSACION_PX &&
+        pendiente.tool === activeToolRef.current
+      ) {
+        accionHerramienta(pendiente.tool, pendiente.x, pendiente.y, anguloLibreRef.current);
+        return;
+      }
+
       if (activeToolRef.current !== "room" || !roomStartRef.current) return;
+      if (huboGesto) {
+        cancelRoomDrawing();
+        return;
+      }
       const pointer = fabricCanvas.getScenePoint(opt.e);
       finishRoomDrawing(pointer.x, pointer.y);
     };
@@ -2332,6 +2670,12 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
       if (e.key.toLowerCase() === "r") {
         onToolChange("room");
+      }
+      // Intro cierra la pared en curso (el botón «Terminar pared» de la barra es
+      // la vía táctil; el doble clic, la del ratón).
+      if (e.key === "Enter" && activeToolRef.current === "wall" && wallPointsRef.current.length >= 2) {
+        e.preventDefault();
+        finishWallDrawing();
       }
     };
 
@@ -2412,6 +2756,14 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     const points = wallPointsRef.current;
     const { x, y } = computeSnappedWallPoint(rawX, rawY, freeform);
 
+    // Mismo punto que el anterior (el 2º clic de un doble clic, o dos toques
+    // seguidos en el mismo sitio): no añade nada. Cerrar la pared lo hace el
+    // doble clic, Intro o el botón «Terminar pared».
+    if (points.length > 0) {
+      const ultimo = points[points.length - 1];
+      if (Math.hypot(x - ultimo.x, y - ultimo.y) < 1) return;
+    }
+
     if (points.length > 0) {
       const lastPoint = points[points.length - 1];
 
@@ -2427,7 +2779,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
       fabricCanvas.add(line);
     }
 
-    wallPointsRef.current = [...points, { x, y }];
+    establecerPuntosPared([...points, { x, y }]);
     fabricCanvas.renderAll();
   };
 
@@ -2711,7 +3063,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     setSnapIndicator(fabricCanvas, null);
     tempLinesRef.current = [];
-    wallPointsRef.current = [];
+    establecerPuntosPared([]);
 
     fabricCanvas.renderAll();
     // LA HERRAMIENTA NO SE DESARMA. Antes, cada objeto colocado devolvía el
@@ -2735,7 +3087,7 @@ export const CanvasPlano = forwardRef<CanvasPlanoRef, CanvasPlanoProps>(({
     }
     setSnapIndicator(fabricCanvas, null);
     tempLinesRef.current = [];
-    wallPointsRef.current = [];
+    establecerPuntosPared([]);
 
     fabricCanvas.renderAll();
   };

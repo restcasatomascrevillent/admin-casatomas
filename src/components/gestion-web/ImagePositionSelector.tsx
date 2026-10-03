@@ -94,47 +94,24 @@ export function ImagePositionSelector({
     setPosition(clampedPercent);
   }, [imageBounds, frameHeightPercent]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
+  // Pointer Events (ratón, dedo y lápiz con el mismo código). Antes había
+  // eventos de ratón + `onTouchMove` con `preventDefault()`: React registra los
+  // eventos táctiles como pasivos, así que ese `preventDefault` no hacía nada y
+  // en la tablet el dedo desplazaba la página en vez de mover el recuadro.
+  // `touch-none` en el contenedor evita ese desplazamiento mientras se arrastra.
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     setIsDragging(true);
     calculatePosition(e.clientY);
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isDragging) {
       calculatePosition(e.clientY);
     }
-  }, [isDragging, calculatePosition]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
-
-  // Touch events
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setIsDragging(true);
-    calculatePosition(e.touches[0].clientY);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (isDragging) {
-      e.preventDefault();
-      calculatePosition(e.touches[0].clientY);
-    }
-  };
-
-  const handleTouchEnd = () => {
+  const handlePointerEnd = () => {
     setIsDragging(false);
   };
 
@@ -159,24 +136,24 @@ export function ImagePositionSelector({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[95dvh] p-0 overflow-hidden">
         <DialogHeader className="p-4 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Move className="w-5 h-5" />
             Posicionar imagen
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Arrastra el recuadro para elegir qué parte de la imagen se verá en la tarjeta
+            Arrastra el recuadro con el dedo para elegir qué parte de la imagen se verá en la tarjeta
           </p>
         </DialogHeader>
 
         <div 
           ref={containerRef}
-          className="relative w-full h-[70vh] overflow-hidden cursor-ns-resize select-none bg-zinc-900 flex items-center justify-center"
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          className="relative w-full h-[60dvh] touch-none overflow-hidden cursor-ns-resize select-none bg-zinc-900 flex items-center justify-center"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
         >
           {/* Imagen de fondo fija - 100% visible */}
           <img
@@ -246,10 +223,10 @@ export function ImagePositionSelector({
         </div>
 
         <DialogFooter className="p-4 pt-2 flex gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="h-11" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} className="gap-2">
+          <Button onClick={handleConfirm} className="h-11 gap-2">
             <Check className="w-4 h-4" />
             Aplicar posición
           </Button>

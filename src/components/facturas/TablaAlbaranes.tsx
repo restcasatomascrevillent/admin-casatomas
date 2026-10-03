@@ -5,7 +5,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, Search, FileText, Package, Sparkles, Pencil } from "lucide-react";
 import { EditarFacturaDialog } from "./EditarFacturaDialog";
@@ -20,6 +19,7 @@ import {
 import { SelectorColumnas, type ColumnaType } from "./shared/SelectorColumnas";
 import { FilaProducto } from "./shared/FilaProducto";
 import { BotonOriginal, AccionesDocumento } from "./shared/BotonOriginal";
+import { TextoLargoPopover } from "./shared/TextoLargoPopover";
 import { EstadoDocumento, ResumenRevision, type FiltroRevision } from "./shared/EstadoDocumento";
 import {
   CELDA,
@@ -105,10 +105,10 @@ const FilaAlbaranMobile = ({
               <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <div className="min-w-0">
-              <CardTitle className="truncate text-sm font-semibold text-foreground">
+              <CardTitle className="break-words text-sm font-semibold text-foreground">
                 {albaran.numero_documento}
               </CardTitle>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground" title={albaran.proveedor ?? undefined}>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground" title={albaran.proveedor ?? undefined}>
                 {albaran.proveedor || "Sin proveedor"}
               </p>
               <div className="mt-1.5">
@@ -129,7 +129,7 @@ const FilaAlbaranMobile = ({
             )}
             <p className="mt-0.5 whitespace-nowrap text-xs text-muted-foreground">{formatDate(albaran.fecha)}</p>
             {tieneProductos && (
-              <Badge variant="secondary" className="mt-1.5 bg-muted/80 text-[10px] font-bold uppercase">
+              <Badge variant="secondary" className="mt-1.5 bg-muted/80 text-xs font-bold uppercase">
                 {albaran.productos.length} líneas
               </Badge>
             )}
@@ -143,25 +143,25 @@ const FilaAlbaranMobile = ({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 w-full min-w-0 justify-center gap-1 border border-border/40 px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50"
+          className="h-11 w-full min-w-0 justify-center gap-1.5 border border-border/40 px-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
           onClick={(e) => {
             e.stopPropagation();
             onEdit(albaran);
           }}
         >
-          <Pencil className="h-3 w-3" /> Editar
+          <Pencil className="h-4 w-4" /> Editar
         </Button>
         {onPreguntarIA && (
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-full min-w-0 justify-center gap-1 border border-[hsl(38,59%,45%)/0.2] bg-[hsl(38,59%,45%)/0.05] px-2 text-[11px] font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.15] hover:text-[hsl(38,59%,45%)]"
+            className="h-11 w-full min-w-0 justify-center gap-1.5 border border-[hsl(38,59%,45%)/0.2] bg-[hsl(38,59%,45%)/0.05] px-2 text-sm font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.15] hover:text-[hsl(38,59%,45%)]"
             onClick={(e) => {
               e.stopPropagation();
               onPreguntarIA(albaran);
             }}
           >
-            <Sparkles className="h-3 w-3" /> IA
+            <Sparkles className="h-4 w-4" /> IA
           </Button>
         )}
       </div>
@@ -300,18 +300,7 @@ const FilaAlbaranDesktop = ({
         {visibles.observaciones && (
           <TableCell className={`${CELDA} ${ANCHO_OBSERVACIONES}`}>
             {albaran.observaciones && albaran.observaciones.length > 24 ? (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="block cursor-help truncate text-sm text-muted-foreground">
-                      {truncateText(albaran.observaciones, 24)}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-sm">
-                    <p className="text-sm">{albaran.observaciones}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <TextoLargoPopover completo={albaran.observaciones} corto={truncateText(albaran.observaciones, 24)} />
             ) : (
               <span className="block truncate text-sm text-muted-foreground">{albaran.observaciones || "-"}</span>
             )}
@@ -480,8 +469,8 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
             filtro={filtro}
             onFiltro={setFiltro}
           />
-          {/* El selector solo aplica a la tabla, que no existe por debajo de `lg`. */}
-          <div className="hidden lg:block">
+          {/* El selector solo aplica a la tabla, que no existe por debajo de `xl`. */}
+          <div className="hidden xl:block">
             <SelectorColumnas columnas={COLUMNAS_ALBARANES} visibles={columnasVisibles} onChange={toggleColumna} />
           </div>
         </div>
@@ -495,11 +484,14 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
         </div>
       ) : (
         <>
-          {/* Tarjetas apiladas por debajo de 1024 px. Ver `shared/tabla.ts`. */}
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 custom-scrollbar lg:hidden">
-            {albaranesFiltrados.length === 0
-              ? vacio
-              : albaranesFiltrados.map((a) => (
+          {/* Tarjetas por debajo de 1280 px (tablet: botones de 44 px; dos columnas
+              entre 1024 y 1279 px). Ver `shared/tabla.ts`. */}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 custom-scrollbar xl:hidden">
+            {albaranesFiltrados.length === 0 ? (
+              vacio
+            ) : (
+              <div className="grid items-start gap-x-3 lg:grid-cols-2">
+                {albaranesFiltrados.map((a) => (
                   <FilaAlbaranMobile
                     key={a.id}
                     albaran={a}
@@ -509,14 +501,16 @@ export const TablaAlbaranes = ({ onPreguntarIA }: { onPreguntarIA?: (doc: Factur
                     onEdit={handleEditAlbaran}
                   />
                 ))}
+              </div>
+            )}
           </div>
 
           {albaranesFiltrados.length === 0 ? (
-            <div className="hidden lg:block">{vacio}</div>
+            <div className="hidden xl:block">{vacio}</div>
           ) : (
             /* Sin `min-w`: la tabla nunca es mas ancha que su contenedor.
                Ver el comentario equivalente en TablaFacturas. */
-            <div className="relative hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-background shadow-sm custom-scrollbar lg:block">
+            <div className="relative hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-border/60 bg-background shadow-sm custom-scrollbar xl:block">
               <Table>
                 <TableHeader className="sticky top-0 z-20 bg-muted/95 shadow-[0_1px_3px_rgba(0,0,0,0.05)] backdrop-blur supports-[backdrop-filter]:bg-muted/80">
                   <TableRow className="border-b-border/60 hover:bg-transparent">

@@ -185,7 +185,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo Cóctel</DialogTitle>
         </DialogHeader>
@@ -234,7 +234,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                 <FormItem>
                   <FormLabel>Precio (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" min="0" {...field} />
+                    <Input type="number" inputMode="decimal" step="0.01" min="0" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -309,7 +309,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6"
+                    className="absolute top-1 right-1 h-11 w-11"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
@@ -334,7 +334,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
               <FormLabel>Alérgenos</FormLabel>
 
               {/* Grid de alérgenos oficiales */}
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {ALERGENOS_OFICIALES.map((alergeno) => {
                   const isSelected = alergenosSeleccionados.includes(alergeno.id);
                   return (
@@ -343,7 +343,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                       type="button"
                       onClick={() => toggleAlergeno(alergeno.id)}
                       className={[
-                        "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border",
+                        "flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 border",
                         isSelected
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted",
@@ -361,7 +361,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                   value={nuevoAlergeno}
                   onChange={(e) => setNuevoAlergeno(e.target.value)}
                   placeholder="Añadir alérgeno personalizado..."
-                  className="flex-1"
+                  className="h-11 flex-1 text-base md:text-base"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -373,6 +373,8 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-11 w-11 shrink-0"
+                  aria-label="Añadir alérgeno"
                   onClick={addAlergenoPersonalizado}
                   disabled={!nuevoAlergeno.trim()}
                 >
@@ -387,15 +389,16 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                     <Badge
                       key={alergeno}
                       variant="secondary"
-                      className="gap-1 pr-1"
+                      className="gap-0 py-0 pl-3 pr-0 text-sm"
                     >
                       {alergeno}
                       <button
                         type="button"
                         onClick={() => removeAlergenoPersonalizado(alergeno)}
-                        className="ml-1 hover:text-destructive"
+                        className="flex h-11 w-11 items-center justify-center hover:text-destructive"
+                        aria-label={`Quitar ${alergeno}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </button>
                     </Badge>
                   ))}
@@ -423,7 +426,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
             />
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               <Button

@@ -199,7 +199,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Bebida</DialogTitle>
           <DialogDescription>
@@ -255,7 +255,6 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 ref={fileInputRef}
                 onChange={handleImageChange}
                 accept="image/*"
-                capture="environment"
                 className="hidden"
               />
 
@@ -266,7 +265,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 h-11 w-11"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
@@ -302,7 +301,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                   <FormItem>
                     <FormLabel>Precio (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -343,10 +342,10 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
             />
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={actualizarBebida.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarBebida.isPending || isUploadingImage}>
                 {actualizarBebida.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

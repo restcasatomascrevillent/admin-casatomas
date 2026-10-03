@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } fr
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
@@ -14,6 +14,7 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent, CollisionDetection, Announcements } from "@dnd-kit/core";
+import type { Modifier } from "@dnd-kit/core";
 import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,8 +64,11 @@ import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "./ConMotivo";
 import { ElegirMesaDialog } from "./ElegirMesaDialog";
 import { useCanAccessSection } from "@/hooks/useUserRole";
+import { useIsCoarsePointer } from "@/hooks/use-mobile";
 import {
   ANCHO_COLUMNA_PLEGADA,
+  ANCHO_MIN_COLUMNA,
+  ANCHO_MIN_COLUMNA_TACTIL,
   accionesSoloIcono,
   calcularDisposicion,
   type DisposicionKanban,
@@ -176,6 +180,9 @@ function ReservaCard({
     <div
       className="flex items-center shrink-0"
       onPointerDown={(e) => e.stopPropagation()}
+      // `TouchSensor` escucha `touchstart` en la tarjeta: sin esto, un toque de >=250 ms sobre el
+      // menú arrancaba un arrastre y dnd-kit se tragaba el clic.
+      onTouchStart={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
       <DropdownMenu>
@@ -269,7 +276,7 @@ function ReservaCard({
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded-lg border bg-card transition-shadow duration-200 group outline-none",
+        "rounded-lg border bg-card transition-shadow duration-200 group outline-none select-none [-webkit-touch-callout:none]",
         soloIcono ? "p-2" : "p-2.5 sm:p-3",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         arrastrable
@@ -295,8 +302,9 @@ function ReservaCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
               onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               disabled={!acc.importante.habilitada}
-              className="shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform disabled:pointer-events-none disabled:opacity-50"
+              className="touch-hit shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform disabled:pointer-events-none disabled:opacity-50"
               aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"}
               aria-pressed={!!reserva.importante}
             >
@@ -358,12 +366,12 @@ function ContenidoTarjeta({
           <Users className="h-3 w-3" aria-hidden="true" />
           {reserva.numero_comensales}
         </span>
-        <Badge className={cn("text-[10px] px-1.5 py-0 h-4", estado ? estado.insignia : "bg-gray-500 text-white")}>
+        <Badge className={cn("text-[10px] px-1.5 py-0 h-4 pointer-coarse:h-5 pointer-coarse:text-xs", estado ? estado.insignia : "bg-gray-500 text-white")}>
           {estado ? estado.etiqueta : reserva.estado}
         </Badge>
       </div>
       {reserva.telefono && (
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-1.5">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-1.5 pointer-coarse:text-xs">
           <Phone className="h-2.5 w-2.5" aria-hidden="true" />
           {reserva.telefono}
         </div>
@@ -479,7 +487,7 @@ function KanbanColumn({
             <button
               type="button"
               onClick={onToggleMinimize}
-              className="p-0.5 rounded hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="touch-target inline-flex items-center justify-center p-0.5 -ml-1 rounded hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={`Minimizar columna ${title}`}
               title="Minimizar columna"
             >
@@ -574,7 +582,12 @@ function FilaColumnas({
     return () => observador.disconnect();
   }, []);
 
-  const disposicion = useMemo(() => calcularDisposicion(items, ancho), [items, ancho]);
+  // Con dedo las columnas no bajan de ~232px (ver `ANCHO_MIN_COLUMNA_TACTIL`).
+  const dedo = useIsCoarsePointer();
+  const disposicion = useMemo(
+    () => calcularDisposicion(items, ancho, dedo ? ANCHO_MIN_COLUMNA_TACTIL : ANCHO_MIN_COLUMNA),
+    [items, ancho, dedo],
+  );
 
   const { paradas, visiblesPorParada } = disposicion;
   const desplazable = disposicion.modo === "desplazable";
@@ -699,6 +712,13 @@ function FilaColumnas({
 // minimizadas); si no hay nada — teclado, o el puntero entre columnas — el
 // rectángulo con más intersección. `closestCenter`, lo que había, elegía a
 // veces la columna vecina al soltar sobre el borde.
+/**
+ * Con dedo, `snapCenterToCursor` dejaba la tarjeta que se arrastra justo debajo de la yema, tapando
+ * la columna de destino. Se sube ~64px para que se vea dónde se va a soltar (la detección de
+ * colisión sigue usando el punto del dedo, no la tarjeta).
+ */
+const subirSobreElDedo: Modifier = ({ transform }) => ({ ...transform, y: transform.y - 64 });
+
 const deteccionColisiones: CollisionDetection = (args) => {
   const bajoPuntero = pointerWithin(args);
   return bajoPuntero.length > 0 ? bajoPuntero : rectIntersection(args);
@@ -728,6 +748,7 @@ export function GestorReservasKanban() {
   // sale deshabilitado sin él, con el motivo a la vista (`accionesDisponibles`).
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  const dedo = useIsCoarsePointer();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
@@ -768,8 +789,13 @@ export function GestorReservasKanban() {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    // TABLET (03/10/2026): ratón y dedo por separado. Con `PointerSensor` el dedo activaba el
+    // arrastre a los 6 px (saltándose el retardo del `TouchSensor`) y el navegador, que se queda
+    // el gesto para hacer scroll, lanza `pointercancel`, que ese sensor no escucha: deslizar para
+    // desplazar la columna o la fila de salas unas veces arrancaba un arrastre y otras no.
+    // El Apple Pencil emite eventos táctiles, así que `TouchSensor` también lo cubre.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -1017,7 +1043,7 @@ export function GestorReservasKanban() {
           <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
         </ToggleGroup>
         <p className="text-xs text-muted-foreground sm:basis-full lg:basis-auto lg:ml-auto">
-          Arrastra una tarjeta a otro espacio o usa <MoreVertical className="inline h-3 w-3" aria-hidden="true" /> → «Mover a…».
+          Mantén pulsada una tarjeta y arrástrala a otro espacio, o usa <MoreVertical className="inline h-3 w-3" aria-hidden="true" /> → «Mover a…».
         </p>
       </div>
 
@@ -1057,7 +1083,7 @@ export function GestorReservasKanban() {
                     ancho={disposicion.anchoColumna}
                     margenDerecho={disposicion.margenes[col.id] ?? 0}
                     conIman={disposicion.idsConIman.includes(col.id)}
-                    alturaMaxima="65vh"
+                    alturaMaxima="65dvh"
                   >
                     {(reservasPorColumna[col.id] || []).map((reserva) => (
                       <ReservaCard
@@ -1080,7 +1106,7 @@ export function GestorReservasKanban() {
           </FilaColumnas>
         </div>
 
-        <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
+        <DragOverlay modifiers={dedo ? [snapCenterToCursor, subirSobreElDedo] : [snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>
           {activeReserva ? (
             <ReservaCard
               reserva={activeReserva}

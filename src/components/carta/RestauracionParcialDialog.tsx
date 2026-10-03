@@ -138,7 +138,7 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px]">
+      <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[900px]">
         <DialogHeader>
           <DialogTitle>Restauración Parcial de Precios</DialogTitle>
           <DialogDescription>
@@ -171,7 +171,7 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
               placeholder="Buscar items..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-9"
+              className="h-11 pl-9 text-base md:text-base"
             />
           </div>
 
@@ -182,7 +182,7 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
                 variant="ghost"
                 size="sm"
                 onClick={seleccionarTodos}
-                className="h-8"
+                className="h-11 px-3"
               >
                 <Checkbox 
                   checked={todosSeleccionados}
@@ -195,35 +195,37 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
               </span>
             </div>
 
-            <ScrollArea className="h-[400px] rounded-lg border">
+            <ScrollArea className="h-[min(400px,45dvh)] rounded-lg border">
               <div className="p-4 space-y-2">
                 {itemsFiltrados.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                   >
-                    <Checkbox
-                      checked={item.seleccionado}
-                      onCheckedChange={() => toggleSeleccion(item.id)}
-                    />
-                    
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{item.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Precio actual: {item.precioActual.toFixed(2)}€
-                      </p>
-                    </div>
+                    <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-4">
+                      <Checkbox
+                        checked={item.seleccionado}
+                        onCheckedChange={() => toggleSeleccion(item.id)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.nombre}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Precio actual: {item.precioActual.toFixed(2)}€
+                        </p>
+                      </div>
+                    </label>
 
                     <div className="flex items-center gap-3">
                       {editandoId === item.id ? (
                         <div className="flex items-center gap-2">
                           <Input
                             type="number"
+                            inputMode="decimal"
                             step="0.01"
                             min="0"
                             value={item.precioEditado}
                             onChange={(e) => actualizarPrecio(item.id, e.target.value)}
-                            className="w-24 h-8"
+                            className="h-11 w-28 text-base md:text-base"
                             autoFocus
                             onBlur={() => setEditandoId(null)}
                             onKeyDown={(e) => {
@@ -237,10 +239,11 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditandoId(item.id)}
-                          className="gap-2"
+                          className="h-11 gap-2 px-3"
+                          aria-label={`Editar el precio de ${item.nombre}`}
                         >
                           <span className="font-bold">{item.precioEditado.toFixed(2)}€</span>
-                          <Edit3 className="h-3 w-3" />
+                          <Edit3 className="h-4 w-4" />
                         </Button>
                       )}
                       
@@ -258,10 +261,11 @@ export function RestauracionParcialDialog({ open, onOpenChange, ajuste }: Restau
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="h-11 px-4" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button 
+            className="h-11 px-4"
             onClick={handleRestaurar}
             disabled={itemsSeleccionados.length === 0}
           >

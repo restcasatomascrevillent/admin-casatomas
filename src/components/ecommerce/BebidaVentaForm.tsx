@@ -160,6 +160,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
               <Input
                 id="precio_coste"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 value={form.precio_coste || ""}
                 onChange={(e) => setForm({ ...form, precio_coste: e.target.value ? parseFloat(e.target.value) : null })}
@@ -172,6 +173,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
               <Input
                 id="precio"
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 value={form.precio_eur || ""}
                 onChange={(e) => setForm({ ...form, precio_eur: e.target.value ? parseFloat(e.target.value) : null })}
@@ -201,6 +203,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
               <Input
                 id="stock"
                 type="number"
+                inputMode="decimal"
                 value={form.stock || 0}
                 onChange={(e) => setForm({ ...form, stock: parseInt(e.target.value) || 0 })}
                 placeholder="10"
@@ -242,6 +245,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
               <Input
                 id="orden"
                 type="number"
+                inputMode="decimal"
                 value={form.orden || ""}
                 onChange={(e) => setForm({ ...form, orden: e.target.value ? parseInt(e.target.value) : null })}
                 placeholder="1"
@@ -270,7 +274,8 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6"
+                    className="absolute top-1 right-1 h-11 w-11"
+                    aria-label="Quitar la imagen"
                     onClick={() => {
                       setImagePreview(null);
                       setForm({ ...form, imagen_url: null });
@@ -280,7 +285,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
                   </Button>
                 </div>
               ) : (
-                <label className="flex items-center gap-2 cursor-pointer border border-dashed rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                <label className="flex min-h-14 items-center gap-2 cursor-pointer border border-dashed rounded-lg p-4 hover:bg-muted/50 transition-colors">
                   <Upload className="h-5 w-5 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">
                     {uploading ? "Subiendo..." : "Subir imagen"}
@@ -297,7 +302,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
             </div>
           </div>
 
-          <Button type="submit" disabled={isPending || !form.nombre.trim()}>
+          <Button type="submit" className="h-11 px-6" disabled={isPending || !form.nombre.trim()}>
             {isPending ? (isEditing ? "Guardando..." : "Añadiendo...") : (isEditing ? "Guardar Cambios" : "Añadir Bebida")}
           </Button>
         </form>

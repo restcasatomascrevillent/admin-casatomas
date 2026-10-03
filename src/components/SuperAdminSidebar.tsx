@@ -1,5 +1,5 @@
 import { LayoutDashboard, ShoppingCart, Wallet, Coins, Star, Phone, Mail, Activity, MapPin, Bot, Users, LogOut, ArrowLeft, ShieldAlert } from "lucide-react";
-import type { ComponentType, SVGProps } from "react";
+import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -33,24 +33,30 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
 ];
 
 export function SuperAdminSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
-  const isCollapsed = state === "collapsed";
+  // Dentro del panel deslizante (tablet vertical) el menú siempre se ve expandido.
+  const isCollapsed = state === "collapsed" && !isMobile;
+
+  // Al navegar, el panel deslizante se cierra solo.
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [currentPath, setOpenMobile]);
 
   return (
-    <Sidebar collapsible="icon" className={isCollapsed ? "w-14" : "w-64"}>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         {!isCollapsed && (
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-6 w-6 text-destructive" />
             <div className="flex flex-col">
               <h2 className="text-lg font-semibold text-sidebar-foreground">Super Admin</h2>
-              <span className="text-xs text-muted-foreground">Control total del sistema</span>
+              <span className="text-xs text-sidebar-foreground/70">Control total del sistema</span>
             </div>
           </div>
         )}
@@ -70,7 +76,7 @@ export function SuperAdminSidebar() {
                       end={item.url === "/super-admin"}
                       className="flex items-center gap-3 hover:bg-sidebar-accent rounded-md transition-colors"
                     >
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
@@ -81,10 +87,10 @@ export function SuperAdminSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-4 space-y-2">
+      <SidebarFooter className={`border-t border-sidebar-border space-y-2 ${isCollapsed ? "px-2 py-4" : "p-4"}`}>
         <Button
           variant="ghost"
-          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
           onClick={() => navigate("/dashboard")}
         >
           <ArrowLeft className="h-4 w-4 shrink-0" />
@@ -92,7 +98,7 @@ export function SuperAdminSidebar() {
         </Button>
         <Button
           variant="ghost"
-          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+          className={`w-full text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent ${isCollapsed ? 'justify-center px-2' : 'justify-start'}`}
           onClick={() => signOut()}
         >
           <LogOut className="h-4 w-4 shrink-0" />

@@ -340,9 +340,18 @@ describe("AccionesReserva · variantes", () => {
     const { celda, botones } = montar({ reserva: reserva("pendiente"), variante: "tarjeta" });
     const fila = celda.firstElementChild as HTMLElement;
     expect(fila.tagName).toBe("DIV");
-    expect(fila.className).toBe("flex items-center gap-1 pt-1");
+    // Tablet (03/10/2026): la fila hace wrap y los botones llevan TEXTO visible (con dedo no hay `title`).
+    expect(fila.className).toBe("flex flex-wrap items-center gap-2 pt-1");
     expect(botones).toHaveLength(6);
     expect(within(celda).queryByRole("checkbox")).toBeNull();
+    for (const texto of ["Mesa", "Verificar", "Editar", "Cancelar", "Blacklist"]) {
+      expect(within(celda).getAllByText(texto).length, texto).toBeGreaterThan(0);
+    }
+  });
+
+  it("`fila`: solo iconos (la tabla no tiene sitio para el texto)", () => {
+    const { celda } = montar({ reserva: reserva("pendiente") });
+    expect(within(celda).queryByText("Blacklist")).toBeNull();
   });
 });
 

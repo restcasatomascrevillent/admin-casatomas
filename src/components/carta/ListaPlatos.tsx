@@ -107,7 +107,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {platos.map((plato) => (
           <Card 
             key={plato.id} 
@@ -153,7 +153,9 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-11 w-11"
                       title="Ajustar posición de imagen"
+                      aria-label="Ajustar posición de imagen"
                       onClick={() => setPosicionPlato(plato)}
                     >
                       <Move className="h-4 w-4" />
@@ -163,7 +165,9 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
+                    className="h-11 w-11"
                     title={fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
                     onClick={() => toggleFotoVisible(plato.id)}
                   >
                     {fotosOcultas.has(plato.id) ? (
@@ -194,15 +198,15 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 compact
               />
 
-              <div className="flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
-                <span className="text-xs text-muted-foreground">Foto expandida en carta web</span>
+              <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
+                <span className="text-sm text-muted-foreground">Foto expandida en carta web</span>
                 <Switch
                   checked={plato.expanded ?? false}
                   onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
                   disabled={toggleExpanded.isPending}
-                  className="scale-90 data-[state=checked]:bg-amber-600"
+                  className="data-[state=checked]:bg-amber-600"
                 />
-              </div>
+              </label>
 
               {plato.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
@@ -256,7 +260,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  className="h-11 flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                   onClick={() => setPlatoAEditar(plato)}
                 >
                   <Pencil className="mr-2 h-4 w-4" />
@@ -265,7 +269,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="h-11 flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                   onClick={() => setPlatoAEliminar(plato)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -320,7 +324,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             <img
               src={fotoAVisualizar.url}
               alt={fotoAVisualizar.nombre}
-              className="max-h-[75vh] w-full rounded-md object-contain"
+              className="max-h-[75dvh] w-full rounded-md object-contain"
             />
           )}
         </DialogContent>

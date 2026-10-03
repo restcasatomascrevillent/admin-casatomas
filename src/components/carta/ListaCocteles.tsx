@@ -68,7 +68,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cocteles.map((coctel) => (
           <Card
             key={coctel.id}
@@ -106,7 +106,9 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-11 w-11"
                       title={fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
+                      aria-label={fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
                       onClick={() => toggleFotoVisible(coctel.id)}
                     >
                       {fotosOcultas.has(coctel.id) ? (
@@ -162,8 +164,9 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    className="h-11 w-11 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                     title="Editar"
+                    aria-label="Editar"
                     onClick={() => setCoctelAEditar(coctel)}
                   >
                     <Pencil className="h-4 w-4" />
@@ -171,8 +174,9 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-destructive hover:text-destructive"
+                    className="h-11 w-11 text-destructive hover:text-destructive"
                     title="Eliminar"
+                    aria-label="Eliminar"
                     onClick={() => setCoctelAEliminar(coctel)}
                   >
                     <Trash2 className="h-4 w-4" />

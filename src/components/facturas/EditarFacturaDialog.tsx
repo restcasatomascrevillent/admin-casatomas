@@ -100,7 +100,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Editar Factura {factura?.numero_documento}</DialogTitle>
                     <DialogDescription>
@@ -175,7 +175,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                                     <FormItem>
                                         <FormLabel>Subtotal (€)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" {...field} value={field.value || 0} />
+                                            <Input type="number" inputMode="decimal" step="0.01" {...field} value={field.value || 0} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -189,7 +189,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                                     <FormItem>
                                         <FormLabel>IVA (€)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" {...field} value={field.value || 0} />
+                                            <Input type="number" inputMode="decimal" step="0.01" {...field} value={field.value || 0} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -203,7 +203,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                                     <FormItem>
                                         <FormLabel>Total (€)</FormLabel>
                                         <FormControl>
-                                            <Input type="number" step="0.01" {...field} value={field.value || 0} />
+                                            <Input type="number" inputMode="decimal" step="0.01" {...field} value={field.value || 0} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -231,7 +231,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                         />
 
                         <div className="flex bg-muted/50 p-4 rounded-lg items-center justify-between border">
-                            <div className="space-y-0.5">
+                            <div className="space-y-0.5 pr-3">
                                 <FormLabel className="text-base text-foreground">Marcar como verificada</FormLabel>
                                 <DialogDescription>
                                     Indica que los importes y datos de esta factura han sido revisados y son correctos.
@@ -257,11 +257,12 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="h-11 px-5"
                                 onClick={() => onOpenChange(false)}
                             >
                                 Cancelar
                             </Button>
-                            <Button type="submit" disabled={updateFacturaMutation.isPending}>
+                            <Button type="submit" className="h-11 px-5" disabled={updateFacturaMutation.isPending}>
                                 {updateFacturaMutation.isPending ? "Guardando..." : "Guardar Factura"}
                             </Button>
                         </div>

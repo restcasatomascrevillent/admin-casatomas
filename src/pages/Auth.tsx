@@ -37,8 +37,9 @@ export default function Auth() {
     setLoading(false);
   };
 
+  // `min-h-dvh` + scroll natural: con el teclado abierto en vertical la tarjeta no queda cortada.
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <div className="min-h-app flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
@@ -64,6 +65,9 @@ export default function Auth() {
                 <Input
                   id="login-email"
                   type="text"
+                  inputMode="email"
+                  autoComplete="username"
+                  enterKeyHint="next"
                   placeholder="tu@email.com o nombre.usuario"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
@@ -72,7 +76,7 @@ export default function Auth() {
                   spellCheck={false}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Empleados: usa solo tu nombre de usuario
                 </p>
               </div>
@@ -81,6 +85,8 @@ export default function Auth() {
                 <Input
                   id="login-password"
                   type="password"
+                  autoComplete="current-password"
+                  enterKeyHint="go"
                   placeholder="••••••••"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}

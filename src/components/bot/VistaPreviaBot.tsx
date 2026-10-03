@@ -115,7 +115,7 @@ export function VistaPreviaBot({ borradores }: VistaPreviaBotProps) {
           aria-label="Idioma de la vista previa"
         >
           {IDIOMAS.map((i) => (
-            <ToggleGroupItem key={i.value} value={i.value} className="h-7 px-2 text-xs uppercase" title={i.label}>
+            <ToggleGroupItem key={i.value} value={i.value} className="h-11 min-w-11 px-3 text-sm uppercase" title={i.label}>
               {i.value}
             </ToggleGroupItem>
           ))}
@@ -174,7 +174,7 @@ export function VistaPreviaBot({ borradores }: VistaPreviaBotProps) {
         </div>
 
         <div className="border-t pt-3">
-          <Button type="button" variant="outline" size="sm" onClick={handleProbar} disabled={probando}>
+          <Button type="button" variant="outline" size="sm" className="h-11 px-4" onClick={handleProbar} disabled={probando}>
             {probando ? (
               <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" aria-hidden="true" />
             ) : (

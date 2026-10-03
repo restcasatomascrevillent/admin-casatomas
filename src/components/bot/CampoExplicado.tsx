@@ -41,11 +41,11 @@ export function CampoExplicado({ htmlFor, etiqueta, ayuda, efecto, accesorio, ch
       {children}
       {efecto && (
         <Collapsible open={abierto} onOpenChange={setAbierto}>
-          <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <CollapsibleTrigger className="inline-flex min-h-11 items-center gap-1 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <ChevronRight className={cn("h-3 w-3 transition-transform", abierto && "rotate-90")} aria-hidden="true" />
             Cómo afecta al bot
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-1.5 text-xs leading-relaxed text-muted-foreground">{efecto}</CollapsibleContent>
+          <CollapsibleContent className="pt-1.5 text-sm leading-relaxed text-muted-foreground">{efecto}</CollapsibleContent>
         </Collapsible>
       )}
     </div>

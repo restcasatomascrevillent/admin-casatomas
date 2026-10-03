@@ -725,7 +725,7 @@ export function PanelLateral({
   };
 
   return (
-    <div className="w-72 flex flex-col gap-2 max-h-full overflow-y-auto pr-1">
+    <div className="w-full flex flex-col gap-2 pr-1">
       {/* Panel de propiedades - siempre visible cuando hay selección */}
       {selectedElement && (
         <Card className="border-2 border-primary/20 bg-primary/5">
@@ -761,7 +761,7 @@ export function PanelLateral({
                       <div className="text-xs font-medium bg-green-50 border border-green-200 rounded px-2 py-1 text-green-800">
                         {selectedElement.nombre}
                       </div>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Mesa agrupada: su nombre lo genera la fusión a partir de las mesas que la
                         forman, así que no se edita aquí. Desagrúpala y cambia el número de cada
                         mesa por separado.
@@ -786,31 +786,31 @@ export function PanelLateral({
                             }
                           }}
                           placeholder="Ej: 7"
-                          className={`h-7 text-xs ${numeroEditDuplicado ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                          className={`h-11 text-base ${numeroEditDuplicado ? "border-destructive focus-visible:ring-destructive" : ""}`}
                           aria-invalid={numeroEditDuplicado}
                         />
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="h-7 text-xs shrink-0"
+                          className="h-11 text-base shrink-0"
                           onClick={handleRenombrarMesa}
                           disabled={!puedeGuardarNumero || actualizarMesa.isPending}
                           title="Guardar el número"
                         >
-                          <Check className="h-3 w-3" />
+                          <Check className="h-4 w-4" />
                         </Button>
                       </div>
                       {numeroEditDuplicado ? (
-                        <p className="text-[10px] text-destructive">
+                        <p className="text-xs text-destructive">
                           {mensajeNombreMesaDuplicado(numeroEdit)}
                         </p>
                       ) : numeroEditTrim.length === 0 ? (
-                        <p className="text-[10px] text-destructive">
+                        <p className="text-xs text-destructive">
                           La mesa necesita un número.
                         </p>
                       ) : (
-                        <p className="text-[10px] text-muted-foreground">
-                          El número que se ve en la sala. Enter para guardar, Esc para descartar.
+                        <p className="text-xs text-muted-foreground">
+                          El número que se ve en la sala. Pulsa ✓ (o Intro) para guardar.
                         </p>
                       )}
                     </>
@@ -834,7 +834,7 @@ export function PanelLateral({
 
                     <select
                       aria-label="Tipo de mesa"
-                      className="h-7 w-full rounded-md border border-input bg-background px-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="h-11 w-full rounded-md border border-input bg-background px-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       value={presetMesaSeleccionada?.id ?? ""}
                       onChange={(e) => {
                         const preset = presetMesaPorId(e.target.value);
@@ -857,7 +857,7 @@ export function PanelLateral({
 
                     <div className="grid grid-cols-3 gap-1">
                       <div className="space-y-0.5">
-                        <Label htmlFor="mesa-sel-capacidad" className="text-[10px]">
+                        <Label htmlFor="mesa-sel-capacidad" className="text-xs">
                           Plazas
                         </Label>
                         <Input
@@ -865,13 +865,13 @@ export function PanelLateral({
                           type="number"
                           min={MIN_CAPACIDAD_MESA}
                           max={MAX_CAPACIDAD_MESA}
-                          className="h-7 text-xs px-1"
+                          className="h-11 text-base px-1"
                           value={mesaEdit.capacidad}
                           onChange={(e) => setMesaEdit({ ...mesaEdit, capacidad: e.target.value })}
                         />
                       </div>
                       <div className="space-y-0.5">
-                        <Label htmlFor="mesa-sel-ancho" className="text-[10px]">
+                        <Label htmlFor="mesa-sel-ancho" className="text-xs">
                           {mesaEdit.forma === "circular" ? "Ø (cm)" : "Ancho"}
                         </Label>
                         <Input
@@ -879,13 +879,13 @@ export function PanelLateral({
                           type="number"
                           min={MIN_LADO_MESA_CM}
                           max={MAX_LADO_MESA_CM}
-                          className="h-7 text-xs px-1"
+                          className="h-11 text-base px-1"
                           value={mesaEdit.ancho}
                           onChange={(e) => setMesaEdit({ ...mesaEdit, ancho: e.target.value })}
                         />
                       </div>
                       <div className="space-y-0.5">
-                        <Label htmlFor="mesa-sel-alto" className="text-[10px]">
+                        <Label htmlFor="mesa-sel-alto" className="text-xs">
                           Largo
                         </Label>
                         <Input
@@ -893,7 +893,7 @@ export function PanelLateral({
                           type="number"
                           min={MIN_LADO_MESA_CM}
                           max={MAX_LADO_MESA_CM}
-                          className="h-7 text-xs px-1"
+                          className="h-11 text-base px-1"
                           value={mesaEdit.forma === "circular" ? mesaEdit.ancho : mesaEdit.alto}
                           disabled={mesaEdit.forma === "circular"}
                           onChange={(e) => setMesaEdit({ ...mesaEdit, alto: e.target.value })}
@@ -906,35 +906,35 @@ export function PanelLateral({
                         <Button
                           variant={mesaEdit.forma === "rectangular" ? "default" : "outline"}
                           size="sm"
-                          className="flex-1 h-7"
+                          className="flex-1 h-11"
                           title="Rectangular"
                           onClick={() => setMesaEdit({ ...mesaEdit, forma: "rectangular" })}
                         >
-                          <Square className="h-3 w-3" />
+                          <Square className="h-4 w-4" />
                         </Button>
                         <Button
                           variant={mesaEdit.forma === "circular" ? "default" : "outline"}
                           size="sm"
-                          className="flex-1 h-7"
+                          className="flex-1 h-11"
                           title="Circular"
                           onClick={() => setMesaEdit({ ...mesaEdit, forma: "circular" })}
                         >
-                          <Circle className="h-3 w-3" />
+                          <Circle className="h-4 w-4" />
                         </Button>
                       </div>
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="h-7 text-xs shrink-0"
+                        className="h-11 text-base shrink-0"
                         onClick={handleGuardarMedidasMesa}
                         disabled={!puedeGuardarMedidasMesa}
                         title="Guardar capacidad y tamaño"
                       >
-                        <Check className="h-3 w-3" />
+                        <Check className="h-4 w-4" />
                       </Button>
                     </div>
 
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {mesaEditSinCambios ? (
                         <>
                           {selectedElement.capacidad} plaza(s) ·{" "}
@@ -951,7 +951,7 @@ export function PanelLateral({
                   </div>
                 )}
                 {selectedElement.isMerged && (
-                  <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700">
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
                     Mesa agrupada
                   </Badge>
                 )}
@@ -977,7 +977,7 @@ export function PanelLateral({
                         }}
                         title="Quitar etiqueta"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ) : (
@@ -986,12 +986,12 @@ export function PanelLateral({
                         placeholder="Ej: Terraza, VIP..."
                         value={etiquetaInput}
                         onChange={(e) => setEtiquetaInput(e.target.value)}
-                        className="h-7 text-xs"
+                        className="h-11 text-base"
                       />
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="h-7 text-xs shrink-0"
+                        className="h-11 text-base shrink-0"
                         onClick={() => {
                           if (etiquetaInput.trim()) {
                             onUpdateMesaEtiqueta?.(selectedElement.id, etiquetaInput.trim());
@@ -1001,7 +1001,7 @@ export function PanelLateral({
                         }}
                         disabled={!etiquetaInput.trim()}
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   )}
@@ -1012,20 +1012,20 @@ export function PanelLateral({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 h-7 text-xs border-orange-300 text-orange-600 hover:bg-orange-50"
+                      className="flex-1 h-11 text-base border-orange-300 text-orange-600 hover:bg-orange-50"
                       onClick={() => onUnmergeMesa(selectedElement.id)}
                     >
-                      <Unlink className="h-3 w-3 mr-1" />
+                      <Unlink className="h-4 w-4 mr-1" />
                       Desagrupar
                     </Button>
                   )}
                   <Button
                     variant="destructive"
                     size="sm"
-                    className={`h-7 text-xs ${selectedElement.isMerged ? 'flex-1' : 'w-full'}`}
+                    className={`h-11 text-base ${selectedElement.isMerged ? 'flex-1' : 'w-full'}`}
                     onClick={() => handleAbrirEliminarMesa({ id: selectedElement.id, nombre: selectedElement.nombre })}
                   >
-                    <Trash2 className="h-3 w-3 mr-1" />
+                    <Trash2 className="h-4 w-4 mr-1" />
                     Eliminar
                   </Button>
                 </div>
@@ -1039,13 +1039,13 @@ export function PanelLateral({
       <Collapsible open={openAddMesa} onOpenChange={setOpenAddMesa}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer">
+            <button type="button" className="flex min-h-12 w-full items-center justify-between p-3 text-left touch-manipulation">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Plus className="h-4 w-4" />
                 Añadir Mesa
               </div>
               {openAddMesa ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </div>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3">
@@ -1061,20 +1061,20 @@ export function PanelLateral({
                       handleAddMesa();
                     }
                   }}
-                  className={`h-8 ${nuevoNombreDuplicado ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  className={`h-11 ${nuevoNombreDuplicado ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   aria-invalid={nuevoNombreDuplicado}
                 />
                 {nuevoNombreDuplicado ? (
-                  <p className="text-[10px] text-destructive">
+                  <p className="text-xs text-destructive">
                     {mensajeNombreMesaDuplicado(newMesa.nombre)}
                   </p>
                 ) : (
                   <button
                     type="button"
-                    className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    className="min-h-11 py-2 text-left text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
                     onClick={() => setNewMesa({ ...newMesa, nombre: siguienteLibre })}
                   >
-                    Primer número libre: {siguienteLibre} (clic para usarlo)
+                    Primer número libre: {siguienteLibre} (toca para usarlo)
                   </button>
                 )}
               </div>
@@ -1086,18 +1086,18 @@ export function PanelLateral({
                     <Button
                       variant={newMesa.forma === "rectangular" ? "default" : "outline"}
                       size="sm"
-                      className="flex-1 h-7"
+                      className="flex-1 h-11"
                       onClick={() => handleFormaChange("rectangular")}
                     >
-                      <Square className="h-3 w-3" />
+                      <Square className="h-4 w-4" />
                     </Button>
                     <Button
                       variant={newMesa.forma === "circular" ? "default" : "outline"}
                       size="sm"
-                      className="flex-1 h-7"
+                      className="flex-1 h-11"
                       onClick={() => handleFormaChange("circular")}
                     >
-                      <Circle className="h-3 w-3" />
+                      <Circle className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -1109,7 +1109,7 @@ export function PanelLateral({
                     max={20}
                     value={newMesa.capacidad}
                     onChange={(e) => setNewMesa({ ...newMesa, capacidad: parseInt(e.target.value) || 1 })}
-                    className="h-8"
+                    className="h-11"
                   />
                 </div>
               </div>
@@ -1123,7 +1123,7 @@ export function PanelLateral({
                     max={300}
                     value={newMesa.ancho}
                     onChange={(e) => setNewMesa({ ...newMesa, ancho: parseInt(e.target.value) || 80 })}
-                    className="h-8"
+                    className="h-11"
                   />
                 </div>
                 {newMesa.forma === "rectangular" && (
@@ -1135,21 +1135,21 @@ export function PanelLateral({
                       max={300}
                       value={newMesa.alto}
                       onChange={(e) => setNewMesa({ ...newMesa, alto: parseInt(e.target.value) || 60 })}
-                      className="h-8"
+                      className="h-11"
                     />
                   </div>
                 )}
               </div>
 
               <Button
-                className="w-full h-8 text-xs"
+                className="w-full h-11 text-base"
                 onClick={handleAddMesa}
                 disabled={crearMesa.isPending || creandoLote || !puedeCrearMesa}
               >
-                <Plus className="h-3 w-3 mr-1" />
+                <Plus className="h-4 w-4 mr-1" />
                 {crearMesa.isPending ? "Creando..." : "Crear Mesa"}
               </Button>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Se guarda en la base de datos al instante (no hace falta pulsar «Guardar») y
                 aparece en el plano para que la arrastres a su sitio. Las mesas dibujadas con la
                 herramienta del lienzo, en cambio, se guardan al pulsar «Guardar».
@@ -1163,7 +1163,7 @@ export function PanelLateral({
       <Collapsible open={openAddLote} onOpenChange={setOpenAddLote}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer">
+            <button type="button" className="flex min-h-12 w-full items-center justify-between p-3 text-left touch-manipulation">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Rows3 className="h-4 w-4" />
                 Cargar la sala
@@ -1174,11 +1174,11 @@ export function PanelLateral({
                 )}
               </div>
               {openAddLote ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </div>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3">
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Escribe los números de la sala —admite rangos, saltos y prefijos— y ajusta
                 después solo las mesas que sean distintas. Máximo {MAX_MESAS_POR_LOTE} de una vez.
               </p>
@@ -1200,7 +1200,7 @@ export function PanelLateral({
                   }}
                   placeholder="1-8, 11-16, T1-T6, 20"
                   rows={2}
-                  className={`min-h-[52px] text-xs ${
+                  className={`min-h-[88px] text-base ${
                     loteTexto.trim() && listaLote.error
                       ? "border-destructive focus-visible:ring-destructive"
                       : ""
@@ -1210,7 +1210,7 @@ export function PanelLateral({
                 />
                 <p
                   id="lote-numeros-ayuda"
-                  className={`text-[10px] ${
+                  className={`text-xs ${
                     loteTexto.trim() && listaLote.error ? "text-destructive" : "text-muted-foreground"
                   }`}
                 >
@@ -1222,11 +1222,11 @@ export function PanelLateral({
                 </p>
                 <Button
                   variant="secondary"
-                  className="w-full h-7 text-xs"
+                  className="w-full h-11 text-base"
                   onClick={handleAnadirNumerosALote}
                   disabled={creandoLote || !loteTexto.trim() || !!listaLote.error}
                 >
-                  <Plus className="h-3 w-3 mr-1" />
+                  <Plus className="h-4 w-4 mr-1" />
                   Añadir a la lista
                 </Button>
               </div>
@@ -1240,7 +1240,7 @@ export function PanelLateral({
                       key={p.id}
                       variant={presetLote.id === p.id ? "default" : "outline"}
                       size="sm"
-                      className="h-auto flex-col items-start gap-0 py-1 px-1 text-[10px] leading-tight"
+                      className="h-auto flex-col items-start gap-0 py-1 px-1 text-xs leading-tight"
                       title={`${p.etiqueta} · ${p.medidas} · ${p.capacidad} plaza(s)`}
                       onClick={() => {
                         setPresetLote(p);
@@ -1259,7 +1259,7 @@ export function PanelLateral({
                     </Button>
                   ))}
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Se usa para las mesas nuevas y se aplica a todas las de la lista. Solo la
                   redonda es circular: el plano únicamente distingue redonda de rectangular.
                 </p>
@@ -1279,13 +1279,13 @@ export function PanelLateral({
                       placeholder="Ej: 4"
                       value={capacidadParaTodas}
                       onChange={(e) => setCapacidadParaTodas(e.target.value)}
-                      className="h-7 text-xs"
+                      className="h-11 text-base"
                     />
                   </div>
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-7 shrink-0 text-xs"
+                    className="h-11 shrink-0 text-base"
                     disabled={!capacidadParaTodas.trim()}
                     onClick={() => {
                       setFilasLote((prev) =>
@@ -1302,13 +1302,13 @@ export function PanelLateral({
               {/* 3) La lista: una línea por mesa, para tocar solo las que cambian. */}
               {filasLote.length > 0 && (
                 <div className="rounded-md border">
-                  <div className="flex items-center justify-between bg-muted/50 px-2 py-1 text-[10px] text-muted-foreground">
+                  <div className="flex items-center justify-between bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
                     <span>
                       {totalesLote.total} mesa(s) · {totalesLote.plazas} plazas
                     </span>
                     <button
                       type="button"
-                      className="underline underline-offset-2 hover:text-foreground"
+                      className="min-h-11 px-2 underline underline-offset-2 hover:text-foreground"
                       onClick={() => {
                         setFilasLote([]);
                         setResumenLote(null);
@@ -1324,7 +1324,7 @@ export function PanelLateral({
                         const problema =
                           normalizado.length === 0 || nombresLoteConProblema.has(normalizado);
                         return (
-                          <div key={fila.clave} className="flex items-center gap-1">
+                          <div key={fila.clave} className="flex flex-wrap items-center gap-1 border-b pb-1 last:border-b-0">
                             <Input
                               aria-label={`Número de la mesa ${fila.nombre}`}
                               value={fila.nombre}
@@ -1333,7 +1333,7 @@ export function PanelLateral({
                                   actualizarFilaLote(prev, fila.clave, { nombre: e.target.value }),
                                 )
                               }
-                              className={`h-7 min-w-0 flex-1 px-1 text-xs ${
+                              className={`h-11 min-w-[5rem] flex-1 px-2 text-base ${
                                 problema ? "border-destructive focus-visible:ring-destructive" : ""
                               }`}
                               aria-invalid={problema}
@@ -1341,7 +1341,7 @@ export function PanelLateral({
                             <select
                               aria-label={`Tipo de la mesa ${fila.nombre}`}
                               title={medidasMesaTexto(fila.forma, fila.anchoCm, fila.altoCm)}
-                              className="h-7 w-[86px] shrink-0 rounded-md border border-input bg-background px-1 text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              className="h-11 w-[116px] shrink-0 rounded-md border border-input bg-background px-1 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               value={fila.presetId ?? ""}
                               onChange={(e) => {
                                 const preset = presetMesaPorId(e.target.value);
@@ -1370,18 +1370,18 @@ export function PanelLateral({
                                   }),
                                 )
                               }
-                              className="h-7 w-11 shrink-0 px-1 text-xs"
+                              className="h-11 w-16 shrink-0 px-1 text-base"
                             />
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-6 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                              className="h-11 w-11 shrink-0 p-0 text-muted-foreground hover:text-destructive"
                               aria-label={`Quitar la mesa ${fila.nombre} de la lista`}
                               onClick={() =>
                                 setFilasLote((prev) => quitarFilaLote(prev, fila.clave))
                               }
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-4 w-4" />
                             </Button>
                           </div>
                         );
@@ -1392,10 +1392,10 @@ export function PanelLateral({
               )}
 
               {loteAvisoChoques && (
-                <p className="text-[10px] text-destructive">{loteAvisoChoques}</p>
+                <p className="text-xs text-destructive">{loteAvisoChoques}</p>
               )}
               {hayFilasSinNumero && (
-                <p className="text-[10px] text-destructive">
+                <p className="text-xs text-destructive">
                   Hay mesas sin número en la lista: ponles uno o quítalas.
                 </p>
               )}
@@ -1404,8 +1404,8 @@ export function PanelLateral({
                   error: las que fallaron se quedan en la lista para reintentar. */}
               {resumenLote?.hayFallos && (
                 <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2">
-                  <p className="text-[10px] font-medium text-destructive">{resumenLote.mensaje}</p>
-                  <ul className="space-y-0.5 text-[10px] text-destructive">
+                  <p className="text-xs font-medium text-destructive">{resumenLote.mensaje}</p>
+                  <ul className="space-y-0.5 text-xs text-destructive">
                     {resumenLote.fallidas.map((f) => (
                       <li key={f.nombre}>
                         Mesa {f.nombre}: {f.motivo}.
@@ -1415,8 +1415,8 @@ export function PanelLateral({
                 </div>
               )}
 
-              <Button className="w-full h-8 text-xs" onClick={handleAddLote} disabled={!puedeCrearLote}>
-                <Plus className="h-3 w-3 mr-1" />
+              <Button className="w-full h-11 text-base" onClick={handleAddLote} disabled={!puedeCrearLote}>
+                <Plus className="h-4 w-4 mr-1" />
                 {creandoLote
                   ? `Creando mesas… ${progresoLote}/${filasLote.length}`
                   : filasLote.length === 0
@@ -1432,18 +1432,18 @@ export function PanelLateral({
       <Collapsible open={openMesasList} onOpenChange={setOpenMesasList}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer">
+            <button type="button" className="flex min-h-12 w-full items-center justify-between p-3 text-left touch-manipulation">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <List className="h-4 w-4" />
                 Mesas
                 <Badge variant="secondary" className="text-xs">{mesasCanvas.length}</Badge>
               </div>
               {openMesasList ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </div>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="p-0">
-              <ScrollArea className="h-40">
+              <ScrollArea className="h-52">
                 <div className="p-2 space-y-1">
                   {mesasCanvas.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-2">
@@ -1453,7 +1453,7 @@ export function PanelLateral({
                     mesasCanvas.map((mesa) => (
                       <div
                         key={mesa.id}
-                        className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors text-xs ${
+                        className={`flex min-h-11 items-center justify-between p-2 rounded cursor-pointer transition-colors text-sm touch-manipulation ${
                           selectedElement?.id === mesa.id 
                             ? "bg-primary/10 border border-primary/30" 
                             : "bg-muted/50 hover:bg-muted"
@@ -1471,10 +1471,10 @@ export function PanelLateral({
                             {mesa.nombre}
                           </span>
                           {mesa.isMerged && (
-                            <span className="text-[9px] text-green-700 shrink-0">agrupada</span>
+                            <span className="text-[11px] text-green-700 shrink-0">agrupada</span>
                           )}
                         </div>
-                        <Badge variant="outline" className="text-[10px] py-0 h-5">
+                        <Badge variant="outline" className="text-xs py-0 h-5">
                           <Users className="h-2.5 w-2.5 mr-0.5" />
                           {mesa.capacidad}
                         </Badge>
@@ -1492,13 +1492,13 @@ export function PanelLateral({
       <Collapsible open={openLeyenda} onOpenChange={setOpenLeyenda}>
         <Card>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-3 cursor-pointer">
+            <button type="button" className="flex min-h-12 w-full items-center justify-between p-3 text-left touch-manipulation">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Info className="h-4 w-4" />
                 Leyenda
               </div>
               {openLeyenda ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            </div>
+            </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3">
@@ -1521,10 +1521,10 @@ export function PanelLateral({
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground border-t pt-2">
-                Atajos: S seleccionar · W pared · A área · M mesa · C mesa circular ·
-                D puerta · Supr borrar · Esc cancelar. Al dibujar paredes, Shift
-                desactiva el ajuste a 0/45/90°.
+              <p className="text-xs text-muted-foreground border-t pt-2">
+                Con teclado: S seleccionar · W pared · A área · M mesa · C mesa circular · D puerta · Supr
+                borrar · Esc cancelar. Todo esto tiene su botón en la barra de arriba; «Ángulo libre»
+                equivale a mantener Mayús al dibujar paredes.
               </p>
             </CardContent>
           </CollapsibleContent>

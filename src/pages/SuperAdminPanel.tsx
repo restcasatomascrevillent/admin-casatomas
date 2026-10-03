@@ -47,9 +47,9 @@ export default function SuperAdminPanel() {
                 {toggles.map((toggle) => (
                   <div
                     key={toggle.section_key}
-                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0"
+                    className="flex min-h-14 items-center justify-between gap-3 py-1 first:pt-0 last:pb-0"
                   >
-                    <Label htmlFor={`toggle-${toggle.section_key}`} className="text-sm font-medium">
+                    <Label htmlFor={`toggle-${toggle.section_key}`} className="flex-1 cursor-pointer py-3 text-sm font-medium">
                       {toggle.label}
                     </Label>
                     <Switch
@@ -80,7 +80,7 @@ export default function SuperAdminPanel() {
                 <Button
                   key={feature.url}
                   variant="outline"
-                  className="justify-start h-auto py-3"
+                  className="h-auto min-h-11 justify-start py-3"
                   asChild
                 >
                   <Link to={feature.url}>

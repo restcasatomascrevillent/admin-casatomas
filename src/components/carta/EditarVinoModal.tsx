@@ -259,7 +259,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Vino</DialogTitle>
           <DialogDescription>
@@ -310,7 +310,6 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 ref={fileInputRef}
                 onChange={handleImageChange}
                 accept="image/*"
-                capture="environment"
                 className="hidden"
               />
 
@@ -321,7 +320,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 h-11 w-11"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
@@ -356,7 +355,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 <FormItem>
                   <FormLabel>Precio (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -465,7 +464,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
             {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}
             <div className="space-y-3">
               <FormLabel>Alérgenos</FormLabel>
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {ALERGENOS_OFICIALES.map((alergeno) => {
                   const isSelected = alergenosSeleccionados.includes(alergeno.id);
                   return (
@@ -474,7 +473,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                       type="button"
                       onClick={() => toggleAlergeno(alergeno.id)}
                       className={[
-                        "flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border",
+                        "flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 border",
                         isSelected
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted",
@@ -491,7 +490,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                   value={nuevoAlergeno}
                   onChange={(e) => setNuevoAlergeno(e.target.value)}
                   placeholder="Añadir alérgeno personalizado..."
-                  className="flex-1"
+                  className="h-11 flex-1 text-base md:text-base"
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -512,14 +511,15 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               {alergenosPersonalizados.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {alergenosPersonalizados.map((alergeno) => (
-                    <Badge key={alergeno} variant="secondary" className="gap-1 pr-1">
+                    <Badge key={alergeno} variant="secondary" className="gap-0 py-0 pl-3 pr-0 text-sm">
                       {alergeno}
                       <button
                         type="button"
                         onClick={() => removeAlergenoPersonalizado(alergeno)}
-                        className="ml-1 hover:text-destructive"
+                        className="flex h-11 w-11 items-center justify-center hover:text-destructive"
+                        aria-label={`Quitar ${alergeno}`}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </button>
                     </Badge>
                   ))}
@@ -546,10 +546,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
             />
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={actualizarVino.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage}>
                 {actualizarVino.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

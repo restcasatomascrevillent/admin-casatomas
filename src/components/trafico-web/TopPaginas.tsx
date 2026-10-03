@@ -37,11 +37,11 @@ export function TopPaginas({ proyecto, desde, hasta }: TopPaginasProps) {
             Páginas
           </CardTitle>
           <Tabs value={orden} onValueChange={(v) => setOrden(v as OrdenTopPaginas)}>
-            <TabsList className="h-8">
-              <TabsTrigger value="visitas" className="px-2.5 text-xs">
+            <TabsList className="h-auto">
+              <TabsTrigger value="visitas" className="min-h-11 px-3 text-sm">
                 Por visitas
               </TabsTrigger>
-              <TabsTrigger value="bytes" className="px-2.5 text-xs">
+              <TabsTrigger value="bytes" className="min-h-11 px-3 text-sm">
                 Por transferencia
               </TabsTrigger>
             </TabsList>

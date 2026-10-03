@@ -91,7 +91,7 @@ const INSIGNIA =
   "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
 const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] font-medium";
 
-const ANCHO_ACCIONES = "w-[176px] xl:w-[188px]";
+const ANCHO_ACCIONES = "w-[176px] xl:w-[188px] pointer-coarse:w-[240px] pointer-coarse:xl:w-[240px]";
 const ANCHO_MOTIVO = "w-[128px] xl:w-[152px]";
 /** El `max-w` es imprescindible: con `truncate` (que implica `nowrap`) una
  * tabla de layout automático reclamaría el ancho del nombre más largo de la
@@ -102,7 +102,8 @@ const ANCHO_FECHA = "w-[74px] xl:w-[116px]";
 
 /** Ancho FIJO de cada botón de acción. "Rechazar" y "Aprobar" miden distinto,
  * así que sin fijarlo el segundo botón caería en una X diferente en cada fila. */
-const ANCHO_BOTON = "w-[82px] xl:w-[88px]";
+// Con dedo el botón sube a 44 px y a `px-4`: el ancho fijo de ratón se queda corto para «Rechazar».
+const ANCHO_BOTON = "w-[82px] xl:w-[88px] pointer-coarse:w-auto pointer-coarse:min-w-[6rem] pointer-coarse:xl:w-auto";
 
 /** Franja ámbar de "pendiente de revisar". Va como sombra interior y NO como
  * `border-l-4`: con `border-collapse`, un borde de verdad empuja el contenido

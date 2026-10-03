@@ -58,6 +58,10 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
   const nombre = reserva.nombre || "el cliente";
   const detener = {
     onPointerDown: (e: React.SyntheticEvent) => e.stopPropagation(),
+    // El kanban arrastra con `TouchSensor`, que escucha `touchstart` en la
+    // tarjeta: sin esto, un toque de >=200 ms sobre un botón de aquí arrancaba
+    // un arrastre y dnd-kit se tragaba el clic.
+    onTouchStart: (e: React.SyntheticEvent) => e.stopPropagation(),
     onKeyDown: (e: React.SyntheticEvent) => e.stopPropagation(),
   };
 
@@ -146,11 +150,14 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
       <ConMotivo motivo={motivoSiNoSePuede(llegada)}>
         <Button
           type="button"
-          size="sm"
+          // Sin texto es un botón de icono: así en táctil sube a 44x44 (el
+          // `size="sm"` con `w-6 p-0` chocaba con el `px-4` táctil de ui/button).
+          size={soloIcono ? "icon" : "sm"}
           variant="outline"
           className={cn(
             "gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40",
             compacto ? "h-6 text-[11px]" : "h-7 text-xs",
+            "pointer-coarse:text-sm",
             // Sin texto queda cuadrado (24px de lado en compacto): es la mitad
             // de ancho que con «Ha llegado», y eso es justo lo que permite
             // estrechar la columna del kanban sin esconder ninguna.

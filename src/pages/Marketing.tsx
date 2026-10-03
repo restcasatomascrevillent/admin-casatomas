@@ -13,16 +13,16 @@ export default function Marketing() {
             en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
 
         <Tabs defaultValue="crear" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="crear" className="gap-2">
+          <TabsList className="h-auto flex-wrap justify-start">
+            <TabsTrigger value="crear" className="min-h-11 gap-2 px-4">
               <Send className="h-4 w-4" />
               Enviar Newsletter
             </TabsTrigger>
-            <TabsTrigger value="suscriptores" className="gap-2">
+            <TabsTrigger value="suscriptores" className="min-h-11 gap-2 px-4">
               <Users className="h-4 w-4" />
               Suscriptores
             </TabsTrigger>
-            <TabsTrigger value="estadisticas" className="gap-2">
+            <TabsTrigger value="estadisticas" className="min-h-11 gap-2 px-4">
               <BarChart3 className="h-4 w-4" />
               Estadísticas
             </TabsTrigger>

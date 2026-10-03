@@ -64,19 +64,20 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       title={copied ? "¡Copiado!" : "Copiar respuesta"}
       className={cn(
-        "flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium transition-all duration-150",
+        "flex min-h-11 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-all duration-150",
         copied
-          ? "text-emerald-500 bg-emerald-500/10"
-          : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60"
+          ? "text-emerald-600 bg-emerald-500/10"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
       )}
     >
       {copied ? (
-        <Check className="h-3 w-3" />
+        <Check className="h-4 w-4" />
       ) : (
-        <Copy className="h-3 w-3" />
+        <Copy className="h-4 w-4" />
       )}
       {copied ? "Copiado" : "Copiar"}
     </button>
@@ -151,15 +152,15 @@ export function ChatArea({
           </div>
 
           {/* Sugerencias (dinámicas o por defecto) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl">
             {listaSugerencias.map(({ icon: Icon, texto }) => (
               <button
                 key={texto}
                 onClick={() => handleSugerencia(texto)}
                 disabled={isSending}
-                className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-card p-3 text-left text-xs text-muted-foreground hover:border-[hsl(38,59%,45%)] hover:text-foreground hover:shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="flex min-h-11 items-start gap-2.5 rounded-xl border border-border/60 bg-card p-3 text-left text-sm text-muted-foreground hover:border-[hsl(38,59%,45%)] hover:text-foreground hover:shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed group"
               >
-                <Icon className="h-3.5 w-3.5 shrink-0 mt-0.5 group-hover:text-[hsl(38,59%,45%)] transition-colors" />
+                <Icon className="h-4 w-4 shrink-0 mt-0.5 group-hover:text-[hsl(38,59%,45%)] transition-colors" />
                 <span className="leading-snug">{texto}</span>
               </button>
             ))}
@@ -222,7 +223,7 @@ export function ChatArea({
                   </div>
 
                   {/* Burbuja + acciones */}
-                  <div className={cn("flex flex-col gap-1 max-w-[78%]", isUser ? "items-end" : "items-start")}>
+                  <div className={cn("flex flex-col gap-1 max-w-[88%] sm:max-w-[78%]", isUser ? "items-end" : "items-start")}>
                     <div
                       className={cn(
                         "rounded-2xl px-4 py-2.5 shadow-sm",
@@ -246,7 +247,7 @@ export function ChatArea({
                       </div>
                       <p
                         className={cn(
-                          "text-[10px] mt-1.5 text-right",
+                          "text-xs mt-1.5 text-right",
                           isUser ? "text-white/60" : "text-muted-foreground/60"
                         )}
                       >
@@ -258,9 +259,8 @@ export function ChatArea({
                               "mr-1.5 font-medium",
                               isUser ? "text-white/90" : "text-destructive"
                             )}
-                            title="No se pudo guardar en el historial: se perdera al recargar y el asistente no lo recordara"
                           >
-                            sin guardar ·
+                            sin guardar (no se pudo guardar en el historial: se perderá al recargar) ·
                           </span>
                         )}
                         {new Date(msg.created_at).toLocaleTimeString("es-ES", {
@@ -278,11 +278,12 @@ export function ChatArea({
                         {/* Botón regenerar solo en el último mensaje del asistente */}
                         {isLastAssistant && onRegenerar && !isSending && (
                           <button
+                            type="button"
                             onClick={onRegenerar}
                             title="Regenerar respuesta"
-                            className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/60 transition-all duration-150"
+                            className="flex min-h-11 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
                           >
-                            <RefreshCw className="h-3 w-3" />
+                            <RefreshCw className="h-4 w-4" />
                             Regenerar
                           </button>
                         )}
@@ -340,16 +341,19 @@ function InputBar({ input, setInput, isSending, onSend, onKeyDown }: InputBarPro
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder="Escribe tu pregunta… (Enter para enviar)"
+        placeholder="Escribe tu pregunta…"
+        enterKeyHint="send"
+        aria-label="Pregunta para el asistente"
         disabled={isSending}
-        className="min-h-[52px] max-h-32 resize-none text-sm rounded-xl border-border/60 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-1 focus-visible:border-[hsl(38,59%,45%)]"
+        className="min-h-[52px] max-h-32 resize-none text-base md:text-base rounded-xl border-border/60 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-1 focus-visible:border-[hsl(38,59%,45%)]"
         rows={2}
       />
       <Button
         onClick={onSend}
         disabled={isSending || !input.trim()}
         size="icon"
-        className="h-auto w-11 shrink-0 rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
+        aria-label="Enviar pregunta"
+        className="h-auto min-h-11 w-12 shrink-0 rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
         style={{
           background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 36%))",
           border: "none",

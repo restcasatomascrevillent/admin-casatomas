@@ -87,7 +87,7 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
     return (
         <>
         <Dialog open={!!call} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+            <DialogContent className="max-w-3xl max-h-[85dvh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         Detalle de llamada
@@ -233,7 +233,7 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                                                         {tool.tool}
                                                     </span>
                                                     {tool.timestamp && (
-                                                        <span className="text-[10px] text-muted-foreground">
+                                                        <span className="text-xs text-muted-foreground">
                                                             {format(
                                                                 new Date(tool.timestamp),
                                                                 "HH:mm:ss",
@@ -269,9 +269,9 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                         {/* Link reserva */}
                         {reservaId && (
                             <section className="flex flex-wrap gap-2">
-                                <Button asChild variant="outline" size="sm">
+                                <Button asChild variant="outline" size="sm" className="h-11 px-4">
                                     <Link to={`/reservas?reserva=${reservaId}`}>
-                                        <ExternalLink className="w-3 h-3 mr-2" />
+                                        <ExternalLink className="w-4 h-4 mr-2" />
                                         Ver reserva creada
                                     </Link>
                                 </Button>
@@ -280,14 +280,20 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        className="h-11 px-4"
                                         disabled={!puedeEditar}
                                         title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
                                         onClick={() => editarReserva(reservaId)}
                                     >
-                                        <SquarePen className="w-3 h-3 mr-2" />
+                                        <SquarePen className="w-4 h-4 mr-2" />
                                         Editar reserva
                                     </Button>
                                 </ConMotivo>
+                                {!puedeEditar && (
+                                    <p className="basis-full text-xs text-muted-foreground">
+                                        No tienes permiso para editar reservas.
+                                    </p>
+                                )}
                             </section>
                         )}
                     </div>

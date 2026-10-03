@@ -45,12 +45,12 @@ export function HistorialVersionesPlantilla({ tipo, versiones, puedeRestaurar }:
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-1.5">
+        <Button type="button" variant="outline" size="sm" className="h-11 gap-1.5 px-4">
           <History className="h-4 w-4" />
           Historial de versiones{versiones.length > 0 ? ` (${versiones.length})` : ""}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[80dvh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Historial de versiones</DialogTitle>
           <DialogDescription>
@@ -84,8 +84,8 @@ export function HistorialVersionesPlantilla({ tipo, versiones, puedeRestaurar }:
               {!v.es_actual && puedeRestaurar && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" className="mt-2 h-7 gap-1.5 px-2 text-xs">
-                      <RotateCcw className="h-3 w-3" />
+                    <Button type="button" variant="ghost" size="sm" className="mt-2 h-11 gap-1.5 px-3 text-sm">
+                      <RotateCcw className="h-4 w-4" />
                       Restaurar esta versión
                     </Button>
                   </AlertDialogTrigger>
@@ -117,7 +117,7 @@ export function HistorialVersionesPlantilla({ tipo, versiones, puedeRestaurar }:
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setAbierto(false)}>
+          <Button type="button" variant="outline" className="h-11 px-5" onClick={() => setAbierto(false)}>
             Cerrar
           </Button>
         </DialogFooter>

@@ -85,7 +85,7 @@ export default function GestionResenas() {
                     subtítulo era relleno. Se conserva el botón, que sí es una
                     acción. */}
                 <div className="flex justify-end">
-                    <Button onClick={handleSync} disabled={syncing} className="gap-2 self-start sm:self-auto">
+                    <Button onClick={handleSync} disabled={syncing} className="h-11 gap-2 self-start px-5 sm:self-auto">
                         <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                         {syncing ? "Sincronizando..." : "Sincronizar ahora"}
                     </Button>
@@ -181,7 +181,7 @@ export default function GestionResenas() {
                 {/* Configuración Google Places */}
                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Settings className="h-4 w-4" />
@@ -196,8 +196,8 @@ export default function GestionResenas() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                             >
-                                <Button variant="ghost" size="sm" className="gap-1.5">
-                                    <ExternalLink className="h-3.5 w-3.5" />
+                                <Button variant="ghost" size="sm" className="h-11 gap-1.5 px-4">
+                                    <ExternalLink className="h-4 w-4" />
                                     Ver en Maps
                                 </Button>
                             </a>
@@ -233,23 +233,27 @@ export default function GestionResenas() {
                                     </a>{" "}
                                     y copia el ID que empieza por ChIJ...
                                 </p>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <Input
                                         id="new-place-id"
                                         placeholder="ChIJxxxxxxxxxxxxxxxxx"
                                         value={newPlaceId}
                                         onChange={(e) => setNewPlaceId(e.target.value)}
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                        className="h-11 min-w-[14rem] flex-1 text-base md:text-base"
                                     />
-                                    <Button onClick={handleSavePlaceId} disabled={savingPlaceId || !newPlaceId.trim()}>
+                                    <Button className="h-11 px-5" onClick={handleSavePlaceId} disabled={savingPlaceId || !newPlaceId.trim()}>
                                         Guardar
                                     </Button>
-                                    <Button variant="ghost" onClick={() => { setEditingPlaceId(false); setNewPlaceId(""); }}>
+                                    <Button variant="ghost" className="h-11 px-5" onClick={() => { setEditingPlaceId(false); setNewPlaceId(""); }}>
                                         Cancelar
                                     </Button>
                                 </div>
                             </div>
                         ) : (
-                            <Button variant="outline" size="sm" onClick={() => { setEditingPlaceId(true); setNewPlaceId(config?.place_id ?? ""); }}>
+                            <Button variant="outline" size="sm" className="h-11 px-4" onClick={() => { setEditingPlaceId(true); setNewPlaceId(config?.place_id ?? ""); }}>
                                 Cambiar Place ID
                             </Button>
                         )}
@@ -257,10 +261,10 @@ export default function GestionResenas() {
                         {/* Instrucciones API Key */}
                         <div className="p-4 border border-border rounded-lg bg-muted/20 space-y-2">
                             <p className="text-sm font-medium">🔑 Google Places API Key</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-sm text-muted-foreground">
                                 La API Key se gestiona como secreto seguro en Supabase. Para añadirla o cambiarla:
                             </p>
-                            <ol className="text-xs text-muted-foreground space-y-1 ml-4 list-decimal">
+                            <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
                                 <li>Ve a <strong>Supabase Dashboard → Edge Functions → Secrets</strong></li>
                                 <li>Añade el secreto con nombre: <code className="bg-muted px-1 rounded">GOOGLE_PLACES_API_KEY</code></li>
                                 <li>Valor: tu API Key de Google Cloud con permiso de <em>Places API (New)</em></li>

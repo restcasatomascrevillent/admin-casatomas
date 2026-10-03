@@ -173,7 +173,7 @@ export default function TabBotWeb() {
         <AlertTitle>No se pudo cargar la configuración del bot</AlertTitle>
         <AlertDescription className="space-y-3">
           <p>{error instanceof Error ? error.message : "Error desconocido al leer configBotWeb."}</p>
-          <Button size="sm" variant="outline" className="bg-background" onClick={() => refetch()}>
+          <Button size="sm" variant="outline" className="h-11 bg-background" onClick={() => refetch()}>
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Reintentar
           </Button>
@@ -221,6 +221,7 @@ export default function TabBotWeb() {
               <EstadoGuardadoBadge dirty={dirty} saving={saving} error={saveError} />
               <Button
                 size="sm"
+                className="h-11 px-4"
                 onClick={handleSave}
                 disabled={ocupado || !dirty}
                 aria-label="Guardar cambios y traducir a inglés y francés"

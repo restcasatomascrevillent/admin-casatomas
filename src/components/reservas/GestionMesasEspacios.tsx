@@ -258,6 +258,7 @@ function FilaMesa({ mesa, mesasDelEspacio }: FilaMesaProps) {
                  "Cambiar el número"), así que el foco automático no roba nada:
                  sin él habría que volver a pinchar para escribir. */
               autoFocus
+              enterKeyHint="done"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
               aria-label={`Número de la mesa ${nombreActual}`}

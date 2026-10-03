@@ -52,7 +52,7 @@
 // que en el panel del día.
 // ============================================================================
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -253,6 +253,21 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
    * mover la selección: los datos cargados son los del mes visible, así que un
    * día de otro mes pintaría "no hay reservas" siendo mentira.
    */
+  // Apilado (por debajo de `lg`) el panel del día queda debajo de la rejilla: tocar un día no
+  // cambiaba nada a la vista. Con dedo, si el panel no se ve, se baja hasta él.
+  const panelDiaRef = useRef<HTMLDivElement | null>(null);
+  const elegirDia = (dia: Date) => {
+    setSelectedDate(dia);
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(min-width: 1024px)").matches) return;
+    window.requestAnimationFrame(() => {
+      const caja = panelDiaRef.current?.getBoundingClientRect();
+      if (caja && caja.top > window.innerHeight * 0.6) {
+        panelDiaRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }
+    });
+  };
+
   const cambiarMes = (offset: number) => {
     const nuevo = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
     setCurrentMonth(nuevo);
@@ -351,7 +366,7 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
                           esHoy={dateKey === hoy}
                           seleccionada={isSameDay(day, selectedDate)}
                           ventanaHoras={ventanaHoras}
-                          onSeleccionar={setSelectedDate}
+                          onSeleccionar={elegirDia}
                         />
                       );
                     })}
@@ -364,7 +379,7 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
           {/* Panel del día: el reparto por salas. Con tope de alto solo a partir de
               `lg`, donde va en columna junto al calendario; apilado (por debajo de
               `lg`) crece libre, que es lo que evita que se corte nada. */}
-          <Card className="flex min-w-0 flex-col lg:max-h-[620px]">
+          <Card ref={panelDiaRef} className="flex min-w-0 flex-col scroll-mt-4 lg:max-h-[620px]">
             <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
               {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
                   sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}

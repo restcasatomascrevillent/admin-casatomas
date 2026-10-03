@@ -864,7 +864,7 @@ export function EditorNovedadesWeb() {
                   <AlertTitle>No se pudieron cargar las novedades</AlertTitle>
                   <AlertDescription className="space-y-2">
                     <p>{error instanceof Error ? error.message : "Error desconocido"}</p>
-                    <Button size="sm" variant="outline" className="bg-background" onClick={() => refetch()}>
+                    <Button size="sm" variant="outline" className="h-11 bg-background" onClick={() => refetch()}>
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                       Reintentar
                     </Button>
@@ -889,14 +889,14 @@ export function EditorNovedadesWeb() {
                     return (
                       <li
                         key={novedad.id}
-                        className={`flex items-center gap-3 p-2 pr-1 rounded-lg border transition-colors ${
+                        className={`flex items-center gap-2 p-2 pr-1 rounded-lg border transition-colors ${
                           esEditada ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/50"
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => empezarEdicion(novedad)}
-                          className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex min-h-11 items-center gap-3 flex-1 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           aria-label={`Editar «${novedad.titulo}»`}
                         >
                           <div className="h-10 w-14 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
@@ -930,60 +930,54 @@ export function EditorNovedadesWeb() {
                         </button>
 
                         <div className="flex items-center gap-0.5 shrink-0">
-                          <label className="flex items-center gap-1.5 px-1.5 cursor-pointer" title="Mostrar u ocultar en la web">
+                          <label className="flex min-h-11 items-center gap-1.5 px-1.5 cursor-pointer">
                             <Switch
                               checked={!!novedad.activo}
                               disabled={togglingId === novedad.id}
                               onCheckedChange={(checked) => handleToggleActivo(novedad, checked)}
                               aria-label={`Visible en la web: «${novedad.titulo}»`}
                             />
-                            <span className="hidden sm:inline text-xs text-muted-foreground w-12">
+                            <span className="hidden sm:inline text-xs text-muted-foreground w-14">
                               {novedad.activo ? "Visible" : "Oculta"}
                             </span>
                           </label>
-                          <div className="flex flex-col">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-5 w-7"
-                              disabled={!mismoGrupoArriba || reordenar.isPending}
-                              onClick={() => moverNovedad(index, -1)}
-                              aria-label="Subir"
-                              title="Subir"
-                            >
-                              <ArrowUp className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-5 w-7"
-                              disabled={!mismoGrupoAbajo || reordenar.isPending}
-                              onClick={() => moverNovedad(index, 1)}
-                              aria-label="Bajar"
-                              title="Bajar"
-                            >
-                              <ArrowDown className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => empezarEdicion(novedad)}
-                            aria-label="Editar"
-                            title="Editar"
+                            className="h-11 w-11"
+                            disabled={!mismoGrupoArriba || reordenar.isPending}
+                            onClick={() => moverNovedad(index, -1)}
+                            aria-label="Subir"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            <ArrowUp className="w-4 h-4" />
                           </Button>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            className="h-11 w-11"
+                            disabled={!mismoGrupoAbajo || reordenar.isPending}
+                            onClick={() => moverNovedad(index, 1)}
+                            aria-label="Bajar"
+                          >
+                            <ArrowDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-11 w-11"
+                            onClick={() => empezarEdicion(novedad)}
+                            aria-label="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-11 w-11 text-destructive hover:text-destructive"
                             onClick={() => setDeleteTarget(novedad)}
                             aria-label="Eliminar"
-                            title="Eliminar"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </li>
@@ -1021,7 +1015,7 @@ export function EditorNovedadesWeb() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground shrink-0"
+                    className="h-11 text-muted-foreground shrink-0"
                     onClick={() => conConfirmacion(() => {
                       descartarSubidaSinGuardar();
                       cargarEnFormulario(null);
@@ -1071,6 +1065,7 @@ export function EditorNovedadesWeb() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-11"
                     onClick={handleAbrirModalTono}
                     disabled={generandoDescripcion}
                   >
@@ -1087,11 +1082,11 @@ export function EditorNovedadesWeb() {
                   value={formData.descripcion}
                   onChange={(e) => setCampo("descripcion", e.target.value)}
                   placeholder="Escribe el texto o unas ideas sueltas y pulsa «Redactar con IA» para que lo pula."
-                  className="min-h-24"
+                  className="min-h-24 text-base md:text-base"
                 />
 
                 <Collapsible>
-                  <CollapsibleTrigger className="group flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  <CollapsibleTrigger className="group flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                     <ChevronDown className="w-3.5 h-3.5 transition-transform group-data-[state=open]:rotate-180" />
                     Datos extra para la IA (opcional)
                   </CollapsibleTrigger>
@@ -1099,7 +1094,7 @@ export function EditorNovedadesWeb() {
                     <div className="space-y-1.5 max-w-xs">
                       <Label className="text-xs">Tipo de novedad</Label>
                       <Select value={formData.tipo} onValueChange={(v) => setCampo("tipo", v)}>
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger className="h-11">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1126,7 +1121,8 @@ export function EditorNovedadesWeb() {
                                 }))
                               }
                               placeholder={campo.placeholder}
-                              className="h-8 text-sm"
+                              className="h-11 text-base md:text-base"
+                              inputMode={campo.type === "number" ? "decimal" : undefined}
                               step={campo.type === "number" ? "0.01" : undefined}
                             />
                           </div>
@@ -1155,14 +1151,14 @@ export function EditorNovedadesWeb() {
                             nuevos[index] = e.target.value;
                             setCampo("bullets", nuevos);
                           }}
-                          className="h-8 text-sm flex-1"
+                          className="h-11 flex-1 text-base md:text-base"
                           aria-label={`Punto destacado ${index + 1}`}
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-11 w-11 shrink-0"
                           onClick={() => setCampo("bullets", formData.bullets.filter((_, i) => i !== index))}
                           aria-label="Quitar punto"
                         >
@@ -1176,7 +1172,7 @@ export function EditorNovedadesWeb() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-2 text-muted-foreground"
+                  className="h-11 px-3 text-muted-foreground"
                   onClick={() => setCampo("bullets", [...formData.bullets, ""])}
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" />
@@ -1189,15 +1185,15 @@ export function EditorNovedadesWeb() {
                 <Label htmlFor="nov-etiqueta">Etiquetas</Label>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {formData.tags.map((tag, index) => (
-                    <Badge key={`${tag}-${index}`} variant="secondary" className="gap-1 pr-1">
+                    <Badge key={`${tag}-${index}`} variant="secondary" className="gap-0 py-0 pl-3 pr-0 text-sm">
                       {tag}
                       <button
                         type="button"
                         onClick={() => setCampo("tags", formData.tags.filter((_, i) => i !== index))}
-                        className="rounded-sm hover:text-destructive"
+                        className="flex h-11 w-11 items-center justify-center rounded-full hover:text-destructive"
                         aria-label={`Quitar etiqueta ${tag}`}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
                     </Badge>
                   ))}
@@ -1213,7 +1209,7 @@ export function EditorNovedadesWeb() {
                       }
                     }}
                     placeholder="Escribe y pulsa Intro"
-                    className="h-8 text-sm w-44"
+                    className="h-11 w-52 text-base md:text-base"
                   />
                 </div>
               </div>
@@ -1244,7 +1240,7 @@ export function EditorNovedadesWeb() {
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => setImageModalOpen(true)}>
+                      <Button type="button" variant="outline" size="sm" className="h-11" onClick={() => setImageModalOpen(true)}>
                         <Move className="w-3.5 h-3.5 mr-1.5" />
                         Ajustar encuadre
                       </Button>
@@ -1252,13 +1248,14 @@ export function EditorNovedadesWeb() {
                         type="button"
                         variant="outline"
                         size="sm"
+                        className="h-11"
                         disabled={uploading}
                         onClick={() => fileInputRef.current?.click()}
                       >
                         <Upload className="w-3.5 h-3.5 mr-1.5" />
                         Cambiar
                       </Button>
-                      <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={quitarImagen}>
+                      <Button type="button" variant="ghost" size="sm" className="h-11 text-destructive hover:text-destructive" onClick={quitarImagen}>
                         <X className="w-3.5 h-3.5 mr-1.5" />
                         Quitar
                       </Button>
@@ -1293,7 +1290,7 @@ export function EditorNovedadesWeb() {
               <div className="space-y-1.5 max-w-xs">
                 <Label>Icono</Label>
                 <Select value={formData.icono} onValueChange={(v) => setCampo("icono", v)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1321,14 +1318,14 @@ export function EditorNovedadesWeb() {
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className="flex items-start justify-between gap-3 cursor-pointer">
+                  <label className="flex min-h-11 items-start justify-between gap-3 cursor-pointer">
                     <span>
                       <span className="text-sm block">Visible en la web</span>
                       <span className="text-xs text-muted-foreground">Desactívalo para guardarla sin mostrarla.</span>
                     </span>
                     <Switch checked={formData.activo} onCheckedChange={(v) => setCampo("activo", v)} />
                   </label>
-                  <label className="flex items-start justify-between gap-3 cursor-pointer">
+                  <label className="flex min-h-11 items-start justify-between gap-3 cursor-pointer">
                     <span>
                       <span className="text-sm block">Destacada</span>
                       <span className="text-xs text-muted-foreground">Aparece antes que las demás.</span>
@@ -1342,7 +1339,7 @@ export function EditorNovedadesWeb() {
                       type="date"
                       value={formData.fecha_inicio}
                       onChange={(e) => setCampo("fecha_inicio", e.target.value)}
-                      className="h-9"
+                      className="h-11 text-base md:text-base"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1354,10 +1351,10 @@ export function EditorNovedadesWeb() {
                         value={formData.fecha_fin}
                         min={formData.fecha_inicio || undefined}
                         onChange={(e) => setCampo("fecha_fin", e.target.value)}
-                        className="h-9"
+                        className="h-11 text-base md:text-base"
                       />
                       {formData.fecha_fin && (
-                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setCampo("fecha_fin", "")} aria-label="Quitar fecha de fin">
+                        <Button type="button" variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setCampo("fecha_fin", "")} aria-label="Quitar fecha de fin">
                           <X className="w-3.5 h-3.5" />
                         </Button>
                       )}
@@ -1369,7 +1366,7 @@ export function EditorNovedadesWeb() {
               {/* Traducciones */}
               <Collapsible open={traduccionesAbiertas} onOpenChange={setTraduccionesAbiertas} className="rounded-lg border">
                 <div className="flex items-center justify-between gap-2 p-3">
-                  <CollapsibleTrigger className="group flex items-center gap-2 text-sm font-medium min-w-0">
+                  <CollapsibleTrigger className="group flex min-h-11 flex-wrap items-center gap-2 text-sm font-medium min-w-0">
                     <ChevronDown className="w-4 h-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
                     <Languages className="w-4 h-4 shrink-0" />
                     Inglés y francés
@@ -1383,7 +1380,7 @@ export function EditorNovedadesWeb() {
                       <Badge variant="outline" className="text-[10px] font-normal">Sin traducir</Badge>
                     )}
                   </CollapsibleTrigger>
-                  <Button type="button" variant="outline" size="sm" onClick={handleTranslate} disabled={isTranslating || !formData.titulo.trim()}>
+                  <Button type="button" variant="outline" size="sm" className="h-11" onClick={handleTranslate} disabled={isTranslating || !formData.titulo.trim()}>
                     {isTranslating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Languages className="w-3.5 h-3.5 mr-1.5" />}
                     Traducir ahora
                   </Button>
@@ -1401,14 +1398,14 @@ export function EditorNovedadesWeb() {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{k.nombre}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                           <Input
-                            className="sm:col-span-2 h-9"
+                            className="sm:col-span-2 h-11 text-base md:text-base"
                             value={formData[k.titulo]}
                             onChange={(e) => setTraduccion(k.titulo, e.target.value)}
                             placeholder={formData.titulo || "Título"}
                             aria-label={`Título (${k.nombre.toLowerCase()})`}
                           />
                           <Input
-                            className="h-9"
+                            className="h-11 text-base md:text-base"
                             value={formData[k.badge]}
                             onChange={(e) => setTraduccion(k.badge, e.target.value)}
                             placeholder={formData.badge_text || "Etiqueta"}
@@ -1419,7 +1416,7 @@ export function EditorNovedadesWeb() {
                           value={formData[k.descripcion]}
                           onChange={(e) => setTraduccion(k.descripcion, e.target.value)}
                           placeholder={formData.descripcion || "Descripción"}
-                          className="min-h-16 text-sm"
+                          className="min-h-16 text-base md:text-base"
                           aria-label={`Descripción (${k.nombre.toLowerCase()})`}
                         />
                         {extras.length > 0 && <p className="text-xs text-muted-foreground">{extras.join(" · ")}</p>}
@@ -1466,7 +1463,7 @@ export function EditorNovedadesWeb() {
           {vistaPrevia}
         </aside>
         <Collapsible open={previewMovilAbierta} onOpenChange={setPreviewMovilAbierta} className="xl:hidden rounded-lg border">
-          <CollapsibleTrigger className="group w-full flex items-center justify-between p-3 text-sm font-medium">
+          <CollapsibleTrigger className="group w-full flex min-h-11 items-center justify-between p-3 text-sm font-medium">
             Vista previa en el móvil
             <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
           </CollapsibleTrigger>
@@ -1588,7 +1585,7 @@ export function EditorNovedadesWeb() {
 
       {/* IA: resultado */}
       <Dialog open={!!resultadoIA} onOpenChange={(open) => !open && setResultadoIA(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />

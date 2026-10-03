@@ -35,22 +35,28 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
 
   const clases =
     variant === "mobile"
-      ? "inline-flex h-8 w-full min-w-0 items-center justify-center gap-1 rounded-md bg-blue-50 px-2 text-[11px] font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40"
-      : "inline-flex h-7 w-6 shrink-0 items-center justify-center rounded-md text-blue-600 xl:w-7 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40";
+      ? "inline-flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-50 px-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40"
+      : "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40";
 
   if (!driveUrl && !archivoPath) {
     return (
-      <button type="button" disabled className={clases} title="No se guardó el documento original de este registro">
-        <ExternalLink className={variant === "mobile" ? "h-3 w-3" : "h-4 w-4"} />
+      <button
+        type="button"
+        disabled
+        className={clases}
+        title="No se guardó el documento original de este registro"
+        aria-label="Ver original: no se guardó el documento original de este registro"
+      >
+        <ExternalLink className={variant === "mobile" ? "h-4 w-4" : "h-4 w-4"} />
         {variant === "mobile" && label}
       </button>
     );
   }
 
   const icono = cargando ? (
-    <Loader2 className={variant === "mobile" ? "h-3 w-3 animate-spin" : "h-4 w-4 animate-spin"} />
+    <Loader2 className="h-4 w-4 animate-spin" />
   ) : (
-    <ExternalLink className={variant === "mobile" ? "h-3 w-3" : "h-4 w-4"} />
+    <ExternalLink className="h-4 w-4" />
   );
 
   // Drive: enlace normal, sin pasar por Supabase.
@@ -63,6 +69,7 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
         onClick={(e) => e.stopPropagation()}
         className={clases}
         title="Ver documento original (Google Drive)"
+        aria-label={variant === "mobile" ? undefined : "Ver documento original (Google Drive)"}
       >
         {icono}
         {variant === "mobile" && label}
@@ -94,6 +101,7 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
       disabled={cargando}
       className={clases}
       title="Ver documento original (archivo guardado)"
+      aria-label={variant === "mobile" ? undefined : "Ver documento original (archivo guardado)"}
     >
       {icono}
       {variant === "mobile" && label}
@@ -147,32 +155,34 @@ export function AccionesDocumento({
 }: AccionesDocumentoProps) {
   const textos = TEXTOS[tipo];
   return (
-    <div className="flex items-center justify-end gap-0.5 xl:gap-1">
+    <div className="flex items-center justify-end gap-1">
       <BotonOriginal driveUrl={driveUrl} archivoPath={archivoPath} variant="desktop" />
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 w-6 shrink-0 p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:w-7"
+        className="h-11 w-11 shrink-0 p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         onClick={(e) => {
           e.stopPropagation();
           onEditar();
         }}
         title={textos.editar}
+        aria-label={textos.editar}
       >
-        <Pencil className="h-3.5 w-3.5" />
+        <Pencil className="h-4 w-4" />
       </Button>
       {onPreguntarIA && (
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-6 shrink-0 justify-center gap-1.5 whitespace-nowrap p-0 text-[11px] font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)] xl:w-auto xl:px-2"
+          className="h-11 min-w-11 shrink-0 justify-center gap-1.5 whitespace-nowrap p-0 text-xs font-medium text-[hsl(38,59%,45%)] transition-colors hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)] xl:px-2"
           onClick={(e) => {
             e.stopPropagation();
             onPreguntarIA();
           }}
           title={textos.ia}
+          aria-label={textos.ia}
         >
-          <Sparkles className="h-3.5 w-3.5 shrink-0" />
+          <Sparkles className="h-4 w-4 shrink-0" />
           {/* El texto entra por tramos. "Asistente IA" pide ~74 px y a 1280 px
               era justo lo que hacia desbordar la tabla (medido: 938 px de
               minimo contra 924 px utiles), asi que ahi se queda en "IA" —que

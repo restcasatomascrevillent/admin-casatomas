@@ -39,32 +39,30 @@ export function VisibilidadToggles({
           compact && "gap-2 py-1.5 px-2"
         )}
       >
-        <div className="flex items-center gap-2">
+        <label className="flex min-h-11 cursor-pointer items-center gap-2">
           <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Restaurante</span>
+          <span className={cn("text-muted-foreground", "text-sm")}>Restaurante</span>
           <Switch
             checked={restaurante}
             onCheckedChange={onRestauranteChange}
             disabled={isPending}
             className={cn(
-              "data-[state=checked]:bg-amber-600",
-              compact && "scale-90"
+              "data-[state=checked]:bg-amber-600"
             )}
           />
-        </div>
-        <div className="flex items-center gap-2">
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2">
           <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Touza</span>
+          <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
           <Switch
             checked={touza}
             onCheckedChange={onTouzaChange}
             disabled={isPending}
             className={cn(
-              "data-[state=checked]:bg-purple-600",
-              compact && "scale-90"
+              "data-[state=checked]:bg-purple-600"
             )}
           />
-        </div>
+        </label>
       </div>
 
       {/*
@@ -74,9 +72,9 @@ export function VisibilidadToggles({
         base de datos; simplemente deja de salir en las webs.
       */}
       {onActivadoChange && (
-        <div
+        <label
           className={cn(
-            "flex items-center justify-between gap-2 py-2 px-3 rounded-md",
+            "flex min-h-11 cursor-pointer items-center justify-between gap-2 py-2 px-3 rounded-md",
             compact && "py-1.5 px-2",
             estaActivado ? "bg-muted/50" : "bg-destructive/10"
           )}
@@ -91,7 +89,7 @@ export function VisibilidadToggles({
             <span
               className={cn(
                 "truncate",
-                compact ? "text-xs" : "text-sm",
+                "text-sm",
                 estaActivado ? "text-muted-foreground" : "text-destructive font-medium"
               )}
             >
@@ -104,11 +102,10 @@ export function VisibilidadToggles({
             disabled={isActivadoPending}
             aria-label={estaActivado ? "Despublicar de la web" : "Volver a publicar en la web"}
             className={cn(
-              "data-[state=checked]:bg-emerald-600",
-              compact && "scale-90"
+              "data-[state=checked]:bg-emerald-600"
             )}
           />
-        </div>
+        </label>
       )}
     </div>
   );

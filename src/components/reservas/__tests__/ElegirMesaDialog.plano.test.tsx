@@ -95,7 +95,7 @@ const botonMesa = (nombre: string) => screen.findByRole("button", { name: new Re
 async function abierto() {
   const dialogo = await screen.findByRole("dialog", { name: "Elige la mesa de Ana en Reservado" });
   // «Sentando a Ana»: la reserva está señalada, lista para hacer clic en una mesa.
-  await within(dialogo).findByText("Haz clic en una mesa del plano. Puedes elegir varias para juntarlas.");
+  await within(dialogo).findByText("Toca una mesa del plano. Puedes elegir varias para juntarlas.");
   return dialogo;
 }
 

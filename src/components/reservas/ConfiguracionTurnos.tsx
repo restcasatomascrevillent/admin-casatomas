@@ -12,6 +12,16 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -83,6 +93,9 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function ConfiguracionTurnos() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Borrar un periodo pide confirmación en un AlertDialog (el `confirm()` nativo del navegador
+  // no pega con el resto, y en la tablet sale como un cuadro del sistema).
+  const [idAEliminar, setIdAEliminar] = useState<string | null>(null);
   const [editingConfig, setEditingConfig] = useState<ConfiguracionTurno | null>(null);
   // De dónde salió la escalera que se ve AHORA MISMO en la pestaña avanzada
   // al abrir el diálogo: "niveles_escalera" = ya existía tal cual;
@@ -255,7 +268,6 @@ export function ConfiguracionTurnos() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar esta configuración?")) return;
     try {
       await eliminarMutation.mutateAsync(id);
       toast.success("Configuración eliminada");
@@ -383,7 +395,7 @@ export function ConfiguracionTurnos() {
                           <label
                             key={dia.id}
                             className={`
-                              flex items-center justify-center w-10 h-10 rounded-full cursor-pointer border-2 text-sm font-medium
+                              flex items-center justify-center w-10 h-10 pointer-coarse:w-11 pointer-coarse:h-11 rounded-full cursor-pointer border-2 text-sm font-medium
                               ${
                                 field.value.includes(dia.id)
                                   ? "bg-primary text-primary-foreground border-primary"
@@ -604,7 +616,7 @@ export function ConfiguracionTurnos() {
       </Card>
 
       {/* Lista de configuraciones */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {configuracionesConEscalera.map(({ config, enAvanzado, ...escalera }) => (
           <Card key={config.id} className={!config.activo ? "opacity-60" : ""}>
             <CardHeader className="pb-3">
@@ -613,22 +625,25 @@ export function ConfiguracionTurnos() {
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <CardTitle className="text-base">{config.nombre_periodo}</CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pointer-coarse:gap-3">
                   <Switch
                     checked={config.activo}
                     onCheckedChange={() => handleToggleActivo(config)}
+                    aria-label={`Periodo ${config.nombre_periodo} activo`}
                   />
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => openEditDialog(config)}
+                    aria-label={`Editar el periodo ${config.nombre_periodo}`}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDelete(config.id)}
+                    onClick={() => setIdAEliminar(config.id)}
+                    aria-label={`Eliminar el periodo ${config.nombre_periodo}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -717,6 +732,29 @@ export function ConfiguracionTurnos() {
           </p>
         </Card>
       )}
+
+      <AlertDialog open={!!idAEliminar} onOpenChange={(abierto) => !abierto && setIdAEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este periodo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se borra la configuración del periodo de servicio. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = idAEliminar;
+                setIdAEliminar(null);
+                if (id) void handleDelete(id);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

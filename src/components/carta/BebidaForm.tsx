@@ -136,7 +136,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Añadir Bebida</DialogTitle>
           <DialogDescription>
@@ -193,7 +193,6 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 ref={fileInputRef}
                 onChange={handleImageChange}
                 accept="image/*"
-                capture="environment"
                 className="hidden"
               />
               
@@ -208,7 +207,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                     type="button"
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute top-2 right-2 h-11 w-11"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
@@ -235,7 +234,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                   <FormItem>
                     <FormLabel>Precio (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -250,7 +249,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                     <FormItem>
                       <FormLabel>Cantidad</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="Ej: 33" {...field} />
+                        <Input type="number" inputMode="decimal" placeholder="Ej: 33" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -305,11 +304,12 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
               <Button
                 type="button"
                 variant="outline"
+                className="h-11 px-5"
                 onClick={() => onOpenChange(false)}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={crearBebida.isPending || isUploading}>
+              <Button type="submit" className="h-11 px-5" disabled={crearBebida.isPending || isUploading}>
                 {crearBebida.isPending || isUploading ? "Guardando..." : "Guardar Bebida"}
               </Button>
             </div>

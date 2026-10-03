@@ -48,7 +48,7 @@ export function EditorPlantillasEmail() {
       <Tabs defaultValue={TIPOS_PLANTILLA[0]}>
         <TabsList className="h-auto flex-wrap justify-start gap-1">
           {TIPOS_PLANTILLA.map((tipo) => (
-            <TabsTrigger key={tipo} value={tipo}>
+            <TabsTrigger key={tipo} value={tipo} className="min-h-11 px-4">
               {ETIQUETA_TIPO[tipo]}
             </TabsTrigger>
           ))}

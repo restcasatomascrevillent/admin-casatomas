@@ -98,7 +98,7 @@ export function ConfirmarRestauracionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px]">
+      <DialogContent className="max-h-[94dvh] overflow-y-auto sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" />
@@ -236,10 +236,11 @@ export function ConfirmarRestauracionDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="h-11 px-4" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
           <Button 
+            className="h-11 px-4"
             onClick={() => {
               onConfirm();
               onOpenChange(false);

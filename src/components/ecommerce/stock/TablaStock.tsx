@@ -144,7 +144,7 @@ export function TablaStock() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-11 w-11"
                         onClick={() => abrirModal({
                           id: producto.id,
                           nombre: producto.nombre,
@@ -152,13 +152,14 @@ export function TablaStock() {
                           stock: producto.stock || 0,
                         }, 'entrada')}
                         title="Añadir stock"
+                        aria-label="Añadir stock"
                       >
                         <Plus className="h-4 w-4 text-green-600" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-11 w-11"
                         onClick={() => abrirModal({
                           id: producto.id,
                           nombre: producto.nombre,
@@ -166,13 +167,14 @@ export function TablaStock() {
                           stock: producto.stock || 0,
                         }, 'salida')}
                         title="Retirar stock"
+                        aria-label="Retirar stock"
                       >
                         <Minus className="h-4 w-4 text-red-600" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-11 w-11"
                         onClick={() => abrirModal({
                           id: producto.id,
                           nombre: producto.nombre,
@@ -180,6 +182,7 @@ export function TablaStock() {
                           stock: producto.stock || 0,
                         }, 'ajuste')}
                         title="Ajustar stock"
+                        aria-label="Ajustar stock"
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -193,7 +196,7 @@ export function TablaStock() {
       )}
 
       <Dialog open={modalAbierto} onOpenChange={setModalAbierto}>
-        <DialogContent>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {tipoMovimiento === 'ajuste' && 'Ajustar Stock'}
@@ -217,9 +220,11 @@ export function TablaStock() {
                 <Input
                   id="cantidad"
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   value={cantidad}
                   onChange={(e) => setCantidad(e.target.value)}
+                  className="h-11 text-base md:text-base"
                   placeholder={tipoMovimiento === 'ajuste' ? 'Nuevo valor de stock' : 'Unidades'}
                 />
               </div>
@@ -231,16 +236,17 @@ export function TablaStock() {
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
                   placeholder="Ej: Recepción de mercancía, rotura, inventario..."
+                  className="text-base md:text-base"
                   rows={2}
                 />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalAbierto(false)}>
+            <Button variant="outline" className="h-11 px-5" onClick={() => setModalAbierto(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleGuardar} disabled={!cantidad}>
+            <Button className="h-11 px-5" onClick={handleGuardar} disabled={!cantidad}>
               Guardar
             </Button>
           </DialogFooter>

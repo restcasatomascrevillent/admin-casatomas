@@ -81,11 +81,11 @@ export function SeccionProductos() {
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <TabsList>
-            <TabsTrigger value="bebidas" className="gap-2">
+            <TabsTrigger value="bebidas" className="min-h-11 gap-2 px-4">
               <Wine className="h-4 w-4" />
               Bebidas
             </TabsTrigger>
-            <TabsTrigger value="comida" className="gap-2">
+            <TabsTrigger value="comida" className="min-h-11 gap-2 px-4">
               <Beef className="h-4 w-4" />
               Comida
             </TabsTrigger>
@@ -93,12 +93,12 @@ export function SeccionProductos() {
 
           <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); else handleAddNew(); }}>
             <DialogTrigger asChild>
-              <Button onClick={handleAddNew}>
+              <Button className="h-11 px-5" onClick={handleAddNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir {activeTab === "bebidas" ? "Bebida" : "Comida"}
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
               {activeTab === "bebidas" ? (
                 <BebidaVentaForm 
                   onSuccess={handleDialogClose} 
