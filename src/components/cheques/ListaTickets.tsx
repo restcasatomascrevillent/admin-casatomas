@@ -11,7 +11,7 @@ interface Ticket {
 interface Listado { total: number; expedidos: number; importe_pagado: number; tickets: Ticket[] }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
-export function ListaTickets({ verificar }: { verificar: (codigo: string) => void }) {
+export function ListaTickets() {
   const [pagina, setPagina] = useState(0);
   const [datos, setDatos] = useState<Listado | null>(null);
   const [error, setError] = useState("");
@@ -38,9 +38,9 @@ export function ListaTickets({ verificar }: { verificar: (codigo: string) => voi
     <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Expedición total de tickets</h2><p className="text-sm text-muted-foreground">Todos los cheques regalo, del más reciente al más antiguo.</p></div><Button variant="outline" disabled={cargando} onClick={() => setRevision(r => r + 1)}>Actualizar</Button></div>
     {cargando ? <p role="status">Cargando tickets…</p> : error ? <p role="alert" className="rounded-xl border border-destructive/40 p-4">{error}</p> : datos && <>
       <div className="grid gap-3 sm:grid-cols-3">{[["Tickets registrados", datos.total], ["Tickets expedidos", datos.expedidos], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <Card key={nombre}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{nombre}</p><p className="text-2xl font-semibold mt-1">{valor}</p></CardContent></Card>)}</div>
-      <div className="overflow-x-auto rounded-xl border"><table className="w-full text-sm"><thead className="bg-muted/50"><tr>{["Fecha", "Código", "Comprador", "Destinatario", "Importe", "Estado", ""].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
-        {datos.tickets.map(t => <tr key={t.id} className="border-t"><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap">{t.codigo || "Sin expedir"}</td><td className="p-3">{t.comprador_nombre}</td><td className="p-3">{t.destinatario_nombre || "—"}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : "Disponible"}</td><td className="p-3">{t.codigo && <Button variant="outline" size="sm" onClick={() => verificar(t.codigo!)}>Verificar</Button>}</td></tr>)}
-        {!datos.tickets.length && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No hay tickets en esta página.</td></tr>}
+      <div className="overflow-x-auto rounded-xl border"><table className="w-full text-sm"><thead className="bg-muted/50"><tr>{["Fecha", "Código", "Comprador", "Importe", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
+        {datos.tickets.map(t => <tr key={t.id} className="border-t"><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap">{t.codigo || "Sin expedir"}</td><td className="p-3">{t.comprador_nombre}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : "Disponible"}</td></tr>)}
+        {!datos.tickets.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No hay tickets en esta página.</td></tr>}
       </tbody></table></div>
       <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={pagina === 0} onClick={() => setPagina(p => p - 1)}>Anterior</Button><p className="text-sm">Página {pagina + 1} de {Math.max(1, Math.ceil(datos.total / 50))}</p><Button variant="outline" disabled={(pagina + 1) * 50 >= datos.total} onClick={() => setPagina(p => p + 1)}>Siguiente</Button></div>
     </>}
