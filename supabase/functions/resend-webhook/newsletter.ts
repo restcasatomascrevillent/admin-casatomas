@@ -19,7 +19,13 @@
 //   · contact.updated con unsubscribed = true -> 'resend_baja_nativa'. Es la
 //     baja desde la página de preferencias de Resend ({{{RESEND_UNSUBSCRIBE_URL}}}
 //     o su cabecera List-Unsubscribe automática) cuando el newsletter salga
-//     como Broadcast (fase 2). Hoy no llega ninguno: queda preparado.
+//     como Broadcast (fase 2, NEWSLETTER_CANAL=broadcast). Red de seguridad si
+//     se pierde: la reconciliación de newsletter-sync-resend (diaria y antes
+//     de cada Broadcast) hace lo mismo leyendo los contactos de Resend.
+//   · contact.deleted -> NO es una baja (lo borramos nosotros al dar de baja, o
+//     alguien en el dashboard): solo se desvincula resend_contact_id
+//     (`decidirDesvinculoContacto`). Si la persona sigue activa en la tabla, la
+//     siguiente sincronización la vuelve a crear: la tabla manda.
 //
 // NUNCA reactiva: ningún evento de Resend pone activo = true (contact.updated
 // con unsubscribed = false se ignora). La única vía de alta/reactivación es el
@@ -137,4 +143,20 @@ export function destinatarioArchivo(evento: EventoResendMinimo): string | null {
   if (Array.isArray(data.to) && typeof data.to[0] === "string") return data.to[0];
   if (typeof data.email === "string") return data.email;
   return null;
+}
+
+/**
+ * contact.deleted -> id del contacto a desvincular de newsletter_suscriptores
+ * (resend_contact_id = NULL). No da de baja a nadie. `null` para el resto.
+ */
+export function decidirDesvinculoContacto(evento: EventoResendMinimo): string | null {
+  if (evento?.type !== "contact.deleted") return null;
+  const data = (evento?.data ?? {}) as Record<string, unknown>;
+  return typeof data.id === "string" && data.id.trim() ? data.id.trim() : null;
+}
+
+/** Los eventos de correo de un Broadcast traen `broadcast_id`: se archiva para las estadísticas por envío. */
+export function broadcastIdDe(evento: EventoResendMinimo): string | null {
+  const data = (evento?.data ?? {}) as Record<string, unknown>;
+  return typeof data.broadcast_id === "string" && data.broadcast_id ? data.broadcast_id : null;
 }
