@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Gift, Search, CheckCircle2, XCircle, Loader2, FileText } from "lucide-react";
+import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, ArrowRight } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { toast } from "sonner";
+import { CASA_TOMAS, LOGO_CASA_TOMAS } from "@/lib/cheques/casaTomas";
+import { VistaFacturaCheque } from "@/components/cheques/VistaFacturaCheque";
 
 // Estas tablas/RPC se incorporan mediante la migración de Cheques.
 const db = supabase as unknown as SupabaseClient;
@@ -34,7 +36,7 @@ interface Plantilla {
   iva_porcentaje: number;
   pie: string;
 }
-const vacia: Plantilla = { id: true, emisor_nombre: "", emisor_nif: "", emisor_direccion: "", logo_data: "", iva_porcentaje: 0, pie: "Importe correspondiente al cheque regalo." };
+const vacia: Plantilla = { id: true, emisor_nombre: CASA_TOMAS.nombre, emisor_nif: "", emisor_direccion: CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, iva_porcentaje: 0, pie: CASA_TOMAS.pie };
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
 export default function Cheques() {
@@ -53,7 +55,7 @@ export default function Cheques() {
     setCargando(true); setErrorCarga("");
     const { data, error } = await db.from("plantilla_factura_cheques").select("*").eq("id", true).single();
     if (error) setErrorCarga("No se pudo cargar la plantilla. Comprueba que la migración de Cheques está aplicada y tienes permiso.");
-    else { setPlantilla({ ...data, iva_porcentaje: Number(data.iva_porcentaje) }); setCambios(false); }
+    else { setPlantilla({ ...vacia, ...data, emisor_nombre: data.emisor_nombre || vacia.emisor_nombre, emisor_direccion: data.emisor_direccion || vacia.emisor_direccion, logo_data: data.logo_data || ((!data.emisor_nombre && !data.emisor_direccion && !data.emisor_nif) ? vacia.logo_data : ""), pie: data.pie || vacia.pie, iva_porcentaje: Number(data.iva_porcentaje) }); setCambios(false); }
     setCargando(false);
   }
   useEffect(() => { void cargar(); }, []);
@@ -111,23 +113,30 @@ export default function Cheques() {
     } catch { toast.error("No se pudo guardar la plantilla"); }
     finally { setGuardando(false); }
   }
-  const total = 100;
-  const base = Math.round(10000 / (1 + plantilla.iva_porcentaje / 100)) / 100;
+  function usarCasaTomas() {
+    setPlantilla(p => ({ ...p, emisor_nombre: p.emisor_nombre || CASA_TOMAS.nombre, emisor_direccion: p.emisor_direccion || CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, pie: CASA_TOMAS.pie }));
+    setCambios(true);
+  }
   const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : "Cheque válido para canjear";
 
   return <DashboardLayout>
     <div className="space-y-6">
-      <div><h1 className="flex items-center gap-2 text-2xl font-semibold"><Gift className="h-6 w-6" />Cheques regalo</h1><p className="text-sm text-muted-foreground">Verifica códigos y prepara las facturas de las compras de la web.</p></div>
+      <header className="relative overflow-hidden rounded-2xl border border-[#e5ddd0] bg-[#faf7f1] p-5 sm:p-7 text-[#302923]">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-7">
+          <div className="rounded-xl bg-white border border-[#eee7dc] p-3 shrink-0 self-start"><img src={LOGO_CASA_TOMAS} alt="Casa Tomás" className="w-28 h-20 object-contain" /></div>
+          <div><p className="text-[10px] uppercase tracking-[.2em] text-[#927b62] mb-2">Casa Tomás · Gestión del restaurante</p><h1 className="font-serif text-3xl sm:text-4xl">Cheques regalo</h1><p className="text-sm text-[#796957] mt-2 max-w-lg">Una experiencia para regalar. Verifica cada cheque y prepara una factura con la identidad de Casa Tomás.</p></div>
+        </div>
+      </header>
       <Tabs defaultValue="verificar">
-        <TabsList className="grid w-full max-w-lg grid-cols-2 h-auto">
-          <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
-          <TabsTrigger value="plantilla" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
+        <TabsList className="grid w-full max-w-lg grid-cols-2 h-auto rounded-xl p-1.5 bg-muted/60">
+          <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
+          <TabsTrigger value="plantilla" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
         </TabsList>
         <TabsContent value="verificar" className="mt-6 space-y-4">
-          <Card className="max-w-xl"><CardHeader><CardTitle>Comprobar un cheque regalo</CardTitle></CardHeader><CardContent>
+          <Card className="max-w-xl rounded-2xl shadow-sm"><CardHeader><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#795440]/10 text-[#795440]"><ShieldCheck className="h-5 w-5" /></div><CardTitle>Comprobar un cheque regalo</CardTitle><p className="text-sm text-muted-foreground">Introduce el código que aparece en el email del cliente.</p></CardHeader><CardContent>
             <form onSubmit={verificar} className="space-y-4">
-              <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); }} className="uppercase font-mono" /></div>
-              <Button type="submit" disabled={ocupado || !codigo.trim()} className="w-full sm:w-auto">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
+              <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
+              <Button type="submit" disabled={ocupado || !codigo.trim()} className="w-full h-12 rounded-xl bg-[#795440] hover:bg-[#654432] text-white">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
             </form>
           </CardContent></Card>
           {resultado && <Card className={`max-w-xl ${resultado.valido ? "border-emerald-500" : "border-destructive/50"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
@@ -136,10 +145,12 @@ export default function Cheques() {
           </CardContent></Card>}
         </TabsContent>
         <TabsContent value="plantilla" className="mt-6">
-          {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : errorCarga ? <Card><CardContent className="space-y-4 pt-6"><p role="alert">{errorCarga}</p><Button onClick={() => void cargar()}>Reintentar</Button></CardContent></Card> : <div className="grid gap-6 xl:grid-cols-2 items-start">
-            <Card><CardHeader><CardTitle>Datos de la factura</CardTitle></CardHeader><CardContent>
+          {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : errorCarga ? <Card><CardContent className="space-y-4 pt-6"><p role="alert">{errorCarga}</p><Button onClick={() => void cargar()}>Reintentar</Button></CardContent></Card> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
+            <Card className="rounded-2xl shadow-sm"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Personaliza tu factura</CardTitle><p className="text-sm text-muted-foreground mt-2">El logo y los datos de Casa Tomás ya están preparados.</p></div><Palette className="h-5 w-5 text-[#795440] shrink-0" /></div></CardHeader><CardContent>
               <form onSubmit={guardar} className="space-y-4">
                 <fieldset disabled={!puedeEditar || guardando} className="space-y-4">
+                  <Button type="button" variant="outline" className="w-full min-h-11 rounded-xl border-[#d8c6b5] text-[#795440]" onClick={usarCasaTomas}><img src={LOGO_CASA_TOMAS} alt="" className="h-7 w-10 object-contain mr-2" />Usar plantilla Casa Tomás<ArrowRight className="h-4 w-4 ml-auto" /></Button>
+                  <p className="text-xs text-muted-foreground">Revisa la razón social y completa el NIF fiscal antes de emitir. Los datos fiscales y el IVA que tengas guardados se conservan al aplicar esta plantilla.</p>
                   <div className="space-y-2"><Label htmlFor="emisor-nombre">Nombre o razón social del emisor</Label><Input id="emisor-nombre" required maxLength={200} value={plantilla.emisor_nombre} onChange={e => cambiar("emisor_nombre", e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="emisor-nif">NIF / CIF del emisor</Label><Input id="emisor-nif" required maxLength={30} value={plantilla.emisor_nif} onChange={e => cambiar("emisor_nif", e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="emisor-direccion">Dirección fiscal completa</Label><Textarea id="emisor-direccion" required maxLength={300} value={plantilla.emisor_direccion} onChange={e => cambiar("emisor_direccion", e.target.value)} /></div>
@@ -151,14 +162,8 @@ export default function Cheques() {
                 {puedeEditar && <Button type="submit" disabled={guardando || !cambios}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
               </form>
             </CardContent></Card>
-            <div className="space-y-3 min-w-0"><p className="text-sm text-muted-foreground">Vista previa con datos de ejemplo · importe de 100 €</p>
-              <article className="rounded-lg border bg-white text-neutral-800 shadow-sm p-5 sm:p-8 space-y-8 break-words" aria-label="Vista previa de factura">
-                <header className="flex justify-between gap-4 items-start">{plantilla.logo_data ? <img src={plantilla.logo_data} alt="Logo del emisor" className="max-w-[130px] max-h-[65px] object-contain" /> : <h2 className="text-xl font-bold">CASA TOMÁS</h2>}<div className="text-right"><h2 className="text-2xl font-bold">FACTURA</h2><p className="text-sm">CT-00000001</p><p className="text-xs">{new Date().toLocaleDateString("es-ES")}</p></div></header>
-                <div className="grid sm:grid-cols-2 gap-6 text-sm"><div><h3 className="font-semibold text-xs mb-2">EMISOR</h3><p>{plantilla.emisor_nombre || "Razón social del restaurante"}</p><p>NIF: {plantilla.emisor_nif || "NIF del emisor"}</p><p>{plantilla.emisor_direccion || "Dirección fiscal del emisor"}</p></div><div><h3 className="font-semibold text-xs mb-2">CLIENTE · EJEMPLO</h3><p>Nombre del comprador</p><p>NIF: 12345678Z</p><p>Dirección fiscal del comprador</p><p>cliente@ejemplo.com</p></div></div>
-                <div className="text-sm"><div className="flex justify-between gap-4 bg-stone-100 p-3 font-semibold"><span>Concepto</span><span>Importe</span></div><div className="flex justify-between gap-4 py-4"><span>Cheque regalo Casa Tomás</span><span className="whitespace-nowrap">{euro(total)}</span></div></div>
-                <div className="ml-auto max-w-xs space-y-2 text-sm"><p className="flex justify-between gap-4"><span>Base imponible</span><span>{euro(base)}</span></p>{plantilla.iva_porcentaje > 0 && <p className="flex justify-between gap-4"><span>IVA ({plantilla.iva_porcentaje}%)</span><span>{euro(total - base)}</span></p>}<p className="flex justify-between gap-4 border-t pt-3 font-bold text-lg"><span>TOTAL PAGADO</span><span className="whitespace-nowrap">{euro(total)}</span></p></div>
-                <footer className="space-y-3 text-xs text-neutral-600"><p>Pago confirmado mediante Stripe</p><p className="whitespace-pre-wrap">{plantilla.pie}</p></footer>
-              </article>
+            <div className="space-y-3 min-w-0 xl:sticky xl:top-6"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
+              <VistaFacturaCheque plantilla={plantilla} />
             </div>
           </div>}
         </TabsContent>
@@ -167,3 +172,4 @@ export default function Cheques() {
     <Dialog open={confirmar} onOpenChange={open => !ocupado && setConfirmar(open)}><DialogContent><DialogHeader><DialogTitle>Canjear cheque regalo</DialogTitle><DialogDescription>Vas a utilizar {resultado?.codigo} por {euro(Number(resultado?.importe_eur || 0))}. Después no podrá volver a canjearse.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={ocupado} onClick={() => setConfirmar(false)}>Volver</Button><Button disabled={ocupado} onClick={() => void canjear()}>{ocupado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar canje</Button></DialogFooter></DialogContent></Dialog>
   </DashboardLayout>;
 }
+

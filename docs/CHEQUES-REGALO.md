@@ -32,3 +32,9 @@ La migración no permite lectura pública de códigos, emails o datos de comprad
 - Esquema validado en PostgreSQL local: permisos de consulta/canje, lectura privada, cheque cancelado, segundo canje rechazado y factura estable al cambiar la plantilla.
 
 Este cambio necesita el despliegue de Supabase anterior; un commit o despliegue de Vercel no aplica SQL ni actualiza Edge Functions.
+
+## Plantilla Casa Tomás
+
+La migración `20261003180000_plantilla_casa_tomas.sql` prepara el logo original, la dirección y el contacto en plantillas vacías. Conserva datos fiscales personalizados y el NIF existente. Revisa razón social y NIF antes de emitir. El botón «Usar plantilla Casa Tomás» recupera el logo y el pie de contacto, conservando datos fiscales e IVA.
+
+Para actualizar la apariencia de las facturas enviadas, desplegar de nuevo `stripe-webhook-cheques-regalo` desde `casa-tomas-story`; incluye los módulos compartidos de marca y PDF. Las facturas existentes conservan sus datos; el cambio modifica su presentación si se vuelve a generar el PDF.
