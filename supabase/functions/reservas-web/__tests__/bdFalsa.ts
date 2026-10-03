@@ -27,6 +27,9 @@ export class BaseFalsa {
   tablas: Record<string, Fila[]> = {};
   /** Cada consulta que ha llegado a ejecutarse, en orden. Sembrar con `tabla(...).push` NO cuenta. */
   accesos: Acceso[] = [];
+  /** Columnas que "no existen" por tabla (migración sin aplicar): un INSERT
+   * que las lleve falla entero con PGRST204, como PostgREST. */
+  columnasInexistentes: Record<string, string[]> = {};
   private secuencia = 0;
 
   tabla(nombre: string): Fila[] {
@@ -170,6 +173,13 @@ export class ConsultaFalsa implements PromiseLike<Resultado> {
     const filas = this.db.tabla(this.nombre);
     if (this.op === "insert") {
       const entrada = Array.isArray(this.carga) ? this.carga : [this.carga ?? {}];
+      const inexistente = (this.db.columnasInexistentes[this.nombre] ?? []).find((c) => entrada.some((v) => c in v));
+      if (inexistente) {
+        return {
+          data: null,
+          error: { code: "PGRST204", message: `Could not find the '${inexistente}' column of '${this.nombre}' in the schema cache` },
+        };
+      }
       const nuevas = entrada.map((v) => ({ id: this.db.nuevoId(), created_at: new Date().toISOString(), ...v }));
       filas.push(...nuevas);
       return this.forma(this.devolver ? nuevas.map((n) => ({ ...n })) : null);

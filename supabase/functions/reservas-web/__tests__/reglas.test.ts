@@ -19,6 +19,11 @@ import {
   contarEspaciosQueCaben,
   rechazoTouzaSinReservas,
   MOTIVO_TOUZA_SIN_RESERVAS,
+  leerConsentimientos,
+  condicionesObligatorias,
+  rechazoCondicionesNoAceptadas,
+  esColumnaInexistente,
+  ERROR_CONDICIONES_NO_ACEPTADAS,
 } from "../reglas.ts";
 import { NEGOCIOS } from "../plantillas.ts";
 
@@ -109,5 +114,93 @@ describe("contarEspaciosQueCaben", () => {
   it("cuenta las salas con hueco para todo el grupo", () => {
     expect(contarEspaciosQueCaben(SALAS_CT, 40)).toBe(3);
     expect(contarEspaciosQueCaben([], 2)).toBe(0);
+  });
+});
+
+// Casillas RGPD del formulario web (2026-10-03). Solo el booleano `true` es un sí.
+describe("leerConsentimientos", () => {
+  it("las dos casillas a true", () => {
+    expect(leerConsentimientos({ acepta_condiciones: true, consentimiento_newsletter: true })).toEqual({
+      aceptaCondiciones: true,
+      consentimientoNewsletter: true,
+    });
+  });
+
+  it("ausentes, null o cuerpo vacío: false", () => {
+    expect(leerConsentimientos({})).toEqual({ aceptaCondiciones: false, consentimientoNewsletter: false });
+    expect(leerConsentimientos(null)).toEqual({ aceptaCondiciones: false, consentimientoNewsletter: false });
+    expect(leerConsentimientos({ acepta_condiciones: null, consentimiento_newsletter: undefined })).toEqual({
+      aceptaCondiciones: false,
+      consentimientoNewsletter: false,
+    });
+  });
+
+  it.each([["true"], [1], ["on"], ["sí"], [{}], [[true]]])("valor ambiguo %j: NO cuenta como consentimiento", (valor) => {
+    expect(leerConsentimientos({ acepta_condiciones: valor, consentimiento_newsletter: valor })).toEqual({
+      aceptaCondiciones: false,
+      consentimientoNewsletter: false,
+    });
+  });
+
+  it("son independientes: aceptar las condiciones no suscribe al newsletter", () => {
+    expect(leerConsentimientos({ acepta_condiciones: true })).toEqual({ aceptaCondiciones: true, consentimientoNewsletter: false });
+  });
+});
+
+describe("condicionesObligatorias (secret RESERVAS_WEB_CONDICIONES_OBLIGATORIAS)", () => {
+  it("sin secret: se exige", () => {
+    expect(condicionesObligatorias(undefined)).toBe(true);
+    expect(condicionesObligatorias(null)).toBe(true);
+    expect(condicionesObligatorias("")).toBe(true);
+  });
+
+  it('solo "false" (sin distinguir mayúsculas ni espacios) la desactiva', () => {
+    expect(condicionesObligatorias("false")).toBe(false);
+    expect(condicionesObligatorias(" FALSE ")).toBe(false);
+  });
+
+  it.each([["true"], ["0"], ["no"], ["fasle"], ["off"]])("%j no la desactiva (un secret mal escrito nunca apaga la exigencia)", (v) => {
+    expect(condicionesObligatorias(v)).toBe(true);
+  });
+});
+
+describe("rechazoCondicionesNoAceptadas", () => {
+  const sinCondiciones = { aceptaCondiciones: false, consentimientoNewsletter: false };
+  const conCondiciones = { aceptaCondiciones: true, consentimientoNewsletter: false };
+
+  it("exigida y sin marcar: 400 con error y mensaje claros", () => {
+    expect(rechazoCondicionesNoAceptadas(sinCondiciones, true)).toEqual({
+      status: 400,
+      cuerpo: {
+        ok: false,
+        error: ERROR_CONDICIONES_NO_ACEPTADAS,
+        mensaje: "Para enviar la reserva tienes que aceptar la política de privacidad y las condiciones de la reserva.",
+      },
+    });
+  });
+
+  it("exigida y marcada: null", () => {
+    expect(rechazoCondicionesNoAceptadas(conCondiciones, true)).toBeNull();
+  });
+
+  it("interruptor apagado: null aunque no venga marcada", () => {
+    expect(rechazoCondicionesNoAceptadas(sinCondiciones, false)).toBeNull();
+  });
+});
+
+describe("esColumnaInexistente", () => {
+  const errorPostgrest = {
+    code: "PGRST204",
+    message: "Could not find the 'condiciones_aceptadas_at' column of 'reservas' in the schema cache",
+  };
+
+  it("el error real de PostgREST para esa columna: true", () => {
+    expect(esColumnaInexistente(errorPostgrest, "condiciones_aceptadas_at")).toBe(true);
+  });
+
+  it("otra columna, otro error o sin error: false", () => {
+    expect(esColumnaInexistente(errorPostgrest, "consentimiento_newsletter")).toBe(false);
+    expect(esColumnaInexistente({ code: "23514", message: "Aforo superado" }, "condiciones_aceptadas_at")).toBe(false);
+    expect(esColumnaInexistente(null, "condiciones_aceptadas_at")).toBe(false);
   });
 });

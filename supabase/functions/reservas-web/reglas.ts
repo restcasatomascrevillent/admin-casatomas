@@ -103,3 +103,96 @@ export function rechazoTouzaSinReservas(marca: Marca): RechazoTouzaSinReservas |
     },
   };
 }
+
+// ============================================================================
+// CONSENTIMIENTOS DEL FORMULARIO WEB (RGPD) — 2026-10-03
+// ============================================================================
+// El formulario de casa-tomas-story manda dos booleanos con estos nombres
+// EXACTOS en el cuerpo de POST /crear:
+//   · `acepta_condiciones`        — casilla OBLIGATORIA (política de
+//     privacidad y condiciones de la reserva). Sin ella no se crea nada.
+//   · `consentimiento_newsletter` — casilla OPCIONAL (desmarcada por defecto)
+//     para recibir el newsletter. Se guarda en
+//     `reservas.consentimiento_newsletter` y, si es true, el trigger
+//     `agregar_suscriptor_al_reservar_consentida` da de alta (o reactiva) el
+//     email en `newsletter_suscriptores` con `origen_alta = 'reserva_web'`.
+//
+// SOLO `=== true` cuenta como sí. "true", 1, "on", null o la ausencia del
+// campo son NO: el consentimiento tiene que ser una acción afirmativa e
+// inequívoca (RGPD art. 4.11 y 7) — nunca se infiere de un valor ambiguo.
+//
+// Hasta este cambio reservas-web no leía `consentimiento_newsletter` (aunque
+// el COMMENT de la columna decía que sí): todas las reservas web guardaban
+// false y el trigger no daba de alta a nadie.
+// ============================================================================
+
+export interface ConsentimientosReserva {
+  aceptaCondiciones: boolean;
+  consentimientoNewsletter: boolean;
+}
+
+/** Lee las dos casillas del cuerpo. Cualquier cosa distinta de `true` es false. */
+export function leerConsentimientos(body: Record<string, unknown> | null | undefined): ConsentimientosReserva {
+  return {
+    aceptaCondiciones: body?.acepta_condiciones === true,
+    consentimientoNewsletter: body?.consentimiento_newsletter === true,
+  };
+}
+
+/**
+ * ¿Se exige `acepta_condiciones`? Interruptor de emergencia por secret
+ * (`RESERVAS_WEB_CONDICIONES_OBLIGATORIAS`): por defecto SÍ. Solo el valor
+ * literal "false" (sin distinguir mayúsculas ni espacios) lo desactiva, para
+ * que un secret mal escrito nunca apague la exigencia por accidente.
+ * Pensado para la transición: si la función se despliega antes que la web
+ * que manda la casilla, `supabase secrets set
+ * RESERVAS_WEB_CONDICIONES_OBLIGATORIAS=false` deja pasar las reservas sin
+ * redesplegar; `supabase secrets unset ...` vuelve a exigirla.
+ */
+export function condicionesObligatorias(valorSecret: string | null | undefined): boolean {
+  return (valorSecret ?? "").trim().toLowerCase() !== "false";
+}
+
+export const ERROR_CONDICIONES_NO_ACEPTADAS = "condiciones_no_aceptadas";
+
+export interface RechazoCondiciones {
+  status: 400;
+  cuerpo: { ok: false; error: typeof ERROR_CONDICIONES_NO_ACEPTADAS; mensaje: string };
+}
+
+/**
+ * 400 si se exige la casilla y no viene marcada; `null` si se puede seguir.
+ * 400 (no 422): es un dato obligatorio del formulario que falta, igual que
+ * `nombre_requerido`; se rechaza ANTES de cualquier lectura o escritura (no
+ * se registra solicitud ni se manda correo de alguien que no ha aceptado).
+ */
+export function rechazoCondicionesNoAceptadas(
+  consentimientos: ConsentimientosReserva,
+  exigir: boolean,
+): RechazoCondiciones | null {
+  if (!exigir || consentimientos.aceptaCondiciones) return null;
+  return {
+    status: 400,
+    cuerpo: {
+      ok: false,
+      error: ERROR_CONDICIONES_NO_ACEPTADAS,
+      mensaje: "Para enviar la reserva tienes que aceptar la política de privacidad y las condiciones de la reserva.",
+    },
+  };
+}
+
+/**
+ * ¿El error de PostgREST es «esa columna no existe»? (PGRST204, «Could not
+ * find the 'x' column of 'reservas' in the schema cache»). Lo usa el INSERT
+ * de `handleCrear` para no tumbar las reservas si la función se despliega
+ * antes que la migración que crea `condiciones_aceptadas_at`.
+ */
+export function esColumnaInexistente(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  columna: string,
+): boolean {
+  if (!error) return false;
+  const mensaje = error.message ?? "";
+  if (!mensaje.includes(`'${columna}'`)) return false;
+  return error.code === "PGRST204" || /could not find .* column/i.test(mensaje);
+}
