@@ -37,11 +37,20 @@ interface Plantilla {
   pie: string;
 }
 const vacia: Plantilla = { id: true, emisor_nombre: CASA_TOMAS.nombre, emisor_nif: "", emisor_direccion: CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, iva_porcentaje: 0, pie: CASA_TOMAS.pie };
+function mensajeError(error: unknown, accion: string) {
+  const detalle = error && typeof error === "object" ? error as { code?: string; message?: string } : {};
+  if (["PGRST202", "PGRST205", "42P01", "42883"].includes(detalle.code || "")) {
+    return "La configuración de Cheques todavía no está instalada en Supabase. Aplica las migraciones de Cheques en el proyecto jeamoczmbfsnwkfjxcyo y vuelve a intentarlo.";
+  }
+  if (detalle.code === "42501") return "Tu usuario no tiene permiso para esta operación. Revisa los permisos de Cheques.";
+  return detalle.message || `No se pudo ${accion}. Comprueba la conexión y vuelve a intentarlo.`;
+}
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
 export default function Cheques() {
   const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
   const [codigo, setCodigo] = useState("");
+  const [errorVerificacion, setErrorVerificacion] = useState("");
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
@@ -53,23 +62,28 @@ export default function Cheques() {
 
   async function cargar() {
     setCargando(true); setErrorCarga("");
-    const { data, error } = await db.from("plantilla_factura_cheques").select("*").eq("id", true).single();
-    if (error) setErrorCarga("No se pudo cargar la plantilla. Comprueba que la migración de Cheques está aplicada y tienes permiso.");
-    else { setPlantilla({ ...vacia, ...data, emisor_nombre: data.emisor_nombre || vacia.emisor_nombre, emisor_direccion: data.emisor_direccion || vacia.emisor_direccion, logo_data: data.logo_data || ((!data.emisor_nombre && !data.emisor_direccion && !data.emisor_nif) ? vacia.logo_data : ""), pie: data.pie || vacia.pie, iva_porcentaje: Number(data.iva_porcentaje) }); setCambios(false); }
-    setCargando(false);
+    try {
+      const { data, error } = await db.from("plantilla_factura_cheques").select("*").eq("id", true).single();
+      if (error) throw error;
+      if (!data) throw new Error("No hay una plantilla guardada o tu usuario no tiene permiso para leerla.");
+      setPlantilla({ ...vacia, ...data, emisor_nombre: data.emisor_nombre || vacia.emisor_nombre, emisor_direccion: data.emisor_direccion || vacia.emisor_direccion, logo_data: data.logo_data || ((!data.emisor_nombre && !data.emisor_direccion && !data.emisor_nif) ? vacia.logo_data : ""), pie: data.pie || vacia.pie, iva_porcentaje: Number(data.iva_porcentaje) });
+      setCambios(false);
+    } catch (error) { setErrorCarga(mensajeError(error, "cargar la plantilla")); }
+    finally { setCargando(false); }
   }
+
   useEffect(() => { void cargar(); }, []);
 
   async function verificar(e: FormEvent) {
     e.preventDefault();
     const normalizado = codigo.trim().toUpperCase().replace(/\s+/g, "");
     if (!normalizado) return;
-    setOcupado(true); setResultado(null);
+    setOcupado(true); setResultado(null); setErrorVerificacion("");
     try {
       const { data, error } = await db.rpc("verificar_cheque_regalo", { p_codigo: normalizado });
       if (error) throw error;
       setResultado(data as Resultado);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "No se pudo verificar el cheque. Inténtalo de nuevo."); }
+    } catch (e) { setErrorVerificacion(mensajeError(e, "verificar el cheque")); }
     finally { setOcupado(false); }
   }
   async function canjear() {
@@ -82,7 +96,7 @@ export default function Cheques() {
       toast.success("Cheque canjeado correctamente");
     } catch (e) {
       setConfirmar(false); setResultado(null);
-      toast.error(e instanceof Error ? e.message : "No se pudo canjear. Verifica de nuevo: puede haber sido utilizado por otra persona.");
+      toast.error(mensajeError(e, "canjear el cheque"));
     } finally { setOcupado(false); }
   }
   function cambiar<K extends keyof Plantilla>(k: K, v: Plantilla[K]) {
@@ -110,7 +124,7 @@ export default function Cheques() {
       const { data, error } = await db.from("plantilla_factura_cheques").update({ ...limpia, actualizado_en: new Date().toISOString() }).eq("id", true).select("id").single();
       if (error || !data) throw error || new Error("No se ha guardado la plantilla");
       setPlantilla(limpia); setCambios(false); toast.success("Plantilla de factura guardada");
-    } catch { toast.error("No se pudo guardar la plantilla"); }
+    } catch (error) { toast.error(mensajeError(error, "guardar la plantilla")); }
     finally { setGuardando(false); }
   }
   function usarCasaTomas() {
@@ -121,12 +135,6 @@ export default function Cheques() {
 
   return <DashboardLayout>
     <div className="space-y-6">
-      <header className="relative overflow-hidden rounded-2xl border border-[#e5ddd0] bg-[#faf7f1] p-5 sm:p-7 text-[#302923]">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-7">
-          <div className="rounded-xl bg-white border border-[#eee7dc] p-3 shrink-0 self-start"><img src={LOGO_CASA_TOMAS} alt="Casa Tomás" className="w-28 h-20 object-contain" /></div>
-          <div><p className="text-[10px] uppercase tracking-[.2em] text-[#927b62] mb-2">Casa Tomás · Gestión del restaurante</p><h1 className="font-serif text-3xl sm:text-4xl">Cheques regalo</h1><p className="text-sm text-[#796957] mt-2 max-w-lg">Una experiencia para regalar. Verifica cada cheque y prepara una factura con la identidad de Casa Tomás.</p></div>
-        </div>
-      </header>
       <Tabs defaultValue="verificar">
         <TabsList className="grid w-full max-w-lg grid-cols-2 h-auto rounded-xl p-1.5 bg-muted/60">
           <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
@@ -135,20 +143,22 @@ export default function Cheques() {
         <TabsContent value="verificar" className="mt-6 space-y-4">
           <Card className="max-w-xl rounded-2xl shadow-sm"><CardHeader><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#795440]/10 text-[#795440]"><ShieldCheck className="h-5 w-5" /></div><CardTitle>Comprobar un cheque regalo</CardTitle><p className="text-sm text-muted-foreground">Introduce el código que aparece en el email del cliente.</p></CardHeader><CardContent>
             <form onSubmit={verificar} className="space-y-4">
-              <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
+              <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); setErrorVerificacion(""); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
               <Button type="submit" disabled={ocupado || !codigo.trim()} className="w-full h-12 rounded-xl bg-[#795440] hover:bg-[#654432] text-white">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
             </form>
           </CardContent></Card>
+          {errorVerificacion && <Card className="max-w-xl border-destructive/50"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
           {resultado && <Card className={`max-w-xl ${resultado.valido ? "border-emerald-500" : "border-destructive/50"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
             <h2 className={`flex items-center gap-2 font-semibold ${resultado.valido ? "text-emerald-700" : "text-destructive"}`}>{resultado.valido ? <CheckCircle2 /> : <XCircle />}{estado}</h2>
             {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{resultado.valido && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{resultado.valido && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
           </CardContent></Card>}
         </TabsContent>
         <TabsContent value="plantilla" className="mt-6">
-          {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : errorCarga ? <Card><CardContent className="space-y-4 pt-6"><p role="alert">{errorCarga}</p><Button onClick={() => void cargar()}>Reintentar</Button></CardContent></Card> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
+          {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
             <Card className="rounded-2xl shadow-sm"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Personaliza tu factura</CardTitle><p className="text-sm text-muted-foreground mt-2">El logo y los datos de Casa Tomás ya están preparados.</p></div><Palette className="h-5 w-5 text-[#795440] shrink-0" /></div></CardHeader><CardContent>
-              <form onSubmit={guardar} className="space-y-4">
-                <fieldset disabled={!puedeEditar || guardando} className="space-y-4">
+              {errorCarga && <div className="space-y-3 rounded-lg border border-destructive/40 p-4"><p role="alert">{errorCarga}</p><p className="text-sm text-muted-foreground">Vista previa de la plantilla Casa Tomás. No se han recuperado los datos guardados; la edición está bloqueada hasta restablecer la conexión.</p><Button onClick={() => void cargar()} variant="outline">Reintentar conexión</Button></div>}
+              <form onSubmit={guardar} className="space-y-4 mt-4">
+                <fieldset disabled={!puedeEditar || guardando || !!errorCarga} className="space-y-4">
                   <Button type="button" variant="outline" className="w-full min-h-11 rounded-xl border-[#d8c6b5] text-[#795440]" onClick={usarCasaTomas}><img src={LOGO_CASA_TOMAS} alt="" className="h-7 w-10 object-contain mr-2" />Usar plantilla Casa Tomás<ArrowRight className="h-4 w-4 ml-auto" /></Button>
                   <p className="text-xs text-muted-foreground">Revisa la razón social y completa el NIF fiscal antes de emitir. Los datos fiscales y el IVA que tengas guardados se conservan al aplicar esta plantilla.</p>
                   <div className="space-y-2"><Label htmlFor="emisor-nombre">Nombre o razón social del emisor</Label><Input id="emisor-nombre" required maxLength={200} value={plantilla.emisor_nombre} onChange={e => cambiar("emisor_nombre", e.target.value)} /></div>
@@ -159,7 +169,7 @@ export default function Cheques() {
                   <div className="space-y-2"><Label htmlFor="pie-factura">Texto al pie</Label><Textarea id="pie-factura" maxLength={500} value={plantilla.pie} onChange={e => cambiar("pie", e.target.value)} /></div>
                 </fieldset>
                 <p className="text-sm text-muted-foreground">Si el cliente solicita factura, recibirá un PDF por email después de confirmarse el pago. Los cambios se aplican a las próximas facturas.</p>
-                {puedeEditar && <Button type="submit" disabled={guardando || !cambios}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
+                {puedeEditar && <Button type="submit" disabled={guardando || !cambios || !!errorCarga}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
               </form>
             </CardContent></Card>
             <div className="space-y-3 min-w-0 xl:sticky xl:top-6"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
