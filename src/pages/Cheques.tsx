@@ -49,7 +49,7 @@ const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", 
 
 export default function Cheques() {
   const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
-  const [codigo, setCodigo] = useState("");
+  const [codigo, setCodigo] = useState("CT-");
   const [errorVerificacion, setErrorVerificacion] = useState("");
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -77,7 +77,7 @@ export default function Cheques() {
   async function verificar(e: FormEvent) {
     e.preventDefault();
     const normalizado = codigo.trim().toUpperCase().replace(/\s+/g, "");
-    if (!normalizado) return;
+    if (!normalizado || normalizado === "CT-") return;
     setOcupado(true); setResultado(null); setErrorVerificacion("");
     try {
       const { data, error } = await db.rpc("verificar_cheque_regalo", { p_codigo: normalizado });
@@ -144,7 +144,7 @@ export default function Cheques() {
           <Card className="max-w-xl rounded-2xl shadow-sm"><CardHeader><div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#795440]/10 text-[#795440]"><ShieldCheck className="h-5 w-5" /></div><CardTitle>Comprobar un cheque regalo</CardTitle><p className="text-sm text-muted-foreground">Introduce el código que aparece en el email del cliente.</p></CardHeader><CardContent>
             <form onSubmit={verificar} className="space-y-4">
               <div className="space-y-2"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); setErrorVerificacion(""); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
-              <Button type="submit" disabled={ocupado || !codigo.trim()} className="w-full h-12 rounded-xl bg-[#795440] hover:bg-[#654432] text-white">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
+              <Button type="submit" disabled={ocupado || !codigo.trim() || codigo.trim().toUpperCase() === "CT-"} className="w-full h-12 rounded-xl bg-[#795440] hover:bg-[#654432] text-white">{ocupado ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}Verificar cheque</Button>
             </form>
           </CardContent></Card>
           {errorVerificacion && <Card className="max-w-xl border-destructive/50"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
