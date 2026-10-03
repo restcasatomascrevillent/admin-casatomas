@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, ArrowRight } from "lucide-react";
+import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,8 +36,9 @@ interface Plantilla {
   logo_data: string;
   iva_porcentaje: number;
   pie: string;
+  email_mensaje: string;
 }
-const vacia: Plantilla = { id: true, emisor_nombre: CASA_TOMAS.nombre, emisor_nif: "", emisor_direccion: CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, iva_porcentaje: 0, pie: CASA_TOMAS.pie };
+const vacia: Plantilla = { id: true, emisor_nombre: CASA_TOMAS.nombre, emisor_nif: "", emisor_direccion: CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, iva_porcentaje: 0, pie: CASA_TOMAS.pie, email_mensaje: "Gracias por tu compra. Adjuntamos la factura de tu cheque regalo de Casa Tomás." };
 function mensajeError(error: unknown, accion: string) {
   const detalle = error && typeof error === "object" ? error as { code?: string; message?: string } : {};
   if (["PGRST202", "PGRST205", "42P01", "42883"].includes(detalle.code || "")) {
@@ -117,9 +118,9 @@ export default function Cheques() {
   async function guardar(e: FormEvent) {
     e.preventDefault();
     if (!puedeEditar || guardando || errorCarga) return;
-    const limpia = { ...plantilla, emisor_nombre: plantilla.emisor_nombre.trim(), emisor_nif: plantilla.emisor_nif.trim(), emisor_direccion: plantilla.emisor_direccion.trim() };
-    if (!limpia.emisor_nombre || !limpia.emisor_nif || !limpia.emisor_direccion || !Number.isFinite(limpia.iva_porcentaje) || limpia.iva_porcentaje < 0 || limpia.iva_porcentaje > 100) {
-      toast.error("Completa los datos del emisor y un IVA entre 0 y 100%."); return;
+    const limpia = { ...plantilla, email_mensaje: plantilla.email_mensaje.trim(), emisor_nombre: plantilla.emisor_nombre.trim(), emisor_nif: plantilla.emisor_nif.trim(), emisor_direccion: plantilla.emisor_direccion.trim() };
+    if (!limpia.email_mensaje || !limpia.emisor_nombre || !limpia.emisor_nif || !limpia.emisor_direccion || !Number.isFinite(limpia.iva_porcentaje) || limpia.iva_porcentaje < 0 || limpia.iva_porcentaje > 100) {
+      toast.error("Completa los datos del emisor, el mensaje del email y un IVA entre 0 y 100%."); return;
     }
     setGuardando(true);
     try {
@@ -128,10 +129,6 @@ export default function Cheques() {
       setPlantilla(limpia); setCambios(false); toast.success("Plantilla de factura guardada");
     } catch (error) { toast.error(mensajeError(error, "guardar la plantilla")); }
     finally { setGuardando(false); }
-  }
-  function usarCasaTomas() {
-    setPlantilla(p => ({ ...p, emisor_nombre: p.emisor_nombre || CASA_TOMAS.nombre, emisor_direccion: p.emisor_direccion || CASA_TOMAS.direccion, logo_data: LOGO_CASA_TOMAS, pie: CASA_TOMAS.pie }));
-    setCambios(true);
   }
   const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : "Cheque válido para canjear";
 
@@ -163,14 +160,14 @@ export default function Cheques() {
               {errorCarga && <div className="space-y-3 rounded-lg border border-destructive/40 p-4"><p role="alert">{errorCarga}</p><p className="text-sm text-muted-foreground">Vista previa de la plantilla Casa Tomás. No se han recuperado los datos guardados; la edición está bloqueada hasta restablecer la conexión.</p><Button onClick={() => void cargar()} variant="outline">Reintentar conexión</Button></div>}
               <form onSubmit={guardar} className="space-y-4 mt-4">
                 <fieldset disabled={!puedeEditar || guardando || !!errorCarga} className="space-y-4">
-                  <Button type="button" variant="outline" className="w-full min-h-11 rounded-xl border-[#d8c6b5] text-[#795440]" onClick={usarCasaTomas}><img src={LOGO_CASA_TOMAS} alt="" className="h-7 w-10 object-contain mr-2" />Usar plantilla Casa Tomás<ArrowRight className="h-4 w-4 ml-auto" /></Button>
-                  <p className="text-xs text-muted-foreground">Revisa la razón social y completa el NIF fiscal antes de emitir. Los datos fiscales y el IVA que tengas guardados se conservan al aplicar esta plantilla.</p>
+                  <p className="text-xs text-muted-foreground">Revisa la razón social y completa el NIF fiscal antes de emitir.</p>
                   <div className="space-y-2"><Label htmlFor="emisor-nombre">Nombre o razón social del emisor</Label><Input id="emisor-nombre" required maxLength={200} value={plantilla.emisor_nombre} onChange={e => cambiar("emisor_nombre", e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="emisor-nif">NIF / CIF del emisor</Label><Input id="emisor-nif" required maxLength={30} value={plantilla.emisor_nif} onChange={e => cambiar("emisor_nif", e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="emisor-direccion">Dirección fiscal completa</Label><Textarea id="emisor-direccion" required maxLength={300} value={plantilla.emisor_direccion} onChange={e => cambiar("emisor_direccion", e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="logo-factura">Logo de la factura</Label><Input id="logo-factura" type="file" accept="image/png,image/jpeg" onChange={e => void logo(e.target.files?.[0])} /><p className="text-xs text-muted-foreground">PNG o JPG, hasta 200 KB.</p>{plantilla.logo_data && <Button type="button" variant="outline" onClick={() => cambiar("logo_data", "")}>Quitar logo</Button>}</div>
                   <div className="space-y-2"><Label htmlFor="iva-factura">IVA incluido en el importe (%)</Label><Input id="iva-factura" type="number" step="0.01" min="0" max="100" required value={plantilla.iva_porcentaje} onChange={e => cambiar("iva_porcentaje", Number(e.target.value))} /><p className="text-xs text-muted-foreground">El total coincide con el pago del cheque. Usa 0 para emitir sin desglose de IVA.</p></div>
                   <div className="space-y-2"><Label htmlFor="pie-factura">Texto al pie</Label><Textarea id="pie-factura" maxLength={500} value={plantilla.pie} onChange={e => cambiar("pie", e.target.value)} /></div>
+                  <div className="space-y-2 border-t pt-4"><Label htmlFor="email-factura">Mensaje del email de la factura</Label><Textarea id="email-factura" required rows={5} maxLength={3000} value={plantilla.email_mensaje} onChange={e => cambiar("email_mensaje", e.target.value)} /><p className="text-xs text-muted-foreground">Este mensaje acompaña al PDF adjunto. Se conservan los saltos de línea.</p></div>
                 </fieldset>
                 <p className="text-sm text-muted-foreground">Si el cliente solicita factura, recibirá un PDF por email después de confirmarse el pago. Los cambios se aplican a las próximas facturas.</p>
                 {puedeEditar && <Button type="submit" disabled={guardando || !cambios || !!errorCarga}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
@@ -178,6 +175,7 @@ export default function Cheques() {
             </CardContent></Card>
             <div className="space-y-3 min-w-0 xl:sticky xl:top-6"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
               <VistaFacturaCheque plantilla={plantilla} />
+              <Card><CardHeader><CardTitle className="text-base">Mensaje que recibirá el cliente</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap break-words text-sm">{plantilla.email_mensaje}</p><p className="mt-4 text-xs text-muted-foreground">Adjunto: Factura-CT-00000001.pdf</p></CardContent></Card>
             </div>
           </div>}
         </TabsContent>
