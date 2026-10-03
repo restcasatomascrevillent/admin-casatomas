@@ -124,6 +124,11 @@ export class ConsultaFalsa implements PromiseLike<Resultado> {
     this.filtros.push((f) => f[c] === v);
     return this;
   }
+  /** Solo `.is(col, null)` (lo único que usa _shared/verificacion-email.ts). */
+  is(c: string, v: null) {
+    this.filtros.push((f) => (v === null ? f[c] == null : f[c] === v));
+    return this;
+  }
   in(c: string, vs: unknown[]) {
     this.filtros.push((f) => vs.includes(f[c]));
     return this;

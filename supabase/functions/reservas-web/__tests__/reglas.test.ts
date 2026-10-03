@@ -23,6 +23,8 @@ import {
   condicionesObligatorias,
   rechazoCondicionesNoAceptadas,
   esColumnaInexistente,
+  camposConsentimientoSolicitud,
+  faltaColumnaConsentimientoSolicitud,
   ERROR_CONDICIONES_NO_ACEPTADAS,
 } from "../reglas.ts";
 import { NEGOCIOS } from "../plantillas.ts";
@@ -202,5 +204,31 @@ describe("esColumnaInexistente", () => {
     expect(esColumnaInexistente(errorPostgrest, "consentimiento_newsletter")).toBe(false);
     expect(esColumnaInexistente({ code: "23514", message: "Aforo superado" }, "condiciones_aceptadas_at")).toBe(false);
     expect(esColumnaInexistente(null, "condiciones_aceptadas_at")).toBe(false);
+  });
+});
+
+describe("camposConsentimientoSolicitud (doble opt-in, migración 20261003184500)", () => {
+  const AHORA = "2026-10-03T18:45:00.000Z";
+
+  it("las dos casillas: newsletter true y la hora de aceptación de las condiciones", () => {
+    expect(camposConsentimientoSolicitud({ aceptaCondiciones: true, consentimientoNewsletter: true }, AHORA)).toEqual({
+      consentimiento_newsletter: true,
+      condiciones_aceptadas_at: AHORA,
+    });
+  });
+
+  it("sin casillas (o sin datos): false y null", () => {
+    expect(camposConsentimientoSolicitud({ aceptaCondiciones: false, consentimientoNewsletter: false }, AHORA)).toEqual({
+      consentimiento_newsletter: false,
+      condiciones_aceptadas_at: null,
+    });
+    expect(camposConsentimientoSolicitud(undefined, AHORA)).toEqual({ consentimiento_newsletter: false, condiciones_aceptadas_at: null });
+  });
+
+  it("faltaColumnaConsentimientoSolicitud: solo el PGRST204 de esas dos columnas", () => {
+    expect(faltaColumnaConsentimientoSolicitud({ code: "PGRST204", message: "Could not find the 'consentimiento_newsletter' column of 'solicitudes_pendientes' in the schema cache" })).toBe(true);
+    expect(faltaColumnaConsentimientoSolicitud({ code: "PGRST204", message: "Could not find the 'condiciones_aceptadas_at' column of 'solicitudes_pendientes' in the schema cache" })).toBe(true);
+    expect(faltaColumnaConsentimientoSolicitud({ code: "PGRST204", message: "Could not find the 'marca' column of 'solicitudes_pendientes' in the schema cache" })).toBe(false);
+    expect(faltaColumnaConsentimientoSolicitud(null)).toBe(false);
   });
 });
