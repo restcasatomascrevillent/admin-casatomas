@@ -2249,6 +2249,7 @@ export type Database = {
           id: string
           nombre: string | null
           origen_alta: string | null
+          /** CHECK: enlace_email | cabecera_one_click | panel_manual y, con 20261003171500 aplicada, queja_spam | rebote_permanente | suprimido_resend | resend_baja_nativa (ver src/lib/newsletter/bajas.ts). */
           origen_baja: string | null
           /** Solo existe si 20261003143000_reserva_web_prueba_consentimiento.sql está aplicada. */
           reserva_consentimiento_id: string | null
@@ -4689,6 +4690,11 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      /** Solo existe si 20261003171500_newsletter_baja_automatica.sql está aplicada. Solo service_role (resend-webhook). */
+      newsletter_registrar_baja: {
+        Args: { p_email: string; p_origen: string; p_suscriptor_id?: string | null }
+        Returns: number
+      }
       normalizar_nombre_producto: {
         Args: { p_nombre: string }
         Returns: string
