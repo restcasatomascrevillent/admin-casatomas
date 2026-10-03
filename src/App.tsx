@@ -24,6 +24,7 @@ import GestionWeb from "./pages/GestorWeb";
 import AsistenteTelefonico from "./pages/AsistenteTelefonico";
 import Marketing from "./pages/Marketing";
 import NotFound from "./pages/NotFound";
+import Cheques from "./pages/Cheques";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
 import GestorGasto from "./pages/GestorGasto";
@@ -91,6 +92,7 @@ const App = () => (
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
+                  <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   <Route path="/super-admin/login" element={<SuperAdminLogin />} />
@@ -117,3 +119,4 @@ const App = () => (
 );
 
 export default App;
+

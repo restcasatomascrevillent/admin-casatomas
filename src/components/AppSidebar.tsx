@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, LogOut, Shield, Settings } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, Gift, LogOut, Shield, Settings } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -39,6 +39,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
   // Super Admin y ya no forman parte del Admin Panel normal (ver /super-admin).
   { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB, toggleKey: "gestion_web" },
   { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing", toggleKey: "marketing" },
+  { title: "Cheques", url: "/cheques", icon: Gift, sectionKey: "cheques", toggleKey: "cheques" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas", toggleKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios", toggleKey: "usuarios" },
 ];
@@ -153,3 +154,4 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+

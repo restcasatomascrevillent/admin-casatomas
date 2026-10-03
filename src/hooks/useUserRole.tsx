@@ -28,6 +28,7 @@ export const SECTIONS = [
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter" },
+  { key: "cheques", label: "Cheques regalo" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
@@ -178,3 +179,4 @@ export function useCanAccessSection(sectionKey: SectionKey, permissionType: "vie
 
   return { canAccess, loading: false };
 }
+
