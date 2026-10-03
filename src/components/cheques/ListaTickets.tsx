@@ -28,7 +28,7 @@ export function ListaTickets() {
         const { data, error } = await (supabase as unknown as SupabaseClient).rpc("listar_cheques_regalo_v2", { p_pagina: pagina, p_busqueda: busqueda });
         if (error) throw error;
         if (!data || !Array.isArray(data.tickets)) throw new Error("Respuesta de listado inválida");
-        if (activo) setDatos(data as Listado);
+        if (activo) setDatos({ ...data, tickets: data.tickets.filter((ticket: Ticket) => ticket.estado === "pagado" || ticket.estado === "cancelado") } as Listado);
       } catch (e) {
         const detalle = e as { code?: string; message?: string };
         if (activo) { setDatos(null); setError(detalle.code === "PGRST202" ? "Falta instalar la función de listado de tickets en Supabase." : detalle.message || "No se pudo cargar el listado."); }
