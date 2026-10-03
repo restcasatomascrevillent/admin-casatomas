@@ -3,7 +3,7 @@
  * de envío e historial. Supabase mockeado: nunca se llama a funciones reales.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -33,6 +33,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: v
 import { toast } from "sonner";
 import { SincronizacionResend, CanalEnvio } from "../SincronizacionResend";
 import { HistorialEnvios } from "../HistorialEnvios";
+import { useEnviarPruebaNewsletter } from "@/hooks/useEnviarNewsletter";
 import {
   agruparEstadisticas,
   mensajeSincronizacion,
@@ -215,5 +216,20 @@ describe("HistorialEnvios", () => {
     expect(await screen.findByText("Viejo")).toBeInTheDocument();
     expect(screen.getByText("Directo")).toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("useEnviarPruebaNewsletter", () => {
+  it("llama a enviar-newsletter con prueba: true y muestra el aviso", async () => {
+    invoke.mockResolvedValueOnce({ data: { success: true, prueba: true, message: "Prueba enviada como Broadcast a delivered@resend.dev" }, error: null });
+    const qc = new QueryClient();
+    const { result } = renderHook(() => useEnviarPruebaNewsletter(), {
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ tipo: "anuncio", titulo: "T", mensaje: "M" });
+    });
+    expect(invoke).toHaveBeenCalledWith("enviar-newsletter", { body: { tipo: "anuncio", titulo: "T", mensaje: "M", prueba: true } });
+    expect(toast.success).toHaveBeenCalledWith("Prueba enviada como Broadcast a delivered@resend.dev");
   });
 });
