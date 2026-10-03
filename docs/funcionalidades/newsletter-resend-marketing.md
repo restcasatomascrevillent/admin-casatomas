@@ -99,3 +99,17 @@ Decisiones que necesita el dueño antes de empezar:
 4. **API key.** Contacts y Broadcasts necesitan una clave con *full access*; propuesta: una clave nueva `RESEND_MARKETING_API_KEY` solo para las funciones de marketing y dejar la actual para los correos de reserva.
 5. **Página de baja de Resend**: personalizar título, logo y colores en *Settings → Unsubscribe page*.
 6. **Webhook**: añadir `contact.updated` (y `contact.deleted` si se quiere archivar) al endpoint actual.
+
+## 7. Doble opt-in, email normalizado y solicitudes (rama `feat/newsletter-doble-optin`)
+
+Migración `20261003184500_newsletter_doble_optin_y_email_normalizado.sql` (**NO APLICADA**, después de `20261003171500`) + rollback + `supabase/tests/newsletter_doble_optin_test.sql`.
+
+- **El alta ya no ocurre al insertar la reserva.** La reserva guarda la casilla (`consentimiento_newsletter`, `consentimiento_newsletter_at`); el alta la hace `newsletter_alta_reserva_verificada_upd` cuando se marca `reservas.email_verificado_at`, que solo escriben las Edge Functions cuando el **cliente pulsa «Confirmo»** en el correo (`emails-reserva` `/enlace/ejecutar` aceptar, `reservas-web` `/confirmar`) o **acepta desde el correo la propuesta de su solicitud** (`fn_aceptar_propuesta_solicitud` vía email). Código común: `supabase/functions/_shared/verificacion-email.ts`.
+- **No cuentan**: `verificada` (la pone el personal), confirmar a mano, «Rechazar» desde el correo, reservas canceladas antes de verificar, reservas sin email.
+- **El personal no puede escribir** la casilla, su fecha, `condiciones_aceptadas_at` ni `email_verificado_at` (trigger `reservas_proteger_consentimiento_newsletter`, usa el rol del JWT); cambiar el email anula casilla y verificación.
+- **Solicitudes**: `solicitudes_pendientes.consentimiento_newsletter` / `condiciones_aceptadas_at` (las rellena `reservas-web`); una reserva con `solicitud_id` las hereda en la BD si el email coincide. Sin cambios en el panel ni en `fn_aceptar_propuesta_solicitud`.
+- **Email**: trigger `newsletter_suscriptores_normalizar_email` (`lower(btrim())`) + índice único `newsletter_suscriptores_email_lower_key` (sustituye al no único de 171500). Duplicados existentes fusionados en el más antiguo (la baja manda, consentimiento más reciente), copia en `newsletter_suscriptores_depurados`.
+- **Altas antiguas sin verificar** (nacidas del trigger de INSERT): se retiran (constancia sin email/nombre en `newsletter_suscriptores_depurados`); vuelven solas si el cliente confirma.
+- **Reactivar** exige además que la reserva del consentimiento nuevo esté verificada y que la casilla sea posterior a la baja.
+- `origen_alta` admite `reserva_manual` y `solicitud_web` (antes una reserva `manual` quedaba como `reserva_web`).
+- Pasos del dueño: ver la cabecera de la migración (aplicar 171500 → 184500 → test → `functions deploy emails-reserva reservas-web --project-ref jeamoczmbfsnwkfjxcyo`).
