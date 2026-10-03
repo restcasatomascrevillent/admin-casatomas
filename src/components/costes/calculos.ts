@@ -370,12 +370,13 @@ export interface TotalMensual {
 export function calcularTotalMensual(
   iaUsd: number | null,
   fijosEur: number | null,
-  facturadoEur: number,
+  facturadoEur: number | null,
 ): TotalMensual {
   const iaEurAprox = esNulo(iaUsd) ? null : iaUsd * USD_EUR;
   const fijos = esNulo(fijosEur) ? null : fijosEur;
   const totalEurAprox = iaEurAprox === null || fijos === null ? null : iaEurAprox + fijos;
-  const margenEur = totalEurAprox === null ? null : facturadoEur - totalEurAprox;
-  const margenPct = margenEur === null || facturadoEur <= 0 ? null : (100 * margenEur) / facturadoEur;
+  const margenEur = totalEurAprox === null || facturadoEur === null ? null : facturadoEur - totalEurAprox;
+  const margenPct = margenEur === null || facturadoEur === null || facturadoEur <= 0 ? null : (100 * margenEur) / facturadoEur;
   return { iaEurAprox, fijosEur: fijos, totalEurAprox, margenEur, margenPct };
 }
+
