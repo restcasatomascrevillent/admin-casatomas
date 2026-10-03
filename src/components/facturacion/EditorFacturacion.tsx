@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { useFacturacionOficiososia, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
+import { useFacturacionOficiososia, type BorradorGuardado, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 import { categorias, periodicidades, nuevaFactura, nuevaLinea, totalesFactura, erroresFactura, facturaSchema, euros, type Factura, type ParteFactura, type LineaFactura } from "./modelo";
 import { VistaFactura } from "./VistaFactura";
 import { SelectorServicios, EditarCatalogo } from "./SelectorServicios";
@@ -33,6 +33,7 @@ export function EditorFacturacion() {
   const [f, setF] = useState<Factura>(() => nuevaFactura());
   const [versionConfig, setVersionConfig] = useState<string | null>(null);
   const [actual, setActual] = useState<{id:string;version:string|null} | null>(null);
+  const [borrador, setBorrador] = useState<{id:string;version:string|null;facturaId?:string|null}|null>(null);
   const [dirty, setDirty] = useState(false);
   const [facturaModificada, setFacturaModificada] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,7 +47,9 @@ export function EditorFacturacion() {
     iniciado.current = true;
     if (q.data.config) {
       setF({...q.data.config.documento,catalogo:q.data.config.documento.catalogo ?? catalogoInicial()}); setVersionConfig(q.data.config.actualizado_en);
-      const archivada = q.data.facturas.find(g => g.numero === q.data.config?.documento.numero.trim());
+      const pendiente = q.data.borradores?.find(b=>JSON.stringify(b.documento)===JSON.stringify(q.data?.config?.documento));
+      if(pendiente)setBorrador({id:pendiente.id,version:pendiente.actualizado_en,facturaId:pendiente.factura_id});
+      const archivada = q.data.facturas.find(g => pendiente ? g.id===pendiente.factura_id : g.numero === q.data.config?.documento.numero.trim());
       if (archivada) {
         setActual({id:archivada.id,version:archivada.actualizado_en});
         setFacturaModificada(JSON.stringify(archivada.documento) !== JSON.stringify(q.data.config.documento));
@@ -64,18 +67,29 @@ export function EditorFacturacion() {
   const puedeCambiar = () => !dirty || window.confirm("Hay cambios sin guardar. ¿Quieres descartarlos?");
   const abrir = (guardada: FacturaGuardada) => {
     if (!puedeCambiar()) return;
+    setBorrador(null);
     setF({...guardada.documento,catalogo:f.catalogo ?? catalogoInicial()}); setActual({id:guardada.id,version:guardada.actualizado_en});
     setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null); setDirty(false); setFacturaModificada(false);
   };
+  const abrirBorrador = (b:BorradorGuardado) => {
+    if (!puedeCambiar()) return;
+    const emitida=q.data?.facturas.find(g=>g.id===b.factura_id);
+    setF({...b.documento,catalogo:f.catalogo ?? catalogoInicial()});
+    setBorrador({id:b.id,version:b.actualizado_en,facturaId:b.factura_id});
+    setActual(emitida?{id:emitida.id,version:emitida.actualizado_en}:null);
+    setVersionConfig(q.data?.config?.actualizado_en ?? null);setDirty(false);setFacturaModificada(true);setTab("nueva");setPaso(0);
+  };
   const nuevo = () => {
     if (!puedeCambiar()) return;
-    setF(prepararNuevaFactura(f,q.data?.facturas ?? [])); setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
+    setBorrador(null);
+    setF(prepararNuevaFactura(f,[...(q.data?.facturas ?? []),...(q.data?.borradores ?? [])])); setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
     setVersionConfig(q.data?.config?.actualizado_en ?? null);
   };
   const duplicar = (g:FacturaGuardada) => {
     if (!puedeCambiar()) return;
-    const base = prepararNuevaFactura(f,q.data?.facturas ?? []);
+    setBorrador(null);
+    const base = prepararNuevaFactura(f,[...(q.data?.facturas ?? []),...(q.data?.borradores ?? [])]);
     setF({...g.documento,numero:base.numero,fecha:base.fecha,vencimiento:base.vencimiento,catalogo:base.catalogo,
       lineas:g.documento.lineas.map(l=>({...l,id:crypto.randomUUID()}))});
     setActual(null); setDirty(true); setFacturaModificada(false); setTab("nueva"); setPaso(0);
@@ -91,17 +105,19 @@ export function EditorFacturacion() {
     try { cambiar(agregarProductos(f,f.catalogo ?? catalogoInicial(),ids,paqueteId)); }
     catch(e) {toast.error(e instanceof Error ? e.message : "No se han podido añadir los servicios.");}
   };
-  const guardar = async (comoFactura: boolean, descargar = false) => {
+  const guardar = async (comoFactura: boolean, descargar = false, soloCatalogo = false) => {
     const errores = comoFactura ? erroresFactura(f) : facturaSchema.safeParse(f).success ? [] : ["Revisa fechas, cantidades, precios y límites de los textos."];
     if (errores.length) { toast.error(errores.join(" ")); return; }
     setBusy(true);
     try {
       const documento = {...f, numero:f.numero.trim()};
-      const resultado = await q.guardar(documento, versionConfig, comoFactura ? actual ?? {id:crypto.randomUUID(),version:null} : undefined);
+      const resultado = await q.guardar(documento, versionConfig, comoFactura ? actual ?? {id:crypto.randomUUID(),version:null} : undefined, soloCatalogo ? undefined : borrador ?? {id:crypto.randomUUID(),version:null,facturaId:actual?.id});
+      if(resultado.borrador)setBorrador({id:resultado.borrador.id,version:resultado.borrador.actualizado_en,facturaId:resultado.borrador.factura_id});
+      if(comoFactura)setBorrador(null);
       setF(documento);
       setVersionConfig(resultado.config.actualizado_en); setDirty(false);
       if (resultado.factura) { setActual({id:resultado.factura.id,version:resultado.factura.actualizado_en}); setFacturaModificada(false); }
-      toast.success(comoFactura ? actual ? "Factura actualizada" : "Factura emitida" : "Borrador y tarifas guardados");
+      toast.success(comoFactura ? actual ? "Factura actualizada" : "Factura emitida" : soloCatalogo ? "Catálogo y tarifas guardados" : "Borrador guardado");
       if (comoFactura && !descargar) setTab("emitidas");
       if (descargar) {
         const { descargarFactura } = await import("./pdf");
@@ -115,7 +131,9 @@ export function EditorFacturacion() {
     const r = await q.refetch();
     if (!r.data || r.error) return;
     const documento = r.data.config ? {...r.data.config.documento,catalogo:r.data.config.documento.catalogo ?? catalogoInicial()} : prepararNuevaFactura(nuevaFactura(),r.data.facturas);
-    const archivada = r.data.facturas.find(g => g.numero === documento.numero.trim());
+    const pendiente=r.data.borradores?.find(b=>JSON.stringify(b.documento)===JSON.stringify(documento));
+    const archivada = r.data.facturas.find(g => pendiente ? g.id===pendiente.factura_id : g.numero === documento.numero.trim());
+    setBorrador(pendiente?{id:pendiente.id,version:pendiente.actualizado_en,facturaId:pendiente.factura_id}:null);
     setF(documento); setActual(archivada ? {id:archivada.id,version:archivada.actualizado_en} : null);
     setVersionConfig(r.data.config?.actualizado_en ?? null); setDirty(false);
     setFacturaModificada(!!archivada && JSON.stringify(archivada.documento) !== JSON.stringify(documento));
@@ -142,13 +160,13 @@ export function EditorFacturacion() {
     </div>}
     <Tabs value={tab} onValueChange={setTab}>
       <TabsList className="grid h-auto w-full grid-cols-3">
-        <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="emitidas">Facturas emitidas</TabsTrigger>
+        <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="emitidas">Facturas</TabsTrigger>
         <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="nueva">Nueva factura</TabsTrigger>
         <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="catalogo">Módulos y paquetes</TabsTrigger>
       </TabsList>
       <TabsContent value="emitidas" className="space-y-4 pt-3">
         {q.isLoading ? <p role="status">Cargando facturas…</p> : q.isError ? <p className="text-sm text-muted-foreground">El historial no está disponible. Reintenta la carga.</p> :
-          <FacturasEmitidas facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
+          <FacturasEmitidas borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
       </TabsContent>
       <TabsContent value="nueva" className="space-y-5 pt-3">
       {actual && <p className="text-sm font-medium">Editando factura {f.numero}</p>}
@@ -243,7 +261,7 @@ export function EditorFacturacion() {
       </TabsContent>
       <TabsContent value="catalogo" className="space-y-4 pt-3">
         <EditarCatalogo catalogo={f.catalogo ?? catalogoInicial()} cambiar={c=>cambiar({...f,catalogo:c})} busy={busy || q.isLoading} />
-        <Button disabled={deshabilitado} onClick={()=>void guardar(false)}><Save className="mr-2 h-4 w-4" />Guardar catálogo y tarifas</Button>
+        <Button disabled={deshabilitado} onClick={()=>void guardar(false,false,true)}><Save className="mr-2 h-4 w-4" />Guardar catálogo y tarifas</Button>
       </TabsContent>
     </Tabs>
   </div>;

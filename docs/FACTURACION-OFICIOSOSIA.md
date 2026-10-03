@@ -80,3 +80,9 @@ comunicación con servicios de la Administración.
 ### Nueva factura compacta
 
 El editor muestra un único paso cada vez: Cliente, Servicios, Ajustes y Revisar. Se puede navegar con Anterior/Siguiente o directamente por la barra de pasos sin perder los datos. El total permanece visible; los conceptos se distribuyen en dos columnas en escritorio y ocultan tipo, periodicidad e IVA tras un desplegable. La selección de paquetes se pliega al añadir servicios. Emitir y descargar están en el paso Revisar, junto con la vista previa; pago y observaciones se editan en Ajustes (paso 3); el borrador puede guardarse desde cualquier paso.
+
+### Facturas y borradores
+
+La pestaña Facturas reúne las emitidas y los borradores, identificados por estado. Permite filtrar por estado, cliente/NIF/número y rango de fechas y limpiar los filtros. Los importes emitidos y en borrador se muestran por separado. Los borradores pueden continuarse o duplicarse; el PDF corresponde a facturas emitidas. Cada borrador se guarda independientemente y desaparece de la lista de pendientes al emitirse, sin eliminar otros borradores.
+
+Aplicar `20261003181000_facturacion_borradores.sql` después de la migración inicial. Añade la tabla de borradores y la RPC v2, recupera el borrador previo y conserva acceso exclusivo del superadmin y control de versiones.

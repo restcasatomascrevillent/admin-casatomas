@@ -23,8 +23,8 @@ describe("editor simplificado",()=>{
     render(<EditorFacturacion/>);
     expect(screen.getByRole("tab",{name:"Nueva factura"})).toBeInTheDocument();
     expect(screen.getByRole("tab",{name:"Módulos y paquetes"})).toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("tab",{name:"Facturas emitidas"}),{button:0,ctrlKey:false});
-    expect(screen.getByText("Todavía no hay facturas emitidas")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab",{name:"Facturas"}),{button:0,ctrlKey:false});
+    expect(screen.getByText("Todavía no hay facturas")).toBeInTheDocument();
   });
   it("rellena un paquete con precios guardados y evita añadirlo dos veces",()=>{
     render(<EditorFacturacion/>);
