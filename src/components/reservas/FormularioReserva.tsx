@@ -405,11 +405,17 @@ export const FormularioReserva = ({
   // el aforo (pendiente, verificada o confirmada) y se ha cambiado el día, la
   // hora o los comensales. Con lo demás (nombre, notas, sala…) no hay nada que
   // comprobar, y avisar de un turno lleno por arreglar una errata solo asustaría.
+  // Sacar la reserva de una sala privada (fuera de aforo) a una normal SÍ empieza a consumir aforo.
+  const salePrivada =
+    !!reservaAEditar?.espacio_id &&
+    (watchedEspacio ?? null) !== reservaAEditar.espacio_id &&
+    salas.some((s) => s.id === reservaAEditar.espacio_id && s.privada);
   const aforoCambiado =
     !!reservaAEditar &&
     (fechaStr !== String(reservaAEditar.fecha).slice(0, 10) ||
       horaCorta(watchedHora) !== horaCorta(reservaAEditar.hora) ||
-      Number(watchedComensales) !== Number(reservaAEditar.numero_comensales));
+      Number(watchedComensales) !== Number(reservaAEditar.numero_comensales) ||
+      salePrivada);
   const comprobarAforo = !reservaAEditar || (aforoCambiado && esReservaViva(reservaAEditar.estado));
 
   // Verificar el aforo del turno cuando hay fecha, hora y comensales.
@@ -432,9 +438,25 @@ export const FormularioReserva = ({
         // UPDATE («editar no puede subir la ocupación»: si el cambio no suma, se
         // puede guardar).
         const fechaAforo = format(watchedFecha, "yyyy-MM-dd");
+        // `watchedEspacio`: si la sala elegida es privada (el Reservado) está FUERA DE AFORO y no se
+        // rechaza por turno lleno (2026-10-03); si la reserva SALE de una sala privada, sí consume aforo.
         const resultado = reservaAEditar
-          ? await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, MARCA_POR_DEFECTO, reservaAEditar)
-          : await verificarAforoTurno(fechaAforo, watchedHora, watchedComensales, MARCA_POR_DEFECTO);
+          ? await verificarAforoTurno(
+              fechaAforo,
+              watchedHora,
+              watchedComensales,
+              MARCA_POR_DEFECTO,
+              reservaAEditar,
+              watchedEspacio,
+            )
+          : await verificarAforoTurno(
+              fechaAforo,
+              watchedHora,
+              watchedComensales,
+              MARCA_POR_DEFECTO,
+              undefined,
+              watchedEspacio,
+            );
         if (!cancelado) {
           setDisponibilidadInfo({ disponible: resultado.disponible, mensaje: resultado.mensaje });
         }
@@ -465,6 +487,7 @@ export const FormularioReserva = ({
     watchedFecha,
     watchedHora,
     watchedComensales,
+    watchedEspacio,
     comprobarAforo,
     reservaAEditar?.id,
     reservaAEditar?.fecha,

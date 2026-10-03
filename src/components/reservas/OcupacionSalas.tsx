@@ -21,6 +21,7 @@ import {
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
+import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 
 // ============================================================================
 // "Ocupación de salas": rejilla salas × franjas de un día para decidir dónde
@@ -371,7 +372,17 @@ function AforoTurno({ ocupacion, turno }: { ocupacion: OcupacionSalasDia; turno:
   );
 }
 
-function CeldaTurnoView({ celda }: { celda: CeldaTurno }) {
+function CeldaTurnoView({ celda, privada }: { celda: CeldaTurno; privada?: boolean }) {
+  if (privada) {
+    // Sala privada: fuera de aforo y con una sola reserva por turno; se dice "ocupada"/"libre", no "n/20".
+    const ocupada = celda.nivel === "lleno";
+    return (
+      <span className="flex items-center gap-1 whitespace-nowrap">
+        <span className="font-medium">{ocupada ? "Ocupada" : "Libre"}</span>
+        {ocupada && celda.ocupados > 0 && <span className="text-[10px] opacity-80">{celda.ocupados} pax</span>}
+      </span>
+    );
+  }
   if (celda.capacidad == null) {
     return <span className="text-muted-foreground">{celda.ocupados} pax</span>;
   }
@@ -408,17 +419,19 @@ function FilaRejilla({
         {sala.capacidad != null && (
           <span className="block text-[10px] font-normal text-muted-foreground">{sala.capacidad} plazas</span>
         )}
+        {sala.privada && <EtiquetaFueraDeAforo className="mt-0.5" />}
       </th>
       {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => {
         const celda = sala.turnos[t];
         // Cabe de verdad = cabe en la sala Y el turno tiene aforo (si no, la BD lo rechaza).
-        const cabe = celda.cabe && ocupacion.aforo[t].cabe;
+        // Una sala privada está fuera de aforo: que el turno esté lleno no la bloquea.
+        const cabe = celda.cabe && (sala.privada || ocupacion.aforo[t].cabe);
         return [
           <td
             key={`${t}-turno`}
             className={cn("border-l px-2 py-1.5", sala.capacidad != null && CLASES_NIVEL[celda.nivel])}
           >
-            <CeldaTurnoView celda={celda} />
+            <CeldaTurnoView celda={celda} privada={sala.privada} />
           </td>,
           ...ocupacion.franjas[t].map((h) => {
             const enHora = sala.porHora[h];

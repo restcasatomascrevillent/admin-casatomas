@@ -8,12 +8,17 @@
 // Antes este módulo (`resumenNegocios.ts`) daba un total de los dos negocios y
 // un desglose por negocio.
 //
-// La capacidad es la suma de las salas activas de Casa Tomás, igual que el
-// trigger de aforo. Estados que cuentan como "van a venir / han venido":
-// pendiente, verificada, confirmada y completada (llegó). Ver useOcupacionHoy.ts.
+// La capacidad es la suma de las salas activas de Casa Tomás SIN las salas
+// privadas, igual que el trigger de aforo (150: el Reservado está FUERA DE AFORO,
+// decisión del dueño del 2026-10-03), y las reservas de una sala privada no
+// entran en ninguna cifra (ni reservas, ni comensales, ni %): se avisan aparte
+// (`avisosSalasPrivadas`, en `salaPrivada.ts`). Estados que cuentan como "van a
+// venir / han venido": pendiente, verificada, confirmada y completada (llegó).
+// Ver useOcupacionHoy.ts.
 // ============================================================================
 
 import { admiteReservas, salaAdmiteReservas } from "./negocios";
+import { capacidadDeAforo, idsSalasPrivadasActivas, reservasQueConsumenAforo } from "./salaPrivada";
 
 export const ESTADOS_ACTIVOS_RESUMEN = ["pendiente", "verificada", "confirmada", "completada"] as const;
 
@@ -21,9 +26,12 @@ export interface ReservaResumen {
   estado: string;
   numero_comensales: number | null;
   marca?: string | null;
+  /** Para dejar fuera las reservas de una sala privada (fuera de aforo). */
+  espacio_id?: string | null;
 }
 
 export interface EspacioResumen {
+  id?: string | null;
   capacidad_maxima: number | null;
   activa?: boolean | null;
   caracteristicas?: unknown;
@@ -47,10 +55,13 @@ export function resumirOcupacion(
   reservas: readonly ReservaResumen[],
   espacios: readonly EspacioResumen[],
 ): CifrasOcupacion {
-  const propias = reservas.filter((r) => admiteReservas(r.marca));
-  const capacidadTotal = espacios
-    .filter((e) => e.activa !== false && salaAdmiteReservas(e))
-    .reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0);
+  const salasDeCasaTomas = espacios.filter((e) => e.activa !== false && salaAdmiteReservas(e));
+  // Salas privadas: fuera de aforo. Ni su capacidad ni sus reservas entran en las cifras.
+  const propias = reservasQueConsumenAforo(
+    reservas.filter((r) => admiteReservas(r.marca)),
+    idsSalasPrivadasActivas(salasDeCasaTomas),
+  );
+  const capacidadTotal = capacidadDeAforo(salasDeCasaTomas);
   const activas = propias.filter((r) => (ESTADOS_ACTIVOS_RESUMEN as readonly string[]).includes(r.estado));
   const totalComensales = activas.reduce((s, r) => s + (Number(r.numero_comensales) || 0), 0);
   return {

@@ -41,7 +41,7 @@ import { admiteReservas, salaAdmiteReservas } from "../negocios";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-/** Aforo REAL de producción de Casa Tomás por turno: Comedor 50 + Salón 50 + Terraza 50 + Reservado 20. */
+/** Aforo de ejemplo de estos tests. (El real de Casa Tomás, sin el Reservado que está fuera de aforo, es 150.) */
 const AFORO = 170;
 
 /** "Ahora" = miércoles 14/10/2026 10:30 en Madrid (CEST, +02:00). */
@@ -658,5 +658,94 @@ describe("textoTurno y describirDia", () => {
 
   it("un día sin reservas o sin datos dice «sin reservas»", () => {
     expect(describirDia(undefined, 48).aria).toBe("sin reservas");
+  });
+});
+
+// ─── El Reservado: FUERA DE AFORO (decisión del dueño, 2026-10-03) ───────────
+
+describe("sala privada (el Reservado) en el calendario", () => {
+  const RESERVADO = { id: "reservado", nombre: "Reservado" };
+  const CTX: ContextoCalendario = { ...CONTEXTO, salasPrivadas: [RESERVADO] };
+
+  it("aforoCasaTomas no suma el Reservado: 150, no 170", () => {
+    const espacios = [
+      { id: "comedor", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+      { id: "salon", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+      { id: "terraza", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+      { id: "reservado", capacidad_maxima: 20, activa: true, caracteristicas: { marca: "casa_tomas", privada: true } },
+    ];
+    expect(aforoCasaTomas(espacios)).toBe(150);
+    // Solo el Reservado: no hay aforo que medir (no es un 20).
+    expect(aforoCasaTomas(espacios.slice(3))).toBeNull();
+  });
+
+  it("sus reservas no suman comensales, reservas ni porcentaje del día", () => {
+    const dia = "2026-10-20";
+    const resumen = resumirDia(
+      dia,
+      [
+        reserva(dia, "13:30", 10, { espacio_id: "comedor" }),
+        reserva(dia, "14:00", 8, { espacio_id: "reservado" }),
+        reserva(dia, "21:00", 20, { espacio_id: "reservado" }),
+      ],
+      150,
+      CTX,
+    );
+    expect(resumen.comensales).toBe(10);
+    expect(resumen.reservas).toBe(1);
+    expect(resumen.turnos.comida.comensales).toBe(10);
+    expect(resumen.turnos.cena.comensales).toBe(0);
+    expect(resumen.porcentaje).toBe(6); // 10 / 150
+    // …pero queda constancia de que está ocupado en la comida y en la cena.
+    expect(resumen.salasPrivadas).toEqual([{ espacioId: "reservado", nombre: "Reservado", turnos: ["comida", "cena"] }]);
+  });
+
+  it("un día con solo el Reservado: sin cifras, color «sin reservas», pero con indicador", () => {
+    const dia = "2026-10-21";
+    const resumen = resumirDia(dia, [reserva(dia, "21:00", 8, { espacio_id: "reservado" })], 150, CTX);
+    expect(resumen.reservas).toBe(0);
+    expect(resumen.comensales).toBe(0);
+    expect(resumen.nivel).toBe("vacio");
+    expect(resumen.salasPrivadas).toHaveLength(1);
+    const mes = resumirMes([reserva(dia, "21:00", 8, { espacio_id: "reservado" })], 150, CTX);
+    expect(mes[dia]).toBeDefined();
+    // Y el tooltip lo dice.
+    const d = describirDia(mes[dia], 48);
+    expect(d.lineas).toEqual(["Reservado ocupado en la cena (fuera de aforo)"]);
+    expect(d.aria).toContain("fuera de aforo");
+  });
+
+  it("cancelada y «No vino» no marcan el día; «Llegó» (ya sentada) sí", () => {
+    const dia = "2026-10-22";
+    const con = (estado: string) =>
+      resumirDia(dia, [reserva(dia, "14:00", 4, { espacio_id: "reservado", estado })], 150, CTX).salasPrivadas;
+    expect(con("cancelada")).toEqual([]);
+    expect(con("no_show")).toEqual([]);
+    expect(con("completada")).toHaveLength(1);
+    expect(con("pendiente")).toHaveLength(1);
+  });
+
+  it("sin el contexto de salas privadas, nada cambia (compatibilidad)", () => {
+    const dia = "2026-10-20";
+    const resumen = resumirDia(dia, [reserva(dia, "14:00", 8, { espacio_id: "reservado" })], 150, CONTEXTO);
+    expect(resumen.comensales).toBe(8);
+    expect(resumen.salasPrivadas).toEqual([]);
+  });
+
+  it("un día pasado tampoco cuenta los comensales del Reservado, y lo marca", () => {
+    const dia = "2026-10-10";
+    const resumen = resumirDia(
+      dia,
+      [
+        reserva(dia, "14:00", 6, { espacio_id: "comedor", estado: "completada" }),
+        reserva(dia, "21:00", 8, { espacio_id: "reservado", estado: "completada" }),
+      ],
+      150,
+      CTX,
+    );
+    expect(resumen.esPasado).toBe(true);
+    expect(resumen.comensales).toBe(6);
+    expect(resumen.reservas).toBe(1);
+    expect(resumen.salasPrivadas[0].turnos).toEqual(["cena"]);
   });
 });

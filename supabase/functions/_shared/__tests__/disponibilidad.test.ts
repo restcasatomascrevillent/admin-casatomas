@@ -37,6 +37,9 @@ import {
   AVISO_UMBRAL_FUERA_DE_RANGO,
   sumarCapacidadPorMarca,
   filtrarEspaciosPorMarca,
+  esCaracteristicaPrivada,
+  idsSalasPrivadas,
+  sinReservasEnSalasPrivadas,
   MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type EntradaDisponibilidad,
@@ -1455,5 +1458,81 @@ describe("aforo por negocio (marca)", () => {
         sumarCapacidadPorMarca(ESPACIOS_PRODUCCION, "casa_tomas"),
       );
     });
+  });
+});
+
+// ============================================================
+// 19. SALAS PRIVADAS: FUERA DE AFORO (decisión del dueño, 2026-10-03)
+// ============================================================
+// «El Reservado no quiero que se tenga en cuenta en los aforos [...] pero que
+// sepamos que está.» Una sala con `caracteristicas.privada = true` no suma su
+// capacidad al aforo de la marca (Casa Tomás = 150, no 170) y sus reservas no
+// consumen aforo. Lo mismo que hace `validar_capacidad_reserva()` desde
+// `20261003150000_sala_privada_fuera_de_aforo.sql`. Lo usan reservas-web y el panel.
+describe("salas privadas fuera de aforo", () => {
+  const ESPACIOS_CON_RESERVADO: EspacioParaAforo[] = [
+    { capacidad_maxima: 50, marca: "casa_tomas" },
+    { capacidad_maxima: 50, marca: "casa_tomas" },
+    { capacidad_maxima: 50, marca: "casa_tomas" },
+    { capacidad_maxima: 20, marca: "casa_tomas", privada: true }, // Reservado
+  ];
+
+  it("sumarCapacidadPorMarca: Casa Tomás = 150 con el Reservado (no 170)", () => {
+    expect(sumarCapacidadPorMarca(ESPACIOS_CON_RESERVADO, "casa_tomas")).toBe(150);
+  });
+
+  it("acepta el flag como texto 'true' (el ->> del trigger) y no confunde false ni vacío", () => {
+    expect(sumarCapacidadPorMarca([{ capacidad_maxima: 20, privada: "true" }], "casa_tomas")).toBe(0);
+    expect(sumarCapacidadPorMarca([{ capacidad_maxima: 20, privada: false }], "casa_tomas")).toBe(20);
+    expect(sumarCapacidadPorMarca([{ capacidad_maxima: 20, privada: null }], "casa_tomas")).toBe(20);
+    expect(sumarCapacidadPorMarca([{ capacidad_maxima: 20, privada: "false" }], "casa_tomas")).toBe(20);
+  });
+
+  it("esCaracteristicaPrivada e idsSalasPrivadas leen caracteristicas.privada", () => {
+    expect(esCaracteristicaPrivada({ privada: true })).toBe(true);
+    expect(esCaracteristicaPrivada({ privada: "true" })).toBe(true);
+    expect(esCaracteristicaPrivada({ privada: false })).toBe(false);
+    expect(esCaracteristicaPrivada({ marca: "casa_tomas" })).toBe(false);
+    expect(esCaracteristicaPrivada(null)).toBe(false);
+    expect(esCaracteristicaPrivada("privada")).toBe(false);
+    expect(
+      idsSalasPrivadas([
+        { id: "a", caracteristicas: { marca: "casa_tomas" } },
+        { id: "b", caracteristicas: { privada: true } },
+        { id: null, caracteristicas: { privada: true } },
+        null,
+      ]),
+    ).toEqual(["b"]);
+    expect(idsSalasPrivadas(null)).toEqual([]);
+  });
+
+  it("sinReservasEnSalasPrivadas quita solo las de salas privadas", () => {
+    const rs = [r("14:00", 8, "reservado"), r("14:00", 4, "comedor"), r("14:00", 2, null)];
+    expect(sinReservasEnSalasPrivadas(rs, ["reservado"]).map((x) => x.numero_comensales)).toEqual([4, 2]);
+    expect(sinReservasEnSalasPrivadas(rs, [])).toHaveLength(3);
+    expect(sinReservasEnSalasPrivadas(rs, undefined)).toHaveLength(3);
+  });
+
+  it("el motor no cuenta las reservas de una sala privada en el aforo del turno", () => {
+    const res = calcular({
+      reservas: [r("13:30", 10, "comedor"), r("13:30", 20, "reservado"), r("21:00", 8, "reservado")],
+      salasPrivadas: ["reservado"],
+    });
+    expect(res.aforo.comida.ocupacion).toBe(10);
+    expect(res.aforo.cena.ocupacion).toBe(0);
+    expect(res.ocupacion.map((o) => [o.hora, o.total_comensales])).toEqual([["13:30", 10]]);
+  });
+
+  it("sin pasar salasPrivadas se cuentan todas (compatibilidad)", () => {
+    const res = calcular({ reservas: [r("13:30", 10, "comedor"), r("13:30", 20, "reservado")] });
+    expect(res.aforo.comida.ocupacion).toBe(30);
+  });
+
+  it("con el turno al 100 % del aforo, una reserva más en la sala privada no cambia nada", () => {
+    const llena = [r("13:30", CAPACIDAD, "comedor")];
+    const sin = calcular({ reservas: llena, salasPrivadas: ["reservado"] });
+    const con = calcular({ reservas: [...llena, r("14:00", 8, "reservado")], salasPrivadas: ["reservado"] });
+    expect(con.aforo.comida).toEqual(sin.aforo.comida);
+    expect(con.aforo.comida.completo).toBe(true);
   });
 });

@@ -2,9 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { useIdsSalasPrivadas } from "@/hooks/useSalasPrivadas";
+import { reservasQueConsumenAforo } from "@/lib/reservas/salaPrivada";
 
 export function CurvaReservasPorHora() {
-  const { data: reservas, isError, error, refetch } = useTodayConfirmedReservations();
+  const { data: todas, isError, error, refetch } = useTodayConfirmedReservations();
+  // El Reservado (sala privada) está fuera de aforo: sus reservas no entran en la curva.
+  const idsPrivadas = useIdsSalasPrivadas();
+  const reservas = todas ? reservasQueConsumenAforo(todas, idsPrivadas) : todas;
 
   const calcularReservasPorHora = () => {
     if (!reservas || reservas.length === 0) return [];

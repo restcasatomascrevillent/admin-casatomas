@@ -13,6 +13,10 @@
 //   4. El nº de reservas, pequeño.
 //   5. Un punto discreto si hay reservas SIN SALA dentro de la ventana de
 //      asignación (48 h por defecto). Fuera de la ventana no hay nada que decir.
+//   6. Un candado si el Reservado (sala privada) está ocupado ese día en la comida
+//      o en la cena. Está FUERA DE AFORO (2026-10-03): no suma comensales, reservas
+//      ni %, pero el personal tiene que ver que está. El detalle (qué turno) va en
+//      el tooltip y en el `aria-label`.
 //
 // Los días PASADOS van atenuados y sin escala ni barras (histórico: lo que se
 // reservó, sin canceladas). Hoy y el futuro cuentan solo las reservas vivas.
@@ -24,6 +28,7 @@
 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Lock } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -79,6 +84,8 @@ export function CasillaOcupacion({
   const etiqueta = `${format(dia, "d 'de' MMMM", { locale: es })}: ${descripcion.aria}`;
 
   const conReservas = !!resumen && resumen.reservas > 0;
+  // El Reservado ocupado (fuera de aforo): indicador aparte, aunque no haya más reservas.
+  const hayPrivada = !!resumen && resumen.salasPrivadas.length > 0;
   const hayBarras =
     conReservas &&
     !resumen.esPasado &&
@@ -118,13 +125,22 @@ export function CasillaOcupacion({
         >
           {format(dia, "d")}
         </span>
-        {conReservas && resumen.sinSalaEnVentana > 0 && (
-          <span
-            aria-hidden="true"
-            data-testid="punto-sin-sala"
-            className={cn("mr-0.5 mt-0.5 h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3", CLASES_PUNTO_SIN_SALA)}
-          />
-        )}
+        <span className="flex shrink-0 items-center gap-0.5">
+          {hayPrivada && (
+            <Lock
+              aria-hidden="true"
+              data-testid="indicador-sala-privada"
+              className="mt-0.5 h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5"
+            />
+          )}
+          {conReservas && resumen.sinSalaEnVentana > 0 && (
+            <span
+              aria-hidden="true"
+              data-testid="punto-sin-sala"
+              className={cn("mr-0.5 mt-0.5 h-2.5 w-2.5 shrink-0 sm:h-3 sm:w-3", CLASES_PUNTO_SIN_SALA)}
+            />
+          )}
+        </span>
       </span>
 
       {conReservas && (
@@ -168,7 +184,7 @@ export function CasillaOcupacion({
   );
 
   // Sin nada que contar no hay tooltip: no diría más que la propia casilla.
-  if (!conReservas) return boton;
+  if (!conReservas && !hayPrivada) return boton;
 
   return (
     <Tooltip>

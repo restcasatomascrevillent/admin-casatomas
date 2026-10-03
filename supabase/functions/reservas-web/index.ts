@@ -55,6 +55,8 @@ import {
   HORA_CORTE_TURNO,
   sumarCapacidadPorMarca,
   filtrarEspaciosPorMarca,
+  esCaracteristicaPrivada,
+  idsSalasPrivadas,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
 } from "../_shared/disponibilidad.ts";
@@ -324,13 +326,20 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
   // que el trigger `validar_capacidad_reserva`, ver `20260922190000_
   // aforo_por_marca.sql` y `sumarCapacidadPorMarca`/`filtrarEspaciosPorMarca`
   // en `_shared/disponibilidad.ts`.
+  //
+  // SALAS PRIVADAS FUERA DE AFORO (2026-10-03, el «Reservado»): ni suman su
+  // capacidad (`sumarCapacidadPorMarca` las salta con `privada`), ni se
+  // ofrecen como espacio (la web nunca asigna sala privada), ni sus reservas
+  // (que solo se crean desde el panel) consumen aforo. Igual que el trigger.
   const espaciosDeLaMarca = filtrarEspaciosPorMarca(
     ((espaciosRaw || []) as Array<{ id: string; nombre: string; capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }>).map((e) => ({
       ...e,
       marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+      privada: esCaracteristicaPrivada(e.caracteristicas),
     })),
     marca,
   );
+  const idsPrivadas = idsSalasPrivadas((espaciosRaw || []) as Array<{ id: string; caracteristicas: Record<string, unknown> | null }>);
 
   const { data: reservas } = await supabase
     .from("reservas")
@@ -346,7 +355,8 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
   // El "17:00" ya no está escrito a mano aquí: sale de `HORA_CORTE_TURNO`,
   // la misma constante que usa el motor compartido y que copia el trigger.
   const esTurnoComida = horaConsulta ? horaConsulta < HORA_CORTE_TURNO : null;
-  const reservasMismoTurno = (reservas || []).filter((r: { hora: string }) => {
+  const reservasMismoTurno = (reservas || []).filter((r: { hora: string; espacio_id?: string | null }) => {
+    if (r.espacio_id && idsPrivadas.includes(r.espacio_id)) return false;
     if (esTurnoComida === null) return true;
     const rEsComida = r.hora < `${HORA_CORTE_TURNO}:00`;
     return rEsComida === esTurnoComida;
@@ -357,7 +367,7 @@ async function getEspaciosConOcupacion(fecha: string, horaConsulta: string | nul
     if (r.espacio_id) ocupacionPorEspacio[r.espacio_id] = (ocupacionPorEspacio[r.espacio_id] || 0) + r.numero_comensales;
   }
 
-  const resultado: EspacioOcupacion[] = espaciosDeLaMarca.map((e) => ({
+  const resultado: EspacioOcupacion[] = espaciosDeLaMarca.filter((e) => !e.privada).map((e) => ({
     id: e.id,
     nombre: e.nombre,
     capacidad_maxima: e.capacidad_maxima,
@@ -931,6 +941,7 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     (espaciosRaw || []).map((e: { capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }) => ({
       capacidad_maxima: e.capacidad_maxima,
       marca: e.caracteristicas?.marca as string | undefined,
+      privada: esCaracteristicaPrivada(e.caracteristicas),
     })),
     marca,
   );
@@ -941,6 +952,8 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     espacioId,
     configuraciones: (turnosRaw || []) as unknown as ConfiguracionTurnoInput[],
     reservas: (reservasDia || []) as unknown as ReservaOcupante[],
+    // Las reservas en una sala privada (fuera de aforo) no ocupan turno.
+    salasPrivadas: idsSalasPrivadas(espaciosRaw as Array<{ id: string; caracteristicas: unknown }> | null),
     capacidadTotal,
     ahora: ahoraEnMadrid(),
     politica: {
@@ -1288,7 +1301,7 @@ async function handleCrear(req: Request): Promise<Response> {
       // INSERT. Hoy da igual: ni Reservado.tsx ni ReservationForm.tsx
       // mandan `espacio_id`, así que `marcaTemprana` y la `marca` final
       // siempre coinciden en producción.
-      supabase.from("espacios_reserva").select("capacidad_maxima, caracteristicas").eq("activa", true),
+      supabase.from("espacios_reserva").select("id, capacidad_maxima, caracteristicas").eq("activa", true),
       supabase
         .from("reservas")
         .select("hora, numero_comensales, espacio_id")
@@ -1303,10 +1316,12 @@ async function handleCrear(req: Request): Promise<Response> {
       espacioId: espacioIdInput,
       configuraciones: (turnosCrear || []) as unknown as ConfiguracionTurnoInput[],
       reservas: (reservasCrear || []) as unknown as ReservaOcupante[],
+      salasPrivadas: idsSalasPrivadas(espaciosCrear as Array<{ id: string; caracteristicas: unknown }> | null),
       capacidadTotal: sumarCapacidadPorMarca(
         (espaciosCrear || []).map((e: { capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }) => ({
           capacidad_maxima: e.capacidad_maxima,
           marca: e.caracteristicas?.marca as string | undefined,
+          privada: esCaracteristicaPrivada(e.caracteristicas),
         })),
         marcaTemprana,
       ),

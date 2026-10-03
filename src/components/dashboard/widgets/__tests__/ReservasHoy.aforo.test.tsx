@@ -8,6 +8,10 @@
  * verdad (los hooks del dashboard incluidos) contra el doble de Supabase de los tests de hooks, que filtra
  * y devuelve solo las columnas pedidas: si alguien sumara todas las salas, dejara de pedir
  * `caracteristicas` o dejara pasar las reservas de Touza, la cifra cambiaría y este test caería.
+ *
+ * El Reservado de Casa Tomás (`privada: true`) está FUERA DE AFORO (decisión del dueño, 2026-10-03): no suma
+ * sus 20 plazas (el aforo es 150, no 170), sus reservas no entran en ninguna cifra y un aviso aparte dice
+ * si está ocupado.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -72,7 +76,7 @@ beforeEach(() => {
       sala("ct-comedor", 50, {}),
       sala("ct-salon", 50, null),
       sala("ct-terraza", 50, { marca: "casa_tomas" }),
-      sala("ct-reservado", 20, { marca: "casa_tomas" }),
+      sala("ct-reservado", 20, { marca: "casa_tomas", privada: true }),
       sala("ct-bodega", 40, { marca: "casa_tomas" }, false),
       sala("tz-reservado", 20, { privada: true, marca: "touza" }),
       sala("tz-terraza", 30, { marca: "touza" }),
@@ -95,11 +99,31 @@ afterEach(() => {
 });
 
 describe("ReservasHoy · ocupación de Casa Tomás contra su aforo", () => {
-  it("suma solo las salas activas de Casa Tomás (170, no 250) y cuenta solo sus reservas", async () => {
+  it("suma solo las salas activas de Casa Tomás SIN el Reservado (150, no 250 ni 170) y cuenta solo sus reservas", async () => {
     montar();
 
-    // 4 + 2 comensales de Casa Tomás sobre 170: con las salas de Touza serían 250; con sus reservas, 20 y 4.
-    expect(await screen.findByText("6/170 pax · 2 res.")).toBeInTheDocument();
+    // 4 + 2 comensales de Casa Tomás sobre 150: con las salas de Touza serían 250; con sus reservas, 20 y 4.
+    expect(await screen.findByText("6/150 pax · 2 res.")).toBeInTheDocument();
     expect(screen.getByText("4%")).toBeInTheDocument();
+  });
+
+  it("el Reservado ocupado NO entra en las cifras (ni reservas ni comensales ni %) pero se avisa aparte", async () => {
+    (doble.tablas.reservas as unknown[]).push(
+      reserva("ct-reservado-garcia", { hora: "14:00:00", nombre: "García", numero_comensales: 8, espacio_id: "ct-reservado" }),
+    );
+    montar();
+
+    expect(await screen.findByText("6/150 pax · 2 res.")).toBeInTheDocument();
+    expect(screen.getByText("4%")).toBeInTheDocument();
+    const aviso = await screen.findByTestId("aviso-sala-privada");
+    expect(aviso).toHaveTextContent("ct-reservado: ocupado — García, 8 pax (comida); libre en la cena");
+    expect(aviso).toHaveTextContent("Fuera de aforo");
+  });
+
+  it("con el Reservado libre dice «libre» (y las cifras no cambian)", async () => {
+    montar();
+
+    expect(await screen.findByText("6/150 pax · 2 res.")).toBeInTheDocument();
+    expect(await screen.findByTestId("aviso-sala-privada")).toHaveTextContent("ct-reservado: libre");
   });
 });

@@ -76,6 +76,7 @@
 // ============================================================================
 
 import { admiteReservas, marcaDeEspacio } from "./negocios";
+import { esSalaPrivada } from "./salaPrivada";
 
 export interface EspacioParaCuadre {
   id: string;
@@ -117,6 +118,11 @@ export interface CuadreEspacio {
   nombre: string;
   marca: string;
   activa: boolean;
+  /**
+   * Sala privada (el Reservado): FUERA DE AFORO (2026-10-03). Su cuadre de mesas se calcula
+   * como el de cualquier sala, pero NO entra en el total del restaurante (`calcularCuadreTotal`).
+   */
+  privada: boolean;
   capacidadDeclarada: number;
   /**
    * Plazas que cuentan para el aforo: suma de `capacidad` de las mesas REALES
@@ -257,6 +263,7 @@ export function calcularCuadreEspacio(espacio: EspacioParaCuadre, mesas: readonl
     // de `20260922190000_aforo_por_marca.sql`. Las MESAS sí usan `!== false`
     // (ver `mesaActiva`), porque ahí el SQL filtra con `activa is not false`.
     activa: espacio.activa === true,
+    privada: esSalaPrivada(espacio),
     capacidadDeclarada,
     plazasMesas,
     plazasFusionadas,
@@ -296,7 +303,8 @@ export function calcularCuadres(
  * y eso es correcto: mide lo que pasaría de verdad al encender la regla.
  */
 export function calcularCuadreTotal(cuadres: readonly CuadreEspacio[]): CuadreTotal | null {
-  const items = (cuadres ?? []).filter((c) => c && c.activa === true && admiteReservas(c.marca));
+  // Las salas privadas (el Reservado) están fuera de aforo: no entran en el total del restaurante.
+  const items = (cuadres ?? []).filter((c) => c && c.activa === true && admiteReservas(c.marca) && !c.privada);
   if (items.length === 0) return null;
   const capacidadDeclarada = items.reduce((s, c) => s + c.capacidadDeclarada, 0);
   const plazasMesas = items.reduce((s, c) => s + c.plazasMesas, 0);

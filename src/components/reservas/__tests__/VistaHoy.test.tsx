@@ -588,3 +588,63 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
     expect(screen.getByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });
+
+describe("VistaHoy — el Reservado (sala privada) está fuera de aforo pero a la vista", () => {
+  const RESERVADO = "esp-reservado";
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.canEdit = true;
+    h.store.reservas = [];
+    h.store.error = null;
+    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
+      data: RESUMEN,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
+    vi.mocked(useEspaciosReserva).mockReturnValue({
+      data: [...SALAS, { id: RESERVADO, nombre: "Reservado", activa: true, caracteristicas: { marca: "casa_tomas", privada: true } }],
+    } as unknown as ReturnType<typeof useEspaciosReserva>);
+    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useAsignacionesMesa>);
+  });
+
+  it("con una reserva en el Reservado: «Reservado: ocupado — García, 8 pax (comida)», aparte de las cifras", async () => {
+    h.store.reservas = [
+      reserva({ id: "g", nombre: "García", numero_comensales: 8, espacio_id: RESERVADO, hora: "14:00:00" }),
+    ];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const aviso = await screen.findByTestId("aviso-sala-privada");
+    expect(aviso).toHaveTextContent("Reservado: ocupado — García, 8 pax (comida); libre en la cena");
+    expect(aviso).toHaveTextContent("Fuera de aforo");
+    // Las cifras de la franja son las del resumen (que ya las calcula sin el Reservado): no se tocan aquí.
+    expect(screen.getByText("Comensales")).toBeInTheDocument();
+  });
+
+  it("sin reservas en el Reservado: «Reservado: libre»", async () => {
+    h.store.reservas = [reserva({ id: "a", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(await screen.findByTestId("aviso-sala-privada")).toHaveTextContent("Reservado: libre");
+  });
+
+  it("una reserva cancelada no lo ocupa", async () => {
+    h.store.reservas = [reserva({ id: "g", nombre: "García", espacio_id: RESERVADO, estado: "cancelada" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(await screen.findByTestId("aviso-sala-privada")).toHaveTextContent("Reservado: libre");
+  });
+
+  it("si no hay ninguna sala privada, no hay aviso", async () => {
+    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<typeof useEspaciosReserva>);
+    h.store.reservas = [reserva({ id: "a", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(screen.queryByTestId("aviso-sala-privada")).not.toBeInTheDocument();
+  });
+});

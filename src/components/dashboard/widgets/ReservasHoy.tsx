@@ -19,10 +19,13 @@ import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
 import { marcaDeEspacio, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
+import { avisosSalasPrivadas, estaFueraDeAforo, esSalaPrivada, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
+import { AvisoSalasPrivadas } from "@/components/reservas/AvisoSalasPrivadas";
 
 /**
- * Aforo de Casa Tomás: suma de sus salas activas, igual que el trigger
- * `validar_capacidad_reserva` (que suma por marca). Solo Casa Tomás admite
+ * Aforo de Casa Tomás: suma de sus salas activas SIN las privadas (150: el
+ * Reservado está FUERA DE AFORO, decisión del dueño del 2026-10-03), igual que el
+ * trigger `validar_capacidad_reserva` (que suma por marca). Solo Casa Tomás admite
  * reservas (decisión del dueño, 2026-10-01): las salas de Touza que queden
  * activas no suman, y las reservas de Touza ya no llegan aquí
  * (`useTodayReservations` las descarta). Antes la tarjeta daba un bloque de
@@ -34,13 +37,17 @@ function useEspaciosCapacidad() {
     queryFn: async () => {
       const { data: espacios, error } = await supabase
         .from("espacios_reserva")
-        .select("capacidad_maxima, caracteristicas")
+        .select("id, nombre, capacidad_maxima, caracteristicas")
         .eq("activa", true);
 
       if (error) throw error;
       return ((espacios ?? []) as any[]).map((e) => ({
+        id: e.id as string | undefined,
+        nombre: e.nombre as string | undefined,
         capacidad_maxima: Number(e.capacidad_maxima) || 0,
         marca: marcaDeEspacio(e),
+        // Sala privada (el Reservado): fuera de aforo, no suma su capacidad.
+        privada: esSalaPrivada(e),
       }));
     },
     refetchInterval: 60000,
@@ -82,9 +89,13 @@ export function ReservasHoy() {
   // Reservas que ocupan plaza. Mismo criterio que el trigger `trg_validar_capacidad`
   // de la base de datos y que la pestaña "Hoy" de Reservas: antes la barra de ocupación
   // contaba solo confirmadas mientras las tarjetas de al lado contaban otra cosa.
+  // Las reservas de una sala privada (el Reservado) están FUERA DE AFORO: no entran en ninguna cifra
+  // de esta tarjeta (se avisan aparte, más abajo).
+  const idsPrivadas = idsSalasPrivadasActivas(espaciosCapacidad);
   const reservasActivas = todasReservas?.filter(r =>
-    ["pendiente", "verificada", "confirmada"].includes(r.estado)
+    ["pendiente", "verificada", "confirmada"].includes(r.estado) && !estaFueraDeAforo(r, idsPrivadas)
   ) || [];
+  const avisosPrivadas = avisosSalasPrivadas(espaciosCapacidad, todasReservas);
 
   // Desglose por turno (umbral 17:00, el mismo que usa el trigger)
   const reservasComida = reservasActivas.filter(r => parseInt(r.hora.split(':')[0]) < 17);
@@ -103,9 +114,10 @@ export function ReservasHoy() {
   const reservasConNotas = todasReservas?.filter(r => r.notas_cliente && r.notas_cliente.trim() !== '') || [];
 
   // Estados
-  const numConfirmadas = todasReservas?.filter(r => r.estado === "confirmada").length || 0;
-  const reservasPendientes = todasReservas?.filter(r => r.estado === "pendiente").length || 0;
-  const reservasVerificadas = todasReservas?.filter(r => r.estado === "verificada").length || 0;
+  // Salen de las activas (sin el Reservado) para que sumen exactamente las "reservas activas" de arriba.
+  const numConfirmadas = reservasActivas.filter(r => r.estado === "confirmada").length;
+  const reservasPendientes = reservasActivas.filter(r => r.estado === "pendiente").length;
+  const reservasVerificadas = reservasActivas.filter(r => r.estado === "verificada").length;
 
   // Un fallo de red o de permisos no puede pintarse como "0 reservas, 0% de ocupación".
   if (hayError) {
@@ -252,6 +264,8 @@ export function ReservasHoy() {
             {reservasActivas.length} reservas activas ({comensalesActivos} pax, sin canceladas) = {numConfirmadas} confirmadas
             + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
           </p>
+          {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. */}
+          <AvisoSalasPrivadas avisos={avisosPrivadas} />
         </div>
 
         {/* Desglose por turno */}

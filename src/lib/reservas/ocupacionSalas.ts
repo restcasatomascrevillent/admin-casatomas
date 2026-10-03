@@ -15,11 +15,15 @@
 //     (pendiente, verificada, confirmada) del turno, contra la suma de
 //     `capacidad_maxima` de los espacios del negocio. Es EXACTAMENTE la cuenta
 //     del trigger: si aquí "no cabe", el INSERT fallará con 23514.
-//   · SALA PRIVADA (el Reservado, `caracteristicas.privada`; 20261003130000): una
-//     reserva viva se queda la sala ENTERA. En el aforo del turno pesa
-//     `capacidad_maxima` de la sala (GREATEST con sus comensales), no sus
-//     comensales — es la cuenta del trigger —, y la fila de la sala sale llena
-//     en ese turno en cuanto tiene una reserva.
+//   · SALA PRIVADA (el Reservado, `caracteristicas.privada`) — FUERA DE AFORO
+//     (decisión del dueño, 2026-10-03; migración 20261003150000): su capacidad
+//     NO suma al aforo (Casa Tomás = 150) y sus reservas NO consumen aforo
+//     (ni capacidad ni comensales): `aforo` las ignora y un turno al 100 % no
+//     impide reservarla. Lo único que la limita es la EXCLUSIVIDAD (20261003130000):
+//     una sola reserva por día y turno. Por eso su fila sale "ocupada" (nivel
+//     "lleno", no cabe nadie más) en cuanto tiene una reserva en el turno, con
+//     sus comensales reales, y NUNCA se recomienda como alternativa (solo se
+//     reserva desde el panel, eligiéndola a mano).
 //   · OCUPACIÓN DE CADA SALA (orientativa, la BD no la valida): mismo turno,
 //     pero con `ocupaEspacio` de `servicioSala.ts` — los mismos estados MÁS
 //     'completada' (un cliente que ya llegó está sentado en esa sala). Es el
@@ -57,6 +61,7 @@ import {
   type ConfiguracionTurnoInput,
 } from "../../../supabase/functions/_shared/disponibilidad";
 import { ocupaEspacio } from "./servicioSala";
+import { capacidadDeAforo, reservasQueConsumenAforo } from "./salaPrivada";
 
 export type Turno = "comida" | "cena";
 export const TURNOS: Turno[] = ["comida", "cena"];
@@ -139,6 +144,8 @@ export interface FilaSala {
   /** `null` = reservas sin espacio asignado. */
   espacioId: string | null;
   nombre: string;
+  /** Sala privada: fuera de aforo y con una sola reserva por turno. */
+  privada: boolean;
   capacidad: number | null;
   turnos: Record<Turno, CeldaTurno>;
   porHora: Record<string, CeldaHora>;
@@ -262,9 +269,21 @@ function construirFila(
   for (const turno of TURNOS) {
     const delTurno = propias.filter((r) => turnoDeHora(r.hora) === turno);
     const suma = delTurno.reduce((s, r) => s + pax(r), 0);
-    // Sala privada: con una reserva en el turno, la sala está llena (no admite una segunda).
-    const ocupados = privada && delTurno.length > 0 ? Math.max(suma, capacidad ?? 0) : suma;
-    turnos[turno] = celdaTurno(ocupados, capacidad, comensales);
+    if (privada) {
+      // Sala privada: una sola reserva por turno. Con una dentro, la sala está ocupada
+      // (nadie más cabe); sus comensales son los reales y NO cuentan en el aforo.
+      const ocupada = delTurno.length > 0;
+      turnos[turno] = {
+        ocupados: suma,
+        capacidad,
+        tras: suma + comensales,
+        libresTras: capacidad == null ? null : capacidad - (suma + comensales),
+        nivel: ocupada ? "lleno" : "libre",
+        cabe: !ocupada && (capacidad == null || comensales <= capacidad),
+      };
+      continue;
+    }
+    turnos[turno] = celdaTurno(suma, capacidad, comensales);
   }
   const porHora: Record<string, CeldaHora> = {};
   for (const r of propias) {
@@ -275,7 +294,7 @@ function construirFila(
     celda.reservas += 1;
     porHora[h] = celda;
   }
-  return { espacioId, nombre, capacidad, turnos, porHora };
+  return { espacioId, nombre, privada, capacidad, turnos, porHora };
 }
 
 export interface EntradaOcupacionSalas {
@@ -319,16 +338,14 @@ export function calcularOcupacionSalas(entrada: EntradaOcupacionSalas): Ocupacio
   const filaSinAsignar = construirFila(null, "Sin asignar", null, huerfanas, comensales);
   const haySinAsignar = TURNOS.some((t) => filaSinAsignar.turnos[t].ocupados > 0);
 
-  const capacidadTotal = espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0);
-  // Salas privadas: la reserva pesa la sala entera en el aforo (como el trigger de la BD).
-  const privadas = new Map(espacios.filter((e) => e.privada).map((e) => [e.id, Number(e.capacidad_maxima) || 0]));
-  const pesoAforo = (r: ReservaOcupacionSala) =>
-    r.espacio_id && privadas.has(r.espacio_id) ? Math.max(privadas.get(r.espacio_id) as number, pax(r)) : pax(r);
+  // Salas privadas FUERA DE AFORO (2026-10-03): ni suman su capacidad ni sus reservas consumen aforo.
+  const idsPrivadas = espacios.filter((e) => e.privada).map((e) => e.id);
+  const capacidadTotal = capacidadDeAforo(espacios);
   const aforo = {} as Record<Turno, AforoTurnoDia>;
   for (const turno of TURNOS) {
-    const ocupados = reservas
+    const ocupados = reservasQueConsumenAforo(reservas, idsPrivadas)
       .filter((r) => ocupaAforo(r.estado) && turnoDeHora(r.hora) === turno)
-      .reduce((s, r) => s + pesoAforo(r), 0);
+      .reduce((s, r) => s + pax(r), 0);
     const tras = ocupados + comensales;
     aforo[turno] = {
       ocupados,
@@ -357,12 +374,14 @@ export function horasBaseDelDia(
   dia: { espacios: readonly EspacioSala[]; reservas: readonly ReservaOcupacionSala[] },
   configuraciones: readonly ConfiguracionTurnoInput[],
 ): { horasBase: string[]; cerrado: boolean } {
-  const capacidadTotal = dia.espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0);
+  // Sin las salas privadas (fuera de aforo): ni su capacidad ni sus reservas.
+  const capacidadTotal = capacidadDeAforo(dia.espacios);
+  const idsPrivadas = dia.espacios.filter((e) => e.privada).map((e) => e.id);
   const resultado = calcularDisponibilidad({
     fecha,
     espacioId: null,
     configuraciones: configuraciones as ConfiguracionTurnoInput[],
-    reservas: dia.reservas.filter((r) => ocupaAforo(r.estado)),
+    reservas: reservasQueConsumenAforo(dia.reservas, idsPrivadas).filter((r) => ocupaAforo(r.estado)),
     capacidadTotal,
     ahora: null,
   });
@@ -396,7 +415,9 @@ export function evaluarUbicacion(
   const sala = espacioId ? ocupacion.salas.find((s) => s.espacioId === espacioId) ?? null : null;
   const celda = sala ? sala.turnos[turno] : null;
   const aforo = ocupacion.aforo[turno];
-  return { turno, sala, celda, cabeSala: celda ? celda.cabe : true, cabeAforo: aforo.cabe, aforo };
+  // Una sala privada está fuera de aforo: que el turno esté lleno no la bloquea.
+  const cabeAforo = sala?.privada ? true : aforo.cabe;
+  return { turno, sala, celda, cabeSala: celda ? celda.cabe : true, cabeAforo, aforo };
 }
 
 // ----------------------------------------------------------------------------
@@ -413,8 +434,9 @@ const describirCelda = (c: CeldaTurno) =>
 
 /** Sala con más plazas libres tras colocar el grupo, entre las que caben. */
 function mejorSala(ocupacion: OcupacionSalasDia, turno: Turno, excluir?: string | null): FilaSala | null {
+  // Nunca se recomienda una sala privada: solo se reserva eligiéndola a mano desde el panel.
   const candidatas = ocupacion.salas
-    .filter((s) => s.espacioId !== excluir && s.turnos[turno].cabe && (s.capacidad ?? 0) > 0)
+    .filter((s) => !s.privada && s.espacioId !== excluir && s.turnos[turno].cabe && (s.capacidad ?? 0) > 0)
     .sort((a, b) => (b.turnos[turno].libresTras ?? 0) - (a.turnos[turno].libresTras ?? 0));
   return candidatas[0] ?? null;
 }
@@ -455,7 +477,9 @@ export function recomendarUbicacion(
         tipo: "cabe",
         espacioId: ev.sala.espacioId,
         hora,
-        texto: `Cabe en ${ev.sala.nombre} a las ${hora} (${describirCelda(ev.celda)}).`,
+        texto: ev.sala.privada
+          ? `${ev.sala.nombre} está libre a las ${hora} (sala privada: fuera de aforo, una sola reserva por turno).`
+          : `Cabe en ${ev.sala.nombre} a las ${hora} (${describirCelda(ev.celda)}).`,
       };
     }
     if (ev.cabeAforo) {

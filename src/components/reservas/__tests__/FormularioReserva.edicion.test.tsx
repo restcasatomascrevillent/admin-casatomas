@@ -1200,6 +1200,8 @@ describe("FormularioReserva · edición · lista negra, límites y aforo", () =>
           estado: "confirmada",
           marca: "casa_tomas",
         }),
+        // La sala elegida (aquí la que ya tenía): si fuera una sala privada, fuera de aforo, no se rechazaría por turno lleno.
+        "salon",
       ),
     );
     expect(await screen.findByText(/Aforo superado en el turno de comida/)).toBeInTheDocument();

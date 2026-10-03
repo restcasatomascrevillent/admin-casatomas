@@ -719,3 +719,42 @@ describe("CalendarioOcupacion · casilla y panel coherentes", () => {
     await waitFor(() => expect(screen.queryByTestId("ocupacion-del-dia")).not.toBeInTheDocument());
   });
 });
+
+describe("DetalleDiaEspacios · el Reservado (sala privada) está fuera de aforo", () => {
+  // Elena (20 pax) está en el Reservado: su tarjeta sale en el reparto con «Fuera de aforo», pero sus
+  // comensales no entran en las cifras de la cabecera (35 → 15) ni en la ocupación, igual que en la casilla.
+  beforeEach(() => {
+    vi.mocked(useEspaciosReserva).mockReturnValue({
+      data: ESPACIOS.map((e) =>
+        e.id === "e-reservado" ? { ...e, caracteristicas: { marca: "casa_tomas", privada: true } } : e,
+      ),
+      isLoading: false,
+    } as never);
+  });
+
+  it("la tarjeta del Reservado sigue en el reparto, con su etiqueta, y las demás no la llevan", async () => {
+    montar();
+    const reservado = await screen.findByRole("button", { name: "Abrir el plano de Reservado" });
+    expect(within(reservado).getByTestId("etiqueta-fuera-de-aforo")).toBeInTheDocument();
+    expect(within(reservado).getByText("20 comensales")).toBeInTheDocument();
+    expect(within(tarjetaSala("Comedor")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  });
+
+  it("la cabecera no cuenta sus comensales ni su reserva (15 comensales, 4 reservas), igual que la casilla", async () => {
+    montar();
+    await screen.findByRole("button", { name: "Abrir el plano de Reservado" });
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("15");
+    expect(screen.getByText(/4 reservas/)).toBeInTheDocument();
+    expect(within(casillaDia(HOY.getDate())).getByTestId("comensales-casilla")).toHaveTextContent("15");
+  });
+
+  it("un día con solo reservas en el Reservado no dice «no hay reservas»: enseña su tarjeta", async () => {
+    tablas.vista_asignacion_dia = {
+      data: [filaVista("r-elena", "13:30:00", "Elena", 20, "e-reservado", "Reservado", 0, "sin_mesa")],
+    };
+    montar();
+    expect(await screen.findByRole("button", { name: "Abrir el plano de Reservado" })).toBeInTheDocument();
+    expect(screen.queryByText("No hay reservas para este día")).not.toBeInTheDocument();
+    expect(screen.getByTestId("comensales-dia")).toHaveTextContent("0");
+  });
+});

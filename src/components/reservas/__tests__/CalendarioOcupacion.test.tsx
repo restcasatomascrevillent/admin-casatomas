@@ -108,7 +108,9 @@ import { NIVELES_ESCALA, UMBRALES_OCUPACION, estiloNivel, rangoNivel } from "@/l
 const AHORA = new Date("2026-10-14T10:30:00+02:00");
 
 /**
- * Aforo real: Casa Tomás 50+50+20+50 = 170 por turno (+ una sala INACTIVA que no cuenta).
+ * Aforo de estos escenarios: Casa Tomás 50+50+20+50 = 170 por turno (+ una sala INACTIVA que no cuenta).
+ * Aquí el «Reservado» es una sala NORMAL de 20 plazas; en producción es privado y está FUERA de aforo
+ * (150 por turno): eso se prueba en el último bloque de este fichero.
  * Los espacios de Touza (20+30+30) están ahí a propósito: no deben sumar ni enseñarse.
  */
 const ESPACIOS = [
@@ -807,5 +809,62 @@ describe("CalendarioOcupacion · cambios de otros dispositivos", () => {
     montar();
     await mesPintado();
     expect(await screen.findByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
+  });
+});
+
+// ─── 7. El Reservado (sala privada): fuera de aforo, pero a la vista ─────────
+
+describe("CalendarioOcupacion · el Reservado (sala privada) está fuera de aforo", () => {
+  // En producción el Reservado lleva `caracteristicas.privada = true` (decisión del dueño, 2026-10-03):
+  // el aforo es 150 (sin sus 20 plazas) y sus reservas no entran en ninguna cifra, pero se marcan.
+  beforeEach(() => {
+    vi.mocked(useEspaciosReserva).mockReturnValue({
+      data: ESPACIOS.map((e) =>
+        e.id === "e-reservado" ? { ...e, caracteristicas: { marca: "casa_tomas", privada: true } } : e,
+      ),
+      isLoading: false,
+      isError: false,
+    } as never);
+    tablas.reservas = {
+      data: [
+        ...carga(dia(20), 30), // cena, en el comedor
+        reserva(dia(20), "14:00:00", 8, { espacio_id: "e-reservado" }), // comida, Reservado
+        reserva(dia(21), "21:00:00", 8, { espacio_id: "e-reservado" }), // día con SOLO el Reservado
+      ],
+    };
+  });
+
+  it("la leyenda dice que el aforo es 150 (no 170) y explica el candado", async () => {
+    montar();
+    await mesPintado();
+    expect(screen.getByText(/sobre el aforo de 150 comensales por turno/)).toBeInTheDocument();
+    expect(screen.getByTestId("muestra-sala-privada")).toBeInTheDocument();
+    expect(screen.getByText(/Reservado ocupado \(fuera de aforo/)).toBeInTheDocument();
+  });
+
+  it("sus comensales no suman en la cifra grande ni en el %, y la casilla lleva el candado", async () => {
+    montar();
+    await mesPintado();
+    expect(comensales(20)).toHaveTextContent("30"); // sin los 8 del Reservado
+    expect(within(casilla(20)).getByTestId("reservas-casilla")).toHaveTextContent("3 res.");
+    expect(within(casilla(20)).getByTestId("porcentaje-casilla")).toHaveTextContent("20%"); // 30/150, no 38/170
+    expect(within(casilla(20)).getByTestId("indicador-sala-privada")).toBeInTheDocument();
+    expect(casilla(20)).toHaveAttribute("aria-label", expect.stringContaining("Reservado ocupado en la comida (fuera de aforo)"));
+  });
+
+  it("un día con solo el Reservado: sin cifras ni color, pero con candado y explicación", async () => {
+    montar();
+    await mesPintado();
+    const solo = casilla(21);
+    expect(within(solo).queryByTestId("comensales-casilla")).not.toBeInTheDocument();
+    expect(within(solo).getByTestId("indicador-sala-privada")).toBeInTheDocument();
+    expect(solo).toHaveAttribute("data-nivel", "vacio");
+    expect(solo).toHaveAttribute("aria-label", "21 de octubre: Reservado ocupado en la cena (fuera de aforo)");
+  });
+
+  it("los días sin el Reservado no llevan candado", async () => {
+    montar();
+    await mesPintado();
+    expect(within(casilla(22)).queryByTestId("indicador-sala-privada")).not.toBeInTheDocument();
   });
 });

@@ -387,6 +387,30 @@ describe("Casa Tomás — exactamente igual que antes", () => {
     expect(huecos).toEqual(expect.arrayContaining(["14:00", "21:00"]));
     expect(db.escrituras()).toEqual([]);
   });
+
+  it("/disponibilidad: el Reservado de Casa Tomás (sala privada) está FUERA DE AFORO: ni suma sus 20 plazas ni sus reservas ocupan turno", async () => {
+    db.tabla("espacios_reserva").push({
+      id: "reservado-ct",
+      nombre: "Reservado",
+      capacidad_maxima: 20,
+      activa: true,
+      caracteristicas: { marca: "casa_tomas", privada: true },
+    });
+    db.tabla("reservas").push({
+      id: "res-reservado",
+      fecha: FECHA,
+      hora: "14:00:00",
+      numero_comensales: 8,
+      estado: "confirmada",
+      marca: "casa_tomas",
+      espacio_id: "reservado-ct",
+    });
+    const r = await disponibilidad({ fecha: FECHA, numero_comensales: 4 });
+
+    expect(r.status).toBe(200);
+    expect(r.cuerpo[0].aforo_turno.comida).toMatchObject({ capacidad_maxima: 150, ocupacion: 0 });
+    expect(r.cuerpo[0].aforo_turno.cena).toMatchObject({ capacidad_maxima: 150, ocupacion: 0 });
+  });
 });
 
 describe("marca desconocida — igual que hoy: cae en Casa Tomás", () => {

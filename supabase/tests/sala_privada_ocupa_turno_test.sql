@@ -4,6 +4,14 @@ set client_encoding = 'UTF8';
 -- ===========================================================================
 -- Pruebas SQL de 20261003130000_sala_privada_ocupa_turno.sql
 -- ---------------------------------------------------------------------------
+-- SUPERADA (2026-10-03, tarde): una vez aplicada 20261003150000_sala_privada_
+-- fuera_de_aforo.sql (el Reservado queda FUERA DE AFORO y su reserva ya no pesa
+-- la sala entera), varias pruebas de este fichero (T1, T5…) FALLAN A PROPÓSITO:
+-- asumen el peso de 20 y el aforo con la sala privada dentro. Con esa migración
+-- aplicada, la prueba vigente es supabase/tests/sala_privada_fuera_de_aforo_test.sql,
+-- que cubre también la exclusividad. Este fichero solo vale entre 20261003130000
+-- y 20261003150000.
+-- ---------------------------------------------------------------------------
 -- SQL plano (no pgTAP), como el resto de supabase/tests/: cada comprobación
 -- es un ASSERT; el primer fallo aborta con "ASSERT FAILED: <caso>: ...".
 -- TODO va dentro de BEGIN … ROLLBACK: no deja nada escrito (ni reservas, ni

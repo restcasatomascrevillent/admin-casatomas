@@ -5,11 +5,15 @@ import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { format, eachDayOfInterval } from "date-fns";
 import { es } from "date-fns/locale";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { useIdsSalasPrivadas } from "@/hooks/useSalasPrivadas";
+import { reservasQueConsumenAforo } from "@/lib/reservas/salaPrivada";
 
 export function GraficoReservasPorDia() {
   const { getDateRange } = useDashboardFilters();
   const { start, end } = getDateRange();
   const { data, isError, error, refetch } = useDashboardStats(start, end);
+  // El Reservado (sala privada) está fuera de aforo: sus reservas no entran en las cifras.
+  const idsPrivadas = useIdsSalasPrivadas();
 
   const calcularReservasPorDia = () => {
     if (!data?.reservas) return [];
@@ -18,7 +22,7 @@ export function GraficoReservasPorDia() {
     
     return dias.map((dia) => {
       // Solo contar reservas confirmadas para las métricas
-      const reservasDelDia = data.reservas.filter(
+      const reservasDelDia = reservasQueConsumenAforo(data.reservas, idsPrivadas).filter(
         (r) => format(new Date(r.fecha), "yyyy-MM-dd") === format(dia, "yyyy-MM-dd") 
           && r.estado === "confirmada"
       );

@@ -15,8 +15,14 @@
 // 1. QUÉ SE MIDE: comensales / aforo POR TURNO, solo de CASA TOMÁS. Es
 //    exactamente lo que valida el trigger `validar_capacidad_reserva`: el aforo
 //    de un turno es la suma de `capacidad_maxima` de los espacios ACTIVOS del
-//    negocio (hoy 170: Comedor 50 + Salón 50 + Terraza 50 + Reservado 20) y el
-//    turno parte a las 17:00.
+//    negocio SIN las salas privadas (hoy 150: Comedor 50 + Salón 50 + Terraza
+//    50; el Reservado, 20 plazas, está FUERA DE AFORO por decisión del dueño del
+//    2026-10-03) y el turno parte a las 17:00.
+//
+//    SALAS PRIVADAS (el Reservado): sus reservas NO suman comensales, reservas
+//    ni %, ni cuentan para el color del día. No desaparecen: la casilla lleva un
+//    indicador (candado) y el tooltip lo dice cuando el Reservado está ocupado
+//    en la comida o en la cena (`ResumenDiaCalendario.salasPrivadas`).
 //
 //    SOLO CASA TOMÁS ADMITE RESERVAS (decisión del dueño, 2026-10-01). Si en los
 //    datos aparece una reserva antigua de otro negocio (`marca = 'touza'`) se
@@ -80,6 +86,8 @@ import { turnoDeHora, TURNOS, type Turno } from "@/lib/reservas/asignacionMesas"
 import { ESTADO_CANCELADA, esEstadoVivo } from "@/lib/reservas/estadosReserva";
 import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { enVentana, sumarDias } from "@/lib/reservas/ventanaAsignacion";
+import { capacidadDeAforo } from "@/lib/reservas/salaPrivada";
+import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
 
 // ----------------------------------------------------------------------------
 // Escala: umbrales, niveles y etiquetas
@@ -293,11 +301,8 @@ export interface EspacioConAforo {
  * es «no se sabe», no «0 plazas».
  */
 export function aforoCasaTomas(espacios: ReadonlyArray<EspacioConAforo> | null | undefined): number | null {
-  let total = 0;
-  for (const e of espacios ?? []) {
-    if (!e || e.activa === false || !salaAdmiteReservas(e)) continue;
-    total += entero(e.capacidad_maxima);
-  }
+  // Las salas privadas (el Reservado) están fuera de aforo: no suman (`capacidadDeAforo`).
+  const total = capacidadDeAforo((espacios ?? []).filter((e) => !!e && salaAdmiteReservas(e)));
   return total > 0 ? total : null;
 }
 
@@ -409,6 +414,11 @@ export interface ReservaCalendario {
 }
 
 export interface ContextoCalendario {
+  /**
+   * Salas privadas activas (id y nombre). Sus reservas están FUERA DE AFORO: no
+   * entran en ninguna cifra, pero el resumen del día avisa de que están ocupadas.
+   */
+  salasPrivadas?: ReadonlyArray<{ id: string; nombre: string }>;
   /** Hoy en hora de Madrid (`YYYY-MM-DD`). Lo anterior es «pasado». */
   hoy: string;
   /** Ahora, en ms epoch: ancla de la ventana de asignación. */
@@ -417,9 +427,18 @@ export interface ContextoCalendario {
   ventanaHoras: number;
 }
 
+/** Una sala privada con reserva ese día (fuera de aforo): en qué turnos está ocupada. */
+export interface SalaPrivadaDelDia {
+  espacioId: string;
+  nombre: string;
+  turnos: Turno[];
+}
+
 export interface ResumenDiaCalendario extends OcupacionDia {
   fecha: string;
   esPasado: boolean;
+  /** Salas privadas ocupadas ese día. NO entran en `comensales`, `reservas` ni en el %. */
+  salasPrivadas: SalaPrivadaDelDia[];
   /** Reservas vivas sin sala dentro de la ventana de asignación (el punto discreto). */
   sinSalaEnVentana: number;
 }
@@ -437,7 +456,21 @@ export function resumirDia(
   aforo: number | null | undefined,
   contexto: ContextoCalendario,
 ): ResumenDiaCalendario {
-  const deCasaTomas = reservas.filter((r) => admiteReservas(r.marca));
+  const todasDeCasaTomas = reservas.filter((r) => admiteReservas(r.marca));
+
+  // Salas privadas: fuera de aforo. Se separan ANTES de contar nada.
+  const privadas = new Map((contexto.salasPrivadas ?? []).map((s) => [s.id, s.nombre]));
+  const enPrivada = (r: ReservaCalendario) => !!r.espacio_id && privadas.has(String(r.espacio_id));
+  const salasPrivadas: SalaPrivadaDelDia[] = [];
+  for (const [id, nombre] of privadas) {
+    const turnos = TURNOS.filter((t) =>
+      todasDeCasaTomas.some(
+        (r) => r.espacio_id === id && ocupaEspacio(r.estado) && turnoDeHora(r.hora) === t,
+      ),
+    );
+    if (turnos.length > 0) salasPrivadas.push({ espacioId: id, nombre, turnos });
+  }
+  const deCasaTomas = todasDeCasaTomas.filter((r) => !enPrivada(r));
 
   if (fecha < contexto.hoy) {
     let n = 0;
@@ -452,6 +485,7 @@ export function resumirDia(
       ...vacio,
       fecha,
       esPasado: true,
+      salasPrivadas,
       reservas: n,
       comensales,
       nivel: n > 0 ? "pasado" : "vacio",
@@ -475,7 +509,7 @@ export function resumirDia(
     }
   }
 
-  return { ...ocupacion, fecha, esPasado: false, sinSalaEnVentana };
+  return { ...ocupacion, fecha, esPasado: false, salasPrivadas, sinSalaEnVentana };
 }
 
 /**
@@ -498,7 +532,8 @@ export function resumirMes(
   const salida: Record<string, ResumenDiaCalendario> = {};
   for (const [fecha, lista] of porDia) {
     const resumen = resumirDia(fecha, lista, aforo, contexto);
-    if (resumen.reservas > 0) salida[fecha] = resumen;
+    // Un día con solo el Reservado ocupado (fuera de aforo) también tiene entrada: lleva el indicador.
+    if (resumen.reservas > 0 || resumen.salasPrivadas.length > 0) salida[fecha] = resumen;
   }
   return salida;
 }
@@ -510,6 +545,12 @@ export function resumirMes(
 const NOMBRE_TURNO: Record<Turno, string> = { comida: "Comida", cena: "Cena" };
 
 const plural = (n: number, singular: string, plural_: string) => `${n} ${n === 1 ? singular : plural_}`;
+
+/** «Reservado ocupado en la comida (fuera de aforo)» / «… en la comida y la cena (fuera de aforo)». */
+export function fraseSalaPrivada(sala: SalaPrivadaDelDia): string {
+  const turnos = sala.turnos.map((t) => (t === "comida" ? "la comida" : "la cena")).join(" y ");
+  return `${sala.nombre} ocupado en ${turnos} (fuera de aforo)`;
+}
 
 /** «Comida: 45% (77 de 170)», «Cena: completo (170 de 170)» o, sin aforo, «Cena: 12 comensales (aforo sin configurar)». */
 export function textoTurno(t: TurnoOcupacion): string {
@@ -535,14 +576,23 @@ export interface DescripcionDia {
 
 /** El día contado para el tooltip y para el lector de pantalla. */
 export function describirDia(resumen: ResumenDiaCalendario | undefined, ventanaHoras: number): DescripcionDia {
-  if (!resumen || resumen.reservas === 0) return { aria: "sin reservas", lineas: ["Sin reservas"] };
+  if (!resumen || (resumen.reservas === 0 && resumen.salasPrivadas.length === 0)) {
+    return { aria: "sin reservas", lineas: ["Sin reservas"] };
+  }
+
+  const frasesPrivadas = resumen.salasPrivadas.map(fraseSalaPrivada);
+
+  if (resumen.reservas === 0) {
+    // Solo el Reservado: no hay comensales que contar (está fuera de aforo).
+    return { aria: frasesPrivadas.join("; "), lineas: frasesPrivadas };
+  }
 
   const total = `${plural(resumen.comensales, "comensal", "comensales")} en ${plural(resumen.reservas, "reserva", "reservas")}`;
 
   if (resumen.esPasado) {
     return {
-      aria: `día pasado, ${total}`,
-      lineas: [total, "Día pasado: lo que se reservó, sin contar las canceladas"],
+      aria: [`día pasado, ${total}`, ...frasesPrivadas].join("; "),
+      lineas: [total, "Día pasado: lo que se reservó, sin contar las canceladas", ...frasesPrivadas],
     };
   }
 
@@ -561,6 +611,10 @@ export function describirDia(resumen: ResumenDiaCalendario | undefined, ventanaH
 
   if (resumen.sinSalaEnVentana > 0) {
     const frase = `${plural(resumen.sinSalaEnVentana, "reserva sin sala", "reservas sin sala")} en las próximas ${ventanaHoras} h`;
+    lineas.push(frase);
+    partesAria.push(frase);
+  }
+  for (const frase of frasesPrivadas) {
     lineas.push(frase);
     partesAria.push(frase);
   }

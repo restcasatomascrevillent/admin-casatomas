@@ -48,6 +48,8 @@ import { ErrorLecturaInconsistente } from "@/lib/reservas/paginarConsulta";
 import type { DobleSupabase } from "@/lib/reservas/__tests__/dobleSupabaseLotes";
 
 const supa = vi.hoisted(() => ({
+  /** Las salas que devuelve `useEspaciosReserva` (por defecto, ninguna). */
+  espacios: [] as unknown[],
   // La escritura del ejecutor de acciones es `update(…).eq("id", …)[.in("estado", …)].select("id")`.
   update: vi.fn(),
   eq: vi.fn(),
@@ -134,7 +136,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: supa.canEdit, loading: false }),
 }));
-vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
+vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: supa.espacios }) }));
 
 // Hijos pesados: aquí solo estorban.
 vi.mock("@/hooks/useEdicionReserva", () => ({
@@ -276,6 +278,7 @@ beforeEach(() => {
   supa.lecturas.opciones.conservarOrdenDeLaTabla = true;
   supa.respuestas = [];
   supa.canEdit = true;
+  supa.espacios = [];
   supa.filas = [
     reserva("res-pendiente", "pendiente", "Ana Pendiente"),
     reserva("res-verificada", "verificada", "Berta Verificada"),
@@ -1640,5 +1643,36 @@ describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
     expect(supa.lecturas.peticiones).toHaveLength(4); // los 2 lotes del primer intento y los 2 del reintento
     expect(toast.error).not.toHaveBeenCalled();
     expect(registrosDeCarga()).toEqual([]);
+  });
+});
+
+describe("ListaReservasAvanzada · el Reservado (sala privada) está fuera de aforo", () => {
+  beforeEach(() => {
+    supa.espacios = [
+      { id: "esp-comedor", nombre: "Comedor", activa: true, caracteristicas: { marca: "casa_tomas" } },
+      { id: "esp-reservado", nombre: "Reservado", activa: true, caracteristicas: { marca: "casa_tomas", privada: true } },
+    ];
+    supa.filas = [
+      reserva("res-comedor", "confirmada", "Carmen Comedor", "esp-comedor"),
+      reserva("res-reservado", "confirmada", "Rosa Reservada", "esp-reservado"),
+      reserva("res-sin-sala", "confirmada", "Sara SinSala"),
+    ];
+  });
+
+  it("solo las reservas del Reservado llevan la etiqueta «Fuera de aforo»", async () => {
+    const { tabla } = await montar();
+
+    expect(within(filaDe(tabla, "Rosa Reservada")).getByTestId("etiqueta-fuera-de-aforo")).toBeInTheDocument();
+    expect(within(filaDe(tabla, "Carmen Comedor")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+    expect(within(filaDe(tabla, "Sara SinSala")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  });
+
+  it("sin salas privadas (o con la sala desactivada) no hay etiqueta", async () => {
+    supa.espacios = [
+      { id: "esp-reservado", nombre: "Reservado", activa: false, caracteristicas: { marca: "casa_tomas", privada: true } },
+    ];
+    const { tabla } = await montar();
+
+    expect(within(tabla).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
   });
 });

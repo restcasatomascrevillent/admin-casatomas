@@ -25,6 +25,7 @@ import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
+import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
@@ -170,6 +171,8 @@ function ReservaCard({
 
   const columnaActual = columnaDeReserva(reserva, columnas);
   const destinos = columnas.filter((c) => c.id !== columnaActual);
+  // En una sala privada (el Reservado) la reserva está FUERA DE AFORO: se etiqueta.
+  const fueraDeAforo = !!columnas.find((c) => c.id === columnaActual)?.privada;
 
   // El menú «…» de la tarjeta. En columnas estrechas baja a la fila de
   // acciones para dejarle al NOMBRE todo el ancho de la cabecera: con el menú
@@ -323,6 +326,7 @@ function ReservaCard({
         </div>
         {!soloIcono && menuAcciones}
       </div>
+      {fueraDeAforo && <EtiquetaFueraDeAforo className="mb-2" />}
       <ContenidoTarjeta reserva={reserva} sinCabecera />
       {soloIcono ? (
         /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el
@@ -405,6 +409,7 @@ function KanbanColumn({
   id,
   title,
   capacidadMax,
+  privada,
   paxComida,
   paxCena,
   filtroTurno,
@@ -421,6 +426,8 @@ function KanbanColumn({
   id: string;
   title: string;
   capacidadMax?: number;
+  /** Sala privada (el Reservado): fuera de aforo; no tiene barras de aforo y lleva su etiqueta. */
+  privada?: boolean;
   paxComida: number;
   paxCena: number;
   filtroTurno: FiltroTurno;
@@ -497,7 +504,8 @@ function KanbanColumn({
           </div>
           <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
-        {capacidadMax != null && capacidadMax > 0 && (
+        {privada && <EtiquetaFueraDeAforo />}
+        {!privada && capacidadMax != null && capacidadMax > 0 && (
           <div className="space-y-1.5">
             {filtroTurno !== "cena" && <BarraTurno etiqueta="Comida" pax={paxComida} capacidad={capacidadMax} />}
             {filtroTurno !== "comida" && <BarraTurno etiqueta="Cena" pax={paxCena} capacidad={capacidadMax} />}
@@ -1073,6 +1081,7 @@ export function GestorReservasKanban() {
                     id={col.id}
                     title={col.title}
                     capacidadMax={col.capacidadMax}
+                    privada={col.privada}
                     paxComida={paxPorColumna[col.id]?.comida ?? 0}
                     paxCena={paxPorColumna[col.id]?.cena ?? 0}
                     filtroTurno={filtroTurno}

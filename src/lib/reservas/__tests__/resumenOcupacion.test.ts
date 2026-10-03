@@ -93,3 +93,52 @@ describe("resumirOcupacion · qué salas suman capacidad", () => {
     expect(cifras).toMatchObject({ totalReservas: 1, totalComensales: 4, capacidadTotal: 0, porcentajeTotal: 0 });
   });
 });
+
+describe("resumirOcupacion · el Reservado (sala privada) está fuera de aforo", () => {
+  const ESPACIOS: EspacioResumen[] = [
+    { id: "comedor", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+    { id: "salon", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+    { id: "terraza", capacidad_maxima: 50, activa: true, caracteristicas: { marca: "casa_tomas" } },
+    { id: "reservado", capacidad_maxima: 20, activa: true, caracteristicas: { marca: "casa_tomas", privada: true } },
+  ];
+  const en = (espacio_id: string, estado: string, n: number): ReservaResumen => ({
+    estado,
+    numero_comensales: n,
+    marca: "casa_tomas",
+    espacio_id,
+  });
+
+  it("la capacidad es 150 (sin el Reservado)", () => {
+    expect(resumirOcupacion([], ESPACIOS).capacidadTotal).toBe(150);
+  });
+
+  it("sus reservas no suman reservas, comensales ni porcentaje", () => {
+    const cifras = resumirOcupacion(
+      [en("comedor", "confirmada", 15), en("reservado", "confirmada", 8), en("reservado", "pendiente", 3)],
+      ESPACIOS,
+    );
+    expect(cifras).toMatchObject({
+      totalReservas: 1,
+      totalComensales: 15,
+      reservasConfirmadas: 1,
+      reservasPendientes: 0,
+      capacidadTotal: 150,
+      porcentajeTotal: 10,
+    });
+  });
+
+  it("sin id de espacio en la reserva (dato antiguo) cuenta como siempre", () => {
+    const cifras = resumirOcupacion([r("confirmada", 5)], ESPACIOS);
+    expect(cifras.totalComensales).toBe(5);
+  });
+
+  it("una sala privada desactivada ya no es privada: sus reservas cuentan", () => {
+    const apagada: EspacioResumen[] = [
+      ...ESPACIOS.slice(0, 3),
+      { id: "reservado", capacidad_maxima: 20, activa: false, caracteristicas: { marca: "casa_tomas", privada: true } },
+    ];
+    const cifras = resumirOcupacion([en("reservado", "confirmada", 4)], apagada);
+    expect(cifras.totalComensales).toBe(4);
+    expect(cifras.capacidadTotal).toBe(150);
+  });
+});

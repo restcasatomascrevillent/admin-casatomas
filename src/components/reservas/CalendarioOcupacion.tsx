@@ -67,6 +67,7 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { aforoCasaTomas, resumirMes, type ReservaCalendario } from "@/lib/reservas/ocupacionCalendario";
+import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { configAsignacionDesde, fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
 import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
 import { CasillaOcupacion } from "./CasillaOcupacion";
@@ -241,11 +242,19 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   const { data: configuracion } = useConfiguracionReservas();
   const { ventanaHoras } = configAsignacionDesde(configuracion);
   const aforo = useMemo(() => aforoCasaTomas(espacios), [espacios]);
+  // Las salas privadas (el Reservado) están fuera de aforo: no suman en las cifras, pero la casilla las marca.
+  const salasPrivadas = useMemo(
+    () =>
+      ((espacios ?? []) as Array<{ id?: string; nombre?: string }>)
+        .filter((e) => e?.id && esSalaPrivada(e as Parameters<typeof esSalaPrivada>[0]))
+        .map((e) => ({ id: e.id as string, nombre: (e.nombre ?? "").trim() || "Sala privada" })),
+    [espacios],
+  );
 
   // Cifras y nivel de cada día del mes.
   const resumenes = useMemo(
-    () => (reservasMes ? resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras }) : {}),
-    [reservasMes, aforo, hoy, ahora, ventanaHoras],
+    () => (reservasMes ? resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras, salasPrivadas }) : {}),
+    [reservasMes, aforo, hoy, ahora, ventanaHoras, salasPrivadas],
   );
 
   /**

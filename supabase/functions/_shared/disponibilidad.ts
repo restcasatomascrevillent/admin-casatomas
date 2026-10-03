@@ -115,6 +115,56 @@ export interface EspacioParaAforo {
   capacidad_maxima: number;
   /** `caracteristicas->>'marca'`, tal cual llega (sin validar, puede faltar). */
   marca?: string | null;
+  /**
+   * `caracteristicas->>'privada'` (sala privada, hoy el «Reservado» de Casa
+   * Tomás). Una sala privada está FUERA DE AFORO (decisión del dueño,
+   * 2026-10-03): no suma su capacidad (ver `sumarCapacidadPorMarca`). Acepta el
+   * booleano o el texto "true", como lo lee el trigger con `->>`.
+   */
+  privada?: boolean | string | null;
+}
+
+// ------------------------------------------------------------
+// SALAS PRIVADAS — FUERA DE AFORO (decisión del dueño, 2026-10-03)
+// ------------------------------------------------------------
+// «El Reservado no quiero que se tenga en cuenta en los aforos porque no es
+// accesible, es para gente especial y está fuera del sistema de reservas, pero
+// que sepamos que está.» Una sala con `espacios_reserva.caracteristicas.privada
+// = true` (hoy solo el «Reservado» de Casa Tomás, 20 plazas):
+//   · NO suma su capacidad al aforo de la marca (Casa Tomás = 150);
+//   · una reserva en ella NO consume aforo (ni capacidad ni comensales).
+// Lo hace cumplir `validar_capacidad_reserva()` (migración
+// 20261003150000_sala_privada_fuera_de_aforo.sql); estas funciones hacen que
+// el motor compartido (web, emails, panel) cuente igual que el trigger.
+// La exclusividad (una reserva por sala privada, día y turno) la comprueba
+// SOLO el trigger; el motor no la modela (la web nunca asigna sala privada).
+
+/** ¿`caracteristicas.privada` es verdadero? Solo `true` o el texto "true" (el `->>` del trigger). */
+export function esCaracteristicaPrivada(caracteristicas: unknown): boolean {
+  if (!caracteristicas || typeof caracteristicas !== "object") return false;
+  const flag = (caracteristicas as { privada?: unknown }).privada;
+  return flag === true || flag === "true";
+}
+
+/** Ids de las salas privadas de una lista de filas de `espacios_reserva` (con `id` y `caracteristicas`). */
+export function idsSalasPrivadas(
+  espacios: ReadonlyArray<{ id?: string | null; caracteristicas?: unknown } | null | undefined> | null | undefined,
+): string[] {
+  const ids: string[] = [];
+  for (const e of espacios ?? []) {
+    if (e?.id && esCaracteristicaPrivada(e.caracteristicas)) ids.push(String(e.id));
+  }
+  return ids;
+}
+
+/** Las reservas que SÍ consumen aforo: las que no están en una sala privada. */
+export function sinReservasEnSalasPrivadas<T extends { espacio_id?: string | null }>(
+  reservas: readonly T[],
+  salasPrivadas: readonly string[] | null | undefined,
+): T[] {
+  if (!salasPrivadas || salasPrivadas.length === 0) return [...reservas];
+  const privadas = new Set(salasPrivadas);
+  return reservas.filter((r) => !(r?.espacio_id && privadas.has(String(r.espacio_id))));
 }
 
 /**
@@ -142,7 +192,8 @@ export function filtrarEspaciosPorMarca<T extends EspacioParaAforo>(
 }
 
 /**
- * Suma `capacidad_maxima` SOLO de los espacios de la marca indicada.
+ * Suma `capacidad_maxima` SOLO de los espacios de la marca indicada y SIN las
+ * salas privadas (fuera de aforo, 2026-10-03: Casa Tomás = 150, no 170).
  * Ver `filtrarEspaciosPorMarca` (mismo criterio, aquí solo se reduce el
  * resultado a un número).
  */
@@ -150,10 +201,12 @@ export function sumarCapacidadPorMarca(
   espacios: EspacioParaAforo[],
   marca: string | null | undefined,
 ): number {
-  return filtrarEspaciosPorMarca(espacios, marca).reduce(
-    (suma, e) => suma + (Number.isFinite(Number(e.capacidad_maxima)) ? Number(e.capacidad_maxima) : 0),
-    0,
-  );
+  return filtrarEspaciosPorMarca(espacios, marca)
+    .filter((e) => !(e.privada === true || e.privada === "true"))
+    .reduce(
+      (suma, e) => suma + (Number.isFinite(Number(e.capacidad_maxima)) ? Number(e.capacidad_maxima) : 0),
+      0,
+    );
 }
 
 // ------------------------------------------------------------
@@ -247,6 +300,13 @@ export interface EntradaDisponibilidad {
   configuraciones: ConfiguracionTurnoInput[];
   /** Reservas del día en estado que ocupa. */
   reservas: ReservaOcupante[];
+  /**
+   * Ids de las salas privadas (fuera de aforo, ver `idsSalasPrivadas`). Las
+   * reservas cuyo `espacio_id` esté aquí NO cuentan en la ocupación del turno,
+   * igual que en el trigger. Opcional: sin él se cuentan todas (quien ya las
+   * filtró con `sinReservasEnSalasPrivadas` no necesita pasarlo).
+   */
+  salasPrivadas?: readonly string[];
   /**
    * Suma de `capacidad_maxima` de los espacios activos DE LA MISMA MARCA
    * que la reserva/consulta. Igual que el trigger — calcúlese con
@@ -783,7 +843,8 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
   let comensalesComida = 0;
   let comensalesCena = 0;
 
-  for (const reserva of entrada.reservas || []) {
+  const reservasQueOcupan = sinReservasEnSalasPrivadas(entrada.reservas || [], entrada.salasPrivadas);
+  for (const reserva of reservasQueOcupan) {
     if (!reserva) continue;
     const minutos = horaAMinutos(reserva.hora);
     if (minutos === null) continue;

@@ -339,6 +339,21 @@ describe("calcularCuadreTotal", () => {
     expect(calcularCuadreTotal(cuadres)).toMatchObject({ capacidadDeclarada: 100, plazasMesas: 12, espaciosSinMesas: 1 });
   });
 
+  it("las salas privadas (el Reservado) están fuera de aforo: no entran en el total del restaurante", () => {
+    const cuadres = cuadresDe(
+      [
+        espacio({ id: "c", nombre: "Comedor", capacidad_maxima: 50 }),
+        espacio({ id: "res", nombre: "Reservado", capacidad_maxima: 20, caracteristicas: { marca: "casa_tomas", privada: true } }),
+      ],
+      [...mesas("c", 10, 4), ...mesas("res", 1, 20)],
+    );
+    expect(cuadres.find((c) => c.espacioId === "res")?.privada).toBe(true);
+    expect(cuadres.find((c) => c.espacioId === "c")?.privada).toBe(false);
+    // Su propio cuadre se calcula (20 de 20: cuadra), pero no suma al total: 40 plazas de 50 declaradas, no 60 de 70.
+    expect(cuadres.find((c) => c.espacioId === "res")?.estado).toBe("cuadra");
+    expect(calcularCuadreTotal(cuadres)).toMatchObject({ capacidadDeclarada: 50, plazasMesas: 40, diferencia: -10 });
+  });
+
   it("cuenta espaciosSinMesas y espaciosDescuadrados", () => {
     const cuadres = cuadresDe(
       [

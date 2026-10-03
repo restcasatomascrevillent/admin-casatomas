@@ -37,6 +37,7 @@ import {
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { EscaleraTurnoEditor } from "./EscaleraTurnoEditor";
 import { MARCA_POR_DEFECTO, salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { leerNivelesCrudos, NIVELES_POR_DEFECTO, etiquetaNivelLocal } from "./escaleraTexto";
 // El mismo módulo puro que usan la web y el teléfono. Se usa aquí solo para
 // LEER (derivar la escalera equivalente de las columnas antiguas al migrar,
@@ -142,7 +143,12 @@ export function ConfiguracionTurnos() {
       sumarCapacidadPorMarca(
         (espacios ?? [])
           .filter((e: any) => e.activa)
-          .map((e: any) => ({ capacidad_maxima: Number(e.capacidad_maxima) || 0, marca: e.caracteristicas?.marca })),
+          .map((e: any) => ({
+            capacidad_maxima: Number(e.capacidad_maxima) || 0,
+            marca: e.caracteristicas?.marca,
+            // El Reservado (sala privada) está fuera de aforo: no suma.
+            privada: esSalaPrivada(e),
+          })),
         MARCA_POR_DEFECTO,
       ),
     [espacios],

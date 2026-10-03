@@ -48,7 +48,7 @@ const SALAS_BD = [
   sala("ct-comedor", "Comedor", 50, {}),
   sala("ct-salon", "Salón", 50, null),
   sala("ct-terraza", "Terraza", 50, { marca: "casa_tomas" }),
-  sala("ct-reservado", "Reservado", 20, { marca: "casa_tomas" }),
+  sala("ct-reservado", "Reservado", 20, { marca: "casa_tomas", privada: true }),
   sala("ct-bodega", "Bodega", 40, { marca: "casa_tomas" }, false),
   sala("tz-reservado", "El Reservado", 20, { privada: true, marca: "touza" }),
   sala("tz-terraza", "Terraza", 30, { marca: "touza" }),
@@ -78,8 +78,17 @@ describe("Espacios · solo las salas de Casa Tomás", () => {
     expect(screen.getAllByText("Terraza")).toHaveLength(1);
     expect(screen.queryByText("El Reservado")).not.toBeInTheDocument();
     expect(screen.queryByText("Interior")).not.toBeInTheDocument();
-    // 50 + 50 + 50 + 20 de las activas de Casa Tomás (no 250 con las de Touza, ni 210 con la desactivada).
-    expect(screen.getByText(/Aforo por turno/).textContent).toMatch(/Aforo por turno:\s*170\s*plazas/);
+    // 50 + 50 + 50 de las activas de Casa Tomás SIN el Reservado (privado: fuera de aforo, decisión del dueño
+    // del 2026-10-03). No 250 con las de Touza, ni 170 con el Reservado, ni 190 con la desactivada.
+    expect(screen.getByText(/Aforo por turno/).textContent).toMatch(/Aforo por turno:\s*150\s*plazas/);
+    expect(screen.getByText(/Aforo por turno/).textContent).toMatch(/sin las salas privadas/);
+  });
+
+  it("el Reservado (sala privada) lleva la etiqueta «Fuera de aforo» y las demás no", () => {
+    montar();
+
+    expect(screen.getAllByTestId("etiqueta-fuera-de-aforo")).toHaveLength(1);
+    expect(screen.getByText("Fuera de aforo")).toBeInTheDocument();
   });
 
   it("el enlace `?editar=` no abre el plano de una sala de Touza (ni aunque se llame igual que una de Casa Tomás)", () => {

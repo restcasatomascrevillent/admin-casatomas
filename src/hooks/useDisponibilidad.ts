@@ -23,6 +23,8 @@ import {
   minutosAHora,
   filtrarEspaciosPorMarca,
   sumarCapacidadPorMarca,
+  esCaracteristicaPrivada,
+  sinReservasEnSalasPrivadas,
   MARCA_POR_DEFECTO,
   type ConfiguracionTurnoInput,
   type ReservaOcupante,
@@ -142,9 +144,15 @@ export interface TurnoDinamico {
 
 interface DatosDelDia {
   configuraciones: ConfiguracionTurnoInput[];
+  /** Las reservas vivas que CONSUMEN aforo: sin las de salas privadas (fuera de aforo, 2026-10-03). */
   reservas: ReservaOcupante[];
+  /** Todas las vivas del día, también las de salas privadas (para el detalle por sala). */
+  reservasTodas: ReservaOcupante[];
+  /** Ids de las salas privadas activas de la marca. */
+  salasPrivadas: string[];
+  /** Capacidad del aforo: SIN las salas privadas (Casa Tomás = 150). */
   capacidadTotal: number;
-  espacios: { id: string; nombre: string; capacidad_maxima: number }[];
+  espacios: { id: string; nombre: string; capacidad_maxima: number; privada?: boolean }[];
 }
 
 /**
@@ -187,16 +195,21 @@ async function leerDatosDelDia(
     nombre: e.nombre as string,
     capacidad_maxima: Number(e.capacidad_maxima) || 0,
     marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+    // Sala privada (el Reservado): FUERA DE AFORO (2026-10-03), no suma capacidad ni consumen aforo sus reservas.
+    privada: esCaracteristicaPrivada(e.caracteristicas),
   }));
   // Bug corregido 2026-09-22: antes esta lista (y por tanto `capacidadTotal`
   // más abajo) incluía TODOS los espacios activos sin mirar la marca — un
   // espacio de otro negocio ("El Reservado", touza) inflaba el aforo que
   // ve el panel del restaurante. Ver cabecera del fichero.
-  const espacios = filtrarEspaciosPorMarca(espaciosCrudos, marca).map(({ id, nombre, capacidad_maxima }) => ({
+  const espaciosDeLaMarca = filtrarEspaciosPorMarca(espaciosCrudos, marca);
+  const espacios = espaciosDeLaMarca.map(({ id, nombre, capacidad_maxima, privada }) => ({
     id,
     nombre,
     capacidad_maxima,
+    privada,
   }));
+  const salasPrivadas = espacios.filter((e) => e.privada).map((e) => e.id);
 
   const reservasVivas = ((reservasRes.data ?? []) as unknown as Array<ReservaOcupante & { id?: string }>).filter(
     (r) => !excluirReservaId || r.id !== excluirReservaId,
@@ -204,8 +217,11 @@ async function leerDatosDelDia(
 
   return {
     configuraciones: (turnosRes.data ?? []) as unknown as ConfiguracionTurnoInput[],
-    reservas: reservasVivas,
-    capacidadTotal: espacios.reduce((s, e) => s + e.capacidad_maxima, 0),
+    reservas: sinReservasEnSalasPrivadas(reservasVivas, salasPrivadas),
+    reservasTodas: reservasVivas,
+    salasPrivadas,
+    // `sumarCapacidadPorMarca` ya deja fuera las salas privadas.
+    capacidadTotal: sumarCapacidadPorMarca(espaciosDeLaMarca, marca),
     espacios,
   };
 }
@@ -306,7 +322,8 @@ export const useDisponibilidadDetalladaPorFecha = (fecha: string, marca: string 
       });
 
       const comensalesPorEspacioYHora = new Map<string, number>();
-      for (const r of datos.reservas) {
+      // Todas las vivas (también las del Reservado): el detalle por sala las enseña, aunque no cuenten en el aforo.
+      for (const r of datos.reservasTodas) {
         const minutos = horaAMinutos(r.hora);
         if (minutos === null || !r.espacio_id) continue;
         const clave = `${minutosAHora(minutos)}|${r.espacio_id}`;
@@ -375,10 +392,10 @@ export const useDisponibilidadRango = (
     queryKey: ["disponibilidad-rango", fechaInicio, fechaFin, marca],
     queryFn: async () => {
       const [espaciosRes, reservasRes] = await Promise.all([
-        supabase.from("espacios_reserva" as any).select("capacidad_maxima, caracteristicas").eq("activa", true),
+        supabase.from("espacios_reserva" as any).select("id, capacidad_maxima, caracteristicas").eq("activa", true),
         supabase
           .from("reservas" as any)
-          .select("fecha, hora, numero_comensales")
+          .select("fecha, hora, numero_comensales, espacio_id")
           .gte("fecha", fechaInicio)
           .lte("fecha", fechaFin)
           .eq("marca", marca)
@@ -391,18 +408,22 @@ export const useDisponibilidadRango = (
       // TODOS los espacios activos sin filtrar por marca.
       const espaciosDeLaMarca = filtrarEspaciosPorMarca(
         ((espaciosRes.data ?? []) as any[]).map((e) => ({
+          id: e.id as string,
           capacidad_maxima: Number(e.capacidad_maxima) || 0,
           marca: (e.caracteristicas?.marca as string | undefined) ?? null,
+          privada: esCaracteristicaPrivada(e.caracteristicas),
         })),
         marca,
       );
-      const capacidadTotal = espaciosDeLaMarca.reduce((s, e) => s + e.capacidad_maxima, 0);
+      // Sin las salas privadas (fuera de aforo): ni su capacidad ni sus reservas.
+      const capacidadTotal = sumarCapacidadPorMarca(espaciosDeLaMarca, marca);
+      const idsPrivadas = espaciosDeLaMarca.filter((e) => e.privada).map((e) => e.id);
 
       const acumulado = new Map<
         string,
         { fecha: string; hora: string; total_reservas: number; total_comensales: number }
       >();
-      for (const r of (reservasRes.data ?? []) as any[]) {
+      for (const r of sinReservasEnSalasPrivadas((reservasRes.data ?? []) as any[], idsPrivadas)) {
         const minutos = horaAMinutos(r.hora);
         if (minutos === null) continue;
         const hora = minutosAHora(minutos);
@@ -446,6 +467,8 @@ export const useDisponibilidadRango = (
  */
 export interface ReservaAnteriorAforo {
   id: string;
+  /** Sala en la que está guardada (para saber si estaba en una sala privada, fuera de aforo). */
+  espacio_id?: string | null;
   /** "yyyy-MM-dd" (lo que venga detrás, p. ej. "T00:00:00", se ignora). */
   fecha: string;
   /** "HH:MM" o "HH:MM:SS". */
@@ -571,6 +594,12 @@ export const verificarAforoTurno = async (
   comensales: number,
   marca: string = MARCA_POR_DEFECTO,
   reservaEditada?: string | ReservaAnteriorAforo | null,
+  /**
+   * Sala a la que irá la reserva. Si es una sala privada (el Reservado) está FUERA DE
+   * AFORO (2026-10-03): no consume aforo, así que nunca se rechaza por turno lleno
+   * (solo por exclusividad, que decide la BD).
+   */
+  espacioDestinoId?: string | null,
 ): Promise<AforoTurno> => {
   const anterior = reservaEditada && typeof reservaEditada === "object" ? reservaEditada : null;
   const excluirReservaId = anterior ? anterior.id : (reservaEditada as string | null | undefined);
@@ -587,12 +616,20 @@ export const verificarAforoTurno = async (
   const turno = turnoDeHora(hora);
   const aforo = resultado.aforo[turno];
   const esComida = turno === "comida";
-  const efectoEdicion = anterior ? efectoEdicionEnAforo(anterior, { fecha, hora, comensales, marca }) : undefined;
+  const destinoPrivado = !!espacioDestinoId && datos.salasPrivadas.includes(espacioDestinoId);
+  // Sacar una reserva de una sala privada a una normal empieza a consumir aforo, aunque no suba comensales.
+  const veniaDePrivada = !!anterior?.espacio_id && datos.salasPrivadas.includes(anterior.espacio_id);
+  const efectoBase = anterior ? efectoEdicionEnAforo(anterior, { fecha, hora, comensales, marca }) : undefined;
+  const efectoEdicion: EfectoEdicionAforo | undefined =
+    efectoBase === "no_suma" && veniaDePrivada ? "suma" : efectoBase;
   const sinComprobar = efectoEdicion === "no_ocupa" || efectoEdicion === "no_suma";
-  const disponible = sinComprobar || !aforo.completo;
+  const disponible = destinoPrivado || sinComprobar || !aforo.completo;
 
   let mensaje: string;
-  if (efectoEdicion === "no_ocupa") {
+  if (destinoPrivado) {
+    mensaje =
+      "Sala privada: está fuera de aforo (no cuenta en el aforo del turno). Solo admite una reserva por turno.";
+  } else if (efectoEdicion === "no_ocupa") {
     mensaje = "Esta reserva no ocupa plaza (está cancelada o cerrada): el cambio no se comprueba contra el aforo.";
   } else if (efectoEdicion === "no_suma" && aforo.completo) {
     mensaje = `El turno de ${turno} ya está por encima del aforo (${aforo.ocupacion + Number(comensales)} de ${aforo.capacidad_maxima}), pero este cambio no suma comensales: se puede guardar.`;

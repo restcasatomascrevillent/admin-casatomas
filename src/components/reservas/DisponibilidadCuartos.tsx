@@ -8,6 +8,7 @@ import { useConfiguracionTurnos } from "@/hooks/useConfiguracionTurnos";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
+import { capacidadDeAforo, reservasQueConsumenAforo } from "@/lib/reservas/salaPrivada";
 import {
   ETIQUETA_NIVEL,
   ETIQUETA_TURNO,
@@ -73,10 +74,12 @@ export function useRejillaCuartos({
   const rejilla = useMemo<RejillaCuartos | null>(() => {
     if (!fecha || !dia || !turnos.data) return null;
     const servicio = configServicioSalaDesde(config);
+    // Salas privadas (el Reservado): FUERA DE AFORO. Ni su capacidad ni sus reservas entran en la rejilla.
+    const idsPrivadas = dia.espacios.filter((e) => e.privada).map((e) => e.id);
     return construirRejillaCuartos({
       periodos: periodosDelDia(fecha, turnos.data),
-      reservas: dia.reservas,
-      capacidadTurno: dia.espacios.reduce((s, e) => s + (Number(e.capacidad_maxima) || 0), 0),
+      reservas: reservasQueConsumenAforo(dia.reservas, idsPrivadas),
+      capacidadTurno: capacidadDeAforo(dia.espacios),
       estancia: { comida: servicio.estanciaComidaMinutos, cena: servicio.estanciaCenaMinutos },
       propuesta: { hora, comensales },
       excluirReservaId,

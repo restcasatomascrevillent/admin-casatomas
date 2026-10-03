@@ -27,6 +27,8 @@ export interface OcupacionEspacio {
 }
 
 interface EspacioCapacidad {
+  id?: string;
+  nombre?: string;
   capacidad_maxima: number;
   activa: boolean;
   /** `caracteristicas->>'marca'`: solo cuentan las salas de Casa Tomás (`salaAdmiteReservas`). */
@@ -37,6 +39,7 @@ interface ReservaParaResumen {
   estado: string;
   numero_comensales: number;
   marca?: string | null;
+  espacio_id?: string | null;
 }
 
 /**
@@ -81,7 +84,7 @@ export function useResumenOcupacionHoy() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("espacios_reserva" as any)
-        .select("capacidad_maxima, activa, caracteristicas");
+        .select("id, nombre, capacidad_maxima, activa, caracteristicas");
 
       if (error) throw error;
       return (data ?? []) as unknown as EspacioCapacidad[];
@@ -98,7 +101,7 @@ export function useResumenOcupacionHoy() {
 
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("estado, numero_comensales, marca")
+        .select("estado, numero_comensales, marca, espacio_id")
         .eq("fecha", today);
 
       if (error) throw error;

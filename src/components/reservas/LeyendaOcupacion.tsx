@@ -7,6 +7,7 @@
 // permite leerla con daltonismo o en una pantalla mala.
 // ============================================================================
 
+import { Lock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -76,6 +77,10 @@ export function LeyendaOcupacion({
               className={cn("mx-0.5 h-3 w-3 shrink-0", CLASES_PUNTO_SIN_SALA)}
             />
             <span>Reservas sin sala en las próximas {ventanaHoras} h</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Lock aria-hidden="true" data-testid="muestra-sala-privada" className="mx-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Reservado ocupado (fuera de aforo: no cuenta en las cifras)</span>
           </li>
         </ul>
 

@@ -656,3 +656,38 @@ describe("Reservado como sala PRIVADA: una reserva se queda la sala entera", () 
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+describe("Reservado como sala PRIVADA: fuera de aforo", () => {
+  it("su columna y sus reservas llevan «Fuera de aforo»; las demás columnas no, y la suya ya no enseña barras de aforo", async () => {
+    h.reservadoPrivado = true;
+    h.almacen.reservas = [
+      reserva("r-ana", "confirmada", "Ana"),
+      reserva("r-berta", "confirmada", "Berta", { espacio_id: "reservado", numero_comensales: 2 }),
+      reserva("r-carla", "confirmada", "Carla", { espacio_id: "salon", numero_comensales: 3 }),
+    ];
+    montar();
+    await conTablero();
+
+    const reservado = screen.getByRole("region", { name: "Columna Reservado" });
+    // Una en la cabecera de la columna y otra en la tarjeta de Berta.
+    expect(within(reservado).getAllByTestId("etiqueta-fuera-de-aforo")).toHaveLength(2);
+    expect(within(reservado).getAllByText("Fuera de aforo")).toHaveLength(2);
+    // El Reservado no mide su aforo por turno (está fuera de aforo): sin barras de comida/cena.
+    expect(within(reservado).queryByRole("progressbar")).not.toBeInTheDocument();
+
+    const salon = screen.getByRole("region", { name: "Columna Salón" });
+    expect(within(salon).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+    expect(within(salon).getAllByRole("progressbar").length).toBeGreaterThan(0);
+    const sinAsignar = screen.getByRole("region", { name: "Columna Sin asignar" });
+    expect(within(sinAsignar).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  });
+
+  it("si el Reservado no es privado (sin el flag), no lleva etiqueta", async () => {
+    h.reservadoPrivado = false;
+    h.almacen.reservas = [reserva("r-berta", "confirmada", "Berta", { espacio_id: "reservado", numero_comensales: 2 })];
+    montar();
+    await conTablero("Berta");
+
+    expect(screen.queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  });
+});

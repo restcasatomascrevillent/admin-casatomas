@@ -13,6 +13,8 @@ import { useMesas } from "@/hooks/useMesas";
 import { EspacioForm } from "@/components/reservas/EspacioForm";
 import { EditorPlanoEspacio } from "@/components/espacios/EditorPlanoEspacio";
 import { salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { capacidadDeAforo, esSalaPrivada } from "@/lib/reservas/salaPrivada";
+import { EtiquetaFueraDeAforo } from "@/components/reservas/EtiquetaFueraDeAforo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,11 +111,12 @@ export default function Espacios() {
             <p className="text-sm text-muted-foreground">
               Aforo por turno:{" "}
               <span className="font-medium text-foreground tabular-nums">
-                {espacios
-                  .filter((e: any) => e.activa)
-                  .reduce((s: number, e: any) => s + (Number(e.capacidad_maxima) || 0), 0)}
+                {capacidadDeAforo(espacios.filter((e: any) => e.activa))}
               </span>{" "}
               plazas
+              {espacios.some((e: any) => e.activa && esSalaPrivada(e)) && (
+                <span> (sin las salas privadas: están fuera de aforo)</span>
+              )}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {espacios.map((espacio: any) => {
@@ -131,6 +134,7 @@ export default function Espacios() {
                             ) : (
                               <Badge variant="secondary">Inactivo</Badge>
                             )}
+                            {esSalaPrivada(espacio) && <EtiquetaFueraDeAforo />}
                           </CardTitle>
                           <CardDescription className="mt-2">
                             {espacio.descripcion || "Sin descripción"}

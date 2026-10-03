@@ -150,6 +150,8 @@ import {
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
 import { aforoCasaTomas, ocupacionPorTurno } from "@/lib/reservas/ocupacionCalendario";
+import { estaFueraDeAforo, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
+import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 import { fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
@@ -301,11 +303,14 @@ function TarjetaSala({
   grupo,
   tieneMesas,
   onIr,
+  fueraDeAforo = false,
 }: {
   grupo: ResumenEspacio;
   /** ¿La sala tiene alguna mesa activa en el plano? Si no, el grado 2 es imposible. */
   tieneMesas: boolean;
   onIr: (espacioId: string) => void;
+  /** Sala privada (el Reservado): sus reservas no cuentan en las cifras de arriba. */
+  fueraDeAforo?: boolean;
 }) {
   const espacioId = grupo.espacio_id as string;
   // Solo se puede hablar de "cerrada" si la sala tiene mesas que asignar.
@@ -327,6 +332,7 @@ function TarjetaSala({
           <span className="truncate font-medium" title={grupo.espacio_nombre}>
             {grupo.espacio_nombre}
           </span>
+          {fueraDeAforo && <EtiquetaFueraDeAforo />}
         </div>
         <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
@@ -450,7 +456,15 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
     return filas.filter((f) => turno === "todos" || f.turno === turno).map(aFilaResumen(espaciosPorId));
   }, [filas, turno, espaciosPorId]);
 
-  const resumen = useMemo(() => resumenDia(filasFiltradas), [filasFiltradas]);
+  // Salas privadas (el Reservado): FUERA DE AFORO. Su tarjeta sale en el reparto (con su etiqueta),
+  // pero sus reservas no entran en las cifras de la cabecera ni en la ocupación, igual que en la casilla.
+  const privadas = useMemo(() => new Set(idsSalasPrivadasActivas(espacios as Array<{ id?: string }> | undefined)), [espacios]);
+  const filasAforo = useMemo(
+    () => filasFiltradas.filter((f) => !estaFueraDeAforo(f, privadas)),
+    [filasFiltradas, privadas],
+  );
+
+  const resumen = useMemo(() => resumenDia(filasAforo), [filasAforo]);
   const { porEspacio, sinSala } = useMemo(() => resumenPorEspacio(filasFiltradas), [filasFiltradas]);
 
   // Las CIFRAS DE LA CABECERA (comensales, reservas, con mesa) son las de las
@@ -460,8 +474,8 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   // filtra por `reservas.marca` y la vista da la de la SALA (ver la cabecera de
   // este fichero y la de `useResumenAsignacionDia`).
   const comensales = useMemo(
-    () => filasFiltradas.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
-    [filasFiltradas],
+    () => filasAforo.reduce((s, f) => s + (Number(f.numero_comensales) || 0), 0),
+    [filasAforo],
   );
 
   // Ocupación del día por turno: con TODAS las filas (el filtro de turno no la
@@ -472,10 +486,12 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   const ocupacion = useMemo(
     () =>
       ocupacionPorTurno(
-        filas.map((f) => ({ marca: f.marca, turno: f.turno, comensales: f.numero_comensales })),
+        filas
+          .filter((f) => !estaFueraDeAforo(f, privadas))
+          .map((f) => ({ marca: f.marca, turno: f.turno, comensales: f.numero_comensales })),
         aforo,
       ),
-    [filas, aforo],
+    [filas, aforo, privadas],
   );
   // Un día pasado no se mide contra el aforo: ya ocurrió.
   const esPasado = fechaISO < fechaMadrid(Date.now());
@@ -585,7 +601,7 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
           />
         ) : isLoading ? (
           <EsqueletoDia />
-        ) : resumen.total === 0 ? (
+        ) : filasFiltradas.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             {hayEnOtroTurno
               ? `No hay reservas en el turno de ${ETIQUETA_TURNO[turno].toLowerCase()}.`
@@ -625,7 +641,13 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
             {porEspacio.map((grupo) => {
               const id = grupo.espacio_id as string;
               return (
-                <TarjetaSala key={id} grupo={grupo} tieneMesas={salasConMesas.has(id)} onIr={irAlPlano} />
+                <TarjetaSala
+                  key={id}
+                  grupo={grupo}
+                  tieneMesas={salasConMesas.has(id)}
+                  onIr={irAlPlano}
+                  fueraDeAforo={privadas.has(id)}
+                />
               );
             })}
           </>

@@ -34,6 +34,8 @@ import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { admiteReservas } from "@/lib/reservas/negocios";
+import { avisosSalasPrivadas } from "@/lib/reservas/salaPrivada";
+import { AvisoSalasPrivadas } from "./AvisoSalasPrivadas";
 import { cn } from "@/lib/utils";
 import { ConMotivo } from "./ConMotivo";
 
@@ -171,6 +173,13 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
     return agruparPendientesDeMesa(reservasHoy ?? [], idsReservasConMesa(asignaciones ?? []), salas);
   }, [reservasHoy, asignaciones, espacios]);
 
+  // El Reservado (sala privada) está FUERA DE AFORO: no entra en las cifras de arriba, pero se avisa
+  // aparte de si está ocupado hoy. Mismas reservas de hoy que la franja de pendientes de mesa.
+  const avisosPrivadas = useMemo(
+    () => avisosSalasPrivadas(espacios as Array<{ id?: string; nombre?: string }> | undefined, reservasHoy),
+    [espacios, reservasHoy],
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-3 sm:space-y-4">
@@ -232,6 +241,9 @@ export function VistaHoy({ onEspacioClick, onAsignarMesa, onEditarReserva, puede
             />
           </div>
         </div>
+
+        {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. */}
+        <AvisoSalasPrivadas avisos={avisosPrivadas} />
 
         {/* Cómo avanza una reserva (2026-09-30): los seis estados con la cifra
             de hoy de cada uno. SIN consulta propia: usa las reservas de hoy
