@@ -101,6 +101,21 @@ export function EditorFacturacion() {
     catch(e) { toast.error(e instanceof Error ? e.message : "No se ha podido descargar la factura."); }
     finally {setBusy(false);}
   };
+  const eliminar = async (g:FacturaGuardada,estado:"emitida"|"borrador") => {
+    if(!window.confirm(`¿Eliminar ${estado==="emitida"?"la factura":"el borrador"} ${g.numero || "sin número"}? Esta acción no se puede deshacer.`))return;
+    setBusy(true);
+    try {
+      const resultado=await q.eliminar(g,estado);
+      if(estado==="emitida" && actual?.id===g.id){setActual(null);setFacturaModificada(true);setDirty(true);}
+      if(estado==="borrador" && borrador?.id===g.id){setBorrador(null);setDirty(true);}
+      if(estado==="emitida" && borrador?.facturaId===g.id){
+        const pendiente=resultado.borradores?.find(b=>b.id===borrador.id);
+        setBorrador(pendiente?{id:pendiente.id,version:pendiente.actualizado_en,facturaId:null}:null);
+      }
+      toast.success(estado==="emitida"?"Factura eliminada":"Borrador eliminado");
+    }catch(e){toast.error(e instanceof Error?e.message:"No se ha podido eliminar.");}
+    finally{setBusy(false);}
+  };
   const agregar = (ids:string[],paqueteId?:string) => {
     try { cambiar(agregarProductos(f,f.catalogo ?? catalogoInicial(),ids,paqueteId)); }
     catch(e) {toast.error(e instanceof Error ? e.message : "No se han podido añadir los servicios.");}
@@ -166,7 +181,7 @@ export function EditorFacturacion() {
       </TabsList>
       <TabsContent value="emitidas" className="space-y-4 pt-3">
         {q.isLoading ? <p role="status">Cargando facturas…</p> : q.isError ? <p className="text-sm text-muted-foreground">El historial no está disponible. Reintenta la carga.</p> :
-          <FacturasEmitidas borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
+          <FacturasEmitidas eliminar={(g,estado)=>void eliminar(g,estado)} borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
       </TabsContent>
       <TabsContent value="nueva" className="space-y-5 pt-3">
       {actual && <p className="text-sm font-medium">Editando factura {f.numero}</p>}

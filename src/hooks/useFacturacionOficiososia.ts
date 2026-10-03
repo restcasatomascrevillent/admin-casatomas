@@ -52,7 +52,14 @@ export function useFacturacionOficiososia() {
     }));
     return result;
   }
-  return { ...query, guardar };
+  async function eliminar(documento:FacturaGuardada, estado:"emitida"|"borrador") {
+    const {data,error}=await db.rpc("oficiososia_facturacion_eliminar",{p_id:documento.id,p_estado:estado,p_version:documento.actualizado_en});
+    if(error)throw new Error(error.code==="PGRST202" ? "Aplica la migración 20261003190000_facturacion_eliminar.sql para habilitar la eliminación." : error.message);
+    const resultado=validarDatos(data);
+    cache.setQueryData<DatosFacturacion>(FACTURACION_KEY,resultado);
+    return resultado;
+  }
+  return { ...query, guardar, eliminar };
 }
 export function useMensualFacturado() {
   const q = useFacturacionOficiososia();

@@ -1,12 +1,12 @@
 import { beforeEach,describe,it,expect,vi } from "vitest";
-import { render,screen,fireEvent,within } from "@testing-library/react";
+import { render,screen,fireEvent,within,waitFor } from "@testing-library/react";
 import { nuevaFactura } from "../modelo";
 import { catalogoInicial } from "../catalogo";
 import type { DatosFacturacion } from "@/hooks/useFacturacionOficiososia";
 
-const mock=vi.hoisted(()=>({data:null as DatosFacturacion|null,guardar:vi.fn()}));
+const mock=vi.hoisted(()=>({data:null as DatosFacturacion|null,guardar:vi.fn(),eliminar:vi.fn()}));
 vi.mock("@/hooks/useFacturacionOficiososia",()=>({
-  useFacturacionOficiososia:()=>({data:mock.data,isLoading:false,isError:false,isFetching:false,guardar:mock.guardar,refetch:vi.fn()}),
+  useFacturacionOficiososia:()=>({data:mock.data,isLoading:false,isError:false,isFetching:false,guardar:mock.guardar,eliminar:mock.eliminar,refetch:vi.fn()}),
 }));
 import { EditorFacturacion } from "../EditorFacturacion";
 
@@ -71,6 +71,21 @@ describe("editor simplificado",()=>{
     expect(screen.getByRole("button",{name:"Emitir factura"})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
     expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Precio unitario (€)")).toHaveValue(175);
+  });
+
+  it("exige confirmación antes de eliminar una factura",async()=>{
+    const documento=mock.data!.config!.documento;
+    mock.data!.facturas=[{id:"emitida",numero:documento.numero,documento,creado_en:"2026-10-03",actualizado_en:"2026-10-03"}];
+    mock.eliminar.mockResolvedValue({...mock.data,facturas:[]});
+    const confirmar=vi.spyOn(window,"confirm").mockReturnValue(false);
+    render(<EditorFacturacion/>);
+    fireEvent.mouseDown(screen.getByRole("tab",{name:"Facturas"}),{button:0,ctrlKey:false});
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar factura FO-2026-010"}));
+    expect(mock.eliminar).not.toHaveBeenCalled();
+    confirmar.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar factura FO-2026-010"}));
+    await waitFor(()=>expect(mock.eliminar).toHaveBeenCalledWith(expect.objectContaining({id:"emitida"}),"emitida"));
+    confirmar.mockRestore();
   });
 
 });

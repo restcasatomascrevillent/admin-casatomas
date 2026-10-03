@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Download, Pencil, Copy, FilePlus2 } from "lucide-react";
+import { Download, Pencil, Copy, FilePlus2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { euros, totalesFactura } from "./modelo";
 import { normalizar } from "./catalogo";
 import type { BorradorGuardado, FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
 
-export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,editar,duplicar,descargar,nueva}: {
+export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,editar,duplicar,descargar,nueva,eliminar}: {
   borradores?:BorradorGuardado[];editarBorrador:(b:BorradorGuardado)=>void;
   facturas:FacturaGuardada[];busy:boolean;editar:(f:FacturaGuardada)=>void;duplicar:(f:FacturaGuardada)=>void;
+  eliminar:(f:FacturaGuardada,estado:"emitida"|"borrador")=>void;
   descargar:(f:FacturaGuardada)=>void;nueva:()=>void;
 }) {
   const [busqueda,setBusqueda] = useState("");
@@ -41,6 +42,7 @@ export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,edi
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={busy} onClick={()=>g.estado==="borrador"?editarBorrador(g):editar(g)}><Pencil className="mr-2 h-4 w-4" />{g.estado==="borrador"?"Continuar":"Editar"}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={()=>duplicar(g)}><Copy className="mr-2 h-4 w-4" />Duplicar</Button>
+        <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={busy} onClick={()=>eliminar(g,g.estado)} aria-label={"Eliminar "+(g.estado==="emitida"?"factura ":"borrador ")+(g.numero || "sin número")}><Trash2 className="mr-2 h-4 w-4" />Eliminar</Button>
         {g.estado==="emitida" && <Button size="sm" disabled={busy} onClick={()=>descargar(g)}><Download className="mr-2 h-4 w-4" />PDF</Button>}
       </div>
     </article>)}

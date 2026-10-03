@@ -90,3 +90,7 @@ Aplicar `20261003181000_facturacion_borradores.sql` después de la migración in
 ### IVA general de la factura
 
 El catálogo y los conceptos no ofrecen IVA individual. El paso 3 permite activar/desactivar el impuesto y fijar un único porcentaje, aplicado y redondeado sobre la base total después de descuentos. Las facturas nuevas usan el 21% como valor inicial editable. Los PDF históricos sin `ivaGlobal` conservan su cálculo anterior; al editar y guardar se adopta el porcentaje general mostrado. No requiere migración adicional.
+
+### Eliminar documentos
+
+Cada factura y borrador tiene una acción Eliminar con confirmación irreversible. La RPC comprueba acceso de superadmin y versión del documento antes de borrar. Los borradores vinculados a una factura eliminada se conservan sin vínculo y actualizan su versión. Aplicar `20261003190000_facturacion_eliminar.sql` después de las migraciones de facturación y borradores.
