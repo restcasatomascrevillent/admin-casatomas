@@ -1,6 +1,6 @@
 # Newsletter: baja automática y conexión con Resend Marketing
 
-Fecha: 2026-10-03. Rama: `feat/newsletter-baja-automatica` (sobre `feat/newsletter-consentimiento`).
+Fecha: 2026-10-03. Fase 1: rama `feat/newsletter-baja-automatica` (sobre `feat/newsletter-consentimiento`). Fase 2 (Resend Marketing): rama `feat/newsletter-resend-broadcasts` (sobre la anterior) — ver secciones 7 (doble opt-in) y 8–10 (Resend Marketing).
 
 Encargo del dueño: *"añade en el admin panel que en la newsletter se ponga automático el darse de baja; lo siguiente es montar la conexión para hacer esto a través de los 1000 mensajes de marketing que tenemos en Resend al mes"*.
 
@@ -67,6 +67,8 @@ Fuentes oficiales (consultadas el 2026-10-03):
 
 ## 5. Pasos del dueño para desplegar la fase 1
 
+> **Rama integrada (`integracion/newsletter`):** no seguir estos pasos sueltos; usar el orden único de la sección 9, que incluye esta fase.
+
 1. Aplicar migraciones, en orden (si la primera no está ya):
    `npx supabase db query --linked -f supabase/migrations/20261003143000_reserva_web_prueba_consentimiento.sql`
    `npx supabase db query --linked -f supabase/migrations/20261003171500_newsletter_baja_automatica.sql`
@@ -78,7 +80,7 @@ Fuentes oficiales (consultadas el 2026-10-03):
 4. Resend → Webhooks: el endpoint `…/functions/v1/resend-webhook` debe tener marcados `email.bounced`, `email.complained`, `email.suppressed` (ya los usa reservas) y, para la fase 2, `contact.updated`. El secreto sigue siendo `RESEND_WEBHOOK_SECRET`.
 5. Desplegar el panel (Vercel, al fusionar).
 
-## 6. Fase 2: enviar por Resend Marketing (plan y estimación)
+## 6. Fase 2: enviar por Resend Marketing (plan y estimación original — implementado, ver sección 8)
 
 | # | Tarea | Estimación |
 |---|---|---|
@@ -112,4 +114,85 @@ Migración `20261003184500_newsletter_doble_optin_y_email_normalizado.sql` (**NO
 - **Altas antiguas sin verificar** (nacidas del trigger de INSERT): se retiran (constancia sin email/nombre en `newsletter_suscriptores_depurados`); vuelven solas si el cliente confirma.
 - **Reactivar** exige además que la reserva del consentimiento nuevo esté verificada y que la casilla sea posterior a la baja.
 - `origen_alta` admite `reserva_manual` y `solicitud_web` (antes una reserva `manual` quedaba como `reserva_web`).
-- Pasos del dueño: ver la cabecera de la migración (aplicar 171500 → 184500 → test → `functions deploy emails-reserva reservas-web --project-ref jeamoczmbfsnwkfjxcyo`).
+- Pasos del dueño: los de la sección 9 (orden único para las tres migraciones).
+
+---
+
+## 8. Fase 2 implementada (rama `feat/newsletter-resend-broadcasts`, 2026-10-03)
+
+**Estado:** código y tests hechos; **nada desplegado ni aplicado**. Por defecto (`NEWSLETTER_CANAL` sin poner) el newsletter sigue saliendo por la vía transaccional de la fase 1: desplegar no cambia el comportamiento hasta que el dueño ponga `NEWSLETTER_CANAL=broadcast`.
+
+### Qué hace
+
+- **`newsletter-sync-resend`** (función nueva, `verify_jwt = false`): la tabla manda y Resend es el cartero. Cada pasada lee todos los contactos de Resend y los del Segment, planifica **solo las diferencias** (incremental: una pasada sin cambios no escribe nada en Resend) y ejecuta, a ≤ 8 peticiones/s y con reintento en 429 `rate_limit_exceeded` (respeta `retry-after`):
+  1. **Reconciliación**: activo en la tabla pero `unsubscribed = true` en Resend → baja `resend_baja_nativa` (vía `newsletter_registrar_baja`) y después se borra el contacto. Nunca se pone `unsubscribed: false` ni se reactiva a nadie.
+  2. **Borrar de Resend** a los dados de baja (y a los activos cuya dirección está en `direcciones_email_suprimidas`): libera cuota.
+  3. **Quitar del Segment** a contactos que no son de la tabla (metidos a mano en el dashboard).
+  4. Altas (contacto creado ya dentro del Segment), añadir al Segment a los que ya existían y actualizar `first_name`.
+  - Cerrojo: una sola pasada a la vez (`newsletter_sincronizaciones_resend`, índice único parcial); las colgadas se cierran a los 15 min. Presupuesto de 100 s: lo que no cabe queda **pendiente** para la siguiente pasada.
+  - Llamadores: panel (permiso de Marketing: leer para `estado`, escribir para `sincronizar`) y cron (cabecera `x-webhook-secret` = `NEWSLETTER_SYNC_CRON_SECRET`, falla cerrado).
+  - Segment: `RESEND_NEWSLETTER_SEGMENT_ID` o, si no está, busca "Newsletter Casa Tomás" y si no existe **lo crea** (el id sale en la respuesta y en la tabla de pasadas).
+- **`enviar-newsletter` con `NEWSLETTER_CANAL=broadcast`**: sincroniza **dentro del cerrojo**; si queda algún dado de baja sin quitar de Resend, la sincronización falla o se supera el límite de contactos, **no envía nada** (409/502 con el motivo). Si todo cuadra: misma plantilla con `{{{RESEND_UNSUBSCRIBE_URL}}}` en el pie, Broadcast creado como borrador → apuntado en `newsletter_envios` (`canal = 'broadcast'`, `resend_broadcast_id`) → enviado. Si la respuesta del envío es dudosa (red/5xx) consulta el estado del Broadcast en vez de reenviar.
+- **Prueba segura** (`{"prueba": true}`, botón «Enviar prueba por Resend» en el panel): Broadcast a un Segment de pruebas que solo tiene `NEWSLETTER_EMAIL_PRUEBA` (por defecto `delivered@resend.dev`). Se niega si ese Segment tiene a alguien más o si es el del newsletter. No sincroniza ni escribe historial. Funciona con cualquier `NEWSLETTER_CANAL`.
+- **`newsletter-baja`**: tras guardar la baja local (que es la que manda), borra el contacto en Resend en segundo plano (`EdgeRuntime.waitUntil`). Si falla, lo registra y la siguiente sincronización lo borra (y ningún Broadcast sale mientras quede).
+- **`resend-webhook`**: `contact.updated` con `unsubscribed: true` → baja `resend_baja_nativa` (ya estaba en fase 1); `contact.deleted` → solo desvincula `resend_contact_id` (no es una baja); los eventos de un Broadcast guardan `metadata.broadcast_id` para las estadísticas. El 500 por `email_eventos.email_id` NOT NULL ya estaba arreglado en la rama base (id sintético `contact.updated:<id>`).
+- **Migración `20261003193000_newsletter_resend_broadcasts.sql`** (NO APLICADA): `resend_contact_id`, `resend_sincronizado_at`; `newsletter_envios.canal` y `resend_broadcast_id`; tabla `newsletter_sincronizaciones_resend`; `newsletter_marcar_sincronizados()` (service_role) y `newsletter_estadisticas_broadcasts()` (SECURITY INVOKER). Rollback en `supabase/rollbacks/`, test en `supabase/tests/newsletter_resend_broadcasts_test.sql`.
+- **Panel**: en *Suscriptores*, tarjeta «Resend Marketing» (canal actual, contactos usados / 1.000 con aviso al 80 % y al 100 %, última sincronización, botón «Sincronizar con Resend»); en *Enviar Newsletter*, por qué canal saldrá y el botón de prueba; en *Estadísticas*, historial de envíos con canal y entregados/abiertos/clics/rebotes de cada Broadcast.
+
+### Ficheros
+
+`supabase/functions/_shared/resend-marketing/{config,cliente,sync,repositorio,servicio}.ts`, `_shared/permiso-marketing.ts` (movido desde `enviar-newsletter/permiso.ts`, que lo reexporta), `newsletter-sync-resend/{index,peticion}.ts`, `enviar-newsletter/{broadcast,prueba,registro}.ts` + `index.ts`, `newsletter-baja/resend.ts` + `index.ts`, `resend-webhook/{newsletter,index}.ts`, `supabase/config.toml`; panel: `src/lib/newsletter/resend.ts`, `src/hooks/useResendMarketing.ts`, `useEnviarNewsletter.ts`, `src/components/marketing/{SincronizacionResend,HistorialEnvios}.tsx`, `GestionCorreos.tsx`, `CreadorNewsletter.tsx`, `src/pages/Marketing.tsx`.
+
+## 9. Pasos del dueño para desplegar todo (doble opt-in + fase 2, en orden)
+
+> Todo desde la carpeta **`adminpanelct`** una vez fusionada la rama (allí está el proyecto enlazado: `supabase/.temp`). Si se hace desde el worktree `adminpanelct-newsletter-resend`, los `functions deploy` llevan `--project-ref jeamoczmbfsnwkfjxcyo` y para `db query --linked` hay que enlazar antes: `npx supabase link --project-ref jeamoczmbfsnwkfjxcyo`.
+
+1. **Migraciones**, en este orden exacto (la 143000 ya está aplicada; la 150000 de salas privadas es de otra rama y es independiente). Cada una se detiene sola si falta la anterior:
+   ```
+   npx supabase db query --linked -f supabase/migrations/20261003171500_newsletter_baja_automatica.sql
+   npx supabase db query --linked -f supabase/tests/newsletter_baja_automatica_test.sql
+   npx supabase db query --linked -f supabase/migrations/20261003184500_newsletter_doble_optin_y_email_normalizado.sql
+   npx supabase db query --linked -f supabase/tests/newsletter_doble_optin_test.sql
+   npx supabase db query --linked -f supabase/tests/consentimiento_newsletter.test.sql
+   npx supabase db query --linked -f supabase/migrations/20261003193000_newsletter_resend_broadcasts.sql
+   npx supabase db query --linked -f supabase/tests/newsletter_resend_broadcasts_test.sql
+   ```
+   (Los tests van en `BEGIN … ROLLBACK`: no dejan nada escrito. Si terminan sin ERROR, todo bien.)
+   **Por qué la 184500 va antes que cualquier sincronización con Resend:** retira las altas antiguas sin email verificado y fusiona los duplicados por mayúsculas. Si se sincronizara antes, se subirían a Resend contactos que no deben recibir nada (y gastarían cuota). La 193000 no depende de la 184500 para cargar (solo exige la 171500), pero **no se pulsa «Sincronizar con Resend» ni se activa el cron hasta tener aplicadas las tres**; si se sincronizó antes por error, la siguiente pasada borra de Resend a los retirados (ya no están activos en la tabla).
+2. **Resend (dashboard)**:
+   - *API Keys → Create*: permiso **Full access** (Contacts y Broadcasts no funcionan con *Sending access*). Es la `RESEND_MARKETING_API_KEY`; la clave actual de reservas no se toca.
+   - *Webhooks*: en el endpoint que ya existe (`https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/resend-webhook`) marcar además **`contact.updated`** y **`contact.deleted`** (deben seguir `email.bounced`, `email.complained`, `email.suppressed`). El secreto sigue siendo `RESEND_WEBHOOK_SECRET`.
+   - *Settings → Unsubscribe page*: título, logo y colores de Casa Tomás (el "Powered by Resend" solo se quita en Pro).
+   - Segment: **no hace falta crearlo**; la primera sincronización crea "Newsletter Casa Tomás". Si se prefiere crearlo a mano (*Audience → Segments*), poner su id en `RESEND_NEWSLETTER_SEGMENT_ID`. Tampoco hace falta crear el de pruebas ("Newsletter Casa Tomás (pruebas)"); **no meter a nadie en él**.
+3. **Secrets** (`npx supabase secrets set … --project-ref jeamoczmbfsnwkfjxcyo`):
+   - `RESEND_MARKETING_API_KEY=re_…` (la del paso 2).
+   - `NEWSLETTER_SYNC_CRON_SECRET=<valor aleatorio largo>` (para el cron).
+   - **No** poner todavía `NEWSLETTER_CANAL` (o ponerlo a `transaccional`).
+   - Opcionales: `NEWSLETTER_FROM_EMAIL` (sin él sale con `RESEND_FROM_EMAIL`, dominio `send.miguelbenito.space`, decisión del dueño), `NEWSLETTER_REPLY_TO`, `RESEND_NEWSLETTER_SEGMENT_ID` (tras la primera sincronización, copiar el id que muestra la respuesta / `newsletter_sincronizaciones_resend.segment_id`), `NEWSLETTER_LIMITE_CONTACTOS` (si se cambia de plan), `NEWSLETTER_EMAIL_PRUEBA`.
+4. **Desplegar funciones**:
+   ```
+   npx supabase functions deploy emails-reserva reservas-web newsletter-sync-resend enviar-newsletter newsletter-baja resend-webhook --project-ref jeamoczmbfsnwkfjxcyo
+   ```
+   (`emails-reserva` y `reservas-web` llevan el clic de «Confirmo» que verifica el email (doble opt-in); `newsletter-sync-resend` es nueva y va con `verify_jwt = false` desde `supabase/config.toml`; comprobar en el dashboard que quedó así.)
+5. **Desplegar el panel** (Vercel, al fusionar en `main`).
+6. **Primera sincronización** desde el panel: *Newsletter → Suscriptores → «Sincronizar con Resend»*. No envía nada; solo copia los activos a Resend. Comprobar en Resend → *Audience* que el Segment tiene tantos contactos como activos hay en el panel. Si sale "quedan N cambios", volver a pulsar hasta que termine.
+7. **Prueba segura**: en *Enviar Newsletter*, escribir un newsletter y pulsar **«Enviar prueba por Resend (no llega a clientes)»**. Va solo a `delivered@resend.dev`. Comprobar en Resend → *Broadcasts* que el `[PRUEBA] …` salió como *Sent*, con el remitente correcto y el enlace de baja de Resend en el pie.
+8. **Cron diario** (elige uno, ver el final de la migración 20261003193000):
+   - A) SQL: `select vault.create_secret('<mismo valor que NEWSLETTER_SYNC_CRON_SECRET>', 'newsletter_sync_cron_secret');` y el `cron.schedule('newsletter-sync-resend-diario', '30 5 * * *', …)` que está comentado en la migración (requiere `pg_net`).
+   - B) Dashboard → *Integrations → Cron → Create job* → Edge Function `newsletter-sync-resend`, POST, `30 5 * * *`, cabecera `x-webhook-secret`, cuerpo `{"accion":"sincronizar"}`.
+9. **Activar Broadcasts**: `npx supabase secrets set NEWSLETTER_CANAL=broadcast --project-ref jeamoczmbfsnwkfjxcyo`. El panel pasa a mostrar «Envío actual: Broadcast de Resend Marketing». El siguiente «Enviar Newsletter» ya va a los clientes.
+10. **Vuelta atrás** en cualquier momento: `NEWSLETTER_CANAL=transaccional` (o borrar el secret). Rollback de la BD: `supabase/rollbacks/20261003193000_newsletter_resend_broadcasts_ROLLBACK.sql` (antes quitar el cron).
+
+## 10. Gotchas de la API de Resend (comprobados en la doc oficial el 2026-10-03)
+
+- **El SDK `resend@2.0.0` del repo no sirve** para esto (es anterior a la Contacts API global, los Segments y `segment_id`; el SDK actual es la v6.32). Se usa `fetch` directo con tipos propios (`_shared/resend-marketing/cliente.ts`) y se deja el SDK viejo para los correos de reserva.
+- Endpoints: `GET /contacts?limit=100&after=<id>` (paginado, `has_more`), `GET /segments/{id}/contacts`, `POST /contacts {email, first_name, segments:[{id}]}`, `PATCH|DELETE /contacts/{id|email}`, `POST|DELETE /contacts/{id}/segments/{segment_id}`, `GET|POST /segments`, `POST /broadcasts {segment_id, from, subject, html, name, send}`, `POST /broadcasts/{id}/send`, `GET /broadcasts/{id}` (`status`: draft/queued/sent). Errores: `{statusCode, name, message}`.
+- **429 no siempre es "espera un segundo"**: `rate_limit_exceeded` sí se reintenta (`retry-after`), pero `daily_quota_exceeded` / `monthly_quota_exceeded` también son 429 y no se arreglan reintentando.
+- Rate limit **10 req/s por equipo** (todas las claves, también la de reservas): por eso la sincronización va a 8/s en serie.
+- La cuota de marketing cuenta **contactos guardados**, también los `unsubscribed`; pasado el límite, Broadcast → **403** `validation_error` "You have reached your contacts quota". Hay que borrar a los dados de baja.
+- **Nunca mandar `unsubscribed: false`** al crear/actualizar: re-suscribiría a quien se dio de baja en la página de Resend si el webhook se perdió. La sincronización solo manda `first_name` y Segments.
+- Un Broadcast **no admite cabeceras ni tags propios**; Resend pone `List-Unsubscribe`/`List-Unsubscribe-Post`. El enlace es `{{{RESEND_UNSUBSCRIBE_URL}}}` (único por destinatario).
+- Los eventos `email.*` de un Broadcast traen `broadcast_id`; los `contact.*` traen `id`, `email`, `unsubscribed`, `segment_ids` y **no** `email_id`.
+- `contact.deleted` llega también cuando borramos nosotros: no se trata como baja.
+- El "Send Broadcast" solo funciona con Broadcasts creados por API; se crea como borrador (`send: false`) para guardar el id antes de enviar. No se reintenta el envío en 5xx (podría salir dos veces): se consulta el estado.
+- La respuesta de crear contacto cuando el email ya existe **no está documentada**: si falla, se busca con `GET /contacts/{email}` y se cuadra (o, si está `unsubscribed`, se registra la baja).

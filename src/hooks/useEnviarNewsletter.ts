@@ -36,6 +36,32 @@ export async function mensajeErrorFuncion(error: unknown, porDefecto: string): P
   return typeof msg === "string" && msg ? msg : porDefecto;
 }
 
+/**
+ * Prueba segura por Resend Marketing: enviar-newsletter con {prueba: true}
+ * manda el Broadcast a un Segment que solo tiene la dirección de prueba
+ * (delivered@resend.dev por defecto). No llega a ningún cliente ni queda en el
+ * historial. Ver supabase/functions/enviar-newsletter/prueba.ts.
+ */
+export function useEnviarPruebaNewsletter() {
+  return useMutation({
+    mutationFn: async (payload: NewsletterPayload) => {
+      const { data, error } = await supabase.functions.invoke('enviar-newsletter', {
+        body: { ...payload, prueba: true },
+      });
+      if (error) {
+        throw new Error(await mensajeErrorFuncion(error, 'Error al enviar la prueba'));
+      }
+      return data as RespuestaEnvio;
+    },
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Prueba enviada');
+    },
+    onError: (error: Error) => {
+      toast.error(`Prueba: ${error.message}`);
+    },
+  });
+}
+
 export function useEnviarNewsletter() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -57,6 +83,9 @@ export function useEnviarNewsletter() {
         toast.success(data?.message || 'Newsletter enviado correctamente');
       }
       queryClient.invalidateQueries({ queryKey: ["newsletter-suscriptores"] });
+      // Historial y estado de Resend (useResendMarketing): el envío por Broadcast sincroniza antes.
+      queryClient.invalidateQueries({ queryKey: ["newsletter-envios-historial"] });
+      queryClient.invalidateQueries({ queryKey: ["newsletter-resend-estado"] });
     },
     onError: (error: Error) => {
       toast.error(`Error: ${error.message}`);

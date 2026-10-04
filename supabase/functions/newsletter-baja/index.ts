@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { baseBajaWeb, urlBajaWeb, quiereJson, respuestaBaja, type EstadoBaja } from "./enlace-web.ts";
+import { quitarDeResendTrasBaja } from "./resend.ts";
 
 // ============================================================================
 // newsletter-baja
@@ -345,5 +346,18 @@ serve(async (req) => {
   }
 
   console.log(`newsletter-baja: suscriptor ${sid} dado de baja (origen=${origen})`);
+
+  // Fase 2 (Resend Marketing): fuera de Resend también. Best-effort y en
+  // segundo plano (EdgeRuntime.waitUntil) para no retrasar la respuesta; si
+  // falla, la próxima sincronización lo arregla (ver resend.ts).
+  const quitar = quitarDeResendTrasBaja({
+    apiKey: Deno.env.get("RESEND_MARKETING_API_KEY"),
+    email: suscriptor.email,
+    suscriptorId: sid,
+  });
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(quitar);
+  else await quitar;
+
   return responder("baja_hecha", renderDonePage(suscriptor.email, nowIso, false), 200, suscriptor.email, nowIso);
 });

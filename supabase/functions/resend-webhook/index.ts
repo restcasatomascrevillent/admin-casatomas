@@ -11,7 +11,14 @@ import {
   ORIGEN_RESEND_WEBHOOK,
   type EstadoEntrega,
 } from "./eventos.ts";
-import { decidirBajaNewsletter, idArchivoEvento, destinatarioArchivo, type DecisionBajaNewsletter } from "./newsletter.ts";
+import {
+  decidirBajaNewsletter,
+  decidirDesvinculoContacto,
+  broadcastIdDe,
+  idArchivoEvento,
+  destinatarioArchivo,
+  type DecisionBajaNewsletter,
+} from "./newsletter.ts";
 
 // ============================================================================
 // RESEND-WEBHOOK — recibe los eventos asíncronos de Resend (delivered,
@@ -91,6 +98,7 @@ interface ResendWebhookEvent {
     email?: string;
     unsubscribed?: boolean;
     tags?: unknown;
+    broadcast_id?: string;
     subject?: string;
     created_at?: string;
     click?: {
@@ -203,6 +211,13 @@ serve(async (req: Request): Promise<Response> => {
       metadata.bounce_message = event.data.bounce.message;
     }
 
+    // Broadcasts (newsletter por Resend Marketing): para contar entregas,
+    // aperturas, clics y rebotes por envío (newsletter_estadisticas_broadcasts).
+    const broadcastId = broadcastIdDe(event);
+    if (broadcastId) {
+      metadata.broadcast_id = broadcastId;
+    }
+
     // Insertar evento en la base de datos — INCONDICIONAL, primer paso de
     // I/O, ANTES de intentar enriquecer nada (ver cabecera: es la garantía
     // mínima de este encargo, no depende de la migración de esta entrega).
@@ -263,6 +278,22 @@ serve(async (req: Request): Promise<Response> => {
         bajaNewsletter = await darDeBajaNewsletter(supabase, decisionBaja);
       } catch (err) {
         console.error("[resend-webhook] Error dando de baja del newsletter (evento ya archivado):", err instanceof Error ? err.message : err);
+      }
+    }
+
+    // contact.deleted: solo se desvincula el contacto (no es una baja; ver newsletter.ts).
+    const contactoBorrado = decidirDesvinculoContacto(event);
+    if (contactoBorrado) {
+      try {
+        const { error: errDesvinculo } = await supabase
+          .from("newsletter_suscriptores")
+          .update({ resend_contact_id: null })
+          .eq("resend_contact_id", contactoBorrado);
+        if (errDesvinculo) {
+          console.error("[resend-webhook] No se pudo desvincular el contacto borrado (¿migración 20261003193000 sin aplicar?):", errDesvinculo.message);
+        }
+      } catch (err) {
+        console.error("[resend-webhook] Error desvinculando contacto borrado:", err instanceof Error ? err.message : err);
       }
     }
 

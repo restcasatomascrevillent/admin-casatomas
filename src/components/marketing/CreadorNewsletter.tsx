@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Send, Users, Loader2 } from "lucide-react";
+import { Send, Users, Loader2, FlaskConical } from "lucide-react";
 import { SelectorTipoNewsletter, TipoNewsletter } from "./SelectorTipoNewsletter";
 import { PreviewNewsletter } from "./PreviewNewsletter";
 import { SelectorImagenGaleria } from "./SelectorImagenGaleria";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
-import { useEnviarNewsletter } from "@/hooks/useEnviarNewsletter";
+import { useEnviarNewsletter, useEnviarPruebaNewsletter } from "@/hooks/useEnviarNewsletter";
+import { CanalEnvio } from "./SincronizacionResend";
 
 export function CreadorNewsletter() {
   const [tipo, setTipo] = useState<TipoNewsletter | null>(null);
@@ -21,6 +22,7 @@ export function CreadorNewsletter() {
 
   const { totalSuscriptores } = useNewsletterSuscriptores();
   const { mutate: enviarNewsletter, isPending } = useEnviarNewsletter();
+  const { mutate: enviarPrueba, isPending: enviandoPrueba } = useEnviarPruebaNewsletter();
 
   const handleSeleccionarTipo = (nuevoTipo: TipoNewsletter, tituloDefault: string, mensajeDefault: string) => {
     setTipo(nuevoTipo);
@@ -113,6 +115,9 @@ export function CreadorNewsletter() {
                 onSeleccionar={setImagenUrl}
               />
 
+              {/* Canal del envío (NEWSLETTER_CANAL: directo o Broadcast de Resend Marketing) */}
+              <CanalEnvio />
+
               {/* Recipients Count */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
                 <Users className="h-4 w-4" />
@@ -132,6 +137,17 @@ export function CreadorNewsletter() {
                   <Send className="h-4 w-4 mr-2" />
                 )}
                 Enviar Newsletter
+              </Button>
+
+              {/* Prueba por Resend Marketing: solo a la dirección de prueba, nunca a clientes */}
+              <Button
+                className="h-11 w-full"
+                variant="outline"
+                onClick={() => tipo && enviarPrueba({ tipo, titulo, mensaje, imagen_url: imagenUrl })}
+                disabled={!isFormValid || isPending || enviandoPrueba}
+              >
+                {enviandoPrueba ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
+                Enviar prueba por Resend (no llega a clientes)
               </Button>
             </CardContent>
           </Card>

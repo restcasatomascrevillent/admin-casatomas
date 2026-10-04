@@ -73,6 +73,17 @@ verify_jwt = false
 [functions.sync-trafico-web]
 verify_jwt = false
 
+# La llama pg_cron / el Cron del Dashboard una vez al día SIN usuario ni JWT
+# (sincronización diaria del newsletter con Resend Marketing). Mismo caso que
+# sync-trafico-web. Autenticación real, una de dos:
+#   · x-webhook-secret == NEWSLETTER_SYNC_CRON_SECRET (tiempo constante, FALLA
+#     CERRADO -> 500 si la env var falta), o
+#   · JWT de usuario + can_read_section/can_write_section('marketing') (panel).
+# Sin ninguna de las dos cabeceras -> 401. Ver
+# supabase/functions/newsletter-sync-resend/{index.ts,peticion.ts}.
+[functions.newsletter-sync-resend]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
@@ -122,9 +133,9 @@ verify_jwt = true
 [functions.rebuild-webs]
 verify_jwt = true
 
-# JWT de usuario (`auth.getUser()`), sin comprobación de permiso: cualquier
-# usuario autenticado pasa. PENDIENTE: añadirle is_admin/has_section_permission.
-# La anon key NO cuela aquí, porque no tiene usuario asociado.
+# JWT de usuario + can_write_section('marketing') (enviar-newsletter/permiso.ts
+# -> _shared/permiso-marketing.ts). La anon key NO cuela aquí, porque no tiene
+# usuario asociado.
 [functions.enviar-newsletter]
 verify_jwt = true
 
