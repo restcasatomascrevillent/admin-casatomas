@@ -18,6 +18,9 @@
  *     RESERVAS_WEB_CONDICIONES_OBLIGATORIAS=false deja de exigirla.
  *   · Si la migración 20261003143000 no está aplicada (no existe
  *     `condiciones_aceptadas_at`), la reserva se crea igual, sin esa columna.
+ *   · Desde 20261003184500 (doble opt-in) el alta ya no la hace ese trigger
+ *     en el INSERT: la casilla se guarda aquí y el alta llega cuando el
+ *     cliente verifica el email (ver el bloque «Doble opt-in» al final).
  *
  * El trigger es de la BD: aquí solo se comprueba lo que la función guarda en
  * `reservas`, que es lo que lo dispara.

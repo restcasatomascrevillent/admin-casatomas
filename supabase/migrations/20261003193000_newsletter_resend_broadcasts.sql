@@ -8,13 +8,19 @@
 --   20261003143000_reserva_web_prueba_consentimiento.sql
 --   20261003171500_newsletter_baja_automatica.sql   (crea newsletter_registrar_baja)
 -- Si falta la segunda, este fichero se detiene en el paso 0 sin tocar nada.
+-- ORDEN RECOMENDADO (rama integrada): 171500 -> 184500 -> 193000. Este fichero
+-- carga también sin la 184500, pero NO se sincroniza con Resend (botón del
+-- panel, cron o un envío por Broadcast) hasta tener aplicada la 184500: retira
+-- las altas sin email verificado y fusiona duplicados, y lo que se suba antes
+-- se queda en Resend gastando cuota (ver docs/.../newsletter-resend-marketing.md,
+-- sección 9). Probado en PGlite en los dos órdenes.
 --
 -- Pasos (proyecto jeamoczmbfsnwkfjxcyo, desde la carpeta adminpanelct):
 --   1. npx supabase db query --linked -f supabase/migrations/20261003193000_newsletter_resend_broadcasts.sql
 --   2. Comprobar (no deja nada escrito, todo dentro de BEGIN ... ROLLBACK):
 --        npx supabase db query --linked -f supabase/tests/newsletter_resend_broadcasts_test.sql
 --   3. Seguir con secrets, Resend y funciones en
---      docs/funcionalidades/newsletter-resend-marketing.md ("Pasos del dueño, fase 2").
+--      docs/funcionalidades/newsletter-resend-marketing.md (sección 9, «Pasos del dueño»).
 --   Rollback: supabase/rollbacks/20261003193000_newsletter_resend_broadcasts_ROLLBACK.sql
 --
 -- QUÉ HACE Y POR QUÉ (encargo: usar los 1.000 contactos/mes del plan de

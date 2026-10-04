@@ -2,30 +2,36 @@
 
 Comprobación MANUAL en producción, para hacer **una vez** justo después de
 desplegar. Nadie la ejecuta automáticamente. Crea 2 reservas de prueba (y 1
-suscriptor) con TU email y al final las borra. Tarda unos 10 minutos.
+suscriptor) con TU email y al final las borra. Tarda unos 15 minutos.
 
 > Qué demuestra: que la función `reservas-web` desplegada exige
 > `acepta_condiciones`, guarda `consentimiento_newsletter` y
-> `condiciones_aceptadas_at`, y que el trigger de la base de datos da de alta
-> en `newsletter_suscriptores` solo a quien marcó la casilla.
+> `condiciones_aceptadas_at`, y que el alta en `newsletter_suscriptores` es de
+> **doble opt-in** (migración 20261003184500): al reservar NO se da de alta a
+> nadie; el alta llega cuando el cliente pulsa «Confirmo» en el correo de su
+> reserva (`reservas.email_verificado_at`), y solo si marcó la casilla.
 
 ## 0. Antes de empezar
 
 Orden de despliegue (si algo de esto falta, para aquí):
 
-1. Migración aplicada:
-   `npx supabase db query --linked -f supabase/migrations/20261003143000_reserva_web_prueba_consentimiento.sql`
+1. Migraciones aplicadas, en el orden de
+   `docs/funcionalidades/newsletter-resend-marketing.md` (sección 9):
+   20261003143000 (ya aplicada) → 20261003171500 → 20261003184500.
 2. Test SQL en verde (no deja datos, todo va en `BEGIN … ROLLBACK`):
    `npx supabase db query --linked -f supabase/tests/consentimiento_newsletter.test.sql`
-   → si termina **sin `ERROR`**, ha pasado.
-3. Función desplegada: `npx supabase functions deploy reservas-web`
+   → si termina **sin `ERROR`**, ha pasado (exige 184500: A0 lo comprueba).
+3. Funciones desplegadas: `npx supabase functions deploy reservas-web emails-reserva`
+   (`emails-reserva` es la que marca el email como verificado cuando el cliente
+   pulsa «Confirmo»).
 4. El interruptor de transición **NO** está puesto (si no, la casilla no se exige):
    `npx supabase secrets list` → no debe aparecer `RESERVAS_WEB_CONDICIONES_OBLIGATORIAS`.
    (Si aparece y la web ya manda la casilla: `npx supabase secrets unset RESERVAS_WEB_CONDICIONES_OBLIGATORIAS`.)
 
 Hazlo en un momento tranquilo: las reservas de prueba aparecen unos minutos
 como «pendiente» en el panel (con la campana). El canal web NO manda correo
-al cliente en el alta, así que no recibirás nada en tu buzón.
+al cliente en el alta; el único correo que recibirás es el «Confirma tu
+reserva» del paso 6, cuando la verifiques tú desde el panel.
 
 ## 1. Variables
 
@@ -70,9 +76,9 @@ curl -sS -w "\nHTTP %{http_code}\n" -X POST "$URL_RW/crear" \
 Esperado: `HTTP 400` y `"error":"condiciones_no_aceptadas"`.
 
 > Si sale **201**, el interruptor está puesto (paso 0.4) o la función
-> desplegada es la antigua. Para, y borra esa reserva con el paso 6.
+> desplegada es la antigua. Para, y borra esa reserva con el paso 8.
 
-## 4. Las dos casillas marcadas → 201 + alta en la newsletter
+## 4. Las dos casillas marcadas → 201 (y todavía SIN alta: falta confirmar el email)
 
 ```bash
 curl -sS -w "\nHTTP %{http_code}\n" -X POST "$URL_RW/crear" \
@@ -92,23 +98,38 @@ curl -sS -w "\nHTTP %{http_code}\n" -X POST "$URL_RW/crear" \
 
 Esperado: `HTTP 201`.
 
-## 6. Comprobación en la base de datos
+## 6. Confirmar el email (doble opt-in)
+
+1. Comprueba primero con el SQL del paso 7 que **todavía no hay ningún
+   suscriptor** de los dos emails (la casilla sola no da de alta).
+2. En el panel, Reservas → «SMOKE consentimiento 1» → **Verificar/Aceptar**.
+   Llega a `EMAIL_SMOKE_1` el correo «Confirma tu reserva»: pulsa **«Confirmo»**.
+3. Haz lo mismo con «SMOKE consentimiento 2» (pulsa «Confirmo» en el correo de
+   `EMAIL_SMOKE_2`): verifica el email, pero como no marcó la casilla, no se le
+   da de alta.
+4. Ojo: si pasas una reserva a «Confirmada» a mano desde el panel, NO cuenta
+   como email verificado y no hay alta (es lo esperado).
+
+## 7. Comprobación en la base de datos
 
 Guarda esto como `smoke-check.sql` (cambia los dos emails) y ejecútalo con
 `npx supabase db query --linked -f smoke-check.sql` (o pégalo en el SQL editor):
 
 ```sql
 -- Reservas de prueba: deben salir 2 (la del paso 3 NO existe).
-select id, nombre, email, canal, estado, consentimiento_newsletter, condiciones_aceptadas_at, created_at
+select id, nombre, email, canal, estado, consentimiento_newsletter, condiciones_aceptadas_at,
+       email_verificado_at, created_at
 from public.reservas
 where notas_cliente = 'SMOKE-CONSENTIMIENTO'
 order by created_at;
 
--- Suscriptores: debe salir SOLO el email 1, activo, origen_alta = 'reserva_web',
--- fecha_consentimiento = created_at de su reserva y reserva_consentimiento_id = id de su reserva.
+-- Suscriptores: antes del paso 6.2, NINGUNO. Después, SOLO el email 1, activo,
+-- origen_alta = 'reserva_web', fecha_consentimiento = created_at de su reserva,
+-- reserva_consentimiento_id = id de su reserva y fecha_verificacion_email = email_verificado_at.
 select s.email, s.activo, s.origen_alta, s.fecha_consentimiento, s.reserva_consentimiento_id,
-       r.id as reserva_id, r.created_at as reserva_created_at,
-       (s.reserva_consentimiento_id = r.id and s.fecha_consentimiento = r.created_at) as prueba_ok
+       s.fecha_verificacion_email, r.id as reserva_id, r.created_at as reserva_created_at,
+       (s.reserva_consentimiento_id = r.id and s.fecha_consentimiento = r.created_at
+        and s.fecha_verificacion_email = r.email_verificado_at) as prueba_ok
 from public.newsletter_suscriptores s
 left join public.reservas r on r.id = s.reserva_consentimiento_id
 where s.email in ('tuemail+smoke-consent-1@gmail.com', 'tuemail+smoke-consent-2@gmail.com');
@@ -118,12 +139,13 @@ Debe verse:
 
 | comprobación | esperado |
 |---|---|
-| reservas `SMOKE-CONSENTIMIENTO` | 2 filas, `canal = web`, `estado = pendiente` |
-| «SMOKE consentimiento 1» | `consentimiento_newsletter = true`, `condiciones_aceptadas_at` con fecha |
+| reservas `SMOKE-CONSENTIMIENTO` | 2 filas, `canal = web`; `estado = pendiente` antes del paso 6 y `confirmada` después |
+| «SMOKE consentimiento 1» | `consentimiento_newsletter = true`, `condiciones_aceptadas_at` con fecha, `email_verificado_at` con fecha tras pulsar «Confirmo» |
 | «SMOKE consentimiento 2» | `consentimiento_newsletter = false`, `condiciones_aceptadas_at` con fecha |
-| suscriptores | 1 fila (email 1), `activo = true`, `origen_alta = reserva_web`, `prueba_ok = true` |
+| suscriptores antes del paso 6.2 | 0 filas |
+| suscriptores después | 1 fila (email 1), `activo = true`, `origen_alta = reserva_web`, `prueba_ok = true` |
 
-## 7. Limpieza (obligatoria)
+## 8. Limpieza (obligatoria)
 
 Guarda como `smoke-limpieza.sql` (cambia los dos emails) y ejecútalo igual.
 Va en transacción y comprueba que solo borra lo de la prueba:
@@ -165,7 +187,7 @@ end $$;
 commit;
 ```
 
-## 8. (Opcional) La web de verdad
+## 9. (Opcional) La web de verdad
 
 Con casa-tomas-story desplegado, en la portada:
 
@@ -177,14 +199,15 @@ Con casa-tomas-story desplegado, en la portada:
    casilla NO se marca.
 4. Si haces una reserva real de prueba, mira el `Payload` de `crear`:
    `acepta_condiciones: true` y `consentimiento_newsletter: true/false` (booleanos,
-   no texto). Luego bórrala con el paso 7 (cambiando el filtro por su email).
+   no texto). Luego bórrala con el paso 8 (cambiando el filtro por su email).
 
 ## Si algo falla
 
 | síntoma | causa probable | qué hacer |
 |---|---|---|
-| paso 3 da 201 | interruptor `RESERVAS_WEB_CONDICIONES_OBLIGATORIAS=false` puesto, o función antigua | `secrets list` / redeploy; borrar con el paso 7 |
-| paso 4 da 201 pero no hay suscriptor | trigger desactivado o función del trigger antigua | volver a ejecutar el test SQL (A0 lo dice) |
+| paso 3 da 201 | interruptor `RESERVAS_WEB_CONDICIONES_OBLIGATORIAS=false` puesto, o función antigua | `secrets list` / redeploy; borrar con el paso 8 |
+| hay suscriptor justo después del paso 4 (sin confirmar) | 184500 sin aplicar (sigue el alta en el INSERT) | aplicar 171500 y 184500; volver a ejecutar el test SQL |
+| tras pulsar «Confirmo» no hay suscriptor | `email_verificado_at` vacío: `emails-reserva`/`reservas-web` sin desplegar, o la reserva se confirmó a mano | redeploy de las dos funciones y repetir con una reserva nueva; si `email_verificado_at` tiene fecha, ejecutar el test SQL (A0 dice si faltan los triggers) |
 | `condiciones_aceptadas_at` NULL con la casilla marcada | migración sin aplicar (la función guarda sin esa columna y lo avisa en logs: «Falta la columna reservas.condiciones_aceptadas_at») | aplicar la migración |
 | paso 4/5 da 409/422 | sin hueco, día cerrado o límite por teléfono/email | otra fecha/hora (paso 2) |
 | 401 | `ANON_KEY` mal copiada | revisar la clave pública |

@@ -29,8 +29,10 @@
 //
 // NUNCA reactiva: ningún evento de Resend pone activo = true (contact.updated
 // con unsubscribed = false se ignora). La única vía de alta/reactivación es el
-// consentimiento nuevo de una reserva (trigger agregar_suscriptor_al_reservar_
-// consentida) y la migración 20261003171500 lo impone en la base de datos.
+// consentimiento nuevo de una reserva con el email verificado por el cliente
+// (doble opt-in: triggers newsletter_alta_reserva_verificada_*, migración
+// 20261003184500) y las migraciones 20261003171500/184500 lo imponen en la
+// base de datos.
 // ============================================================================
 
 export type OrigenBajaWebhook = "queja_spam" | "rebote_permanente" | "suprimido_resend" | "resend_baja_nativa";
