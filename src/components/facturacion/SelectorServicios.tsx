@@ -1,4 +1,9 @@
-import { Check, Plus, Package } from "lucide-react";
+import type { ReactNode } from "react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, useSortable, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
+import { Check, Plus, Package, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -36,19 +41,44 @@ export function SelectorServicios({catalogo,lineas,agregar}: Props) {
   </CardContent></Card>;
 }
 
+function ServicioOrdenable({id,nombre,index,total,busy,mover,children}: {id:string;nombre:string;index:number;total:number;busy:boolean;mover:(from:number,to:number)=>void;children:ReactNode}) {
+  const {attributes,listeners,setNodeRef,transform,transition,isDragging} = useSortable({id,disabled:busy});
+  return <div ref={setNodeRef} style={{transform:CSS.Transform.toString(transform),transition}} className={`relative rounded-lg border bg-background p-3 ${isDragging ? "z-20 shadow-lg ring-2 ring-primary/30" : ""}`}>
+    <div className="mb-3 flex items-center gap-2">
+      <Button type="button" variant="ghost" size="icon" disabled={busy} {...attributes} {...listeners} aria-label={"Arrastrar " + nombre} className="h-10 w-10 shrink-0 touch-none cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{index+1}. {nombre}</span>
+      <Button type="button" variant="outline" size="icon" disabled={busy || index===0} aria-label={"Subir " + nombre} onClick={()=>mover(index,index-1)}><ArrowUp className="h-4 w-4" /></Button>
+      <Button type="button" variant="outline" size="icon" disabled={busy || index===total-1} aria-label={"Bajar " + nombre} onClick={()=>mover(index,index+1)}><ArrowDown className="h-4 w-4" /></Button>
+    </div>
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+  </div>;
+}
+
 export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFacturacion;cambiar:(c:CatalogoFacturacion)=>void;busy:boolean}) {
+  const sensors = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}),useSensor(KeyboardSensor,{coordinateGetter:sortableKeyboardCoordinates}));
+  const mover = (from:number,to:number) => {
+    if(busy || from<0 || to<0 || from>=catalogo.productos.length || to>=catalogo.productos.length || from===to)return;
+    cambiar({...catalogo,productos:arrayMove(catalogo.productos,from,to)});
+  };
   const producto = (id:string, v:Partial<CatalogoFacturacion["productos"][number]>) => cambiar({...catalogo,productos:catalogo.productos.map(p=>p.id===id?{...p,...v}:p)});
   const selectClass = "h-10 w-full rounded-md border border-input bg-background px-2 text-sm";
   return <fieldset disabled={busy} className="min-w-0 space-y-5">
     <Card><CardHeader><CardTitle className="text-base">Tarifas de módulos y servicios</CardTitle>
       <p className="text-sm text-muted-foreground">Define tus precios una vez. Se copiarán al seleccionar un módulo o paquete en una nueva factura.</p>
+      <p className="text-xs text-muted-foreground">Arrastra desde el asa o usa las flechas para mover los módulos arriba y abajo. Pulsa «Guardar catálogo y tarifas» para conservar el orden.</p>
     </CardHeader><CardContent className="space-y-3">
-      {catalogo.productos.map(p=><div key={p.id} className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({active,over})=>{
+        if(over)mover(catalogo.productos.findIndex(p=>p.id===active.id),catalogo.productos.findIndex(p=>p.id===over.id));
+      }}>
+      <SortableContext items={catalogo.productos.map(p=>p.id)} strategy={verticalListSortingStrategy}>
+      <div className="space-y-3">
+      {catalogo.productos.map((p,index)=><ServicioOrdenable key={p.id} id={p.id} nombre={p.nombre} index={index} total={catalogo.productos.length} busy={busy} mover={mover}>
         <label className="text-xs">Servicio<Input aria-label={"Nombre de " + p.nombre} maxLength={160} value={p.nombre} onChange={e=>producto(p.id,{nombre:e.target.value})} className="mt-1" /></label>
         <label className="text-xs">Precio (€)<Input aria-label={"Precio de " + p.nombre} type="number" min={0} max={1000000} step="0.01" value={p.precio} onChange={e=>producto(p.id,{precio:Number(e.target.value)})} className="mt-1" /></label>
         <label className="text-xs">Periodicidad<select className={selectClass+" mt-1"} value={p.periodicidad} onChange={e=>producto(p.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v=><option key={v}>{v}</option>)}</select></label>
         <label className="text-xs">Tipo<select className={selectClass+" mt-1"} value={p.categoria} onChange={e=>producto(p.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v=><option key={v}>{v}</option>)}</select></label>
-      </div>)}
+      </ServicioOrdenable>)}
+      </div></SortableContext></DndContext>
       <Button type="button" variant="outline" disabled={catalogo.productos.length>=100} onClick={()=>cambiar({...catalogo,productos:[...catalogo.productos,{id:crypto.randomUUID(),nombre:"Nuevo servicio",categoria:"Módulo",precio:0,periodicidad:"Mensual"}]})}><Plus className="mr-2 h-4 w-4" />Añadir servicio al catálogo</Button>
     </CardContent></Card>
     <Card><CardHeader><CardTitle className="text-base">Paquetes</CardTitle>
