@@ -81,9 +81,9 @@
 //
 // FUERA DE ESTA FUNCIÓN, a propósito y tal como está hoy:
 //   · «Dar mesa» lo decide `resolverSaltoAsignacion` (saltoAsignacion.ts), módulo
-//     compartido con la franja «Pendientes de mesa» de Hoy: Lista siempre lo
+//     compartido con el kanban de Hoy (menú «⋮» de las tarjetas «Sin mesa»): Lista siempre lo
 //     pinta, habilitado si la reserva tiene sala y fecha y no está cancelada, sin
-//     mirar `canEdit`; la tarjeta del kanban no lo tiene.
+//     mirar `canEdit`.
 //   · «Gestionar» es de las SOLICITUDES del bot; en una reserva esa ranura es
 //     ahora «editar».
 //   · «Llamar» (enlace tel:) del menú de la tarjeta.

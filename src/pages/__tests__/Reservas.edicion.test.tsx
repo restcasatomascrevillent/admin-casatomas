@@ -1,13 +1,11 @@
 /**
- * Página /reservas: el editor de reservas (2026-09-30) llega a la pestaña «Hoy»
- * (las pastillas de «Pendientes de mesa») desde aquí, igual que `onAsignarMesa` y
- * `onEspacioClick`: la página tiene el diálogo y el permiso de edición de la
- * sección «reservas», y se los pasa a `VistaHoy` por props.
+ * Página /reservas: el permiso de edición de la sección «reservas» gobierna «Nueva Reserva»
+ * (2026-10-01), la insignia de solicitudes cuenta lo mismo que la lista, y el alta manual no cambia:
+ * `datosNuevaReserva` se memoiza con `useMemo([openDialog])` para que el formulario no reescriba la
+ * fecha en cada render, y eso NO se puede romper.
  *
- * También se comprueba que el alta manual no ha cambiado: `datosNuevaReserva` se
- * memoiza con `useMemo([openDialog])` para que el formulario no reescriba la
- * fecha en cada render, y eso NO se puede romper. Y que «Nueva Reserva» pide el
- * permiso de edición de «reservas» (2026-10-01).
+ * (04/10/2026: «Hoy» ya no recibe callbacks de edición ni de asignación —se retiró la franja
+ * «Pendientes de mesa»; el kanban lleva su propio editor—, así que `VistaHoy` se monta sin props.)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -15,8 +13,6 @@ import { MemoryRouter } from "react-router-dom";
 
 const h = vi.hoisted(() => ({
   canEdit: true as boolean,
-  editarReserva: vi.fn(),
-  vistaHoy: vi.fn(),
   formulario: vi.fn(),
   solicitudes: [] as Array<Record<string, unknown>>,
 }));
@@ -24,16 +20,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("@/components/reservas/VistaHoy", () => ({
-  VistaHoy: (props: { onEditarReserva?: (id: string) => void }) => {
-    h.vistaHoy(props);
-    return (
-      <button type="button" onClick={() => props.onEditarReserva?.("res-1")}>
-        lápiz de una pastilla
-      </button>
-    );
-  },
-}));
+vi.mock("@/components/reservas/VistaHoy", () => ({ VistaHoy: () => null }));
 vi.mock("@/components/reservas/FormularioReserva", () => ({
   FormularioReserva: (props: unknown) => {
     h.formulario(props);
@@ -60,12 +47,6 @@ vi.mock("@/hooks/useUserRole", () => ({
     loading: false,
   }),
 }));
-vi.mock("@/hooks/useEdicionReserva", () => ({
-  useEdicionReserva: () => ({
-    editarReserva: h.editarReserva,
-    dialogoEdicion: <div data-testid="dialogo-edicion" />,
-  }),
-}));
 
 import Reservas from "@/pages/Reservas";
 
@@ -76,8 +57,6 @@ function montar() {
     </MemoryRouter>,
   );
 }
-
-const ultimasProps = () => h.vistaHoy.mock.calls.at(-1)![0] as { onEditarReserva?: (id: string) => void; puedeEditar?: boolean };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -105,32 +84,6 @@ describe("Reservas (página) · insignia de solicitudes sin resolver", () => {
     montar();
 
     expect(screen.queryByLabelText(/sin resolver/)).not.toBeInTheDocument();
-  });
-});
-
-describe("Reservas (página) · el editor llega a «Hoy»", () => {
-  it("VistaHoy recibe el callback de editar y el permiso, y al llamarlo abre el editor de esa reserva", () => {
-    montar();
-
-    expect(typeof ultimasProps().onEditarReserva).toBe("function");
-    expect(ultimasProps().puedeEditar).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: "lápiz de una pastilla" }));
-    expect(h.editarReserva).toHaveBeenCalledTimes(1);
-    expect(h.editarReserva).toHaveBeenCalledWith("res-1");
-  });
-
-  it("sin permiso de edición sobre «reservas» se lo dice a VistaHoy (los lápices salen deshabilitados)", () => {
-    h.canEdit = false;
-    montar();
-
-    expect(ultimasProps().puedeEditar).toBe(false);
-  });
-
-  it("pinta el diálogo de edición que devuelve el hook (una vez)", () => {
-    montar();
-
-    expect(screen.getAllByTestId("dialogo-edicion")).toHaveLength(1);
   });
 });
 

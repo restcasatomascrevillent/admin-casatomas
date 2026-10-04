@@ -30,7 +30,7 @@
 // LA URL
 //   El plano apunta `?fecha=&turno=` en la URL al atender la reserva señalada. Dentro del
 //   kanban eso no debe quedarse pegado: al cerrar se devuelve la URL a como estaba (si no,
-//   la próxima vez que se abra el plano de una sala desde «Pendientes de mesa» saldría con el
+//   la próxima vez que se abra el plano de una sala desde «Mesas» saldría con el
 //   turno de la última reserva movida y no con el del reloj).
 //
 // CERRAR
@@ -138,7 +138,7 @@ export function ElegirMesaDialog({ reserva, fecha, espacioId, espacioNombre, onC
     if (mesas.isError) {
       setFase("descartado");
       toast.error(
-        `No se pudo abrir el mapa de ${espacioNombre}. La reserva ya está en esa sala: puedes darle mesa desde «Pendientes de mesa».`,
+        `No se pudo abrir el mapa de ${espacioNombre}. La reserva ya está en esa sala: puedes darle mesa desde su tarjeta del kanban («⋮» → «Dar mesa»).`,
       );
       onCerrar();
     } else if ((mesas.data?.length ?? 0) === 0) {

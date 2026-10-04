@@ -79,7 +79,7 @@ export interface AsignacionConDetalles extends AsignacionMesa {
  *
  * `refresco` (opcional, al final por lo mismo): relectura periódica de respaldo
  * mientras realtime no entrega `asignaciones_mesa` (`REFRESCO_PERIODICO` de
- * realtimeCanal.ts). La piden «Hoy» (kanban y «Pendientes de mesa») y el modo
+ * realtimeCanal.ts). La piden «Hoy» (el kanban, para marcar «Sin mesa») y el modo
  * servicio, que pueden pasarse horas a la vista sin que cambie el foco.
  */
 export function useAsignacionesMesa(

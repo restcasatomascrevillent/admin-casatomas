@@ -657,8 +657,8 @@ describe("Reservado como sala PRIVADA: una reserva se queda la sala entera", () 
   });
 });
 
-describe("Reservado como sala PRIVADA: fuera de aforo", () => {
-  it("su columna y sus reservas llevan «Fuera de aforo»; las demás columnas no, y la suya ya no enseña barras de aforo", async () => {
+describe("Reservado como sala PRIVADA: sin columna en el kanban (04/10/2026)", () => {
+  it("no pinta columna del Reservado: quien está en él no sale en ninguna columna (ni en «Sin asignar»); las demás siguen", async () => {
     h.reservadoPrivado = true;
     h.almacen.reservas = [
       reserva("r-ana", "confirmada", "Ana"),
@@ -668,18 +668,28 @@ describe("Reservado como sala PRIVADA: fuera de aforo", () => {
     montar();
     await conTablero();
 
-    const reservado = screen.getByRole("region", { name: "Columna Reservado" });
-    // Una en la cabecera de la columna y otra en la tarjeta de Berta.
-    expect(within(reservado).getAllByTestId("etiqueta-fuera-de-aforo")).toHaveLength(2);
-    expect(within(reservado).getAllByText("Fuera de aforo")).toHaveLength(2);
-    // El Reservado no mide su aforo por turno (está fuera de aforo): sin barras de comida/cena.
-    expect(within(reservado).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Columna Reservado" })).not.toBeInTheDocument();
+    // Berta está en el Reservado: no se pinta en ninguna columna (se ve en el aviso desplegable de «Hoy»).
+    expect(screen.queryByText("Berta")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+    const salon = within(screen.getByRole("region", { name: "Columna Salón" }));
+    expect(salon.getByText("Carla")).toBeInTheDocument();
+    expect(salon.getByText("Ana")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Columna Sin asignar" })).queryByText("Berta")).not.toBeInTheDocument();
+  });
 
-    const salon = screen.getByRole("region", { name: "Columna Salón" });
-    expect(within(salon).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
-    expect(within(salon).getAllByRole("progressbar").length).toBeGreaterThan(0);
-    const sinAsignar = screen.getByRole("region", { name: "Columna Sin asignar" });
-    expect(within(sinAsignar).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  it("«Mover a…» sigue ofreciendo el Reservado aunque no tenga columna, y la reserva sale de la columna al moverla", async () => {
+    h.reservadoPrivado = true;
+    h.almacen.reservas = [reserva("r-ana", "confirmada", "Ana")];
+    montar();
+    await conTablero();
+
+    await moverA("Ana", /^Reservado/);
+
+    await mapaDe("Ana", "Reservado");
+    expect(h.almacen.escrituras).toEqual([{ tabla: "reservas", payload: { espacio_id: "reservado" }, ids: ["r-ana"] }]);
+    // Ya no está en «Sin asignar» ni en ninguna otra columna: vive en el Reservado.
+    await waitFor(() => expect(screen.queryByText("Ana")).not.toBeInTheDocument());
   });
 
   it("si el Reservado no es privado (sin el flag), no lleva etiqueta", async () => {

@@ -21,6 +21,7 @@ import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
 import { marcaDeEspacio, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
 import { avisosSalasPrivadas, estaFueraDeAforo, esSalaPrivada, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
 import { AvisoSalasPrivadas } from "@/components/reservas/AvisoSalasPrivadas";
+import type { ReservaServicio } from "@/lib/reservas/servicioSala";
 
 /**
  * Aforo de Casa Tomás: suma de sus salas activas SIN las privadas (150: el
@@ -265,7 +266,7 @@ export function ReservasHoy() {
             + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
           </p>
           {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. */}
-          <AvisoSalasPrivadas avisos={avisosPrivadas} />
+          <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={todasReservas as unknown as ReservaServicio[] | undefined} />
         </div>
 
         {/* Desglose por turno */}
