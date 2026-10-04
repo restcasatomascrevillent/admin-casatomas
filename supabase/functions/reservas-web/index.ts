@@ -123,7 +123,10 @@ import {
   esColumnaInexistente,
   camposConsentimientoSolicitud,
   faltaColumnaConsentimientoSolicitud,
+  interpretarSondeoDobleOptin,
+  consentimientoNewsletterParaGuardar,
   type ConsentimientosReserva,
+  type EstadoDobleOptin,
 } from "./reglas.ts";
 
 // ------------------------------------------------------------
@@ -297,6 +300,27 @@ interface SolicitudPendienteInput {
    * newsletter pasa a la reserva que salga de la solicitud. */
   consentimientos?: ConsentimientosReserva;
 }
+// ¿Está aplicada 20261003184500 (doble opt-in)? Ver la salvaguarda en
+// reglas.ts: sin ella, guardar la casilla del newsletter en la reserva daría
+// de alta al instante sin verificar el email (trigger antiguo). Solo se
+// recuerda el "sí" (la columna no desaparece); un "no" o un fallo se vuelve a
+// comprobar en la siguiente reserva, así que aplicar la migración surte efecto
+// sin redesplegar.
+let dobleOptinConfirmado = false;
+async function estadoDobleOptin(): Promise<EstadoDobleOptin> {
+  if (dobleOptinConfirmado) return "activo";
+  try {
+    const { error } = await supabase.from("reservas").select("email_verificado_at").limit(0);
+    const estado = interpretarSondeoDobleOptin(error);
+    if (estado === "activo") dobleOptinConfirmado = true;
+    else console.error(`[CREAR] Doble opt-in ${estado} (¿migración 20261003184500 sin aplicar?): la casilla del newsletter NO se guarda en la reserva.`, error?.code, error?.message);
+    return estado;
+  } catch (err) {
+    console.error("[CREAR] No se pudo comprobar el doble opt-in; la casilla del newsletter NO se guarda:", (err as Error)?.message || err);
+    return "desconocido";
+  }
+}
+
 async function registrarSolicitudPendiente(input: SolicitudPendienteInput): Promise<void> {
   try {
     const fila: Record<string, unknown> = {
@@ -1481,7 +1505,11 @@ async function handleCrear(req: Request): Promise<Response> {
     // fecha del consentimiento al newsletter es `created_at` de esta misma
     // fila; la de la aceptación de las condiciones va en su propia columna
     // porque, con el interruptor de transición apagado, puede faltar.
-    consentimiento_newsletter: consentimientos.consentimientoNewsletter,
+    // Solo con el doble opt-in activo (ver estadoDobleOptin / reglas.ts): si
+    // no, el trigger antiguo suscribiría el email sin verificarlo.
+    consentimiento_newsletter: consentimientos.consentimientoNewsletter
+      ? consentimientoNewsletterParaGuardar(consentimientos, await estadoDobleOptin())
+      : false,
     condiciones_aceptadas_at: consentimientos.aceptaCondiciones ? new Date().toISOString() : null,
   };
 

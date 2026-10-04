@@ -26,6 +26,8 @@ import {
   camposConsentimientoSolicitud,
   faltaColumnaConsentimientoSolicitud,
   ERROR_CONDICIONES_NO_ACEPTADAS,
+  interpretarSondeoDobleOptin,
+  consentimientoNewsletterParaGuardar,
 } from "../reglas.ts";
 import { NEGOCIOS } from "../plantillas.ts";
 
@@ -230,5 +232,23 @@ describe("camposConsentimientoSolicitud (doble opt-in, migración 20261003184500
     expect(faltaColumnaConsentimientoSolicitud({ code: "PGRST204", message: "Could not find the 'condiciones_aceptadas_at' column of 'solicitudes_pendientes' in the schema cache" })).toBe(true);
     expect(faltaColumnaConsentimientoSolicitud({ code: "PGRST204", message: "Could not find the 'marca' column of 'solicitudes_pendientes' in the schema cache" })).toBe(false);
     expect(faltaColumnaConsentimientoSolicitud(null)).toBe(false);
+  });
+});
+
+describe("salvaguarda del doble opt-in (sin 20261003184500 el trigger antiguo suscribiría sin verificar)", () => {
+  it("interpretarSondeoDobleOptin: sin error = activo; columna inexistente = inactivo; otro error = desconocido", () => {
+    expect(interpretarSondeoDobleOptin(null)).toBe("activo");
+    expect(interpretarSondeoDobleOptin({ code: "42703", message: "column reservas.email_verificado_at does not exist" })).toBe("inactivo");
+    expect(interpretarSondeoDobleOptin({ code: "PGRST204", message: "Could not find the 'email_verificado_at' column of 'reservas'" })).toBe("inactivo");
+    expect(interpretarSondeoDobleOptin({ code: "500", message: "fetch failed" })).toBe("desconocido");
+  });
+
+  it("consentimientoNewsletterParaGuardar: true SOLO con la casilla marcada y el doble opt-in confirmado", () => {
+    const si = { aceptaCondiciones: true, consentimientoNewsletter: true };
+    const no = { aceptaCondiciones: true, consentimientoNewsletter: false };
+    expect(consentimientoNewsletterParaGuardar(si, "activo")).toBe(true);
+    expect(consentimientoNewsletterParaGuardar(si, "inactivo")).toBe(false);
+    expect(consentimientoNewsletterParaGuardar(si, "desconocido")).toBe(false);
+    expect(consentimientoNewsletterParaGuardar(no, "activo")).toBe(false);
   });
 });

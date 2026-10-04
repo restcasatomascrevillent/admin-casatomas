@@ -27,6 +27,11 @@ Orden de despliegue (si algo de esto falta, para aquí):
 4. El interruptor de transición **NO** está puesto (si no, la casilla no se exige):
    `npx supabase secrets list` → no debe aparecer `RESERVAS_WEB_CONDICIONES_OBLIGATORIAS`.
    (Si aparece y la web ya manda la casilla: `npx supabase secrets unset RESERVAS_WEB_CONDICIONES_OBLIGATORIAS`.)
+5. Orden obligatorio: las funciones se despliegan DESPUÉS de 171500 y 184500
+   (antes, el trigger antiguo de 20261003143000 suscribiría en el INSERT sin
+   verificar; `reservas-web` trae una salvaguarda, pero no se cuenta con ella).
+   Y la web publicada tiene que mandar `acepta_condiciones` (casa-tomas-story
+   con las casillas): si no, todas las reservas web dan 400.
 
 Hazlo en un momento tranquilo: las reservas de prueba aparecen unos minutos
 como «pendiente» en el panel (con la campana). El canal web NO manda correo

@@ -100,14 +100,16 @@ export class ConsultaFalsa implements PromiseLike<Resultado> {
   private carga: Fila | Fila[] | null = null;
   private devolver = false;
   private modo: "lista" | "una" | "unaOninguna" = "lista";
+  private columnas: string[] = [];
 
   constructor(
     private db: BaseFalsa,
     private nombre: string,
   ) {}
 
-  select(_columnas?: string) {
+  select(columnas?: string) {
     if (this.op !== "select") this.devolver = true;
+    else if (columnas) this.columnas = columnas.split(",").map((c) => c.trim());
     return this;
   }
   insert(v: Fila | Fila[]) {
@@ -188,6 +190,13 @@ export class ConsultaFalsa implements PromiseLike<Resultado> {
       const nuevas = entrada.map((v) => ({ id: this.db.nuevoId(), created_at: new Date().toISOString(), ...v }));
       filas.push(...nuevas);
       return this.forma(this.devolver ? nuevas.map((n) => ({ ...n })) : null);
+    }
+    if (this.op === "select") {
+      // Leer una columna que "no existe" (migración sin aplicar): 42703, como Postgres vía PostgREST.
+      const inexistente = (this.db.columnasInexistentes[this.nombre] ?? []).find((c) => this.columnas.includes(c));
+      if (inexistente) {
+        return { data: null, error: { code: "42703", message: `column ${this.nombre}.${inexistente} does not exist` } };
+      }
     }
     const seleccion = filas.filter((f) => this.filtros.every((cumple) => cumple(f)));
     if (this.op === "update") {

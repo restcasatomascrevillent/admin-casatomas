@@ -27,9 +27,20 @@ set client_encoding = 'UTF8';
 --      hace falta --project-ref):
 --      npx supabase functions deploy emails-reserva reservas-web --project-ref jeamoczmbfsnwkfjxcyo
 --      Mientras no se desplieguen, NADIE se da de alta (nadie marca
---      email_verificado_at): es el lado seguro. Al revés (funciones antes que
---      la migración) tampoco rompe nada: la marca de verificación falla en
---      silencio (columna inexistente) y la reserva se confirma igual.
+--      email_verificado_at): es el lado seguro.
+--      ORDEN OBLIGATORIO: 171500 -> 184500 -> desplegar funciones. NUNCA
+--      reservas-web antes que esta migración: hasta aplicarla sigue vivo el
+--      trigger agregar_suscriptor_al_reservar_consentida (20261003143000, ya
+--      en producción), que da de alta EN EL INSERT de la reserva, sin
+--      verificar el email (un email ajeno escrito en la web quedaría
+--      suscrito). Salvaguarda en código (revisión final 2026-10-04):
+--      reservas-web solo guarda la casilla si existe
+--      reservas.email_verificado_at (se crea en esta misma transacción, que
+--      borra ese trigger); sin ella la casilla se pierde (lado seguro). Aun
+--      así, el orden es el de arriba: la salvaguarda es una red, no el plan.
+--      emails-reserva antes que la migración no rompe nada: la marca de
+--      verificación falla en silencio (columna inexistente) y la reserva se
+--      confirma igual (ese clic no dará alta nunca).
 --   5. Comprobar:
 --        select tgname from pg_trigger where tgrelid = 'public.reservas'::regclass
 --          and (tgname like 'newsletter_%' or tgname like 'reservas_proteger_%' or tgname like 'agregar_suscriptor%');

@@ -231,3 +231,45 @@ export function faltaColumnaConsentimientoSolicitud(
 ): boolean {
   return COLUMNAS_CONSENTIMIENTO_SOLICITUD.some((c) => esColumnaInexistente(error, c));
 }
+
+// ============================================================================
+// SALVAGUARDA DEL DOBLE OPT-IN (revisión final, 2026-10-04)
+// ============================================================================
+// Mientras la migración 20261003184500 NO esté aplicada sigue vivo el trigger
+// `agregar_suscriptor_al_reservar_consentida` (20260926062009, redefinido en
+// 20261003143000, ya en producción): da de alta en el newsletter EN EL MISMO
+// INSERT de una reserva con `consentimiento_newsletter = true`, sin verificar
+// el email — cualquiera podría suscribir un email ajeno desde la web.
+//
+// Por eso esta función solo guarda la casilla en la BD cuando ha comprobado
+// que el doble opt-in está activo. La señal es la columna
+// `reservas.email_verificado_at`: la crea 20261003184500 en la MISMA
+// transacción (begin/commit propios) que borra el trigger antiguo, así que
+// "existe la columna" equivale a "ya no hay alta sin verificar". Si la
+// comprobación no es concluyente (error de red, etc.) tampoco se guarda: se
+// pierde una casilla (lado seguro) antes que suscribir a alguien sin verificar.
+// (Tras un ROLLBACK de 20261003184500 la columna queda y vuelve el trigger
+// antiguo: es la vuelta atrás documentada en ese rollback.)
+// ============================================================================
+
+export type EstadoDobleOptin = "activo" | "inactivo" | "desconocido";
+
+/** Interpreta el sondeo `select email_verificado_at ... limit 0` sobre reservas. */
+export function interpretarSondeoDobleOptin(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): EstadoDobleOptin {
+  if (!error) return "activo";
+  const mensaje = error.message ?? "";
+  if (error.code === "42703" || (mensaje.includes("email_verificado_at") && /does not exist|could not find/i.test(mensaje))) {
+    return "inactivo";
+  }
+  return "desconocido";
+}
+
+/** Valor de `consentimiento_newsletter` que se escribe en la reserva: solo `true` con el doble opt-in confirmado. */
+export function consentimientoNewsletterParaGuardar(
+  consentimientos: ConsentimientosReserva,
+  dobleOptin: EstadoDobleOptin,
+): boolean {
+  return consentimientos.consentimientoNewsletter === true && dobleOptin === "activo";
+}
