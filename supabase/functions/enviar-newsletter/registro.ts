@@ -10,7 +10,7 @@
 import type { FilaEnvio, RegistroEnvios } from "./broadcast.ts";
 
 // deno-lint-ignore no-explicit-any
-type ClienteSupabase = any;
+type ClienteSupabase = any; // eslint-disable-line @typescript-eslint/no-explicit-any -- cliente supabase-js sin importar https:// (testeable con vitest)
 
 function faltaColumna(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;

@@ -311,7 +311,7 @@ serve(async (req) => {
 
 async function enviarPorBroadcast(
   // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: any, // eslint-disable-line @typescript-eslint/no-explicit-any -- mismo cliente que el resto de index.ts
   registro: ReturnType<typeof crearRegistroEnvios>,
   datos: Parameters<typeof enviarBroadcast>[0]["datos"],
   usuarioId: string,

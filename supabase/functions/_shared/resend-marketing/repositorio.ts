@@ -10,7 +10,7 @@ import type { DatosSync, ResumenSync, SuscriptorLocal } from "./sync.ts";
 
 // Tipado estructural mínimo del cliente de supabase-js que se usa aquí.
 // deno-lint-ignore no-explicit-any
-type ClienteSupabase = any;
+type ClienteSupabase = any; // eslint-disable-line @typescript-eslint/no-explicit-any -- cliente supabase-js sin importar https:// (testeable con vitest)
 
 export type OrigenPasada = "panel" | "cron" | "envio";
 

@@ -204,7 +204,7 @@ function checkSharedSecret(req: Request): boolean {
 // --- normalizePhone (vapi-webhook.js:142) ---
 function normalizePhone(phone: string | null | undefined): string {
   if (!phone) return "";
-  let normalized = phone.replace(/[\s\-\(\)\+\.]/g, "");
+  let normalized = phone.replace(/[\s\-()+.]/g, "");
   if (normalized.startsWith("0034")) normalized = normalized.slice(4);
   if (normalized.startsWith("34") && normalized.length === 11) normalized = normalized.slice(2);
   return normalized;
