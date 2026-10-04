@@ -50,9 +50,24 @@
 // si en los datos antiguos aparece una reserva de `marca = 'touza'`, se ignora
 // con la regla común de todo el panel (`admiteReservas`, en negocios.ts), igual
 // que en el panel del día.
+//
+// ---------------------------------------------------------------------------
+// ALTURA FIJA, SIN SCROLL (encargo del dueño, 2026-10-04)
+// ---------------------------------------------------------------------------
+// «Que esta vista calcule la altura para el tamaño de la pantalla, para que sea
+// fija, sin scroll.» Las cuentas y su porqué están en
+// `lib/reservas/alturaCalendario.ts`; la medida, en `useAlturaDisponible`.
+//   · ≥ lg: el bloque (cabecera del mes + [calendario | panel del día] +
+//     leyenda) mide justo lo que queda de ventana desde su posición. La rejilla
+//     reparte ese alto entre sus semanas (5 o 6, `minmax(0,1fr)`), la casilla se
+//     adapta a su fila (`medirCasilla`) y el panel del día hace scroll interno.
+//   · < lg: panel del día debajo; el calendario (cabecera + mes entero) ocupa la
+//     altura visible y el resto queda a un scroll de página.
+//   · Sin medida (jsdom, sin ResizeObserver) o ventana muy baja (< suelo): el
+//     layout de siempre / el suelo, y la página hace scroll.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -63,6 +78,15 @@ import { es } from "date-fns/locale";
 import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useIsCompactNav } from "@/hooks/use-mobile";
+import { useAlturaDisponible, useTamanoElemento } from "@/hooks/useAlturaDisponible";
+import {
+  ALTURA_LEYENDA_COMPLETA,
+  alturaTarjetaCalendario,
+  medirCasilla,
+  semanasDelMes,
+  tamanoCasilla,
+} from "@/lib/reservas/alturaCalendario";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
@@ -197,6 +221,14 @@ function BloqueErrorMes({
 }
 
 export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps) {
+  // Nodos medidos (ref de callback + estado: el raíz no existe mientras carga el mes).
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const [rejilla, setRejilla] = useState<HTMLDivElement | null>(null);
+  const alturaBloque = useAlturaDisponible(raiz);
+  const tamanoRejilla = useTamanoElemento(rejilla);
+  // Menú fijo desde 1024 px (= `lg`): calendario y panel van lado a lado.
+  const apilado = useIsCompactNav();
+
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
@@ -287,6 +319,12 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     start: startOfMonth(currentMonth),
     end: endOfMonth(currentMonth),
   });
+  const huecosIniciales = (startOfMonth(currentMonth).getDay() + 6) % 7;
+  const semanas = semanasDelMes(huecosIniciales, daysInMonth.length);
+
+  // Altura fija: `alturaBloque` es null hasta medir (y siempre en jsdom).
+  const tamano = tamanoRejilla ? tamanoCasilla(tamanoRejilla, semanas) : null;
+  const { densidad, fuenteComensales } = medirCasilla(tamano ?? { ancho: 100, alto: 80 });
 
   // Los espacios casi siempre ya están en caché (la página los pide al montarse):
   // solo se espera por ellos si de verdad faltan, para no pintar el mes en gris
@@ -306,13 +344,28 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     );
   }
 
+  const medida = alturaBloque !== null;
+
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="space-y-4 sm:space-y-6">
+      <div
+        ref={setRaiz}
+        data-testid="calendario-ocupacion"
+        data-altura-fija={medida ? String(alturaBloque) : undefined}
+        className={cn("flex flex-col", medida ? "gap-3 lg:h-[var(--alto-bloque)]" : "gap-4 sm:gap-6")}
+        style={
+          medida
+            ? ({
+                "--alto-bloque": `${alturaBloque}px`,
+                "--alto-calendario": `${alturaTarjetaCalendario(alturaBloque)}px`,
+              } as CSSProperties)
+            : undefined
+        }
+      >
         {/* Navegación del mes */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        <Card className={cn(medida && "h-14 shrink-0")}>
+          <CardContent className={cn("p-4", medida && "flex h-full items-center px-2 py-0")}>
+            <div className="flex w-full items-center justify-between">
               <Button variant="ghost" onClick={() => cambiarMes(-1)} aria-label="Mes anterior">
                 <ChevronLeft className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -329,11 +382,22 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
         {/* `grid-cols-1` explícito: sin él, por debajo de `lg` la columna es
             `auto` y se ensancha hasta lo más ancho que lleve dentro (la tabla de
             cuartos de hora del panel), con lo que la cuadrícula se salía de la
-            pantalla en el móvil. */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
-          {/* Calendario */}
-          <Card className="min-w-0 lg:col-span-2">
-            <CardContent className="p-2 sm:p-4">
+            pantalla en el móvil. Con altura fija, desde `lg` la única fila ocupa
+            todo el alto que queda (`minmax(0,1fr)`) y ambas tarjetas lo llenan. */}
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-4 lg:grid-cols-3",
+            medida ? "lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)]" : "sm:gap-6",
+          )}
+        >
+          {/* Calendario. Apilado (< lg) con altura fija: cabecera + mes entero a la vista. */}
+          <Card
+            className={cn(
+              "min-w-0 lg:col-span-2",
+              medida && "flex min-h-0 flex-col max-lg:h-[var(--alto-calendario)]",
+            )}
+          >
+            <CardContent className={cn("p-2 sm:p-4", medida && "flex min-h-0 flex-1 flex-col p-2 sm:p-3")}>
               {isError ? (
                 <BloqueErrorMes
                   error={error}
@@ -345,21 +409,29 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
               ) : (
                 <>
                   {/* Header días de la semana */}
-                  <div className="mb-1 grid grid-cols-7 gap-0.5 sm:mb-2 sm:gap-1">
+                  <div className={cn("grid grid-cols-7 gap-0.5 sm:gap-1", medida ? "mb-1 shrink-0" : "mb-1 sm:mb-2")}>
                     {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
                       <div
                         key={day}
-                        className="py-1 text-center text-xs font-medium text-muted-foreground sm:py-2 sm:text-sm"
+                        className={cn(
+                          "text-center text-xs font-medium text-muted-foreground sm:text-sm",
+                          medida ? "py-0.5" : "py-1 sm:py-2",
+                        )}
                       >
                         {day}
                       </div>
                     ))}
                   </div>
 
-                  {/* Días del mes */}
-                  <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+                  {/* Días del mes. Con altura fija las filas se reparten el alto (5 o 6 semanas). */}
+                  <div
+                    ref={setRejilla}
+                    data-testid="rejilla-mes"
+                    className={cn("grid grid-cols-7 gap-1", medida && "min-h-0 flex-1")}
+                    style={medida ? { gridTemplateRows: `repeat(${semanas}, minmax(0, 1fr))` } : undefined}
+                  >
                     {/* Espacios vacíos para alinear el primer día */}
-                    {Array.from({ length: (startOfMonth(currentMonth).getDay() + 6) % 7 }).map((_, i) => (
+                    {Array.from({ length: huecosIniciales }).map((_, i) => (
                       <div key={`empty-${i}`} />
                     ))}
 
@@ -376,6 +448,8 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
                           seleccionada={isSameDay(day, selectedDate)}
                           ventanaHoras={ventanaHoras}
                           onSeleccionar={elegirDia}
+                          densidad={medida ? densidad : undefined}
+                          fuenteComensales={medida ? fuenteComensales : undefined}
                         />
                       );
                     })}
@@ -385,11 +459,18 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
             </CardContent>
           </Card>
 
-          {/* Panel del día: el reparto por salas. Con tope de alto solo a partir de
-              `lg`, donde va en columna junto al calendario; apilado (por debajo de
-              `lg`) crece libre, que es lo que evita que se corte nada. */}
-          <Card ref={panelDiaRef} className="flex min-w-0 flex-col scroll-mt-4 lg:max-h-[620px]">
-            <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+          {/* Panel del día: el reparto por salas. Desde `lg`, en columna junto al
+              calendario: con altura medida llena la fila (el alto lo pone la
+              rejilla) y hace scroll INTERNO; sin medir, tope de 620 px. Apilado
+              (por debajo de `lg`) crece libre, que es lo que evita que se corte nada. */}
+          <Card
+            ref={panelDiaRef}
+            className={cn("flex min-w-0 flex-col scroll-mt-4", medida ? "lg:min-h-0" : "lg:max-h-[620px]")}
+          >
+            {/* `relative`: sin él, los hijos `position:absolute` del panel (el `caption sr-only` de
+                la rejilla por cuartos) se anclan al documento, escapan del `overflow-hidden` y
+                añaden unos píxeles de scroll de página bajo el calendario de altura fija. */}
+            <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-4">
               {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
                   sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}
               <ReservasEnVivoContexto.Provider value={true}>
@@ -399,7 +480,12 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
           </Card>
         </div>
 
-        <LeyendaOcupacion ventanaHoras={ventanaHoras} aforo={aforo} aforoNoDisponible={errorEspacios} />
+        <LeyendaOcupacion
+          ventanaHoras={ventanaHoras}
+          aforo={aforo}
+          aforoNoDisponible={errorEspacios}
+          compacta={medida && !apilado && alturaBloque < ALTURA_LEYENDA_COMPLETA}
+        />
       </div>
     </TooltipProvider>
   );
