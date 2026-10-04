@@ -36,14 +36,15 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
             </tr>)}</tbody>
           </table>
         </div>
-        <dl className="ml-auto max-w-xs space-y-2 text-sm">
-          {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Subtotal</dt><dd>{euros(t.subtotal)}</dd></div>
+        <dl className="ml-auto max-w-sm space-y-2 text-sm">
+          {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Antes del descuento</dt><dd>{euros(t.subtotal)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Descuento global {f.descuentoGlobal}%</dt><dd>−{euros(t.descuentoGlobal)}</dd></div></>}
-          <div className="flex justify-between gap-4"><dt>Base imponible</dt><dd>{euros(t.base)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>{(f.descuentoGlobal ?? 0) > 0 ? "Después del descuento" : "Base imponible"}</dt><dd>{euros(t.base)}</dd></div>
           {t.grupos.map(g => <div key={g.tipo} className="flex justify-between gap-4"><dt>IVA {g.tipo}%</dt><dd>{euros(g.importe)}</dd></div>)}
           {f.retencion > 0 && <div className="flex justify-between gap-4"><dt>Retención {f.retencion}%</dt><dd>−{euros(t.retencion)}</dd></div>}
           <div className="flex justify-between gap-4 bg-[#ffb300] px-3 py-3 text-base font-bold"><dt>TOTAL</dt><dd>{euros(t.total)}</dd></div>
         </dl>
+        {(f.descuentoGlobal ?? 0) > 0 && <p className="text-right text-xs text-[#666]">El descuento global se aplica antes de los impuestos.</p>}
         {f.pago && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Forma de pago</h3><p className="whitespace-pre-wrap break-words">{f.pago}</p></section>}
         {f.notas && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Observaciones</h3><p className="whitespace-pre-wrap break-words">{f.notas}</p></section>}
         <footer className="border-t border-[#dedbd4] pt-3 text-[10px] text-[#777]">OficiosOsIA · {f.numero || "Borrador"}</footer>

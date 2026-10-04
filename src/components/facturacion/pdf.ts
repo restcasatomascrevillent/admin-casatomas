@@ -110,10 +110,10 @@ export async function crearPdfFactura(f: Factura) {
     derechaTexto(euros(importe), 192, y, 40); y += destacado ? 14 : 7;
   };
   if ((f.descuentoGlobal??0)>0) {
-    totalFila("Subtotal",t.subtotal);
+    totalFila("Antes del descuento",t.subtotal);
     totalFila("Descuento global " + f.descuentoGlobal + "%",-t.descuentoGlobal);
   }
-  totalFila("Base imponible", t.base);
+  totalFila((f.descuentoGlobal??0)>0 ? "Después del descuento" : "Base imponible", t.base);
   t.grupos.forEach(g => totalFila("IVA " + g.tipo + "%", g.importe));
   if (f.retencion) totalFila("Retención " + f.retencion + "%", -t.retencion);
   totalFila("TOTAL", t.total, true);
