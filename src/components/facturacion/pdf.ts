@@ -33,6 +33,8 @@ export async function crearPdfFactura(f: Factura) {
     lector.readAsDataURL(blob);
   });
   const t = totalesFactura(f);
+  const bruto = t.lineas.reduce((sum,l)=>sum+l.bruto,0);
+  const hayDescuento = t.descuentosLineas > 0 || (f.descuentoGlobal??0)>0;
   let y = 48;
   const izquierda = 16, derecha = 194, limite = 274;
   const fecha = (v: string) => v.split("-").reverse().join("/");
@@ -102,18 +104,21 @@ export async function crearPdfFactura(f: Factura) {
     y += alto;
     doc.setDrawColor(220,220,220); doc.line(izquierda, y-4, derecha, y-4);
   }
-  const altoTotales = 22 + t.grupos.length * 7 + (f.retencion ? 7 : 0) + ((f.descuentoGlobal??0)>0 ? 14 : 0);
+  const altoTotales = 22 + t.grupos.length * 7 + (f.retencion ? 7 : 0) + (hayDescuento ? 14 : 0) + (t.descuentosLineas>0 ? 7 : 0) + ((f.descuentoGlobal??0)>0 ? 14 : 0);
   espacio(altoTotales); y += 4;
   const totalFila = (label: string, importe: number, destacado = false) => {
-    if (destacado) { doc.setFillColor(255,179,0); doc.rect(108,y-5,86,10,"F"); }
-    texto(label, 111, y, destacado ? 10 : 9, destacado);
+    if (destacado) { doc.setFillColor(255,179,0); doc.rect(88,y-5,106,10,"F"); }
+    texto(label, 91, y, destacado ? 10 : 9, destacado);
     derechaTexto(euros(importe), 192, y, 40); y += destacado ? 14 : 7;
   };
+  if(hayDescuento) totalFila("Antes de los descuentos",bruto);
+  if(t.descuentosLineas>0) totalFila("Descuentos por concepto",-t.descuentosLineas);
   if ((f.descuentoGlobal??0)>0) {
-    totalFila("Antes del descuento",t.subtotal);
+    totalFila("Antes del descuento global",t.subtotal);
     totalFila("Descuento global " + f.descuentoGlobal + "%",-t.descuentoGlobal);
   }
-  totalFila((f.descuentoGlobal??0)>0 ? "Después del descuento" : "Base imponible", t.base);
+  if(hayDescuento) totalFila("Descuento total aplicado",-(t.descuentosLineas+t.descuentoGlobal));
+  totalFila(hayDescuento ? "Después de los descuentos" : "Base imponible", t.base);
   t.grupos.forEach(g => totalFila("IVA " + g.tipo + "%", g.importe));
   if (f.retencion) totalFila("Retención " + f.retencion + "%", -t.retencion);
   totalFila("TOTAL", t.total, true);

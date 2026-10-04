@@ -2,6 +2,8 @@ import { euros, totalesFactura, type Factura } from "./modelo";
 
 export function VistaFactura({ factura: f }: { factura: Factura }) {
   const t = totalesFactura(f);
+  const bruto = t.lineas.reduce((sum,l)=>sum+l.bruto,0);
+  const hayDescuento = t.descuentosLineas > 0 || (f.descuentoGlobal ?? 0) > 0;
   const fecha = (v: string) => v ? v.split("-").reverse().join("/") : "—";
   return (
     <article aria-label="Vista previa de factura" className="overflow-hidden rounded-xl border bg-[#fdfcf9] text-[#191919] shadow-sm">
@@ -37,14 +39,17 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
           </table>
         </div>
         <dl className="ml-auto max-w-sm space-y-2 text-sm">
-          {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Antes del descuento</dt><dd>{euros(t.subtotal)}</dd></div>
+          {hayDescuento && <><div className="flex justify-between gap-4"><dt>Antes de los descuentos</dt><dd>{euros(bruto)}</dd></div>
+            {t.descuentosLineas > 0 && <div className="flex justify-between gap-4"><dt>Descuentos por concepto</dt><dd>−{euros(t.descuentosLineas)}</dd></div>}
+            {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Antes del descuento global</dt><dd>{euros(t.subtotal)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Descuento global {f.descuentoGlobal}%</dt><dd>−{euros(t.descuentoGlobal)}</dd></div></>}
-          <div className="flex justify-between gap-4"><dt>{(f.descuentoGlobal ?? 0) > 0 ? "Después del descuento" : "Base imponible"}</dt><dd>{euros(t.base)}</dd></div>
+            <div className="flex justify-between gap-4 font-medium"><dt>Descuento total aplicado</dt><dd>−{euros(t.descuentosLineas+t.descuentoGlobal)}</dd></div></>}
+          <div className="flex justify-between gap-4"><dt>{hayDescuento ? "Después de los descuentos" : "Base imponible"}</dt><dd>{euros(t.base)}</dd></div>
           {t.grupos.map(g => <div key={g.tipo} className="flex justify-between gap-4"><dt>IVA {g.tipo}%</dt><dd>{euros(g.importe)}</dd></div>)}
           {f.retencion > 0 && <div className="flex justify-between gap-4"><dt>Retención {f.retencion}%</dt><dd>−{euros(t.retencion)}</dd></div>}
           <div className="flex justify-between gap-4 bg-[#ffb300] px-3 py-3 text-base font-bold"><dt>TOTAL</dt><dd>{euros(t.total)}</dd></div>
         </dl>
-        {(f.descuentoGlobal ?? 0) > 0 && <p className="text-right text-xs text-[#666]">El descuento global se aplica antes de los impuestos.</p>}
+        {hayDescuento && <p className="text-right text-xs text-[#666]">Los descuentos se aplican antes de los impuestos.</p>}
         {f.pago && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Forma de pago</h3><p className="whitespace-pre-wrap break-words">{f.pago}</p></section>}
         {f.notas && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Observaciones</h3><p className="whitespace-pre-wrap break-words">{f.notas}</p></section>}
         <footer className="border-t border-[#dedbd4] pt-3 text-[10px] text-[#777]">OficiosOsIA · {f.numero || "Borrador"}</footer>
