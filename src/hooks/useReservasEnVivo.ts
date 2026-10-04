@@ -7,7 +7,7 @@ import { crearInvalidacionDiferida, nombreCanalUnico, vigilarCanal } from "@/lib
 // ============================================================================
 // RESERVAS EN VIVO: la suscripción de las pantallas que no tenían
 // ----------------------------------------------------------------------------
-// El kanban de «Hoy», la franja «Pendientes de mesa», la línea de estados y el
+// El kanban de «Hoy», las cifras, el aviso de salas privadas y el
 // Calendario no se enteraban de lo que cambiaba en otro dispositivo (solo al
 // volver a la pestaña). Este hook escucha INSERT/UPDATE/DELETE de `reservas` y
 // de `asignaciones_mesa` (dar o quitar mesa solo escribe ahí: `asignar_mesas_

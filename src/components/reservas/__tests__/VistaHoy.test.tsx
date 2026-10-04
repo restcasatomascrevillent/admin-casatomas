@@ -1,20 +1,17 @@
 /**
- * Tests de la franja "Pendientes de mesa" de `VistaHoy` (pestaña Hoy).
+ * Tests de `VistaHoy` (pestaña Hoy).
  *
  * ESTRATEGIA
  * ----------------------------------------------------------------------------
  * · `GestorReservasKanban` se mockea a `() => null`: es el protagonista de la
  *   pestaña, pero aquí no se prueba — y montarlo de verdad arrastraría dnd-kit
  *   y media base de datos.
- * · Los hooks de datos se mockean (ocupación, salas, asignaciones) y las
- *   reservas del día llegan por un doble en memoria del cliente de Supabase,
- *   porque esa consulta vive DENTRO del componente.
- * · Lo que NO se mockea y corre de verdad: `pendientesDeMesa` (agrupado) y
- *   `saltoAsignacion` (destino y textos). El compromiso del diseño es que esta
- *   franja y la lista de reservas digan LO MISMO ante el mismo caso, así que el
- *   test compara el `title` contra el del módulo compartido en vez de contra un
- *   literal copiado aquí: si alguien cambia el texto en un sitio y no en otro,
- *   esto no se entera... pero si alguien deja de usar el módulo compartido, sí.
+ * · Los hooks de datos se mockean (ocupación, salas) y las reservas del día
+ *   llegan por un doble en memoria del cliente de Supabase, porque esa consulta
+ *   (la del aviso de salas privadas) vive DENTRO del componente.
+ * · 04/10/2026: el dueño pidió quitar de Hoy la franja «Pendientes de mesa» (el
+ *   kanban ya marca «Sin mesa» en cada tarjeta) y la línea «Cómo avanza una
+ *   reserva» (ruido visual): hay tests que vigilan que no vuelvan.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -24,10 +21,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const h = vi.hoisted(() => ({
   store: { reservas: [] as Record<string, unknown>[], error: null as unknown },
-  // Editar una reserva desde su pastilla (2026-09-30): el callback y el permiso
-  // de la sección «reservas» que `Reservas.tsx` le pasa a `VistaHoy` por props.
-  canEdit: true as boolean,
-  editarReserva: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -66,7 +59,15 @@ vi.mock("@/components/reservas/GestorReservasKanban", () => ({
 }));
 vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
-vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
+// Las tarjetas del desplegable del Reservado (mismas del kanban): sin asignaciones, con permiso de edición,
+// sin editor, lista negra ni mapa de mesas (cada uno tiene sus propios tests).
+vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn(() => ({ data: [] })) }));
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+vi.mock("@/hooks/useEdicionReserva", () => ({
+  useEdicionReserva: () => ({ editarReserva: vi.fn(), dialogoEdicion: null }),
+}));
+vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
+vi.mock("@/components/reservas/ElegirMesaDialog", () => ({ ElegirMesaDialog: () => null }));
 // La suscripción realtime tiene sus tests (useReservasEnVivo.test.tsx); aquí solo se mira que la
 // pestaña la monte. El resto del módulo (el refresco periódico) es el de verdad.
 vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
@@ -92,12 +93,9 @@ vi.mock("@/components/reservas/DisponibilidadCuartos", async () => {
 
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { useReservasEnVivo } from "@/hooks/useReservasEnVivo";
-import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { hoyLocal } from "@/components/reservas/asignacionPlano";
-import { resolverSaltoAsignacion } from "@/lib/reservas/saltoAsignacion";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -127,32 +125,18 @@ const reserva = (over: Record<string, unknown> & { id: string }) => ({
   ...over,
 });
 
-function montar(
-  props?: Partial<{
-    onEspacioClick: (id: string) => void;
-    onAsignarMesa: (d: unknown) => void;
-    /** Montar la vista SIN editor (como la monta, p. ej., el test del timeline de estados). */
-    sinEditor: boolean;
-  }>,
-) {
-  const onEspacioClick = vi.fn();
-  const onAsignarMesa = vi.fn();
+function montar() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
 
   render(
     <QueryClientProvider client={queryClient}>
-      <VistaHoy
-        onEspacioClick={props?.onEspacioClick ?? onEspacioClick}
-        onAsignarMesa={(props?.onAsignarMesa ?? onAsignarMesa) as (d: never) => void}
-        onEditarReserva={props?.sinEditor ? undefined : h.editarReserva}
-        puedeEditar={h.canEdit}
-      />
+      <VistaHoy />
     </QueryClientProvider>,
   );
 
-  return { onEspacioClick, onAsignarMesa, queryClient };
+  return { queryClient };
 }
 
 /** Espera a que la consulta de reservas de hoy haya terminado (bien o mal). */
@@ -163,18 +147,9 @@ async function esperarCarga(queryClient: QueryClient) {
   });
 }
 
-/**
- * La pastilla de una reserva (el botón que salta al plano): su nombre accesible
- * empieza por la hora. Se busca así y no por `/Ana/` a secas porque cada
- * pastilla lleva además su lápiz de editar, «Editar la reserva de Ana», que
- * también contiene el nombre.
- */
-const pastillaDe = (nombre: string) => screen.findByRole("button", { name: new RegExp(`^\\d{2}:\\d{2}.*${nombre}`) });
-
-describe("VistaHoy — franja «Pendientes de mesa»", () => {
+describe("VistaHoy — lo que ya NO hay (retirado el 04/10/2026 a petición del dueño)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    h.canEdit = true;
     h.store.reservas = [];
     h.store.error = null;
     vi.mocked(useResumenOcupacionHoy).mockReturnValue({
@@ -187,177 +162,39 @@ describe("VistaHoy — franja «Pendientes de mesa»", () => {
     vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
       typeof useEspaciosReserva
     >);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
-      typeof useAsignacionesMesa
-    >);
   });
 
-  // ── Cuándo NO se pinta ─────────────────────────────────────────────────────
-
-  it("no pinta la franja cuando no hay ninguna reserva", async () => {
+  it("no hay franja «Pendientes de mesa», aunque haya reservas con sala y sin mesa ni reservas sin sala", async () => {
+    h.store.reservas = [
+      reserva({ id: "r1", nombre: "Ana" }),
+      reserva({ id: "r2", nombre: "Huerfana", espacio_id: null }),
+    ];
     const { queryClient } = montar();
     await esperarCarga(queryClient);
 
-    expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
-  });
-
-  it("no pinta la franja cuando todas las reservas ya tienen mesa", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" }), reserva({ id: "r2", nombre: "Bruno" })];
-    vi.mocked(useAsignacionesMesa).mockReturnValue({
-      data: [{ reserva_id: "r1" }, { reserva_id: "r2" }],
-    } as unknown as ReturnType<typeof useAsignacionesMesa>);
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pendientes de mesa/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Pendientes de mesa")).not.toBeInTheDocument();
+    // Ni sus pastillas ni sus lápices: ahora eso vive en las tarjetas del kanban.
     expect(screen.queryByText("Ana")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
   });
 
-  it("si falla la carga, la franja desaparece pero la pestaña sigue en pie", async () => {
+  it("no hay línea «Cómo avanza una reserva» (cifras por estado)", async () => {
+    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    expect(screen.queryByText(/Cómo avanza una reserva/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Cómo avanza una reserva/i)).not.toBeInTheDocument();
+  });
+
+  it("si falla la carga de reservas, la pestaña sigue en pie con sus indicadores", async () => {
     h.store.error = { message: "boom" };
 
     const { queryClient } = montar();
     await esperarCarga(queryClient);
 
-    expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
-    // El resto de la pestaña (indicadores + kanban) no se tapa con un error.
     expect(screen.getByText("Reservas hoy")).toBeInTheDocument();
-  });
-
-  // ── Cuándo SÍ se pinta ─────────────────────────────────────────────────────
-
-  it("pinta las reservas sin mesa agrupadas bajo su sala", async () => {
-    h.store.reservas = [
-      reserva({ id: "r1", nombre: "Ana", hora: "13:00:00", numero_comensales: 4 }),
-      reserva({ id: "r2", nombre: "Bruno", espacio_id: SALON, hora: "21:30:00" }),
-      reserva({ id: "r3", nombre: "Carla" }),
-    ];
-    vi.mocked(useAsignacionesMesa).mockReturnValue({
-      data: [{ reserva_id: "r3" }],
-    } as unknown as ReturnType<typeof useAsignacionesMesa>);
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(await screen.findByText("Pendientes de mesa")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Comedor" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Salón" })).toBeInTheDocument();
-    expect(screen.getByText("Ana")).toBeInTheDocument();
-    expect(screen.getByText("Bruno")).toBeInTheDocument();
-    // La que ya tiene mesa no sale.
-    expect(screen.queryByText("Carla")).not.toBeInTheDocument();
-    // Hora recortada a HH:MM y comensales visibles.
-    expect(screen.getByText("13:00")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-  });
-
-  // Touza no admite reservas (decisión del dueño 2026-10-01): una reserva antigua de Touza que quede hoy en la
-  // base de datos no sale en la franja (ni su sala), aunque no tenga mesa. Vigila también que la consulta
-  // pida `marca`: el doble solo devuelve las columnas pedidas.
-  it("no pinta las reservas de Touza (ni su sala), solo las de Casa Tomás", async () => {
-    h.store.reservas = [
-      reserva({ id: "r1", nombre: "Ana", marca: "casa_tomas" }),
-      reserva({ id: "tz", nombre: "Touza Demo", espacio_id: "tz-reservado", marca: "touza", hora: "21:00:00" }),
-    ];
-    vi.mocked(useEspaciosReserva).mockReturnValue({
-      data: [...SALAS, { id: "tz-reservado", nombre: "El Reservado", activa: true, caracteristicas: { marca: "touza" } }],
-    } as unknown as ReturnType<typeof useEspaciosReserva>);
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(await screen.findByText("Ana")).toBeInTheDocument();
-    expect(screen.queryByText("Touza Demo")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "El Reservado" })).not.toBeInTheDocument();
-    // La franja cuenta 1 pendiente, no 2.
-    expect(within(screen.getByRole("region", { name: "Pendientes de mesa" })).getByText("1")).toBeInTheDocument();
-  });
-
-  it("un clic en la pastilla salta al plano con el destino exacto de la reserva", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
-
-    const { onAsignarMesa, queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    fireEvent.click(await pastillaDe("Ana"));
-
-    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
-    expect(onAsignarMesa).toHaveBeenCalledWith({
-      espacioId: COMEDOR,
-      fecha: HOY,
-      reservaId: "r1",
-      // La fixture es de las 13:00: el destino lleva el turno de COMIDA, para
-      // que el plano abra en el servicio donde esa reserva existe.
-      turno: "comida",
-    });
-  });
-
-  it("un clic en el nombre de la sala abre el plano de esa sala", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana", espacio_id: SALON })];
-
-    const { onEspacioClick, queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    fireEvent.click(await screen.findByRole("button", { name: "Salón" }));
-
-    expect(onEspacioClick).toHaveBeenCalledTimes(1);
-    expect(onEspacioClick).toHaveBeenCalledWith(SALON);
-  });
-
-  // ── El caso "sin sala" ─────────────────────────────────────────────────────
-
-  it("la pastilla de una reserva sin sala está deshabilitada y explica qué falta", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana", espacio_id: null })];
-
-    const { onAsignarMesa, queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    const pastilla = await pastillaDe("Ana");
-    expect(pastilla).toBeDisabled();
-    // Texto del módulo compartido, no uno inventado aquí.
-    expect(pastilla).toHaveAttribute(
-      "title",
-      resolverSaltoAsignacion({ id: "r1", fecha: HOY, espacio_id: null }).titulo,
-    );
-
-    fireEvent.click(pastilla);
-    expect(onAsignarMesa).not.toHaveBeenCalled();
-  });
-
-  it("el grupo «sin sala» va el último y su cabecera no es un botón", async () => {
-    h.store.reservas = [
-      reserva({ id: "r1", nombre: "Huerfana", espacio_id: null, hora: "12:00:00" }),
-      reserva({ id: "r2", nombre: "Ana", espacio_id: COMEDOR, hora: "13:00:00" }),
-    ];
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    const franja = await screen.findByLabelText("Pendientes de mesa");
-    const etiquetas = Array.from(franja.querySelectorAll("button, span"))
-      .map((el) => el.textContent?.trim())
-      .filter((t): t is string => !!t);
-
-    expect(etiquetas.indexOf("Sin sala")).toBeGreaterThan(etiquetas.indexOf("Comedor"));
-    // "Sin sala" es texto, no un botón: desde ahí no hay plano que abrir.
-    expect(screen.queryByRole("button", { name: "Sin sala" })).not.toBeInTheDocument();
-    expect(screen.getByText("Sin sala")).toBeInTheDocument();
-  });
-
-  // ── Tono ───────────────────────────────────────────────────────────────────
-
-  it("no usa tono de error: nada de rojo ni de `destructive` en la franja", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" }), reserva({ id: "r2", espacio_id: null })];
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    const franja = await screen.findByLabelText("Pendientes de mesa");
-    expect(franja.className).not.toMatch(/destructive|red-/);
-    for (const el of Array.from(franja.querySelectorAll("*"))) {
-      expect(el.className.toString()).not.toMatch(/destructive|red-/);
-    }
   });
 });
 
@@ -375,9 +212,6 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
     } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
     vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
       typeof useEspaciosReserva
-    >);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
-      typeof useAsignacionesMesa
     >);
   });
 
@@ -402,141 +236,6 @@ describe("VistaHoy — disponibilidad por cuartos de hora (reservas-sin-salas)",
   });
 });
 
-// Editar una reserva desde su pastilla (2026-09-30: las reservas se editan
-// siempre, desde cualquier vista). La franja solo enseña lo que sigue SIN mesa
-// y cuenta (pendiente, verificada, confirmada y «Llegó»: canceladas y «No vino»
-// no ocupan sitio y no salen), y cada pastilla lleva su lápiz. El lápiz no
-// sienta a nadie y NO depende de que la reserva tenga sala: una pastilla «sin
-// sala» está deshabilitada para saltar al plano, pero se puede editar, y
-// editarla es justo cómo se le da sala.
-describe("VistaHoy — editar desde la pastilla", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    h.canEdit = true;
-    h.store.reservas = [];
-    h.store.error = null;
-    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
-      data: RESUMEN,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
-    vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
-      typeof useEspaciosReserva
-    >);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
-      typeof useAsignacionesMesa
-    >);
-  });
-
-  const lapizDe = (nombre: string) => screen.findByRole("button", { name: `Editar la reserva de ${nombre}` });
-
-  it.each(["pendiente", "verificada", "confirmada", "completada"])(
-    "la pastilla de una reserva «%s» lleva su lápiz y abre el editor de esa reserva",
-    async (estado) => {
-      h.store.reservas = [reserva({ id: "r1", nombre: "Ana", estado })];
-
-      const { onAsignarMesa, queryClient } = montar();
-      await esperarCarga(queryClient);
-
-      fireEvent.click(await lapizDe("Ana"));
-
-      expect(h.editarReserva).toHaveBeenCalledTimes(1);
-      expect(h.editarReserva).toHaveBeenCalledWith("r1");
-      // Editar no es sentar: no salta al plano.
-      expect(onAsignarMesa).not.toHaveBeenCalled();
-    },
-  );
-
-  it("cada pastilla tiene el suyo: dos reservas, dos lápices, cada uno con su id", async () => {
-    h.store.reservas = [
-      reserva({ id: "r1", nombre: "Ana", hora: "13:00:00" }),
-      reserva({ id: "r2", nombre: "Bruno", espacio_id: SALON, hora: "21:30:00" }),
-    ];
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    fireEvent.click(await lapizDe("Bruno"));
-    expect(h.editarReserva).toHaveBeenLastCalledWith("r2");
-    fireEvent.click(await lapizDe("Ana"));
-    expect(h.editarReserva).toHaveBeenLastCalledWith("r1");
-  });
-
-  it("una reserva SIN SALA (pastilla deshabilitada para saltar al plano) se puede editar igual", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Huerfana", espacio_id: null })];
-
-    const { onAsignarMesa, queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(await pastillaDe("Huerfana")).toBeDisabled();
-    const lapiz = await lapizDe("Huerfana");
-    expect(lapiz).toBeEnabled();
-
-    fireEvent.click(lapiz);
-    expect(h.editarReserva).toHaveBeenCalledWith("r1");
-    expect(onAsignarMesa).not.toHaveBeenCalled();
-  });
-
-  it("una reserva sin nombre (la BD lo permite) se puede editar igual", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: null })];
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    fireEvent.click(await screen.findByRole("button", { name: "Editar la reserva de este cliente" }));
-    expect(h.editarReserva).toHaveBeenCalledWith("r1");
-  });
-
-  it("sin permiso de edición sobre «reservas» el lápiz sale deshabilitado y lo explica", async () => {
-    h.canEdit = false;
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
-
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    const lapiz = await lapizDe("Ana");
-    expect(lapiz).toBeDisabled();
-    expect(lapiz).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(lapiz);
-    expect(h.editarReserva).not.toHaveBeenCalled();
-  });
-
-  it("el lápiz no cambia el tono de la franja (sin rojo ni `destructive`) y la pastilla sigue igual", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
-
-    const { onAsignarMesa, queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    const lapiz = await lapizDe("Ana");
-    expect(lapiz.className).not.toMatch(/destructive|red-/);
-    // La pastilla sigue saltando al plano con su destino de siempre.
-    fireEvent.click(await pastillaDe("Ana"));
-    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
-  });
-
-  it("sin editor (`onEditarReserva` no llega) las pastillas salen sin lápiz y la vista se monta igual, sin proveedor de permisos", async () => {
-    h.store.reservas = [reserva({ id: "r1", nombre: "Ana" })];
-
-    const { onAsignarMesa, queryClient } = montar({ sinEditor: true });
-    await esperarCarga(queryClient);
-
-    expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
-    // Lo de siempre sigue en pie: la pastilla salta al plano.
-    fireEvent.click(await pastillaDe("Ana"));
-    expect(onAsignarMesa).toHaveBeenCalledTimes(1);
-  });
-
-  it("si no hay nada pendiente no hay franja ni lápices", async () => {
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(screen.queryByText("Pendientes de mesa")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Editar la reserva de/ })).not.toBeInTheDocument();
-  });
-});
-
 describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -552,9 +251,6 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
     vi.mocked(useEspaciosReserva).mockReturnValue({ data: SALAS } as unknown as ReturnType<
       typeof useEspaciosReserva
     >);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<
-      typeof useAsignacionesMesa
-    >);
   });
 
   it("monta la suscripción compartida a `reservas` (`useReservasEnVivo`) para toda la pestaña", async () => {
@@ -564,7 +260,7 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
     expect(vi.mocked(useReservasEnVivo)).toHaveBeenCalled();
   });
 
-  it("«Pendientes de mesa» (y la línea de estados, que come de ella) se relee cada minuto, solo con la pestaña a la vista", async () => {
+  it("la consulta de reservas de hoy (la del aviso de salas privadas) se relee cada minuto, solo con la pestaña a la vista", async () => {
     const { queryClient } = montar();
     await esperarCarga(queryClient);
 
@@ -573,13 +269,6 @@ describe("VistaHoy — lo que cambia en OTRO dispositivo (realtime y su respaldo
       refetchInterval: 60_000,
       refetchIntervalInBackground: false,
     });
-  });
-
-  it("las mesas de hoy también se releen cada minuto: una mesa dada en otro dispositivo saca la reserva de la franja", async () => {
-    const { queryClient } = montar();
-    await esperarCarga(queryClient);
-
-    expect(vi.mocked(useAsignacionesMesa)).toHaveBeenCalledWith(HOY, undefined, undefined, REFRESCO_PERIODICO);
   });
 
   it("la rejilla por cuartos queda dentro de `ReservasEnVivoContexto`: no abre un segundo canal a `reservas`", () => {
@@ -593,7 +282,6 @@ describe("VistaHoy — el Reservado (sala privada) está fuera de aforo pero a l
   const RESERVADO = "esp-reservado";
   beforeEach(() => {
     vi.clearAllMocks();
-    h.canEdit = true;
     h.store.reservas = [];
     h.store.error = null;
     vi.mocked(useResumenOcupacionHoy).mockReturnValue({
@@ -606,7 +294,6 @@ describe("VistaHoy — el Reservado (sala privada) está fuera de aforo pero a l
     vi.mocked(useEspaciosReserva).mockReturnValue({
       data: [...SALAS, { id: RESERVADO, nombre: "Reservado", activa: true, caracteristicas: { marca: "casa_tomas", privada: true } }],
     } as unknown as ReturnType<typeof useEspaciosReserva>);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useAsignacionesMesa>);
   });
 
   it("con una reserva en el Reservado: «Reservado: ocupado — García, 8 pax (comida)», aparte de las cifras", async () => {
@@ -621,6 +308,73 @@ describe("VistaHoy — el Reservado (sala privada) está fuera de aforo pero a l
     expect(aviso).toHaveTextContent("Fuera de aforo");
     // Las cifras de la franja son las del resumen (que ya las calcula sin el Reservado): no se tocan aquí.
     expect(screen.getByText("Comensales")).toBeInTheDocument();
+  });
+
+  // 04/10/2026 (dueño): el Reservado ya no tiene columna en el kanban; "al darle al desplegable veo quién es".
+  it("el aviso es un desplegable: cerrado no hay tarjetas; abierto, una por reserva con teléfono, estado y «Ha llegado»", async () => {
+    h.store.reservas = [
+      reserva({
+        id: "g",
+        nombre: "García",
+        numero_comensales: 8,
+        espacio_id: RESERVADO,
+        hora: "14:00:00",
+        telefono: "600111222",
+        estado: "confirmada",
+      }),
+    ];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const aviso = await screen.findByTestId("aviso-sala-privada");
+    const disparador = await within(aviso).findByRole("button", { name: /Reservado: ocupado/ });
+    expect(disparador).toHaveAttribute("aria-expanded", "false");
+    expect(within(aviso).queryByText("600111222")).not.toBeInTheDocument();
+    expect(within(aviso).queryByRole("button", { name: /Marcar que García ha llegado/ })).not.toBeInTheDocument();
+
+    fireEvent.click(disparador);
+
+    expect(disparador).toHaveAttribute("aria-expanded", "true");
+    const tarjetas = within(aviso).getByRole("list", { name: "Reservas de la sala privada" });
+    expect(within(tarjetas).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(tarjetas).getByText("García")).toBeInTheDocument();
+    expect(within(tarjetas).getByText("14:00")).toBeInTheDocument();
+    expect(within(tarjetas).getByText("Confirmada")).toBeInTheDocument();
+    expect(within(tarjetas).getByRole("link", { name: /600111222/ })).toHaveAttribute("href", "tel:600111222");
+    // Las mismas acciones que la tarjeta del kanban: llegada, estrella y el menú «⋮».
+    expect(within(tarjetas).getByRole("button", { name: /Marcar que García ha llegado/ })).toBeEnabled();
+    expect(within(tarjetas).getByRole("button", { name: "Marcar como importante" })).toBeInTheDocument();
+    expect(within(tarjetas).getByRole("button", { name: /^Acciones de la reserva de García/ })).toBeInTheDocument();
+
+    fireEvent.click(disparador);
+    await waitFor(() => expect(within(aviso).queryByRole("list", { name: "Reservas de la sala privada" })).not.toBeInTheDocument());
+  });
+
+  it("el menú «⋮» de la tarjeta del Reservado ofrece «Mover a…» las demás salas y «Sin asignar»", async () => {
+    h.store.reservas = [reserva({ id: "g", nombre: "García", espacio_id: RESERVADO, hora: "14:00:00" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Reservado: ocupado/ }));
+    const menuBtn = await screen.findByRole("button", { name: /^Acciones de la reserva de García/ });
+    fireEvent.keyDown(menuBtn, { key: "Enter" });
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getByRole("menuitem", { name: /^Comedor/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /^Salón/ })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: /^Sin asignar/ })).toBeInTheDocument();
+    // Ya está en el Reservado: no se ofrece como destino.
+    expect(within(menu).queryByRole("menuitem", { name: /^Reservado/ })).not.toBeInTheDocument();
+  });
+
+  it("con el Reservado libre no hay desplegable ni tarjetas", async () => {
+    h.store.reservas = [reserva({ id: "a", nombre: "Ana" })];
+    const { queryClient } = montar();
+    await esperarCarga(queryClient);
+
+    const aviso = await screen.findByTestId("aviso-sala-privada");
+    expect(aviso).toHaveTextContent("Reservado: libre");
+    expect(within(aviso).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(aviso).queryByRole("list")).not.toBeInTheDocument();
   });
 
   it("sin reservas en el Reservado: «Reservado: libre»", async () => {

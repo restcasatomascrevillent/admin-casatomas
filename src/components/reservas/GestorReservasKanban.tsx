@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -11,7 +11,6 @@ import {
   rectIntersection,
   MeasuringStrategy,
   useDroppable,
-  useDraggable,
 } from "@dnd-kit/core";
 import type { DragStartEvent, DragEndEvent, CollisionDetection, Announcements } from "@dnd-kit/core";
 import type { Modifier } from "@dnd-kit/core";
@@ -20,57 +19,41 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { turnoDeHora } from "@/hooks/useDisponibilidad";
-import { admiteReservas, salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { admiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
-import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
-import { comensalesEnEspacioTurno, evaluarMovimiento, type ReservaServicio } from "@/lib/reservas/servicioSala";
-import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
-import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
-import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacionMesas";
+import { comensalesEnEspacioTurno, type ReservaServicio } from "@/lib/reservas/servicioSala";
+import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Clock, Users, Star, GripVertical, Phone, Search, ChevronDown, ChevronLeft, ChevronRight, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen } from "lucide-react";
+import { Users, Search, ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
-import { ControlLlegada } from "./ControlLlegada";
 import { BlacklistModal } from "./BlacklistModal";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
-import { ConMotivo } from "./ConMotivo";
-import { ElegirMesaDialog } from "./ElegirMesaDialog";
+import { ReservaCard } from "./ReservaCard";
+import { useMovimientoReservaServicio, mesasPorReservaDe } from "@/hooks/useMovimientoReservaServicio";
+import {
+  SIN_ASIGNAR,
+  columnaDeReserva,
+  columnasVisibles,
+  construirColumnas,
+  esSinAsignar,
+  type Columna,
+} from "@/lib/reservas/columnasServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useIsCoarsePointer } from "@/hooks/use-mobile";
 import {
   ANCHO_COLUMNA_PLEGADA,
   ANCHO_MIN_COLUMNA,
   ANCHO_MIN_COLUMNA_TACTIL,
-  accionesSoloIcono,
   calcularDisposicion,
   type DisposicionKanban,
   type ItemColumna,
@@ -85,304 +68,7 @@ import {
 // Qué botones tiene cada tarjeta, y cuáles se pueden pulsar, lo decide
 // `accionesDisponibles(reserva, { vista: "hoy", canEdit })`.
 
-// Solo Casa Tomás (decisión del dueño, 2026-10-01: Touza no admite reservas).
-// Las columnas son «Sin asignar» + las salas activas de Casa Tomás, y las
-// reservas, las de Casa Tomás: lo que quede de Touza en la base de datos (sus
-// salas aún activas, sus reservas de demostración) no sale (`admiteReservas`).
-// Antes los negocios iban en filas de columnas apiladas, cada una con su aforo.
-const SIN_ASIGNAR = "sin-asignar";
-const esSinAsignar = (id: string) => id === SIN_ASIGNAR;
 type FiltroTurno = "todo" | "comida" | "cena";
-
-interface Columna {
-  id: string;
-  title: string;
-  capacidadMax?: number;
-  /** Sala privada (`caracteristicas.privada`, el Reservado): una reserva se queda la sala entera. */
-  privada?: boolean;
-}
-
-/** Columna en la que se pinta una reserva: su sala si está entre las columnas; si no, "Sin asignar". */
-function columnaDeReserva(reserva: ReservaServicio, columnas: Columna[]): string {
-  return reserva.espacio_id && columnas.some((c) => c.id === reserva.espacio_id) ? reserva.espacio_id : SIN_ASIGNAR;
-}
-
-type Acciones = ReturnType<typeof useAccionesServicioReserva>;
-
-// Draggable reservation card
-function ReservaCard({
-  reserva,
-  columnas,
-  acciones,
-  onMover,
-  onToggleImportante,
-  onBlacklist,
-  onEditar,
-  puedeEditar,
-  isDragOverlay,
-  anchoColumna,
-}: {
-  reserva: ReservaServicio;
-  columnas: Columna[];
-  acciones: Acciones;
-  onMover: (reserva: ReservaServicio, destinoColumnaId: string) => void;
-  onToggleImportante: (reserva: ReservaServicio) => void;
-  onBlacklist: (reserva: ReservaServicio) => void;
-  /** Abre el editor de la reserva (2026-09-30): está en el menú «⋮» de TODA tarjeta, movible o no. */
-  onEditar?: (reserva: ReservaServicio) => void;
-  /**
-   * Permiso de edición sobre «reservas». Obligatorio a propósito (un valor por
-   * defecto dejaría pasar a todo el mundo si alguien se olvida de pasarlo): sin él,
-   * todo lo que escribe en la reserva sale deshabilitado, con el motivo visible.
-   */
-  puedeEditar: boolean;
-  isDragOverlay?: boolean;
-  /**
-   * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
-   * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
-   * el mismo ancho de ventana da columnas distintas según cuántas salas haya
-   * y el menú lateral, así que cada columna decide por su cuenta.
-   */
-  anchoColumna?: number;
-}) {
-  // Qué se puede hacer con esta reserva en Hoy (servicio), según su estado y el permiso.
-  const acc = accionesDisponibles(reserva, { vista: "hoy", canEdit: puedeEditar });
-  // Se arrastra solo si se puede mover: que su estado lo permita Y que haya permiso.
-  const arrastrable = acc.mover.habilitada;
-  // Una reserva que por su estado no ocupa sitio («No vino») se ve apagada; sin
-  // permiso, en cambio, se ve normal: lo único que cambia es que no se mueve.
-  const ocupaSitio = ocupaEspacio(reserva.estado);
-  const soloIcono = accionesSoloIcono(anchoColumna);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: reserva.id,
-    data: reserva,
-    disabled: !arrastrable || isDragOverlay,
-  });
-
-  if (isDragOverlay) {
-    return (
-      <div
-        className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] shadow-2xl rotate-1 scale-[1.03] cursor-grabbing pointer-events-none"
-      >
-        <ContenidoTarjeta reserva={reserva} />
-      </div>
-    );
-  }
-
-  const columnaActual = columnaDeReserva(reserva, columnas);
-  const destinos = columnas.filter((c) => c.id !== columnaActual);
-  // En una sala privada (el Reservado) la reserva está FUERA DE AFORO: se etiqueta.
-  const fueraDeAforo = !!columnas.find((c) => c.id === columnaActual)?.privada;
-
-  // El menú «…» de la tarjeta. En columnas estrechas baja a la fila de
-  // acciones para dejarle al NOMBRE todo el ancho de la cabecera: con el menú
-  // arriba (más la estrella y el asa) al nombre le quedaban 10px a 124px de
-  // columna, o sea "L…". Abajo comparte fila con los iconos de llegada, que
-  // ahí sí sobra sitio.
-  const menuAcciones = (
-    <div
-      className="flex items-center shrink-0"
-      onPointerDown={(e) => e.stopPropagation()}
-      // `TouchSensor` escucha `touchstart` en la tarjeta: sin esto, un toque de >=250 ms sobre el
-      // menú arrancaba un arrastre y dnd-kit se tragaba el clic.
-      onTouchStart={(e) => e.stopPropagation()}
-      onKeyDown={(e) => e.stopPropagation()}
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground"
-            aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
-          >
-            {acciones.estaEnCurso(reserva.id) ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <MoreVertical className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
-            <MoveRight className="h-3.5 w-3.5" />
-            Mover a…
-          </DropdownMenuLabel>
-          {acc.mover.habilitada ? (
-            destinos.map((c) => (
-              <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
-                {c.title}
-                {c.capacidadMax ? (
-                  <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
-                ) : null}
-              </DropdownMenuItem>
-            ))
-          ) : (
-            // El motivo, a la vista en el propio menú: «No se puede mover en este
-            // estado» o «No tienes permiso para editar reservas».
-            <DropdownMenuItem disabled>{acc.mover.titulo}</DropdownMenuItem>
-          )}
-          {reserva.telefono && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a href={`tel:${reserva.telefono}`}>
-                  <Phone className="h-3.5 w-3.5 mr-2" />
-                  Llamar
-                </a>
-              </DropdownMenuItem>
-            </>
-          )}
-          {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Va
-              en el menú de TODA tarjeta —también las que no se pueden mover— y
-              sin mirar el estado: lo único que lo apaga es el permiso. */}
-          {onEditar && (
-            <>
-              <DropdownMenuSeparator />
-              {/* El ítem deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
-              <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.editar)}>
-                <DropdownMenuItem
-                  disabled={!acc.editar.habilitada}
-                  title={motivoSiNoSePuede(acc.editar)}
-                  onSelect={() => onEditar(reserva)}
-                >
-                  <SquarePen className="h-3.5 w-3.5 mr-2" />
-                  Editar reserva
-                </DropdownMenuItem>
-              </ConMotivo>
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.listaNegra)}>
-            <DropdownMenuItem
-              disabled={!acc.listaNegra.habilitada}
-              onSelect={() => onBlacklist(reserva)}
-              className="text-destructive focus:text-destructive"
-            >
-              <ShieldBan className="h-3.5 w-3.5 mr-2" />
-              Añadir a blacklist
-            </DropdownMenuItem>
-          </ConMotivo>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {/* Asa decorativa: se retira en columnas estrechas, donde esos 16px son
-          la diferencia entre ver el nombre y no verlo. La tarjeta entera
-          sigue siendo arrastrable. */}
-      {arrastrable && !soloIcono && (
-        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" aria-hidden="true" />
-      )}
-    </div>
-  );
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        "rounded-lg border bg-card transition-shadow duration-200 group outline-none select-none [-webkit-touch-callout:none]",
-        soloIcono ? "p-2" : "p-2.5 sm:p-3",
-        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        arrastrable
-          ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30"
-          : ocupaSitio
-            ? "cursor-default"
-            : "cursor-default opacity-60",
-        isDragging && "opacity-30 border-dashed border-primary/40",
-        reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
-        (reserva as { en_blacklist?: boolean }).en_blacklist && "border-destructive/40 bg-destructive/5",
-      )}
-      aria-roledescription={arrastrable ? "reserva arrastrable" : "reserva"}
-      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${etiquetaEstadoReserva(reserva.estado)}`}
-      {...(arrastrable ? listeners : {})}
-      {...attributes}
-    >
-      <div className="flex items-start justify-between gap-1 mb-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {/* Sin permiso, deshabilitada y con el motivo a la vista (en el envoltorio:
-              un botón deshabilitado no recibe el ratón). */}
-          <ConMotivo motivo={motivoSiNoSePuede(acc.importante)}>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              disabled={!acc.importante.habilitada}
-              className="touch-hit shrink-0 -m-1 p-1 touch-manipulation hover:scale-110 transition-transform disabled:pointer-events-none disabled:opacity-50"
-              aria-label={reserva.importante ? "Quitar importante" : "Marcar como importante"}
-              aria-pressed={!!reserva.importante}
-            >
-              <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
-            </button>
-          </ConMotivo>
-          {/* `title`: con las columnas estrechas (112–220px) los nombres largos
-              se cortan con puntos suspensivos; el completo se lee al pasar el
-              ratón, además de estar en el `aria-label` de la tarjeta. */}
-          <span className="font-semibold text-sm truncate" title={reserva.nombre || "Sin nombre"}>
-            {reserva.nombre || "Sin nombre"}
-          </span>
-          {(reserva as { en_blacklist?: boolean }).en_blacklist && (
-            <ShieldBan className="h-3.5 w-3.5 text-destructive shrink-0" aria-label="En lista negra" />
-          )}
-        </div>
-        {!soloIcono && menuAcciones}
-      </div>
-      {fueraDeAforo && <EtiquetaFueraDeAforo className="mb-2" />}
-      <ContenidoTarjeta reserva={reserva} sinCabecera />
-      {soloIcono ? (
-        /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el
-           suelo de ancho de columna lo marca el elemento suelto más ancho y no
-           la fila entera. */
-        <div className="flex flex-wrap items-center gap-1 mt-2">
-          <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto soloIcono />
-          {menuAcciones}
-        </div>
-      ) : (
-        <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto className="mt-2" />
-      )}
-    </div>
-  );
-}
-
-function ContenidoTarjeta({
-  reserva,
-  sinCabecera,
-}: {
-  reserva: ReservaServicio;
-  sinCabecera?: boolean;
-}) {
-  // Nombre y color del estado, del mapa único. Un estado que no existe (el CHECK no
-  // lo permite) se pinta tal cual y en gris, como hacía este kanban.
-  const estado = infoEstadoReserva(reserva.estado);
-  return (
-    <>
-      {!sinCabecera && (
-        <div className="flex items-center gap-1.5 min-w-0 mb-2">
-          {reserva.importante && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />}
-          <span className="font-semibold text-sm truncate">{reserva.nombre || "Sin nombre"}</span>
-        </div>
-      )}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5 tabular-nums">
-          <Clock className="h-3 w-3" aria-hidden="true" />
-          {typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}
-        </span>
-        <span className="flex items-center gap-1 bg-muted/50 rounded-md px-1.5 py-0.5 tabular-nums">
-          <Users className="h-3 w-3" aria-hidden="true" />
-          {reserva.numero_comensales}
-        </span>
-        <Badge className={cn("text-[10px] px-1.5 py-0 h-4 pointer-coarse:h-5 pointer-coarse:text-xs", estado ? estado.insignia : "bg-gray-500 text-white")}>
-          {estado ? estado.etiqueta : reserva.estado}
-        </Badge>
-      </div>
-      {reserva.telefono && (
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-1.5 pointer-coarse:text-xs">
-          <Phone className="h-2.5 w-2.5" aria-hidden="true" />
-          {reserva.telefono}
-        </div>
-      )}
-    </>
-  );
-}
 
 function BarraTurno({ etiqueta, pax, capacidad }: { etiqueta: string; pax: number; capacidad: number }) {
   const porcentaje = capacidad ? Math.min(100, Math.round((pax / capacidad) * 100)) : 0;
@@ -732,21 +418,6 @@ const deteccionColisiones: CollisionDetection = (args) => {
   return bajoPuntero.length > 0 ? bajoPuntero : rectIntersection(args);
 };
 
-/**
- * Un movimiento que se confirma antes de hacerlo. Hay DOS motivos para preguntar y
- * pueden darse a la vez (entonces sale un solo aviso con los dos):
- *   · `excede`: la sala de destino se pasaría de aforo en ese turno.
- *   · `mesas`: la reserva tiene mesas asignadas y el trigger de la BD
- *     (`trg_reservas_sincronizar_asignaciones`) las BORRA al cambiar la sala.
- */
-interface MovimientoPendiente {
-  reserva: ReservaServicio;
-  destinoId: string | null;
-  destinoNombre: string;
-  excede: { ocupacionTras: number; capacidad: number; turno: "comida" | "cena" } | null;
-  mesas: { nombres: string[]; salaActual: string | null } | null;
-}
-
 export function GestorReservasKanban() {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
@@ -765,12 +436,7 @@ export function GestorReservasKanban() {
   // todos aunque ocupen menos espacio de ancho por columna"). Por defecto el
   // conjunto está vacío, o sea: todas abiertas.
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
-  const [movimientoPendiente, setMovimientoPendiente] = useState<MovimientoPendiente | null>(null);
   const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
-  // La reserva que se acaba de mover y la sala a la que ha ido: tras guardarse el cambio se abre el
-  // mapa de esa sala para elegirle la mesa (`ElegirMesaDialog`). `null` hasta que se mueve algo.
-  const [mapaMesa, setMapaMesa] = useState<{ reserva: ReservaServicio; espacioId: string; espacioNombre: string } | null>(null);
-  const cerrarMapaMesa = useCallback(() => setMapaMesa(null), []);
   const hoy = format(new Date(), "yyyy-MM-dd");
 
   // Marcar/desmarcar "importante" y añadir a blacklist: acciones que antes
@@ -850,40 +516,17 @@ export function GestorReservasKanban() {
   // bloquea, para no romper el kanban. Con el mismo respaldo de cada minuto que
   // `VistaHoy` (las mesas que dé otro dispositivo, sin realtime).
   const { data: asignacionesDeHoy } = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
-  const mesasPorReserva = useMemo(() => {
-    const porReserva = new Map<string, string[]>();
-    for (const a of asignacionesDeHoy ?? []) {
-      if (!a?.reserva_id) continue;
-      porReserva.set(a.reserva_id, [...(porReserva.get(a.reserva_id) ?? []), a.mesas?.nombre ?? ""]);
-    }
-    for (const nombres of porReserva.values()) {
-      nombres.sort((x, y) => x.localeCompare(y, "es", { numeric: true }));
-    }
-    return porReserva;
-  }, [asignacionesDeHoy]);
+  const mesasPorReserva = useMemo(() => mesasPorReservaDe(asignacionesDeHoy), [asignacionesDeHoy]);
 
-  // Salas activas de Casa Tomás, por id (hay dos «Terraza», una de cada negocio).
-  const espaciosActivos = useMemo(
-    () => (espacios || []).filter((e: any) => e.activa !== false && salaAdmiteReservas(e)),
-    [espacios],
-  );
-
-  // Columnas: "Sin asignar" + las salas de Casa Tomás.
-  const columnas = useMemo<Columna[]>(
-    () => [
-      { id: SIN_ASIGNAR, title: "Sin asignar" },
-      ...espaciosActivos.map((e: any) => ({
-        id: e.id,
-        title: e.nombre,
-        capacidadMax: e.capacidad_maxima,
-        privada: esSalaPrivada(e),
-      })),
-    ],
-    [espaciosActivos],
-  );
+  // Todas las columnas posibles como DESTINO: "Sin asignar" + las salas activas de Casa Tomás (por id: hay
+  // dos «Terraza», una de cada negocio), el Reservado (sala privada) incluido, para poder mandar ahí una
+  // reserva con «⋮ → Mover a…». Las que se PINTAN son `columnasPintadas`: sin las privadas (el Reservado
+  // se ve en el aviso desplegable de «Hoy»).
+  const columnas = useMemo<Columna[]>(() => construirColumnas(espacios), [espacios]);
+  const columnasPintadas = useMemo(() => columnasVisibles(columnas), [columnas]);
   const itemsFila = useMemo<ItemColumna[]>(
-    () => columnas.map((col) => ({ id: col.id, plegada: minimizedCols.has(col.id) })),
-    [columnas, minimizedCols],
+    () => columnasPintadas.map((col) => ({ id: col.id, plegada: minimizedCols.has(col.id) })),
+    [columnasPintadas, minimizedCols],
   );
 
   const reservasFiltradas = useMemo(() => {
@@ -925,64 +568,26 @@ export function GestorReservasKanban() {
     return map;
   }, [reservas, columnas]);
 
-  const nombreColumna = (id: string | number | undefined | null) =>
-    columnas.find((c) => c.id === id)?.title ?? "Sin asignar";
+  const { solicitarMovimiento, darMesa, dialogos } = useMovimientoReservaServicio({
+    acciones,
+    columnas,
+    reservas: reservas || [],
+    mesasPorReserva,
+    fecha: hoy,
+  });
 
   /**
-   * Hace el movimiento (ya confirmado, si hacía falta) y, SOLO si se ha guardado, abre el mapa de la
-   * sala de destino para elegirle la mesa. Los dos caminos de mover (arrastrar y «Mover a…») y las
-   * dos confirmaciones (aforo y mesas) acaban aquí.
-   *
-   * «Sin asignar» no tiene plano y no se abre nada. Con una sala, `ElegirMesaDialog` comprueba por su
-   * cuenta que tenga mesas (por id de sala, nunca por nombre): si no las tiene no pinta nada y se cierra sin ruido.
+   * Con sala, que ocupe sitio (pendiente/verificada/confirmada/completada) y sin ninguna mesa
+   * asignada. Mientras las asignaciones no han llegado NO se marca nada: mejor callar que acusar en falso.
    */
-  const moverYElegirMesa = async (reserva: ReservaServicio, destinoId: string | null, destinoNombre: string) => {
-    const movida = await acciones.moverEspacio(reserva, destinoId, destinoNombre);
-    // Una sola reserva a la vez: si ya había un mapa abierto, éste lo sustituye (no se apilan).
-    if (movida && destinoId) setMapaMesa({ reserva, espacioId: destinoId, espacioNombre: destinoNombre });
-  };
+  const estaSinMesa = (reserva: ReservaServicio) =>
+    asignacionesDeHoy !== undefined &&
+    ocupaEspacio(reserva.estado) &&
+    columnaDeReserva(reserva, columnas) !== SIN_ASIGNAR &&
+    !mesasPorReserva.has(reserva.id);
 
-  const solicitarMovimiento = (reserva: ReservaServicio, columnaId: string) => {
-    const destinoId = esSinAsignar(columnaId) ? null : columnaId;
-    const col = columnas.find((c) => c.id === columnaId);
-    // Sala privada (el Reservado): una reserva se la queda entera; si ya hay otra en ese turno, se avisa aquí
-    // en vez de dejar que la BD lo rechace (23514 «Sala privada ocupada»).
-    const evaluacion = evaluarMovimiento(
-      reserva,
-      destinoId,
-      reservas || [],
-      col?.capacidadMax,
-      col?.privada ? { nombre: col.title } : null,
-    );
-
-    switch (evaluacion.tipo) {
-      case "sin_cambio":
-        return;
-      case "bloqueado":
-        toast.error(evaluacion.motivo);
-        return;
-      case "excede_capacidad":
-      case "ok": {
-        const destinoNombre = col?.title ?? "Sin asignar";
-        const excede =
-          evaluacion.tipo === "excede_capacidad"
-            ? { ocupacionTras: evaluacion.ocupacionTras, capacidad: evaluacion.capacidad ?? 0, turno: evaluacion.turno }
-            : null;
-        const nombresMesas = mesasPorReserva.get(reserva.id);
-        const mesas = nombresMesas
-          ? {
-              nombres: nombresMesas,
-              salaActual: columnas.find((c) => c.id === columnaDeReserva(reserva, columnas))?.title ?? null,
-            }
-          : null;
-        if (!excede && !mesas) {
-          void moverYElegirMesa(reserva, destinoId, destinoNombre);
-          return;
-        }
-        setMovimientoPendiente({ reserva, destinoId, destinoNombre, excede, mesas });
-      }
-    }
-  };
+  const nombreColumna = (id: string | number | undefined | null) =>
+    columnas.find((c) => c.id === id)?.title ?? "Sin asignar";
 
   const handleDragStart = (event: DragStartEvent) => {
     const r = (reservas || []).find((res) => res.id === event.active.id);
@@ -1073,7 +678,7 @@ export function GestorReservasKanban() {
         <div className="flex flex-col gap-3 min-w-0 flex-1">
           <FilaColumnas items={itemsFila} arrastrando={!!activeReserva}>
             {(disposicion) =>
-              columnas.map((col) => {
+              columnasPintadas.map((col) => {
                 const plegada = minimizedCols.has(col.id);
                 return (
                   <KanbanColumn
@@ -1104,6 +709,8 @@ export function GestorReservasKanban() {
                         onToggleImportante={toggleImportante}
                         onBlacklist={setBlacklistReserva}
                         onEditar={(r) => editarReserva(r.id)}
+                        onDarMesa={darMesa}
+                        sinMesa={estaSinMesa(reserva)}
                         puedeEditar={puedeEditar}
                         anchoColumna={disposicion.anchoColumna}
                       />
@@ -1131,67 +738,8 @@ export function GestorReservasKanban() {
         </DragOverlay>
       </DndContext>
 
-      <AlertDialog open={!!movimientoPendiente} onOpenChange={(open) => !open && setMovimientoPendiente(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            {/* Si se pasa de aforo manda ese aviso (el de siempre); si solo hay mesas
-                que se van a quitar, el mismo aviso que el panel de Asignación. */}
-            <AlertDialogTitle>
-              {movimientoPendiente?.excede
-                ? `¿Superar la capacidad de ${movimientoPendiente.destinoNombre}?`
-                : "¿Cambiar de sala y quitar sus mesas?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2">
-                {movimientoPendiente?.excede && (
-                  <p>
-                    {`Con la reserva de ${movimientoPendiente.reserva.nombre || "este cliente"} (${movimientoPendiente.reserva.numero_comensales} pax), el turno de ${movimientoPendiente.excede.turno === "comida" ? "comida" : "cena"} de ${movimientoPendiente.destinoNombre} quedaría en ${movimientoPendiente.excede.ocupacionTras} de ${movimientoPendiente.excede.capacidad} plazas.`}
-                  </p>
-                )}
-                {movimientoPendiente?.mesas && (
-                  <>
-                    <p>
-                      {textoQuitarMesas({
-                        nombre: movimientoPendiente.reserva.nombre,
-                        cantidad: movimientoPendiente.mesas.nombres.length,
-                        mesasNombres: movimientoPendiente.mesas.nombres,
-                        salaActual: movimientoPendiente.mesas.salaActual,
-                        destinoNombre: movimientoPendiente.destinoNombre,
-                      })}
-                    </p>
-                    <p>{TEXTO_CAMBIO_INTERNO}</p>
-                  </>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>No mover</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const m = movimientoPendiente;
-                setMovimientoPendiente(null);
-                if (m) void moverYElegirMesa(m.reserva, m.destinoId, m.destinoNombre);
-              }}
-            >
-              {movimientoPendiente?.excede ? "Mover igualmente" : "Cambiar de sala"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Tras mover una reserva a una sala con plano: el mapa de esa sala, con la reserva ya señalada,
-          para elegirle la mesa. «Ahora no» (o cerrar) la deja en la sala, sin mesa. Va FUERA del DndContext. */}
-      {mapaMesa && (
-        <ElegirMesaDialog
-          key={`${mapaMesa.reserva.id}|${mapaMesa.espacioId}`}
-          reserva={mapaMesa.reserva}
-          fecha={hoy}
-          espacioId={mapaMesa.espacioId}
-          espacioNombre={mapaMesa.espacioNombre}
-          onCerrar={cerrarMapaMesa}
-        />
-      )}
+      {/* Confirmaciones de mover y mapa para elegir mesa (`useMovimientoReservaServicio`). Van FUERA del DndContext. */}
+      {dialogos}
 
       <BlacklistModal
         reserva={blacklistReserva}

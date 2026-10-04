@@ -1,5 +1,5 @@
 /**
- * Tests del timeline de estados de reserva (`TimelineEstadosReserva`, pestaña "Hoy").
+ * Tests del timeline de estados de reserva (`TimelineEstadosReserva`, pestaña "Lista").
  *
  * QUÉ SE FIJA
  * ----------------------------------------------------------------------------
@@ -11,59 +11,20 @@
  * · Cifras opcionales: sin reservas no hay cifras (nunca un 0 falso); con ellas,
  *   una por estado; los estados que no son de los seis no cuentan.
  * · Plegable, y la elección se recuerda en el navegador.
- * · Montado dentro de `VistaHoy`: recibe las cifras de las reservas de hoy que
- *   la pestaña YA carga (sin consulta propia).
+ * · 04/10/2026: ya no se monta en la pestaña Hoy (el dueño lo quitó por ruido visual; lo
+ *   vigila VistaHoy.test.tsx). Vive en la pestaña Lista, como filtro por estado.
  *
  * Y lo que se añadió al montarlo también en la pestaña Lista (2026-10-01):
  * · `cifras` (ya contadas por quien llama) y `alcance` (cómo se rotulan: «cifras
- *   de hoy» / «cifras de la lista»…). Sin ellos, la pestaña Hoy sale exactamente
+ *   de hoy» / «cifras de la lista»…). Sin ellos, el timeline sale exactamente
  *   como antes.
  * · Nodos pulsables (`onElegirEstado` + `estadoActivo`): solo si quien monta el
  *   timeline los pide. Son botones de alternancia (`aria-pressed`); sin el
- *   callback —la pestaña Hoy— el timeline sigue siendo una leyenda, sin botones.
+ *   callback el timeline sigue siendo una leyenda, sin botones.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 
-// ─── Dobles para el bloque de `VistaHoy` (mismo patrón que VistaHoy.test.tsx) ──
-
-const h = vi.hoisted(() => ({
-  store: { reservas: [] as Record<string, unknown>[], error: null as unknown },
-}));
-
-vi.mock("@/integrations/supabase/client", () => {
-  const builder = () => {
-    const q: Record<string, unknown> = {};
-    const seguir = () => q;
-    q.select = seguir;
-    q.eq = seguir;
-    q.neq = seguir;
-    q.order = seguir;
-    q.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-      Promise.resolve(
-        h.store.error ? { data: null, error: h.store.error } : { data: h.store.reservas, error: null },
-      ).then(ok, ko);
-    return q;
-  };
-  return { supabase: { from: vi.fn(() => builder()) } };
-});
-vi.mock("@/components/reservas/GestorReservasKanban", () => ({ GestorReservasKanban: () => null }));
-vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({ DisponibilidadCuartos: () => null }));
-vi.mock("@/hooks/useOcupacionHoy", () => ({ useResumenOcupacionHoy: vi.fn() }));
-vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: vi.fn() }));
-vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: vi.fn() }));
-// La suscripción realtime de la pestaña tiene sus tests (useReservasEnVivo.test.tsx).
-vi.mock("@/hooks/useReservasEnVivo", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/hooks/useReservasEnVivo")>()),
-  useReservasEnVivo: vi.fn(),
-}));
-
-import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
-import { VistaHoy } from "@/components/reservas/VistaHoy";
-import { hoyLocal } from "@/components/reservas/asignacionPlano";
 import { TimelineEstadosReserva } from "@/components/reservas/TimelineEstadosReserva";
 
 // ─── Lo que se espera ────────────────────────────────────────────────────────
@@ -395,81 +356,5 @@ describe("TimelineEstadosReserva — nodos pulsables (el filtro por estado de la
     fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
-  });
-});
-
-describe("TimelineEstadosReserva — montado en la pestaña Hoy (VistaHoy)", () => {
-  const HOY = hoyLocal();
-  const RESUMEN = {
-    totalReservas: 6,
-    totalComensales: 20,
-    capacidadTotal: 170,
-    porcentajeTotal: 12,
-    reservasCanceladas: 3,
-  };
-  const reserva = (id: string, estado: string) => ({
-    id,
-    nombre: `Cliente ${id}`,
-    hora: "13:00:00",
-    numero_comensales: 2,
-    estado,
-    espacio_id: null,
-  });
-
-  function montarHoy() {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <VistaHoy onEspacioClick={vi.fn()} onAsignarMesa={vi.fn()} />
-      </QueryClientProvider>,
-    );
-    return queryClient;
-  }
-
-  const esperarCarga = (queryClient: QueryClient) =>
-    waitFor(() => {
-      const estado = queryClient.getQueryState(["reservas-hoy", "pendientes-mesa", HOY])?.status;
-      expect(estado === "success" || estado === "error").toBe(true);
-    });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    h.store.reservas = [];
-    h.store.error = null;
-    vi.mocked(useResumenOcupacionHoy).mockReturnValue({
-      data: RESUMEN,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    } as unknown as ReturnType<typeof useResumenOcupacionHoy>);
-    vi.mocked(useEspaciosReserva).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useEspaciosReserva>);
-    vi.mocked(useAsignacionesMesa).mockReturnValue({ data: [] } as unknown as ReturnType<typeof useAsignacionesMesa>);
-  });
-
-  it("recibe las cifras de las reservas de hoy que la pestaña ya carga, y las canceladas del resumen", async () => {
-    h.store.reservas = [
-      reserva("a", "pendiente"),
-      reserva("b", "verificada"),
-      reserva("c", "confirmada"),
-      reserva("d", "confirmada"),
-      reserva("e", "completada"),
-    ];
-
-    const queryClient = montarHoy();
-    await esperarCarga(queryClient);
-
-    await waitFor(() => expect(cifras()).toEqual(["1", "1", "2", "1", "3", "0"]));
-  });
-
-  it("si las reservas de hoy no cargan, el timeline sigue en pie pero sin cifras", async () => {
-    h.store.error = { message: "boom" };
-
-    const queryClient = montarHoy();
-    await esperarCarga(queryClient);
-
-    expect(screen.getByRole("region", { name: /Cómo avanza una reserva/ })).toBeInTheDocument();
-    expect(nodos()).toHaveLength(6);
-    expect(cifras()).toEqual([null, null, null, null, null, null]);
   });
 });

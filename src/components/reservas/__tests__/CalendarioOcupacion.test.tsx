@@ -777,6 +777,112 @@ describe("CalendarioOcupacion · estructura", () => {
   });
 });
 
+// ─── 10b. Altura fija (calendario a la altura de la pantalla) ────────────────
+
+describe("CalendarioOcupacion · altura fija, sin scroll", () => {
+  const original = {
+    innerHeight: window.innerHeight,
+    ro: (globalThis as { ResizeObserver?: unknown }).ResizeObserver,
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: original.innerHeight });
+  });
+
+  /** jsdom no calcula layout: se le dan medidas a mano (bloque en y=88, rejilla de 700×456). */
+  function conLayout(altoVentana: number) {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: altoVentana });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const top = this.dataset.testid === "calendario-ocupacion" ? 88 : 0;
+      return { top, bottom: top + 100, left: 0, right: 100, width: 100, height: 100, x: 0, y: top, toJSON: () => ({}) };
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 700 });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 456 });
+  }
+
+  it("sin medidas de layout (jsdom) conserva el layout de siempre: ni altura fija ni densidad", async () => {
+    const { container } = montar();
+    await mesPintado();
+    expect(screen.getByTestId("calendario-ocupacion")).not.toHaveAttribute("data-altura-fija");
+    expect(casilla(14)).not.toHaveAttribute("data-densidad");
+    expect(screen.queryByTestId("leyenda-compacta")).toBeNull();
+    // El panel conserva su tope de siempre.
+    expect(container.querySelector('[class*="lg:max-h-"]')).not.toBeNull();
+  });
+
+  it("el bloque mide lo que queda de ventana: alto visual − posición del bloque", async () => {
+    conLayout(800);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(screen.getByTestId("calendario-ocupacion")).toHaveAttribute("data-altura-fija", "712"));
+    expect(screen.getByTestId("calendario-ocupacion").style.getPropertyValue("--alto-bloque")).toBe("712px");
+  });
+
+  it("la rejilla reparte el alto entre las semanas del mes (octubre 2026: 5) con minmax(0,1fr)", async () => {
+    conLayout(800);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(screen.getByTestId("rejilla-mes")).toHaveStyle({ gridTemplateRows: "repeat(5, minmax(0, 1fr))" }));
+  });
+
+  it("cada casilla se adapta a su fila: 88 px de alto → densidad media (sin «N res.»), todo sigue en el aria-label", async () => {
+    tablas.reservas = { data: carga(dia(20), 34) };
+    conLayout(800);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(casilla(20)).toHaveAttribute("data-densidad", "media"));
+    expect(within(casilla(20)).getByTestId("comensales-casilla")).toHaveTextContent("34");
+    expect(within(casilla(20)).queryByTestId("reservas-casilla")).toBeNull();
+    expect(within(casilla(20)).getByTestId("porcentaje-casilla")).toHaveTextContent("20%");
+    expect(casilla(20)).toHaveAttribute("aria-label", expect.stringMatching(/34 comensales en 4 reservas/));
+  });
+
+  it("con una fila de ~65 px la casilla pasa a una sola línea (cifra y barra; sin % escrito ni «N res.»)", async () => {
+    tablas.reservas = { data: carga(dia(20), 34) };
+    conLayout(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(340);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(casilla(20)).toHaveAttribute("data-densidad", "compacta"));
+    expect(within(casilla(20)).getByTestId("comensales-casilla")).toHaveTextContent("34");
+    expect(within(casilla(20)).getByTestId("barras-casilla")).toBeInTheDocument();
+    expect(within(casilla(20)).queryByTestId("porcentaje-casilla")).toBeNull();
+    expect(within(casilla(20)).queryByTestId("reservas-casilla")).toBeNull();
+  });
+
+  it("con poca altura la leyenda pasa a su variante compacta; con mucha, completa", async () => {
+    conLayout(800);
+    const { unmount } = montar();
+    await mesPintado();
+    await waitFor(() => expect(screen.getByTestId("leyenda-compacta")).toBeInTheDocument());
+    unmount();
+    conLayout(1200);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(screen.getByTestId("calendario-ocupacion")).toHaveAttribute("data-altura-fija"));
+    expect(screen.queryByTestId("leyenda-compacta")).toBeNull();
+  });
+
+  it("una ventana demasiado baja no encoge más del suelo (520 px): la página hace scroll antes que casillas ilegibles", async () => {
+    conLayout(500);
+    montar();
+    await mesPintado();
+    await waitFor(() => expect(screen.getByTestId("calendario-ocupacion")).toHaveAttribute("data-altura-fija", "520"));
+  });
+});
+
 // ─── 11. Lo que cambia en OTRO dispositivo ───────────────────────────────────
 
 describe("CalendarioOcupacion · cambios de otros dispositivos", () => {
