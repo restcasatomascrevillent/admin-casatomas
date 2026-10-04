@@ -79,6 +79,20 @@ export function normalizarEmail(email: unknown): string | null {
   return EMAIL_RE.test(v) ? v : null;
 }
 
+/**
+ * Patrón de ILIKE que solo casa con ESE email, sin distinguir mayúsculas:
+ * escapa los comodines de LIKE (`%`, `_`) y la barra de escape. Lo usa el
+ * fallback de resend-webhook cuando no existe la RPC newsletter_registrar_baja
+ * (antes de 20261003184500 la tabla puede tener «Ana@x.es» y el evento trae
+ * «ana@x.es»; un `.eq("email", …)` no lo encontraba).
+ * Devuelve null si el email lleva `*`: PostgREST convierte `*` en `%` dentro de
+ * like/ilike y no hay forma de escaparlo, así que podría dar de baja a otros.
+ */
+export function patronIlikeExacto(email: string): string | null {
+  if (email.includes("*")) return null;
+  return email.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 /** Saca la dirección de "Nombre <a@b.c>" o "a@b.c". */
 function direccionDe(valor: unknown): string | null {
   if (typeof valor !== "string") return null;

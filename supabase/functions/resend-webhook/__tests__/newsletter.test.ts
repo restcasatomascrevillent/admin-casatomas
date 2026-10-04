@@ -5,7 +5,7 @@
  * resend.com/docs/webhooks/contacts/updated (consultado 2026-10-03).
  */
 import { describe, it, expect } from "vitest";
-import { decidirBajaNewsletter, leerEtiquetas, idArchivoEvento, destinatarioArchivo, normalizarEmail } from "../newsletter.ts";
+import { decidirBajaNewsletter, leerEtiquetas, idArchivoEvento, destinatarioArchivo, normalizarEmail, patronIlikeExacto } from "../newsletter.ts";
 
 const SID = "0b6c3c0e-1f0a-4f63-9a59-6a2c2f4b6c11";
 
@@ -106,5 +106,43 @@ describe("normalizarEmail", () => {
   it("minúsculas y recorte", () => {
     expect(normalizarEmail("  A@B.ES ")).toBe("a@b.es");
     expect(normalizarEmail(3)).toBeNull();
+  });
+});
+
+describe("patronIlikeExacto (fallback sin la RPC newsletter_registrar_baja)", () => {
+  // Réplica de ILIKE con la barra invertida como escape, para comprobar el patrón sin base de datos.
+  const escaparRe = (c: string) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const ilike = (valor: string, patron: string) => {
+    let re = "";
+    for (let i = 0; i < patron.length; i++) {
+      const c = patron[i];
+      if (c === "\\") re += escaparRe(patron[++i]);
+      else if (c === "%") re += ".*";
+      else if (c === "_") re += ".";
+      else re += escaparRe(c);
+    }
+    return new RegExp(`^${re}$`, "i").test(valor);
+  };
+
+  it("casa con el mismo email aunque cambien las mayúsculas", () => {
+    expect(ilike("Ana.Perez@Correo.es", patronIlikeExacto("ana.perez@correo.es")!)).toBe(true);
+  });
+
+  it("escapa % y _: no casa con otros emails", () => {
+    expect(patronIlikeExacto("a_b%c@x.es")).toBe("a\\_b\\%c@x.es");
+    expect(ilike("aXbYYc@x.es", patronIlikeExacto("a_b%c@x.es")!)).toBe(false);
+    expect(ilike("a_b%c@x.es", patronIlikeExacto("a_b%c@x.es")!)).toBe(true);
+  });
+
+  it("escapa la barra invertida", () => {
+    expect(patronIlikeExacto("a\\b@x.es")).toBe("a\\\\b@x.es");
+  });
+
+  it("con un asterisco devuelve null (PostgREST lo trataría como comodín)", () => {
+    expect(patronIlikeExacto("a*@x.es")).toBeNull();
+  });
+
+  it("no casa con un email que solo lo contiene", () => {
+    expect(ilike("xana@correo.es", patronIlikeExacto("ana@correo.es")!)).toBe(false);
   });
 });

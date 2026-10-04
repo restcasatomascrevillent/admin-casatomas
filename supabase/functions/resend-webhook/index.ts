@@ -17,6 +17,7 @@ import {
   broadcastIdDe,
   idArchivoEvento,
   destinatarioArchivo,
+  patronIlikeExacto,
   type DecisionBajaNewsletter,
 } from "./newsletter.ts";
 
@@ -476,7 +477,8 @@ async function actuarSobreEnvio(
 // BAJA DEL NEWSLETTER — RPC newsletter_registrar_baja (migración
 // 20261003171500: compara el email sin mayúsculas y solo toca filas activas).
 // Si la migración aún no está aplicada, cae a un UPDATE directo (por id si el
-// correo traía la etiqueta `suscriptor`, si no por email exacto) — puede que
+// correo traía la etiqueta `suscriptor`, si no por email sin distinguir
+// mayúsculas: ILIKE con los comodines escapados, como la RPC) — puede que
 // el CHECK de origen_baja todavía no acepte el valor nuevo y falle: se queda en
 // el log y el evento archivado, igual que el resto de este webhook.
 // ==============================================================================
@@ -499,7 +501,16 @@ async function darDeBajaNewsletter(supabase: SupabaseClient, d: DecisionBajaNews
     .from("newsletter_suscriptores")
     .update({ activo: false, fecha_baja: ahora, origen_baja: d.origen })
     .eq("activo", true);
-  consulta = d.suscriptorId ? consulta.eq("id", d.suscriptorId) : consulta.eq("email", d.email);
+  if (d.suscriptorId) {
+    consulta = consulta.eq("id", d.suscriptorId);
+  } else {
+    const patron = patronIlikeExacto(d.email);
+    if (patron === null) {
+      console.error("[resend-webhook] Email con «*»: sin la RPC no se puede buscar sin riesgo; no se da de baja a nadie.");
+      return 0;
+    }
+    consulta = consulta.ilike("email", patron);
+  }
   const { data: actualizadas, error: errUpdate } = await consulta.select("id");
   if (errUpdate) {
     console.error("[resend-webhook] No se pudo dar de baja del newsletter:", errUpdate.message);
