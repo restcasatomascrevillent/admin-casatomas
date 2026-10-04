@@ -131,7 +131,11 @@ const pestanaDe = (fecha: string) => {
 };
 const abrirDia = (fecha: string) => fireEvent.mouseDown(pestanaDe(fecha));
 const diaAbierto = () => document.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute("data-fecha");
-const celdaResumen = (titulo: string) => screen.getByText(titulo, { selector: "dt" }).closest("div")!;
+/** Resumen del día: una línea pequeña junto al título (ya no hay tarjetas de contadores). */
+const resumenDia = () => screen.getByTestId("resumen-dia");
+/** Sección de un turno («Comida» / «Cena»): su cabecera lleva el resumen del turno. */
+const seccionTurno = (titulo: "Comida" | "Cena") =>
+  screen.getByText(titulo, { selector: "h3, span" }).closest(".rounded-lg.border") as HTMLElement;
 /** Filas de reserva del panel abierto. Con 100 filas, las consultas por rol de Testing Library tardan segundos. */
 const filasDelPanel = () => document.querySelectorAll('[role="tabpanel"] li');
 
@@ -383,20 +387,49 @@ describe("PanelAsignacion · lo que lleva un día", () => {
   it("resumen del día, de la comida y de la cena: reservas, comensales y sin mesa", () => {
     montar();
 
-    const dia = celdaResumen("Todo el día");
+    const dia = resumenDia();
     expect(dia).toHaveTextContent("4 reservas");
     expect(dia).toHaveTextContent("15 comensales");
     expect(dia).toHaveTextContent("3 sin mesa");
 
-    const comida = celdaResumen("Comida");
+    const comida = seccionTurno("Comida");
     expect(comida).toHaveTextContent("2 reservas");
     expect(comida).toHaveTextContent("7 comensales");
     expect(comida).toHaveTextContent("2 sin mesa");
 
-    const cena = celdaResumen("Cena");
+    const cena = seccionTurno("Cena");
     expect(cena).toHaveTextContent("2 reservas");
     expect(cena).toHaveTextContent("8 comensales");
     expect(cena).toHaveTextContent("1 sin mesa");
+  });
+
+  it("ya no hay tarjetas de contadores: el resumen del día es una línea junto al título", () => {
+    montar();
+
+    // Ni la lista de definiciones de las tres tarjetas (Todo el día / Comida / Cena) ni sus títulos.
+    expect(document.querySelector("dl")).toBeNull();
+    expect(document.querySelector("dt")).toBeNull();
+    expect(screen.queryByText("Todo el día")).toBeNull();
+    // El resumen del día va en la fila del título, en una sola línea de texto.
+    const titulo = screen.getByRole("heading", { level: 3, name: /^Mañana/ });
+    const resumen = resumenDia();
+    expect(resumen).toHaveTextContent("4 reservas · 15 comensales · 3 sin mesa");
+    expect(titulo.parentElement).toContainElement(resumen);
+    // Comida y cena lo llevan solo en la cabecera de su sección.
+    expect(screen.getAllByText(/\d+ reservas? · \d+ comensales/)).toHaveLength(3);
+  });
+
+  it("el interruptor «Ocultar las que ya tienen mesa» está en la misma fila que el título del día", () => {
+    montar();
+
+    const titulo = screen.getByRole("heading", { level: 3, name: /^Mañana/ });
+    const cabecera = titulo.closest("header") as HTMLElement;
+    expect(cabecera).not.toBeNull();
+    expect(within(cabecera).getByRole("switch", { name: "Ocultar las que ya tienen mesa" })).toBeInTheDocument();
+    // El día de la ventana de asignación lo dice un chip pequeño en esa misma fila.
+    expect(within(cabecera).getByText("Próximas 48 h")).toBeInTheDocument();
+    // Y no hay otro interruptor suelto fuera de la cabecera del día.
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
   });
 
   it("los turnos van con sus subgrupos por grado y sus filas", () => {
@@ -419,9 +452,9 @@ describe("PanelAsignacion · lo que lleva un día", () => {
     const aviso = screen.getByRole("status");
     expect(aviso).toHaveTextContent("Todo asignado. Las 2 reservas de este día ya tienen mesa.");
     expect(screen.getByText("Cliente h1")).toBeInTheDocument();
-    expect(celdaResumen("Todo el día")).toHaveTextContent("Todo asignado");
-    // Es hoy: se avisa de que solo salen las que aún no han empezado.
-    expect(screen.getByText(/Solo salen las reservas de hoy que aún no han empezado/)).toBeInTheDocument();
+    expect(resumenDia()).toHaveTextContent("todo asignado");
+    // Es hoy: se avisa de que solo salen las que aún no han empezado (texto oculto, sin línea propia).
+    expect(screen.getByText(/Solo salen las reservas de hoy que aún no han empezado/)).toHaveClass("sr-only");
   });
 
   it("un día sin reservas dice «Sin reservas este día»", () => {
@@ -435,10 +468,10 @@ describe("PanelAsignacion · lo que lleva un día", () => {
 
   it("el día abierto dice si cae en la ventana de asignación", () => {
     montar();
-    expect(screen.getByText("Dentro de las próximas 48 h")).toBeInTheDocument();
+    expect(screen.getByText("Próximas 48 h")).toHaveAttribute("title", "Dentro de las próximas 48 h");
 
     abrirDia(MARTES);
-    expect(screen.queryByText("Dentro de las próximas 48 h")).toBeNull();
+    expect(screen.queryByText("Próximas 48 h")).toBeNull();
   });
 });
 
@@ -453,14 +486,14 @@ describe("PanelAsignacion · «Ocultar las que ya tienen mesa»", () => {
 
     expect(screen.queryByText("Cliente m3")).toBeNull();
     expect(screen.queryByText(/Con mesa · /)).toBeNull();
-    const dia = celdaResumen("Todo el día");
+    const dia = resumenDia();
     expect(dia).toHaveTextContent("3 reservas");
     expect(dia).toHaveTextContent("13 comensales");
     expect(dia).toHaveTextContent("3 sin mesa");
     expect(dia).toHaveTextContent("1 con mesa oculta");
     // La que tiene mesa es de la cena: la comida no esconde nada.
-    expect(celdaResumen("Cena")).toHaveTextContent("1 con mesa oculta");
-    expect(celdaResumen("Comida")).not.toHaveTextContent("oculta");
+    expect(seccionTurno("Cena")).toHaveTextContent("1 con mesa oculta");
+    expect(seccionTurno("Comida")).not.toHaveTextContent("oculta");
   });
 
   it("la insignia de cada pestaña (reservas sin mesa) no cambia con el interruptor", () => {
@@ -493,8 +526,8 @@ describe("PanelAsignacion · «Ocultar las que ya tienen mesa»", () => {
 
     ocultar();
 
-    const comida = celdaResumen("Comida");
-    expect(comida).toHaveTextContent("Todo asignado");
+    const comida = seccionTurno("Comida");
+    expect(comida).toHaveTextContent("todo asignado");
     expect(comida).not.toHaveTextContent("Sin reservas");
     expect(comida).toHaveTextContent("1 con mesa oculta");
   });
@@ -528,8 +561,8 @@ describe("PanelAsignacion · sin Touza", () => {
     expect(pestana(/^Dom 4, sin reservas/)).toBeInTheDocument();
     // Ni en las listas ni en el resumen del día.
     expect(screen.queryByText("Cliente t1")).toBeNull();
-    expect(celdaResumen("Todo el día")).toHaveTextContent("4 reservas");
-    expect(celdaResumen("Todo el día")).toHaveTextContent("15 comensales");
+    expect(resumenDia()).toHaveTextContent("4 reservas");
+    expect(resumenDia()).toHaveTextContent("15 comensales");
     abrirDia(SABADO);
     expect(screen.queryByText("Cliente t2")).toBeNull();
     expect(screen.getByText("Cliente s1")).toBeInTheDocument();
@@ -572,7 +605,7 @@ describe("PanelAsignacion · muchas reservas", () => {
     montar();
 
     // 70 reservas: reparto i % 3 → 24 sin sala, 23 con sala sin mesa, 23 con mesa → 47 sin mesa.
-    const total = celdaResumen("Todo el día");
+    const total = resumenDia();
     expect(total).toHaveTextContent("70 reservas");
     expect(total).toHaveTextContent("280 comensales");
     expect(total).toHaveTextContent("47 sin mesa");

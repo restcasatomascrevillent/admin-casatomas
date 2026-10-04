@@ -5,8 +5,6 @@ import { AlertTriangle, Check, ChevronDown, LayoutGrid, Loader2, MapPin, SquareP
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
@@ -246,16 +244,10 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* 04/10/2026, a petición del dueño: sin título ni explicación ni selector de rango (se queda en
-          14 días); solo el interruptor, que es lo que se usa. */}
-      <div className="flex min-h-11 items-center gap-2">
-        <Switch id="asignacion-solo-pendientes" checked={soloPendientes} onCheckedChange={setSoloPendientes} />
-        <Label htmlFor="asignacion-solo-pendientes" className="text-sm font-normal">
-          Ocultar las que ya tienen mesa
-        </Label>
-      </div>
-
+          14 días). El interruptor «Ocultar las que ya tienen mesa» vive en la fila del título del día
+          (`PanelDia`), para que la lista empiece lo más arriba posible. */}
       {!isError && !isLoading && truncado && (
         <div
           role="status"
@@ -286,7 +278,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
           </CardContent>
         </Card>
       ) : (
-        <Tabs value={diaActivo} onValueChange={setDiaElegido} className="space-y-4">
+        <Tabs value={diaActivo} onValueChange={setDiaElegido} className="space-y-3">
           <TiraDias
             dias={pestanas}
             hoy={desde}
@@ -302,6 +294,8 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
               etiquetas={etiquetasDia(diaActivo, desde)}
               enVentana={pestanas.find((p) => p.fecha === diaActivo)?.enVentana ?? false}
               ventanaHoras={asignacion.ventanaHoras}
+              soloPendientes={soloPendientes}
+              onSoloPendientes={setSoloPendientes}
               renderFila={(fila: FilaAsignacionDia) => <FilaReserva key={fila.reserva_id} fila={fila} {...filaProps} />}
             />
           </TabsContent>
