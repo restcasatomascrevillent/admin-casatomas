@@ -26,6 +26,9 @@ set client_encoding = 'UTF8';
 --     lower(email); se recrea el índice NO único de 20261003171500. Los
 --     emails ya guardados siguen en minúsculas (no se "desnormalizan").
 --   · CHECK de origen_alta a los 3 valores de 20260926062009.
+--   · Vuelven las políticas INSERT/UPDATE/DELETE de newsletter_suscriptores
+--     para quien tenga escritura en Marketing (20260918120000) y sus
+--     privilegios de escritura.
 --
 -- Qué NO revierte (a propósito):
 --   · Columnas nuevas (reservas.email_verificado_at y
@@ -194,6 +197,22 @@ alter table public.newsletter_suscriptores
 
 comment on column public.newsletter_suscriptores.origen_alta is
   'Cómo se dio de alta: reserva_web (casilla de consentimiento explícita en el formulario de reserva web), reserva_telefono (mismo consentimiento por teléfono, pendiente de implementar en restaurante-phone), panel_manual (alta manual desde el panel). NULL en altas anteriores a este campo.';
+
+-- --- Escritura del personal: políticas de 20260918120000 ---
+grant insert, update, delete on public.newsletter_suscriptores to authenticated;
+drop policy if exists "newsletter_suscriptores_insert_seccion" on public.newsletter_suscriptores;
+create policy "newsletter_suscriptores_insert_seccion" on public.newsletter_suscriptores
+  for insert to authenticated
+  with check (public.can_write_section('marketing'));
+drop policy if exists "newsletter_suscriptores_update_seccion" on public.newsletter_suscriptores;
+create policy "newsletter_suscriptores_update_seccion" on public.newsletter_suscriptores
+  for update to authenticated
+  using (public.can_write_section('marketing'))
+  with check (public.can_write_section('marketing'));
+drop policy if exists "newsletter_suscriptores_delete_seccion" on public.newsletter_suscriptores;
+create policy "newsletter_suscriptores_delete_seccion" on public.newsletter_suscriptores
+  for delete to authenticated
+  using (public.can_write_section('marketing'));
 
 commit;
 

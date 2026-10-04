@@ -42,6 +42,9 @@ set client_encoding = 'UTF8';
 --   T9  el panel no puede poner la casilla ni en reservas ni en solicitudes;
 --       cambiar el email anula casilla y verificación
 --   T10 origen_alta por canal: manual -> reserva_manual
+--   T11 solo el sistema escribe en newsletter_suscriptores: sin políticas ni
+--       privilegios de INSERT/UPDATE/DELETE para anon/authenticated (el
+--       panel solo lee); la lectura con permiso de Marketing sigue
 -- Reservas de prueba en 2099-07-21 (si ese día tuviera reservas reales no
 -- pasa nada: se insertan dentro de la transacción y se deshacen).
 -- ===========================================================================
@@ -361,6 +364,31 @@ begin
   update public.reservas set email_verificado_at = now() where id = v_id;
   assert (select origen_alta from public.newsletter_suscriptores where email = 't10t@optin.invalid') = 'reserva_telefono',
     'T10: canal telefono no quedó como reserva_telefono';
+end
+$$;
+
+-- T11: el personal no puede saltarse el doble opt-in ni la baja escribiendo
+-- directamente en la tabla (INSERT de un activo, UPDATE del email, DELETE de
+-- una baja + INSERT nuevo).
+do $$
+begin
+  assert not exists (select 1 from pg_policies
+                      where schemaname = 'public' and tablename = 'newsletter_suscriptores'
+                        and cmd in ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+                        and roles && array['authenticated', 'anon', 'public']::name[]),
+    'T11: queda una política de escritura en newsletter_suscriptores para authenticated/anon';
+  assert exists (select 1 from pg_policies
+                  where schemaname = 'public' and tablename = 'newsletter_suscriptores'
+                    and policyname = 'newsletter_suscriptores_select_seccion'),
+    'T11: desapareció la política de lectura de Marketing';
+  assert not has_table_privilege('authenticated', 'public.newsletter_suscriptores', 'INSERT'),
+    'T11: authenticated aún tiene INSERT en newsletter_suscriptores';
+  assert not has_table_privilege('authenticated', 'public.newsletter_suscriptores', 'UPDATE'),
+    'T11: authenticated aún tiene UPDATE en newsletter_suscriptores';
+  assert not has_table_privilege('authenticated', 'public.newsletter_suscriptores', 'DELETE'),
+    'T11: authenticated aún tiene DELETE en newsletter_suscriptores';
+  assert not has_table_privilege('anon', 'public.newsletter_suscriptores', 'INSERT'),
+    'T11: anon tiene INSERT en newsletter_suscriptores';
 end
 $$;
 

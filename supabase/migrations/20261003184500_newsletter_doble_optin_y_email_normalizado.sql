@@ -171,6 +171,20 @@ set client_encoding = 'UTF8';
 --    Consecuencia aceptada: si alguna de esas reservas ya estaba 'confirmada'
 --    (no se sabe si por el cliente o por el personal), ese suscriptor no
 --    vuelve solo.
+--
+-- E) SOLO EL SISTEMA ESCRIBE EN newsletter_suscriptores (punto 9, revisión
+--    final del 2026-10-04). Las políticas de 20260918120000 dejaban a
+--    cualquier usuario con permiso de escritura en Marketing hacer INSERT,
+--    UPDATE y DELETE directos por la API (el panel no los usa: solo lee). Con
+--    eso el doble opt-in y la «baja sin reactivación manual» se podían saltar:
+--    INSERT de un email cualquiera ya activo, UPDATE del email de una fila
+--    activa, o DELETE de una baja + INSERT nuevo (el trigger de protección es
+--    solo BEFORE UPDATE). Se quitan esas tres políticas y los privilegios de
+--    escritura de anon/authenticated; la lectura (SELECT con permiso de
+--    Marketing) no cambia. Escriben solo los triggers SECURITY DEFINER y las
+--    Edge Functions (service role). Una supresión RGPD a petición del
+--    interesado se hace con su enlace de baja o, si hay que borrar la fila,
+--    desde el SQL editor (postgres).
 -- ============================================================================
 
 begin;
@@ -717,5 +731,13 @@ $$;
 
 COMMENT ON FUNCTION public.newsletter_suscriptores_proteger_baja() IS
   'Trigger BEFORE UPDATE de newsletter_suscriptores: completa fecha/origen de la baja, la hace inmutable y solo deja reactivar con un consentimiento nuevo (reserva del mismo email, casilla posterior a la baja y email verificado). Migraciones 20261003171500 y 20261003184500.';
+
+-- --- 9. Solo el sistema escribe en newsletter_suscriptores (punto E) ---
+-- El personal LEE (newsletter_suscriptores_select_seccion, sin cambios); nadie
+-- con un JWT de usuario puede dar de alta, cambiar ni borrar filas.
+DROP POLICY IF EXISTS "newsletter_suscriptores_insert_seccion" ON public.newsletter_suscriptores;
+DROP POLICY IF EXISTS "newsletter_suscriptores_update_seccion" ON public.newsletter_suscriptores;
+DROP POLICY IF EXISTS "newsletter_suscriptores_delete_seccion" ON public.newsletter_suscriptores;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.newsletter_suscriptores FROM anon, authenticated;
 
 commit;
