@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CalendarClock, Check, ChevronDown, Clock, LayoutGrid, Loader2, MapPin, SquarePen, Users } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertTriangle, Check, ChevronDown, LayoutGrid, Loader2, MapPin, SquarePen, Users } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -63,7 +62,7 @@ import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacio
 // ----------------------------------------------------------------------------
 // El cliente de Casa Tomás solo reserva una hora: la sala y la mesa se deciden
 // por dentro. La pantalla se organiza en PESTAÑAS POR DÍA (2026-10-01, petición
-// del dueño): una por cada día del rango de «Mostrar», cada una con la cuenta
+// del dueño): una por cada día del rango (14 días), cada una con la cuenta
 // de reservas sin mesa de ese día. Dentro de cada día, su resumen y los turnos
 // (comida, cena) agrupados por grado. La ventana de `asignacion_ventana_horas`
 // ya no parte la pantalla en dos bloques: solo MARCA en la tira los días que
@@ -84,7 +83,6 @@ import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacio
 //   lista y la pestaña Hoy).
 // ============================================================================
 
-const OPCIONES_DIAS = [7, 14, 30] as const;
 
 /**
  * PostgREST corta cada petición a 1000 filas, pero `useReservasPorAsignar` lee el rango ENTERO por
@@ -123,7 +121,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
-  const [dias, setDias] = useState<number>(14);
+  const dias = 14;
   const [soloPendientes, setSoloPendientes] = useState(false);
   const [cambioPendiente, setCambioPendiente] = useState<CambioPendiente | null>(null);
   // Día de la pestaña abierta. Sin nada recordado (`null`), cuando llegan los datos se fija el de
@@ -249,52 +247,14 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Asignación de salas y mesas</CardTitle>
-          </div>
-          <CardDescription>
-            El cliente solo reserva una hora: la sala y la mesa se deciden aquí. Elige un día: el número de cada
-            pestaña son sus reservas sin mesa, la marca de verificación{" "}
-            <Check
-              className="inline h-3.5 w-3.5 align-[-2px] text-emerald-700 dark:text-emerald-300"
-              strokeWidth={3}
-              aria-hidden="true"
-            />{" "}
-            significa que ya está todo asignado y el reloj{" "}
-            <Clock className="inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" /> señala los días de las próximas{" "}
-            {asignacion.ventanaHoras}&nbsp;h, los primeros que conviene repartir. Se puede asignar cualquier reserva,
-            esté o no en esa ventana.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="asignacion-dias" className="text-xs text-muted-foreground">
-              Mostrar
-            </Label>
-            <Select value={String(dias)} onValueChange={(v) => setDias(Number(v))}>
-              <SelectTrigger id="asignacion-dias" className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {OPCIONES_DIAS.map((d) => (
-                  <SelectItem key={d} value={String(d)}>
-                    Próximos {d} días
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex h-10 items-center gap-2">
-            <Switch id="asignacion-solo-pendientes" checked={soloPendientes} onCheckedChange={setSoloPendientes} />
-            <Label htmlFor="asignacion-solo-pendientes" className="text-sm font-normal">
-              Ocultar las que ya tienen mesa
-            </Label>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 04/10/2026, a petición del dueño: sin título ni explicación ni selector de rango (se queda en
+          14 días); solo el interruptor, que es lo que se usa. */}
+      <div className="flex min-h-11 items-center gap-2">
+        <Switch id="asignacion-solo-pendientes" checked={soloPendientes} onCheckedChange={setSoloPendientes} />
+        <Label htmlFor="asignacion-solo-pendientes" className="text-sm font-normal">
+          Ocultar las que ya tienen mesa
+        </Label>
+      </div>
 
       {!isError && !isLoading && truncado && (
         <div
@@ -305,7 +265,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
           <p>
             <span className="font-medium">Puede que falten reservas.</span> Este rango tiene más de{" "}
             {LIMITE_FILAS_TEXTO} reservas y solo se han cargado las primeras {LIMITE_FILAS_TEXTO}, por fecha y hora:
-            las cuentas de los últimos días pueden quedarse cortas. Elige menos días en «Mostrar».
+            las cuentas de los últimos días pueden quedarse cortas.
           </p>
         </div>
       )}

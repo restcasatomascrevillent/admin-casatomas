@@ -211,23 +211,24 @@ describe("PanelAsignacion · la tira de días", () => {
     expect(pestana(/^Hoy, todo asignado/)).toBeInTheDocument();
   });
 
-  it("ya no hay bloques «Próximas 48 horas» / «Más adelante» y el texto explica la tira", () => {
+  it("ya no hay bloques «Próximas 48 horas» / «Más adelante», ni título, ni explicación, ni «Mostrar»", () => {
     montar();
 
     expect(screen.queryByText(/Próximas 48 horas/)).toBeNull();
     expect(screen.queryByText("Más adelante")).toBeNull();
-    expect(screen.getByText(/Elige un día/)).toHaveTextContent(/el reloj señala los días de las próximas 48 h/);
+    // 04/10/2026, a petición del dueño: arriba solo queda el interruptor.
+    expect(screen.queryByText("Asignación de salas y mesas")).toBeNull();
+    expect(screen.queryByText(/Elige un día/)).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Mostrar" })).toBeNull();
+    expect(screen.getByRole("switch", { name: "Ocultar las que ya tienen mesa" })).toBeInTheDocument();
   });
 
-  it("con «Mostrar» más corto hay menos pestañas", async () => {
+  it("el rango es fijo: 14 días desde hoy (15 pestañas)", () => {
     montar();
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Mostrar" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Próximos 7 días" }));
-
-    expect(screen.getAllByRole("tab")).toHaveLength(8);
-    expect(pestanaDe("2026-10-08")).toBeInTheDocument();
-    expect(document.querySelector('[role="tab"][data-fecha="2026-10-09"]')).toBeNull();
+    expect(screen.getAllByRole("tab")).toHaveLength(15);
+    expect(pestanaDe("2026-10-15")).toBeInTheDocument();
+    expect(document.querySelector('[role="tab"][data-fecha="2026-10-16"]')).toBeNull();
   });
 });
 
@@ -296,27 +297,6 @@ describe("PanelAsignacion · qué día se abre", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Ocultar las que ya tienen mesa" }));
 
     expect(diaAbierto()).toBe(SABADO);
-  });
-
-  it("al cambiar «Mostrar» se conserva el día si sigue existiendo y, si no, vuelve al de por defecto", async () => {
-    h.filas = [...datosBase(), fila("x1", "2026-10-12", "13:00:00", "sin_sala")];
-    montar();
-    abrirDia(MARTES);
-
-    // 7 días: el martes 6 sigue en el rango.
-    fireEvent.click(screen.getByRole("combobox", { name: "Mostrar" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Próximos 7 días" }));
-    expect(diaAbierto()).toBe(MARTES);
-
-    // Se elige un día de más adelante y se acorta el rango: ese día ya no existe.
-    fireEvent.click(screen.getByRole("combobox", { name: "Mostrar" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Próximos 14 días" }));
-    abrirDia("2026-10-12");
-    expect(diaAbierto()).toBe("2026-10-12");
-    fireEvent.click(screen.getByRole("combobox", { name: "Mostrar" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Próximos 7 días" }));
-
-    expect(diaAbierto()).toBe(MANANA);
   });
 
   it("no se mueve solo cuando se asignan las últimas mesas del día abierto", () => {
@@ -526,9 +506,8 @@ describe("PanelAsignacion · sin Touza", () => {
 
     expect(screen.queryByRole("combobox", { name: "Negocio" })).toBeNull();
     expect(screen.queryByText("Negocio")).toBeNull();
-    // Solo queda «Mostrar» entre los desplegables.
-    expect(screen.getAllByRole("combobox")).toHaveLength(1);
-    expect(screen.getByRole("combobox", { name: "Mostrar" })).toBeInTheDocument();
+    // Ya no queda ningún desplegable (tampoco «Mostrar», retirado el 04/10/2026).
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
     // La insignia de negocio (`NegocioBadge`) llevaba este título.
     expect(document.querySelector('[title^="Negocio:"]')).toBeNull();
     expect(screen.queryByText("Casa Tomás")).toBeNull();
@@ -734,7 +713,6 @@ describe("PanelAsignacion · tope de la consulta", () => {
     montar();
 
     expect(screen.getByText("Puede que falten reservas.")).toBeInTheDocument();
-    expect(screen.getByText(/Elige menos días en «Mostrar»/)).toBeInTheDocument();
     expect(screen.getByText(/más de 10\.000 reservas y solo se han cargado las primeras 10\.000/)).toBeInTheDocument();
     expect(diaAbierto()).toBe(MANANA);
   });
