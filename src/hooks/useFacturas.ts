@@ -25,6 +25,13 @@ export interface Factura {
   tipo: string;
   numero_documento: string;
   proveedor: string | null;
+  /**
+   * `facturas.proveedor_normalizado` (columna generada con
+   * `normalizar_proveedor()`): minusculas, sin acentos ni sufijo legal. Es lo
+   * que permite saber que "Bodega Campoluz, S.L." y "BODEGA CAMPOLUZ, S.L."
+   * son el mismo proveedor. Opcional para no romper los mocks que no la traen.
+   */
+  proveedor_normalizado?: string | null;
   cif: string | null;
   fecha: string;
   subtotal: number | null;
@@ -63,7 +70,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
   const { data, error } = await supabase
     .from('facturas')
     .select(`
-      id, tipo, numero_documento, proveedor, cif, fecha,
+      id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
@@ -97,6 +104,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       tipo: doc.tipo,
       numero_documento: doc.numero_documento,
       proveedor: doc.proveedor,
+      proveedor_normalizado: doc.proveedor_normalizado ?? null,
       cif: doc.cif,
       fecha: doc.fecha,
       subtotal: doc.subtotal != null ? Number(doc.subtotal) : null,
