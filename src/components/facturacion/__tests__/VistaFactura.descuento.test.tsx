@@ -11,7 +11,7 @@ describe("Descuento global en la factura",()=>{
     const fila=(label:string)=>within(screen.getByText(label).parentElement!);
     expect(fila("Antes del descuento global").getByText(/180,00/)).toBeInTheDocument();
     expect(fila("Descuento global 25%").getByText(/45,00/)).toBeInTheDocument();
-    expect(fila("Después de los descuentos").getByText(/135,00/)).toBeInTheDocument();
+    expect(fila("Base imponible").getByText(/135,00/)).toBeInTheDocument();
     expect(fila("TOTAL").getByText(aplicarIva ? /163,35/ : /135,00/)).toBeInTheDocument();
   });
   it("resume los descuentos de conceptos aunque no exista descuento global",()=>{
@@ -20,8 +20,10 @@ describe("Descuento global en la factura",()=>{
     render(<VistaFactura factura={f}/>);
     const fila=(label:string)=>within(screen.getByText(label).parentElement!);
     expect(fila("Antes de los descuentos").getByText(/2050,00|2.050,00/)).toBeInTheDocument();
-    expect(fila("Descuentos por concepto").getByText(/1150,00|1.150,00/)).toBeInTheDocument();
-    expect(fila("Después de los descuentos").getByText(/900,00/)).toBeInTheDocument();
+    expect(fila("Descuento total aplicado").getByText(/1150,00|1.150,00/)).toBeInTheDocument();
+    expect(screen.queryByText("Descuentos por concepto")).toBeNull();
+    expect(screen.queryByText("Después de los descuentos")).toBeNull();
+    expect(fila("Base imponible").getByText(/900,00/)).toBeInTheDocument();
     expect(screen.queryByText("Antes del descuento global")).toBeNull();
   });
   it("mantiene la base imponible cuando no hay descuento global",()=>{

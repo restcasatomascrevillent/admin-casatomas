@@ -40,11 +40,10 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
         </div>
         <dl className="ml-auto max-w-sm space-y-2 text-sm">
           {hayDescuento && <><div className="flex justify-between gap-4"><dt>Antes de los descuentos</dt><dd>{euros(bruto)}</dd></div>
-            {t.descuentosLineas > 0 && <div className="flex justify-between gap-4"><dt>Descuentos por concepto</dt><dd>−{euros(t.descuentosLineas)}</dd></div>}
             {(f.descuentoGlobal ?? 0) > 0 && <><div className="flex justify-between gap-4"><dt>Antes del descuento global</dt><dd>{euros(t.subtotal)}</dd></div>
             <div className="flex justify-between gap-4"><dt>Descuento global {f.descuentoGlobal}%</dt><dd>−{euros(t.descuentoGlobal)}</dd></div></>}
             <div className="flex justify-between gap-4 font-medium"><dt>Descuento total aplicado</dt><dd>−{euros(t.descuentosLineas+t.descuentoGlobal)}</dd></div></>}
-          <div className="flex justify-between gap-4"><dt>{hayDescuento ? "Después de los descuentos" : "Base imponible"}</dt><dd>{euros(t.base)}</dd></div>
+          <div className="flex justify-between gap-4"><dt>Base imponible</dt><dd>{euros(t.base)}</dd></div>
           {t.grupos.map(g => <div key={g.tipo} className="flex justify-between gap-4"><dt>IVA {g.tipo}%</dt><dd>{euros(g.importe)}</dd></div>)}
           {f.retencion > 0 && <div className="flex justify-between gap-4"><dt>Retención {f.retencion}%</dt><dd>−{euros(t.retencion)}</dd></div>}
           <div className="flex justify-between gap-4 bg-[#ffb300] px-3 py-3 text-base font-bold"><dt>TOTAL</dt><dd>{euros(t.total)}</dd></div>
