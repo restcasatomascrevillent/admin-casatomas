@@ -656,7 +656,7 @@ export function GestorReservasKanban() {
           <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
         </ToggleGroup>
         <p className="text-xs text-muted-foreground sm:basis-full lg:basis-auto lg:ml-auto">
-          Mantén pulsada una tarjeta y arrástrala a otro espacio, o usa <MoreVertical className="inline h-3 w-3" aria-hidden="true" /> → «Mover a…».
+          Toca una tarjeta para ver sus acciones (<MoreVertical className="inline h-3 w-3" aria-hidden="true" />), o mantenla pulsada y arrástrala a otro espacio.
         </p>
       </div>
 
@@ -711,6 +711,7 @@ export function GestorReservasKanban() {
                         onEditar={(r) => editarReserva(r.id)}
                         onDarMesa={darMesa}
                         sinMesa={estaSinMesa(reserva)}
+                        mesas={mesasPorReserva.get(reserva.id)}
                         puedeEditar={puedeEditar}
                         anchoColumna={disposicion.anchoColumna}
                       />
@@ -731,6 +732,8 @@ export function GestorReservasKanban() {
               onMover={solicitarMovimiento}
               onToggleImportante={toggleImportante}
               onBlacklist={setBlacklistReserva}
+              sinMesa={estaSinMesa(activeReserva)}
+              mesas={mesasPorReserva.get(activeReserva.id)}
               puedeEditar={puedeEditar}
               isDragOverlay
             />

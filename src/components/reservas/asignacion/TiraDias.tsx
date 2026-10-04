@@ -99,7 +99,7 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
       ref={tiraRef}
       // Fija arriba al bajar por un día largo. En móvil queda justo debajo de la barra superior
       // (`DashboardLayout`: h-12, sticky, z-50); en escritorio no hay barra.
-      className="sticky top-12 z-30 border-b bg-background py-2 md:top-0"
+      className="sticky top-12 z-30 border-b bg-background py-1 md:top-0"
     >
       <div className="flex items-center gap-1.5">
         {sale && (
@@ -107,7 +107,7 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
             type="button"
             variant="outline"
             size="icon"
-            className="hidden h-9 w-9 shrink-0 sm:inline-flex"
+            className="hidden h-9 w-9 shrink-0 pointer-coarse:h-11 pointer-coarse:w-11 sm:inline-flex"
             tabIndex={-1}
             aria-label="Ver días anteriores"
             disabled={!borde.izquierda}
@@ -122,7 +122,10 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
             ref={scrollRef}
             className="no-scrollbar relative overflow-x-auto overscroll-x-contain rounded-md"
           >
-            <TabsList className="h-auto w-max min-w-full justify-start gap-1 p-1">
+            {/* `max-w-none` + `no-scrollbar`: el que hace scroll es el contenedor de fuera (el que miden las
+                flechas), no la propia lista, y sin barra visible (04/10/2026: ocupaba una fila entera).
+                `pointer-coarse:min-h-0`: la altura la dan las pestañas (44 px con dedo). */}
+            <TabsList className="no-scrollbar h-auto w-max min-w-full max-w-none justify-start gap-1 p-0.5 pointer-coarse:min-h-0">
               {dias.map((d) => {
                 const etiquetas = etiquetasDia(d.fecha, hoy);
                 const estado = textoEstado(d);
@@ -134,7 +137,7 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
                     data-fecha={d.fecha}
                     aria-label={[etiquetas.corta, estado, ventana].filter(Boolean).join(", ")}
                     title={[etiquetas.titulo, estado, ventana].filter(Boolean).join(" · ")}
-                    className="h-10 min-w-[3.25rem] shrink-0 cursor-pointer touch-manipulation gap-1.5 px-2.5 hover:bg-background/60 data-[state=active]:hover:bg-background sm:h-9 sm:px-3"
+                    className="h-9 min-w-[3.25rem] shrink-0 cursor-pointer touch-manipulation gap-1.5 px-2.5 hover:bg-background/60 data-[state=active]:hover:bg-background pointer-coarse:h-11 sm:px-3"
                   >
                     {d.enVentana && <Clock className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />}
                     <span>{etiquetas.corta}</span>
@@ -164,7 +167,7 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
             type="button"
             variant="outline"
             size="icon"
-            className="hidden h-9 w-9 shrink-0 sm:inline-flex"
+            className="hidden h-9 w-9 shrink-0 pointer-coarse:h-11 pointer-coarse:w-11 sm:inline-flex"
             tabIndex={-1}
             aria-label="Ver días siguientes"
             disabled={!borde.derecha}

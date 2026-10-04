@@ -131,7 +131,11 @@ const Facturas = () => {
             {/* PESTAÑA 1: DOCUMENTOS */}
             <TabsContent value="documentos" className="h-full m-0 outline-none flex flex-col data-[state=inactive]:hidden">
               <div className="flex-1 bg-card rounded-xl border border-border/50 shadow-sm flex flex-col min-h-0 overflow-hidden">
-                <Tabs defaultValue="facturas" className="w-full flex-1 flex flex-col">
+                {/* `min-h-0` imprescindible: sin él este flex item no puede ser más
+                    bajo que su contenido, crece hasta el alto de TODAS las filas y la
+                    tarjeta (`overflow-hidden`) lo recorta — el listado de abajo nunca
+                    llega a desbordar y no hay scroll (2026-10-04). */}
+                <Tabs defaultValue="facturas" className="w-full flex-1 flex flex-col min-h-0">
                   <div className="shrink-0 px-2 sm:px-4 pt-2 sm:pt-4 pb-0 bg-muted/5 border-b border-border/30">
                     <TabsList className="flex h-11 w-full justify-start rounded-none bg-transparent p-0 overflow-x-auto no-scrollbar">
                       <TabsTrigger

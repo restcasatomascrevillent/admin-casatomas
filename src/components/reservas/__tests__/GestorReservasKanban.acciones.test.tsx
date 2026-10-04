@@ -549,14 +549,17 @@ describe("tarjeta · «Mover a…»", () => {
     const aviso = within(menu).getByRole("menuitem", { name: MOTIVO_SIN_PERMISO });
     expect(aviso).toHaveAttribute("data-disabled");
     expect(within(menu).queryByRole("menuitem", { name: /^Terraza/ })).not.toBeInTheDocument();
-    // dnd-kit apaga el arrastre (ratón, tacto y teclado) con `aria-disabled` en la tarjeta.
-    expect(await tarjeta("Ana")).toHaveAttribute("aria-disabled", "true");
+    // El arrastre (ratón, tacto y teclado) está apagado en dnd-kit (`disabled`); la tarjeta lo dice con
+    // `data-arrastrable` y sin `aria-disabled`, porque tocarla abre el menú.
+    expect(await tarjeta("Ana")).toHaveAttribute("data-arrastrable", "false");
+    expect(await tarjeta("Ana")).not.toHaveAttribute("aria-disabled");
     expect(escrituras()).toEqual([]);
   });
 
   it("con permiso la tarjeta de una reserva viva SÍ se arrastra", async () => {
     montar();
 
+    expect(await tarjeta("Ana")).toHaveAttribute("data-arrastrable", "true");
     expect(await tarjeta("Ana")).toHaveAttribute("aria-disabled", "false");
   });
 
@@ -568,7 +571,7 @@ describe("tarjeta · «Mover a…»", () => {
 
     expect(within(menu).getByText("No se puede mover en este estado")).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: /^Terraza/ })).not.toBeInTheDocument();
-    expect(await tarjeta("Fede")).toHaveAttribute("aria-disabled", "true");
+    expect(await tarjeta("Fede")).toHaveAttribute("data-arrastrable", "false");
     expect(escrituras()).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MAX_MESAS_POR_LOTE,
+  etiquetaMesasReserva,
   generarNumerosMesaEnRango,
   mensajeChoquesLoteNombresMesa,
   mensajeChoquesResueltos,
@@ -361,5 +362,30 @@ describe("mensajeChoquesResueltos", () => {
     ]);
     expect(mensaje).toContain("7 → 7-bis");
     expect(mensaje).not.toContain("8 →");
+  });
+});
+
+describe("etiquetaMesasReserva (insignia de la tarjeta)", () => {
+  it("una mesa: «Mesa 7»", () => {
+    expect(etiquetaMesasReserva(["7"])).toBe("Mesa 7");
+  });
+
+  it("varias mesas: «Mesas 7, 9», en el orden recibido", () => {
+    expect(etiquetaMesasReserva(["7", "9"])).toBe("Mesas 7, 9");
+  });
+
+  it("una mesa fusionada ya lleva el «+» en el nombre: «Mesa 7+8»", () => {
+    expect(etiquetaMesasReserva(["7+8"])).toBe("Mesa 7+8");
+  });
+
+  it("sin mesas (o solo nombres vacíos) no hay etiqueta: quien llama decide si pinta «Sin mesa»", () => {
+    expect(etiquetaMesasReserva([])).toBeNull();
+    expect(etiquetaMesasReserva(undefined)).toBeNull();
+    expect(etiquetaMesasReserva(["", "  ", null])).toBeNull();
+  });
+
+  it("ignora vacíos y repetidos, y no escribe «Mesa Mesa 9»", () => {
+    expect(etiquetaMesasReserva(["7", "", "7"])).toBe("Mesa 7");
+    expect(etiquetaMesasReserva(["Mesa 9"])).toBe("Mesa 9");
   });
 });
