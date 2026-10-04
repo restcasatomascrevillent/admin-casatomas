@@ -31,7 +31,7 @@ describe("Orden de módulos",()=>{
     fireEvent.click(screen.getByRole("button",{name:"Cancelar"}));
     expect(screen.getByLabelText("Precio de Reservas")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Eliminar Reservas"}));
-    fireEvent.click(screen.getByRole("button",{name:"Eliminar módulo",exact:true}));
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar módulo"}));
     expect(screen.queryByLabelText("Precio de Reservas")).toBeNull();
     const data=JSON.parse(screen.getByTestId("catalogo").textContent!);
     expect(data.productos.map((p:{id:string})=>p.id)).toEqual(["a","c"]);

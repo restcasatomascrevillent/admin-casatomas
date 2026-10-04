@@ -44,7 +44,7 @@ describe("editor simplificado",()=>{
     fireEvent.click(screen.getByRole("button",{name:"Cancelar"}));
     expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3);
     fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 2"}));
-    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto",exact:true}));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto"}));
     await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(2));
   });
 
@@ -56,7 +56,7 @@ describe("editor simplificado",()=>{
     fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
     expect(screen.getByRole("button",{name:"Eliminar concepto 1"})).toBeEnabled();
     fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 1"}));
-    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto",exact:true}));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto"}));
     await waitFor(()=>expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Descripción")).toHaveValue(""));
     const concepto=within(screen.getByRole("group",{name:"Concepto 1"}));
     expect(concepto.getByLabelText("Descripción")).toHaveValue("");
