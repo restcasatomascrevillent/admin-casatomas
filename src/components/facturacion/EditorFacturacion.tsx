@@ -231,7 +231,7 @@ export function EditorFacturacion() {
             {f.lineas.map((l,i) => <fieldset key={l.id} className="min-w-0 space-y-3 rounded-lg border p-3">
               <legend className="px-2 text-xs font-semibold">Concepto {i+1}</legend>
               <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><Campo titulo="Descripción"><Input maxLength={300} value={l.concepto} onChange={e => linea(l.id,{concepto:e.target.value})} /></Campo></div>
-                <Button className="mt-6 shrink-0" size="icon" variant="ghost" disabled={f.lineas.length === 1} aria-label={"Eliminar concepto " + (i+1)} onClick={() => cambiar({...f,lineas:f.lineas.filter(v => v.id !== l.id)})}><Trash2 className="h-4 w-4" /></Button></div>
+                <Button className="mt-6 shrink-0" size="icon" variant="ghost" aria-label={"Eliminar concepto " + (i+1)} onClick={() => cambiar({...f,lineas:f.lineas.length === 1 ? [{...nuevaLinea("Otros"),concepto:""}] : f.lineas.filter(v => v.id !== l.id)})}><Trash2 className="h-4 w-4" /></Button></div>
 
               <div className="grid grid-cols-3 items-end gap-2">
                 <Campo titulo="Cantidad"><Input type="number" min={0.01} max={100000} step="0.01" value={l.cantidad} onChange={e=>linea(l.id,{cantidad:Number(e.target.value)})} /></Campo>

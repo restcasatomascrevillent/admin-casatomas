@@ -19,6 +19,22 @@ beforeEach(()=>{
   mock.data={config:{documento,actualizado_en:"2026-10-03T12:00:00Z"},facturas:[]};
 });
 describe("editor simplificado",()=>{
+  it("permite eliminar el último concepto y deja una línea vacía para empezar",async()=>{
+    mock.data!.config!.documento.lineas[0].concepto="Licencia del panel";
+    mock.data!.config!.documento.lineas[0].precio=40;
+    mock.guardar.mockImplementation(async(documento)=>({config:{documento,actualizado_en:"nueva-version"}}));
+    render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    expect(screen.getByRole("button",{name:"Eliminar concepto 1"})).toBeEnabled();
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 1"}));
+    const concepto=within(screen.getByRole("group",{name:"Concepto 1"}));
+    expect(concepto.getByLabelText("Descripción")).toHaveValue("");
+    expect(concepto.getByLabelText("Precio unitario (€)")).toHaveValue(0);
+    fireEvent.click(screen.getByRole("button",{name:"Guardar borrador"}));
+    await waitFor(()=>expect(mock.guardar).toHaveBeenCalled());
+    expect(mock.guardar.mock.calls[0][0].lineas[0]).toMatchObject({concepto:"",precio:0});
+  });
+
   it("mantiene las tres pestañas y permite consultar un historial vacío",()=>{
     render(<EditorFacturacion/>);
     expect(screen.getByRole("tab",{name:"Nueva factura"})).toBeInTheDocument();
