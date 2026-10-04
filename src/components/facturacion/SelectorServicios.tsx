@@ -1,15 +1,16 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, useSortable, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Plus, Package, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, Plus, Package, GripVertical, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { categorias, periodicidades, euros, type CatalogoFacturacion, type LineaFactura } from "./modelo";
 import { productosSeleccionados } from "./catalogo";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface Props {
   catalogo: CatalogoFacturacion; lineas: LineaFactura[];
@@ -41,7 +42,7 @@ export function SelectorServicios({catalogo,lineas,agregar}: Props) {
   </CardContent></Card>;
 }
 
-function ServicioOrdenable({id,nombre,index,total,busy,mover,children}: {id:string;nombre:string;index:number;total:number;busy:boolean;mover:(from:number,to:number)=>void;children:ReactNode}) {
+function ServicioOrdenable({id,nombre,index,total,busy,mover,eliminar,children}: {id:string;nombre:string;index:number;total:number;busy:boolean;mover:(from:number,to:number)=>void;eliminar:()=>void;children:ReactNode}) {
   const {attributes,listeners,setNodeRef,transform,transition,isDragging} = useSortable({id,disabled:busy});
   return <div ref={setNodeRef} style={{transform:CSS.Transform.toString(transform),transition}} className={`relative rounded-lg border bg-background p-3 ${isDragging ? "z-20 shadow-lg ring-2 ring-primary/30" : ""}`}>
     <div className="mb-3 flex items-center gap-2">
@@ -49,12 +50,20 @@ function ServicioOrdenable({id,nombre,index,total,busy,mover,children}: {id:stri
       <span className="min-w-0 flex-1 truncate text-sm font-medium">{index+1}. {nombre}</span>
       <Button type="button" variant="outline" size="icon" disabled={busy || index===0} aria-label={"Subir " + nombre} onClick={()=>mover(index,index-1)}><ArrowUp className="h-4 w-4" /></Button>
       <Button type="button" variant="outline" size="icon" disabled={busy || index===total-1} aria-label={"Bajar " + nombre} onClick={()=>mover(index,index+1)}><ArrowDown className="h-4 w-4" /></Button>
+      <Button type="button" variant="ghost" size="icon" disabled={busy} aria-label={"Eliminar " + nombre} className="shrink-0 text-destructive hover:text-destructive" onClick={eliminar}><Trash2 className="h-4 w-4" /></Button>
     </div>
     <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
   </div>;
 }
 
 export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFacturacion;cambiar:(c:CatalogoFacturacion)=>void;busy:boolean}) {
+  const [eliminarId,setEliminarId] = useState<string | null>(null);
+  const pendiente = catalogo.productos.find(p=>p.id===eliminarId);
+  const eliminar = () => {
+    if(busy || !pendiente)return;
+    cambiar({...catalogo,productos:catalogo.productos.filter(p=>p.id!==pendiente.id),paquetes:catalogo.paquetes.map(p=>({...p,productoIds:p.productoIds.filter(id=>id!==pendiente.id)}))});
+    setEliminarId(null);
+  };
   const sensors = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}),useSensor(KeyboardSensor,{coordinateGetter:sortableKeyboardCoordinates}));
   const mover = (from:number,to:number) => {
     if(busy || from<0 || to<0 || from>=catalogo.productos.length || to>=catalogo.productos.length || from===to)return;
@@ -62,7 +71,8 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
   };
   const producto = (id:string, v:Partial<CatalogoFacturacion["productos"][number]>) => cambiar({...catalogo,productos:catalogo.productos.map(p=>p.id===id?{...p,...v}:p)});
   const selectClass = "h-10 w-full rounded-md border border-input bg-background px-2 text-sm";
-  return <fieldset disabled={busy} className="min-w-0 space-y-5">
+  return <><AlertDialog open={!!pendiente} onOpenChange={open=>{if(!open)setEliminarId(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar módulo del catálogo</AlertDialogTitle><AlertDialogDescription>Vas a eliminar «{pendiente?.nombre}» del catálogo y de los paquetes que lo incluyan. Las facturas ya creadas conservan sus conceptos. Pulsa «Guardar catálogo y tarifas» después para guardar el cambio.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={eliminar}>Eliminar módulo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  <fieldset disabled={busy} className="min-w-0 space-y-5">
     <Card><CardHeader><CardTitle className="text-base">Tarifas de módulos y servicios</CardTitle>
       <p className="text-sm text-muted-foreground">Define tus precios una vez. Se copiarán al seleccionar un módulo o paquete en una nueva factura.</p>
       <p className="text-xs text-muted-foreground">Arrastra desde el asa o usa las flechas para mover los módulos arriba y abajo. Pulsa «Guardar catálogo y tarifas» para conservar el orden.</p>
@@ -72,7 +82,7 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
       }}>
       <SortableContext items={catalogo.productos.map(p=>p.id)} strategy={verticalListSortingStrategy}>
       <div className="space-y-3">
-      {catalogo.productos.map((p,index)=><ServicioOrdenable key={p.id} id={p.id} nombre={p.nombre} index={index} total={catalogo.productos.length} busy={busy} mover={mover}>
+      {catalogo.productos.map((p,index)=><ServicioOrdenable key={p.id} id={p.id} nombre={p.nombre} index={index} total={catalogo.productos.length} busy={busy} mover={mover} eliminar={()=>setEliminarId(p.id)}>
         <label className="text-xs">Servicio<Input aria-label={"Nombre de " + p.nombre} maxLength={160} value={p.nombre} onChange={e=>producto(p.id,{nombre:e.target.value})} className="mt-1" /></label>
         <label className="text-xs">Precio (€)<Input aria-label={"Precio de " + p.nombre} type="number" min={0} max={1000000} step="0.01" value={p.precio} onChange={e=>producto(p.id,{precio:Number(e.target.value)})} className="mt-1" /></label>
         <label className="text-xs">Periodicidad<select className={selectClass+" mt-1"} value={p.periodicidad} onChange={e=>producto(p.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v=><option key={v}>{v}</option>)}</select></label>
@@ -92,5 +102,5 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
     </details>)}
       <Button type="button" variant="outline" disabled={catalogo.paquetes.length>=30} onClick={()=>cambiar({...catalogo,paquetes:[...catalogo.paquetes,{id:crypto.randomUUID(),nombre:"Nuevo paquete",productoIds:[]}]})}><Plus className="mr-2 h-4 w-4" />Crear paquete</Button>
     </CardContent></Card>
-  </fieldset>;
+  </fieldset></>;
 }

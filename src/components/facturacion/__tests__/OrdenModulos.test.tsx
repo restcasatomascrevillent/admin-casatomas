@@ -25,6 +25,19 @@ describe("Orden de módulos",()=>{
     fireEvent.click(screen.getByRole("button",{name:"Bajar Reservas"}));
     expect(screen.getAllByRole("button",{name:/Arrastrar /}).map(b=>b.getAttribute("aria-label"))).toEqual(["Arrastrar Carta","Arrastrar Reservas","Arrastrar Cheques"]);
   });
+  it("confirma la eliminación y retira el módulo de los paquetes",()=>{
+    render(<Harness/>);
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar Reservas"}));
+    fireEvent.click(screen.getByRole("button",{name:"Cancelar"}));
+    expect(screen.getByLabelText("Precio de Reservas")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar Reservas"}));
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar módulo",exact:true}));
+    expect(screen.queryByLabelText("Precio de Reservas")).toBeNull();
+    const data=JSON.parse(screen.getByTestId("catalogo").textContent!);
+    expect(data.productos.map((p:{id:string})=>p.id)).toEqual(["a","c"]);
+    expect(data.paquetes[0].productoIds).toEqual(["a","c"]);
+    expect(data.productos.map((p:{precio:number})=>p.precio)).toEqual([10,15]);
+  });
   it("bloquea los controles mientras se guarda",()=>{
     render(<Harness busy/>);
     expect(screen.getByRole("button",{name:"Arrastrar Reservas"})).toBeDisabled();
