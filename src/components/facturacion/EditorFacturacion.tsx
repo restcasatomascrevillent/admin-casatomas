@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Plus, Save, Download, Trash2, RefreshCw, FilePlus2 } from "lucide-react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { ConceptoOrdenable } from "./ConceptoOrdenable";
+import { Plus, Save, Download, RefreshCw, FilePlus2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +71,17 @@ export function EditorFacturacion() {
     return () => window.removeEventListener("beforeunload", advertir);
   }, [dirty]);
   const cambiar = (next: Factura) => { setF(next); setDirty(true); setFacturaModificada(true); };
+  const sensorsConceptos = useSensors(useSensor(PointerSensor,{activationConstraint:{distance:8}}),useSensor(KeyboardSensor,{coordinateGetter:sortableKeyboardCoordinates}));
+  const moverConcepto = (from:number,to:number) => {
+    if(busy || from<0 || to<0 || from>=f.lineas.length || to>=f.lineas.length || from===to)return;
+    cambiar({...f,lineas:arrayMove(f.lineas,from,to)});
+  };
+  const eliminarConcepto = async (id:string) => {
+    const concepto=f.lineas.find(l=>l.id===id);
+    if(busy || !concepto)return;
+    if(!await confirmar("Eliminar concepto",`Vas a quitar «${concepto.concepto || "Concepto sin descripción"}» de esta factura. Guarda los cambios para conservar la eliminación.`,"Eliminar concepto"))return;
+    cambiar({...f,lineas:f.lineas.length===1 ? [{...nuevaLinea("Otros"),concepto:""}] : f.lineas.filter(l=>l.id!==id)});
+  };
   const linea = (id: string, cambio: Partial<LineaFactura>) => cambiar({...f,lineas:f.lineas.map(l => l.id === id ? {...l,...cambio} : l)});
   const puedeCambiar = async () => !dirty || await confirmar("Cambios sin guardar", "Hay cambios sin guardar. ¿Quieres descartarlos para continuar?", "Descartar cambios");
   const abrir = async (guardada: FacturaGuardada) => {
@@ -227,11 +242,10 @@ export function EditorFacturacion() {
           </>}
           {paso === 1 && <>
           <details className="rounded-lg border p-3" open={!f.lineas.some(l=>l.concepto.trim())}><summary className="cursor-pointer text-sm font-medium">Añadir módulos o paquetes</summary><div className="mt-3"><SelectorServicios catalogo={f.catalogo ?? catalogoInicial()} lineas={f.lineas} agregar={agregar} /></div></details>
-          <Card><CardHeader><CardTitle className="text-base">2. Conceptos de la factura</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid items-start gap-3 lg:grid-cols-2">
-            {f.lineas.map((l,i) => <fieldset key={l.id} className="min-w-0 space-y-3 rounded-lg border p-3">
-              <legend className="px-2 text-xs font-semibold">Concepto {i+1}</legend>
+          <Card><CardHeader><CardTitle className="text-base">2. Conceptos de la factura</CardTitle><p className="text-xs text-muted-foreground">Arrastra desde el asa o usa las flechas para cambiar el orden de los conceptos.</p></CardHeader><CardContent className="space-y-4"><DndContext sensors={sensorsConceptos} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({active,over})=>{if(over)moverConcepto(f.lineas.findIndex(l=>l.id===active.id),f.lineas.findIndex(l=>l.id===over.id));}}><SortableContext items={f.lineas.map(l=>l.id)} strategy={verticalListSortingStrategy}><div className="space-y-3">
+            {f.lineas.map((l,i) => <ConceptoOrdenable key={l.id} id={l.id} index={i} total={f.lineas.length} busy={busy} mover={moverConcepto} eliminar={()=>void eliminarConcepto(l.id)}>
               <div className="flex items-start gap-2"><div className="min-w-0 flex-1"><Campo titulo="Descripción"><Input maxLength={300} value={l.concepto} onChange={e => linea(l.id,{concepto:e.target.value})} /></Campo></div>
-                <Button className="mt-6 shrink-0" size="icon" variant="ghost" aria-label={"Eliminar concepto " + (i+1)} onClick={() => cambiar({...f,lineas:f.lineas.length === 1 ? [{...nuevaLinea("Otros"),concepto:""}] : f.lineas.filter(v => v.id !== l.id)})}><Trash2 className="h-4 w-4" /></Button></div>
+              </div>
 
               <div className="grid grid-cols-3 items-end gap-2">
                 <Campo titulo="Cantidad"><Input type="number" min={0.01} max={100000} step="0.01" value={l.cantidad} onChange={e=>linea(l.id,{cantidad:Number(e.target.value)})} /></Campo>
@@ -241,8 +255,8 @@ export function EditorFacturacion() {
               <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Tipo y periodicidad · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
                 <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
               </details>
-            </fieldset>)}
-            </div><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
+            </ConceptoOrdenable>)}
+            </div></SortableContext></DndContext><Button variant="outline" disabled={f.lineas.length >= 100} onClick={() => cambiar({...f,lineas:[...f.lineas,nuevaLinea()]})}><Plus className="mr-2 h-4 w-4" />Añadir concepto</Button>
             <p className="text-xs text-muted-foreground">Cada línea corresponde al periodo indicado en su descripción. La periodicidad sirve para calcular la cuota mensual; no multiplica el importe de la factura.</p>
           </CardContent></Card>
           </>}

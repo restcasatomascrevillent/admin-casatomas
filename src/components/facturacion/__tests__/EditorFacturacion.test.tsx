@@ -19,6 +19,35 @@ beforeEach(()=>{
   mock.data={config:{documento,actualizado_en:"2026-10-03T12:00:00Z"},facturas:[]};
 });
 describe("editor simplificado",()=>{
+  it("reordena conceptos, conserva precios y respeta el orden en la factura",()=>{
+    render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    fireEvent.click(screen.getByRole("button",{name:/Panel esencial/}));
+    const primero=within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Descripción").getAttribute("value");
+    const segundo=within(screen.getByRole("group",{name:"Concepto 2"})).getByLabelText("Descripción").getAttribute("value");
+    fireEvent.change(within(screen.getByRole("group",{name:"Concepto 2"})).getByLabelText("Precio unitario (€)"),{target:{value:"77"}});
+    fireEvent.click(screen.getByRole("button",{name:"Subir concepto 2"}));
+    expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Descripción")).toHaveValue(segundo);
+    expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Precio unitario (€)")).toHaveValue(77);
+    expect(screen.getByRole("button",{name:"Subir concepto 1"})).toBeDisabled();
+    fireEvent.click(screen.getByRole("button",{name:"4. Revisar"}));
+    const rows=within(screen.getByRole("article")).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent(segundo!);
+    expect(rows[2]).toHaveTextContent(primero!);
+  });
+  it("confirma antes de eliminar un concepto y permite cancelar",async()=>{
+    render(<EditorFacturacion/>);
+    fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
+    fireEvent.click(screen.getByRole("button",{name:/Panel esencial/}));
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 2"}));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"Cancelar"}));
+    expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 2"}));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto",exact:true}));
+    await waitFor(()=>expect(screen.getAllByRole("group",{name:/^Concepto /})).toHaveLength(2));
+  });
+
   it("permite eliminar el último concepto y deja una línea vacía para empezar",async()=>{
     mock.data!.config!.documento.lineas[0].concepto="Licencia del panel";
     mock.data!.config!.documento.lineas[0].precio=40;
@@ -27,6 +56,8 @@ describe("editor simplificado",()=>{
     fireEvent.click(screen.getByRole("button",{name:"2. Servicios"}));
     expect(screen.getByRole("button",{name:"Eliminar concepto 1"})).toBeEnabled();
     fireEvent.click(screen.getByRole("button",{name:"Eliminar concepto 1"}));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button",{name:"Eliminar concepto",exact:true}));
+    await waitFor(()=>expect(within(screen.getByRole("group",{name:"Concepto 1"})).getByLabelText("Descripción")).toHaveValue(""));
     const concepto=within(screen.getByRole("group",{name:"Concepto 1"}));
     expect(concepto.getByLabelText("Descripción")).toHaveValue("");
     expect(concepto.getByLabelText("Precio unitario (€)")).toHaveValue(0);
