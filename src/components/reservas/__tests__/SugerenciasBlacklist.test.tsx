@@ -277,7 +277,8 @@ describe("SugerenciasBlacklist", () => {
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("51–100")).toBeDefined();
     expect(screen.getByText(/Página 2 de 4/)).toBeDefined();
-  });
+    // Dos renders de 50 filas con jsdom: en un portátil normal pasa de los 5 s por defecto.
+  }, 30_000);
 
   it("con una sola página no pinta el paginador", () => {
     renderTabla([makeSugerencia()]);

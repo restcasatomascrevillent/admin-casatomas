@@ -193,7 +193,7 @@ const NO_GESTIONADAS = ["gestion_bot", "asistente_telefonico", "usuarios"];
 const DE_OTRO: FilaBd = { user_id: OTRO, section_key: "reservas", can_view: true, can_edit: true, updated_at: "2026-09-01T10:00:00Z" };
 
 /**
- * Lo que manda el diálogo (sus 6 secciones, `permisosParaEditar`) tras: quitar «Ver» en
+ * Lo que manda el diálogo (sus 7 secciones con Cheques, `permisosParaEditar`) tras: quitar «Ver» en
  * Facturas, dar «Ver» en Carta y dejar el resto como estaba.
  */
 const dialogo = () =>
@@ -240,7 +240,7 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
     expect(escrituras[0].payload!.map((f) => f.section_key).sort()).toEqual(["dashboard", "gestor_carta", "reservas"]);
     expect(escrituras[1].filtros).toEqual([
       ["eq", "user_id", USUARIO],
-      ["in", "section_key", ["gestion_web", "marketing", "facturas"]],
+      ["in", "section_key", ["gestion_web", "marketing", "cheques", "facturas"]],
     ]);
     // Resultado: lo marcado está, lo desmarcado ya no, y la edición de Reservas sigue.
     expect(enBd("reservas")).toMatchObject({ can_view: true, can_edit: true });
