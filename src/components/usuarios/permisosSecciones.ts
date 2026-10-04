@@ -46,6 +46,7 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
+  cheques: "canjear cheques regalo y modificar la plantilla de factura.",
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
 };
 
@@ -94,3 +95,4 @@ export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArr
     (p, i) => p.can_view === pb[i].can_view && p.can_edit === pb[i].can_edit,
   );
 }
+

@@ -2,7 +2,7 @@ import { Bot, Receipt, Scale, Server } from "lucide-react";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TOTAL_MENSUAL_FACTURADO_EUR } from "@/components/dashboard/widgets/GestorGasto";
+import { useMensualFacturado } from "@/hooks/useFacturacionOficiososia";
 import type { FilaCosteMes } from "@/hooks/useCostes";
 import { esNulo, fmtEur, fmtNumero, fmtPct, fmtUsd, fmtUsdEnEur, SIN_DATOS, TEXTO_TIPO_CAMBIO } from "./formato";
 import { calcularTotalMensual, iaUsdMes, TEXTO_ORIGEN, type ResumenCoste } from "./calculos";
@@ -51,11 +51,12 @@ interface KpisCostesProps {
 /**
  * Los cuatro números que el dueño necesita para poner precio: lo que le cuesta
  * la IA, lo que le cuestan los servicios, el total al mes y cuánto le queda de
- * los 246 €/mes que factura.
+ * la cuota recurrente guardada en facturación.
  */
 export function KpisCostes({ resumen, mes, dias }: KpisCostesProps) {
+  const facturado = useMensualFacturado();
   const ia = iaUsdMes(mes);
-  const total = calcularTotalMensual(ia.usd, mes?.fijos_eur_mes ?? null, TOTAL_MENSUAL_FACTURADO_EUR);
+  const total = calcularTotalMensual(ia.usd, mes?.fijos_eur_mes ?? null, facturado);
   const margenNegativo = !esNulo(total.margenEur) && total.margenEur < 0;
 
   return (
@@ -111,7 +112,7 @@ export function KpisCostes({ resumen, mes, dias }: KpisCostesProps) {
         alerta={margenNegativo}
         pie={
           <>
-            Se factura {fmtEur(TOTAL_MENSUAL_FACTURADO_EUR)}/mes (Gestor de Gasto) ·{" "}
+            Se factura {fmtEur(facturado)}/mes (último borrador guardado, sin impuestos) ·{" "}
             {esNulo(total.margenPct) ? SIN_DATOS : fmtPct(total.margenPct)} de margen
           </>
         }
@@ -119,3 +120,4 @@ export function KpisCostes({ resumen, mes, dias }: KpisCostesProps) {
     </div>
   );
 }
+

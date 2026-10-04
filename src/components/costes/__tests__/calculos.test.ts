@@ -310,6 +310,12 @@ describe("iaUsdMes", () => {
 });
 
 describe("calcularTotalMensual", () => {
+  it("sin tarifa guardada conserva el coste conocido pero no inventa un margen", () => {
+    const t = calcularTotalMensual(100, 50, null);
+    expect(t.totalEurAprox).toBeCloseTo(100 * USD_EUR + 50);
+    expect(t.margenEur).toBeNull();
+    expect(t.margenPct).toBeNull();
+  });
   it("convierte los dólares a euros y calcula el margen sobre lo facturado", () => {
     const t = calcularTotalMensual(100, 50, 246);
     expect(t.iaEurAprox).toBeCloseTo(100 * USD_EUR);

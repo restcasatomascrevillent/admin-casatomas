@@ -1,7 +1,7 @@
 import { CalendarClock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TOTAL_MENSUAL_FACTURADO_EUR } from "@/components/dashboard/widgets/GestorGasto";
+import { useMensualFacturado } from "@/hooks/useFacturacionOficiososia";
 import type { FilaCosteMes } from "@/hooks/useCostes";
 import { esNulo, fmtEur, fmtMes, fmtNumero, fmtPct, fmtUsd, fmtUsdEnEur, SIN_DATOS, TEXTO_TIPO_CAMBIO } from "./formato";
 import { calcularTotalMensual, iaUsdMes, TEXTO_ORIGEN } from "./calculos";
@@ -32,8 +32,9 @@ function FilaDato({ etiqueta, valor, detalle }: FilaDatoProps) {
  * precio de venta, así que se dice de dónde sale cada parte.
  */
 export function ProyeccionMes({ mes }: { mes: FilaCosteMes | null | undefined }) {
+  const facturado = useMensualFacturado();
   const ia = iaUsdMes(mes);
-  const total = calcularTotalMensual(ia.usd, mes?.fijos_eur_mes ?? null, TOTAL_MENSUAL_FACTURADO_EUR);
+  const total = calcularTotalMensual(ia.usd, mes?.fijos_eur_mes ?? null, facturado);
 
   return (
     <Card>
@@ -105,7 +106,7 @@ export function ProyeccionMes({ mes }: { mes: FilaCosteMes | null | undefined })
             Total aproximado: mezcla dólares y euros con {TEXTO_TIPO_CAMBIO}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Frente a los {fmtEur(TOTAL_MENSUAL_FACTURADO_EUR)}/mes que se facturan, el margen es{" "}
+            Frente a los {fmtEur(facturado)}/mes que se facturan, el margen es{" "}
             <span className="font-medium tabular-nums text-foreground">
               {esNulo(total.margenEur) ? SIN_DATOS : `≈ ${fmtEur(total.margenEur)}`}
             </span>{" "}
@@ -116,3 +117,4 @@ export function ProyeccionMes({ mes }: { mes: FilaCosteMes | null | undefined })
     </Card>
   );
 }
+
