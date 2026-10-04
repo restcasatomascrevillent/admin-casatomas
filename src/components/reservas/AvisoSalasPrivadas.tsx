@@ -159,6 +159,7 @@ function DetalleSalaPrivada({ reservas, nombreSala }: { reservas: ReservaServici
               onToggleImportante={(r) => void acciones.alternarImportante(r)}
               onBlacklist={setBlacklist}
               onEditar={(r) => editarReserva(r.id)}
+              mesas={mesasPorReserva.get(reserva.id)}
               puedeEditar={puedeEditar}
               sinArrastre
               telefonoEnlace

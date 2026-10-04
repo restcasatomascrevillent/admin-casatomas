@@ -35,6 +35,9 @@ export function ConMotivo({
     <span
       className={cn("inline-flex", className)}
       title={motivo || undefined}
+      // Un toque sobre el envoltorio de un control apagado tampoco abre el menú de la tarjeta
+      // (`ReservaCard`): el control tiene su propia respuesta (el aviso del motivo).
+      data-sin-menu-tarjeta=""
       onClick={
         motivo
           ? (e) => {

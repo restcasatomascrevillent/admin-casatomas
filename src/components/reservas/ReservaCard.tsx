@@ -10,7 +10,23 @@
 // Qué botones tiene cada tarjeta, y cuáles se pueden pulsar, lo decide
 // `accionesDisponibles(reserva, { vista: "hoy", canEdit })`. El nombre y el color de
 // cada estado salen de `ESTADOS_RESERVA` (src/lib/reservas/estadosReserva.ts).
+//
+// TOCAR LA TARJETA = «⋮» (04/10/2026, dueño: «si hago clic en la tarjeta es como los tres
+// puntitos; lo único es arrastrar, que es cambiar de espacio»). Un toque/clic en cualquier zona
+// neutra abre el MISMO menú que el botón «⋮» (un solo `DropdownMenu` controlado, anclado al «⋮»).
+// Mantener pulsado y arrastrar sigue moviendo la tarjeta: un arrastre no abre el menú al soltar
+// (dnd-kit ya se traga el clic posterior; además se ignora todo clic en los 400 ms siguientes a
+// un arrastre, por si el navegador sintetiza otro). No abren el menú: estrella, «⋮», la fila de
+// llegada (`ControlLlegada`), enlaces, y el envoltorio de un control apagado (`ConMotivo`);
+// los dos últimos se marcan con `data-sin-menu-tarjeta`. Un clic dentro del menú ya abierto
+// (React lo propaga por el portal) tampoco cuenta: se mira el DOM, no el árbol de React.
+//
+// TECLADO: la tarjeta arrastrable es el activador del `KeyboardSensor` de dnd-kit, que usa
+// Intro/Espacio para empezar a arrastrar; esas teclas NO abren el menú (se prioriza el arrastre
+// con teclado). El menú se abre con el «⋮» (Tab hasta él). La tarjeta que no se arrastra (sin
+// permiso, estado que no se mueve, desplegable del Reservado) sí abre el menú con Intro/Espacio.
 // ============================================================================
+import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen, CircleDashed } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { etiquetaMesasReserva } from "@/components/espacios/nombresMesa";
 import type { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
@@ -36,6 +53,11 @@ import { accionesSoloIcono } from "./kanbanLayout";
 
 type Acciones = ReturnType<typeof useAccionesServicioReserva>;
 
+/** Controles propios de la tarjeta: un toque sobre ellos hace lo suyo y no abre el menú de la tarjeta. */
+const CONTROLES_PROPIOS = "button, a, input, select, textarea, [data-sin-menu-tarjeta]";
+/** Tras un arrastre no se abre el menú: el clic que algunos navegadores sintetizan al soltar. */
+const MS_SIN_MENU_TRAS_ARRASTRE = 400;
+
 // Draggable reservation card
 export function ReservaCard({
   reserva,
@@ -47,6 +69,7 @@ export function ReservaCard({
   onEditar,
   onDarMesa,
   sinMesa,
+  mesas,
   puedeEditar,
   isDragOverlay,
   sinArrastre,
@@ -69,6 +92,11 @@ export function ReservaCard({
    * tono neutro.
    */
   sinMesa?: boolean;
+  /**
+   * Nombres de las mesas asignadas ese día (`mesas.nombre`, que ES el número de la sala: "7",
+   * "7+8"). Con alguna, la insignia «Mesa 7» / «Mesas 7, 9» ocupa el sitio de «Sin mesa».
+   */
+  mesas?: readonly string[];
   /**
    * Permiso de edición sobre «reservas». Obligatorio a propósito (un valor por
    * defecto dejaría pasar a todo el mundo si alguien se olvida de pasarlo): sin él,
@@ -105,13 +133,23 @@ export function ReservaCard({
     data: reserva,
     disabled: !arrastrable || isDragOverlay,
   });
+  // Menú de acciones, controlado: lo abren el «⋮» y el toque en la tarjeta.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  // Cuándo terminó el último arrastre (el cleanup corre al dejar de arrastrar): ver `alTocarTarjeta`.
+  const finDeArrastre = useRef(0);
+  useEffect(() => {
+    if (!isDragging) return;
+    return () => {
+      finDeArrastre.current = Date.now();
+    };
+  }, [isDragging]);
 
   if (isDragOverlay) {
     return (
       <div
         className="p-2.5 sm:p-3 rounded-lg border-2 border-primary bg-card w-[200px] sm:w-[230px] shadow-2xl rotate-1 scale-[1.03] cursor-grabbing pointer-events-none"
       >
-        <ContenidoTarjeta reserva={reserva} sinMesa={sinMesa} />
+        <ContenidoTarjeta reserva={reserva} sinMesa={sinMesa} mesas={mesas} />
       </div>
     );
   }
@@ -120,6 +158,26 @@ export function ReservaCard({
   const destinos = columnas.filter((c) => c.id !== columnaActual);
   // En una sala privada (el Reservado) la reserva está FUERA DE AFORO: se etiqueta.
   const fueraDeAforo = !!columnas.find((c) => c.id === columnaActual)?.privada;
+  const textoMesas = etiquetaMesasReserva(mesas);
+
+  /** Un toque en una zona neutra de la tarjeta = pulsar «⋮». */
+  const alTocarTarjeta = (e: MouseEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented || isDragging) return;
+    if (Date.now() - finDeArrastre.current < MS_SIN_MENU_TRAS_ARRASTRE) return;
+    const destino = e.target as Element;
+    // El menú vive en un portal: React propaga hasta aquí los clics de dentro de él, pero no son de la tarjeta.
+    if (!e.currentTarget.contains(destino)) return;
+    const control = destino.closest?.(CONTROLES_PROPIOS);
+    if (control && control !== e.currentTarget && e.currentTarget.contains(control)) return;
+    setMenuAbierto(true);
+  };
+
+  /** Solo la tarjeta que NO se arrastra (si no, Intro/Espacio son del `KeyboardSensor`). */
+  const alTeclearEnTarjeta = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+    e.preventDefault();
+    setMenuAbierto(true);
+  };
 
   // El menú «…» de la tarjeta. En columnas estrechas baja a la fila de
   // acciones para dejarle al NOMBRE todo el ancho de la cabecera: con el menú
@@ -135,7 +193,7 @@ export function ReservaCard({
       onTouchStart={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <DropdownMenu>
+      <DropdownMenu open={menuAbierto} onOpenChange={setMenuAbierto}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -238,22 +296,30 @@ export function ReservaCard({
     <div
       ref={setNodeRef}
       className={cn(
-        "rounded-lg border bg-card transition-shadow duration-200 group outline-none select-none [-webkit-touch-callout:none]",
+        "rounded-lg border bg-card transition-shadow duration-200 group outline-none select-none touch-manipulation [-webkit-touch-callout:none]",
         soloIcono ? "p-2" : "p-2.5 sm:p-3",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         arrastrable
           ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30"
           : ocupaSitio
-            ? "cursor-default"
-            : "cursor-default opacity-60",
+            ? "cursor-pointer hover:shadow-md hover:border-primary/30"
+            : "cursor-pointer opacity-60",
         isDragging && "opacity-30 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
         (reserva as { en_blacklist?: boolean }).en_blacklist && "border-destructive/40 bg-destructive/5",
       )}
       aria-roledescription={arrastrable ? "reserva arrastrable" : "reserva"}
-      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${etiquetaEstadoReserva(reserva.estado)}`}
+      aria-label={`${reserva.nombre || "Sin nombre"}, ${reserva.hora?.substring(0, 5)}, ${reserva.numero_comensales} comensales, ${etiquetaEstadoReserva(reserva.estado)}${textoMesas ? `, ${textoMesas}` : ""}`}
+      onClick={alTocarTarjeta}
+      onKeyDown={arrastrable ? undefined : alTeclearEnTarjeta}
       {...(arrastrable ? listeners : {})}
       {...attributes}
+      aria-haspopup="menu"
+      aria-expanded={menuAbierto}
+      // dnd-kit pone `aria-disabled` en la tarjeta que no se arrastra; ahora esa tarjeta se puede tocar
+      // (abre el menú), así que se quita y el estado de arrastre pasa a `data-arrastrable`.
+      aria-disabled={arrastrable ? attributes["aria-disabled"] : undefined}
+      data-arrastrable={arrastrable ? "true" : "false"}
     >
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -286,7 +352,7 @@ export function ReservaCard({
         {!soloIcono && menuAcciones}
       </div>
       {fueraDeAforo && <EtiquetaFueraDeAforo className="mb-2" />}
-      <ContenidoTarjeta reserva={reserva} sinCabecera sinMesa={sinMesa} telefonoEnlace={telefonoEnlace} />
+      <ContenidoTarjeta reserva={reserva} sinCabecera sinMesa={sinMesa} mesas={mesas} telefonoEnlace={telefonoEnlace} />
       {soloIcono ? (
         /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el
            suelo de ancho de columna lo marca el elemento suelto más ancho y no
@@ -306,18 +372,22 @@ export function ContenidoTarjeta({
   reserva,
   sinCabecera,
   sinMesa,
+  mesas,
   telefonoEnlace,
 }: {
   reserva: ReservaServicio;
   sinCabecera?: boolean;
-  /** Tiene sala y ninguna mesa: insignia neutra «Sin mesa» junto al estado. */
+  /** Tiene sala y ninguna mesa: insignia neutra «Sin mesa» junto al estado (con mesa, sale «Mesa N»). */
   sinMesa?: boolean;
+  /** Nombres de las mesas asignadas: insignia «Mesa 7» / «Mesas 7, 9» en el sitio de «Sin mesa». */
+  mesas?: readonly string[];
   /** El teléfono es un enlace `tel:` (con área táctil de 44 px con dedo). */
   telefonoEnlace?: boolean;
 }) {
   // Nombre y color del estado, del mapa único. Un estado que no existe (el CHECK no
   // lo permite) se pinta tal cual y en gris, como hacía este kanban.
   const estado = infoEstadoReserva(reserva.estado);
+  const textoMesas = etiquetaMesasReserva(mesas);
   return (
     <>
       {!sinCabecera && (
@@ -338,7 +408,15 @@ export function ContenidoTarjeta({
         <Badge className={cn("text-[10px] px-1.5 py-0 h-4 pointer-coarse:h-5 pointer-coarse:text-xs", estado ? estado.insignia : "bg-gray-500 text-white")}>
           {estado ? estado.etiqueta : reserva.estado}
         </Badge>
-        {sinMesa && (
+        {textoMesas ? (
+          <Badge
+            variant="outline"
+            className="gap-0.5 text-[11px] px-1.5 py-0 h-5 font-semibold tabular-nums text-foreground border-primary/40 pointer-coarse:h-6 pointer-coarse:text-xs"
+            title={mesas && mesas.length > 1 ? "Mesas asignadas a esta reserva" : "Mesa asignada a esta reserva"}
+          >
+            {textoMesas}
+          </Badge>
+        ) : sinMesa && (
           <Badge
             variant="outline"
             className="gap-0.5 text-[10px] px-1.5 py-0 h-4 font-normal text-muted-foreground pointer-coarse:h-5 pointer-coarse:text-xs"

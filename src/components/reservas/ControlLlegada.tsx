@@ -57,6 +57,8 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
   const ocupado = disabled || acciones.estaEnCurso(reserva.id);
   const nombre = reserva.nombre || "el cliente";
   const detener = {
+    // La fila entera es de la llegada: un toque en ella no abre el menú de la tarjeta (`ReservaCard`).
+    "data-sin-menu-tarjeta": "",
     onPointerDown: (e: React.SyntheticEvent) => e.stopPropagation(),
     // El kanban arrastra con `TouchSensor`, que escucha `touchstart` en la
     // tarjeta: sin esto, un toque de >=200 ms sobre un botón de aquí arrancaba

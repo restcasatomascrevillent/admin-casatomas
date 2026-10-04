@@ -355,3 +355,26 @@ export function mensajeChoquesResueltos(resueltos: readonly NombreMesaResuelto[]
   const lista = cambiados.map((r) => `${r.deseado} → ${r.asignado}`).join(", ");
   return `Ya había mesas con esos números, así que se han renombrado: ${lista}. REVISA esas mesas y ponles el número real de la sala antes de guardar.`;
 }
+
+// ---------------------------------------------------------------------------
+// Presentación: «Mesa 7» / «Mesas 7, 9» en la tarjeta de una reserva
+// ---------------------------------------------------------------------------
+
+/**
+ * Texto de las mesas asignadas a una reserva, para la insignia de su tarjeta (kanban de «Hoy»):
+ * «Mesa 7», «Mesas 7, 9» o, si la mesa es una unión, «Mesa 7+8» (el nombre de una mesa fusionada ya
+ * lleva el «+»). `null` si no hay ninguna con nombre: quien llama decide entonces si pinta «Sin mesa».
+ *
+ * El número ES `mesas.nombre` (ver la cabecera de este fichero): no se inventa nada. Se ignoran
+ * los nombres vacíos, los repetidos y un posible prefijo «Mesa » (para no escribir «Mesa Mesa 7»);
+ * el orden es el recibido (`mesasPorReservaDe` ya los trae ordenados de forma numérica).
+ */
+export function etiquetaMesasReserva(nombres: readonly (string | null | undefined)[] | null | undefined): string | null {
+  const limpios: string[] = [];
+  for (const bruto of nombres ?? []) {
+    const nombre = (bruto ?? "").replace(/^\s*mesas?\s+/i, "").trim();
+    if (nombre && !limpios.includes(nombre)) limpios.push(nombre);
+  }
+  if (limpios.length === 0) return null;
+  return limpios.length === 1 ? `Mesa ${limpios[0]}` : `Mesas ${limpios.join(", ")}`;
+}
