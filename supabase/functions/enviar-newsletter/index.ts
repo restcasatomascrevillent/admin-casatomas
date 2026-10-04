@@ -13,7 +13,7 @@ import {
 import { comprobarPermisoNewsletter, type ClientePermiso } from "./permiso.ts";
 import { enviarBroadcast, puedeEnviarBroadcast } from "./broadcast.ts";
 import { crearRegistroEnvios } from "./registro.ts";
-import { enviarPrueba } from "./prueba.ts";
+import { enviarPrueba, payloadDePrueba } from "./prueba.ts";
 import {
   canalNewsletter,
   limiteContactos,
@@ -133,13 +133,15 @@ serve(async (req) => {
     } catch {
       return json({ success: false, error: 'Cuerpo de la petición no válido' }, 400);
     }
-    const validacion = validarPayload(cuerpo);
+    // Prueba segura por Resend Marketing (ver prueba.ts): a un Segment que solo
+    // tiene la dirección de prueba (delivered@resend.dev). Nunca a clientes.
+    // Los datos de la prueba vienen anidados en `newsletter` (ver payloadDePrueba).
+    const prueba = payloadDePrueba(cuerpo);
+    const validacion = validarPayload(prueba ?? cuerpo);
     if (!validacion.ok) return json({ success: false, error: validacion.error }, 400);
     const datos = validacion.datos;
 
-    // Prueba segura por Resend Marketing (ver prueba.ts): a un Segment que solo
-    // tiene la dirección de prueba (delivered@resend.dev). Nunca a clientes.
-    if ((cuerpo as { prueba?: unknown }).prueba === true) {
+    if (prueba !== null) {
       return await enviarPruebaBroadcast(datos, user.id);
     }
 

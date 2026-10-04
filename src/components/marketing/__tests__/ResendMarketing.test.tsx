@@ -229,7 +229,25 @@ describe("useEnviarPruebaNewsletter", () => {
     await act(async () => {
       await result.current.mutateAsync({ tipo: "anuncio", titulo: "T", mensaje: "M" });
     });
-    expect(invoke).toHaveBeenCalledWith("enviar-newsletter", { body: { tipo: "anuncio", titulo: "T", mensaje: "M", prueba: true } });
+    expect(invoke).toHaveBeenCalledWith("enviar-newsletter", {
+      body: { prueba: true, newsletter: { tipo: "anuncio", titulo: "T", mensaje: "M" } },
+    });
     expect(toast.success).toHaveBeenCalledWith("Prueba enviada como Broadcast a delivered@resend.dev");
+  });
+
+  it("NO pone tipo/titulo/mensaje en la raíz: una enviar-newsletter antigua (sin modo prueba) respondería 400 en vez de mandarlo a todos", async () => {
+    invoke.mockResolvedValueOnce({ data: { success: true }, error: null });
+    const qc = new QueryClient();
+    const { result } = renderHook(() => useEnviarPruebaNewsletter(), {
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ tipo: "oferta", titulo: "T", mensaje: "M", imagen_url: "https://x.test/a.png" });
+    });
+    const cuerpo = (invoke.mock.calls.at(-1)?.[1] as { body: Record<string, unknown> }).body;
+    // Lo que miraba la versión antigua: `if (!payload.tipo || !payload.titulo || !payload.mensaje) -> 400`.
+    expect(cuerpo.tipo).toBeUndefined();
+    expect(cuerpo.titulo).toBeUndefined();
+    expect(cuerpo.mensaje).toBeUndefined();
   });
 });

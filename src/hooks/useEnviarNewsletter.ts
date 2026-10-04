@@ -37,16 +37,26 @@ export async function mensajeErrorFuncion(error: unknown, porDefecto: string): P
 }
 
 /**
- * Prueba segura por Resend Marketing: enviar-newsletter con {prueba: true}
- * manda el Broadcast a un Segment que solo tiene la dirección de prueba
- * (delivered@resend.dev por defecto). No llega a ningún cliente ni queda en el
- * historial. Ver supabase/functions/enviar-newsletter/prueba.ts.
+ * Prueba segura por Resend Marketing: enviar-newsletter con
+ * {prueba: true, newsletter: {...}} manda el Broadcast a un Segment que solo
+ * tiene la dirección de prueba (delivered@resend.dev por defecto). No llega a
+ * ningún cliente ni queda en el historial. Ver
+ * supabase/functions/enviar-newsletter/prueba.ts.
+ *
+ * Los datos van ANIDADOS en `newsletter`, nunca en la raíz: una versión
+ * anterior de enviar-newsletter (sin modo prueba) ignoraría `prueba` y con
+ * tipo/titulo/mensaje en la raíz mandaría el newsletter a TODOS los
+ * suscriptores. Así responde 400 y no sale nada (ver payloadDePrueba).
  */
+export function cuerpoPrueba(payload: NewsletterPayload): { prueba: true; newsletter: NewsletterPayload } {
+  return { prueba: true, newsletter: payload };
+}
+
 export function useEnviarPruebaNewsletter() {
   return useMutation({
     mutationFn: async (payload: NewsletterPayload) => {
       const { data, error } = await supabase.functions.invoke('enviar-newsletter', {
-        body: { ...payload, prueba: true },
+        body: cuerpoPrueba(payload),
       });
       if (error) {
         throw new Error(await mensajeErrorFuncion(error, 'Error al enviar la prueba'));

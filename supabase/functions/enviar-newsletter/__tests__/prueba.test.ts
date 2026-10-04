@@ -3,7 +3,8 @@
  * prueba, nunca a clientes. Resend falso.
  */
 import { describe, it, expect, vi } from "vitest";
-import { enviarPrueba, EMAIL_PRUEBA_POR_DEFECTO, NOMBRE_SEGMENTO_PRUEBAS, type ClientePrueba } from "../prueba.ts";
+import { enviarPrueba, payloadDePrueba, EMAIL_PRUEBA_POR_DEFECTO, NOMBRE_SEGMENTO_PRUEBAS, type ClientePrueba } from "../prueba.ts";
+import { validarPayload } from "../plantillas.ts";
 import type { ContactoResend, ResultadoResend } from "../../_shared/resend-marketing/cliente.ts";
 
 const ok = <T>(data: T): ResultadoResend<T> => ({ ok: true, status: 200, data });
@@ -78,5 +79,28 @@ describe("enviarPrueba", () => {
     const r = await enviarPrueba({ cliente: c, datos, from: "x" });
     expect(r).toMatchObject({ ok: false, status: 502 });
     expect(!r.ok && r.error).toMatch(/not verified/);
+  });
+});
+
+describe("payloadDePrueba (forma segura de la petición de prueba)", () => {
+  const datos = { tipo: "anuncio", titulo: "T", mensaje: "M" };
+
+  it("prueba con los datos anidados en `newsletter`: devuelve esos datos (y validan)", () => {
+    const p = payloadDePrueba({ prueba: true, newsletter: datos });
+    expect(p).toEqual(datos);
+    expect(validarPayload(p).ok).toBe(true);
+  });
+
+  it("sin prueba === true no es una prueba: el cuerpo se valida tal cual (envío real)", () => {
+    expect(payloadDePrueba(datos)).toBeNull();
+    expect(payloadDePrueba({ ...datos, prueba: "true" })).toBeNull();
+    expect(payloadDePrueba(null)).toBeNull();
+  });
+
+  it("una prueba sin `newsletter` NUNCA cae al envío real: no valida (400)", () => {
+    // Forma antigua {..., prueba: true} con los datos en la raíz: se rechaza en vez de enviarse.
+    const p = payloadDePrueba({ ...datos, prueba: true });
+    expect(p).toEqual({});
+    expect(validarPayload(p).ok).toBe(false);
   });
 });

@@ -1,7 +1,8 @@
 // ============================================================================
 // Envío de PRUEBA por Resend Marketing — no llega a ningún cliente
 // ----------------------------------------------------------------------------
-// enviar-newsletter con {"prueba": true}: manda el newsletter como Broadcast a
+// enviar-newsletter con {"prueba": true, "newsletter": {...}} (ver
+// payloadDePrueba): manda el newsletter como Broadcast a
 // un Segment de pruebas que contiene SOLO la dirección de prueba
 // (NEWSLETTER_EMAIL_PRUEBA, por defecto delivered@resend.dev, la dirección de
 // pruebas de Resend que simula una entrega correcta). Sirve para comprobar
@@ -20,6 +21,24 @@ import { renderNewsletter, asuntoNewsletter, tieneEnlaceBaja, type DatosNewslett
 import { MARCADOR_BAJA_RESEND, normalizarEmail } from "../_shared/resend-marketing/config.ts";
 import { resolverSegmento, type ClienteSync } from "../_shared/resend-marketing/sync.ts";
 import type { ClienteBroadcast } from "./broadcast.ts";
+
+/**
+ * Forma de la petición de prueba: `{"prueba": true, "newsletter": {tipo, titulo, mensaje, imagen_url}}`,
+ * SIN tipo/titulo/mensaje en la raíz. A propósito: una versión ANTERIOR de
+ * enviar-newsletter (sin modo prueba) ignora `prueba` y, si encontrara
+ * tipo/titulo/mensaje en la raíz, mandaría el newsletter A TODOS los
+ * suscriptores. Con los datos anidados responde 400 («Campos requeridos») y no
+ * sale nada: el botón «Enviar prueba» del panel es seguro aunque el panel se
+ * despliegue antes que la función.
+ * Devuelve el payload del newsletter si es una prueba, o `null` si no lo es.
+ * Una prueba sin `newsletter` devuelve `{}` (no valida -> 400), nunca cae al envío real.
+ */
+export function payloadDePrueba(cuerpo: unknown): unknown | null {
+  if (!cuerpo || typeof cuerpo !== "object") return null;
+  const c = cuerpo as { prueba?: unknown; newsletter?: unknown };
+  if (c.prueba !== true) return null;
+  return c.newsletter && typeof c.newsletter === "object" ? c.newsletter : {};
+}
 
 export const EMAIL_PRUEBA_POR_DEFECTO = "delivered@resend.dev";
 export const NOMBRE_SEGMENTO_PRUEBAS = "Newsletter Casa Tomás (pruebas)";
