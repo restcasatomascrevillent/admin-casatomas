@@ -12,6 +12,7 @@ const activo: SuscriptorNewsletter = {
   created_at: "2026-09-01T10:00:00Z",
   fecha_baja: null,
   origen_baja: null,
+  origen_alta: "reserva_web",
 };
 const baja: SuscriptorNewsletter = {
   id: "2",
@@ -29,13 +30,14 @@ describe("ListaSuscriptores", () => {
     expect(screen.getByRole("tab", { name: "Activos (1)" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Dados de baja (1)" })).toBeInTheDocument();
     expect(screen.getByText("activo@ejemplo.es")).toBeInTheDocument();
+    expect(screen.getByText("Se apuntó por: Reserva web")).toBeInTheDocument();
   });
 
   it("los dados de baja muestran fecha y motivo, y no hay botón para reactivarlos", () => {
     render(<ListaSuscriptores activos={[activo]} bajas={[baja]} isLoading={false} />);
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Dados de baja (1)" }));
     expect(screen.getByText("baja@ejemplo.es")).toBeInTheDocument();
-    expect(screen.getByText("Marcó un correo como spam")).toBeInTheDocument();
+    expect(screen.getByText("Marcó el correo como spam")).toBeInTheDocument();
     expect(screen.getByText(/^Baja: /)).toBeInTheDocument();
     expect(screen.getByText(/No se pueden volver a activar desde aquí/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /reactivar|activar|suscribir/i })).not.toBeInTheDocument();

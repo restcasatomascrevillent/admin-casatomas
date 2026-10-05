@@ -38,10 +38,10 @@ export function PreviewNewsletter({ tipo, titulo, mensaje, imagenUrl }: PreviewN
 
   if (!tipo) {
     return (
-      <Card className="h-full flex items-center justify-center bg-muted/30 min-h-[500px]">
+      <Card className="flex items-center justify-center bg-muted/30 min-h-[500px] lg:min-h-0 lg:flex-1">
         <div className="text-center py-12">
           <p className="text-muted-foreground">
-            Selecciona un tipo de newsletter para ver la preview
+            Elige un tipo de newsletter para ver aquí cómo quedará
           </p>
         </div>
       </Card>
@@ -49,19 +49,20 @@ export function PreviewNewsletter({ tipo, titulo, mensaje, imagenUrl }: PreviewN
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="bg-muted/30 p-2 text-center text-xs text-muted-foreground border-b">
+    <Card className="overflow-hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+      <div className="shrink-0 bg-muted/30 p-2 text-center text-xs text-muted-foreground border-b">
         Vista previa del email
       </div>
-      <div className="max-h-[600px] overflow-y-auto">
+      {/* Desde `lg` el marco llena la columna (alto de pantalla) y el correo se desplaza dentro del iframe. */}
+      <div className="max-h-[600px] overflow-y-auto lg:flex lg:max-h-none lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden">
         <iframe
           srcDoc={html}
-          className="w-full min-h-[550px] border-0"
+          className="w-full min-h-[550px] border-0 lg:min-h-0 lg:flex-1"
           title="Vista previa del email"
           sandbox=""
         />
       </div>
-      <div className="p-2 text-center text-xs text-muted-foreground border-t">
+      <div className="shrink-0 p-2 text-center text-xs text-muted-foreground border-t">
         El pie con el enlace para darse de baja se añade siempre, automáticamente. Cada suscriptor recibe su
         enlace personal y el botón «Cancelar suscripción» de su programa de correo.
       </div>

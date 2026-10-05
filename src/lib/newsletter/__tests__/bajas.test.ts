@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparSuscriptores, etiquetaOrigenBaja, esBajaPorEntrega, formatearFechaBaja, type SuscriptorNewsletter } from "../bajas";
+import { agruparSuscriptores, etiquetaOrigenAlta, etiquetaOrigenBaja, esBajaPorEntrega, formatearFechaBaja, type SuscriptorNewsletter } from "../bajas";
 
 const fila = (p: Partial<SuscriptorNewsletter>): SuscriptorNewsletter => ({
   id: p.id ?? Math.random().toString(),
@@ -34,15 +34,19 @@ describe("agruparSuscriptores", () => {
 
 describe("etiquetaOrigenBaja", () => {
   it("traduce todos los orígenes del CHECK", () => {
-    expect(etiquetaOrigenBaja("enlace_email")).toMatch(/enlace/i);
+    expect(etiquetaOrigenBaja("enlace_email")).toBe("Se dio de baja desde el email");
     expect(etiquetaOrigenBaja("cabecera_one_click")).toMatch(/Cancelar suscripción/);
-    expect(etiquetaOrigenBaja("queja_spam")).toMatch(/spam/);
-    expect(etiquetaOrigenBaja("rebote_permanente")).toMatch(/inexistente/);
-    expect(etiquetaOrigenBaja("suprimido_resend")).toMatch(/Resend/);
-    expect(etiquetaOrigenBaja("resend_baja_nativa")).toMatch(/Resend/);
+    expect(etiquetaOrigenBaja("queja_spam")).toBe("Marcó el correo como spam");
+    expect(etiquetaOrigenBaja("rebote_permanente")).toBe("Email inexistente o rechazado");
+    expect(etiquetaOrigenBaja("suprimido_resend")).toMatch(/rechazado/);
+    expect(etiquetaOrigenBaja("resend_baja_nativa")).toMatch(/página de baja/);
     expect(etiquetaOrigenBaja("panel_manual")).toMatch(/panel/);
     expect(etiquetaOrigenBaja(null)).toMatch(/antigua/);
-    expect(etiquetaOrigenBaja("otro")).toBe("otro");
+    expect(etiquetaOrigenBaja("otro")).toBe("Otro motivo");
+    // Ninguna etiqueta enseña jerga técnica al personal.
+    for (const o of ["enlace_email", "cabecera_one_click", "panel_manual", "queja_spam", "rebote_permanente", "suprimido_resend", "resend_baja_nativa"]) {
+      expect(etiquetaOrigenBaja(o)).not.toMatch(/Resend|Broadcast|one.click/i);
+    }
   });
 
   it("marca como 'por entrega' solo queja, rebote y supresión", () => {
@@ -51,6 +55,17 @@ describe("etiquetaOrigenBaja", () => {
     expect(esBajaPorEntrega("suprimido_resend")).toBe(true);
     expect(esBajaPorEntrega("enlace_email")).toBe(false);
     expect(esBajaPorEntrega(null)).toBe(false);
+  });
+});
+
+describe("etiquetaOrigenAlta", () => {
+  it("nombres humanos para el origen del alta", () => {
+    expect(etiquetaOrigenAlta("reserva_web")).toBe("Reserva web");
+    expect(etiquetaOrigenAlta("reserva_telefono")).toBe("Reserva por teléfono");
+    expect(etiquetaOrigenAlta("reserva_manual")).toBe("Reserva manual");
+    expect(etiquetaOrigenAlta("solicitud_web")).toBe("Solicitud web");
+    expect(etiquetaOrigenAlta(null)).toBe("");
+    expect(etiquetaOrigenAlta("raro")).toBe("Otro origen");
   });
 });
 

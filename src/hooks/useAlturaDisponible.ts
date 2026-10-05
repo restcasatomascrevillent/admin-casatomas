@@ -18,8 +18,11 @@ import { calcularAlturaDisponible } from "@/lib/reservas/alturaCalendario";
  * lateral, al envolver la fila de pestañas o al cargar las fuentes—. Nunca
  * escribe el mismo valor dos veces, así que no hay bucle con la propia altura
  * que fija.
+ *
+ * `minimo`: suelo en px (por defecto el del calendario, `ALTURA_MINIMA_BLOQUE`);
+ * por debajo el bloque no encoge más y la página hace scroll.
  */
-export function useAlturaDisponible(nodo: HTMLElement | null): number | null {
+export function useAlturaDisponible(nodo: HTMLElement | null, minimo?: number): number | null {
   const [alto, setAlto] = useState<number | null>(null);
 
   useLayoutEffect(() => {
@@ -45,6 +48,7 @@ export function useAlturaDisponible(nodo: HTMLElement | null): number | null {
           topPagina: caja.top + window.scrollY,
           altoVisible: vv ? vv.height : window.innerHeight,
           paddingInferior: relleno,
+          minimo,
         }),
       );
     };
@@ -73,7 +77,7 @@ export function useAlturaDisponible(nodo: HTMLElement | null): number | null {
       window.visualViewport?.removeEventListener("resize", ahora);
       if (raf) window.cancelAnimationFrame(raf);
     };
-  }, [nodo]);
+  }, [nodo, minimo]);
 
   return alto;
 }

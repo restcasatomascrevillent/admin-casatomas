@@ -89,20 +89,21 @@ beforeEach(() => {
 
 describe("lib/newsletter/resend", () => {
   it("textos de canal y cuota", () => {
-    expect(textoCanal("broadcast")).toMatch(/Broadcast/);
-    expect(textoCanal("transaccional")).toMatch(/directo/);
+    expect(textoCanal("broadcast")).toBe("Por lista de envío");
+    expect(textoCanal("transaccional")).toBe("Correo directo");
     expect(porcentajeCuota(850, 1000)).toBe(85);
     expect(porcentajeCuota(1500, 1000)).toBe(100);
     expect(textoCuota(500, 1000)).toBe("");
-    expect(textoCuota(800, 1000)).toMatch(/80 %/);
-    expect(textoCuota(1000, 1000)).toMatch(/no deja enviar/);
+    expect(textoCuota(800, 1000)).toMatch(/más del 80 % de los contactos del plan \(máx\. 1\.000\)/);
+    expect(textoCuota(1000, 1000)).toMatch(/máximo de contactos del plan \(1\.000\)/);
+    expect(textoCuota(1000, 1000)).not.toMatch(/Resend|Broadcast/);
   });
 
   it("mensaje tras sincronizar", () => {
     const base = { success: true, estado: "ok" as const, contactos_resend: 10, limite_contactos: 1000, destinatarios: 9, altas: 3, borrados: 1, bajas_resend: 0, pendientes: 0, bloquea_envio: false, total_errores: 0 };
-    expect(mensajeSincronizacion(base)).toEqual({ tipo: "ok", texto: "Sincronizado con Resend: 3 añadidos, 1 quitados de Resend." });
+    expect(mensajeSincronizacion(base)).toEqual({ tipo: "ok", texto: "Lista de envío actualizada: 3 añadidos, 1 quitado." });
     expect(mensajeSincronizacion({ ...base, estado: "parcial", pendientes: 7 }).tipo).toBe("aviso");
-    expect(mensajeSincronizacion({ ...base, success: false, estado: "error", error: "sin clave" })).toEqual({ tipo: "error", texto: "sin clave" });
+    expect(mensajeSincronizacion({ ...base, success: false, estado: "error", error: "Resend respondió 500 (internal)" })).toEqual({ tipo: "error", texto: "No se pudo actualizar la lista de envío. Inténtalo de nuevo y, si sigue igual, avisa al equipo técnico." });
   });
 
   it("agrupa las estadísticas por Broadcast", () => {
@@ -121,21 +122,22 @@ describe("SincronizacionResend", () => {
   it("muestra canal, contactos usados de 1.000 y la última pasada", async () => {
     invoke.mockResolvedValueOnce({ data: estado(), error: null });
     envolver(<SincronizacionResend />);
-    expect(await screen.findByText(/Envío actual: Broadcast de Resend Marketing/)).toBeInTheDocument();
-    expect(screen.getByText("420 / 1000")).toBeInTheDocument();
+    expect(await screen.findByText(/Envío actual: Por lista de envío/)).toBeInTheDocument();
+    expect(screen.getByText("420 de 1.000")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "420");
-    expect(screen.getByText(/415 recibirían el próximo Broadcast/)).toBeInTheDocument();
+    expect(screen.getByText(/415 recibirían el próximo envío/)).toBeInTheDocument();
+    expect(screen.getByText(/Última actualización/)).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("newsletter-sync-resend", { body: { accion: "estado" } });
   });
 
   it("avisa al 80 % y al 100 % del límite", async () => {
     invoke.mockResolvedValueOnce({ data: estado({ contactos_resend: 850 }), error: null });
     const { unmount } = envolver(<SincronizacionResend />);
-    expect(await screen.findByText(/Más del 80 %/)).toBeInTheDocument();
+    expect(await screen.findByText(/más del 80 %/i)).toBeInTheDocument();
     unmount();
     invoke.mockResolvedValueOnce({ data: estado({ contactos_resend: 1000 }), error: null });
     envolver(<SincronizacionResend />);
-    expect(await screen.findByText(/Límite de contactos alcanzado/)).toBeInTheDocument();
+    expect(await screen.findByText(/Has llegado al máximo de contactos del plan/)).toBeInTheDocument();
   });
 
   it("el botón sincroniza (≥ 44 px) y muestra el resultado", async () => {
@@ -147,24 +149,27 @@ describe("SincronizacionResend", () => {
       })
       .mockResolvedValue({ data: estado({ contactos_resend: 421 }), error: null });
     envolver(<SincronizacionResend />);
-    const boton = await screen.findByRole("button", { name: /Sincronizar con Resend/ });
+    const boton = await screen.findByRole("button", { name: /Actualizar lista de envío/ });
     expect(boton.className).toMatch(/\bh-11\b/);
     fireEvent.click(boton);
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("newsletter-sync-resend", { body: { accion: "sincronizar" } }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sincronizado con Resend: 1 añadidos."));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Lista de envío actualizada: 1 añadido."));
   });
 
   it("sin clave de Resend el botón está desactivado", async () => {
     invoke.mockResolvedValueOnce({ data: estado({ configurado: { api_key: false, segment_id: null, cron_secret: false } }), error: null });
     envolver(<SincronizacionResend />);
-    expect(await screen.findByRole("button", { name: /Sincronizar con Resend/ })).toBeDisabled();
-    expect(screen.getByText(/RESEND_MARKETING_API_KEY/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Actualizar lista de envío/ })).toBeDisabled();
+    expect(screen.getByText("El envío de newsletter no está disponible ahora mismo. Avisa al equipo técnico.")).toBeInTheDocument();
+    // El nombre de la variable solo aparece dentro del desplegable «Detalle técnico».
+    expect(screen.getByText(/RESEND_MARKETING_API_KEY/).closest("details")).not.toBeNull();
   });
 
   it("si la función no está desplegada, lo dice sin romper la página", async () => {
     invoke.mockResolvedValueOnce({ data: null, error: { message: "Failed to send a request to the Edge Function" } });
     envolver(<SincronizacionResend />);
-    expect(await screen.findByText(/todavía no está conectado/)).toBeInTheDocument();
+    expect(await screen.findByText(/La lista de envío todavía no está disponible/)).toBeInTheDocument();
+    expect(screen.getByText("Failed to send a request to the Edge Function").closest("details")).not.toBeNull();
   });
 });
 
@@ -172,12 +177,14 @@ describe("CanalEnvio", () => {
   it("broadcast", async () => {
     invoke.mockResolvedValueOnce({ data: estado(), error: null });
     envolver(<CanalEnvio />);
-    expect(await screen.findByText(/enlace de baja de Resend/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Cada correo incluye un enlace para darse de baja\. Las bajas se registran solas en la lista de suscriptores\./),
+    ).toBeInTheDocument();
   });
   it("sin conexión con Resend: envío directo", async () => {
     invoke.mockResolvedValueOnce({ data: null, error: { message: "x" } });
     envolver(<CanalEnvio />);
-    await waitFor(() => expect(screen.getByText(/Envío directo/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/correo directo/)).toBeInTheDocument());
   });
 });
 
@@ -201,8 +208,8 @@ describe("HistorialEnvios", () => {
     });
     envolver(<HistorialEnvios />);
     expect(await screen.findByText("Menú de otoño")).toBeInTheDocument();
-    expect(screen.getByText("Broadcast")).toBeInTheDocument();
-    expect(screen.getByText("Directo")).toBeInTheDocument();
+    expect(screen.getByText("Lista de envío")).toBeInTheDocument();
+    expect(screen.getByText("Correo directo")).toBeInTheDocument();
     expect(screen.getByText(/410 entregados · 200 abiertos/)).toBeInTheDocument();
     expect(rpc).toHaveBeenCalledWith("newsletter_estadisticas_broadcasts", { p_broadcast_ids: ["b1"] });
   });
@@ -214,7 +221,7 @@ describe("HistorialEnvios", () => {
     ];
     envolver(<HistorialEnvios />);
     expect(await screen.findByText("Viejo")).toBeInTheDocument();
-    expect(screen.getByText("Directo")).toBeInTheDocument();
+    expect(screen.getByText("Correo directo")).toBeInTheDocument();
     expect(rpc).not.toHaveBeenCalled();
   });
 });
@@ -232,7 +239,7 @@ describe("useEnviarPruebaNewsletter", () => {
     expect(invoke).toHaveBeenCalledWith("enviar-newsletter", {
       body: { prueba: true, newsletter: { tipo: "anuncio", titulo: "T", mensaje: "M" } },
     });
-    expect(toast.success).toHaveBeenCalledWith("Prueba enviada como Broadcast a delivered@resend.dev");
+    expect(toast.success).toHaveBeenCalledWith("Prueba enviada. Solo llega a la dirección de pruebas del equipo, no a ningún cliente.");
   });
 
   it("NO pone tipo/titulo/mensaje en la raíz: una enviar-newsletter antigua (sin modo prueba) respondería 400 en vez de mandarlo a todos", async () => {

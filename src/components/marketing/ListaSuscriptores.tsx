@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   esBajaPorEntrega,
+  etiquetaOrigenAlta,
   etiquetaOrigenBaja,
   formatearFechaBaja,
   type SuscriptorNewsletter,
@@ -42,7 +43,7 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
 
       <TabsContent value="activos">
         {activos.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">Aún no hay suscriptores activos.</p>
+          <p className="text-sm text-muted-foreground text-center py-8">Todavía no hay suscriptores activos.</p>
         ) : (
           <ScrollArea className="h-[300px]">
             <ul className="space-y-2">
@@ -50,6 +51,9 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
                 <li key={s.id} className="p-2 rounded-md bg-muted/50 min-w-0">
                   <p className="font-medium text-sm break-all">{s.email}</p>
                   {s.nombre && <p className="text-xs text-muted-foreground">{s.nombre}</p>}
+                  {etiquetaOrigenAlta(s.origen_alta) && (
+                    <p className="text-xs text-muted-foreground">Se apuntó por: {etiquetaOrigenAlta(s.origen_alta)}</p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -59,11 +63,11 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
 
       <TabsContent value="bajas">
         <p className="text-xs text-muted-foreground mb-2">
-          No reciben ningún envío. No se pueden volver a activar desde aquí: solo vuelven si marcan otra vez la
-          casilla del newsletter en una reserva nueva y la confirman desde su correo.
+          No reciben ninguna newsletter. No se pueden volver a activar desde aquí: solo vuelven a recibirla si se
+          apuntan de nuevo al reservar en la web y confirman su reserva desde el email.
         </p>
         {bajas.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">Nadie se ha dado de baja.</p>
+          <p className="text-sm text-muted-foreground text-center py-8">Todavía nadie se ha dado de baja.</p>
         ) : (
           <ScrollArea className="h-[300px]">
             <ul className="space-y-2">

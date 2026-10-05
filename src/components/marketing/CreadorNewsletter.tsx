@@ -12,6 +12,7 @@ import { SelectorImagenGaleria } from "./SelectorImagenGaleria";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { useEnviarNewsletter, useEnviarPruebaNewsletter } from "@/hooks/useEnviarNewsletter";
 import { CanalEnvio } from "./SincronizacionResend";
+import { textoSuscriptores } from "@/lib/newsletter/textos";
 
 export function CreadorNewsletter() {
   const [tipo, setTipo] = useState<TipoNewsletter | null>(null);
@@ -62,14 +63,18 @@ export function CreadorNewsletter() {
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-2">
-        {/* Left Column - Form */}
-        <div className="space-y-6">
+      {/* Desde `lg` (tablet apaisada y escritorio) las dos columnas van lado a
+          lado y llenan el alto de la pestaña (Marketing.tsx lo calcula): cada
+          una hace su propio scroll. Por debajo van apiladas y desplaza la
+          pestaña entera. */}
+      <div className="grid gap-6 lg:flex-1 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]">
+        {/* Columna del formulario */}
+        <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <Card>
             <CardHeader>
-              <CardTitle>Crear Newsletter</CardTitle>
+              <CardTitle>Crear newsletter</CardTitle>
               <CardDescription>
-                Selecciona el tipo y personaliza el contenido
+                Elige el tipo, escribe el texto y revisa cómo queda en la vista previa.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -87,7 +92,7 @@ export function CreadorNewsletter() {
                 <Label htmlFor="titulo">Título</Label>
                 <Input
                   id="titulo"
-                  placeholder="Título del newsletter"
+                  placeholder="Título de la newsletter"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   disabled={!tipo}
@@ -100,7 +105,7 @@ export function CreadorNewsletter() {
                 <Label htmlFor="mensaje">Mensaje</Label>
                 <Textarea
                   id="mensaje"
-                  placeholder="Escribe el mensaje del newsletter..."
+                  placeholder="Escribe el mensaje de la newsletter..."
                   value={mensaje}
                   onChange={(e) => setMensaje(e.target.value)}
                   disabled={!tipo}
@@ -115,13 +120,16 @@ export function CreadorNewsletter() {
                 onSeleccionar={setImagenUrl}
               />
 
-              {/* Canal del envío (NEWSLETTER_CANAL: directo o Broadcast de Resend Marketing) */}
+              {/* Cómo saldrá el envío (NEWSLETTER_CANAL: directo o por lista, Broadcast de Resend Marketing) */}
               <CanalEnvio />
 
               {/* Recipients Count */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                <Users className="h-4 w-4" />
-                <span>Se enviará a <strong className="text-foreground">{totalSuscriptores}</strong> suscriptores</span>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                <Users className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  Al enviarla, le llegará a <strong className="text-foreground">{textoSuscriptores(totalSuscriptores)}</strong> de
+                  verdad. Antes puedes mandarte una prueba.
+                </span>
               </div>
 
               {/* Send Button */}
@@ -136,34 +144,38 @@ export function CreadorNewsletter() {
                 ) : (
                   <Send className="h-4 w-4 mr-2" />
                 )}
-                Enviar Newsletter
+                Enviar a {textoSuscriptores(totalSuscriptores)}
               </Button>
 
               {/* Prueba por Resend Marketing: solo a la dirección de prueba, nunca a clientes */}
-              <Button
-                className="h-11 w-full"
-                variant="outline"
-                onClick={() => tipo && enviarPrueba({ tipo, titulo, mensaje, imagen_url: imagenUrl })}
-                disabled={!isFormValid || isPending || enviandoPrueba}
-              >
-                {enviandoPrueba ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
-                Enviar prueba por Resend (no llega a clientes)
-              </Button>
+              <div className="space-y-1">
+                <Button
+                  className="h-11 w-full"
+                  variant="outline"
+                  onClick={() => tipo && enviarPrueba({ tipo, titulo, mensaje, imagen_url: imagenUrl })}
+                  disabled={!isFormValid || isPending || enviandoPrueba}
+                  aria-describedby="ayuda-prueba"
+                >
+                  {enviandoPrueba ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
+                  Enviar prueba (no llega a clientes)
+                </Button>
+                <p id="ayuda-prueba" className="text-xs text-muted-foreground text-center">
+                  La prueba se envía solo a una dirección de pruebas del equipo; ningún cliente la recibe.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column - Preview */}
-        <div>
-          <div className="xl:sticky xl:top-6">
-            <Label className="mb-3 block">Vista previa del email</Label>
-            <PreviewNewsletter
-              tipo={tipo}
-              titulo={titulo}
-              mensaje={mensaje}
-              imagenUrl={imagenUrl}
-            />
-          </div>
+        {/* Columna de la vista previa: desde `lg` la tarjeta llena la columna y el correo se desplaza dentro */}
+        <div className="lg:flex lg:min-h-0 lg:flex-col">
+          <Label className="mb-3 block shrink-0">Vista previa del email</Label>
+          <PreviewNewsletter
+            tipo={tipo}
+            titulo={titulo}
+            mensaje={mensaje}
+            imagenUrl={imagenUrl}
+          />
         </div>
       </div>
 
@@ -171,9 +183,9 @@ export function CreadorNewsletter() {
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Enviar newsletter?</AlertDialogTitle>
+            <AlertDialogTitle>¿Enviar la newsletter a {textoSuscriptores(totalSuscriptores)}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se enviará "{titulo}" a {totalSuscriptores} suscriptores. Esta acción no se puede deshacer.
+              Es un envío real: «{titulo}» le llegará a {textoSuscriptores(totalSuscriptores)} y no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -182,7 +194,7 @@ export function CreadorNewsletter() {
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
-              Confirmar envío
+              Sí, enviar a todos
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

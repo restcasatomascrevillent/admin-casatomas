@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mensajeErrorFuncion } from "@/hooks/useEnviarNewsletter";
+import { textoErrorCliente } from "@/lib/newsletter/textos";
 import {
   agruparEstadisticas,
   mensajeSincronizacion,
@@ -25,7 +26,7 @@ export function useEstadoResend() {
     queryKey: CLAVE_ESTADO_RESEND,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("newsletter-sync-resend", { body: { accion: "estado" } });
-      if (error) throw new Error(await mensajeErrorFuncion(error, "No se pudo consultar la conexión con Resend"));
+      if (error) throw new Error(await mensajeErrorFuncion(error, "No se pudo consultar el estado de la lista de envío"));
       return data as EstadoResend;
     },
     retry: false,
@@ -39,7 +40,7 @@ export function useSincronizarResend() {
   return useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("newsletter-sync-resend", { body: { accion: "sincronizar" } });
-      if (error) throw new Error(await mensajeErrorFuncion(error, "No se pudo sincronizar con Resend"));
+      if (error) throw new Error(await mensajeErrorFuncion(error, "No se pudo actualizar la lista de envío"));
       return data as ResultadoSincronizacion;
     },
     onSuccess: (data) => {
@@ -49,7 +50,8 @@ export function useSincronizarResend() {
       else toast.error(m.texto);
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      console.error('Actualizar lista de envío:', error.message);
+      toast.error(textoErrorCliente(error.message, 'No se pudo actualizar la lista de envío. Inténtalo de nuevo y, si sigue igual, avisa al equipo técnico.'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: CLAVE_ESTADO_RESEND });

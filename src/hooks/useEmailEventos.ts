@@ -1,151 +1,53 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { paginarConsulta } from "@/lib/reservas/paginarConsulta";
+import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
+import {
+  resumirEventosCorreo,
+  TIPOS_EVENTO_CORREO,
+  type EventoCorreo,
+  type ResumenCorreos,
+} from "@/lib/newsletter/estadisticasCorreos";
 
-export interface EmailEvento {
-  id: string;
-  email_id: string;
-  tipo_evento: string;
-  email_destinatario: string | null;
-  timestamp_evento: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
+/** Eventos archivados como mucho (tope de seguridad de la lectura por lotes). */
+const LIMITE_EVENTOS = 50_000;
+
+export interface EstadisticasCorreos extends ResumenCorreos {
+  /** Había más eventos que el tope: las cifras son de los `LIMITE_EVENTOS` más recientes. */
+  truncado: boolean;
 }
 
-export interface EmailEventosStats {
-  total: number;
-  sent: number;
-  delivered: number;
-  opened: number;
-  clicked: number;
-  bounced: number;
-  complained: number;
-}
-
-export interface EmailEventosPorDia {
-  fecha: string;
-  sent: number;
-  delivered: number;
-  opened: number;
-  clicked: number;
-}
-
-export function useEmailEventos() {
+/**
+ * Estadísticas de los correos (pestaña Newsletter › Estadísticas): UNA lectura
+ * de `email_eventos` y UNA cuenta (`resumirEventosCorreo`) de la que salen las
+ * tarjetas, el desglose y la tendencia de 7 días, para que no puedan
+ * contradecirse. Antes eran dos consultas con criterios distintos (correos
+ * únicos para las cifras, eventos sueltos para la tendencia) y el componente
+ * sumaba conjuntos que se solapan.
+ *
+ * Por lotes (`paginarConsulta`): PostgREST corta cada petición a 1.000 filas
+ * sin avisar, y con ~3 eventos por correo las cifras se habrían quedado cortas
+ * a partir de unos 300 correos. Se refresca sola cada minuto con la pestaña a
+ * la vista (no hay realtime sobre `email_eventos`).
+ */
+export function useEstadisticasCorreos() {
   return useQuery({
-    queryKey: ["email-eventos"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("email_eventos")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      return data as EmailEvento[];
+    ...REFRESCO_PERIODICO,
+    queryKey: ["email-eventos-resumen"],
+    queryFn: async ({ signal }): Promise<EstadisticasCorreos> => {
+      const { filas, truncado } = await paginarConsulta<EventoCorreo & { id: string }>(
+        (primera, ultima, contar) =>
+          supabase
+            .from("email_eventos")
+            .select("id, tipo_evento, email_id, timestamp_evento, created_at", contar ? { count: "exact" } : undefined)
+            .in("tipo_evento", [...TIPOS_EVENTO_CORREO])
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(primera, ultima)
+            .abortSignal(signal),
+        { clave: (f) => f.id, signal, limiteFilas: LIMITE_EVENTOS },
+      );
+      return { ...resumirEventosCorreo(filas, { ahora: Date.now(), dias: 7 }), truncado };
     },
-  });
-}
-
-export function useEmailEventosStats() {
-  return useQuery({
-    queryKey: ["email-eventos-stats"],
-    queryFn: async () => {
-      // Obtener todos los eventos con email_id para contar únicos
-      const { data, error } = await supabase
-        .from("email_eventos")
-        .select("tipo_evento, email_id");
-
-      if (error) throw error;
-
-      // Contar emails únicos por tipo de evento
-      const emailsPorTipo: Record<string, Set<string>> = {
-        sent: new Set(),
-        delivered: new Set(),
-        opened: new Set(),
-        clicked: new Set(),
-        bounced: new Set(),
-        complained: new Set(),
-      };
-
-      data.forEach((evento) => {
-        const tipo = evento.tipo_evento;
-        if (tipo in emailsPorTipo) {
-          emailsPorTipo[tipo].add(evento.email_id);
-        }
-      });
-
-      const stats: EmailEventosStats = {
-        total: data.length,
-        sent: emailsPorTipo.sent.size,
-        delivered: emailsPorTipo.delivered.size,
-        opened: emailsPorTipo.opened.size,
-        clicked: emailsPorTipo.clicked.size,
-        bounced: emailsPorTipo.bounced.size,
-        complained: emailsPorTipo.complained.size,
-      };
-
-      // Calcular tasas - todas basadas en emails únicos enviados (100%)
-      const rates = {
-        deliveryRate: stats.sent > 0 ? Math.round((stats.delivered / stats.sent) * 100) : 0,
-        openRate: stats.sent > 0 ? Math.round((stats.opened / stats.sent) * 100) : 0,
-        clickRate: stats.sent > 0 ? Math.round((stats.clicked / stats.sent) * 100) : 0,
-        bounceRate: stats.sent > 0 ? Math.round((stats.bounced / stats.sent) * 100) : 0,
-      };
-
-      return { stats, rates };
-    },
-  });
-}
-
-export function useEmailEventosPorDia(dias: number = 7) {
-  return useQuery({
-    queryKey: ["email-eventos-por-dia", dias],
-    queryFn: async () => {
-      const fechaInicio = new Date();
-      fechaInicio.setDate(fechaInicio.getDate() - dias);
-
-      const { data, error } = await supabase
-        .from("email_eventos")
-        .select("tipo_evento, timestamp_evento")
-        .gte("timestamp_evento", fechaInicio.toISOString())
-        .order("timestamp_evento", { ascending: true });
-
-      if (error) throw error;
-
-      // Agrupar por día
-      const porDia: Record<string, EmailEventosPorDia> = {};
-
-      data.forEach((evento) => {
-        if (!evento.timestamp_evento) return;
-        
-        const fecha = evento.timestamp_evento.split("T")[0];
-        if (!porDia[fecha]) {
-          porDia[fecha] = { fecha, sent: 0, delivered: 0, opened: 0, clicked: 0 };
-        }
-
-        const tipo = evento.tipo_evento as keyof Omit<EmailEventosPorDia, "fecha">;
-        if (tipo in porDia[fecha]) {
-          porDia[fecha][tipo]++;
-        }
-      });
-
-      return Object.values(porDia).sort((a, b) => a.fecha.localeCompare(b.fecha));
-    },
-  });
-}
-
-export function useEmailEventosRecientes(limite: number = 10) {
-  return useQuery({
-    queryKey: ["email-eventos-recientes", limite],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("email_eventos")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(limite);
-
-      if (error) throw error;
-      return data as EmailEvento[];
-    },
-    refetchInterval: 30000, // Refrescar cada 30 segundos
   });
 }

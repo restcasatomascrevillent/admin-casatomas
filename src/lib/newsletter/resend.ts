@@ -1,5 +1,5 @@
 // ============================================================================
-// Newsletter por Resend Marketing — textos y cálculos del panel (lógica pura)
+// Lista de envío del newsletter — textos y cálculos del panel (lógica pura)
 // ----------------------------------------------------------------------------
 // Las reglas (canal, límite de contactos, aviso al 80 %) vienen del mismo
 // fichero que usan las funciones: supabase/functions/_shared/resend-marketing/
@@ -7,6 +7,7 @@
 // ({accion: "estado"}); ver docs/funcionalidades/newsletter-resend-marketing.md.
 // ============================================================================
 
+import { formatoNumero, plural, textoErrorCliente } from "./textos";
 import {
   nivelCuota,
   type CanalNewsletter,
@@ -66,8 +67,9 @@ export interface ResultadoSincronizacion {
   error?: string;
 }
 
+/** Etiqueta corta de cómo saldrá la newsletter. */
 export function textoCanal(canal: CanalNewsletter | null | undefined): string {
-  return canal === "broadcast" ? "Broadcast de Resend Marketing" : "Envío directo (cuota diaria compartida con las reservas)";
+  return canal === "broadcast" ? "Por lista de envío" : "Correo directo";
 }
 
 export function porcentajeCuota(usados: number | null | undefined, limite: number): number {
@@ -77,8 +79,13 @@ export function porcentajeCuota(usados: number | null | undefined, limite: numbe
 
 export function textoCuota(usados: number | null | undefined, limite: number): string {
   const nivel = nivelCuota(usados, limite);
-  if (nivel === "lleno") return "Límite de contactos alcanzado: Resend no deja enviar Broadcasts hasta borrar contactos o subir de plan.";
-  if (nivel === "aviso") return "Más del 80 % de los contactos del plan: conviene revisar los contactos de Resend que no son del newsletter o subir de plan.";
+  const max = formatoNumero(limite);
+  if (nivel === "lleno") {
+    return `Has llegado al máximo de contactos del plan (${max}). No se puede enviar la newsletter hasta liberar contactos o ampliar el plan. Avisa al equipo técnico.`;
+  }
+  if (nivel === "aviso") {
+    return `Estás usando más del 80 % de los contactos del plan (máx. ${max}). Conviene revisar la lista o ampliar el plan antes de llegar al máximo.`;
+  }
   return "";
 }
 
@@ -86,7 +93,7 @@ const ETIQUETA_PASADA: Record<PasadaResend["estado"], string> = {
   en_curso: "En curso",
   ok: "Correcta",
   parcial: "Con avisos",
-  error: "Error",
+  error: "Con errores",
 };
 
 const ETIQUETA_ORIGEN: Record<PasadaResend["origen"], string> = {
@@ -103,21 +110,29 @@ export function etiquetaOrigenPasada(p: Pick<PasadaResend, "origen">): string {
   return ETIQUETA_ORIGEN[p.origen] ?? p.origen;
 }
 
-/** Mensaje para el aviso tras pulsar «Sincronizar con Resend». */
+/** Mensaje para el aviso tras pulsar «Actualizar lista de envío». */
 export function mensajeSincronizacion(r: ResultadoSincronizacion): { tipo: "ok" | "aviso" | "error"; texto: string } {
-  if (!r.success || r.estado === "error") return { tipo: "error", texto: r.error || "No se pudo sincronizar con Resend" };
+  if (!r.success || r.estado === "error") {
+    return {
+      tipo: "error",
+      texto: textoErrorCliente(r.error, "No se pudo actualizar la lista de envío. Inténtalo de nuevo y, si sigue igual, avisa al equipo técnico."),
+    };
+  }
   const partes: string[] = [];
-  if (r.altas) partes.push(`${r.altas} añadidos`);
-  if (r.borrados) partes.push(`${r.borrados} quitados de Resend`);
-  if (r.bajas_resend) partes.push(`${r.bajas_resend} bajas desde la página de Resend`);
+  if (r.altas) partes.push(plural(r.altas, "añadido", "añadidos"));
+  if (r.borrados) partes.push(plural(r.borrados, "quitado", "quitados"));
+  if (r.bajas_resend) partes.push(plural(r.bajas_resend, "baja nueva", "bajas nuevas"));
   const cambios = partes.length ? partes.join(", ") : "sin cambios";
   if (r.pendientes > 0) {
-    return { tipo: "aviso", texto: `Sincronización a medias (${cambios}): quedan ${r.pendientes} cambios. Vuelve a pulsar «Sincronizar».` };
+    return {
+      tipo: "aviso",
+      texto: `La lista se ha actualizado a medias (${cambios}): quedan ${plural(r.pendientes, "cambio", "cambios")} por aplicar. Vuelve a pulsar «Actualizar lista de envío».`,
+    };
   }
   if (r.total_errores > 0) {
-    return { tipo: "aviso", texto: `Sincronizado con ${r.total_errores} avisos (${cambios}).` };
+    return { tipo: "aviso", texto: `Lista de envío actualizada con ${plural(r.total_errores, "aviso", "avisos")} (${cambios}).` };
   }
-  return { tipo: "ok", texto: `Sincronizado con Resend: ${cambios}.` };
+  return { tipo: "ok", texto: `Lista de envío actualizada: ${cambios}.` };
 }
 
 export interface FilaEstadistica {
