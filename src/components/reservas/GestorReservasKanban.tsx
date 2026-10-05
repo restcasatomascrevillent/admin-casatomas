@@ -50,6 +50,7 @@ import {
 } from "@/lib/reservas/columnasServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useIsCoarsePointer } from "@/hooks/use-mobile";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import {
   ANCHO_COLUMNA_PLEGADA,
   ANCHO_MIN_COLUMNA,
@@ -69,6 +70,27 @@ import {
 // `accionesDisponibles(reserva, { vista: "hoy", canEdit })`.
 
 type FiltroTurno = "todo" | "comida" | "cena";
+
+/**
+ * ALTO DEL KANBAN (05/10/2026, petición del dueño: en «Hoy», sin scroll de página): la fila de columnas mide
+ * justo el alto que queda de ventana, con el mismo mecanismo que el Calendario, «Próximas reservas» y la
+ * Newsletter (`useAlturaDisponible`: alto del viewport visual − posición del bloque − relleno inferior del
+ * <main>, recalculado al redimensionar, girar la tablet, abrir el teclado, plegar el menú o desplegar algo de
+ * encima). Lo de arriba (cifras, aviso del Reservado, «Disponibilidad por cuartos de hora», buscador y
+ * filtros) queda fijo; cada columna se estira hasta el fondo y sus tarjetas se desplazan por dentro.
+ *
+ * Antes cada columna tenía un tope de `65dvh` que no descontaba lo de encima (de 350 a 570 px según la pantalla):
+ * con la columna «Sin asignar» llena, lo de encima + el tope + la cabecera de la columna pasaban del alto de la
+ * ventana y la página entera hacía scroll. Ese tope solo queda para cuando no hay medida (jsdom, primer
+ * pintado sin layout).
+ *
+ * SUELO (px): por debajo el kanban no encoge más y, solo entonces, la página hace scroll («Disponibilidad por
+ * cuartos de hora» desplegada en una ventana baja, teclado en pantalla). 280 px = una tarjeta entera bajo la
+ * cabecera de una columna con barras de aforo. No es el de 360 de «Próximas reservas»: aquí lo de encima es
+ * más alto, y en la ventana del dueño (1280×711 a 150 %) al kanban le quedan 313 px; con 360 la página volvía
+ * a hacer scroll justo ahí (y en la tablet apaisada y el móvil).
+ */
+const ALTURA_MINIMA_KANBAN = 280;
 
 function BarraTurno({ etiqueta, pax, capacidad }: { etiqueta: string; pax: number; capacidad: number }) {
   const porcentaje = capacidad ? Math.min(100, Math.round((pax / capacidad) * 100)) : 0;
@@ -128,7 +150,11 @@ function KanbanColumn({
   margenDerecho: number;
   /** Lleva imán de scroll: es donde el desplazamiento puede quedarse parado. */
   conIman: boolean;
-  alturaMaxima: string;
+  /**
+   * Tope de alto de las tarjetas, solo sin altura medida (ver `ALTURA_MINIMA_KANBAN`). Con altura medida no
+   * hay tope: la columna se estira hasta el fondo de la fila y las tarjetas se desplazan por dentro.
+   */
+  alturaMaxima?: string;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   // El ancho va en `style` y no en clases porque lo decide la aritmética de
@@ -208,8 +234,8 @@ function KanbanColumn({
           con puntos suspensivos, como estaba previsto. Se notaba poco con
           columnas de 224px y mucho al bajar el mínimo. */}
       <ScrollArea
-        className="flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block"
-        style={{ maxHeight: alturaMaxima }}
+        className="min-h-0 flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block"
+        style={alturaMaxima ? { maxHeight: alturaMaxima } : undefined}
       >
         <div className={cn("p-2 space-y-2 min-h-[120px] transition-colors duration-200 rounded-b-xl", isOver && "bg-primary/[0.02]")}>
           {children}
@@ -253,14 +279,19 @@ function KanbanColumn({
  *
  * El ancho se mide con ResizeObserver, no por breakpoints: el ancho real
  * depende del sidebar, que se pliega.
+ *
+ * `llenarAlto`: el bloque que la contiene tiene altura fija (`ALTURA_MINIMA_KANBAN`): la fila se queda con
+ * todo ese alto (`flex-1 min-h-0` en cada nivel) y las columnas se estiran hasta abajo.
  */
 function FilaColumnas({
   items,
   arrastrando,
+  llenarAlto,
   children,
 }: {
   items: ItemColumna[];
   arrastrando: boolean;
+  llenarAlto: boolean;
   children: (disposicion: DisposicionKanban) => React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -331,7 +362,7 @@ function FilaColumnas({
   };
 
   return (
-    <section aria-label="Salas de hoy" className="flex flex-col gap-2 min-w-0">
+    <section aria-label="Salas de hoy" className={cn("flex flex-col gap-2 min-w-0", llenarAlto && "min-h-0 flex-1")}>
       {desplazable && (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-1 text-xs min-w-0">
           <div className="ml-auto flex items-center gap-1 self-center">
@@ -368,7 +399,7 @@ function FilaColumnas({
         </div>
       )}
 
-      <div className="relative min-w-0">
+      <div className={cn("relative min-w-0", llenarAlto && "flex min-h-0 flex-1 flex-col")}>
         <div
           ref={scrollRef}
           onScroll={alDesplazar}
@@ -378,6 +409,8 @@ function FilaColumnas({
             // `position: sticky` en toda la app una vez).
             "flex min-w-0 overflow-x-auto overflow-y-hidden py-2",
             desplazable ? "[scrollbar-width:thin]" : "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            // Con alto fijo, la fila ocupa todo el alto y las columnas (estiradas) también.
+            llenarAlto && "min-h-0 flex-1",
           )}
           style={{
             // Mientras se arrastra se desactiva el imán: si no, el autoscroll
@@ -438,6 +471,11 @@ export function GestorReservasKanban() {
   const [minimizedCols, setMinimizedCols] = useState<Set<string>>(new Set());
   const [blacklistReserva, setBlacklistReserva] = useState<ReservaServicio | null>(null);
   const hoy = format(new Date(), "yyyy-MM-dd");
+  // Alto de la fila de columnas, calculado solo (ver `ALTURA_MINIMA_KANBAN`). `null` mientras no hay medida
+  // (cargando, jsdom): entonces cada columna conserva su tope de siempre y la página crece con ellas.
+  const [bloqueColumnas, setBloqueColumnas] = useState<HTMLDivElement | null>(null);
+  const alturaColumnas = useAlturaDisponible(bloqueColumnas, ALTURA_MINIMA_KANBAN);
+  const medida = alturaColumnas !== null;
 
   // Marcar/desmarcar "importante" y añadir a blacklist: acciones que antes
   // vivían solo en la tabla "Reservas de Hoy" (retirada 2026-09-25 al pasar
@@ -675,8 +713,17 @@ export function GestorReservasKanban() {
           },
         }}
       >
-        <div className="flex flex-col gap-3 min-w-0 flex-1">
-          <FilaColumnas items={itemsFila} arrastrando={!!activeReserva}>
+        {/* Con altura medida: este bloque mide justo lo que queda de ventana y la fila de columnas se queda con
+            todo él. `flex-none` y no `flex-1`: en una columna flex sin alto propio (la de este componente),
+            Chrome ignora el `height` de un hijo `flex: 1 1 0%` y le da el alto de su contenido. */}
+        <div
+          ref={setBloqueColumnas}
+          data-testid="kanban-columnas"
+          data-altura-fija={medida ? String(alturaColumnas) : undefined}
+          className={cn("flex flex-col gap-3 min-w-0", medida ? "flex-none" : "flex-1")}
+          style={medida ? { height: alturaColumnas } : undefined}
+        >
+          <FilaColumnas items={itemsFila} arrastrando={!!activeReserva} llenarAlto={medida}>
             {(disposicion) =>
               columnasPintadas.map((col) => {
                 const plegada = minimizedCols.has(col.id);
@@ -697,7 +744,7 @@ export function GestorReservasKanban() {
                     ancho={disposicion.anchoColumna}
                     margenDerecho={disposicion.margenes[col.id] ?? 0}
                     conIman={disposicion.idsConIman.includes(col.id)}
-                    alturaMaxima="65dvh"
+                    alturaMaxima={medida ? undefined : "65dvh"}
                   >
                     {(reservasPorColumna[col.id] || []).map((reserva) => (
                       <ReservaCard

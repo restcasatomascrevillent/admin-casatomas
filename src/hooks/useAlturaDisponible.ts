@@ -15,9 +15,14 @@ import { calcularAlturaDisponible } from "@/lib/reservas/alturaCalendario";
  * Se vuelve a medir al cambiar el tamaño de la ventana, al girar la tablet, al
  * redimensionarse el viewport visual (teclado) y al cambiar de tamaño el
  * `<main>` o el `<body>` —que es lo que ocurre al plegar/desplegar el menú
- * lateral, al envolver la fila de pestañas o al cargar las fuentes—. Nunca
- * escribe el mismo valor dos veces, así que no hay bucle con la propia altura
- * que fija.
+ * lateral, al envolver la fila de pestañas o al cargar las fuentes— o
+ * cualquiera de los contenedores del bloque hasta el `<main>`: es lo que
+ * ocurre cuando se pliega o se despliega algo que hay ENCIMA del bloque (en
+ * «Hoy», «Disponibilidad por cuartos de hora» o el aviso del Reservado sobre el
+ * kanban). Al plegarlo el bloque sube, pero el `<main>` no cambia de tamaño (ya
+ * medía el alto de la ventana), así que sin vigilar los contenedores el bloque
+ * se quedaba corto con un hueco debajo. Nunca escribe el mismo valor dos veces,
+ * así que no hay bucle con la propia altura que fija.
  *
  * `minimo`: suelo en px (por defecto el del calendario, `ALTURA_MINIMA_BLOQUE`);
  * por debajo el bloque no encoge más y la página hace scroll.
@@ -65,7 +70,11 @@ export function useAlturaDisponible(nodo: HTMLElement | null, minimo?: number): 
     };
     const observador = new ResizeObserver(programar);
     const main = nodo.closest("main");
-    if (main) observador.observe(main);
+    // Los contenedores del bloque, del padre hasta el <main> (o el <body> si no hay <main>).
+    for (let contenedor = nodo.parentElement; contenedor; contenedor = contenedor.parentElement) {
+      observador.observe(contenedor);
+      if (contenedor === main || contenedor === document.body) break;
+    }
     observador.observe(document.body);
     window.addEventListener("resize", ahora);
     window.addEventListener("orientationchange", ahora);
