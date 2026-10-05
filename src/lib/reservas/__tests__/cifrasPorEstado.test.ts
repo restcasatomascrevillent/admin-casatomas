@@ -18,7 +18,7 @@
  *   `unificarReservasYSolicitudes`. Ya no hay filtro «Negocio» en la lista.
  * · `alcanceCifrasDeLaLista`: cómo se rotulan esas cifras («cifras de la lista»,
  *   «…de hoy», «…del 3 oct 2026»), y el aviso de que el filtro de estado no cuenta.
- * · `cifraPorAtender` (2026-10-05): la cifra del botón «Pendientes». Se cuenta como
+ * · `cifraPorAtender` (2026-10-05): la cifra del botón «Por atender». Se cuenta como
  *   las del timeline (sin el filtro de estado) pero con las solicitudes sin resolver:
  *   es EXACTAMENTE el número de filas que la lista enseña al pulsar el botón.
  */
@@ -259,7 +259,7 @@ describe("cifrasDeLaLista", () => {
   });
 });
 
-describe("cifraPorAtender (el botón «Pendientes»)", () => {
+describe("cifraPorAtender (el botón «Por atender»)", () => {
   const solicitud = (id: string, estado: string, o: Partial<SolicitudPendiente> = {}): SolicitudPendiente => ({
     id,
     nombre: `Solicitud ${id}`,
@@ -294,7 +294,7 @@ describe("cifraPorAtender (el botón «Pendientes»)", () => {
     expect(cifraPorAtender([], SOLICITUDES, {})).toBe(2);
   });
 
-  it("sin nada pendiente es 0 (dato real)", () => {
+  it("sin nada por atender es 0 (dato real)", () => {
     expect(cifraPorAtender([reserva("x", "confirmada")], [solicitud("y", "resuelta")], {})).toBe(0);
     expect(cifraPorAtender([], [], {})).toBe(0);
   });
@@ -316,7 +316,7 @@ describe("cifraPorAtender (el botón «Pendientes»)", () => {
     expect(cifraPorAtender(LISTA, SOLICITUDES, { canal: "web" })).toBe(0);
   });
 
-  it("es justo el número de filas que la lista enseña con «Pendientes» puesto, con cualquier combinación de filtros", () => {
+  it("es justo el número de filas que la lista enseña con «Por atender» puesto, con cualquier combinación de filtros", () => {
     const combinaciones: FiltrosListaUnificada[] = [
       {},
       { fecha: "2026-10-01" },

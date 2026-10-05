@@ -35,7 +35,8 @@
  *
  * Y lo que pidió el 2026-10-05 («pon aquí un filtro de solo pendientes y en los dos filtros pon lo que es el
  * filtro en lugar de "Todos"»): los desplegables cerrados dicen qué filtran («Estado», «Estado: Confirmada») y hay
- * un atajo «Pendientes» (reservas pendientes + solicitudes sin resolver) que va a la par con el desplegable. Se
+ * un atajo «Por atender» (reservas pendientes + solicitudes sin resolver; el nombre lo decidió el dueño) que va a
+ * la par con el desplegable. Se
  * comprueba en su propio describe, antes del de la lectura por lotes.
  *
  * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
@@ -1436,18 +1437,19 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
 // pon lo que es el filtro en lugar de "Todos" para que se entienda».
 //   · Los dos desplegables, cerrados, dicen QUÉ filtran: «Estado» / «Canal» sin filtro y «Estado: Confirmada» /
 //     «Canal: Web» con uno. Abiertos, «Todos» pasa a «Todos los estados» / «Todos los canales».
-//   · «Pendientes»: botón de alternancia junto a «Hoy» y «Fecha» que enseña SOLO lo que espera al personal —las
-//     reservas `pendiente` y las solicitudes del asistente sin resolver—. Es la opción `por_atender` del
-//     desplegable «Estado» (botón y desplegable van a la par) y se combina con los demás filtros. Su cifra se
-//     cuenta como las del timeline: la lista con sus filtros menos el de estado.
+//   · «Por atender» (el nombre lo decidió el dueño; no «Pendientes»): botón de alternancia junto a «Hoy» y «Fecha»
+//     que enseña SOLO lo que espera al personal —las reservas `pendiente` y las solicitudes del asistente sin
+//     resolver—. Es la opción `por_atender` del desplegable «Estado» (botón y desplegable van a la par) y se
+//     combina con los demás filtros. Su cifra se cuenta como las del timeline: la lista con sus filtros menos el
+//     de estado.
 //   · El paso «Pendiente» del timeline sigue siendo SOLO reservas pendientes.
-describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el atajo «Pendientes»", { timeout: 30_000 }, () => {
+describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el atajo «Por atender»", { timeout: 30_000 }, () => {
   const desplegableEstado = () => screen.getByRole("combobox", { name: "Filtrar por estado" });
   const desplegableCanal = () => screen.getByRole("combobox", { name: "Filtrar por canal" });
   const textoDe = (el: HTMLElement) => el.textContent?.replace(/\s+/g, " ").trim();
   const clasesDe = (el: HTMLElement) => el.className.split(/\s+/);
-  const botonPendientes = () => screen.getByRole("button", { name: /^Pendientes/ });
-  const cifraPendientes = () => botonPendientes().querySelector("[data-cifra-pendientes]")?.textContent?.replace(/\D/g, "");
+  const botonPorAtender = () => screen.getByRole("button", { name: /^Por atender/ });
+  const cifraDelBoton = () => botonPorAtender().querySelector("[data-cifra-por-atender]")?.textContent?.replace(/\D/g, "");
   const contador = () => screen.getByText(/^\d+ reservas/);
   const buscador = () => screen.getByRole("textbox", { name: "Buscar reservas y solicitudes" });
   const timeline = () => screen.getByRole("region", { name: /Cómo avanza una reserva/ });
@@ -1463,7 +1465,7 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     fireEvent.click(await screen.findByRole("option", { name: opcion }));
     await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
   }
-  const OPCION_PENDIENTES = "Pendientes (reservas y solicitudes sin resolver)";
+  const OPCION_POR_ATENDER = "Por atender (reservas y solicitudes sin resolver)";
 
   const solicitudDe = (id: string, estado: string, nombre: string) =>
     ({ ...solicitud, id, estado, nombre }) as SolicitudPendiente;
@@ -1548,12 +1550,12 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     expect(textoDe(desplegableCanal())).toBe("Canal");
   });
 
-  it("abiertos, «Todos» pasa a «Todos los estados» / «Todos los canales», y «Pendientes (…)» va justo después de «Todos los estados»", async () => {
+  it("abiertos, «Todos» pasa a «Todos los estados» / «Todos los canales», y «Por atender (…)» va justo después de «Todos los estados»", async () => {
     await montar();
 
     fireEvent.click(desplegableEstado());
     const deEstado = (await screen.findAllByRole("option")).map((o) => textoDe(o));
-    expect(deEstado.slice(0, 3)).toEqual(["Todos los estados", OPCION_PENDIENTES, "Solicitudes sin resolver"]);
+    expect(deEstado.slice(0, 3)).toEqual(["Todos los estados", OPCION_POR_ATENDER, "Solicitudes sin resolver"]);
     expect(deEstado).not.toContain("Todos");
     fireEvent.click(screen.getByRole("option", { name: "Todos los estados" }));
     await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
@@ -1563,44 +1565,50 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     expect(deCanal).toEqual(["Todos los canales", "📞 Tel", "🌐 Web", "✏️ Manual"]);
   });
 
-  // ── «Pendientes» ────────────────────────────────────────────────────────────
+  // ── «Por atender» ───────────────────────────────────────────────────────────
 
-  it("«Pendientes» es un botón de alternancia, sin pulsar al entrar, con la cifra de lo pendiente: reservas pendientes + solicitudes sin resolver", async () => {
+  it("«Por atender» es un botón de alternancia, sin pulsar al entrar, con la cifra de lo que hay por atender: reservas pendientes + solicitudes sin resolver", async () => {
     await montar(conSolicitudes());
 
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "false");
-    expect(botonPendientes()).toBeEnabled();
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "false");
+    expect(botonPorAtender()).toBeEnabled();
     // Sin pulsar, con borde, como «Hoy» cuando no está puesto (variante `outline`).
-    expect(clasesDe(botonPendientes())).toContain("border-input");
-    expect(clasesDe(botonPendientes())).not.toContain("bg-primary");
+    expect(clasesDe(botonPorAtender())).toContain("border-input");
+    expect(clasesDe(botonPorAtender())).not.toContain("bg-primary");
     // 2 reservas pendientes + 2 solicitudes sin resolver (las 2 cerradas no cuentan).
-    expect(cifraPendientes()).toBe("4");
-    expect(botonPendientes()).toHaveAccessibleName("Pendientes 4 por atender");
+    expect(cifraDelBoton()).toBe("4");
+    // Se ve «Por atender» y la cifra; el lector de pantalla oye también qué se cuenta.
+    expect(botonPorAtender()).toHaveAccessibleName("Por atender 4 reservas y solicitudes");
+    expect(botonPorAtender()).toHaveAttribute(
+      "title",
+      "Ver solo lo que está por atender: reservas pendientes y solicitudes sin resolver",
+    );
   });
 
   it("pulsado enseña SOLO las reservas pendientes y las solicitudes sin resolver (ningún otro estado, ninguna cerrada) y la insignia lo cuenta", async () => {
     const { tabla } = await montar(conSolicitudes());
     expect(contador()).toHaveTextContent("7 reservas · 2 solicitudes");
 
-    fireEvent.click(botonPendientes());
+    fireEvent.click(botonPorAtender());
 
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "true");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "true");
+    expect(botonPorAtender()).toHaveAttribute("title", "Quitar el filtro «Por atender»");
     // Pulsado, el estilo activo de «Hoy» (variante `default`, relleno oscuro).
-    expect(clasesDe(botonPendientes())).toContain("bg-primary");
+    expect(clasesDe(botonPorAtender())).toContain("bg-primary");
     // Las solicitudes abiertas van primero (orden de la lista); luego las reservas, de la más reciente a la más antigua.
     expect(clientes(tabla)).toEqual(["Familia Ballester", "Grupo Contactado", "Pepa PendienteWeb", "Ana Pendiente"]);
     expect(contador()).toHaveTextContent("2 reservas · 2 solicitudes");
     // La cifra del botón es justo lo que se ve.
-    expect(cifraPendientes()).toBe("4");
+    expect(cifraDelBoton()).toBe("4");
   });
 
   it("volver a pulsarlo quita el filtro: todos los estados otra vez", async () => {
     const { tabla } = await montar(conSolicitudes());
 
-    fireEvent.click(botonPendientes());
-    fireEvent.click(botonPendientes());
+    fireEvent.click(botonPorAtender());
+    fireEvent.click(botonPorAtender());
 
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "false");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "false");
     expect(textoDe(desplegableEstado())).toBe("Estado");
     expect(clientes(tabla)).toHaveLength(9); // 7 reservas + 2 solicitudes sin resolver
     expect(contador()).toHaveTextContent("7 reservas · 2 solicitudes");
@@ -1609,20 +1617,21 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
   it("el botón y el desplegable «Estado» van a la par, en los dos sentidos", async () => {
     const { tabla } = await montar(conSolicitudes());
 
-    // Botón → desplegable: dice «Estado: Pendientes» y, abierto, esa opción es la marcada.
-    fireEvent.click(botonPendientes());
-    expect(textoDe(desplegableEstado())).toBe("Estado: Pendientes");
+    // Botón → desplegable: dice «Estado: Por atender» y, abierto, esa opción es la marcada.
+    fireEvent.click(botonPorAtender());
+    expect(textoDe(desplegableEstado())).toBe("Estado: Por atender");
+    expect(desplegableEstado()).toHaveAttribute("title", "Estado: Por atender");
     fireEvent.click(desplegableEstado());
-    expect(await screen.findByRole("option", { name: OPCION_PENDIENTES })).toHaveAttribute("data-state", "checked");
+    expect(await screen.findByRole("option", { name: OPCION_POR_ATENDER })).toHaveAttribute("data-state", "checked");
     // Otro estado en el desplegable suelta el botón…
     fireEvent.click(screen.getByRole("option", { name: "Confirmada" }));
     await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "false");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "false");
     expect(clientes(tabla)).toEqual(["Carlos Confirmado"]);
 
-    // … y elegir «Pendientes (…)» en el desplegable lo pulsa.
-    await elegirOpcion(desplegableEstado(), OPCION_PENDIENTES);
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "true");
+    // … y elegir «Por atender (…)» en el desplegable lo pulsa.
+    await elegirOpcion(desplegableEstado(), OPCION_POR_ATENDER);
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "true");
     expect(clientes(tabla)).toHaveLength(4);
   });
 
@@ -1631,33 +1640,34 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
 
     // Web: solo la pendiente de la web (las solicitudes son del teléfono).
     await elegirOpcion(desplegableCanal(), /Web/);
-    expect(cifraPendientes()).toBe("1");
-    fireEvent.click(botonPendientes());
+    expect(cifraDelBoton()).toBe("1");
+    fireEvent.click(botonPorAtender());
     expect(clientes(tabla)).toEqual(["Pepa PendienteWeb"]);
 
     // Teléfono: la pendiente de hoy y las dos solicitudes sin resolver.
     await elegirOpcion(desplegableCanal(), /Tel/);
-    expect(cifraPendientes()).toBe("3");
+    expect(cifraDelBoton()).toBe("3");
     expect(clientes(tabla)).toEqual(["Familia Ballester", "Grupo Contactado", "Ana Pendiente"]);
 
     // Y además «Hoy»: solo la de hoy (las solicitudes y la de la web son de mañana).
     fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
-    expect(cifraPendientes()).toBe("1");
+    expect(cifraDelBoton()).toBe("1");
     expect(clientes(tabla)).toEqual(["Ana Pendiente"]);
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "true");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "true");
   });
 
   it("se combina con la búsqueda, y la cifra la sigue", async () => {
     const { tabla } = await montar(conSolicitudes());
 
     fireEvent.change(buscador(), { target: { value: "Ballester" } });
-    expect(cifraPendientes()).toBe("1");
-    fireEvent.click(botonPendientes());
+    expect(cifraDelBoton()).toBe("1");
+    expect(botonPorAtender()).toHaveAccessibleName("Por atender 1 reserva o solicitud");
+    fireEvent.click(botonPorAtender());
     expect(clientes(tabla)).toEqual(["Familia Ballester"]);
 
     // Una búsqueda que solo casa con lo que NO está pendiente: nada.
     fireEvent.change(buscador(), { target: { value: "Carlos" } });
-    expect(cifraPendientes()).toBe("0");
+    expect(cifraDelBoton()).toBe("0");
     expect(clientes(tabla)).toEqual([]);
   });
 
@@ -1665,11 +1675,11 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     await montar(conSolicitudes());
 
     await elegirOpcion(desplegableEstado(), "Confirmada");
-    expect(cifraPendientes()).toBe("4");
+    expect(cifraDelBoton()).toBe("4");
     fireEvent.click(pasoDelTimeline("Cancelada"));
-    expect(cifraPendientes()).toBe("4");
+    expect(cifraDelBoton()).toBe("4");
     await elegirOpcion(desplegableEstado(), "Solicitudes cerradas");
-    expect(cifraPendientes()).toBe("4");
+    expect(cifraDelBoton()).toBe("4");
   });
 
   it("el paso «Pendiente» del timeline sigue enseñando SOLO las reservas pendientes, sin solicitudes, y no pulsa el botón", async () => {
@@ -1678,37 +1688,37 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     fireEvent.click(pasoDelTimeline("Pendiente"));
 
     expect(clientes(tabla)).toEqual(["Pepa PendienteWeb", "Ana Pendiente"]);
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "false");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "false");
     expect(textoDe(desplegableEstado())).toBe("Estado: Pendiente");
 
-    // Y con «Pendientes» puesto, ningún paso del timeline sale pulsado (no es uno de sus estados).
-    fireEvent.click(botonPendientes());
+    // Y con «Por atender» puesto, ningún paso del timeline sale pulsado (no es uno de sus estados).
+    fireEvent.click(botonPorAtender());
     expect(pulsadosDelTimeline()).toEqual([]);
     expect(clientes(tabla)).toHaveLength(4);
   });
 
-  it("sin nada pendiente la cifra es 0, el botón sigue disponible y la lista dice que no hay nada pendiente", async () => {
+  it("sin nada por atender la cifra es 0, el botón sigue disponible y la lista dice que no hay nada por atender", async () => {
     supa.filas = [reserva("c", "confirmada", "Carlos Confirmado")];
     const { tabla } = await montar(conSolicitudes([solicitudDe("sol-resuelta", "resuelta", "Grupo Resuelto")]));
 
-    expect(cifraPendientes()).toBe("0");
-    expect(botonPendientes()).toBeEnabled();
-    fireEvent.click(botonPendientes());
+    expect(cifraDelBoton()).toBe("0");
+    expect(botonPorAtender()).toBeEnabled();
+    fireEvent.click(botonPorAtender());
 
-    expect(botonPendientes()).toHaveAttribute("aria-pressed", "true");
+    expect(botonPorAtender()).toHaveAttribute("aria-pressed", "true");
     expect(clientes(tabla)).toEqual([]);
-    expect(tabla).toHaveTextContent("No hay nada pendiente: ninguna reserva pendiente ni solicitud sin resolver");
+    expect(tabla).toHaveTextContent("No hay nada por atender: ninguna reserva pendiente ni solicitud sin resolver");
     expect(contador()).toHaveTextContent(/^0 reservas$/);
   });
 
-  it("con más filtros puestos, la lista vacía de «Pendientes» lo dice («con los filtros aplicados»)", async () => {
+  it("con más filtros puestos, la lista vacía de «Por atender» lo dice («con los filtros aplicados»)", async () => {
     const { tabla } = await montar(conSolicitudes());
 
-    fireEvent.click(botonPendientes());
+    fireEvent.click(botonPorAtender());
     fireEvent.change(buscador(), { target: { value: "nadie-se-llama-asi" } });
 
     expect(tabla).toHaveTextContent(
-      "No hay nada pendiente con los filtros aplicados: ninguna reserva pendiente ni solicitud sin resolver",
+      "No hay nada por atender con los filtros aplicados: ninguna reserva pendiente ni solicitud sin resolver",
     );
   });
 });
