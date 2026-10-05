@@ -1,12 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { diagnosticoResolucion } from "./imagen.ts";
 import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
-import { bloqueContenido, crearClienteOpenAI } from "./openai.ts";
-import { extraerDocumentoUnico } from "./extraccion.ts";
-import { type ContextoGuardado, guardarDocumento, guardarOriginalPendiente, sustituirFactura } from "./guardado.ts";
-import { iniciarTrabajo, registrarDuplicadoSincrono, validarInicio } from "./trabajos.ts";
+import { crearClienteOpenAI } from "./openai.ts";
+import { type ContextoGuardado, sustituirFactura } from "./guardado.ts";
+import { iniciarTrabajo, validarInicio } from "./trabajos.ts";
+import { ficheroDesdePayload, procesarSincrono } from "./unico.ts";
 
 // ============================================================================
 //  procesar-factura  ·  OCR de facturas/albaranes SIN n8n
@@ -19,11 +18,13 @@ import { iniciarTrabajo, registrarDuplicadoSincrono, validarInicio } from "./tra
 //     Si el documento ya existe → { duplicado: true, sustituible: {...} } para
 //     que el panel ofrezca «Sustituir la existente».
 //
-//   · `modo: "iniciar"` (documentos LARGOS, 04b): el panel ya ha subido las
-//     piezas (páginas de un PDF o franjas de una imagen muy alta) a
-//     facturas-originales/pendientes/{uid}/{trabajo}/ y aquí solo se crea el
-//     trabajo y se despacha; la lectura la hace `ocr-trabajo` en segundo
-//     plano. Responde en < 2 s.
+//   · `modo: "iniciar"` (documentos LARGOS, 04b, y desde el 05-oct-2026
+//     también los de UNA página): el panel ya ha subido las piezas (páginas
+//     de un PDF, franjas de una imagen muy alta, o el fichero entero como
+//     pieza única) a facturas-originales/pendientes/{uid}/{trabajo}/ y aquí
+//     solo se crea el trabajo y se despacha; la lectura la hace
+//     `ocr-trabajo` en segundo plano. Responde en < 2 s. Una pieza única se
+//     lee con el MISMO código y modelo que el camino síncrono (unico.ts).
 //
 //   · `modo: "sustituir"`: reemplaza EN SITIO la factura duplicada por el
 //     documento nuevo ya leído (exige permiso de EDICIÓN en Facturas).
@@ -81,7 +82,10 @@ serve(async (req) => {
       const v = validarInicio(payload, auth.userId);
       if (!v.ok) return jsonResponse({ success: false, error: v.error });
       const ctx = contexto();
-      return jsonResponse(await iniciarTrabajo(ctx.supabase, auth.userId, v.peticion, modeloPiezas));
+      // Una sola pieza = documento de una página leído en segundo plano con
+      // el código y el modelo (OCR_MODELO) del camino síncrono.
+      const modelo = v.peticion.piezas.length === 1 ? cfgModelo.modelo : modeloPiezas;
+      return jsonResponse(await iniciarTrabajo(ctx.supabase, auth.userId, v.peticion, modelo));
     }
 
     // ── Sustituir la factura existente por el documento nuevo ──
@@ -103,72 +107,17 @@ serve(async (req) => {
       return jsonResponse(r);
     }
 
-    // ── Camino síncrono de una página (v101) ──
+    // ── Camino síncrono de una página (v101; el panel nuevo solo lo usa si
+    //    el servidor no admite trabajos de una pieza). Código en unico.ts,
+    //    el MISMO que lee y guarda los trabajos de una pieza de ocr-trabajo.
     const archivo = payload.archivo;
     if (!archivo?.contenido_base64) throw new Error("No se recibió ningún archivo");
-
-    const mimeType: string = archivo.tipo || "application/pdf";
-    const isPdf = mimeType.includes("pdf");
-    const b64: string = archivo.contenido_base64.includes(",")
-      ? archivo.contenido_base64.split(",")[1]
-      : archivo.contenido_base64;
+    const fichero = ficheroDesdePayload(archivo);
 
     console.log(
-      `[procesar-factura] ${archivo.nombre} (${mimeType}) — user ${auth.userId} — modelo ${cfgModelo.modelo}/${cfgModelo.detalle}`,
+      `[procesar-factura] ${archivo.nombre} (${fichero.mime}) — user ${auth.userId} — modelo ${cfgModelo.modelo}/${cfgModelo.detalle}`,
     );
-
-    // Diagnóstico de resolución (solo log; ver imagen.ts).
-    if (!isPdf) {
-      try {
-        const cabecera = atob(b64.slice(0, 65536));
-        const bytes = new Uint8Array(cabecera.length);
-        for (let i = 0; i < cabecera.length; i++) bytes[i] = cabecera.charCodeAt(i);
-        const diag = diagnosticoResolucion(bytes);
-        if (diag) console.log(diag);
-      } catch {
-        // Medir es informativo.
-      }
-    }
-
-    const ctx = contexto();
-    const contentBlock = bloqueContenido(b64, mimeType, archivo.nombre || "document.pdf", cfgModelo.detalle);
-
-    // 2) → 2b) Extracción, pie, contador, citas, deducción y normalización.
-    const listo = await extraerDocumentoUnico(ctx.openai, contentBlock);
-
-    // 4) → 9) Duplicado, embeddings, cabecera, líneas, validación, archivo.
-    const g = await guardarDocumento(ctx, {
-      ...listo,
-      original: { tipo: "base64", b64, mime: mimeType, nombre: archivo.nombre },
-      paginas: 1,
-    });
-
-    if (g.estado === "duplicado" && g.existente) {
-      // Se guarda lo leído (sin volver a pagar el OCR) para «Sustituir la existente».
-      // Primero el registro (si la migración no está aplicada, no se sube nada
-      // a pendientes/); después el original, que es el que se archivará.
-      const trabajoId = crypto.randomUUID();
-      const sustituible = await registrarDuplicadoSincrono(ctx.supabase, {
-        userId: auth.userId,
-        trabajoId,
-        nombre: archivo.nombre,
-        mime: mimeType,
-        originalPath: null,
-        datos: listo.datos,
-        alertasPrevias: listo.alertasPrevias,
-        totalOrigen: listo.totalOrigen,
-        existente: g.existente,
-        modelo: cfgModelo.modelo,
-      });
-      if (sustituible) {
-        const originalPath = await guardarOriginalPendiente(ctx.supabase, auth.userId, trabajoId, b64, mimeType);
-        if (originalPath) {
-          await ctx.supabase.from("ocr_trabajos").update({ original_path: originalPath }).eq("id", trabajoId);
-        }
-      }
-      return jsonResponse({ ...g.respuesta, sustituible });
-    }
-    return jsonResponse(g.respuesta);
+    return jsonResponse(await procesarSincrono(contexto(), fichero, auth.userId));
   } catch (error) {
     console.error("[procesar-factura] Error:", error);
     const msg = error instanceof Error ? error.message : "Error desconocido";

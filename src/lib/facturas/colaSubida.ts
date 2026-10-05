@@ -8,10 +8,12 @@
 //  React (este fichero) que monta UNA vez <ColaSubidaProvider> por encima de
 //  las rutas; el componente de la pestaña «Cargar» solo lo enseña.
 //
-//  Fases de cada documento:
-//    seleccionado → (Enviar) → en_cola → preparando → subiendo (camino largo)
+//  Fases de cada documento (desde el 05-oct-2026 TODOS van por trabajos en el
+//  servidor: los largos troceados y los de una página como pieza única):
+//    seleccionado → (Enviar) → en_cola → preparando → subiendo (a Storage)
 //      → procesando (en el servidor: ocr_trabajos) → terminado
-//    seleccionado → en_cola → preparando → enviando (camino de una página:
+//    Respaldo si el servidor aún no admite trabajos (versión antigua):
+//    seleccionado → en_cola → preparando → enviando (camino síncrono:
 //      una sola llamada a procesar-factura de 10-40 s) → terminado
 //  «En el navegador» (cerrar la pestaña las pierde): en_cola, preparando,
 //  subiendo y enviando. «procesando» ya está en el servidor y sigue aunque se
@@ -28,6 +30,7 @@ import {
   esperarTrabajo,
   type EstadoTrabajo,
   iniciarDocumentoLargo,
+  iniciarDocumentoUnico,
   type InicioDocumentoLargo,
   type PlanDocumento,
   planificarDocumento,
@@ -142,8 +145,14 @@ export interface DepsCola {
     plan: Extract<PlanDocumento, { camino: "largo" }>,
     onProgreso: (subidas: number, total: number) => void,
   ) => Promise<InicioDocumentoLargo>;
+  /**
+   * Documento de una página como trabajo de UNA pieza en el servidor (sube el
+   * fichero y crea el trabajo). Si falta, o el servidor no lo admite
+   * (SinDocumentosLargos), se usa `procesarUnico`.
+   */
+  iniciarUnico?: (file: File, onProgreso: (subidas: number, total: number) => void) => Promise<InicioDocumentoLargo>;
   esperar: (trabajoId: string, onCambio: (t: EstadoTrabajo | null) => void) => Promise<EstadoTrabajo>;
-  /** Camino síncrono de una página: lee el fichero y llama a procesar-factura. */
+  /** Camino síncrono de una página (respaldo): lee el fichero y llama a procesar-factura. */
   procesarUnico: (file: File, nombre: string) => Promise<ResultadoProcesamiento>;
   /** Cada documento que termina (toast, invalidar listas…). */
   alTerminar?: (e: ElementoCola) => void;
@@ -151,7 +160,12 @@ export interface DepsCola {
   alAcabarTanda?: (r: ResumenTanda) => void;
   crearPreview?: (file: File) => string;
   revocarPreview?: (url: string) => void;
-  /** Documentos procesándose a la vez (antes iban TODOS a la vez). */
+  /**
+   * Documentos a la vez EN EL NAVEGADOR (preparando, subiendo o, en el camino
+   * síncrono, esperando la respuesta). Los que ya están «procesando» en el
+   * servidor no ocupan hueco: así una tanda se sube entera enseguida y se
+   * puede cerrar la pestaña sin esperar a que se lean los primeros.
+   */
   maxSimultaneos?: number;
   generarId?: () => string;
 }
@@ -238,14 +252,16 @@ export function crearColaSubida(deps: DepsCola) {
     const fin = await deps.esperar(trabajoId, (t) => {
       if (t) actualizar(id, { progreso: describirProgreso(t) });
     });
-    const n = piezas ?? fin.num_paginas;
+    // Solo los documentos largos hablan de «trozos»; uno de una página, no.
+    const total = piezas ?? fin.num_paginas;
+    const n = total > 1 ? total : undefined;
     if (fin.estado === "fallido" || fin.estado === "cancelado") {
       return { nombre, success: false, error: fin.error || "No se pudo leer el documento", piezas: n };
     }
     return aResultado(nombre, fin.resultado, n);
   };
 
-  const procesar = async (id: string) => {
+  const procesar = async (id: string, liberarHueco: () => void) => {
     const e = buscar(id);
     if (!e?.file) return;
     const { file, nombre } = e;
@@ -268,10 +284,24 @@ export function crearColaSubida(deps: DepsCola) {
             actualizar(id, { progreso: `Subiendo trozo ${n} de ${t}…` }),
           );
           actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, piezas: inicio.numPiezas, progreso: "En cola…" });
+          liberarHueco();
           resultado = await seguirTrabajo(id, nombre, inicio.trabajoId, inicio.numPiezas);
         } catch (err) {
           if (!(err instanceof SinDocumentosLargos)) throw err;
           console.warn("[cola-subida] el servidor aún no admite documentos largos; camino de una página:", err.message);
+        }
+      } else if (deps.iniciarUnico) {
+        // Una página: también en el servidor (pieza única). Solo la subida a
+        // Storage depende del navegador; luego se puede cerrar la pestaña.
+        try {
+          actualizar(id, { fase: "subiendo", progreso: "Subiendo…", piezas: undefined });
+          const inicio = await deps.iniciarUnico(file, () => undefined);
+          actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, progreso: "En cola…" });
+          liberarHueco();
+          resultado = await seguirTrabajo(id, nombre, inicio.trabajoId, 1);
+        } catch (err) {
+          if (!(err instanceof SinDocumentosLargos)) throw err;
+          console.warn("[cola-subida] el servidor aún no lee una página en segundo plano; camino síncrono:", err.message);
         }
       }
       if (!resultado) {
@@ -291,9 +321,16 @@ export function crearColaSubida(deps: DepsCola) {
       enMarcha += 1;
       // Se marca ya, para que la siguiente vuelta del bucle no lo vuelva a coger.
       actualizar(siguiente.id, { fase: "preparando", progreso: "Preparando…" });
-      void procesar(siguiente.id).finally(() => {
+      // El hueco se libra al llegar al servidor («procesando») o al terminar.
+      let libre = false;
+      const liberarHueco = () => {
+        if (libre) return;
+        libre = true;
         enMarcha -= 1;
         bombear();
+      };
+      void procesar(siguiente.id, liberarHueco).finally(() => {
+        liberarHueco();
         comprobarFinTanda();
       });
     }
@@ -372,8 +409,9 @@ export function crearColaSubida(deps: DepsCola) {
     },
 
     /**
-     * Documentos largos que siguen en el servidor y no están en la cola (se
-     * subieron antes de recargar la página): se siguen igual que los propios.
+     * Documentos (largos o de una página) que siguen en el servidor y no
+     * están en la cola (se subieron antes de recargar la página): se siguen
+     * igual que los propios.
      */
     adoptar(trabajos: Pick<EstadoTrabajo, "id" | "nombre_original" | "num_paginas" | "estado">[]) {
       const conocidos = new Set(estado.elementos.map((e) => e.trabajoId).filter(Boolean));
@@ -382,7 +420,8 @@ export function crearColaSubida(deps: DepsCola) {
       const tanda = tandaParaNuevos();
       const elementos: ElementoCola[] = nuevos.map((t) => ({
         id: generarId(), nombre: t.nombre_original, file: null, preview: "", tamano: 0,
-        fase: "procesando", progreso: describirProgreso(t as EstadoTrabajo), tanda, trabajoId: t.id, piezas: t.num_paginas,
+        fase: "procesando", progreso: describirProgreso(t as EstadoTrabajo), tanda, trabajoId: t.id,
+        piezas: t.num_paginas > 1 ? t.num_paginas : undefined,
       }));
       fijar({ tanda, elementos: [...estado.elementos, ...elementos] });
       for (const e of elementos) {
@@ -465,7 +504,7 @@ const convertirABase64 = (file: File): Promise<string> =>
     reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el archivo"));
   });
 
-/** Camino síncrono de una página (el de siempre). */
+/** Camino síncrono de una página (respaldo si el servidor no admite trabajos de una pieza). */
 export async function procesarDocumentoUnico(file: File, nombre: string): Promise<ResultadoProcesamiento> {
   const base64 = await convertirABase64(file);
   const { data, error } = await supabase.functions.invoke("procesar-factura", {
@@ -481,10 +520,11 @@ export async function procesarDocumentoUnico(file: File, nombre: string): Promis
   return aResultado(nombre, data);
 }
 
-export function depsSupabase(): Pick<DepsCola, "planificar" | "iniciarLargo" | "esperar" | "procesarUnico"> {
+export function depsSupabase(): Pick<DepsCola, "planificar" | "iniciarLargo" | "iniciarUnico" | "esperar" | "procesarUnico"> {
   return {
     planificar: planificarDocumento,
     iniciarLargo: iniciarDocumentoLargo,
+    iniciarUnico: (file) => iniciarDocumentoUnico(file),
     esperar: (id, onCambio) => esperarTrabajo(id, onCambio),
     procesarUnico: procesarDocumentoUnico,
   };

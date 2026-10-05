@@ -95,7 +95,7 @@ export function SubidaFacturas() {
         {reparto.descripcion && (
           <CardDescription>
             Haz una foto o elige tus facturas o albaranes (PDF o imágenes). Se procesan en segundo plano: puedes seguir
-            trabajando en otra sección y te avisamos al terminar.
+            trabajando en otra sección y te avisamos al terminar. En cuanto se han subido, puedes incluso cerrar la pestaña.
           </CardDescription>
         )}
       </CardHeader>

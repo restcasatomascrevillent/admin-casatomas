@@ -23,15 +23,27 @@ import { procesarConsolidacion, procesarPagina } from "../procesar-factura/traba
 //
 //  Responde en cuanto reclama (lease de 180 s) y sigue en segundo plano con
 //  EdgeRuntime.waitUntil (mismo patrón que reservas-web: si no existe, espera).
+//
+//  Trabajos de UNA pieza (05-oct-2026: documentos de una página leídos en
+//  segundo plano): la pieza se lee con el código y el modelo (OCR_MODELO) del
+//  camino síncrono y la «consolidación» solo guarda (procesar-factura/unico.ts
+//  y trabajos.ts). Lectura ≤ 4 llamadas a OpenAI en serie (extracción,
+//  relectura por cuadre, pie, contador): cabe de sobra en los 150 s; guardar
+//  va en otra invocación (consolidar).
 // ============================================================================
 
 const SECRETO = Deno.env.get("OCR_TRABAJOS_SECRET");
 const URL_SB = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const cfgModelo = configModelo(
-  { OCR_MODELO: Deno.env.get("OCR_MODELO"), OCR_MODELO_PIEZAS: Deno.env.get("OCR_MODELO_PIEZAS"), OCR_DETALLE: Deno.env.get("OCR_DETALLE") },
-  "piezas",
-);
+const envModelo = {
+  OCR_MODELO: Deno.env.get("OCR_MODELO"),
+  OCR_MODELO_PIEZAS: Deno.env.get("OCR_MODELO_PIEZAS"),
+  OCR_DETALLE: Deno.env.get("OCR_DETALLE"),
+};
+const cfgModelo = configModelo(envModelo, "piezas");
+// Trabajos de UNA pieza (documento de una página): el modelo y la
+// configuración del camino síncrono (OCR_MODELO), no los de las piezas.
+const cfgModeloUnico = configModelo(envModelo, "unico");
 const drive = {
   clientId: Deno.env.get("GOOGLE_CLIENT_ID") ?? "",
   clientSecret: Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "",
@@ -74,7 +86,8 @@ serve(async (req) => {
     if (error) return jsonResponse({ ok: false, error: error.message }, 500);
     const pagina = Array.isArray(data) ? data[0] : data;
     if (!pagina?.id) return jsonResponse({ aceptada: false, motivo: "ya_reclamada_o_no_toca" });
-    await enSegundoPlano(procesarPagina(supabase, openai, pagina), `pieza ${id}`);
+    const openaiUnico = crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModeloUnico });
+    await enSegundoPlano(procesarPagina(supabase, openai, pagina, openaiUnico), `pieza ${id}`);
     return jsonResponse({ aceptada: true }, 202);
   }
 

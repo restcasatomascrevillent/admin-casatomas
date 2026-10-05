@@ -6,19 +6,27 @@
 //  - procesarPagina() / procesarConsolidacion(): lo que hace ocr-trabajo en
 //    segundo plano tras reclamar (lease) una pieza o la consolidación.
 //  - registrarDuplicadoSincrono(): guarda el documento de un duplicado del
-//    camino de una página para poder «Sustituir la existente».
+//    camino de una página para poder «Sustituir la existente» (vive en
+//    unico.ts; se reexporta aquí).
+//  - Trabajos de UNA pieza (05-oct-2026): un documento de una página leído en
+//    segundo plano con el código del camino síncrono (unico.ts). La pieza se
+//    lee con leerDocumentoUnico y lo leído (DocumentoListo) se guarda como
+//    resultado de la pieza; la «consolidación» es trivial: guardarLecturaUnica
+//    con el original en base64 (Drive o Storage, como el síncrono).
 //  Sin Deno.env: todo llega por parámetro.
 // ============================================================================
 
 import { encodeBase64 } from "./base64.ts";
 import { consolidar, prepararDocumentoConsolidado } from "./consolidacion.ts";
-import type { DatosNormalizados } from "./extraccion.ts";
+import { type DocumentoListo, type FicheroUnico, leerDocumentoUnico } from "./extraccion.ts";
 import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, type RespuestaProcesado, resumenNuevo } from "./guardado.ts";
 import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
-import type { OrigenImporte } from "./esquema.ts";
 import { STORAGE_BUCKET } from "./archivo.ts";
+import { guardarLecturaUnica, pendienteUnico } from "./unico.ts";
+
+export { registrarDuplicadoSincrono } from "./unico.ts";
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -67,8 +75,7 @@ export function validarInicio(
   const origen = b.origen === "pdf" || b.origen === "imagen" ? b.origen : null;
   if (!origen) return mal("origen tiene que ser 'pdf' o 'imagen'");
   const piezasRaw = Array.isArray(b.piezas) ? b.piezas : null;
-  if (!piezasRaw) return mal("Faltan las piezas");
-  if (piezasRaw.length < 2) return mal("Un documento de una sola pieza va por el camino normal");
+  if (!piezasRaw || piezasRaw.length === 0) return mal("Faltan las piezas");
   if (piezasRaw.length > MAX_PIEZAS) return mal(`Como mucho ${MAX_PIEZAS} piezas por documento`);
 
   const piezas: PiezaInicio[] = [];
@@ -90,6 +97,10 @@ export function validarInicio(
       return mal(`Franja no válida en la pieza ${numero}`);
     }
     piezas.push({ numero, path: String(x.path), mime, bytes, pieza, pagina_doc: paginaDoc, franja, franjas_pagina: franjasPagina });
+  }
+  // Una sola pieza = documento de una página entero (no una franja suelta).
+  if (piezas.length === 1 && (piezas[0].pieza !== "pagina" || piezas[0].pagina_doc !== 1)) {
+    return mal("Un documento de una sola pieza tiene que ser la página 1 entera");
   }
   const paginasDocumento = Math.max(...piezas.map((p) => p.pagina_doc));
   let original: PeticionInicio["original"] = null;
@@ -137,6 +148,8 @@ export async function iniciarTrabajo(
   const fallo = await comprobarEnStorage(supabase, p, userId);
   if (fallo) return { success: false, error: fallo };
 
+  // Pieza única: la pieza ES el original (para «Sustituir la existente»).
+  const original = p.original ?? (p.piezas.length === 1 ? { path: p.piezas[0].path, mime: p.piezas[0].mime } : null);
   const { error: e1 } = await supabase.from("ocr_trabajos").insert({
     id: p.trabajo_id,
     creado_por: userId,
@@ -144,8 +157,8 @@ export async function iniciarTrabajo(
     paginas_documento: p.paginas_documento,
     origen: p.origen,
     nombre_original: p.nombre,
-    original_path: p.original?.path ?? null,
-    original_mime: p.original?.mime ?? null,
+    original_path: original?.path ?? null,
+    original_mime: original?.mime ?? null,
     modelo,
   });
   if (e1) return { success: false, error: `No se pudo crear el trabajo: ${e1.message}` };
@@ -174,15 +187,34 @@ export async function iniciarTrabajo(
 
 // ─── ocr-trabajo: una pieza ──────────────────────────────────────────────────
 
+/** Descarga una pieza de Storage y la devuelve en base64. */
+async function descargarB64(supabase: Supa, path: string): Promise<string> {
+  const { data: blob, error } = await supabase.storage.from(STORAGE_BUCKET).download(path);
+  if (error || !blob) throw new Error(`descarga ${path}: ${error?.message ?? "vacía"}`);
+  return encodeBase64(new Uint8Array(await blob.arrayBuffer()));
+}
+
+/** Error que puede salir bien al reintentar (red, límites, Storage). */
+export function esErrorTransitorio(msg: string): boolean {
+  return /\b(429|500|502|503|504)\b|fetch failed|network|timeout|descarga /i.test(msg);
+}
+
+/**
+ * Procesa una pieza reclamada. `openaiUnico`: cliente con la configuración del
+ * camino síncrono (OCR_MODELO), para los trabajos de UNA pieza; si no llega,
+ * se usa `openai`.
+ */
 // deno-lint-ignore no-explicit-any
-export async function procesarPagina(supabase: Supa, openai: ClienteOpenAI, pagina: any): Promise<void> {
+export async function procesarPagina(supabase: Supa, openai: ClienteOpenAI, pagina: any, openaiUnico?: ClienteOpenAI): Promise<void> {
   try {
     const { data: t, error: tErr } = await supabase.from("ocr_trabajos")
-      .select("id, num_paginas, contexto_p1, estado").eq("id", pagina.trabajo_id).single();
+      .select("id, num_paginas, contexto_p1, estado, nombre_original").eq("id", pagina.trabajo_id).single();
     if (tErr) throw new Error(`trabajo: ${tErr.message}`);
-    const { data: blob, error: dErr } = await supabase.storage.from(STORAGE_BUCKET).download(pagina.storage_path);
-    if (dErr || !blob) throw new Error(`descarga ${pagina.storage_path}: ${dErr?.message ?? "vacía"}`);
-    const b64 = encodeBase64(new Uint8Array(await blob.arrayBuffer()));
+    if (Number(t.num_paginas) === 1) {
+      await leerPiezaUnica(supabase, openaiUnico ?? openai, pagina, t);
+      return;
+    }
+    const b64 = await descargarB64(supabase, pagina.storage_path);
     const bloque = bloqueContenido(b64, pagina.mime, `pieza-${pagina.numero}`, openai.config.detalle);
     const motivosPrevios = Array.isArray(pagina.motivo_relectura) ? pagina.motivo_relectura as MotivoRelectura[] : null;
     const r = await leerPieza(openai, bloque, {
@@ -227,6 +259,152 @@ export async function procesarPagina(supabase: Supa, openai: ClienteOpenAI, pagi
   }
 }
 
+// ─── ocr-trabajo: trabajo de UNA pieza ─────────────────────────────────────
+
+/** Lo que guarda la pieza de un trabajo de una pieza en `resultado`. */
+export type LecturaUnica = DocumentoListo & { documento_unico: true };
+
+function esLecturaUnica(x: unknown): x is LecturaUnica {
+  const r = x as LecturaUnica | null;
+  return !!r && r.documento_unico === true && !!r.datos && Array.isArray(r.alertasPrevias);
+}
+
+/**
+ * Lee la pieza única con leerDocumentoUnico (el camino síncrono) y la cierra
+ * con lo leído. Un fallo transitorio (red, 429/5xx, Storage) se reintenta con
+ * ocr_fallo_pagina (hasta 3 intentos, como las piezas); uno que no lo es (el
+ * modelo se niega, respuesta cortada, contrato incumplido…) falla a la
+ * primera, como en el síncrono, sin volver a pagar dos lecturas más.
+ */
+// deno-lint-ignore no-explicit-any
+async function leerPiezaUnica(supabase: Supa, cliente: ClienteOpenAI, pagina: any, t: any): Promise<void> {
+  const t0 = Date.now();
+  try {
+    const fichero: FicheroUnico = {
+      b64: await descargarB64(supabase, pagina.storage_path),
+      mime: pagina.mime,
+      nombre: t.nombre_original,
+    };
+    console.log(
+      `[ocr-trabajo] una pieza: ${t.nombre_original} (${fichero.mime}) — trabajo ${t.id} — modelo ${cliente.config.modelo}/${cliente.config.detalle}`,
+    );
+    const listo = await leerDocumentoUnico(cliente, fichero);
+    const resultado: LecturaUnica = { ...listo, documento_unico: true };
+    const { error } = await supabase.rpc("ocr_cerrar_pagina", {
+      p_pagina_id: pagina.id,
+      p_resultado: resultado,
+      p_recuento: null,
+      p_verificacion: null,
+      p_motivos: [],
+      p_filas_extraidas: listo.datos.productos.length,
+      p_filas_contadas: null,
+      p_relecturas: Math.min(1, Math.max(0, listo.intentos - 1)),
+      p_duracion_ms: Date.now() - t0,
+      p_tokens_entrada: cliente.uso.tokensEntrada,
+      p_tokens_salida: cliente.uso.tokensSalida,
+      p_coste: cliente.uso.costeUsd,
+      p_contexto: null,
+      p_modelo: cliente.config.modelo,
+    });
+    if (error) throw new Error(`ocr_cerrar_pagina: ${error.message}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[ocr-trabajo] pieza única ${pagina.id} falló:`, msg);
+    if (esErrorTransitorio(msg)) {
+      const { error } = await supabase.rpc("ocr_fallo_pagina", { p_pagina_id: pagina.id, p_error: msg });
+      if (error) console.error("[ocr-trabajo] ocr_fallo_pagina:", error.message);
+      return;
+    }
+    await falloDefinitivo(supabase, pagina, msg);
+  }
+}
+
+/** La pieza queda «fallida» sin más intentos y se despacha la consolidación,
+ *  que deja el trabajo en «fallido» con el mensaje. Si algo se corta a medias,
+ *  el cron lo recompone (ocr_despachar pasa pagina1 → paginas). */
+// deno-lint-ignore no-explicit-any
+async function falloDefinitivo(supabase: Supa, pagina: any, msg: string): Promise<void> {
+  const { error: e1 } = await supabase.from("ocr_trabajo_paginas")
+    .update({ estado: "fallida", error: msg.slice(0, 2000), lease_hasta: null })
+    .eq("id", pagina.id).eq("estado", "procesando");
+  if (e1) {
+    console.error("[ocr-trabajo] no se pudo marcar la pieza fallida:", e1.message);
+    const { error } = await supabase.rpc("ocr_fallo_pagina", { p_pagina_id: pagina.id, p_error: msg });
+    if (error) console.error("[ocr-trabajo] ocr_fallo_pagina:", error.message);
+    return;
+  }
+  await supabase.from("ocr_trabajos").update({ estado: "paginas" }).eq("id", pagina.trabajo_id).eq("estado", "pagina1");
+  const { error: e3 } = await supabase.rpc("ocr_despachar", { p_trabajo_id: pagina.trabajo_id });
+  if (e3) console.error("[ocr-trabajo] ocr_despachar:", e3.message);
+}
+
+/**
+ * «Consolidación» de un trabajo de una pieza: guardar lo leído EXACTAMENTE
+ * como el camino síncrono (guardarLecturaUnica, original en base64 → Drive o
+ * Storage). Si el original se archivó, se borra la copia de pendientes/; si
+ * no se pudo archivar, la factura apunta a la copia de pendientes/ (que así
+ * no se pierde). Duplicado → «Pendientes de decidir» con la pieza como original.
+ */
+// deno-lint-ignore no-explicit-any
+async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Promise<void> {
+  const { supabase } = ctx;
+  if (!f || f.estado !== "completada" || !esLecturaUnica(f.resultado)) {
+    const msg = f?.error || "No se pudo leer el documento";
+    await terminar(supabase, trabajo.id, "fallido", { success: false, error: msg }, null, msg, null);
+    return;
+  }
+  const { documento_unico: _marca, ...listo } = f.resultado as LecturaUnica;
+
+  let b64: string;
+  try {
+    b64 = await descargarB64(supabase, f.storage_path);
+  } catch (e) {
+    // Reintento tras un corte: si la factura ya se guardó (y la copia de
+    // pendientes/ ya se borró), guardarDocumento la devuelve sin usar el original.
+    const { data: ya } = await supabase.from("facturas").select("id").eq("ocr_trabajo_id", trabajo.id).maybeSingle();
+    if (!ya?.id) throw e;
+    b64 = "";
+  }
+  const fichero: FicheroUnico = { b64, mime: f.mime ?? trabajo.original_mime ?? "image/jpeg", nombre: trabajo.nombre_original };
+  const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id);
+
+  const { data: tCoste } = await supabase.from("ocr_trabajos").select("coste_usd, modelo").eq("id", trabajo.id).single();
+  const comun = {
+    paginas: [{
+      numero: 1, pieza: "pagina", franja: null, estado: f.estado, lineas: f.filas_extraidas, contadas: f.filas_contadas,
+      relecturas: f.relecturas, duracion_ms: f.duracion_ms,
+    }],
+    coste_usd: Number(tCoste?.coste_usd ?? 0),
+    modelo: tCoste?.modelo ?? null,
+  };
+
+  if (g.estado === "guardado") {
+    let respuesta = g.respuesta;
+    if (b64) {
+      if (respuesta.archivo_guardado) {
+        const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([f.storage_path]);
+        if (error) console.warn("[ocr-trabajo] no se pudo borrar la copia de pendientes/:", error.message);
+      } else {
+        // Ni Drive ni Storage: el original sigue en pendientes/ y se apunta ahí.
+        const { error } = await supabase.from("facturas").update({ archivo_path: f.storage_path }).eq("id", g.facturaId);
+        if (!error) {
+          respuesta = {
+            ...respuesta,
+            archivo_guardado: true,
+            archivo_error: `no se pudo archivar (${respuesta.archivo_error}); queda en ${f.storage_path}`,
+            webhookResponse: { ...respuesta.webhookResponse, archivo_guardado: true },
+          };
+        }
+      }
+    }
+    await terminar(supabase, trabajo.id, "completado", { ...respuesta, ...comun }, g.facturaId, null, null);
+    return;
+  }
+  const dup = g.existente ? pendienteUnico(listo, g.existente, trabajo.id) : null;
+  const respuesta: RespuestaProcesado = { ...g.respuesta, sustituible: dup?.sustituible ?? null };
+  await terminar(supabase, trabajo.id, "duplicado", { ...respuesta, ...comun }, g.existente?.id ?? null, null, dup?.pendiente ?? null);
+}
+
 // ─── ocr-trabajo: consolidación ──────────────────────────────────────────────
 
 // deno-lint-ignore no-explicit-any
@@ -234,9 +412,13 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
   const { supabase } = ctx;
   try {
     const { data: filas, error } = await supabase.from("ocr_trabajo_paginas")
-      .select("id, numero, pieza, pagina_doc, franja, estado, storage_path, resultado, recuento, verificacion_pie, relecturas, filas_extraidas, filas_contadas, duracion_ms")
+      .select("id, numero, pieza, pagina_doc, franja, estado, storage_path, mime, error, resultado, recuento, verificacion_pie, relecturas, filas_extraidas, filas_contadas, duracion_ms")
       .eq("trabajo_id", trabajo.id).order("numero");
     if (error) throw new Error(`páginas: ${error.message}`);
+    if (Number(trabajo.num_paginas) === 1) {
+      await consolidarUnico(ctx, trabajo, (filas ?? [])[0]);
+      return;
+    }
     // deno-lint-ignore no-explicit-any
     const piezas: PaginaCerrada[] = (filas ?? []).map((f: any) => ({
       pagina_id: f.id,
@@ -303,7 +485,9 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[ocr-trabajo] consolidación de ${trabajo.id} falló:`, msg);
-    const transitorio = /\b(429|500|502|503|504)\b|fetch failed|network|timeout/i.test(msg);
+    // (La consolidación de varias piezas no descarga nada: «descarga» solo
+    //  puede venir de la de una pieza.)
+    const transitorio = esErrorTransitorio(msg);
     if (transitorio && (trabajo.intentos_consolidacion ?? 1) < 3) {
       // Se deja caducar el lease: el cron la vuelve a intentar.
       return;
@@ -330,56 +514,4 @@ async function terminar(
     p_documento_pendiente: pendiente,
   });
   if (e) console.error("[ocr-trabajo] ocr_terminar_trabajo:", e.message);
-}
-
-// ─── Duplicado del camino síncrono ──────────────────────────────────────────
-
-/**
- * El camino de una página ha detectado un duplicado: se guarda el documento ya
- * leído (sin volver a pagar el OCR) para que el panel pueda ofrecer
- * «Sustituir la existente». Si la migración no está aplicada, devuelve null y
- * el panel se queda con el aviso de duplicado de siempre.
- */
-export async function registrarDuplicadoSincrono(
-  supabase: Supa,
-  a: {
-    userId: string;
-    trabajoId: string;
-    nombre: string;
-    mime: string;
-    originalPath: string | null;
-    datos: DatosNormalizados;
-    alertasPrevias: Record<string, unknown>[];
-    totalOrigen: OrigenImporte | null;
-    existente: DocumentoPendiente["existente"];
-    modelo: string;
-  },
-): Promise<RespuestaProcesado["sustituible"]> {
-  const pendiente: DocumentoPendiente = {
-    datos: a.datos,
-    alertasPrevias: a.alertasPrevias,
-    totalOrigen: a.totalOrigen,
-    paginas: 1,
-    existente: a.existente,
-  };
-  const sustituible = { trabajo_id: a.trabajoId, existente: a.existente, nuevo: resumenNuevo(pendiente) };
-  const { error } = await supabase.from("ocr_trabajos").insert({
-    id: a.trabajoId,
-    creado_por: a.userId,
-    estado: "duplicado",
-    num_paginas: 1,
-    origen: "sincrono",
-    nombre_original: a.nombre,
-    original_path: a.originalPath,
-    original_mime: a.mime,
-    modelo: a.modelo,
-    documento_pendiente: pendiente,
-    resultado: { success: true, duplicado: true, sustituible },
-    terminado_at: new Date().toISOString(),
-  });
-  if (error) {
-    console.warn("[duplicado] no se pudo registrar el pendiente (¿migración sin aplicar?):", error.message);
-    return null;
-  }
-  return sustituible;
 }

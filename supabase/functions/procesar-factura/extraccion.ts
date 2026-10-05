@@ -27,7 +27,8 @@ import {
   retirarImportesNoImpresos,
   validarEstructura,
 } from "./esquema.ts";
-import type { BloqueContenido, ClienteOpenAI } from "./openai.ts";
+import { type BloqueContenido, bloqueContenido, type ClienteOpenAI } from "./openai.ts";
+import { diagnosticoResolucion } from "./imagen.ts";
 import { CIF_CLIENTE, TEXTO_EXTRACCION, VISION_SYSTEM_PROMPT } from "./prompts.ts";
 
 /** Peso de un conjunto de descuadres, para poder comparar dos intentos.
@@ -289,4 +290,39 @@ export async function extraerDocumentoUnico(
       `${datos.productos.length} linea(s), ${extraccion.descuadres.length} descuadre(s) sin resolver.`,
   );
   return { datos, alertasPrevias, totalOrigen, intentos: extraccion.intentos };
+}
+
+/** Fichero de UN documento tal y como lo lee el camino de una página. */
+export interface FicheroUnico {
+  /** Base64 sin cabecera `data:`. */
+  b64: string;
+  mime: string;
+  /** Nombre del fichero (el del panel). Puede faltar en el camino síncrono. */
+  nombre: string;
+}
+
+/**
+ * Lectura COMPLETA de un documento de una página: diagnóstico de resolución
+ * (solo log), bloque de contenido y extraerDocumentoUnico. Es la ÚNICA puerta
+ * de los dos caminos de una página (05-oct-2026): el síncrono (index.ts →
+ * unico.ts) y el de trabajos en segundo plano (ocr-trabajo, trabajo de una
+ * pieza). Así el payload a OpenAI es el mismo byte a byte.
+ */
+export async function leerDocumentoUnico(cliente: ClienteOpenAI, f: FicheroUnico): Promise<DocumentoListo> {
+  const isPdf = f.mime.includes("pdf");
+  // Diagnóstico de resolución (solo log; ver imagen.ts).
+  if (!isPdf) {
+    try {
+      const cabecera = atob(f.b64.slice(0, 65536));
+      const bytes = new Uint8Array(cabecera.length);
+      for (let i = 0; i < cabecera.length; i++) bytes[i] = cabecera.charCodeAt(i);
+      const diag = diagnosticoResolucion(bytes);
+      if (diag) console.log(diag);
+    } catch {
+      // Medir es informativo.
+    }
+  }
+  const contentBlock = bloqueContenido(f.b64, f.mime, f.nombre || "document.pdf", cliente.config.detalle);
+  // 2) → 2b) Extracción, pie, contador, citas, deducción y normalización.
+  return await extraerDocumentoUnico(cliente, contentBlock);
 }

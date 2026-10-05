@@ -14,7 +14,12 @@ import { doble } from "./dobleSupabaseFacturas";
 import { montarSubida } from "./montarSubida";
 import { IndicadorSubidasFacturas } from "../IndicadorSubidasFacturas";
 import type { ResultadoProcesamiento } from "@/lib/facturas/colaSubida";
-import type { EstadoTrabajo } from "@/lib/facturas/documentoLargo";
+import { type EstadoTrabajo, SinDocumentosLargos } from "@/lib/facturas/documentoLargo";
+
+/** procesar-factura desplegada sin trabajos de una pieza: camino síncrono. */
+const servidorAntiguo = async (): Promise<never> => {
+  throw new SinDocumentosLargos("Un documento de una sola pieza va por el camino normal");
+};
 
 function diferida<T>() {
   let resolver!: (v: T) => void;
@@ -50,7 +55,7 @@ const elegir = (nombre: string) =>
 describe("ColaSubidaProvider · la subida sigue en segundo plano", () => {
   it("sigue al salir de Facturas (SubidaFacturas desmontado), avisa al terminar y apunta la tanda en la campana", async () => {
     const d = diferida<ResultadoProcesamiento>();
-    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), procesarUnico: () => d.promesa } });
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: () => d.promesa } });
     elegir("a.pdf");
     fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
     expect(await screen.findByText(/Procesando 0 de 1/)).toBeTruthy();
@@ -77,8 +82,36 @@ describe("ColaSubidaProvider · la subida sigue en segundo plano", () => {
     expect(screen.getByRole("button", { name: "Limpiar terminados" })).toBeTruthy();
   });
 
+  it("una página va al servidor: solo se avisa al cerrar mientras se SUBE el fichero, no mientras se lee", async () => {
+    const subida = diferida<{ trabajoId: string; numPiezas: number }>();
+    const fin = diferida<EstadoTrabajo>();
+    const procesarUnico = vi.fn();
+    montarSubida({
+      deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: () => subida.promesa, esperar: () => fin.promesa, procesarUnico },
+    });
+    elegir("d.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
+    expect(await screen.findByText("Subiendo…")).toBeTruthy();
+    await waitFor(() => expect(cierreBloqueado()).toBe(true));
+
+    await act(async () => { subida.resolver({ trabajoId: "u1", numPiezas: 1 }); });
+    expect(await screen.findByText("En cola…")).toBeTruthy();
+    // Ya está en el servidor: los 10-40 s de lectura siguen aunque se cierre.
+    expect(cierreBloqueado()).toBe(false);
+    expect(screen.queryByText(/Documento largo/)).toBeNull();
+
+    await act(async () => {
+      fin.resolver({
+        id: "u1", estado: "completado", num_paginas: 1, nombre_original: "d.pdf", error: null, factura_id: 9, updated_at: "",
+        resultado: { success: true, tipo: "factura", webhookResponse: { tipo: "factura" }, alertas: [], archivo_guardado: true },
+      });
+    });
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Factura guardada", expect.objectContaining({ description: "d.pdf" })));
+    expect(procesarUnico).not.toHaveBeenCalled();
+  });
+
   it("si el usuario está mirando «Cargar», no llena la campana (ya lo ve)", async () => {
-    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), procesarUnico: async (_f, n) => guardada(n) } });
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: async (_f, n) => guardada(n) } });
     elegir("b.pdf");
     fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
     await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
@@ -114,7 +147,7 @@ describe("IndicadorSubidasFacturas", () => {
 
   it("al tocarlo lleva a Facturas → Cargar", async () => {
     const d = diferida<ResultadoProcesamiento>();
-    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), procesarUnico: () => d.promesa } });
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: () => d.promesa } });
     elegir("c.pdf");
     fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
     fireEvent.click(screen.getByRole("link", { name: "Ir a Reservas" }));

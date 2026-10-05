@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const estados: string[] = [];
 const invoke = vi.fn();
+const upload = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
@@ -15,12 +16,26 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     }),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
+    auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) },
+    storage: { from: () => ({ upload: (...a: unknown[]) => upload(...a) }) },
   },
 }));
 
-import { describirProgreso, esperarTrabajo, esTerminal, sustituirExistente } from "../documentoLargo";
+import {
+  describirProgreso,
+  esperarTrabajo,
+  esTerminal,
+  iniciarDocumentoUnico,
+  SinDocumentosLargos,
+  sustituirExistente,
+} from "../documentoLargo";
 
-beforeEach(() => { estados.length = 0; invoke.mockReset(); });
+beforeEach(() => {
+  estados.length = 0;
+  invoke.mockReset();
+  upload.mockReset();
+  upload.mockResolvedValue({ data: {}, error: null });
+});
 
 describe("esperarTrabajo", () => {
   it("sondea hasta un estado terminal y avisa de cada cambio", async () => {
@@ -38,6 +53,52 @@ describe("esperarTrabajo", () => {
     expect(esTerminal("duplicado")).toBe(true);
     expect(esTerminal("consolidando")).toBe(false);
     expect(describirProgreso({ estado: "paginas", num_paginas: 5, ocr_trabajo_paginas: [{ estado: "completada" }, { estado: "pendiente" }] } as never)).toBe("Leídos 1 de 5 trozos…");
+  });
+  it("describirProgreso de un documento de una página no habla de trozos", () => {
+    const t = (estado: string, intentos = 1) => ({ estado, num_paginas: 1, ocr_trabajo_paginas: [{ estado: "procesando", intentos }] }) as never;
+    expect(describirProgreso(t("pendiente"))).toBe("En cola…");
+    expect(describirProgreso(t("pagina1"))).toBe("Leyendo el documento…");
+    expect(describirProgreso(t("pagina1", 2))).toBe("Leyendo el documento (reintento)…");
+    expect(describirProgreso(t("paginas"))).toBe("Comprobando importes y guardando…");
+    expect(describirProgreso(t("consolidando"))).toBe("Comprobando importes y guardando…");
+  });
+});
+
+describe("iniciarDocumentoUnico (una página en segundo plano)", () => {
+  const foto = () => new File(["abcdef"], "foto.jpg", { type: "image/jpeg" });
+  it("sube el fichero UNA vez como pieza única (que es también el original) y crea el trabajo", async () => {
+    invoke.mockResolvedValue({ data: { success: true, trabajo_id: "x", estado: "pagina1", num_paginas: 1 }, error: null });
+    const r = await iniciarDocumentoUnico(foto());
+    expect(upload).toHaveBeenCalledTimes(1);
+    const [path, , opciones] = upload.mock.calls[0] as [string, File, Record<string, unknown>];
+    expect(path).toMatch(/^pendientes\/u1\/[0-9a-f-]{36}\/01\.jpg$/);
+    expect(opciones).toEqual({ contentType: "image/jpeg", upsert: false });
+    const body = (invoke.mock.calls[0] as [string, { body: Record<string, unknown> }])[1].body;
+    const pieza = { path, mime: "image/jpeg", bytes: 6 };
+    expect(body).toEqual({
+      modo: "iniciar", trabajo_id: r.trabajoId, nombre: "foto.jpg", origen: "imagen", original: pieza,
+      piezas: [{ numero: 1, ...pieza, pieza: "pagina", pagina_doc: 1, franja: null, franjas_pagina: null }],
+    });
+    expect(r.numPiezas).toBe(1);
+  });
+  it("un PDF va con origen pdf", async () => {
+    invoke.mockResolvedValue({ data: { success: true }, error: null });
+    await iniciarDocumentoUnico(new File(["%PDF"], "a.pdf", { type: "application/pdf" }));
+    const body = (invoke.mock.calls[0] as [string, { body: { origen: string; piezas: { path: string }[] } }])[1].body;
+    expect(body.origen).toBe("pdf");
+    expect(body.piezas[0].path).toMatch(/\/01\.pdf$/);
+  });
+  it("servidor sin trabajos de una pieza (o sin modo) → SinDocumentosLargos, para caer al síncrono", async () => {
+    invoke.mockResolvedValue({ data: { success: false, error: "Un documento de una sola pieza va por el camino normal" }, error: null });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
+    invoke.mockResolvedValue({ data: { success: false, error: "No se recibió ningún archivo" }, error: null });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
+    upload.mockResolvedValue({ data: null, error: { message: "new row violates row-level security policy" } });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
+  });
+  it("otros errores del servidor se propagan tal cual", async () => {
+    invoke.mockResolvedValue({ data: { success: false, error: "No se encuentra en Storage: x" }, error: null });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toThrow("No se encuentra en Storage: x");
   });
 });
 

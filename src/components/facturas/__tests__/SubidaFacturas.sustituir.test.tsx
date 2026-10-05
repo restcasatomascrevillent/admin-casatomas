@@ -8,7 +8,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
 
-import { doble, filtra } from "./dobleSupabaseFacturas";
+import { doble, filtra, RESPUESTA_SERVIDOR_ANTIGUO } from "./dobleSupabaseFacturas";
 import { montarSubida } from "./montarSubida";
 import { CLAVE_DESCARTADOS } from "@/lib/facturas/pendientesDecidir";
 
@@ -38,6 +38,8 @@ const enviarUno = async (nombre: string) => {
 describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustituir la existente»", () => {
   it("no bloquea: queda en la lista y, al confirmar, pide la sustitución con lo que vio el usuario", async () => {
     invoke.mockImplementation(async (_f: string, opciones?: { body?: Record<string, unknown> }) => {
+      // Servidor sin trabajos de una pieza: el panel cae al camino síncrono.
+      if (opciones?.body?.modo === "iniciar") return RESPUESTA_SERVIDOR_ANTIGUO;
       if (opciones?.body?.modo === "sustituir") {
         return { data: { success: true, message: "Factura 54 sustituida: 8 → 54 líneas.", alertas: [] }, error: null };
       }
@@ -62,8 +64,10 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     expect(screen.getByText(/1 graves/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Sí, sustituir/ }));
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
-    expect(invoke.mock.calls[1][1].body).toEqual({
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3));
+    expect(invoke.mock.calls[0][1].body.modo).toBe("iniciar");
+    expect(invoke.mock.calls[1][1].body.archivo.nombre).toBe("ML101511.pdf");
+    expect(invoke.mock.calls[2][1].body).toEqual({
       modo: "sustituir", factura_id: 54, trabajo_id: sustituible.trabajo_id,
       esperado: { lineas: 8, updated_at: "2026-09-29T15:28:55.00448" },
     });
@@ -72,16 +76,50 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
   });
 
   it("un duplicado sin `sustituible` (servidor antiguo) se pinta como siempre, sin botón", async () => {
-    invoke.mockResolvedValue({
-      data: { success: true, tipo: "factura", duplicado: true, webhookResponse: { tipo: "factura", duplicado: true } },
-      error: null,
-    });
+    invoke.mockImplementation(async (_f: string, opciones?: { body?: Record<string, unknown> }) =>
+      opciones?.body?.modo === "iniciar"
+        ? RESPUESTA_SERVIDOR_ANTIGUO
+        : { data: { success: true, tipo: "factura", duplicado: true, webhookResponse: { tipo: "factura", duplicado: true } }, error: null },
+    );
     montarSubida();
     await enviarUno("a.pdf");
     expect(await screen.findByText(/mismo número, proveedor, fecha y total/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Sustituir la existente/ })).toBeNull();
-    // El PDF falso no se puede trocear: se manda por el camino de una página.
-    expect(invoke.mock.calls[0][1].body.archivo.nombre).toBe("a.pdf");
+    // El PDF falso no se puede trocear: va como una página; el servidor
+    // antiguo no admite la pieza única y se manda por el camino síncrono.
+    expect(invoke.mock.calls[0][1].body.modo).toBe("iniciar");
+    expect(invoke.mock.calls[1][1].body.archivo.nombre).toBe("a.pdf");
+  });
+
+  it("servidor nuevo: una página va en segundo plano (pieza única) y su duplicado queda «por decidir»", async () => {
+    const trabajoId = { valor: "" };
+    invoke.mockImplementation(async (_f: string, opciones?: { body?: Record<string, unknown> }) => {
+      if (opciones?.body?.modo === "iniciar") {
+        trabajoId.valor = String(opciones.body.trabajo_id);
+        return { data: { success: true, trabajo_id: trabajoId.valor, estado: "pagina1", num_paginas: 1 }, error: null };
+      }
+      throw new Error("no debería llamar al camino síncrono");
+    });
+    doble.fijarRespuestas((tabla, llamadas) =>
+      tabla === "ocr_trabajos" && filtra(llamadas, "id", trabajoId.valor)
+        ? {
+          id: trabajoId.valor, estado: "duplicado", num_paginas: 1, nombre_original: "ML101511.pdf", error: null, factura_id: null,
+          updated_at: "", resultado: {
+            success: true, tipo: "factura", duplicado: true, webhookResponse: { tipo: "factura", duplicado: true },
+            sustituible: { ...sustituible, trabajo_id: trabajoId.valor },
+          },
+          ocr_trabajo_paginas: [],
+        }
+        : [],
+    );
+    montarSubida();
+    await enviarUno("ML101511.pdf");
+    const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
+    expect(within(seccion).getByText(/Ya existe la factura ML\/101511 \(8 líneas\)/)).toBeTruthy();
+    expect(invoke).toHaveBeenCalledTimes(1);
+    const body = invoke.mock.calls[0][1].body;
+    expect(body).toMatchObject({ modo: "iniciar", nombre: "ML101511.pdf", origen: "pdf", piezas: [{ numero: 1, pieza: "pagina", pagina_doc: 1 }] });
+    expect(doble.subidas).toEqual([{ bucket: "facturas-originales", path: body.piezas[0].path }]);
   });
 
   it("los pendientes se leen de la BD al entrar (sobreviven a recargar) y «Dejar la que hay» los quita", async () => {

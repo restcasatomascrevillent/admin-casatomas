@@ -6,7 +6,10 @@
 //      → franjas con solape, cada una una pieza del mismo trabajo;
 //    · PDF de más de una página → una pieza por página (y franjas si alguna
 //      página es muy alta);
-//    · todo lo demás → camino síncrono de una página, como siempre.
+//    · todo lo demás (una página) → desde el 05-oct-2026 TAMBIÉN un trabajo
+//      en el servidor, de una sola pieza (iniciarDocumentoUnico), leído con
+//      el mismo código que el camino síncrono; el síncrono queda de respaldo
+//      si el servidor aún no admite trabajos de una pieza.
 //  Las piezas se suben a facturas-originales/pendientes/{uid}/{trabajo}/ y
 //  procesar-factura {modo:"iniciar"} crea el trabajo; ocr-trabajo lo lee en
 //  segundo plano y aquí se sondea ocr_trabajos cada 3 s (Realtime no está
@@ -130,17 +133,60 @@ export async function iniciarDocumentoLargo(
     });
   }
 
-  const { data, error } = await supabase.functions.invoke("procesar-factura", {
-    body: { modo: "iniciar", trabajo_id: trabajoId, nombre: file.name, origen: plan.origen, original, piezas },
-  });
+  await crearTrabajo({ modo: "iniciar", trabajo_id: trabajoId, nombre: file.name, origen: plan.origen, original, piezas });
+  return { trabajoId, numPiezas: plan.piezas.length };
+}
+
+/** procesar-factura {modo:"iniciar"}: crea el trabajo en el servidor. */
+async function crearTrabajo(body: Record<string, unknown>): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("procesar-factura", { body });
   if (error) throw new Error(error.message || "No se pudo iniciar la lectura del documento");
   if (!data?.success) {
+    const motivo = String(data?.error ?? "");
     // Una procesar-factura antigua no entiende `modo` y contesta «No se
-    // recibió ningún archivo»: todavía no está desplegada la versión nueva.
-    if (/no se recibi[oó] ning[uú]n archivo/i.test(String(data?.error))) throw new SinDocumentosLargos(String(data?.error));
+    // recibió ningún archivo»; la de los documentos largos sin trabajos de
+    // una pieza contesta «Un documento de una sola pieza va por el camino
+    // normal»: todavía no está desplegada la versión nueva.
+    if (/no se recibi[oó] ning[uú]n archivo|una sola pieza va por el camino normal/i.test(motivo)) {
+      throw new SinDocumentosLargos(motivo);
+    }
     throw new Error(data?.error || "No se pudo iniciar la lectura del documento");
   }
-  return { trabajoId, numPiezas: plan.piezas.length };
+}
+
+/**
+ * Documento de UNA página en segundo plano (05-oct-2026): se sube el fichero
+ * tal cual como pieza única (que es también el original) y el servidor lo lee
+ * con el mismo código que el camino síncrono, sin que haga falta tener la
+ * pestaña abierta. Si el servidor aún no lo admite → SinDocumentosLargos y la
+ * cola cae al camino síncrono.
+ */
+export async function iniciarDocumentoUnico(
+  file: File,
+  onProgreso?: (subidas: number, total: number) => void,
+): Promise<InicioDocumentoLargo> {
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u?.user?.id;
+  if (!uid) throw new Error("Sesión caducada: vuelve a entrar en el panel.");
+  const trabajoId = crypto.randomUUID();
+  const mime = file.type || "application/octet-stream";
+  const path = `pendientes/${uid}/${trabajoId}/01.${extension(mime)}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: mime, upsert: false });
+  if (error) {
+    if (/row-level security|policy|unauthorized|403/i.test(error.message)) throw new SinDocumentosLargos(error.message);
+    throw new Error(`No se pudo subir ${file.name}: ${error.message}`);
+  }
+  onProgreso?.(1, 1);
+  const pieza = { path, mime, bytes: file.size };
+  await crearTrabajo({
+    modo: "iniciar",
+    trabajo_id: trabajoId,
+    nombre: file.name,
+    origen: mime === "application/pdf" ? "pdf" : "imagen",
+    original: pieza,
+    piezas: [{ numero: 1, ...pieza, pieza: "pagina", pagina_doc: 1, franja: null, franjas_pagina: null }],
+  });
+  return { trabajoId, numPiezas: 1 };
 }
 
 export interface EstadoTrabajo {
@@ -183,6 +229,20 @@ export function describirProgreso(t: EstadoTrabajo | null): string {
   if (!t) return "Preparando…";
   const ps = t.ocr_trabajo_paginas ?? [];
   const hechas = ps.filter((p) => p.estado === "completada" || p.estado === "fallida").length;
+  if (t.num_paginas === 1) {
+    // Documento de una página leído en segundo plano.
+    switch (t.estado) {
+      case "pendiente":
+        return "En cola…";
+      case "pagina1":
+        return ps[0]?.intentos && ps[0].intentos > 1 ? "Leyendo el documento (reintento)…" : "Leyendo el documento…";
+      case "paginas":
+      case "consolidando":
+        return "Comprobando importes y guardando…";
+      default:
+        return t.estado;
+    }
+  }
   switch (t.estado) {
     case "pendiente":
       return "En cola…";

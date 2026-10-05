@@ -111,9 +111,9 @@ describe("validarInicio (modo iniciar)", () => {
     expect(validarInicio({ ...ok, piezas: [pieza(1), pieza(2, { path: "pendientes/otro/" + tid + "/02.jpg" })] }, uid).ok).toBe(false);
     expect(validarInicio({ ...ok, original: { ...ok.original, path: "pendientes/otro/" + tid + "/o.jpg" } }, uid).ok).toBe(false);
   });
-  it("rechaza huecos, N=1, N=41, trabajo no UUID, mime y tamaños malos, '..'", () => {
+  it("rechaza huecos, una franja suelta, N=41, trabajo no UUID, mime y tamaños malos, '..'", () => {
     expect(validarInicio({ ...ok, piezas: [pieza(1), pieza(3)] }, uid).ok).toBe(false);
-    expect(validarInicio({ ...ok, piezas: [pieza(1)] }, uid).ok).toBe(false);
+    expect(validarInicio({ ...ok, piezas: [pieza(1)] }, uid).ok).toBe(false); // franja suelta (una pieza tiene que ser la página 1 entera)
     const muchas = Array.from({ length: 41 }, (_, i) => pieza(i + 1, { franja: 1, franjas_pagina: 1 }));
     expect(validarInicio({ ...ok, piezas: muchas }, uid).ok).toBe(false);
     expect(validarInicio({ ...ok, trabajo_id: "x" }, uid).ok).toBe(false);

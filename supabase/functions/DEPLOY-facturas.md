@@ -184,6 +184,21 @@ select status_code, count(*) from net._http_response
 - **Volver atrás**: `supabase/rollbacks/20261005120000_ocr_trabajos_multipagina_ROLLBACK.sql`
   (antes, desplegar la `procesar-factura` anterior y borrar `ocr-trabajo`).
 
+### Una página también en segundo plano (05-oct-2026)
+
+Sin migración. Desplegar PRIMERO `ocr-trabajo` y DESPUÉS `procesar-factura`: mientras
+`procesar-factura` sea la antigua rechaza los trabajos de una pieza y el panel cae al camino síncrono;
+al revés, una `ocr-trabajo` antigua leería la pieza única como trozo de documento largo (modelo y
+lectura de piezas, no los del síncrono).
+
+```
+npx supabase functions deploy ocr-trabajo --project-ref jeamoczmbfsnwkfjxcyo
+npx supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
+```
+
+Comprobar: subir una foto de una página y cerrar la pestaña en cuanto pase a «En cola…»; al volver
+aparece guardada. En `ocr_trabajos` queda una fila con `num_paginas = 1` y `origen` pdf/imagen.
+
 ### Sustituir Luga (54) y Salazones Garre (39) cuando lleguen los PDF
 
 1. Facturas → Subir → «Elegir archivos» → el PDF (o la captura de 945×2048 que ya hay).

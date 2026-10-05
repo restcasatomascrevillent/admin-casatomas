@@ -229,6 +229,126 @@ describe("camino largo (trabajos en el servidor)", () => {
   });
 });
 
+describe("una página en segundo plano (trabajo de una pieza)", () => {
+  const unico = (estado: string, extra: Partial<EstadoTrabajo> = {}) => trabajo(estado, { num_paginas: 1, nombre_original: "a.pdf", ...extra });
+
+  it("sube el fichero (en el navegador) y luego solo sondea (en el servidor), sin hablar de trozos", async () => {
+    const subida = diferida<{ trabajoId: string; numPiezas: number }>();
+    const fin = diferida<EstadoTrabajo>();
+    let avisoCambio: ((t: EstadoTrabajo | null) => void) | undefined;
+    const procesarUnico = vi.fn(async (_f: File, nombre: string) => ok(nombre));
+    const cola = crearColaSubida(deps({
+      iniciarUnico: () => subida.promesa,
+      esperar: (_id, onCambio) => {
+        avisoCambio = onCambio;
+        return fin.promesa;
+      },
+      procesarUnico,
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    let e = cola.getEstado().elementos[0];
+    expect(e).toMatchObject({ fase: "subiendo", progreso: "Subiendo…" });
+    // Mientras se sube, cerrar la pestaña lo perdería.
+    expect(hayEnNavegador(cola.getEstado())).toBe(true);
+
+    subida.resolver({ trabajoId: "u1", numPiezas: 1 });
+    await vuelta();
+    e = cola.getEstado().elementos[0];
+    expect(e).toMatchObject({ fase: "procesando", trabajoId: "u1" });
+    expect(e.piezas).toBeUndefined();
+    // Ya está en el servidor: los 10-40 s de lectura no dependen de la pestaña.
+    expect(hayEnNavegador(cola.getEstado())).toBe(false);
+
+    avisoCambio!(unico("pagina1"));
+    expect(cola.getEstado().elementos[0].progreso).toBe("Leyendo el documento…");
+    avisoCambio!(unico("consolidando"));
+    expect(cola.getEstado().elementos[0].progreso).toBe("Comprobando importes y guardando…");
+    fin.resolver(unico("completado"));
+    await vuelta();
+    e = cola.getEstado().elementos[0];
+    expect(e).toMatchObject({ fase: "terminado", resultado: { success: true } });
+    expect(e.resultado?.piezas).toBeUndefined();
+    expect(procesarUnico).not.toHaveBeenCalled();
+  });
+
+  it("si el servidor aún no lo admite (versión antigua), va por el camino síncrono de siempre", async () => {
+    const procesarUnico = vi.fn(async (_f: File, nombre: string) => ok(nombre));
+    const esperar = vi.fn();
+    const cola = crearColaSubida(deps({
+      iniciarUnico: async () => { throw new SinDocumentosLargos("Un documento de una sola pieza va por el camino normal"); },
+      esperar,
+      procesarUnico,
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    expect(procesarUnico).toHaveBeenCalledTimes(1);
+    expect(esperar).not.toHaveBeenCalled();
+    expect(cola.getEstado().elementos[0].resultado?.success).toBe(true);
+  });
+
+  it("otro error al subir deja el documento como fallido (con el fichero para reintentar)", async () => {
+    const procesarUnico = vi.fn();
+    const cola = crearColaSubida(deps({
+      iniciarUnico: async () => { throw new Error("No se pudo subir a.pdf: Payload too large"); },
+      procesarUnico,
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    expect(procesarUnico).not.toHaveBeenCalled();
+    expect(cola.getEstado().elementos[0]).toMatchObject({
+      fase: "terminado", resultado: { success: false, error: "No se pudo subir a.pdf: Payload too large" },
+    });
+    expect(cola.getEstado().elementos[0].file).toBeTruthy();
+  });
+
+  it("un duplicado de una página queda «por decidir» (sale de ocr_trabajos)", async () => {
+    const cola = crearColaSubida(deps({
+      iniciarUnico: async () => ({ trabajoId: "u2", numPiezas: 1 }),
+      esperar: async () => unico("duplicado", {
+        id: "u2",
+        resultado: { success: true, duplicado: true, sustituible: { trabajo_id: "u2", existente: { id: 77 }, nuevo: {} } },
+      }),
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    expect(clasificarResultado(cola.getEstado().elementos[0].resultado)).toBe("pendiente");
+  });
+
+  it("lo que ya está en el servidor no ocupa hueco: la tanda se sube entera sin esperar a que se lea", async () => {
+    const fines = [diferida<EstadoTrabajo>(), diferida<EstadoTrabajo>(), diferida<EstadoTrabajo>()];
+    let n = 0;
+    const alAcabarTanda = vi.fn();
+    const cola = crearColaSubida(deps({
+      maxSimultaneos: 1,
+      iniciarUnico: async () => ({ trabajoId: `u${n}`, numPiezas: 1 }),
+      esperar: () => fines[n++].promesa,
+      alAcabarTanda,
+    }));
+    cola.añadirArchivos([pdf("a.pdf"), pdf("b.pdf"), pdf("c.pdf")]);
+    cola.enviar();
+    for (let i = 0; i < 6; i += 1) await vuelta();
+    expect(cola.getEstado().elementos.map((e) => e.fase)).toEqual(["procesando", "procesando", "procesando"]);
+    expect(hayEnNavegador(cola.getEstado())).toBe(false);
+    fines.forEach((f) => f.resolver(unico("completado")));
+    for (let i = 0; i < 3; i += 1) await vuelta();
+    expect(cola.getEstado().elementos.every((e) => e.fase === "terminado")).toBe(true);
+    expect(alAcabarTanda).toHaveBeenCalledTimes(1);
+    expect(alAcabarTanda.mock.calls[0][0]).toMatchObject({ total: 3 });
+  });
+
+  it("al recargar adopta también los de una página, sin hablar de trozos", () => {
+    const cola = crearColaSubida(deps({ esperar: () => new Promise(() => {}) }));
+    cola.adoptar([unico("pagina1")]);
+    expect(cola.getEstado().elementos[0]).toMatchObject({ fase: "procesando", progreso: "Leyendo el documento…" });
+    expect(cola.getEstado().elementos[0].piezas).toBeUndefined();
+  });
+});
+
 describe("marcarSustituida y limpiar", () => {
   it("la fila del duplicado pasa a «sustituida» y «Limpiar terminados» la quita", async () => {
     const cola = crearColaSubida(deps({

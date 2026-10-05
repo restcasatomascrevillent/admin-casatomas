@@ -10,7 +10,7 @@ export interface Llamada {
 
 export function crearDobleSupabase() {
   const inserts: { tabla: string; fila: unknown }[] = [];
-  let responder: (tabla: string, llamadas: Llamada[]) => unknown[] = () => [];
+  let responder: (tabla: string, llamadas: Llamada[]) => unknown = () => [];
   const invoke = vi.fn();
 
   const cadena = (tabla: string, llamadas: Llamada[] = []): unknown =>
@@ -33,21 +33,34 @@ export function crearDobleSupabase() {
       },
     );
 
+  const subidas: { bucket: string; path: string }[] = [];
   const supabase = {
     from: (tabla: string) => cadena(tabla),
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
+    auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) },
+    storage: {
+      from: (bucket: string) => ({
+        upload: async (path: string) => {
+          subidas.push({ bucket, path });
+          return { data: { path }, error: null };
+        },
+      }),
+    },
   };
 
   return {
     supabase,
     invoke,
     inserts,
+    /** Ficheros subidos a Storage (documentos en segundo plano). */
+    subidas,
     /** Qué contesta cada consulta. */
-    fijarRespuestas(f: (tabla: string, llamadas: Llamada[]) => unknown[]) {
+    fijarRespuestas(f: (tabla: string, llamadas: Llamada[]) => unknown) {
       responder = f;
     },
     reiniciar() {
       inserts.length = 0;
+      subidas.length = 0;
       responder = () => [];
       invoke.mockReset();
     },
@@ -64,3 +77,10 @@ export const filtra = (llamadas: Llamada[], columna: string, valor: unknown) =>
  * (misma instancia por la caché de módulos).
  */
 export const doble = crearDobleSupabase();
+
+/** Respuesta de una procesar-factura desplegada ANTES de los trabajos de una
+ *  pieza a {modo:"iniciar"} con una sola pieza: el panel cae al síncrono. */
+export const RESPUESTA_SERVIDOR_ANTIGUO = {
+  data: { success: false, error: "Un documento de una sola pieza va por el camino normal" },
+  error: null,
+};
