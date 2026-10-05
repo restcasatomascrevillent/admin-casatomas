@@ -248,7 +248,7 @@ export function resumenPorEspacio(filas: readonly FilaResumenEspacio[]): {
 // mesa ya está ocupada" no dice CUÁL cuando se asignan varias de golpe).
 
 const MENSAJES_POR_PREFIJO: ReadonlyArray<readonly [string, string]> = [
-  ["MESA_OCUPADA", "Esa mesa ya está asignada a otra reserva en ese turno."],
+  ["MESA_OCUPADA", "Esa mesa ya está ocupada a esa hora por otra reserva."],
   ["MESA_OTRA_SALA", "Esa mesa no es de la sala de la reserva. Cambia primero la reserva de sala."],
   ["RESERVA_SIN_SALA", "Antes de asignar mesa hay que darle sala a la reserva."],
   ["RESERVA_CANCELADA", "La reserva está cancelada: no se le pueden asignar mesas."],
@@ -269,10 +269,10 @@ const MENSAJE_GENERICO = "No se pudieron guardar las mesas. Vuelve a intentarlo.
  *      excepción en el mismo campo según cómo se levante.
  *   2. Dos fallos de infraestructura que, sin traducir, mandan al usuario a
  *      mirar logs:
- *      · 23505 / "duplicate key" → es la restricción
- *        `unique (mesa_id, fecha, turno)` saltando por una carrera entre dos
- *        pantallas (o por un INSERT directo sin pasar por el RPC). Para el
- *        camarero eso es exactamente "mesa ocupada".
+ *      · 23505 / "duplicate key" → era la restricción
+ *        `unique (mesa_id, fecha, turno)` (retirada en 20261005130000, que
+ *        valida por franjas de tiempo); se conserva por si se vuelve atrás con
+ *        el rollback. Para el camarero eso es exactamente "mesa ocupada".
  *      · PGRST202 / 42883 / 42P01 → el RPC o la vista todavía no existen
  *        (migración sin aplicar). Decirlo ahorra media hora de búsqueda.
  *   3. Fallback: la frase genérica, con el texto original detrás si es legible,
@@ -286,6 +286,11 @@ export function mensajeErrorAsignacion(error: unknown): string {
     const pos = mayus.indexOf(prefijo + ":");
     if (pos === -1) continue;
     const detalle = detalleLegible(blob.slice(pos + prefijo.length + 1));
+    // Desde 20261005130000 la base de datos ya da la frase entera («La mesa 3
+    // está ocupada de 14:00 a 16:00 por Oscar»): se enseña tal cual.
+    if (prefijo === "MESA_OCUPADA" && /^la mesa .+ está ocupada de /i.test(detalle)) {
+      return detalle + ". Elige otra mesa o quítasela primero.";
+    }
     return detalle ? mensaje + " (" + detalle + ")" : mensaje;
   }
 
@@ -302,13 +307,14 @@ export function mensajeErrorAsignacion(error: unknown): string {
 }
 
 /**
- * ¿Está esta mesa ocupada por OTRA reserva en ese día+turno? Para pintar el
- * plano: `reservaIdExcluida` es la reserva que se está editando, que no se
- * "ocupa a sí misma" (si no, sus propias mesas saldrían en rojo).
+ * ¿Tiene esta mesa alguna asignación de OTRA reserva en la lista? Comprobación
+ * SIN horas: «aparece o no aparece». Para decidir si una mesa está libre para
+ * una reserva concreta (por franjas de tiempo, que es la regla desde
+ * 20261005130000) usa `conflictoDeMesa` de `./ocupacionMesa`.
  *
- * Devuelve la asignación que estorba (para poder decir de quién es la mesa) o
- * `null`. Filtrar la lista por día y turno es de quien la pasa: este módulo no
- * adivina qué hay dentro.
+ * `reservaIdExcluida` es la reserva que se está editando, que no se "ocupa a sí
+ * misma". Devuelve la asignación que estorba o `null`. Filtrar la lista es de
+ * quien la pasa: este módulo no adivina qué hay dentro.
  */
 export function mesaOcupadaPor<T extends { mesa_id: string; reserva_id: string }>(
   asignaciones: T[],

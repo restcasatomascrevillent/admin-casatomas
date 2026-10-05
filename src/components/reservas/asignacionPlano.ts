@@ -27,6 +27,7 @@ import {
   turnoDeHora,
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
+import { seSolapan, type Franja } from "@/lib/reservas/ocupacionMesa";
 
 // Reexportado por comodidad del componente: la implementación vive en
 // `@/lib/reservas/asignacionMesas`, aquí solo se pasa la pelota.
@@ -282,13 +283,21 @@ export interface DistribucionPropuesta {
 }
 
 /**
- * Reparte mesas libres entre las reservas que aún no tienen ninguna.
+ * Reparte mesas entre las reservas que aún no tienen ninguna.
  *
  * ES UNA FUNCIÓN PURA: no escribe nada. Devuelve una propuesta que el
  * componente aplica llamando al RPC `asignar_mesas_reserva`, el MISMO camino
  * que la asignación manual. Antes esto lo hacía una Edge Function que insertaba
  * directamente en `asignaciones_mesa` (ver el comentario de
  * `handleCalcularDistribucion` en PlanoEspacio2D.tsx).
+ *
+ * OCUPACIÓN POR TIEMPO (05/10/2026): con `franjaDe`, una mesa se puede dar a
+ * VARIAS reservas si sus franjas [hora, hora + tiempo de ocupación) no se
+ * pisan — las ya sentadas (`ocupaciones`) y las que va proponiendo el propio
+ * reparto. Sin `franjaDe` cada reserva ocupa la mesa todo el día (una reserva
+ * por mesa, el comportamiento de antes). `mesasLibres` son las mesas
+ * CANDIDATAS (activas y que se ofrecen); quién está libre a cada hora lo
+ * decide esta función.
  *
  * CRITERIOS, y por qué:
  *
@@ -311,6 +320,10 @@ export function calcularDistribucionMesas(params: {
   reservas: readonly ReservaSala[];
   mesasLibres: readonly MesaDisponible[];
   maxMesasPorReserva?: number;
+  /** Franja de cada reserva. Sin ella (o si devuelve null), la reserva ocupa la mesa todo el día. */
+  franjaDe?: (reserva: ReservaSala) => Franja | null;
+  /** Lo que ya está sentado (de otras reservas), para no pisarlo. */
+  ocupaciones?: ReadonlyArray<{ mesa_id: string; franja: Franja }>;
 }): DistribucionPropuesta {
   const tope = Math.max(1, params.maxMesasPorReserva ?? 3);
 
@@ -323,10 +336,26 @@ export function calcularDistribucionMesas(params: {
         String(a.id).localeCompare(String(b.id)),
     );
 
-  // Piscina de libres, de menor a mayor capacidad.
-  const libres = [...(params.mesasLibres ?? [])]
+  // Mesas candidatas, de menor a mayor capacidad.
+  const mesas = [...(params.mesasLibres ?? [])]
     .filter((m) => m && Number(m.capacidad) > 0)
     .sort((a, b) => a.capacidad - b.capacidad || String(a.nombre).localeCompare(String(b.nombre)));
+
+  // Franjas ocupadas por mesa: lo ya sentado + lo que se va proponiendo.
+  const ocupadas = new Map<string, Franja[]>();
+  for (const o of params.ocupaciones ?? []) {
+    if (!o?.mesa_id || !o.franja) continue;
+    const lista = ocupadas.get(o.mesa_id) ?? [];
+    lista.push(o.franja);
+    ocupadas.set(o.mesa_id, lista);
+  }
+  const libreEn = (mesaId: string, franja: Franja) =>
+    !(ocupadas.get(mesaId) ?? []).some((otra) => seSolapan(otra, franja));
+  const ocupar = (mesaId: string, franja: Franja) => {
+    const lista = ocupadas.get(mesaId) ?? [];
+    lista.push(franja);
+    ocupadas.set(mesaId, lista);
+  };
 
   const propuestas: PropuestaAsignacion[] = [];
   const sinHueco: ReservaSala[] = [];
@@ -336,12 +365,14 @@ export function calcularDistribucionMesas(params: {
 
   for (const reserva of candidatas) {
     const faltan = reserva.numero_comensales;
+    const franja = params.franjaDe?.(reserva) ?? TODO_EL_DIA;
+    const libres = mesas.filter((m) => libreEn(m.id, franja));
 
     // 1) La mesa más justa que llegue ella sola.
-    const indiceJusta = libres.findIndex((m) => m.capacidad >= faltan);
-    if (indiceJusta !== -1) {
-      const [mesa] = libres.splice(indiceJusta, 1);
-      propuestas.push({ reserva, mesaIds: [mesa.id], plazas: mesa.capacidad });
+    const justa = libres.find((m) => m.capacidad >= faltan);
+    if (justa) {
+      ocupar(justa.id, franja);
+      propuestas.push({ reserva, mesaIds: [justa.id], plazas: justa.capacidad });
       continue;
     }
 
@@ -356,10 +387,7 @@ export function calcularDistribucionMesas(params: {
     }
 
     if (suma >= faltan && elegidas.length > 0) {
-      for (const mesa of elegidas) {
-        const i = libres.findIndex((m) => m.id === mesa.id);
-        if (i !== -1) libres.splice(i, 1);
-      }
+      for (const mesa of elegidas) ocupar(mesa.id, franja);
       const orden = ordenarPorNombre(elegidas);
       propuestas.push({ reserva, mesaIds: orden.map((m) => m.id), plazas: suma });
       continue;
@@ -371,3 +399,6 @@ export function calcularDistribucionMesas(params: {
 
   return { propuestas, sinHueco };
 }
+
+/** Sin franja: la reserva ocupa la mesa todo el día (una reserva por mesa). */
+const TODO_EL_DIA: Franja = { inicio: Number.NEGATIVE_INFINITY, fin: Number.POSITIVE_INFINITY };

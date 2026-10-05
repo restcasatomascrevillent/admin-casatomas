@@ -12,11 +12,15 @@
  *   · el `update` de `reservas` escribe en el almacén y, como el trigger
  *     `trg_reservas_sincronizar_asignaciones`, BORRA las mesas de la reserva si cambia su sala;
  *   · el RPC `asignar_mesas_reserva` reemplaza de golpe las mesas de una reserva y rechaza con
- *     `MESA_OCUPADA:` si otra reserva del mismo día y turno ya tiene esa mesa.
+ *     `MESA_OCUPADA: La mesa X está ocupada de HH:MM a HH:MM por Y` si otra reserva del mismo día
+ *     tiene esa mesa en una franja que se pisa (ocupación por tiempo, 20261005130000; minutos de
+ *     `otras.configuracion_reservas` o 105 / 120 por defecto).
  *
  * `antesDeLeer` / `antesDeEscribir` dejan a un test RETENER una petición para comprobar qué
  * se pinta mientras llega. Nada sale de aquí: es un objeto, sin red.
  */
+
+import { franjaDeHora, seSolapan, textoFranja } from "@/lib/reservas/ocupacionMesa";
 
 export type Fila = Record<string, unknown>;
 
@@ -232,14 +236,25 @@ export function crearSupabaseDoble(almacen: AlmacenDoble) {
     const mesaIds = (args.p_mesa_ids ?? []) as unknown[];
     const reserva = reservaDe(reservaId);
 
-    // La restricción real es `unique (mesa_id, fecha, turno)`: se comprueba ANTES de escribir.
+    // La regla real (trigger de `asignaciones_mesa`): ninguna otra reserva del día con esa mesa en
+    // una franja [hora, hora + tiempo de ocupación) que se pise con la suya. Antes de escribir.
+    const cfg = (almacen.otras.configuracion_reservas?.[0] ?? {}) as Fila;
+    const config = {
+      estanciaComidaMinutos: Number(cfg.estancia_comida_minutos) || 105,
+      estanciaCenaMinutos: Number(cfg.estancia_cena_minutos) || 120,
+    };
+    const propia = franjaDeHora(String(reserva?.hora ?? ""), config);
     for (const mesaId of mesaIds) {
-      const choque = almacen.asignaciones.find((a) => {
-        if (a.mesa_id !== mesaId || a.reserva_id === reservaId) return false;
+      for (const a of almacen.asignaciones) {
+        if (a.mesa_id !== mesaId || a.reserva_id === reservaId) continue;
         const otra = reservaDe(a.reserva_id);
-        return otra?.fecha === reserva?.fecha && turnoDe(otra?.hora) === turnoDe(reserva?.hora);
-      });
-      if (choque) return { data: null, error: { message: `MESA_OCUPADA: ${String(mesaDe(mesaId)?.nombre ?? mesaId)}` } };
+        if (otra?.fecha !== reserva?.fecha) continue;
+        const franja = franjaDeHora(String(otra?.hora ?? ""), config);
+        if (propia && franja && seSolapan(propia, franja)) {
+          const message = `MESA_OCUPADA: La mesa ${String(mesaDe(mesaId)?.nombre ?? mesaId)} está ocupada de ${textoFranja(franja)} por ${String(otra?.nombre ?? "otra reserva")}`;
+          return { data: null, error: { code: "23514", message } };
+        }
+      }
     }
 
     almacen.asignaciones = almacen.asignaciones.filter((a) => a.reserva_id !== reservaId);

@@ -18,7 +18,8 @@ import { CLAVE_RESUMEN_ASIGNACION_DIA } from "@/hooks/useResumenAsignacionDia";
 //     `asignar_mesas_reserva`, que es ATÓMICO y reemplaza TODAS las mesas de la
 //     reserva por el array que se le pase (array vacío = quitarlas todas).
 //     Valida en servidor sala, estado de la reserva, mesa activa y choque de
-//     mesa en ese día+turno.
+//     mesa por FRANJA de tiempo ([hora, hora + tiempo de ocupación), migración
+//     20261005130000; antes era por día+turno).
 //   · `useCrearAsignacion` / `useEliminarAsignacion` (LEGADO): un INSERT y un
 //     DELETE sueltos, mesa a mesa. Los usa `PlanoEspacio2D.tsx`. Se mantienen
 //     con la MISMA firma para no romperlo; no valida nada en cliente y depende
@@ -180,8 +181,8 @@ export function useCrearAsignacion() {
       invalidarAsignaciones(queryClient);
     },
     onError: (error) => {
-      // Traducido: si salta la unique (mesa_id, fecha, turno) el camarero tiene
-      // que leer "esa mesa ya está asignada", no "Error al asignar mesa".
+      // Traducido: si la mesa está ocupada a esa hora (MESA_OCUPADA) el camarero
+      // tiene que leer de quién y hasta cuándo, no "Error al asignar mesa".
       toast.error(mensajeErrorAsignacion(error));
       console.error(error);
     },
@@ -228,8 +229,8 @@ export interface AsignarMesasReservaInput {
  * mesa — eso NO es un error y sale con su propio mensaje de éxito.
  *
  * Los ids se deduplican antes de enviarlos: dos clics rápidos sobre la misma
- * mesa en el plano mandarían el id dos veces y la restricción
- * `unique (mesa_id, fecha, turno)` lo leería como "mesa ocupada" por sí misma.
+ * mesa en el plano mandarían el id dos veces (y el UNIQUE (reserva_id, mesa_id)
+ * lo rechazaría).
  *
  * Los errores del servidor (`MESA_OCUPADA:`, `MESA_OTRA_SALA:`,
  * `RESERVA_SIN_SALA:`, `RESERVA_CANCELADA:`, `MESA_INACTIVA:`) se traducen con

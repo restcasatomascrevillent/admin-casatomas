@@ -120,7 +120,8 @@ export function ElegirMesaDialog({ reserva, fecha, espacioId, espacioNombre, onC
   // Mismas consultas (y mismas claves de caché) que hace el plano: él las reutiliza ya calientes.
   const mesas = useMesas(espacioId);
   const reservasSala = useReservasDeSala(espacioId, fecha);
-  const asignaciones = useAsignacionesMesa(fecha, espacioId, destino?.turno);
+  // Sin turno: el plano lee las asignaciones del DÍA ENTERO (la mesa se ocupa por franjas de tiempo).
+  const asignaciones = useAsignacionesMesa(fecha, espacioId);
 
   const [fase, setFase] = useState<Fase>("comprobando");
   const comprobada = !mesas.isFetching && !reservasSala.isFetching;

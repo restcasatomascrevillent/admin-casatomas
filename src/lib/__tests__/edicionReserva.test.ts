@@ -523,9 +523,13 @@ describe("edicionReserva · efecto en las mesas (lo hace el trigger, aquí solo 
     expect(efectoEnMesas(reserva({ hora: "21:00:00" }), { hora: "13:00" })).toBe("mueve");
   });
 
-  it("cambiar la hora dentro del mismo turno, los comensales o el nombre no tocan las mesas", () => {
-    expect(efectoEnMesas(reserva({ hora: "21:00:00" }), { hora: "21:30" })).toBeNull();
-    expect(efectoEnMesas(reserva({ hora: "13:00:00" }), { hora: "14:15" })).toBeNull();
+  it("cambiar la hora dentro del mismo turno también las revalida (la mesa se ocupa por franjas de tiempo)", () => {
+    expect(efectoEnMesas(reserva({ hora: "21:00:00" }), { hora: "21:30" })).toBe("mueve");
+    expect(efectoEnMesas(reserva({ hora: "13:00:00" }), { hora: "14:15" })).toBe("mueve");
+  });
+
+  it("la misma hora con o sin segundos, los comensales o el nombre no tocan las mesas", () => {
+    expect(efectoEnMesas(reserva({ hora: "21:00:00" }), { hora: "21:00" })).toBeNull();
     expect(efectoEnMesas(reserva(), { numero_comensales: 8, nombre: "X" })).toBeNull();
     expect(efectoEnMesas(reserva(), {})).toBeNull();
   });

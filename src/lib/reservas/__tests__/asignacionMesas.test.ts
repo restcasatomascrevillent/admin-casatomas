@@ -292,8 +292,16 @@ describe("mensajeErrorAsignacion", () => {
 
   it("mesa ocupada: frase en español y con el detalle de QUÉ mesa", () => {
     const mensaje = mensajeErrorAsignacion({ message: "MESA_OCUPADA: la mesa 12 ya tiene reserva" });
-    expect(mensaje).toContain("ya está asignada a otra reserva");
+    expect(mensaje).toContain("ya está ocupada a esa hora");
     expect(mensaje).toContain("la mesa 12 ya tiene reserva");
+  });
+
+  it("mesa ocupada con la frase de la base de datos (franjas): se enseña tal cual", () => {
+    const mensaje = mensajeErrorAsignacion({
+      code: "23514",
+      message: "MESA_OCUPADA: La mesa 3 está ocupada de 14:00 a 16:00 por Oscar Diaz Vidal",
+    });
+    expect(mensaje).toBe("La mesa 3 está ocupada de 14:00 a 16:00 por Oscar Diaz Vidal. Elige otra mesa o quítasela primero.");
   });
 
   it("mesa de otra sala", () => {
@@ -321,13 +329,13 @@ describe("mensajeErrorAsignacion", () => {
   });
 
   it("acepta el error como string pelado y como Error", () => {
-    expect(mensajeErrorAsignacion("MESA_OCUPADA: mesa 3 pillada")).toContain("ya está asignada");
+    expect(mensajeErrorAsignacion("MESA_OCUPADA: mesa 3 pillada")).toContain("ya está ocupada");
     expect(mensajeErrorAsignacion(new Error("MESA_OTRA_SALA: no toca"))).toContain("no es de la sala");
   });
 
   it("no pega detalles inservibles (uuid pelado o una sola palabra)", () => {
     expect(mensajeErrorAsignacion({ message: "MESA_OCUPADA: 3f0b9c2e-1111-4222-8333-444455556666" })).toBe(
-      "Esa mesa ya está asignada a otra reserva en ese turno.",
+      "Esa mesa ya está ocupada a esa hora por otra reserva.",
     );
     expect(mensajeErrorAsignacion({ message: "MESA_INACTIVA:mesa4" })).toBe(
       "Esa mesa está desactivada. Actívala en el plano o elige otra.",
@@ -339,7 +347,7 @@ describe("mensajeErrorAsignacion", () => {
       code: "23505",
       message: 'duplicate key value violates unique constraint "asignaciones_mesa_mesa_fecha_turno_key"',
     });
-    expect(mensaje).toBe("Esa mesa ya está asignada a otra reserva en ese turno.");
+    expect(mensaje).toBe("Esa mesa ya está ocupada a esa hora por otra reserva.");
   });
 
   it("si el RPC o la vista no existen, lo dice en vez de mandar a los logs", () => {

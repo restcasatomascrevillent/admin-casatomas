@@ -1406,7 +1406,7 @@ export const FormularioReserva = ({
               {`Esta reserva tiene mesa asignada (${mesasAsignadas.join(", ")}). ${
                 efectoMesas === "quita"
                   ? "Al cambiar de sala se quitan las mesas asignadas y habrá que sentarla de nuevo."
-                  : "Al cambiar el día o el turno, la mesa se mantiene si está libre; si no, la reserva queda pendiente de mesa."
+                  : "Al cambiar el día o la hora, la mesa se mantiene si sigue libre a esa hora; si no, la reserva queda pendiente de mesa."
               }`}
             </AlertDescription>
           </Alert>

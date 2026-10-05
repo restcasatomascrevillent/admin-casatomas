@@ -9,8 +9,9 @@
  *
  *   · `from("reservas")` / `from("asignaciones_mesa")` leen del almacén;
  *   · `rpc("asignar_mesas_reserva")` REEMPLAZA de golpe las mesas de una
- *     reserva, igual que el RPC, y antes de tocar nada comprueba la restricción
- *     `unique (mesa_id, fecha, turno)` devolviendo `MESA_OCUPADA: <mesa>`.
+ *     reserva, igual que el RPC, y antes de tocar nada comprueba que la mesa no
+ *     la tenga otra reserva en una franja de tiempo que se pise (ocupación por
+ *     tiempo, 20261005130000) devolviendo `MESA_OCUPADA: La mesa X …`.
  *
  * Lo que NO se mockea (corre de verdad): `@/lib/reservas/asignacionMesas`
  * (turnos, ajuste de capacidad, traducción de errores) y
@@ -50,6 +51,16 @@ const h = vi.hoisted(() => {
   // Mismo corte que el SQL: `hora < '17:00:00'` → comida.
   const turnoDe = (hora: string) => (String(hora ?? "") < "17:00:00" ? "comida" : "cena");
   const reservaDe = (id: string) => store.reservas.find((r) => r.id === id);
+  // Franja en minutos con el tiempo de ocupación de `store.config` (105 / 120 por defecto).
+  const franjaDe = (hora: string) => {
+    const [hh, mm] = String(hora ?? "").split(":").map(Number);
+    const inicio = (hh || 0) * 60 + (mm || 0);
+    const minutos =
+      turnoDe(hora) === "comida"
+        ? Number(store.config.estancia_comida_minutos) || 105
+        : Number(store.config.estancia_cena_minutos) || 120;
+    return { inicio, fin: inicio + minutos };
+  };
   const mesaDe = (id: string) => store.mesas.find((m) => m.id === id);
 
   const conDetalles = (fila: FilaAsignacion) => {
@@ -115,18 +126,30 @@ const h = vi.hoisted(() => {
       const reservaId = args?.p_reserva_id as string;
       const mesaIds = (args?.p_mesa_ids ?? []) as string[];
       const reserva = reservaDe(reservaId);
-      const turno = turnoDe(reserva?.hora ?? "");
 
-      // La restricción real es `unique (mesa_id, fecha, turno)`: se comprueba
-      // ANTES de escribir, como haría la transacción del RPC.
+      // La regla real (trigger de `asignaciones_mesa`, 20261005130000): ninguna
+      // otra reserva del día con esa mesa en una franja [hora, hora + tiempo de
+      // ocupación) que se pise. Se comprueba ANTES de escribir, como el RPC.
+      const propia = franjaDe(reserva?.hora ?? "");
       for (const mesaId of mesaIds) {
         const choque = store.asignaciones.find((a) => {
           if (a.mesa_id !== mesaId || a.reserva_id === reservaId) return false;
           const otra = reservaDe(a.reserva_id);
-          return otra?.fecha === reserva?.fecha && turnoDe(otra?.hora ?? "") === turno;
+          const suya = franjaDe(otra?.hora ?? "");
+          return otra?.fecha === reserva?.fecha && propia.inicio < suya.fin && suya.inicio < propia.fin;
         });
         if (choque) {
-          return { data: null, error: { message: `MESA_OCUPADA: ${mesaDe(mesaId)?.nombre ?? mesaId}` } };
+          const otra = reservaDe(choque.reserva_id);
+          const suya = franjaDe(otra?.hora ?? "");
+          const hhmm = (min: number) =>
+            `${String(Math.floor((min % 1440) / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+          return {
+            data: null,
+            error: {
+              code: "23514",
+              message: `MESA_OCUPADA: La mesa ${mesaDe(mesaId)?.nombre ?? mesaId} está ocupada de ${hhmm(suya.inicio)} a ${hhmm(suya.fin)} por ${otra?.nombre}`,
+            },
+          };
         }
       }
 
@@ -883,9 +906,11 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sentar a Familia Pérez" }));
     fireEvent.click(botonMesa("Mesa 4"));
 
-    // La base de datos rechaza y el mensaje llega traducido, nombrando la mesa.
-    await waitFor(() => expect(avisos("error").join(" ")).toMatch(/ya está asignada a otra reserva/i));
-    expect(avisos("error").join(" ")).toMatch(/Mesa 4/);
+    // La base de datos rechaza y el mensaje llega claro: qué mesa, de qué hora a
+    // qué hora y quién la tiene.
+    await waitFor(() =>
+      expect(avisos("error").join(" ")).toMatch(/La mesa Mesa 4 está ocupada de 13:30 a 15:15 por Ana López/),
+    );
 
     // Y el plano se refresca con la verdad: la Mesa 4 es de Ana.
     await waitFor(() => expect(botonMesa("Mesa 4")).toHaveAccessibleName(/ocupada por Ana López/));
@@ -910,14 +935,18 @@ describe("PlanoEspacio2D · asignación de mesas", () => {
     );
   });
 
-  it("avisa sin ir al servidor si la mesa ya es de otra reserva del turno", async () => {
+  it("avisa sin ir al servidor si la mesa ya es de otra reserva a una hora que se pisa", async () => {
+    // Ana 13:30 (hasta las 15:15 con los 105 min de comida) y Pérez 14:00.
     montar({ asignaciones: [{ id: "a1", reserva_id: "r-ana", mesa_id: "m4" }] });
     await esperarReserva("Familia Pérez");
 
     fireEvent.click(screen.getByRole("button", { name: "Sentar a Familia Pérez" }));
+    expect(botonMesa("Mesa 4")).toHaveAccessibleName(/ocupada por Ana López a las 13:30 · no está libre a esa hora/);
     fireEvent.click(botonMesa("Mesa 4"));
 
-    await waitFor(() => expect(avisos("error").join(" ")).toMatch(/Mesa 4 ya es de Ana López/));
+    await waitFor(() =>
+      expect(avisos("error").join(" ")).toMatch(/La mesa Mesa 4 está ocupada de 13:30 a 15:15 por Ana López/),
+    );
     expect(rpcDeAsignacion()).toHaveLength(0);
   });
 
@@ -1148,5 +1177,145 @@ describe("PlanoEspacio2D · editar una reserva desde su fila", () => {
     expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
     fireEvent.click(boton);
     expect(h.editarReserva).not.toHaveBeenCalled();
+  });
+});
+
+// Ocupación de mesa POR TIEMPO (petición del dueño, 05/10/2026): en «Todo el día» se puede
+// sentar, una mesa vale para varias reservas si sus franjas [hora, hora + tiempo de ocupación)
+// no se pisan, y el plano dice en cada mesa quién la ocupa y a qué hora.
+describe("PlanoEspacio2D · ocupación por tiempo («Todo el día»)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.canEdit = true;
+    h.store.asignaciones = [];
+    h.store.llamadasRpc = [];
+    h.store.llamadasEq = [];
+    h.store.errorRpc = null;
+    h.store.contador = 0;
+    h.store.config = { asignacion_mesas_excluidas: [] };
+  });
+
+  const MESA_3 = [mesa("m3", "3", 4)];
+  const OSCAR_Y_EZEQUIEL = [
+    reserva("r-oscar", "Oscar Diaz Vidal", "14:00:00", 3),
+    reserva("r-ezequiel", "Ezequiel Vega", "20:30:00", 2),
+  ];
+  const DIA = `/reservas?fecha=${FECHA}&turno=dia`;
+
+  it("el caso del dueño: con Oscar (comida 14:00) en la mesa 3, deja sentar a Ezequiel (cena 20:30) en la misma", async () => {
+    montar({
+      ruta: DIA,
+      mesas: MESA_3,
+      reservas: OSCAR_Y_EZEQUIEL,
+      asignaciones: [{ id: "a1", reserva_id: "r-oscar", mesa_id: "m3" }],
+    });
+    await esperarReserva("Ezequiel Vega");
+
+    // Ya no se pide elegir Comida o Cena para repartir.
+    expect(screen.queryByText(/Elige Comida o Cena/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("aviso-todo-el-dia")).toHaveTextContent(/105 min en comida y 120 min/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sentar a Ezequiel Vega" }));
+    // Para la franja de Ezequiel la mesa está LIBRE, aunque la use Oscar a mediodía.
+    expect(botonMesa("3")).toHaveAccessibleName(/libre a esa hora · también la usa Oscar Diaz Vidal a las 14:00/);
+    fireEvent.click(botonMesa("3"));
+
+    await waitFor(() => expect(mesasEnAlmacen("r-ezequiel")).toEqual(["m3"]));
+    expect(mesasEnAlmacen("r-oscar")).toEqual(["m3"]);
+    expect(avisos("error")).toEqual([]);
+  });
+
+  it("cada mesa dice quién la ocupa y a qué hora: «14:00 Oscar» y «20:30 Ezequiel»", async () => {
+    montar({
+      ruta: DIA,
+      mesas: MESA_3,
+      reservas: OSCAR_Y_EZEQUIEL,
+      asignaciones: [
+        { id: "a1", reserva_id: "r-oscar", mesa_id: "m3" },
+        { id: "a2", reserva_id: "r-ezequiel", mesa_id: "m3" },
+      ],
+    });
+    await esperarReserva("Ezequiel Vega");
+
+    await waitFor(() =>
+      expect(botonMesa("3")).toHaveAccessibleName(
+        /ocupada por Oscar Diaz Vidal a las 14:00 y por Ezequiel Vega a las 20:30/,
+      ),
+    );
+    const carteles = document.querySelector('[data-ocupantes-mesa="m3"]') as HTMLElement;
+    expect(carteles).not.toBeNull();
+    expect(within(carteles).getByText("Oscar")).toBeInTheDocument();
+    expect(within(carteles).getByText("Ezequiel")).toBeInTheDocument();
+    expect(carteles.textContent).toMatch(/14:00.*Oscar.*20:30.*Ezequiel/);
+  });
+
+  it("con un turno elegido, la mesa enseña solo a los de ese turno", async () => {
+    montar({
+      ruta: `/reservas?fecha=${FECHA}&turno=cena`,
+      mesas: MESA_3,
+      reservas: OSCAR_Y_EZEQUIEL,
+      asignaciones: [
+        { id: "a1", reserva_id: "r-oscar", mesa_id: "m3" },
+        { id: "a2", reserva_id: "r-ezequiel", mesa_id: "m3" },
+      ],
+    });
+    await esperarReserva("Ezequiel Vega");
+    await waitFor(() => expect(botonMesa("3")).toHaveAccessibleName(/^3 · 4 plazas · ocupada por Ezequiel Vega a las 20:30$/));
+  });
+
+  it("al elegir una reserva, la mesa sale ocupada según SU franja (14:00 y 15:00 chocan, 16:00 no)", async () => {
+    h.store.config = { asignacion_mesas_excluidas: [], estancia_comida_minutos: 120, estancia_cena_minutos: 120 };
+    montar({
+      ruta: DIA,
+      mesas: MESA_3,
+      reservas: [
+        reserva("r-a", "Ana", "14:00:00", 2),
+        reserva("r-b", "Blas", "15:00:00", 2),
+        reserva("r-c", "Carla", "16:00:00", 2),
+      ],
+      asignaciones: [{ id: "a1", reserva_id: "r-a", mesa_id: "m3" }],
+    });
+    await esperarReserva("Blas");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sentar a Blas" }));
+    expect(botonMesa("3")).toHaveAccessibleName(/no está libre a esa hora/);
+    fireEvent.click(botonMesa("3"));
+    await waitFor(() =>
+      expect(avisos("error").join(" ")).toMatch(/La mesa 3 está ocupada de 14:00 a 16:00 por Ana/),
+    );
+    expect(rpcDeAsignacion()).toHaveLength(0);
+
+    // Carla, a las 16:00, sí cabe: Ana la deja justo entonces.
+    fireEvent.click(screen.getByRole("button", { name: "Dejar de elegir mesa para Blas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sentar a Carla" }));
+    expect(botonMesa("3")).toHaveAccessibleName(/libre a esa hora/);
+    fireEvent.click(botonMesa("3"));
+    await waitFor(() => expect(mesasEnAlmacen("r-c")).toEqual(["m3"]));
+  });
+
+  it("Repartir en «Todo el día» da la misma mesa a la comida y a la cena", async () => {
+    montar({ ruta: DIA, mesas: MESA_3, reservas: OSCAR_Y_EZEQUIEL });
+    await esperarReserva("Ezequiel Vega");
+
+    fireEvent.click(screen.getByRole("button", { name: /Repartir/ }));
+
+    await waitFor(() => expect(rpcDeAsignacion()).toHaveLength(2));
+    expect(mesasEnAlmacen("r-oscar")).toEqual(["m3"]);
+    expect(mesasEnAlmacen("r-ezequiel")).toEqual(["m3"]);
+    await waitFor(() => expect(avisos("success").join(" ")).toMatch(/2 reservas sentadas/));
+  });
+
+  it("Repartir no pisa lo ya sentado a esa hora: la comida de las 16:30 sigue en la mesa a las 18:00", async () => {
+    montar({
+      ruta: DIA,
+      mesas: MESA_3,
+      reservas: [reserva("r-tarde", "Tarde", "16:30:00", 2), reserva("r-cena", "Cena pronto", "18:00:00", 2)],
+      asignaciones: [{ id: "a1", reserva_id: "r-tarde", mesa_id: "m3" }],
+    });
+    await esperarReserva("Cena pronto");
+
+    fireEvent.click(screen.getByRole("button", { name: /Repartir/ }));
+    await waitFor(() => expect(avisos("info").join(" ")).toMatch(/No quedan mesas libres a esas horas/));
+    expect(rpcDeAsignacion()).toHaveLength(0);
   });
 });

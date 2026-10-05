@@ -189,13 +189,18 @@ describe("ElegirMesaDialog + PlanoEspacio2D", () => {
     );
   });
 
-  it("una mesa que ya es de otra reserva se rechaza con el aviso de siempre y no se guarda nada", async () => {
+  it("una mesa que ya es de otra reserva a una hora que se pisa se rechaza, diciendo de quién y hasta cuándo", async () => {
     montar();
     const dialogo = await abierto();
 
     fireEvent.click(await botonMesa("Mesa 5"));
 
-    await waitFor(() => expect(avisos("error")).toEqual(["Mesa 5 ya es de Romero (21:15). Elige otra o quítasela primero."]));
+    // Romero 21:15 ocupa la mesa hasta las 23:15 (120 min de cena); Ana es a las 21:00.
+    await waitFor(() =>
+      expect(avisos("error")).toEqual([
+        "La mesa Mesa 5 está ocupada de 21:15 a 23:15 por Romero. Elige otra mesa o quítasela primero.",
+      ]),
+    );
     expect(h.almacen.llamadasRpc).toEqual([]);
     expect(within(dialogo).getByRole("button", { name: "Ahora no" })).toBeInTheDocument();
   });

@@ -105,6 +105,15 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
+import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
+import {
+  conflictoDeMesa,
+  franjaDeHora,
+  nombreCorto,
+  ocupacionesDeMesa,
+  textoFranja,
+  textoMesaOcupada,
+} from "@/lib/reservas/ocupacionMesa";
 import {
   useAsignacionesMesa,
   useAsignarMesasReserva,
@@ -122,13 +131,11 @@ import {
   horaEnFiltro,
   hoyLocal,
   mensajeErrorAsignacion,
-  mesaOcupadaPor,
   nombreMesasJuntas,
   OPCIONES_TURNO,
   plazasDeMesas,
   resumenCierreDia,
   turnoDeHora,
-  turnoParaConsulta,
   useReservasDeSala,
   type FiltroTurno,
   type ReservaSala,
@@ -168,7 +175,6 @@ import {
   Undo2,
   Link2,
   CircleDashed,
-  AlertTriangle,
   Armchair,
   SquarePen,
 } from "lucide-react";
@@ -520,12 +526,21 @@ function TarjetaReserva({
 
 // ─── Mesa del plano ──────────────────────────────────────────────────────────
 
+/** Una reserva sentada en una mesa (puede haber varias: a horas que no se pisan). */
+interface OcupanteMesa {
+  asignacion: AsignacionConDetalles;
+  /** La primera mesa del grupo de esa reserva lleva el cartel con el nombre; las demás, «Junta». */
+  esPrimeraDelGrupo: boolean;
+  mesasDelGrupo: number;
+  /** Quitarle las mesas a esa reserva (solo en la primera mesa del grupo). */
+  onQuitar?: () => void;
+}
+
 function MesaPlano({
   mesa,
   mesaOriginal,
-  asignacion,
-  esPrimeraDelGrupo,
-  mesasDelGrupo,
+  ocupantes,
+  motivoOcupada = null,
   elegida,
   noSeOfrece = false,
   modoAsignacion,
@@ -536,16 +551,20 @@ function MesaPlano({
   onDragStart,
   onSeleccionar,
   onAlternar,
-  onQuitarMesas,
   scale,
 }: {
   /** Mesa con coordenadas y tamaño YA en píxeles de pantalla. */
   mesa: Mesa;
   /** Mesa con los datos originales (metros / capacidad) para los callbacks. */
   mesaOriginal: Mesa;
-  asignacion?: AsignacionConDetalles;
-  esPrimeraDelGrupo: boolean;
-  mesasDelGrupo: number;
+  /** Quién la ocupa en el turno que se pinta, por orden de hora (vacío = nadie). */
+  ocupantes: OcupanteMesa[];
+  /**
+   * Solo mientras se sienta a alguien: por qué NO está libre a la hora de ESA
+   * reserva («La mesa 3 está ocupada de 14:00 a 16:00 por Oscar»), o `null` si
+   * lo está — aunque tenga otras reservas a otras horas.
+   */
+  motivoOcupada?: string | null;
   elegida: boolean;
   /**
    * Mesa excluida en Configuración (`asignacion_mesas_excluidas`): se pinta
@@ -560,7 +579,6 @@ function MesaPlano({
   onDragStart: (e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => void;
   onSeleccionar: (mesa: Mesa) => void;
   onAlternar: (mesa: Mesa) => void;
-  onQuitarMesas?: () => void;
   scale: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -572,8 +590,15 @@ function MesaPlano({
   const fontSize = Math.max(11, Math.min(14, minDimension * 0.18));
   const iconSize = Math.max(8, Math.min(12, minDimension * 0.12));
 
-  const ocupada = !!asignacion;
-  const ocupadaPorOtra = ocupada && !elegida;
+  // Fuera del modo asignación: ocupada = alguien la tiene en el turno que se
+  // pinta. Sentando a una reserva: ocupada = no está libre a SU hora (otra
+  // reserva a otra hora no la bloquea; ver `motivoOcupada`).
+  const hayOcupantes = ocupantes.length > 0;
+  const ocupadaPorOtra = modoAsignacion && !!motivoOcupada && !elegida;
+  const ocupada = modoAsignacion ? elegida || ocupadaPorOtra : hayOcupantes;
+  // Varios en la misma mesa → carteles compactos, uno por reserva.
+  const varios = ocupantes.length > 1;
+  const unico = ocupantes.length === 1 ? ocupantes[0] : null;
 
   // Encaje informativo mientras se está sentando a alguien. NO bloquea: una
   // mesa pequeña se marca "se queda corta" pero se puede elegir igual para
@@ -598,12 +623,24 @@ function MesaPlano({
   const hoverScale = isOver ? baseScale : 1;
   const hoverZIndex = isOver ? 100 : isDragging ? 60 : elegida || isSelected ? 30 : 10;
 
+  const quienes = ocupantes
+    .map((o) => `${o.asignacion.reservas.nombre} a las ${horaCorta(o.asignacion.reservas.hora)}`)
+    .join(" y por ");
   const estadoTexto =
     (elegida
       ? `elegida para ${reservaActivaNombre ?? "la reserva"}`
-      : asignacion
-        ? `ocupada por ${asignacion.reservas.nombre} a las ${horaCorta(asignacion.reservas.hora)}`
-        : "libre") + (noSeOfrece ? " · no se ofrece al asignar" : "");
+      : ocupadaPorOtra
+        ? hayOcupantes
+          ? `ocupada por ${quienes} · no está libre a esa hora`
+          : `ocupada a esa hora · ${motivoOcupada}`
+        : modoAsignacion && hayOcupantes
+          ? `libre a esa hora · también la usa ${quienes}`
+          : hayOcupantes
+            ? `ocupada por ${quienes}`
+            : "libre") + (noSeOfrece ? " · no se ofrece al asignar" : "");
+
+  // Sentando a alguien, los carteles de quien NO estorba a esa hora se atenúan.
+  const cartelAtenuado = modoAsignacion && !ocupadaPorOtra && !elegida;
 
   const manejarClic = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -707,16 +744,21 @@ function MesaPlano({
               {noSeOfrece && (
                 <p className="text-xs text-muted-foreground">No se ofrece al asignar (Configuración)</p>
               )}
-              {asignacion ? (
-                <div className="mt-1 border-t border-border pt-1">
-                  <p className="text-xs font-medium">{asignacion.reservas.nombre}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {horaCorta(asignacion.reservas.hora)} · {asignacion.reservas.numero_comensales} comensales
-                    {mesasDelGrupo > 1 && ` · ${mesasDelGrupo} mesas juntas`}
-                  </p>
-                </div>
+              {hayOcupantes ? (
+                ocupantes.map((o) => (
+                  <div key={o.asignacion.reserva_id} className="mt-1 border-t border-border pt-1">
+                    <p className="text-xs font-medium">{o.asignacion.reservas.nombre}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {horaCorta(o.asignacion.reservas.hora)} · {o.asignacion.reservas.numero_comensales} comensales
+                      {o.mesasDelGrupo > 1 && ` · ${o.mesasDelGrupo} mesas juntas`}
+                    </p>
+                  </div>
+                ))
               ) : (
                 <p className="text-xs text-muted-foreground">Libre</p>
+              )}
+              {motivoOcupada && !elegida && (
+                <p className="text-xs font-medium text-destructive">{motivoOcupada}</p>
               )}
             </div>
           </TooltipContent>
@@ -725,22 +767,25 @@ function MesaPlano({
 
       {/* Quién ocupa la mesa: nombre y hora legibles justo encima. Solo en la
           primera mesa del grupo, para que dos mesas juntas no repitan cartel. */}
-      {asignacion && esPrimeraDelGrupo && (
+      {unico && unico.esPrimeraDelGrupo && (
         <div
-          className="pointer-events-auto absolute left-1/2 z-20 min-w-max -translate-x-1/2 rounded-md bg-emerald-600 px-2 py-1 text-white shadow-lg"
+          className={cn(
+            "pointer-events-auto absolute left-1/2 z-20 min-w-max -translate-x-1/2 rounded-md bg-emerald-600 px-2 py-1 text-white shadow-lg",
+            cartelAtenuado && "opacity-60",
+          )}
           style={{ top: -34, maxWidth: Math.max(130, mesaWidth * 1.6) }}
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          {onQuitarMesas && (
+          {unico.onQuitar && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onQuitarMesas();
+                unico.onQuitar?.();
               }}
-              aria-label={`Liberar las mesas de ${asignacion.reservas.nombre}`}
+              aria-label={`Liberar las mesas de ${unico.asignacion.reservas.nombre}`}
               title="Quitar mesas"
               // Zona de 44x44 px alrededor de una X visible de 20 px.
               className="absolute -right-5 -top-5 z-30 flex h-11 w-11 items-center justify-center touch-manipulation"
@@ -751,18 +796,18 @@ function MesaPlano({
             </button>
           )}
           <p className="pointer-events-none truncate text-center text-xs font-semibold leading-tight">
-            {asignacion.reservas.nombre}
+            {unico.asignacion.reservas.nombre}
           </p>
           <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[11px] opacity-95 tabular-nums">
-            <span>{horaCorta(asignacion.reservas.hora)}</span>
+            <span>{horaCorta(unico.asignacion.reservas.hora)}</span>
             <span>·</span>
-            <span>{asignacion.reservas.numero_comensales} pax</span>
-            {mesasDelGrupo > 1 && (
+            <span>{unico.asignacion.reservas.numero_comensales} pax</span>
+            {unico.mesasDelGrupo > 1 && (
               <>
                 <span>·</span>
                 <span className="flex items-center gap-0.5">
                   <Link2 className="h-2.5 w-2.5" />
-                  {mesasDelGrupo}
+                  {unico.mesasDelGrupo}
                 </span>
               </>
             )}
@@ -771,12 +816,42 @@ function MesaPlano({
       )}
 
       {/* Mesas juntas que no llevan cartel: se marca que son parte de un grupo */}
-      {asignacion && !esPrimeraDelGrupo && (
+      {unico && !unico.esPrimeraDelGrupo && (
         <div
-          className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[11px] font-semibold text-white shadow"
+          className={cn(
+            "pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[11px] font-semibold text-white shadow",
+            cartelAtenuado && "opacity-60",
+          )}
           style={{ top: -18 }}
         >
           Junta
+        </div>
+      )}
+
+      {/* Varias reservas en la misma mesa (a horas que no se pisan): un cartel
+          compacto por reserva, «14:00 Oscar» / «20:30 Ezequiel», por orden de
+          hora. Sin X aquí (dos zonas de 44 px se pisarían): se quitan desde su
+          fila del panel o con «Quitar mesas». */}
+      {varios && (
+        <div
+          className={cn(
+            "pointer-events-none absolute left-1/2 z-20 flex min-w-max -translate-x-1/2 flex-col gap-0.5",
+            cartelAtenuado && "opacity-60",
+          )}
+          style={{ top: -(ocupantes.length * 21 + 6) }}
+          data-ocupantes-mesa={mesaOriginal.id}
+        >
+          {ocupantes.map((o) => (
+            <div
+              key={o.asignacion.reserva_id}
+              className="flex items-center justify-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-white shadow tabular-nums"
+              title={`${o.asignacion.reservas.nombre} · ${horaCorta(o.asignacion.reservas.hora)} · ${o.asignacion.reservas.numero_comensales} pax`}
+            >
+              <span>{horaCorta(o.asignacion.reservas.hora)}</span>
+              <span className="max-w-[7rem] truncate">{nombreCorto(o.asignacion.reservas.nombre)}</span>
+              {o.mesasDelGrupo > 1 && <Link2 className="h-2.5 w-2.5 shrink-0" aria-hidden="true" />}
+            </div>
+          ))}
         </div>
       )}
 
@@ -1002,13 +1077,11 @@ export function PlanoEspacio2D({
   // ── Datos ─────────────────────────────────────────────────────────────────
   const { data: mesas, isLoading: loadingMesas } = useMesas(espacioId);
   const { data: plano } = usePlanoEspacio(espacioId);
-  // El turno se le pasa AL HOOK (tercer parámetro): el filtrado por turno lo
-  // hace él con la misma regla del SQL, así que aquí no se repite.
-  const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(
-    fechaSel,
-    espacioId,
-    turnoParaConsulta(filtroTurno),
-  );
+  // Las asignaciones del DÍA ENTERO, sin recortar al turno: desde el
+  // 05/10/2026 una mesa se ocupa por franjas de tiempo ([hora, hora + tiempo de
+  // ocupación)), y una comida de las 16:30 sigue ocupando la mesa a las 18:00.
+  // Lo que se PINTA sí se recorta al turno elegido (`asignacionesTurno`).
+  const { data: asignaciones, refetch: refetchAsignaciones } = useAsignacionesMesa(fechaSel, espacioId);
   const { data: reservasDia } = useReservasDeSala(espacioId, fechaSel);
 
   const crearMesa = useCrearMesa();
@@ -1023,6 +1096,9 @@ export function PlanoEspacio2D({
     () => new Set(configAsignacionDesde(configReservas).mesasExcluidas),
     [configReservas],
   );
+  // «Tiempo de ocupación de mesa» (Configuración): cuánto ocupa la mesa cada
+  // reserva según su turno. Decide si una mesa está libre PARA una reserva.
+  const configOcupacion = useMemo(() => configServicioSalaDesde(configReservas), [configReservas]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1037,18 +1113,47 @@ export function PlanoEspacio2D({
     [reservasDia, filtroTurno],
   );
 
-  // Ya vienen recortadas al turno por `useAsignacionesMesa`. Se conserva el
-  // nombre para que quede claro a qué servicio pertenece lo que se pinta.
-  const asignacionesTurno = useMemo(() => asignaciones ?? [], [asignaciones]);
+  // Todas las del día: con ellas se decide si una mesa está libre para una
+  // reserva concreta (por su franja).
+  const asignacionesDia = useMemo(() => asignaciones ?? [], [asignaciones]);
+  // Las del turno elegido: lo que se pinta (carteles, contadores, panel).
+  const asignacionesTurno = useMemo(
+    () => asignacionesDia.filter((a) => horaEnFiltro(a.reservas?.hora ?? "", filtroTurno)),
+    [asignacionesDia, filtroTurno],
+  );
 
   const mesasPorId = useMemo(() => new Map(localMesas.map((m) => [m.id, m])), [localMesas]);
   const asignacionesPorReserva = useMemo(() => agruparPorReserva(asignacionesTurno), [asignacionesTurno]);
 
-  /** Primera asignación de cada mesa en el turno (la que lleva el cartel). */
-  const asignacionDeMesa = useCallback(
-    (mesaId: string): AsignacionConDetalles | undefined =>
-      asignacionesTurno.find((a) => a.mesa_id === mesaId),
-    [asignacionesTurno],
+  /**
+   * Quién ocupa cada mesa en el turno elegido, por orden de hora. Con «Todo el
+   * día» puede haber varias reservas en una mesa («14:00 Oscar · 20:30
+   * Ezequiel»), y también dentro de un turno si sus horas no se pisan.
+   */
+  const ocupacionesPorMesa = useMemo(() => {
+    const mapa = new Map<string, AsignacionConDetalles[]>();
+    for (const id of new Set(asignacionesTurno.map((a) => a.mesa_id))) {
+      mapa.set(id, ocupacionesDeMesa(asignacionesTurno, id));
+    }
+    return mapa;
+  }, [asignacionesTurno]);
+
+  const ocupantesDeMesa = useCallback(
+    (mesaId: string): AsignacionConDetalles[] => ocupacionesPorMesa.get(mesaId) ?? [],
+    [ocupacionesPorMesa],
+  );
+
+  /**
+   * ¿Puede `reserva` usar esta mesa? Devuelve la frase de por qué no («La mesa
+   * 3 está ocupada de 14:00 a 16:00 por Oscar») o `null` si está libre a SU
+   * hora. Mira el día entero, no solo el turno que se pinta.
+   */
+  const motivoMesaOcupada = useCallback(
+    (mesa: { id: string; nombre: string }, reserva: { id: string; hora: string }): string | null => {
+      const conflicto = conflictoDeMesa(asignacionesDia, mesa.id, reserva, configOcupacion);
+      return conflicto ? textoMesaOcupada(mesa.nombre, conflicto) : null;
+    },
+    [asignacionesDia, configOcupacion],
   );
 
   const mesaIdsDe = useCallback(
@@ -1074,10 +1179,7 @@ export function PlanoEspacio2D({
     [reservasTurno, asignacionesPorReserva],
   );
 
-  const mesasOcupadas = useMemo(
-    () => new Set(asignacionesTurno.map((a) => a.mesa_id)).size,
-    [asignacionesTurno],
-  );
+  const mesasOcupadas = ocupacionesPorMesa.size;
 
   const reservasPendientes = useMemo(
     () => reservasTurno.filter((r) => mesaIdsDe(r.id).length === 0),
@@ -1343,18 +1445,17 @@ export function PlanoEspacio2D({
       }
 
       // Cortesía: avisar antes de gastar un viaje al servidor. La comprobación
-      // de verdad la hace la base de datos (ver cabecera del fichero).
-      const ocupada = mesaOcupadaPor(asignacionesTurno, mesa.id, reservaActiva.id);
-      if (ocupada) {
-        toast.error(
-          `${mesa.nombre} ya es de ${ocupada.reservas.nombre} (${horaCorta(ocupada.reservas.hora)}). Elige otra o quítasela primero.`,
-        );
+      // de verdad la hace la base de datos (ver cabecera del fichero). Libre u
+      // ocupada se decide por la FRANJA de esta reserva, no por el turno.
+      const motivo = motivoMesaOcupada(mesa, reservaActiva);
+      if (motivo) {
+        toast.error(`${motivo}. Elige otra mesa o quítasela primero.`);
         return;
       }
 
       void guardarMesas(reservaActiva, [...actuales, mesa.id]);
     },
-    [reservaActiva, mesaIdsDe, asignacionesTurno, guardarMesas, pedirQuitarMesas, mesasPorId],
+    [reservaActiva, mesaIdsDe, motivoMesaOcupada, guardarMesas, pedirQuitarMesas, mesasPorId],
   );
 
   const seleccionarMesa = useCallback((mesa: Mesa) => setSelectedMesa(mesa), []);
@@ -1386,11 +1487,9 @@ export function PlanoEspacio2D({
       return;
     }
 
-    const ocupada = mesaOcupadaPor(asignacionesTurno, mesa.id, reserva.id);
-    if (ocupada) {
-      toast.error(
-        `${mesa.nombre} ya es de ${ocupada.reservas.nombre} (${horaCorta(ocupada.reservas.hora)}). Elige otra o quítasela primero.`,
-      );
+    const motivo = motivoMesaOcupada(mesa, reserva);
+    if (motivo) {
+      toast.error(`${motivo}. Elige otra mesa o quítasela primero.`);
       return;
     }
 
@@ -1878,7 +1977,8 @@ export function PlanoEspacio2D({
       });
 
       localMesas.forEach((mesa) => {
-        const asignacion = asignacionDeMesa(mesa.id);
+        const ocupantes = ocupantesDeMesa(mesa.id);
+        const asignacion = ocupantes[0];
         const posXPixels = (mesa.pos_x || 0) * PIXELS_PER_METER - offsetX;
         const posYPixels = (mesa.pos_y || 0) * PIXELS_PER_METER - offsetY;
         const anchoPixels = ((mesa.ancho || 80) / 100) * PIXELS_PER_METER;
@@ -1911,7 +2011,7 @@ export function PlanoEspacio2D({
           const cardDiv = document.createElement("div");
           cardDiv.style.position = "absolute";
           cardDiv.style.left = `${posXPixels + anchoPixels / 2}px`;
-          cardDiv.style.top = `${posYPixels - 45}px`;
+          cardDiv.style.top = `${posYPixels - 45 - (ocupantes.length - 1) * 16}px`;
           cardDiv.style.transform = "translateX(-50%)";
           cardDiv.style.backgroundColor = "#16a34a";
           cardDiv.style.color = "white";
@@ -1925,18 +2025,29 @@ export function PlanoEspacio2D({
           cardDiv.style.lineHeight = "1.3";
           cardDiv.style.minWidth = "80px";
 
-          const nameSpan = document.createElement("div");
-          nameSpan.style.fontWeight = "700";
-          nameSpan.style.fontSize = "12px";
-          nameSpan.textContent = asignacion.reservas.nombre || "Sin nombre";
+          if (ocupantes.length > 1) {
+            // Varias reservas en la misma mesa (a horas que no se pisan): una
+            // línea por reserva, «14:00 Oscar · 3 pers.».
+            for (const ocupante of ocupantes) {
+              const linea = document.createElement("div");
+              linea.style.fontSize = "11px";
+              linea.textContent = `${horaCorta(ocupante.reservas.hora)} ${nombreCorto(ocupante.reservas.nombre)} · ${ocupante.reservas.numero_comensales} pers.`;
+              cardDiv.appendChild(linea);
+            }
+          } else {
+            const nameSpan = document.createElement("div");
+            nameSpan.style.fontWeight = "700";
+            nameSpan.style.fontSize = "12px";
+            nameSpan.textContent = asignacion.reservas.nombre || "Sin nombre";
 
-          const infoSpan = document.createElement("div");
-          infoSpan.style.fontSize = "10px";
-          infoSpan.style.opacity = "0.9";
-          infoSpan.textContent = `${horaCorta(asignacion.reservas.hora)} · ${asignacion.reservas.numero_comensales} pers.`;
+            const infoSpan = document.createElement("div");
+            infoSpan.style.fontSize = "10px";
+            infoSpan.style.opacity = "0.9";
+            infoSpan.textContent = `${horaCorta(asignacion.reservas.hora)} · ${asignacion.reservas.numero_comensales} pers.`;
 
-          cardDiv.appendChild(nameSpan);
-          cardDiv.appendChild(infoSpan);
+            cardDiv.appendChild(nameSpan);
+            cardDiv.appendChild(infoSpan);
+          }
           contentDiv.appendChild(cardDiv);
         }
       });
@@ -2082,20 +2193,31 @@ export function PlanoEspacio2D({
   const handleCalcularDistribucion = async () => {
     if (repartiendo) return;
 
-    const mesasLibres = localMesas
-      .filter((m) => m.activa !== false && !asignacionDeMesa(m.id) && !mesasNoOfrecidas.has(m.id))
+    // Candidatas: activas y que se ofrecen. Quién está libre A CADA HORA lo
+    // decide el reparto con las franjas (lo ya sentado del día entero + lo que
+    // va proponiendo): una mesa puede servir a la comida y a la cena, o a dos
+    // reservas del mismo turno que no se pisen.
+    const mesasCandidatas = localMesas
+      .filter((m) => m.activa !== false && !mesasNoOfrecidas.has(m.id))
       .map((m) => ({ id: m.id, nombre: m.nombre, capacidad: m.capacidad }));
+
+    const ocupaciones = asignacionesDia.flatMap((a) => {
+      const franja = franjaDeHora(a.reservas?.hora ?? "", configOcupacion);
+      return franja ? [{ mesa_id: a.mesa_id, franja }] : [];
+    });
 
     const { propuestas, sinHueco } = calcularDistribucionMesas({
       reservas: reservasPendientes,
-      mesasLibres,
+      mesasLibres: mesasCandidatas,
+      franjaDe: (r) => franjaDeHora(r.hora, configOcupacion),
+      ocupaciones,
     });
 
     if (propuestas.length === 0) {
       toast.info(
         reservasPendientes.length === 0
-          ? "No hay reservas pendientes de mesa en este turno."
-          : "No quedan mesas libres que cubran las reservas pendientes.",
+          ? `No hay reservas pendientes de mesa en ${etiquetaFiltroTurno(filtroTurno).toLowerCase()}.`
+          : "No quedan mesas libres a esas horas que cubran las reservas pendientes.",
       );
       return;
     }
@@ -2142,8 +2264,8 @@ export function PlanoEspacio2D({
     if (sinHueco.length > 0) {
       toast.warning(
         sinHueco.length === 1
-          ? `${sinHueco[0].nombre} se queda pendiente de mesa: no hay mesas libres que la cubran.`
-          : `${sinHueco.length} reservas se quedan pendientes de mesa: no hay mesas libres que las cubran.`,
+          ? `${sinHueco[0].nombre} se queda pendiente de mesa: no hay mesas libres a su hora que la cubran.`
+          : `${sinHueco.length} reservas se quedan pendientes de mesa: no hay mesas libres a su hora que las cubran.`,
         { duration: 9000 },
       );
     }
@@ -2363,8 +2485,8 @@ export function PlanoEspacio2D({
               disabled={repartiendo || reservasPendientes.length === 0}
               title={
                 reservasPendientes.length === 0
-                  ? "No hay reservas pendientes de mesa en este turno"
-                  : `Repartir mesas entre las ${reservasPendientes.length} reservas pendientes`
+                  ? `No hay reservas pendientes de mesa en ${etiquetaFiltroTurno(filtroTurno).toLowerCase()}`
+                  : `Repartir mesas entre las ${reservasPendientes.length} reservas pendientes (a horas que no se pisen)`
               }
             >
               <Wand2 className="mr-2 h-4 w-4" />
@@ -2515,10 +2637,14 @@ export function PlanoEspacio2D({
         </Card>
 
         {filtroTurno === "dia" && (
-          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
-            Estás viendo <strong className="font-medium text-foreground">los dos servicios a la vez</strong>: una
-            misma mesa puede salir ocupada por la comida y por la cena. Elige Comida o Cena para repartir.
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground" data-testid="aviso-todo-el-dia">
+            <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Estás viendo <strong className="font-medium text-foreground">los dos servicios a la vez</strong>: cada
+              mesa dice quién la ocupa y a qué hora. Una mesa vale para varias reservas si no se pisan: cada una la
+              ocupa {configOcupacion.estanciaComidaMinutos} min en comida y {configOcupacion.estanciaCenaMinutos} min
+              en cena (Configuración → Tiempo de ocupación de mesa).
+            </span>
           </p>
         )}
 
@@ -2640,13 +2766,22 @@ export function PlanoEspacio2D({
                   {elementosPlano.map((elem) => renderElementoPlano(elem))}
 
                   {localMesas.map((mesa) => {
-                    const asignacion = asignacionDeMesa(mesa.id);
-                    const mesasDelGrupo = asignacion
-                      ? (asignacionesPorReserva.get(asignacion.reserva_id) ?? []).length
-                      : 0;
-                    const esPrimeraDelGrupo = asignacion
-                      ? (asignacionesPorReserva.get(asignacion.reserva_id) ?? [])[0]?.mesa_id === mesa.id
-                      : false;
+                    const ocupantes = ocupantesDeMesa(mesa.id).map((asignacion) => {
+                      const grupo = asignacionesPorReserva.get(asignacion.reserva_id) ?? [];
+                      const esPrimeraDelGrupo = grupo[0]?.mesa_id === mesa.id;
+                      return {
+                        asignacion,
+                        esPrimeraDelGrupo,
+                        mesasDelGrupo: grupo.length,
+                        onQuitar: esPrimeraDelGrupo
+                          ? () => {
+                              const reserva = (reservasDia ?? []).find((r) => r.id === asignacion.reserva_id);
+                              if (reserva) pedirQuitarMesas(reserva);
+                            }
+                          : undefined,
+                      };
+                    });
+                    const elegida = mesaIdsActivos.includes(mesa.id);
 
                     return (
                       <MesaPlano
@@ -2659,10 +2794,9 @@ export function PlanoEspacio2D({
                           alto: ((mesa.alto || 80) / 100) * PIXELS_PER_METER * scale,
                         }}
                         mesaOriginal={mesa}
-                        asignacion={asignacion}
-                        esPrimeraDelGrupo={esPrimeraDelGrupo}
-                        mesasDelGrupo={mesasDelGrupo}
-                        elegida={mesaIdsActivos.includes(mesa.id)}
+                        ocupantes={ocupantes}
+                        motivoOcupada={reservaActiva && !elegida ? motivoMesaOcupada(mesa, reservaActiva) : null}
+                        elegida={elegida}
                         noSeOfrece={mesasNoOfrecidas.has(mesa.id)}
                         modoAsignacion={!!reservaActiva}
                         reservaActivaNombre={reservaActiva?.nombre}
@@ -2672,16 +2806,6 @@ export function PlanoEspacio2D({
                         onDragStart={handleMesaDragStart}
                         onSeleccionar={seleccionarMesa}
                         onAlternar={alternarMesa}
-                        onQuitarMesas={
-                          asignacion && esPrimeraDelGrupo
-                            ? () => {
-                                const reserva = (reservasDia ?? []).find(
-                                  (r) => r.id === asignacion.reserva_id,
-                                );
-                                if (reserva) pedirQuitarMesas(reserva);
-                              }
-                            : undefined
-                        }
                         scale={scale}
                       />
                     );
@@ -2796,8 +2920,8 @@ export function PlanoEspacio2D({
                   </div>
 
                   {(() => {
-                    const asignacion = asignacionDeMesa(selectedMesa.id);
-                    if (!asignacion) {
+                    const ocupantes = ocupantesDeMesa(selectedMesa.id);
+                    if (ocupantes.length === 0) {
                       return (
                         <p className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
                           Libre en {etiquetaFiltroTurno(filtroTurno).toLowerCase()}.
@@ -2807,17 +2931,26 @@ export function PlanoEspacio2D({
                     return (
                       <div className="rounded-lg bg-emerald-50 p-2.5 dark:bg-emerald-950/40">
                         <p className="text-xs font-medium text-muted-foreground">Ocupada por</p>
-                        <p className="truncate text-sm font-semibold">{asignacion.reservas.nombre}</p>
-                        <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {horaCorta(asignacion.reservas.hora)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {asignacion.reservas.numero_comensales}
-                          </span>
-                        </div>
+                        <ul className="mt-0.5 space-y-1">
+                          {ocupantes.map((asignacion) => {
+                            const franja = franjaDeHora(asignacion.reservas.hora, configOcupacion);
+                            return (
+                              <li key={asignacion.reserva_id}>
+                                <p className="truncate text-sm font-semibold">{asignacion.reservas.nombre}</p>
+                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {franja ? textoFranja(franja) : horaCorta(asignacion.reservas.hora)}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    {asignacion.reservas.numero_comensales}
+                                  </span>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     );
                   })()}

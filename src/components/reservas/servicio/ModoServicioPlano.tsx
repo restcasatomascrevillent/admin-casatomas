@@ -548,7 +548,7 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
 
       <Separator />
       <p className="text-xs text-muted-foreground">
-        Estimaciones configurables en Configuración de reservas → "Modo servicio". Estancia comida: {config.estanciaComidaMinutos} min ·
+        Estimaciones configurables en Configuración de reservas → «Tiempo de ocupación de mesa». Comida: {config.estanciaComidaMinutos} min ·
         cena: {config.estanciaCenaMinutos} min · margen de retraso: {config.retrasoGraciaMinutos} min.
       </p>
 

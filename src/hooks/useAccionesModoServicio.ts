@@ -9,8 +9,8 @@ import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 // ----------------------------------------------------------------------------
 // "Ha llegado" (antes «Sentar»: marcar llegada) reutiliza `useAccionesServicioReserva.marcarLlegada`
 // tal cual — no hay nada de servicio-específico ahí. "Mover a otra mesa"
-// reutiliza `useAsignarMesasReserva` (RPC atómico, ya valida el
-// `uq_asignaciones_mesa_mesa_fecha_turno` en servidor). Lo que SÍ es propio de
+// reutiliza `useAsignarMesasReserva` (RPC atómico; el servidor valida que la
+// mesa no la tenga otra reserva en una franja de tiempo que se pise, 20261005130000). Lo que SÍ es propio de
 // esta pantalla es "Liberar" / "Deshacer liberar": tocan `reservas.salida_at`,
 // una columna que no existía antes de esta fase.
 //

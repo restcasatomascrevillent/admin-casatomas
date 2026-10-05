@@ -415,11 +415,22 @@ export function ConfiguracionGeneralReservas() {
 
             <Separator />
 
-            {/* Modo servicio (Fase 4): umbrales de tiempo del plano en vivo */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                Modo servicio (plano en vivo)
+            {/* Tiempo de ocupación de mesa (05/10/2026). Son las mismas columnas que
+                la «estancia estimada» del modo servicio (estancia_comida_minutos /
+                estancia_cena_minutos): una reserva ocupa su mesa de su hora a hora +
+                este tiempo, y la mesa se puede dar a otra reserva fuera de esa franja
+                (lo comprueba la base de datos, migración 20261005130000). */}
+            <div className="space-y-4" data-testid="ajuste-ocupacion-mesa">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Timer className="h-4 w-4 text-muted-foreground" />
+                  Tiempo de ocupación de mesa
+                </div>
+                <p className="pl-6 text-sm text-muted-foreground">
+                  Cuánto ocupa la mesa cada reserva desde su hora. Una misma mesa se puede dar a varias reservas del
+                  día si no se pisan: con 120 min, la de las 14:00 la deja libre a las 16:00. También marca en el
+                  modo servicio cuándo una mesa está «por liberar».
+                </p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
                 <FormField
@@ -429,10 +440,11 @@ export function ConfiguracionGeneralReservas() {
                     <FormItem>
                       <FormLabel className="flex items-center gap-1.5">
                         <UtensilsCrossed className="h-3.5 w-3.5" />
-                        Estancia estimada · Comida
+                        Ocupación de mesa · Comida
                       </FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-2">
+                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                      <div className="flex items-center gap-2">
+                        <FormControl>
                           <Input
                             type="number" inputMode="numeric"
                             min={15}
@@ -441,11 +453,11 @@ export function ConfiguracionGeneralReservas() {
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
                           />
-                          <span className="text-sm text-muted-foreground">minutos</span>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <span className="text-sm text-muted-foreground">minutos</span>
+                      </div>
                       <FormDescription>
-                        Pasado este tiempo desde que se sentó, el plano marca la mesa como "por liberar"
+                        Reservas antes de las 17:00. Por defecto, 105 minutos
                       </FormDescription>
                     </FormItem>
                   )}
@@ -457,10 +469,11 @@ export function ConfiguracionGeneralReservas() {
                     <FormItem>
                       <FormLabel className="flex items-center gap-1.5">
                         <UtensilsCrossed className="h-3.5 w-3.5" />
-                        Estancia estimada · Cena
+                        Ocupación de mesa · Cena
                       </FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-2">
+                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                      <div className="flex items-center gap-2">
+                        <FormControl>
                           <Input
                             type="number" inputMode="numeric"
                             min={15}
@@ -469,15 +482,27 @@ export function ConfiguracionGeneralReservas() {
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
                           />
-                          <span className="text-sm text-muted-foreground">minutos</span>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <span className="text-sm text-muted-foreground">minutos</span>
+                      </div>
                       <FormDescription>
-                        Las cenas suelen alargarse más que las comidas: por eso es un valor aparte
+                        Desde las 17:00. Las cenas suelen alargarse más: por defecto, 120 minutos
                       </FormDescription>
                     </FormItem>
                   )}
                 />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Modo servicio (Fase 4): umbral de retraso del plano en vivo */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Timer className="h-4 w-4 text-muted-foreground" />
+                Modo servicio (plano en vivo)
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
                 <FormField
                   control={form.control}
                   name="retraso_gracia_minutos"
@@ -487,8 +512,9 @@ export function ConfiguracionGeneralReservas() {
                         <Clock className="h-3.5 w-3.5" />
                         Margen antes de marcar retraso
                       </FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-2">
+                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                      <div className="flex items-center gap-2">
+                        <FormControl>
                           <Input
                             type="number" inputMode="numeric"
                             min={0}
@@ -497,9 +523,9 @@ export function ConfiguracionGeneralReservas() {
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                           />
-                          <span className="text-sm text-muted-foreground">minutos</span>
-                        </div>
-                      </FormControl>
+                        </FormControl>
+                        <span className="text-sm text-muted-foreground">minutos</span>
+                      </div>
                       <FormDescription>
                         Minutos tras la hora de la reserva antes de que el plano la pinte "retrasada". No cancela ni modifica la reserva.
                       </FormDescription>

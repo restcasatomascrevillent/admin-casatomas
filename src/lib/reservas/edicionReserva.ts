@@ -32,7 +32,7 @@
 // (desfasado tras aplicar 20260930212000)
 // ============================================================================
 import { format } from "date-fns";
-import { ESTADOS_QUE_OCUPAN, turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad";
+import { ESTADOS_QUE_OCUPAN } from "../../../supabase/functions/_shared/disponibilidad";
 // La regla del canal que no recibe «solicitud recibida» (la web) vive en la Edge
 // Function; se importa la misma para que panel y servidor no puedan divergir.
 import { debeEnviarSolicitudRecibida } from "../../../supabase/functions/emails-reserva/plantillas";
@@ -573,17 +573,24 @@ export function enlaceQuedaRoto(
  * Qué hace la BD con las mesas de la reserva al guardar (trigger
  * `trg_reservas_sincronizar_asignaciones`), para avisarlo ANTES de guardar:
  *   · "quita": cambia la sala → se borran sus mesas;
- *   · "mueve": cambia el día o el turno (corte 17:00) → la mesa se mantiene si
- *     está libre ese día y turno; si no, la reserva se queda pendiente de mesa;
- *   · null: cambiar la hora dentro del mismo turno, los comensales o los datos
- *     de contacto no toca las mesas.
+ *   · "mueve": cambia el día o la HORA → la mesa se mantiene si sigue libre a
+ *     esa hora (desde 20261005130000 la mesa se ocupa por franjas de tiempo:
+ *     [hora, hora + tiempo de ocupación), así que también un cambio de hora
+ *     dentro del mismo turno puede chocar con otra reserva de esa mesa); si no,
+ *     la reserva se queda pendiente de mesa;
+ *   · null: cambiar los comensales o los datos de contacto no toca las mesas.
  */
 export type EfectoEnMesas = "quita" | "mueve" | null;
+
+/** 'HH:MM' de una hora 'HH:MM[:SS]' (para comparar sin que los segundos digan «cambio»). */
+function horaHHMM(hora: unknown): string {
+  return String(hora ?? "").trim().slice(0, 5);
+}
 
 export function efectoEnMesas(original: ReservaEditable, cambios: CambiosReserva): EfectoEnMesas {
   if ("espacio_id" in cambios) return "quita";
   if ("fecha" in cambios) return "mueve";
-  if ("hora" in cambios && turnoDeHora(cambios.hora as string) !== turnoDeHora(original.hora)) return "mueve";
+  if ("hora" in cambios && horaHHMM(cambios.hora) !== horaHHMM(original.hora)) return "mueve";
   return null;
 }
 

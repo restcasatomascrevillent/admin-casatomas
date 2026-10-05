@@ -1291,7 +1291,7 @@ describe("FormularioReserva · edición · sala, importante y mesa", () => {
     expect(bd.update.mock.calls[0][0]).toEqual({ espacio_id: "terraza" });
   });
 
-  it("con mesa asignada, cambiar de turno avisa de que la mesa se mantiene solo si está libre", async () => {
+  it("con mesa asignada, cambiar la hora avisa de que la mesa se mantiene solo si sigue libre a esa hora", async () => {
     prepararBD();
     montar({}, { mesasAsignadas: ["Mesa 4"] });
 
@@ -1299,7 +1299,7 @@ describe("FormularioReserva · edición · sala, importante y mesa", () => {
     fireEvent.click(screen.getByRole("button", { name: "elegir 13:00" }));
 
     const aviso = await screen.findByText(/tiene mesa asignada \(Mesa 4\)/);
-    expect(aviso.textContent).toMatch(/si está libre/);
+    expect(aviso.textContent).toMatch(/si sigue libre a esa hora/);
     expect(aviso.textContent).toMatch(/pendiente de mesa/);
   });
 

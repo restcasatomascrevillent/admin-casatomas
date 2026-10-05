@@ -24,6 +24,7 @@ import {
   turnoParaConsulta,
   calcularDistribucionMesas,
 } from "@/components/reservas/asignacionPlano";
+import { franjaDeHora } from "@/lib/reservas/ocupacionMesa";
 
 // ─── Filtro de turno ─────────────────────────────────────────────────────────
 
@@ -347,5 +348,64 @@ describe("calcularDistribucionMesas", () => {
     expect(propuestas[0].reserva.id).toBe("a");
     expect(propuestas[0].mesaIds).toEqual(["m-M2"]);
     expect(sinHueco).toEqual([]);
+  });
+});
+
+// ─── Reparto con ocupación por tiempo (05/10/2026) ───────────────────────────
+
+describe("calcularDistribucionMesas · franjas de tiempo", () => {
+  const reserva = (id: string, comensales: number, hora: string) => ({
+    id,
+    nombre: `Reserva ${id}`,
+    hora,
+    numero_comensales: comensales,
+    estado: "confirmada",
+    espacio_id: "sala-1",
+  });
+  const mesa = (nombre: string, capacidad: number) => ({ id: `m-${nombre}`, nombre, capacidad });
+  const config120 = { estanciaComidaMinutos: 120, estanciaCenaMinutos: 120 };
+  const franjaDe = (r: { hora: string }) => franjaDeHora(r.hora, config120);
+
+  it("«Todo el día»: la misma mesa sirve a la comida y a la cena", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("oscar", 3, "14:00:00"), reserva("ezequiel", 2, "20:30:00")],
+      mesasLibres: [mesa("3", 4)],
+      franjaDe,
+    });
+    expect(sinHueco).toEqual([]);
+    expect(propuestas.map((p) => [p.reserva.id, p.mesaIds])).toEqual([
+      ["oscar", ["m-3"]],
+      ["ezequiel", ["m-3"]],
+    ]);
+  });
+
+  it("dentro del mismo turno, solo si no se pisan (14:00 y 16:00 sí; 14:00 y 15:00 no)", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("a", 2, "14:00:00"), reserva("b", 2, "15:00:00"), reserva("c", 2, "16:00:00")],
+      mesasLibres: [mesa("3", 2)],
+      franjaDe,
+    });
+    expect(propuestas.map((p) => p.reserva.id).sort()).toEqual(["a", "c"]);
+    expect(sinHueco.map((r) => r.id)).toEqual(["b"]);
+  });
+
+  it("respeta lo ya sentado: una mesa ocupada a esa hora no se ofrece, a otra hora sí", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("tarde", 2, "15:00:00"), reserva("cena", 2, "21:00:00")],
+      mesasLibres: [mesa("3", 2)],
+      franjaDe,
+      ocupaciones: [{ mesa_id: "m-3", franja: { inicio: 14 * 60, fin: 16 * 60 } }],
+    });
+    expect(propuestas.map((p) => p.reserva.id)).toEqual(["cena"]);
+    expect(sinHueco.map((r) => r.id)).toEqual(["tarde"]);
+  });
+
+  it("sin franjas se comporta como antes: una reserva por mesa", () => {
+    const { propuestas, sinHueco } = calcularDistribucionMesas({
+      reservas: [reserva("comida", 2, "14:00:00"), reserva("cena", 2, "21:00:00")],
+      mesasLibres: [mesa("3", 2)],
+    });
+    expect(propuestas).toHaveLength(1);
+    expect(sinHueco).toHaveLength(1);
   });
 });
