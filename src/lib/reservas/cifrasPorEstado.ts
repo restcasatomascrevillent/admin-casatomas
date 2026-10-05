@@ -43,7 +43,7 @@
 // `estado: "all"`. Nada de repetir aquí la lógica de búsqueda o canal: si cambia
 // allí, cambia aquí.
 //
-// LA CIFRA DEL BOTÓN «PENDIENTES» (2026-10-05): `cifraPorAtender`
+// LA CIFRA DEL BOTÓN «POR ATENDER» (2026-10-05): `cifraPorAtender`
 // ----------------------------------------------------------------------------
 //   Se cuenta igual que las del timeline —la lista con sus filtros MENOS el de
 //   estado— y es justo el número de filas que la lista enseña al pulsar el botón:
@@ -123,7 +123,7 @@ export function cifrasDeLaLista<R extends ReservaListable>(
 }
 
 /**
- * La cifra del botón «Pendientes» de la Lista: las filas que la lista enseña al
+ * La cifra del botón «Por atender» de la Lista: las filas que la lista enseña al
  * pulsarlo (reservas `pendiente` + solicitudes sin resolver), con sus filtros
  * (búsqueda, fecha, canal) y SIN el de estado (`filtros.estado` se ignora). Como
  * en la lista, lo que no es de Casa Tomás no entra. No toca lo que recibe.

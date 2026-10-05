@@ -104,14 +104,14 @@ describe("filtrarFilasUnificadas", () => {
     expect(ids("all", { busqueda: "ANA@" }).sort()).toEqual(["conf", "lleg", "pend"]);
   });
 
-  // «Pendientes» (2026-10-05, petición del dueño): un valor más del filtro de estado.
-  it("«Pendientes» (FILTRO_POR_ATENDER): las reservas pendientes y las solicitudes sin resolver, y nada más", () => {
+  // «Por atender» (2026-10-05, petición del dueño; el nombre también es suyo): un valor más del filtro de estado.
+  it("«Por atender» (FILTRO_POR_ATENDER): las reservas pendientes y las solicitudes sin resolver, y nada más", () => {
     expect(FILTRO_POR_ATENDER).toBe("por_atender");
     // Ni la confirmada ni la «Llegó», ni la solicitud descartada.
     expect(ids(FILTRO_POR_ATENDER).sort()).toEqual(["pend", "solicitud-abierta", "solicitud-contactada"]);
   });
 
-  it("«Pendientes» se combina con el canal, la fecha y la búsqueda como cualquier estado", () => {
+  it("«Por atender» se combina con el canal, la fecha y la búsqueda como cualquier estado", () => {
     // Las solicitudes solo salen con «teléfono» (el único canal que las registra), y la pendiente es de teléfono.
     expect(ids(FILTRO_POR_ATENDER, { canal: "telefono" }).sort()).toEqual(["pend", "solicitud-abierta", "solicitud-contactada"]);
     expect(ids(FILTRO_POR_ATENDER, { canal: "web" })).toEqual([]);
@@ -126,7 +126,7 @@ describe("filtrarFilasUnificadas", () => {
   });
 });
 
-describe("estaPorAtender (qué entra en «Pendientes»)", () => {
+describe("estaPorAtender (qué entra en «Por atender»)", () => {
   const filaDeReserva = (estado: string) => unificarReservasYSolicitudes([reserva({ estado })], [])[0];
   const filaDeSolicitud = (estado: string) => unificarReservasYSolicitudes([], [solicitud({ estado })])[0];
 
@@ -145,10 +145,10 @@ describe("estaPorAtender (qué entra en «Pendientes»)", () => {
 });
 
 describe("OPCIONES_FILTRO_ESTADO (el desplegable «Estado»)", () => {
-  it("empieza por «Todos los estados» (ya no «Todos») y justo después «Pendientes»", () => {
+  it("empieza por «Todos los estados» (ya no «Todos») y justo después «Por atender»", () => {
     expect(OPCIONES_FILTRO_ESTADO.slice(0, 2)).toEqual([
       { value: "all", label: "Todos los estados" },
-      { value: FILTRO_POR_ATENDER, label: "Pendientes (reservas y solicitudes sin resolver)", corta: "Pendientes" },
+      { value: FILTRO_POR_ATENDER, label: "Por atender (reservas y solicitudes sin resolver)", corta: "Por atender" },
     ]);
   });
 

@@ -60,17 +60,19 @@ export function contarSolicitudesPendientes(solicitudes: readonly SolicitudPendi
 export const FILTRO_SOLICITUDES = "solicitudes";
 export const FILTRO_SOLICITUDES_CERRADAS = "solicitudes_cerradas";
 /**
- * «Pendientes» (2026-10-05, petición del dueño: «pon aquí un filtro de solo
- * pendientes»): lo que espera a que el personal haga algo, sea reserva o
- * solicitud (`estaPorAtender`). Es un valor más del filtro «Estado», no un
- * filtro aparte: así el botón «Pendientes» de la barra y el desplegable «Estado»
- * no pueden desincronizarse, y se combina con la búsqueda, la fecha y el canal
- * como cualquier otro estado.
+ * «Por atender» (2026-10-05, petición del dueño: «pon aquí un filtro de solo
+ * pendientes»; el nombre, «Por atender» y no «Pendientes», lo decidió él ese
+ * mismo día): lo que espera a que el personal haga algo, sea reserva o
+ * solicitud (`estaPorAtender`). No es el estado «Pendiente» de la reserva (ese
+ * es solo de reservas, y es el paso «Pendiente» del timeline). Es un valor más
+ * del filtro «Estado», no un filtro aparte: así el botón «Por atender» de la
+ * barra y el desplegable «Estado» no pueden desincronizarse, y se combina con
+ * la búsqueda, la fecha y el canal como cualquier otro estado.
  */
 export const FILTRO_POR_ATENDER = "por_atender";
 
 /**
- * ¿Espera la fila a que el personal haga algo? Es lo que enseña «Pendientes»
+ * ¿Espera la fila a que el personal haga algo? Es lo que enseña «Por atender»
  * (`FILTRO_POR_ATENDER`):
  *   · las RESERVAS en estado `pendiente` (hay que aceptarlas o verificarlas). Las
  *     de otro estado, no: una verificada ya espera al cliente, no al personal;
@@ -98,14 +100,14 @@ const ORDEN_ESTADOS_EN_FILTRO: readonly EstadoReserva[] = [
 /**
  * Opciones del desplegable «Estado». `label` es el texto de la opción en la lista
  * abierta; `corta`, si la hay, lo que dice el desplegable CERRADO tras «Estado: »
- * (si no, `label`): «Pendientes» en vez de la explicación entera y, en los estados
+ * (si no, `label`): «Por atender» en vez de la explicación entera y, en los estados
  * de reserva, el nombre de la insignia («Llegó», no «Llegó / completada», que no
  * cabe). «Todos los estados» y no «Todos» (2026-10-05, petición del dueño):
  * cerrado, el desplegable ya no dice «Todos» sino el nombre del filtro.
  */
 export const OPCIONES_FILTRO_ESTADO: { value: string; label: string; corta?: string }[] = [
   { value: "all", label: "Todos los estados" },
-  { value: FILTRO_POR_ATENDER, label: "Pendientes (reservas y solicitudes sin resolver)", corta: "Pendientes" },
+  { value: FILTRO_POR_ATENDER, label: "Por atender (reservas y solicitudes sin resolver)", corta: "Por atender" },
   { value: FILTRO_SOLICITUDES, label: "Solicitudes sin resolver" },
   ...ORDEN_ESTADOS_EN_FILTRO.map((estado) => ({
     value: estado,
@@ -191,7 +193,7 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
   const canal = filtros.canal ?? "all";
   const fecha = filtros.fecha ?? null;
 
-  // «Pendientes»: reservas y solicitudes a la vez, pero solo lo que espera al personal (`estaPorAtender`).
+  // «Por atender»: reservas y solicitudes a la vez, pero solo lo que espera al personal (`estaPorAtender`).
   const porAtender = estado === FILTRO_POR_ATENDER;
 
   return filas.filter((f) => {

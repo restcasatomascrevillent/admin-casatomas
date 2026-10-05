@@ -739,21 +739,21 @@ export function ListaReservasAvanzada({
     () => alcanceCifrasDeLaLista({ fecha: dateFilter, filtroDeEstado: statusFilter !== "all" }),
     [dateFilter, statusFilter],
   );
-  // «Pendientes» (botón de la barra = opción `FILTRO_POR_ATENDER` del desplegable «Estado»). Su cifra se cuenta
+  // «Por atender» (botón de la barra = opción `FILTRO_POR_ATENDER` del desplegable «Estado»). Su cifra se cuenta
   // como las del timeline —la lista con sus filtros menos el de estado— pero con las solicitudes sin resolver,
   // que el botón también enseña: es justo lo que se verá al pulsarlo (`cifraPorAtender`).
-  const soloPendientes = statusFilter === FILTRO_POR_ATENDER;
-  const cifraPendientes = useMemo(
+  const soloPorAtender = statusFilter === FILTRO_POR_ATENDER;
+  const cuantasPorAtender = useMemo(
     () => cifraPorAtender(reservations, solicitudes, filtrosLista),
     [reservations, solicitudes, filtrosLista],
   );
   // Lo que dicen los dos desplegables cerrados: «Estado» / «Estado: Pendiente», «Canal» / «Canal: Web».
   const textoEstado = textoFiltroCerrado("Estado", statusFilter, OPCIONES_FILTRO_ESTADO);
   const textoCanal = textoFiltroCerrado("Canal", canalFilter, OPCIONES_FILTRO_CANAL);
-  // Lista vacía: con «Pendientes» se dice que no queda nada pendiente (con los demás filtros, si los hay).
+  // Lista vacía: con «Por atender» se dice que no queda nada por atender (con los demás filtros, si los hay).
   const hayOtrosFiltros = searchQuery.trim() !== "" || !!dateFilter || canalFilter !== "all";
-  const textoListaVacia = soloPendientes
-    ? `No hay nada pendiente${hayOtrosFiltros ? " con los filtros aplicados" : ""}: ninguna reserva pendiente ni solicitud sin resolver`
+  const textoListaVacia = soloPorAtender
+    ? `No hay nada por atender${hayOtrosFiltros ? " con los filtros aplicados" : ""}: ninguna reserva pendiente ni solicitud sin resolver`
     : "No se encontraron reservas con los filtros aplicados";
 
   // --- Paginación -----------------------------------------------------------
@@ -929,41 +929,42 @@ export function ListaReservasAvanzada({
                 </PopoverContent>
               </Popover>
 
-              {/* «Pendientes» (2026-10-05, petición del dueño: «pon aquí un filtro de solo pendientes»): botón de
-                  alternancia con el estilo de «Hoy» para ver solo lo que espera a que el personal haga algo —las
-                  reservas pendientes y las solicitudes sin resolver—. No es un filtro aparte: pone y quita la
-                  opción «Pendientes» del desplegable «Estado» (`FILTRO_POR_ATENDER`), así que los dos van siempre
-                  a la par, y volver a pulsarlo deja «Todos los estados». La cifra es lo que enseñaría al pulsarlo
-                  con los demás filtros puestos. Un poco más ceñido que «Hoy» (`px-3 gap-1.5`): con él, la barra
-                  sigue cabiendo en una línea a 1440 px. */}
+              {/* «Por atender» (2026-10-05, petición del dueño: «pon aquí un filtro de solo pendientes»; el nombre lo
+                  decidió él: «Por atender», no «Pendientes»): botón de alternancia con el estilo de «Hoy» para ver
+                  solo lo que espera a que el personal haga algo —las reservas pendientes y las solicitudes sin
+                  resolver—. No es un filtro aparte: pone y quita la opción «Por atender» del desplegable «Estado»
+                  (`FILTRO_POR_ATENDER`), así que los dos van siempre a la par, y volver a pulsarlo deja «Todos los
+                  estados». La cifra es lo que enseñaría al pulsarlo con los demás filtros puestos. Un poco más
+                  ceñido que «Hoy» (`px-3 gap-1.5`): con él, la barra sigue cabiendo en una línea a 1440 px. */}
               <Button
-                variant={soloPendientes ? "default" : "outline"}
+                variant={soloPorAtender ? "default" : "outline"}
                 className="gap-1.5 px-3"
-                aria-pressed={soloPendientes}
+                aria-pressed={soloPorAtender}
                 title={
-                  soloPendientes
-                    ? "Quitar el filtro «Pendientes»"
-                    : "Ver solo lo pendiente: reservas pendientes y solicitudes sin resolver"
+                  soloPorAtender
+                    ? "Quitar el filtro «Por atender»"
+                    : "Ver solo lo que está por atender: reservas pendientes y solicitudes sin resolver"
                 }
                 onClick={() => setStatusFilter((actual) => (actual === FILTRO_POR_ATENDER ? "all" : FILTRO_POR_ATENDER))}
               >
-                Pendientes{" "}
+                Por atender{" "}
                 <span
-                  data-cifra-pendientes={cifraPendientes}
+                  data-cifra-por-atender={cuantasPorAtender}
                   className={cn(
                     "rounded-full px-1.5 text-[11px] font-semibold leading-5 tabular-nums",
                     // Pulsado, en negativo sobre el botón oscuro (también con un 0), como la cifra del timeline.
-                    soloPendientes
+                    soloPorAtender
                       ? "bg-primary-foreground text-primary"
-                      : cifraPendientes > 0
+                      : cuantasPorAtender > 0
                         ? "bg-muted text-foreground"
                         : "text-muted-foreground",
                   )}
                 >
-                  {cifraPendientes}
-                  {/* El espacio, fuera del `sr-only` (dentro, el nombre accesible lo recorta). */}
+                  {cuantasPorAtender}
+                  {/* El espacio, fuera del `sr-only` (dentro, el nombre accesible lo recorta). Se lee «Por atender
+                      4 reservas y solicitudes». */}
                   {" "}
-                  <span className="sr-only">por atender</span>
+                  <span className="sr-only">{cuantasPorAtender === 1 ? "reserva o solicitud" : "reservas y solicitudes"}</span>
                 </span>
               </Button>
 
@@ -972,7 +973,7 @@ export function ListaReservasAvanzada({
                   letra (`truncate`: el `line-clamp-1` del primitivo corta por palabras y dejaba «Canal:…» sin el
                   valor), a la izquierda (un `<button>` centra), sin encoger la flecha (`[&>svg]:shrink-0`) y con
                   el texto entero en el `title`. Ancho: 170 px (antes 200 desde `sm`): caben enteros los seis
-                  estados y «Pendientes» y, con el botón nuevo, la barra sigue en una línea a 1440 px; solo las
+                  estados y «Por atender» y, con el botón nuevo, la barra sigue en una línea a 1440 px; solo las
                   dos opciones de solicitudes se recortan, y desde `2xl` (1536 px), donde sobra sitio, caben. */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger
