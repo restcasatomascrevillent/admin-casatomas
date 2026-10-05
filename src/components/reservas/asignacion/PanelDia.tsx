@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { CalendarX2, CheckCircle2, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,8 @@ import type { ReservaVentana } from "@/lib/reservas/ventanaAsignacion";
 // (si no cabe, envuelve a dos líneas). Ya no hay tarjetas de contadores: el resumen de la comida y
 // de la cena va en la cabecera de su propia sección. Debajo, un aviso cuando no queda nada por
 // asignar y los turnos con sus subgrupos y filas.
+// Con la pestaña a la altura de la pantalla (05/10/2026, `PanelAsignacion`) la cabecera queda FIJA y
+// lo de debajo va en una región con scroll propio («Reservas del día»): lo único que se desplaza.
 // Las filas las pinta quien lo monta (`renderFila`): este componente solo organiza.
 // Estados: «Sin reservas este día» y «Todo asignado».
 // ============================================================================
@@ -52,6 +54,8 @@ interface PanelDiaProps<T extends ReservaVentana> {
   soloPendientes: boolean;
   onSoloPendientes: (valor: boolean) => void;
   renderFila: (fila: T) => ReactNode;
+  /** La región con scroll de la lista (quien monta el panel la vuelve arriba al cambiar de día). */
+  listaRef?: Ref<HTMLDivElement>;
 }
 
 export function PanelDia<T extends ReservaVentana>({
@@ -62,14 +66,15 @@ export function PanelDia<T extends ReservaVentana>({
   soloPendientes,
   onSoloPendientes,
   renderFila,
+  listaRef,
 }: PanelDiaProps<T>) {
   const todoAsignado = dia.hayReservas && dia.sinMesa === 0;
 
-  // El panel de la pestaña ya lo nombra su pestaña (aria-labelledby de Radix): aquí no hace falta otro
-  // «region», solo el título del día.
+  // El panel de la pestaña ya lo nombra su pestaña (aria-labelledby de Radix): la cabecera solo lleva el
+  // título del día. Columna flexible: con altura fija, la lista se queda con el alto que sobra.
   return (
-    <div className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h3 className="text-balance text-base font-semibold sm:text-lg">{etiquetas.titulo}</h3>
           {dia.hayReservas && (
@@ -111,64 +116,76 @@ export function PanelDia<T extends ReservaVentana>({
         </div>
       </header>
 
-      {!dia.hayReservas ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-muted-foreground">
-          <CalendarX2 className="h-6 w-6" aria-hidden="true" />
-          <p className="text-sm">Sin reservas este día</p>
-        </div>
-      ) : (
-        <>
-          {todoAsignado && (
-            <div
-              role="status"
-              className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-            >
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              <p>
-                <span className="font-medium">Todo asignado.</span>{" "}
-                {textoTodoAsignado(dia.ocultas > 0 ? dia.ocultas : dia.reservas, dia.ocultas > 0)}
-              </p>
-            </div>
-          )}
+      {/* La lista del día: lo ÚNICO que hace scroll cuando la pestaña mide el alto de la pantalla (la
+          cabecera de arriba y la tira de días quedan fijas). Región con nombre y en el orden de
+          tabulación, con foco visible: con el teclado se llega a ella y se desplaza con flechas o
+          Av Pág sin recorrer fila a fila. Sin altura fija crece con su contenido, como siempre. */}
+      <div
+        ref={listaRef}
+        role="region"
+        aria-label="Reservas del día"
+        tabIndex={0}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-md ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {!dia.hayReservas ? (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-6 text-center text-muted-foreground">
+            <CalendarX2 className="h-6 w-6" aria-hidden="true" />
+            <p className="text-sm">Sin reservas este día</p>
+          </div>
+        ) : (
+          <>
+            {todoAsignado && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+              >
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <p>
+                  <span className="font-medium">Todo asignado.</span>{" "}
+                  {textoTodoAsignado(dia.ocultas > 0 ? dia.ocultas : dia.reservas, dia.ocultas > 0)}
+                </p>
+              </div>
+            )}
 
-          {(["comida", "cena"] as const).map((turno) => {
-            const grupo = dia.turnos.find((g) => g.turno === turno);
-            const resumen = dia.porTurno[turno];
-            if (!grupo) {
-              // Turno con todas sus reservas ocultas por el interruptor: no tiene filas, pero se dice.
-              return resumen.ocultas > 0 ? (
-                <div
-                  key={turno}
-                  className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border px-3 py-2 sm:px-4"
-                >
-                  <span className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[turno]}</span>
-                  <ResumenTurno resumen={resumen} />
-                </div>
-              ) : null;
-            }
-            return (
-              <Card key={grupo.turno}>
-                <CardHeader className="px-3 pb-2 pt-3 sm:px-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <CardTitle className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[grupo.turno]}</CardTitle>
+            {(["comida", "cena"] as const).map((turno) => {
+              const grupo = dia.turnos.find((g) => g.turno === turno);
+              const resumen = dia.porTurno[turno];
+              if (!grupo) {
+                // Turno con todas sus reservas ocultas por el interruptor: no tiene filas, pero se dice.
+                return resumen.ocultas > 0 ? (
+                  <div
+                    key={turno}
+                    className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border px-3 py-2 sm:px-4"
+                  >
+                    <span className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[turno]}</span>
                     <ResumenTurno resumen={resumen} />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3 px-3 pb-3 sm:px-4">
-                  {grupo.grados.map(({ grado, reservas }) => (
-                    <div key={grado} className="space-y-1.5">
-                      <Badge variant="outline" className={cn("text-[11px] font-medium", CLASES_GRADO[grado])}>
-                        {ETIQUETA_GRADO[grado]} · {reservas.length}
-                      </Badge>
-                      <ul className="divide-y rounded-md border">{reservas.map(renderFila)}</ul>
+                ) : null;
+              }
+              return (
+                <Card key={grupo.turno}>
+                  <CardHeader className="px-3 pb-2 pt-3 sm:px-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <CardTitle className="text-sm font-semibold sm:text-base">{ETIQUETA_TURNO[grupo.turno]}</CardTitle>
+                      <ResumenTurno resumen={resumen} />
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </>
-      )}
+                  </CardHeader>
+                  <CardContent className="space-y-3 px-3 pb-3 sm:px-4">
+                    {grupo.grados.map(({ grado, reservas }) => (
+                      <div key={grado} className="space-y-1.5">
+                        <Badge variant="outline" className={cn("text-[11px] font-medium", CLASES_GRADO[grado])}>
+                          {ETIQUETA_GRADO[grado]} · {reservas.length}
+                        </Badge>
+                        <ul className="divide-y rounded-md border">{reservas.map(renderFila)}</ul>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </>
+        )}
+      </div>
     </div>
   );
 }

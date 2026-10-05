@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { ConMotivo } from "./ConMotivo";
 import { cn } from "@/lib/utils";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
@@ -79,6 +80,13 @@ import { TEXTO_CAMBIO_INTERNO, textoQuitarMesas } from "@/lib/reservas/asignacio
 //   señala.
 // · "Mesas" abre el plano de su sala (`onAsignarMesa`, el mismo salto que la
 //   lista y la pestaña Hoy).
+// · ALTO DE LA PANTALLA (05/10/2026, petición del dueño: «como el resto de
+//   pantallas»): la pestaña mide justo el alto que queda de ventana, con el mismo
+//   mecanismo que el Calendario y la Newsletter (`useAlturaDisponible`). El aviso
+//   de tope, la tira de días y la cabecera del día quedan fijos; solo la lista del
+//   día hace scroll, por dentro. Esa lista conserva su posición al refrescarse los
+//   datos (sondeo, tiempo real, cambio de sala), vuelve arriba al cambiar de día y
+//   se recoloca al volver del plano («Mesas»).
 // ============================================================================
 
 
@@ -97,6 +105,26 @@ const LIMITE_FILAS_TEXTO = new Intl.NumberFormat("es-ES").format(LIMITE_FILAS);
  * app): dura lo que `gcTime` (5 min por defecto) y una recarga de la página la borra.
  */
 const CLAVE_DIA_RECORDADO = ["asignacion-dia-recordado"] as const;
+
+/**
+ * Cómo estaba la lista del día al pulsar «Mesas» (el plano desmonta este panel): al volver se recoloca
+ * ahí si sigue abierto el mismo día. Misma caché y misma vida que el día recordado; se gasta al volver.
+ */
+const CLAVE_LISTA_RECORDADA = ["asignacion-lista-recordada"] as const;
+
+interface PosicionLista {
+  dia: string;
+  top: number;
+  /** «Ocultar las que ya tienen mesa» al salir: sin él, la misma posición caería en otra parte de la lista. */
+  soloPendientes: boolean;
+}
+
+/**
+ * Suelo (px) del alto de la pestaña: por debajo (ventanas muy bajas, teclado abierto en el móvil) deja
+ * de encoger y la página hace scroll. El de la Newsletter: caben la tira de días, la cabecera del día y
+ * unos 200 px de lista.
+ */
+const ALTURA_MINIMA_PANEL = 360;
 
 interface CambioPendiente {
   fila: FilaAsignacionDia;
@@ -119,8 +147,18 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
 
+  // Alto de la pantalla, calculado solo: el mismo patrón que el Calendario y la Newsletter
+  // (`useAlturaDisponible`: alto del viewport visual − posición del bloque − relleno del <main>,
+  // recalculado al redimensionar, girar la tablet, abrir el teclado o plegar el menú). Sin medida
+  // (jsdom, primer pintado sin layout) cae al layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_PANEL);
+  const medida = alto !== null;
+
   const dias = 14;
-  const [soloPendientes, setSoloPendientes] = useState(false);
+  // Vuelta del plano («Mesas»): cómo estaba la lista (se lee al montar; ver CLAVE_LISTA_RECORDADA).
+  const [posicionAlVolver] = useState(() => queryClient.getQueryData<PosicionLista>(CLAVE_LISTA_RECORDADA) ?? null);
+  const [soloPendientes, setSoloPendientes] = useState(() => posicionAlVolver?.soloPendientes ?? false);
   const [cambioPendiente, setCambioPendiente] = useState<CambioPendiente | null>(null);
   // Día de la pestaña abierta. Sin nada recordado (`null`), cuando llegan los datos se fija el de
   // por defecto (el primero con reservas sin mesa), para que no se mueva solo cuando se vayan
@@ -180,22 +218,51 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
     [filasPorDia, diaActivo, soloPendientes],
   );
 
-  // Al cambiar de día con la tira pegada arriba, el día nuevo se enseña desde su principio
-  // (si no, se quedaría a media altura de lo que se estaba mirando).
+  // Al cambiar de día, el día nuevo se enseña desde su principio (si no, se quedaría a media altura de
+  // lo que se estaba mirando): la lista vuelve arriba —con altura fija es ella la que hace scroll; al
+  // refrescarse los datos NO se toca— y, sin altura fija, la página sube si la tira pegada la tapa.
   const tiraRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
   const diaMostrado = useRef<string | null>(null);
   useEffect(() => {
     const anterior = diaMostrado.current;
     diaMostrado.current = diaActivo;
+    if (anterior === null || anterior === diaActivo) return;
+    if (listaRef.current) listaRef.current.scrollTop = 0;
     const tira = tiraRef.current;
     const panel = panelRef.current;
-    if (anterior === null || anterior === diaActivo || !tira || !panel || typeof window.scrollTo !== "function") return;
+    if (!tira || !panel || typeof window.scrollTo !== "function") return;
     const pegadaA = parseFloat(window.getComputedStyle(tira).top) || 0;
     const limite = pegadaA + tira.offsetHeight;
     const arriba = panel.getBoundingClientRect().top;
     if (arriba < limite) window.scrollTo({ top: window.scrollY + arriba - limite - 8, behavior: "auto" });
   }, [diaActivo]);
+
+  // Vuelta del plano («Mesas»): la lista se recoloca donde iba (con su «Ocultar las que ya tienen mesa»,
+  // que ya arranca como estaba), una sola vez y solo si es el mismo día. Lo recordado se borra de la caché
+  // al montar: otra visita a la pestaña ya no lo usa. Espera a que haya lista y altura fija: sin ellas no
+  // hay scroll que recolocar.
+  const posicionAplicada = useRef(false);
+  useEffect(() => {
+    queryClient.removeQueries({ queryKey: CLAVE_LISTA_RECORDADA, exact: true });
+  }, [queryClient]);
+  useEffect(() => {
+    const lista = listaRef.current;
+    if (posicionAplicada.current || !posicionAlVolver || !medida || !hayDatos || !lista) return;
+    posicionAplicada.current = true;
+    if (posicionAlVolver.dia === diaActivo) lista.scrollTop = posicionAlVolver.top;
+  }, [posicionAlVolver, medida, hayDatos, diaActivo]);
+
+  /** «Mesas»: antes de saltar al plano se apunta cómo estaba la lista, para recolocarla al volver. */
+  const irAlPlano = (destino: DestinoAsignacion) => {
+    queryClient.setQueryData<PosicionLista>(CLAVE_LISTA_RECORDADA, {
+      dia: diaActivo,
+      top: listaRef.current?.scrollTop ?? 0,
+      soloPendientes,
+    });
+    onAsignarMesa(destino);
+  };
 
   /** Salas activas y usables de Casa Tomás, por nombre (por id: hay dos «Terraza», una de cada negocio). */
   const salasUsables = useMemo(
@@ -237,21 +304,29 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
     excluidas,
     salas: salasUsables,
     onElegirSala: elegirSala,
-    onAsignarMesa,
+    onAsignarMesa: irAlPlano,
     onEditar: editarReserva,
     puedeEditar,
     salaEnCurso: cambiarSala.isPending ? cambiarSala.variables?.reservaId ?? null : null,
   };
 
   return (
-    <div className="space-y-3">
+    // Con altura medida, el bloque entero mide `alto` y es una columna: lo de arriba no encoge
+    // (`shrink-0`) y la lista del día se queda con lo que sobra (`flex-1 min-h-0` en cada nivel).
+    <div
+      ref={setRaiz}
+      data-testid="panel-asignacion"
+      data-altura-fija={alto !== null ? String(alto) : undefined}
+      className="flex flex-col gap-3"
+      style={alto !== null ? { height: alto } : undefined}
+    >
       {/* 04/10/2026, a petición del dueño: sin título ni explicación ni selector de rango (se queda en
           14 días). El interruptor «Ocultar las que ya tienen mesa» vive en la fila del título del día
           (`PanelDia`), para que la lista empiece lo más arriba posible. */}
       {!isError && !isLoading && truncado && (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
@@ -278,7 +353,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
           </CardContent>
         </Card>
       ) : (
-        <Tabs value={diaActivo} onValueChange={setDiaElegido} className="space-y-3">
+        <Tabs value={diaActivo} onValueChange={setDiaElegido} className="flex min-h-0 flex-1 flex-col gap-3">
           <TiraDias
             dias={pestanas}
             hoy={desde}
@@ -286,9 +361,15 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
             activo={diaActivo}
             tiraRef={tiraRef}
           />
-          {/* Un único panel, el del día abierto: los demás días no se pintan. `scroll-mt`: al tabular
-              hacia una fila, el navegador no la deja tapada por la tira fija. */}
-          <TabsContent value={diaActivo} ref={panelRef} className="mt-0 [&_button]:scroll-mt-28">
+          {/* Un único panel, el del día abierto: los demás días no se pintan. `scroll-mt` solo sin altura
+              fija (scroll de página): al tabular hacia una fila, el navegador no la deja tapada por la
+              tira pegada. Con altura fija la tira no tapa la lista, y ese margen haría saltar la lista al
+              devolver el foco a un botón de arriba (al cerrar «Dar sala»). */}
+          <TabsContent
+            value={diaActivo}
+            ref={panelRef}
+            className={cn("mt-0 flex min-h-0 flex-1 flex-col", !medida && "[&_button]:scroll-mt-28")}
+          >
             <PanelDia
               dia={datosDia}
               etiquetas={etiquetasDia(diaActivo, desde)}
@@ -297,6 +378,7 @@ export function PanelAsignacion({ onAsignarMesa }: PanelAsignacionProps) {
               soloPendientes={soloPendientes}
               onSoloPendientes={setSoloPendientes}
               renderFila={(fila: FilaAsignacionDia) => <FilaReserva key={fila.reserva_id} fila={fila} {...filaProps} />}
+              listaRef={listaRef}
             />
           </TabsContent>
         </Tabs>
@@ -412,7 +494,10 @@ function FilaReserva({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
+      {/* `flex-wrap`: en un móvil de 375 px con dedo los tres botones no caben en la fila y «Mesas» se
+          salía de la tarjeta; dentro de la lista con scroll eso sería scroll horizontal. Ahora baja de
+          línea. Desde `sm` la fila va en horizontal y este bloque mide lo que sus botones (no envuelve). */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Sin
             mirar el estado: solo el permiso lo apaga. El botón deshabilitado no
             recibe el ratón: el motivo se ve en el envoltorio. */}

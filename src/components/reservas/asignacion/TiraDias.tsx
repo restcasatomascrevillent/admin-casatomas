@@ -20,7 +20,8 @@ import { etiquetasDia, type ResumenPestana } from "@/lib/reservas/asignacionPorD
 // cosa está en `src/lib/reservas/asignacionPorDias.ts`.
 //
 // La tira es una sola fila con scroll horizontal contenido (la página nunca se
-// ensancha), se queda fija arriba al bajar por un día largo y mantiene a la vista
+// ensancha), se queda fija arriba al bajar por un día largo (con la pestaña a la
+// altura de la pantalla, lo que se desplaza es solo la lista) y mantiene a la vista
 // la pestaña activa.
 // ============================================================================
 
@@ -97,9 +98,11 @@ export function TiraDias({ dias, hoy, ventanaHoras, activo, tiraRef }: TiraDiasP
   return (
     <div
       ref={tiraRef}
-      // Fija arriba al bajar por un día largo. En móvil queda justo debajo de la barra superior
+      // Con la pestaña a la altura de la pantalla (`PanelAsignacion`) la tira queda fuera del scroll de
+      // la lista: fija sin más (`shrink-0`: no encoge). Sin esa medida, o si la ventana es tan baja que
+      // la página hace scroll, se pega arriba al bajar. En móvil queda justo debajo de la barra superior
       // (`DashboardLayout`: h-12, sticky, z-50); en escritorio no hay barra.
-      className="sticky top-12 z-30 border-b bg-background py-1 md:top-0"
+      className="sticky top-12 z-30 shrink-0 border-b bg-background py-1 md:top-0"
     >
       <div className="flex items-center gap-1.5">
         {sale && (
