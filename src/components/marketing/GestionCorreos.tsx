@@ -1,15 +1,20 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Mail, Info, UserMinus, ShieldCheck } from "lucide-react";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListaSuscriptores } from "./ListaSuscriptores";
 import { SincronizacionResend } from "./SincronizacionResend";
+import { contarEmailsActivos } from "@/lib/newsletter/resend";
 
 export function GestionCorreos() {
   // Activos y bajas en una sola consulta (se refresca sola cada minuto). Las
   // bajas las escriben newsletter-baja y resend-webhook con fecha_baja y
   // origen_baja; el personal no da de baja ni reactiva a nadie.
-  const { suscriptores, totalSuscriptores, bajas, totalBajas, isLoading } = useNewsletterSuscriptores();
+  const { suscriptores, totalSuscriptores, bajas, totalBajas, isLoading, error } = useNewsletterSuscriptores();
+  // Para que la lista de envío se actualice sola si no cuadra (SincronizacionResend).
+  const activosDistintos = useMemo(() => contarEmailsActivos(suscriptores), [suscriptores]);
+  const activosParaLista = isLoading ? undefined : error ? null : activosDistintos;
 
   return (
     <div className="space-y-4">
@@ -110,7 +115,7 @@ export function GestionCorreos() {
       </div>
 
       {/* Fase 2: lista de envío (conexión con Resend Marketing, newsletter-sync-resend). */}
-      <SincronizacionResend />
+      <SincronizacionResend activos={activosParaLista} />
     </div>
   );
 }

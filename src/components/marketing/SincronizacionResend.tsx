@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,12 +8,15 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useEstadoResend, useSincronizarResend } from "@/hooks/useResendMarketing";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   etiquetaOrigenPasada,
   etiquetaPasada,
+  motivoAutoSincronizacion,
   nivelCuota,
   porcentajeCuota,
   textoCanal,
+  textoContactosAjenos,
   textoCuota,
 } from "@/lib/newsletter/resend";
 import { MENSAJE_NO_DISPONIBLE, formatoNumero, plural } from "@/lib/newsletter/textos";
@@ -20,9 +24,16 @@ import { MENSAJE_NO_DISPONIBLE, formatoNumero, plural } from "@/lib/newsletter/t
 // Tarjeta «Lista de envío» (por dentro: sincronización con Resend Marketing,
 // fase 2 del newsletter). La tabla newsletter_suscriptores sigue siendo la
 // fuente de verdad; esto solo enseña cómo de cuadrada está la lista que usa el
-// servicio de envío y deja forzar una actualización (la función
-// newsletter-sync-resend también se ejecuta sola cada día y antes de cada
-// envío). Los textos son para personal no técnico: nada de nombres de servicios
+// servicio de envío y deja forzar una actualización. La función
+// newsletter-sync-resend corre también justo antes de cada envío por Broadcast;
+// el cron diario está PREPARADO pero no programado en producción (ver el final
+// de la migración 20261003193000 y la sección 9 de
+// docs/funcionalidades/newsletter-resend-marketing.md). Por eso la tarjeta se
+// actualiza sola al abrirse si la lista no cuadra con los activos, si la última
+// actualización correcta tiene más de 24 h o si no hubo ninguna
+// (motivoAutoSincronizacion): una vez por montaje, en segundo plano, sin avisos
+// emergentes y solo si el usuario puede escribir en Marketing (lo mismo que
+// exige la función: can_write_section('marketing')). Los textos son para personal no técnico: nada de nombres de servicios
 // ni de variables; el detalle técnico va dentro de un desplegable.
 // Controles táctiles de ≥ 44 px (h-11), como el resto del panel en tablet.
 
@@ -37,9 +48,33 @@ function hace(fecha: string | null | undefined): string {
   }
 }
 
-export function SincronizacionResend() {
+interface PropsSincronizacionResend {
+  /**
+   * Suscriptores activos del panel (emails distintos). `undefined` mientras
+   * cargan (no se decide nada todavía); `null` si no se pudieron cargar (solo
+   * cuentan la antigüedad y si hubo alguna actualización). Sin la prop, la
+   * tarjeta no se actualiza sola.
+   */
+  activos?: number | null;
+}
+
+export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}) {
   const { data: estado, isLoading, error } = useEstadoResend();
-  const { mutate: sincronizar, isPending } = useSincronizarResend();
+  const { mutate: sincronizar, isPending, variables } = useSincronizarResend();
+  const { canAccess: puedeSincronizar, loading: cargandoPermiso } = useCanAccessSection("marketing", "edit");
+
+  // Una sola decisión por montaje, cuando ya están el estado, los activos y el
+  // permiso: así ni el refresco del estado tras sincronizar ni el sondeo de los
+  // suscriptores pueden encadenar otra pasada.
+  const decidida = useRef(false);
+  useEffect(() => {
+    if (decidida.current || isLoading || !estado || activos === undefined || cargandoPermiso) return;
+    decidida.current = true;
+    if (!puedeSincronizar || isPending) return;
+    if (motivoAutoSincronizacion(estado, activos) === null) return;
+    sincronizar({ automatica: true });
+  }, [estado, isLoading, activos, cargandoPermiso, puedeSincronizar, isPending, sincronizar]);
+  const actualizandoSola = isPending && variables?.automatica === true;
 
   if (isLoading) {
     return (
@@ -81,6 +116,8 @@ export function SincronizacionResend() {
   const nivel = nivelCuota(usados, limite);
   const aviso = textoCuota(usados, limite);
   const ultima = estado.ultima_pasada;
+  // contactos_resend sale de la última pasada terminada: su desglose también.
+  const ajenos = textoContactosAjenos(estado.ultima_terminada ?? (ultima?.estado !== "en_curso" ? ultima : null));
   const sinClave = !estado.configurado.api_key;
   // Con poco uso el relleno mediría menos de un píxel y parecería vacío: mínimo visible.
   const anchoRelleno = usados && usados > 0 ? Math.max(porcentajeCuota(usados, limite), 3) : 0;
@@ -97,8 +134,8 @@ export function SincronizacionResend() {
         </CardTitle>
         <CardDescription>
           Es la copia de los suscriptores activos que usa el servicio de envío. La lista de esta página es la que
-          manda: se añaden los activos y se quitan los que se dan de baja. Se actualiza sola cada día y justo antes de
-          cada envío.
+          manda: se añaden los activos y se quitan los que se dan de baja. Se actualiza sola al abrir esta pestaña y
+          justo antes de cada envío.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -108,7 +145,14 @@ export function SincronizacionResend() {
             <span className="font-semibold tabular-nums whitespace-nowrap">
               {usados ?? "—"} de {formatoNumero(limite)}
             </span>
+            {actualizandoSola ? (
+              <span role="status" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                Actualizando lista de envío…
+              </span>
+            ) : null}
           </p>
+          {ajenos ? <p className="mt-1 text-xs text-muted-foreground">{ajenos}</p> : null}
           <div
             className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted"
             role="progressbar"
@@ -164,7 +208,7 @@ export function SincronizacionResend() {
           ) : null}
         </div>
 
-        <Button className="h-11 w-full sm:w-auto" variant="outline" onClick={() => sincronizar()} disabled={isPending || sinClave}>
+        <Button className="h-11 w-full sm:w-auto" variant="outline" onClick={() => sincronizar({})} disabled={isPending || sinClave}>
           {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
           Actualizar lista de envío
         </Button>

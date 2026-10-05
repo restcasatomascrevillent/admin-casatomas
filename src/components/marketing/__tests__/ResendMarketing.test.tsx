@@ -30,6 +30,10 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 
+// Permiso de escritura en Marketing (lo que exige la función para sincronizar).
+const permiso = { canAccess: true, loading: false };
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => permiso }));
+
 import { toast } from "sonner";
 import { SincronizacionResend, CanalEnvio } from "../SincronizacionResend";
 import { HistorialEnvios } from "../HistorialEnvios";
@@ -85,6 +89,8 @@ beforeEach(() => {
   vi.mocked(toast.success).mockReset();
   vi.mocked(toast.warning).mockReset();
   vi.mocked(toast.error).mockReset();
+  permiso.canAccess = true;
+  permiso.loading = false;
 });
 
 describe("lib/newsletter/resend", () => {

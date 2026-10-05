@@ -165,3 +165,95 @@ export function agruparEstadisticas(filas: FilaEstadistica[]): Map<string, Estad
   }
   return out;
 }
+
+// ----------------------------------------------------------------------------
+// Autoactualización al abrir la pestaña «Suscriptores»
+// ----------------------------------------------------------------------------
+// Mientras el cron diario no esté programado en producción, la lista de envío
+// solo se actualiza al pulsar el botón o justo antes de un envío; así el
+// contador «Contactos: N de 1.000» se quedaba atrás tras una alta nueva. La
+// tarjeta lanza UNA sincronización en segundo plano al montarse si hace falta
+// (ver SincronizacionResend). La función usa cerrojo: si ya hay otra pasada
+// en curso responde 409 y no se reintenta.
+
+/** Por qué se lanza la sincronización automática (null = no hace falta). */
+export type MotivoAutoSincronizacion = "nunca" | "antigua" | "difiere" | "fallida";
+
+/** La última sincronización correcta caduca a las 24 h. */
+export const MS_CADUCIDAD_SINCRONIZACION = 24 * 60 * 60 * 1000;
+/** Igual que el cerrojo de la función: una pasada «en curso» de más de 15 min está colgada y la siguiente la cierra. */
+export const MS_PASADA_COLGADA = 15 * 60 * 1000;
+/** Tras una pasada fallida no se reintenta sola durante 15 min (el error ya se ve en la tarjeta y el botón sigue ahí). */
+export const MS_ESPERA_TRAS_ERROR = 15 * 60 * 1000;
+
+function msDesde(fecha: string | null | undefined, ahora: number): number | null {
+  if (!fecha) return null;
+  const t = new Date(fecha).getTime();
+  return Number.isNaN(t) ? null : ahora - t;
+}
+
+/** Suscriptores activos distintos por email (la sincronización agrupa por email normalizado). */
+export function contarEmailsActivos(activos: ReadonlyArray<{ email: string | null | undefined }>): number {
+  return new Set(activos.map((s) => (s.email ?? "").trim().toLowerCase()).filter(Boolean)).size;
+}
+
+/**
+ * Decide si la tarjeta debe sincronizar sola al abrirse.
+ *  · `activos`: suscriptores activos del panel (null si no se pudieron cargar:
+ *    entonces solo cuentan la antigüedad y si hubo alguna sincronización).
+ * Devuelve null si no hace falta o si no se debe (sin clave, otra pasada en
+ * curso, error reciente).
+ */
+export function motivoAutoSincronizacion(
+  estado: Pick<EstadoResend, "configurado" | "ultima_pasada" | "ultima_terminada">,
+  activos: number | null,
+  ahora: number = Date.now(),
+): MotivoAutoSincronizacion | null {
+  if (!estado.configurado?.api_key) return null;
+
+  const ultima = estado.ultima_pasada;
+  if (ultima?.estado === "en_curso") {
+    const edad = msDesde(ultima.iniciada_at, ahora);
+    if (edad === null || edad < MS_PASADA_COLGADA) return null;
+  }
+
+  const ref = estado.ultima_terminada ?? (ultima && ultima.estado !== "en_curso" ? ultima : null);
+  if (!ref) return "nunca";
+
+  const edad = msDesde(ref.terminada_at ?? ref.iniciada_at, ahora);
+  if (ref.estado === "error") {
+    return edad !== null && edad < MS_ESPERA_TRAS_ERROR ? null : "fallida";
+  }
+  if (edad === null || edad > MS_CADUCIDAD_SINCRONIZACION) return "antigua";
+
+  if (activos !== null) {
+    // «destinatarios» = activos con contacto dentro de la lista tras esa pasada
+    // (no cuenta contactos ajenos metidos a mano en el servicio de envío).
+    const enLista = ref.destinatarios ?? ref.contactos_resend;
+    if (enLista === null || enLista !== activos) return "difiere";
+  }
+  return null;
+}
+
+/**
+ * Por qué «Contactos» puede ser mayor que los que reciben el envío.
+ * `contactos_resend` cuenta TODOS los contactos de la cuenta del servicio de
+ * envío (es lo que cuenta para el máximo del plan). Los que no están en
+ * newsletter_suscriptores salen como `contactos_ajenos` en la pasada; el más
+ * habitual es la dirección del botón «Enviar prueba» (enviar-newsletter/
+ * prueba.ts: NEWSLETTER_EMAIL_PRUEBA, por defecto delivered@resend.dev, que
+ * vive en un Segment de pruebas aparte y nunca recibe la newsletter). El resto
+ * serían contactos metidos a mano en el servicio. Sin llamar a la API no se
+ * puede saber cuál es cuál, así que el texto lo dice así.
+ * Devuelve "" si no hay nada que explicar.
+ */
+export function textoContactosAjenos(
+  p: Pick<PasadaResend, "contactos_resend" | "contactos_ajenos"> | null | undefined,
+): string {
+  const ajenos = p?.contactos_ajenos ?? 0;
+  if (!p || p.contactos_resend === null || ajenos <= 0) return "";
+  if (ajenos === 1) {
+    return "Incluye 1 contacto que no es suscriptor (normalmente la dirección de pruebas del botón «Enviar prueba»): no recibe la newsletter, pero cuenta para el máximo.";
+  }
+  return `Incluye ${formatoNumero(ajenos)} contactos que no son suscriptores (la dirección de pruebas del botón «Enviar prueba» y otros añadidos a mano en el servicio de envío): no reciben la newsletter, pero cuentan para el máximo.`;
+}

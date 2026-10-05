@@ -35,21 +35,35 @@ export function useEstadoResend() {
   });
 }
 
+export interface OpcionesSincronizacion {
+  /**
+   * Lanzada sola por la tarjeta al abrir la pestaña (no por el botón): sin
+   * avisos emergentes, ni de éxito ni de error (ocupado, sin permiso, fallo).
+   * El resultado se ve en la propia tarjeta al refrescarse el estado.
+   */
+  automatica?: boolean;
+}
+
 export function useSincronizarResend() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_opciones: OpcionesSincronizacion) => {
       const { data, error } = await supabase.functions.invoke("newsletter-sync-resend", { body: { accion: "sincronizar" } });
       if (error) throw new Error(await mensajeErrorFuncion(error, "No se pudo actualizar la lista de envío"));
       return data as ResultadoSincronizacion;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, opciones) => {
+      if (opciones?.automatica) return;
       const m = mensajeSincronizacion(data);
       if (m.tipo === "ok") toast.success(m.texto);
       else if (m.tipo === "aviso") toast.warning(m.texto);
       else toast.error(m.texto);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, opciones) => {
+      if (opciones?.automatica) {
+        console.warn('Actualización automática de la lista de envío:', error.message);
+        return;
+      }
       console.error('Actualizar lista de envío:', error.message);
       toast.error(textoErrorCliente(error.message, 'No se pudo actualizar la lista de envío. Inténtalo de nuevo y, si sigue igual, avisa al equipo técnico.'));
     },
