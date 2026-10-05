@@ -38,6 +38,8 @@ const ETIQUETAS_ALERTA: Record<string, string> = {
   precio_atipico_pagina: "Precio atípico",
   total_documento_extremo: "Total enorme",
   total_documento_irrisorio: "Total ínfimo",
+  total_ausente: "Sin total",
+  subtotal_ausente: "Sin base",
 };
 
 /** Codigo desconocido: se enseña el codigo en limpio antes que un numero suelto. */
