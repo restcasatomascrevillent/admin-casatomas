@@ -831,6 +831,7 @@ export function prepararDocumentoConsolidado(c: ResultadoConsolidacion): Documen
     ...retiradas.map((r) => r.alerta),
     ...discordancias,
     ...(deduccion ? [deduccion.alerta] : []),
+    ...datos.avisos,
   ].map((a) => ({ ...a, detalle: { ...(a.detalle ?? {}), origen: (a.detalle as Record<string, unknown> | undefined)?.origen ?? "multipagina" } })) as unknown as Record<string, unknown>[];
   return { datos, alertasPrevias, totalOrigen };
 }

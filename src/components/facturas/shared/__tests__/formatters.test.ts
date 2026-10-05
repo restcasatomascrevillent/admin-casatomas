@@ -4,6 +4,8 @@ import {
   avisosDocumento,
   claveProveedor,
   esLineaDeServicio,
+  formatCantidadLinea,
+  formatNumero,
   tieneAnomaliaPrecio,
 } from "../formatters";
 
@@ -117,4 +119,24 @@ describe("esLineaDeServicio", () => {
     "%s es mercancia",
     (nombre) => expect(esLineaDeServicio(nombre)).toBe(false),
   );
+});
+
+describe("formatCantidadLinea (líneas por peso con sus unidades)", () => {
+  it("línea por peso con bultos: «12 ud · 24 kg»", () => {
+    expect(formatCantidadLinea({ cantidad: 24, unidad: "kg", bultos: 12 })).toBe("12 ud · 24 kg");
+    expect(formatCantidadLinea({ cantidad: 75.48, unidad: "kg", bultos: 8 })).toBe("8 ud · 75,48 kg");
+  });
+  it("sin bultos: solo la cantidad con su unidad", () => {
+    expect(formatCantidadLinea({ cantidad: 3, unidad: "ud", bultos: null })).toBe("3 ud");
+    expect(formatCantidadLinea({ cantidad: 4.96, unidad: "kg" })).toBe("4,96 kg");
+    expect(formatCantidadLinea({ cantidad: 2, unidad: null })).toBe("2");
+  });
+  it("sin cantidad: guion", () => {
+    expect(formatCantidadLinea({ cantidad: undefined, unidad: "kg", bultos: null })).toBe("-");
+  });
+  it("formatNumero: coma decimal y hasta 3 decimales", () => {
+    expect(formatNumero(111.8)).toBe("111,8");
+    expect(formatNumero(7.355)).toBe("7,355");
+    expect(formatNumero(24)).toBe("24");
+  });
 });

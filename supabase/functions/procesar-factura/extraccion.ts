@@ -8,6 +8,7 @@
 //  Sin Deno.env: recibe un ClienteOpenAI. Lo usan index.ts y el banco local.
 // ============================================================================
 
+import { avisoMagnitudes, resolverMagnitud } from "./magnitudes.ts";
 import { toNumber } from "./normalizacion.ts";
 import {
   aplicarRecuentoVerificado,
@@ -94,24 +95,54 @@ export function normalizarDatos(data: any) {
 
   // deno-lint-ignore no-explicit-any
   const productos = Array.isArray(data.productos)
-    ? data.productos.map((p: any, i: number) => ({
-      nombre: (p.nombre || "").trim() || `Producto ${i + 1}`,
-      cantidad: toNumber(p.cantidad) || 1,
-      unidad: (p.unidad || "unidades").toLowerCase().trim(),
-      precio_unitario: toNumber(p.precio_unitario, true),
-      total: toNumber(p.total, true),
-      // `base_precio` y `bonificada` NO tienen columna en `productos_factura`.
-      base_precio: p.base_precio ?? "desconocida",
-      bonificada: p.bonificada === true,
-      // Multipágina (04b): posición y procedencia. El camino síncrono deja
-      // pagina = 1 y orden = i.
-      pagina: Number.isInteger(p.pagina) ? p.pagina : 1,
-      orden: Number.isInteger(p.orden) ? p.orden : i,
-      albaran_ref: typeof p.albaran_ref === "string" && p.albaran_ref.trim()
-        ? p.albaran_ref.trim().slice(0, 100)
-        : null,
-    }))
+    ? data.productos.map((p: any, i: number) => {
+      const precio_unitario = toNumber(p.precio_unitario, true);
+      const total = toNumber(p.total, true);
+      // Cantidad = la magnitud por la que se multiplica el precio (kilos si el
+      // precio es por kilo), unidad normalizada, y las unidades/bultos aparte.
+      // Ver magnitudes.ts (Luga ML/101511: 12 uds · 24 kg · 4,14 → 99,46).
+      const m = resolverMagnitud({
+        cantidad: toNumber(p.cantidad, true),
+        unidad: p.unidad,
+        peso_kg: toNumber(p.peso_kg, true),
+        base_precio: p.base_precio,
+        precio_unitario,
+        total,
+        bonificada: p.bonificada === true,
+      });
+      return {
+        nombre: (p.nombre || "").trim() || `Producto ${i + 1}`,
+        cantidad: m.cantidad || 1,
+        unidad: m.unidad,
+        bultos: m.bultos,
+        precio_unitario,
+        total,
+        // `base_precio`, `bonificada`, `regla_magnitud` y `sugerencia_magnitud`
+        // NO tienen columna en `productos_factura`.
+        base_precio: p.base_precio ?? "desconocida",
+        bonificada: p.bonificada === true,
+        regla_magnitud: m.regla,
+        sugerencia_magnitud: m.sugerencia,
+        // Multipágina (04b): posición y procedencia. El camino síncrono deja
+        // pagina = 1 y orden = i.
+        pagina: Number.isInteger(p.pagina) ? p.pagina : 1,
+        orden: Number.isInteger(p.orden) ? p.orden : i,
+        albaran_ref: typeof p.albaran_ref === "string" && p.albaran_ref.trim()
+          ? p.albaran_ref.trim().slice(0, 100)
+          : null,
+      };
+    })
     : [];
+  const cambiadasAPeso = productos.filter((p: { regla_magnitud: string }) =>
+    p.regla_magnitud === "peso_cuadra" || p.regla_magnitud === "peso_con_descuento"
+  ).length;
+  if (cambiadasAPeso > 0) {
+    console.log(`[magnitudes] ${data.numero_documento}: ${cambiadasAPeso} línea(s) guardadas por peso (precio por kilo/litro).`);
+  }
+  const avisoMagnitud = avisoMagnitudes(productos.map((p: {
+    nombre: string; cantidad: number; unidad: string; precio_unitario: number | null; total: number | null;
+    sugerencia_magnitud: number | null;
+  }) => ({ ...p, sugerencia: p.sugerencia_magnitud })));
 
   return {
     tipo,
@@ -125,6 +156,9 @@ export function normalizarDatos(data: any) {
     observaciones: data.observaciones || null,
     resumen: data.resumen || null,
     productos,
+    /** Avisos de la normalización de cantidades (no van a ninguna columna:
+     *  los llamantes los añaden a alertasPrevias). */
+    avisos: avisoMagnitud ? [avisoMagnitud] : [],
   };
 }
 
@@ -247,6 +281,7 @@ export async function extraerDocumentoUnico(
     ...discordancias,
     ...(alertaRecuento ? [alertaRecuento] : []),
     ...(deduccion ? [deduccion.alerta] : []),
+    ...datos.avisos,
   ] as unknown as Record<string, unknown>[];
 
   console.log(

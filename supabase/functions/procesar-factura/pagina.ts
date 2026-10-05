@@ -189,10 +189,26 @@ export const PAGINA_JSON_SCHEMA = {
           ],
           properties: {
             nombre: { type: "string", description: "Descripción sin códigos ni lote. PUEDE REPETIRSE." },
-            cantidad: { type: "number", description: "Unidades de venta; si se factura al peso, los kilos." },
-            unidad: { type: "string" },
-            peso_kg: { ...numNull, description: "Solo si hay columna de peso APARTE de la cantidad." },
-            base_precio: { type: "string", enum: ["por_unidad", "por_kg", "por_litro", "desconocida"] },
+            cantidad: {
+              type: "number",
+              description:
+                "La columna de unidades/bultos (Uds, Cant.). Si no hay columna de unidades y solo hay kilos o " +
+                "litros, esos kilos/litros.",
+            },
+            unidad: { type: "string", description: "'ud', 'kg', 'l'… la unidad de 'cantidad'." },
+            peso_kg: {
+              ...numNull,
+              description:
+                "Kilos (o litros) de la fila, SOLO si hay columna de peso/volumen APARTE de la de unidades " +
+                "(Kilos, Kg, Peso, Neto). Cópiala aunque el precio sea por unidad.",
+            },
+            base_precio: {
+              type: "string",
+              enum: ["por_unidad", "por_kg", "por_litro", "desconocida"],
+              description:
+                "Qué multiplica el precio: 'por_kg' si Kilos × Precio = Importe (12 uds, 24,00 kg, 4,14 → " +
+                "99,46), 'por_unidad' si Uds × Precio = Importe. No cambies números para que cuadre.",
+            },
             precio_unitario: { ...numNull, description: "Tal como está impreso; null si no se imprime." },
             total: { ...numNull, description: "Importe de la línea tal como está impreso; null si no se ve." },
             importe_literal: { ...strNull, description: "Los caracteres del importe de la línea ('1,547.26')." },

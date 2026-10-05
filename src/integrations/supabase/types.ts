@@ -3237,6 +3237,7 @@ export type Database = {
       productos_factura: {
         Row: {
           albaran_ref: string | null
+          bultos: number | null
           cantidad: number
           created_at: string | null
           embedding: string | null
@@ -3252,6 +3253,7 @@ export type Database = {
         }
         Insert: {
           albaran_ref?: string | null
+          bultos?: number | null
           cantidad?: number
           created_at?: string | null
           embedding?: string | null
@@ -3267,6 +3269,7 @@ export type Database = {
         }
         Update: {
           albaran_ref?: string | null
+          bultos?: number | null
           cantidad?: number
           created_at?: string | null
           embedding?: string | null

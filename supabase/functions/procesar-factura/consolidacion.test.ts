@@ -326,6 +326,26 @@ describe("consolidar · Luga en FRANJAS con solape", () => {
     expect(listo.totalOrigen).toBe("deducido");
   });
 
+  it("kilos y bultos: las 54 se guardan cuadrando (19 por kilo con sus uds, 35 en ud) y sin avisos de cantidad", () => {
+    const c = consolidar(lugaPorFranjas([12, 24, 36, 46, 54], 3));
+    const listo = prepararDocumentoConsolidado(c);
+    const ps = listo.datos.productos;
+    expect(ps).toHaveLength(54);
+    const tol = (q: number) => Math.max(0.05, Math.abs(q) * 0.005 + 0.01);
+    expect(ps.filter((p) => Math.abs(p.cantidad * (p.precio_unitario as number) - (p.total as number)) > tol(p.cantidad)))
+      .toEqual([]);
+    expect(ps.filter((p) => p.unidad === "kg").map((p) => p.bultos)).toEqual(
+      [1, 12, 1, 24, 1, 12, 1, 3, 1, 12, 1, 1, 1, 12, 3, 8, 1, 12, 1],
+    );
+    expect(ps.filter((p) => p.unidad === "ud" && p.bultos === null)).toHaveLength(35);
+    expect(ps[2]).toMatchObject({ cantidad: 24, unidad: "kg", bultos: 12, precio_unitario: 4.14, total: 99.46 });
+    expect(ps[17]).toMatchObject({ cantidad: 15, unidad: "kg", bultos: 3, total: 87 });
+    expect(ps[44]).toMatchObject({ cantidad: 75.48, unidad: "kg", bultos: 8, total: 1547.26 });
+    expect(ps[1]).toMatchObject({ cantidad: 2, unidad: "kg", bultos: 1, total: 8.4 });
+    expect(ps[4]).toMatchObject({ cantidad: 3, unidad: "ud", bultos: null }); // LAMINAS: por unidad
+    expect(listo.alertasPrevias.map((a) => a.codigo)).toEqual(["total_deducido"]);
+  });
+
   it("dedup DIFUSA: la copia repetida trae un dígito distinto y otro nombre abreviado → se quita igual", () => {
     const c = consolidar(lugaPorFranjas([12, 24, 36, 46, 54], 3, (franja, l, g) => {
       // En la franja siguiente, la primera fila del solape se lee con un

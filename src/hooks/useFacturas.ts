@@ -8,6 +8,13 @@ export interface ProductoFactura {
   precio: number;
   cantidad?: number;
   unidad?: string | null;
+  /**
+   * Unidades/bultos de una línea facturada por peso o volumen
+   * (`productos_factura.bultos`, migración 20261005150000): «12 ud · 24 kg».
+   * En ese caso `cantidad` son los kilos y `precio_unitario` es por kilo.
+   * null/ausente si la línea va por unidades.
+   */
+  bultos?: number | null;
   proveedor: string | null;
   precio_unitario?: number;
 }
@@ -65,24 +72,35 @@ export interface Factura {
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
 
-const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
-  // Una sola query con JOIN — se evita el N+1 de queries separadas
-  const { data, error } = await supabase
-    .from('facturas')
-    .select(`
+const columnasDocumento = (conBultos: boolean) => `
       id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
-        id, nombre, precio_unitario, cantidad, unidad, total
+        id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}
       )
-    `)
-    .eq('tipo', tipo)
-    .order('fecha', { ascending: false })
-    // Las líneas en el orden impreso: se insertan en ese orden (también las de
-    // los documentos largos, 04b), así que el id lo reproduce sin depender de
-    // la columna `orden` (migración 20261005120000, puede no estar aplicada).
-    .order('id', { referencedTable: 'productos_factura', ascending: true });
+    `;
+
+const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
+  // Una sola query con JOIN — se evita el N+1 de queries separadas
+  const consultar = (conBultos: boolean) =>
+    supabase
+      .from('facturas')
+      .select(columnasDocumento(conBultos))
+      .eq('tipo', tipo)
+      .order('fecha', { ascending: false })
+      // Las líneas en el orden impreso: se insertan en ese orden (también las de
+      // los documentos largos, 04b), así que el id lo reproduce sin depender de
+      // la columna `orden` (migración 20261005120000, puede no estar aplicada).
+      .order('id', { referencedTable: 'productos_factura', ascending: true });
+
+  let { data, error } = await consultar(true);
+  // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
+  // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
+  // listado de facturas vacío.
+  if (error && /bultos/i.test(error.message ?? '')) {
+    ({ data, error } = await consultar(false));
+  }
 
   if (error) throw error;
   if (!data || data.length === 0) return [];
@@ -98,6 +116,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
         precio: totalProducto,
         cantidad,
         unidad: p.unidad ?? null,
+        bultos: p.bultos != null ? Number(p.bultos) : null,
         proveedor: null,
         precio_unitario: precioUnitario,
       };

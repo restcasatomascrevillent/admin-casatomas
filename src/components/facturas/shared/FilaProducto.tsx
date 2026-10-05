@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCurrency } from "./formatters";
+import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
 
 export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isMobile?: boolean, allDocs: Factura[] }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -78,7 +78,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
         </Button>
         <span className="font-medium text-foreground mb-1 min-h-6 pr-11">{p.producto_nombre}</span>
         <div className="flex justify-between text-muted-foreground items-center">
-          <span>{p.cantidad ?? "-"} {p.unidad || ""} × {formatCurrency(p.precio_unitario ?? null)}</span>
+          <span>{formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}</span>
           <div className="flex items-center gap-1.5">
             {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
             <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
@@ -150,8 +150,14 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
           <span className="truncate" title={p.producto_nombre}>{p.producto_nombre}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right text-muted-foreground whitespace-nowrap">
-        <span className="font-semibold text-foreground mr-1">{p.cantidad ?? "-"}</span>
+      <TableCell className="py-2.5 text-right text-muted-foreground whitespace-nowrap" title={formatCantidadLinea(p)}>
+        {/* Línea por peso: las unidades encima («12 ud ·») y los kilos, que son
+            lo que multiplica el precio, en la línea principal. La columna mide
+            92-120 px y «12 ud · 75,48 kg» no cabe en una sola línea. */}
+        {p.bultos != null && p.bultos !== 0 && (
+          <span className="block text-xs">{formatNumero(p.bultos)} ud ·</span>
+        )}
+        <span className="font-semibold text-foreground mr-1">{p.cantidad != null ? formatNumero(p.cantidad) : "-"}</span>
         <span className="text-xs">{p.unidad || ""}</span>
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">

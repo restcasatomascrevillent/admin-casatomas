@@ -1,10 +1,30 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import type { AlertaValidacion, Factura } from "@/hooks/useFacturas";
+import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 
 export const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
   return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
+};
+
+/** Cantidad con coma decimal y hasta 3 decimales (los kilos van al gramo): 75,48 · 24 · 1,5. */
+export const formatNumero = (value: number): string =>
+  new Intl.NumberFormat("es-ES", { maximumFractionDigits: 3 }).format(value);
+
+/**
+ * «24 kg», «3 ud» o, si la línea se factura por peso y trae sus unidades
+ * (`bultos`), «12 ud · 24 kg». La cantidad es siempre la magnitud por la que
+ * se multiplica el precio (kilos si el precio es por kilo).
+ */
+export const formatCantidadLinea = (
+  p: Pick<ProductoFactura, "cantidad" | "unidad" | "bultos">,
+): string => {
+  const cantidad =
+    p.cantidad === null || p.cantidad === undefined
+      ? "-"
+      : `${formatNumero(p.cantidad)}${p.unidad ? ` ${p.unidad}` : ""}`;
+  if (p.bultos === null || p.bultos === undefined || p.bultos === 0) return cantidad;
+  return `${formatNumero(p.bultos)} ud · ${cantidad}`;
 };
 
 export const formatDate = (dateString: string | null): string => {

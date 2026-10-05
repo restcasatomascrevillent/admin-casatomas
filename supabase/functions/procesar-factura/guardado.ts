@@ -132,7 +132,7 @@ function textoEmbedding(d: DatosNormalizados): string {
     }`;
 }
 
-function filasProductos(d: DatosNormalizados, embeddings: number[][], conColumnas04b: boolean) {
+function filasProductos(d: DatosNormalizados, embeddings: number[][], conColumnas04b: boolean, conBultos = true) {
   return d.productos.map((p, i) => ({
     nombre: p.nombre,
     cantidad: p.cantidad,
@@ -141,7 +141,16 @@ function filasProductos(d: DatosNormalizados, embeddings: number[][], conColumna
     total: p.total,
     embedding: embeddings[i] ? vec(embeddings[i]) : null,
     ...(conColumnas04b ? { pagina: p.pagina ?? 1, orden: p.orden ?? i, albaran_ref: p.albaran_ref ?? null } : {}),
+    // Unidades/bultos de una línea guardada por peso (migración
+    // 20261005150000). Solo se manda si hay valor: un documento sin líneas al
+    // peso se guarda igual aunque la columna aún no exista.
+    ...(conBultos && p.bultos !== null && p.bultos !== undefined ? { bultos: p.bultos } : {}),
   }));
+}
+
+/** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
+export function faltaColumnaBultos(msg: string | undefined | null): boolean {
+  return !!msg && /bultos/i.test(msg) && /column|columna|schema cache/i.test(msg);
 }
 
 /** Mezcla alertas pre-guardado con las de validar_cordura_factura (manda SQL por código). */
@@ -305,8 +314,14 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 7) Líneas (embeddings en lotes de 100)
     if (d.productos.length > 0) {
       const embs = await openai.embed(d.productos.map((p) => p.nombre));
-      const { error } = await supabase.from("productos_factura")
-        .insert(filasProductos(d, embs, conColumnas04b).map((f) => ({ factura_id: facturaId, ...f })));
+      const insertar = (conBultos: boolean) =>
+        supabase.from("productos_factura")
+          .insert(filasProductos(d, embs, conColumnas04b, conBultos).map((f) => ({ factura_id: facturaId, ...f })));
+      let { error } = await insertar(true);
+      if (error && faltaColumnaBultos(error.message)) {
+        console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
+        ({ error } = await insertar(false));
+      }
       if (error) throw new Error(`insert productos: ${error.message}`);
     }
 

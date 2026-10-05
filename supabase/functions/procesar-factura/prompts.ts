@@ -44,6 +44,10 @@ export const CIF_CLIENTE = "B54583356";
 //      Ahora es un paso obligatorio.
 //   7. No decía nada del formato de fecha de entrada. En España se escribe
 //      DD/MM/AAAA y el modelo puede leerlo como MM/DD. Ahora es explícito.
+//   8. (05-oct-2026, Luga ML/101511) Con columnas «Uds | Kilos | Precio» el
+//      precio es por kilo: la sección B pide las Uds en `cantidad`, los
+//      kilos en `peso_kg` y qué multiplica el precio en `base_precio`. La
+//      cantidad que se GUARDA la decide después magnitudes.ts por aritmética.
 export const VISION_SYSTEM_PROMPT = `Eres un sistema experto de análisis documental para contabilidad en España.
 
 Analizas VISUALMENTE documentos comerciales españoles (facturas y albaranes) de un RESTAURANTE y extraes sus datos. La forma exacta de la salida la impone el esquema JSON de la respuesta; tú concéntrate en LEER BIEN.
@@ -174,14 +178,25 @@ A1. UNA COLUMNA DE NÚMEROS NO ES AUTOMÁTICAMENTE DINERO.
    símbolo de euro ni total a pagar en toda la página.
 
 B. PRECIO UNITARIO vs PRECIO POR KILO. Muchos proveedores de alimentación
-   facturan al peso. Si la columna de precio dice €/kg, EUR/Kg, "precio kilo"
-   o similar, entonces:
-     - precio_unitario es el precio POR KILO
-     - base_precio = "por_kg"
-     - cantidad son los KILOS (puede llevar decimales: 7.35)
-   Si el precio es por pieza o por unidad de venta, base_precio = "por_unidad".
-   Regla que decide siempre: elige la combinación que cumpla
-   cantidad × precio_unitario = total_línea.
+   facturan al peso. Lee cada columna en su campo y di a qué se refiere el
+   precio:
+     - Si la tabla trae UNIDADES y KILOS (o litros) en columnas distintas
+       ("Uds | Kilos | Precio | Dto% | Importe"): cantidad = las Uds,
+       unidad = "ud", peso_kg = los Kilos. Las dos columnas, siempre.
+     - Si solo trae los kilos (o litros) de la línea: cantidad = esos kilos
+       (pueden llevar decimales: 7.35), unidad = "kg" (o "l"), peso_kg = null.
+     - base_precio dice QUÉ MULTIPLICA el precio: "por_kg" si son los kilos,
+       "por_litro" si son los litros, "por_unidad" si son las unidades. Si la
+       columna dice €/kg o "precio kilo", es "por_kg". Si no lo dice, decídelo
+       con la aritmética de la fila, sin cambiar ningún número:
+         Uds 12 | Kilos 24,00 | Precio 4,14 | Importe 99,46
+           12 × 4,14 = 49,68 no da el importe; 24 × 4,14 = 99,36 sí
+           → cantidad 12, unidad "ud", peso_kg 24, base_precio "por_kg"
+         Uds 3 | Kilos 1,50 | Precio 17,84 | Importe 53,53
+           3 × 17,84 = 53,52 sí da el importe
+           → cantidad 3, unidad "ud", peso_kg 1.5, base_precio "por_unidad"
+       Un descuento (Dto%) rebaja el importe: la que cuadra es la que, con el
+       descuento aplicado, da el importe impreso.
    Si el documento muestra a la vez un precio por kilo y un precio por pieza,
    pon en precio_unitario el que cuadre con el total de la línea, y marca
    base_precio en consecuencia.

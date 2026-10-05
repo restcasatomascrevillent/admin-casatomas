@@ -38,6 +38,9 @@
 //  verificar el import map en un deploy de preview ANTES de tocar produccion.
 // ============================================================================
 
+// Unica dependencia: otro modulo puro del mismo directorio (sin red ni Deno).
+import { resolverMagnitud } from "./magnitudes.ts";
+
 // ─── 1. Esquema estricto para OpenAI Structured Outputs ─────────────────────
 //
 //  Reglas del modo `strict: true` que este objeto respeta (saltarselas es un
@@ -169,24 +172,34 @@ export const DOCUMENTO_JSON_SCHEMA = {
             },
             cantidad: {
               type: "number",
-              description: "Cuantas unidades de venta se entregan (piezas, cajas, botellas). Si la linea se factura al peso, aqui van los kilos y puede llevar decimales.",
+              description:
+                "La columna de UNIDADES/BULTOS tal como esta impresa (Uds, Cant., Bultos, Cajas): piezas, " +
+                "cajas, botellas. Si el documento NO trae columna de unidades y solo trae los kilos o litros " +
+                "de la linea, aqui van esos kilos/litros (con decimales).",
             },
             unidad: {
               type: "string",
-              description: "Unidad de 'cantidad' tal como la expresa el documento: ud, kg, l, caja, docena... Si no consta, 'ud'.",
+              description:
+                "Unidad de 'cantidad': 'ud' para unidades, piezas o bultos; 'kg' o 'l' si 'cantidad' son kilos o " +
+                "litros; 'caja', 'docena'... si el documento lo dice asi. Si no consta, 'ud'.",
             },
             peso_kg: {
               type: ["number", "null"],
               description:
-                "Peso en kilos, SOLO si el documento trae una columna de peso APARTE de la cantidad. Muchos albaranes de carne y pescado traen las dos: 12 piezas que pesan 111,8 kg. Ese numero es un PESO, no euros: no lo pongas nunca en 'total'. null si no hay columna de peso.",
+                "Kilos (o litros) de la linea, SOLO si el documento trae una columna de peso o volumen APARTE " +
+                "de la de unidades (Kilos, Kg, Peso, Neto, Litros). Copiala aunque el precio sea por unidad. " +
+                "Muchos albaranes y facturas de alimentacion traen las dos: 12 uds que pesan 24,00 kg. Ese " +
+                "numero es un PESO, no euros: no lo pongas nunca en 'total'. null si no hay esa columna.",
             },
             base_precio: {
               type: "string",
               enum: ["por_unidad", "por_kg", "por_litro", "desconocida"],
               description:
-                "A que se refiere precio_unitario. Es lo que evita confundir un precio POR KILO con el " +
-                "precio de una PIEZA: si la columna dice EUR/kg, es 'por_kg'. Describe la columna que trae " +
-                "el documento; no ajustes ningun numero para que la multiplicacion cuadre.",
+                "A que magnitud se refiere precio_unitario: 'por_kg' si el precio multiplica los KILOS, " +
+                "'por_litro' si multiplica los litros, 'por_unidad' si multiplica las unidades. Si hay columna " +
+                "de unidades y de kilos, decidelo con la aritmetica de la fila: si Uds x Precio no da el " +
+                "Importe pero Kilos x Precio si (12 uds, 24,00 kg, 4,14 -> 99,46 = 24 x 4,14), es 'por_kg'. " +
+                "Describe lo que pone el documento; no cambies ningun numero para que la multiplicacion cuadre.",
             },
             precio_unitario: {
               type: ["number", "null"],
@@ -669,6 +682,11 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
     if (l.bonificada) return;
     if (!esNumeroFinito(l.precio_unitario) || !esNumeroFinito(l.total)) return;
     if (l.precio_unitario <= 0 || l.cantidad <= 0 || l.total <= 0) return;
+    // Línea al peso con columna de kilos aparte (Luga: 12 uds · 24 kg · 4,14 →
+    // 99,46): la cuadra el peso y se guardará por kilos (magnitudes.ts). No es
+    // un descuadre ni motivo de relectura.
+    const regla = resolverMagnitud(l).regla;
+    if (regla === "peso_cuadra" || regla === "peso_con_descuento") return;
     const esperado = l.precio_unitario * l.cantidad;
     if (Math.abs(esperado - l.total) <= ABS_LINEA_MIN) return;
     const ratio = l.total / esperado;
