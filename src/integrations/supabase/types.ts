@@ -1503,6 +1503,8 @@ export type Database = {
           iva: number | null
           numero_documento: string
           observaciones: string | null
+          ocr_trabajo_id: string | null
+          paginas: number
           procesado_en: string | null
           proveedor: string | null
           proveedor_normalizado: string | null
@@ -1527,6 +1529,8 @@ export type Database = {
           iva?: number | null
           numero_documento: string
           observaciones?: string | null
+          ocr_trabajo_id?: string | null
+          paginas?: number
           procesado_en?: string | null
           proveedor?: string | null
           proveedor_normalizado?: string | null
@@ -1551,6 +1555,8 @@ export type Database = {
           iva?: number | null
           numero_documento?: string
           observaciones?: string | null
+          ocr_trabajo_id?: string | null
+          paginas?: number
           procesado_en?: string | null
           proveedor?: string | null
           proveedor_normalizado?: string | null
@@ -1562,7 +1568,62 @@ export type Database = {
           updated_at?: string | null
           verificada?: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "facturas_ocr_trabajo_fk"
+            columns: ["ocr_trabajo_id"]
+            isOneToOne: true
+            referencedRelation: "ocr_trabajos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturas_sustituciones: {
+        Row: {
+          factura_antes: Json
+          factura_id: number
+          historial_antes: Json
+          id: number
+          productos_antes: Json
+          resumen_antes: Json
+          resumen_despues: Json | null
+          sustituida_at: string
+          sustituida_por: string | null
+          trabajo_id: string | null
+        }
+        Insert: {
+          factura_antes: Json
+          factura_id: number
+          historial_antes: Json
+          id?: number
+          productos_antes: Json
+          resumen_antes: Json
+          resumen_despues?: Json | null
+          sustituida_at?: string
+          sustituida_por?: string | null
+          trabajo_id?: string | null
+        }
+        Update: {
+          factura_antes?: Json
+          factura_id?: number
+          historial_antes?: Json
+          id?: number
+          productos_antes?: Json
+          resumen_antes?: Json
+          resumen_despues?: Json | null
+          sustituida_at?: string
+          sustituida_por?: string | null
+          trabajo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturas_sustituciones_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "ocr_trabajos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       favoritos: {
         Row: {
@@ -2589,6 +2650,202 @@ export type Database = {
         }
         Relationships: []
       }
+      ocr_trabajo_paginas: {
+        Row: {
+          bytes: number
+          coste_usd: number | null
+          created_at: string
+          despachada_at: string | null
+          duracion_ms: number | null
+          error: string | null
+          estado: string
+          filas_contadas: number | null
+          filas_extraidas: number | null
+          franja: number | null
+          franjas_pagina: number | null
+          id: number
+          intentos: number
+          lease_hasta: string | null
+          mime: string
+          motivo_relectura: Json | null
+          motivos: Json | null
+          no_antes_de: string
+          numero: number
+          pagina_doc: number
+          pieza: string
+          recuento: Json | null
+          relecturas: number
+          resultado: Json | null
+          storage_path: string
+          tokens_entrada: number | null
+          tokens_salida: number | null
+          trabajo_id: string
+          updated_at: string
+          verificacion_pie: Json | null
+        }
+        Insert: {
+          bytes: number
+          coste_usd?: number | null
+          created_at?: string
+          despachada_at?: string | null
+          duracion_ms?: number | null
+          error?: string | null
+          estado?: string
+          filas_contadas?: number | null
+          filas_extraidas?: number | null
+          franja?: number | null
+          franjas_pagina?: number | null
+          id?: number
+          intentos?: number
+          lease_hasta?: string | null
+          mime: string
+          motivo_relectura?: Json | null
+          motivos?: Json | null
+          no_antes_de?: string
+          numero: number
+          pagina_doc?: number
+          pieza?: string
+          recuento?: Json | null
+          relecturas?: number
+          resultado?: Json | null
+          storage_path: string
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          trabajo_id: string
+          updated_at?: string
+          verificacion_pie?: Json | null
+        }
+        Update: {
+          bytes?: number
+          coste_usd?: number | null
+          created_at?: string
+          despachada_at?: string | null
+          duracion_ms?: number | null
+          error?: string | null
+          estado?: string
+          filas_contadas?: number | null
+          filas_extraidas?: number | null
+          franja?: number | null
+          franjas_pagina?: number | null
+          id?: number
+          intentos?: number
+          lease_hasta?: string | null
+          mime?: string
+          motivo_relectura?: Json | null
+          motivos?: Json | null
+          no_antes_de?: string
+          numero?: number
+          pagina_doc?: number
+          pieza?: string
+          recuento?: Json | null
+          relecturas?: number
+          resultado?: Json | null
+          storage_path?: string
+          tokens_entrada?: number | null
+          tokens_salida?: number | null
+          trabajo_id?: string
+          updated_at?: string
+          verificacion_pie?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocr_trabajo_paginas_trabajo_id_fkey"
+            columns: ["trabajo_id"]
+            isOneToOne: false
+            referencedRelation: "ocr_trabajos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ocr_trabajos: {
+        Row: {
+          consolidar_despachado_at: string | null
+          contexto_p1: Json | null
+          coste_usd: number
+          creado_por: string
+          created_at: string
+          documento_pendiente: Json | null
+          error: string | null
+          estado: string
+          factura_id: number | null
+          id: string
+          intentos_consolidacion: number
+          lease_hasta: string | null
+          limite_at: string
+          modelo: string | null
+          nombre_original: string
+          num_paginas: number
+          origen: string
+          original_mime: string | null
+          original_path: string | null
+          paginas_documento: number
+          resultado: Json | null
+          ronda_relectura: number
+          terminado_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          consolidar_despachado_at?: string | null
+          contexto_p1?: Json | null
+          coste_usd?: number
+          creado_por: string
+          created_at?: string
+          documento_pendiente?: Json | null
+          error?: string | null
+          estado?: string
+          factura_id?: number | null
+          id: string
+          intentos_consolidacion?: number
+          lease_hasta?: string | null
+          limite_at?: string
+          modelo?: string | null
+          nombre_original: string
+          num_paginas: number
+          origen: string
+          original_mime?: string | null
+          original_path?: string | null
+          paginas_documento?: number
+          resultado?: Json | null
+          ronda_relectura?: number
+          terminado_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          consolidar_despachado_at?: string | null
+          contexto_p1?: Json | null
+          coste_usd?: number
+          creado_por?: string
+          created_at?: string
+          documento_pendiente?: Json | null
+          error?: string | null
+          estado?: string
+          factura_id?: number | null
+          id?: string
+          intentos_consolidacion?: number
+          lease_hasta?: string | null
+          limite_at?: string
+          modelo?: string | null
+          nombre_original?: string
+          num_paginas?: number
+          origen?: string
+          original_mime?: string | null
+          original_path?: string | null
+          paginas_documento?: number
+          resultado?: Json | null
+          ronda_relectura?: number
+          terminado_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ocr_trabajos_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_ecommerce: {
         Row: {
           caja: string | null
@@ -2979,6 +3236,7 @@ export type Database = {
       }
       productos_factura: {
         Row: {
+          albaran_ref: string | null
           cantidad: number
           created_at: string | null
           embedding: string | null
@@ -2986,11 +3244,14 @@ export type Database = {
           id: number
           nombre: string
           nombre_normalizado: string | null
+          orden: number | null
+          pagina: number | null
           precio_unitario: number | null
           total: number | null
           unidad: string | null
         }
         Insert: {
+          albaran_ref?: string | null
           cantidad?: number
           created_at?: string | null
           embedding?: string | null
@@ -2998,11 +3259,14 @@ export type Database = {
           id?: number
           nombre: string
           nombre_normalizado?: string | null
+          orden?: number | null
+          pagina?: number | null
           precio_unitario?: number | null
           total?: number | null
           unidad?: string | null
         }
         Update: {
+          albaran_ref?: string | null
           cantidad?: number
           created_at?: string | null
           embedding?: string | null
@@ -3010,6 +3274,8 @@ export type Database = {
           id?: number
           nombre?: string
           nombre_normalizado?: string | null
+          orden?: number | null
+          pagina?: number | null
           precio_unitario?: number | null
           total?: number | null
           unidad?: string | null

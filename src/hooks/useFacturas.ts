@@ -78,7 +78,11 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       )
     `)
     .eq('tipo', tipo)
-    .order('fecha', { ascending: false });
+    .order('fecha', { ascending: false })
+    // Las líneas en el orden impreso: se insertan en ese orden (también las de
+    // los documentos largos, 04b), así que el id lo reproduce sin depender de
+    // la columna `orden` (migración 20261005120000, puede no estar aplicada).
+    .order('id', { referencedTable: 'productos_factura', ascending: true });
 
   if (error) throw error;
   if (!data || data.length === 0) return [];

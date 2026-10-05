@@ -84,6 +84,16 @@ verify_jwt = false
 [functions.newsletter-sync-resend]
 verify_jwt = false
 
+# OCR de documentos largos en segundo plano (04b). La llama SOLO Postgres
+# (net.http_post desde ocr_despachar() y el cron reanudar-trabajos-ocr), sin
+# usuario ni JWT. Autenticación real: cabecera x-ocr-secret ==
+# OCR_TRABAJOS_SECRET (tiempo constante, FALLA CERRADO -> 500 si falta). El
+# valor sale del secreto de Vault 'ocr_trabajos_secret'. Solo acepta ids, nunca
+# rutas. Ver supabase/functions/ocr-trabajo/index.ts y la migración
+# 20261005120000_ocr_trabajos_multipagina.sql.
+[functions.ocr-trabajo]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima

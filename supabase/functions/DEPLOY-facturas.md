@@ -124,3 +124,79 @@ seguridad si Drive falla.
   marcado en `alertas_validacion` (3 alertas de severidad alta). **La correccion del
   importe es decision del dueño**: no se ha tocado el dato.
 - Los 4 secrets de Google Drive siguen sin configurar (ver §1 de este documento).
+
+---
+
+## 7. Documentos largos y «Sustituir la existente» (octubre de 2026)
+
+Diseño: `docs/funcionalidades/04b-facturas-multipagina-plan.md` (raíz del repo
+`codigo-restaurante`). Qué cambia para el usuario: **nada que pulsar**. Una imagen muy
+alta (captura de móvil con varias páginas de un PDF apiladas) o un PDF de varias páginas
+se trocea en el navegador y se lee en segundo plano por trozos; el resto de documentos
+sigue por el camino de siempre. Si un documento ya existe, el panel ofrece
+**«Sustituir la existente»** (con confirmación que enseña la fila actual).
+
+**Orden obligatorio** (todo desde `adminpanelct/`; Claude no puede desplegar ni aplicar):
+
+```bash
+# 1) Migración (+ su test, que termina en ROLLBACK y no deja nada)
+npx supabase db query --linked -f supabase/migrations/20261005120000_ocr_trabajos_multipagina.sql
+#    → tiene que imprimir «ocr_trabajos_multipagina: aplicada | <nº líneas> | true | false»
+npx supabase db query --linked -f supabase/tests/ocr_trabajos_multipagina_test.sql
+#    → «ocr_trabajos_multipagina_test: OK»
+
+# 2) Funciones (procesar-factura sigue funcionando aunque se despliegue antes que la
+#    migración; ocr-trabajo necesita la migración)
+npx supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
+npx supabase functions deploy ocr-trabajo      --project-ref jeamoczmbfsnwkfjxcyo
+
+# 3) Secreto compartido de ocr-trabajo (un valor aleatorio largo; NO lo pegues en ningún chat)
+#    PowerShell:  -join ((48..57)+(97..102) | Get-Random -Count 64 | % {[char]$_})
+#    Git Bash:    openssl rand -hex 32
+npx supabase secrets set OCR_TRABAJOS_SECRET=<VALOR> --project-ref jeamoczmbfsnwkfjxcyo
+#    Modelo (opcional; por defecto gpt-5.6-luna con detail original, ver 04b §1.14):
+#    npx supabase secrets set OCR_MODELO=gpt-5.4-mini --project-ref jeamoczmbfsnwkfjxcyo
+#    npx supabase secrets set OCR_MODELO_PIEZAS=gpt-5.6-luna --project-ref jeamoczmbfsnwkfjxcyo
+```
+
+```sql
+-- 4) EL MISMO valor en Vault (SQL Editor de Supabase). Hasta este paso el cron está
+--    instalado pero MUDO: no llama a nada.
+select vault.create_secret('<VALOR>', 'ocr_trabajos_secret');
+
+-- 5) Comprobaciones
+select jobname, schedule, active from cron.job where jobname = 'reanudar-trabajos-ocr';
+--    → reanudar-trabajos-ocr | * * * * * | true
+select count(*) from vault.secrets where name = 'ocr_trabajos_secret';   -- → 1
+-- Tras subir el primer documento largo:
+select id, estado, num_paginas, coste_usd, error from public.ocr_trabajos order by created_at desc limit 5;
+select status_code, count(*) from net._http_response
+ where created > now() - interval '1 hour' group by 1;                    -- 202/200, nunca 401/500
+```
+
+- `ocr-trabajo` tiene `verify_jwt = false` (la llama pg_net, sin JWT) y se autentica con
+  la cabecera `x-ocr-secret`; sin `OCR_TRABAJOS_SECRET` responde 500 a todo (falla cerrado).
+- Para **rotar el secreto**: `secrets set` con el valor nuevo y
+  `select vault.update_secret((select id from vault.secrets where name='ocr_trabajos_secret'), '<NUEVO>');`
+- **Panel**: se puede publicar antes o después. Si el servidor aún no admite documentos
+  largos (función vieja o migración sin aplicar), el panel lo detecta y manda el
+  documento entero por el camino de una página, como hasta ahora.
+- **Volver atrás**: `supabase/rollbacks/20261005120000_ocr_trabajos_multipagina_ROLLBACK.sql`
+  (antes, desplegar la `procesar-factura` anterior y borrar `ocr-trabajo`).
+
+### Sustituir Luga (54) y Salazones Garre (39) cuando lleguen los PDF
+
+1. Facturas → Subir → «Elegir archivos» → el PDF (o la captura de 945×2048 que ya hay).
+   El PDF de Luga (2 páginas) se trocea solo por páginas; la captura, en 5 franjas.
+2. El resultado dirá «Ya existe la factura ML/101511 (8 líneas)…» con el botón
+   **Sustituir la existente** (exige permiso de EDICIÓN en Facturas).
+3. El diálogo enseña «Ahora» (total, nº de líneas, avisos) frente a «Documento nuevo».
+   Al confirmar, en una sola transacción: copia de la fila, sus líneas y su historial en
+   `facturas_sustituciones`; borra el historial de precios y las líneas viejas; actualiza
+   la cabecera con el **mismo id**; inserta las líneas nuevas (el trigger rehace el
+   historial); archiva el original nuevo y lo enlaza en `archivo_path`.
+4. Garre (39): el número guardado es «F/25011959»; aunque el PDF lo imprima
+   «F / 25011959» se detecta igual (comparación sin espacios ni signos). El CIF del
+   cliente (B54583356, MASIDE) ya no puede quedar como CIF del proveedor.
+5. Ver la copia de una sustitución:
+   `select id, factura_id, sustituida_at, resumen_antes, resumen_despues from facturas_sustituciones order by id desc;`

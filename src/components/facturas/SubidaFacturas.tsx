@@ -5,10 +5,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy, Camera, FolderOpen } from "lucide-react";
+import { Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, Receipt, Package, AlertTriangle, FileWarning, Copy, Camera, FolderOpen, Layers, Replace } from "lucide-react";
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
+import {
+  describirProgreso,
+  esperarTrabajo,
+  iniciarDocumentoLargo,
+  planificarDocumento,
+  SinDocumentosLargos,
+  type Sustituible,
+  sustituirExistente,
+} from "@/lib/facturas/documentoLargo";
+import { useTrabajosOcrEnCurso } from "@/hooks/useTrabajoOcr";
+import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
 
 interface ArchivoFactura {
   file: File;
@@ -37,6 +48,31 @@ interface ResultadoProcesamiento {
    * nuevo: parecia "procesado" cuando en realidad no se habia creado nada.
    */
   duplicado?: boolean;
+  /** Duplicado que se puede SUSTITUIR por el documento nuevo (ya leído). */
+  sustituible?: Sustituible | null;
+  /** Ya se ha sustituido la factura existente por este documento. */
+  sustituida?: boolean;
+  /** Documento largo leído por trozos (páginas o franjas). */
+  piezas?: number;
+}
+
+/** Respuesta de procesar-factura (síncrona) o resultado de un trabajo → fila. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función, se valida campo a campo
+function aResultado(nombre: string, data: any, piezas?: number): ResultadoProcesamiento {
+  if (!data?.success) {
+    return { nombre, success: false, error: data?.error || 'Error desconocido', piezas };
+  }
+  return {
+    nombre,
+    success: true,
+    respuesta: data.webhookResponse,
+    tipo: data.webhookResponse?.tipo || data.tipo,
+    alertas: Array.isArray(data.alertas) ? data.alertas : [],
+    archivoGuardado: data.duplicado === true ? undefined : data.archivo_guardado !== false,
+    duplicado: data.duplicado === true,
+    sustituible: data.sustituible ?? null,
+    piezas,
+  };
 }
 
 export function SubidaFacturas() {
@@ -54,6 +90,27 @@ export function SubidaFacturas() {
   // cámara directamente en vez del selector de archivos.
   const camaraInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const [aSustituir, setASustituir] = useState<{ indice: number; s: Sustituible } | null>(null);
+  // Documentos largos que siguen en segundo plano (p. ej. si se cerró la pestaña).
+  const { data: enCurso = [] } = useTrabajosOcrEnCurso();
+
+  const confirmarSustitucion = async (s: Sustituible) => {
+    const indice = aSustituir?.indice;
+    try {
+      const r = await sustituirExistente(s);
+      toast.success("Factura sustituida", { description: r.message });
+      if (indice !== undefined) {
+        setResultados((prev) => prev.map((x, i) => (i === indice
+          ? { ...x, duplicado: false, sustituida: true, sustituible: null, alertas: r.alertas as AlertaValidacion[] }
+          : x)));
+      }
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      setASustituir(null);
+    } catch (err) {
+      toast.error("No se ha sustituido", { description: err instanceof Error ? err.message : String(err) });
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -179,6 +236,33 @@ export function SubidaFacturas() {
     // Procesar todos los archivos en paralelo con Promise.allSettled
     const resultadosSettled = await Promise.allSettled(
       archivosConBase64.map(async ({ archivo, base64 }) => {
+        // Documento LARGO (imagen muy alta o PDF de varias páginas): se trocea
+        // aquí y se lee en segundo plano por trozos. Automático, sin botón.
+        // Si el servidor aún no lo admite, sigue por el camino de siempre.
+        let plan: Awaited<ReturnType<typeof planificarDocumento>> = { camino: "unico" };
+        try {
+          plan = await planificarDocumento(archivo.file);
+        } catch (err) {
+          console.warn("[subida] no se pudo trocear, se envía entero:", err);
+        }
+        if (plan.camino === "largo") {
+          try {
+            const inicio = await iniciarDocumentoLargo(archivo.file, plan, (n, t) =>
+              setProgreso((p) => ({ ...p, nombreActual: `${archivo.nombre}: subiendo trozo ${n} de ${t}…` })));
+            const fin = await esperarTrabajo(inicio.trabajoId, (t) =>
+              setProgreso((p) => ({ ...p, nombreActual: `${archivo.nombre}: ${describirProgreso(t)}` })));
+            completados += 1;
+            setProgreso({ total: archivos.length, actual: completados, nombreActual: `${completados} de ${archivos.length}` });
+            if (fin.estado === 'fallido' || fin.estado === 'cancelado') {
+              return { nombre: archivo.nombre, success: false, error: fin.error || 'No se pudo leer el documento', piezas: inicio.numPiezas } as ResultadoProcesamiento;
+            }
+            return aResultado(archivo.nombre, fin.resultado, inicio.numPiezas);
+          } catch (err) {
+            if (!(err instanceof SinDocumentosLargos)) throw err;
+            console.warn("[subida] el servidor aún no admite documentos largos; camino de una página:", err.message);
+          }
+        }
+
         const payload = {
           tipo: "AUTO",
           archivo: {
@@ -210,15 +294,7 @@ export function SubidaFacturas() {
           } as ResultadoProcesamiento;
         }
 
-        return {
-          nombre: archivo.nombre,
-          success: true,
-          respuesta: data.webhookResponse,
-          tipo: data.webhookResponse?.tipo || data.tipo,
-          alertas: Array.isArray(data.alertas) ? data.alertas : [],
-          archivoGuardado: data.archivo_guardado !== false,
-          duplicado: data.duplicado === true,
-        } as ResultadoProcesamiento;
+        return aResultado(archivo.nombre, data);
       })
     );
 
@@ -416,6 +492,21 @@ export function SubidaFacturas() {
           </div>
         )}
 
+        {/* Documentos largos que siguen leyéndose en segundo plano */}
+        {!isSubmitting && enCurso.length > 0 && (
+          <div className="rounded-md border border-dashed p-3 text-sm" role="status">
+            <p className="flex items-center gap-2 font-medium">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Leyendo en segundo plano
+            </p>
+            <ul className="mt-1 space-y-0.5 pl-6 text-xs text-muted-foreground">
+              {enCurso.map((t) => (
+                <li key={t.id}>{t.nombre_original}: {describirProgreso(t)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Lista de archivos */}
         {archivos.length > 0 && (
           <div className="space-y-3">
@@ -505,7 +596,33 @@ export function SubidaFacturas() {
                         un `title` (hover) y con el dedo no se podían leer. */}
                     {r.success && r.duplicado && (
                       <span className="basis-full pl-6 flex items-start gap-1 text-xs font-medium text-blue-600">
-                        <Copy className="mt-0.5 h-3 w-3 shrink-0" /> Ya existía un documento con el mismo número, proveedor, fecha y total: no se ha creado uno nuevo.
+                        <Copy className="mt-0.5 h-3 w-3 shrink-0" />
+                        {r.sustituible
+                          ? `Ya existe la factura ${r.sustituible.existente.numero_documento} (${r.sustituible.existente.lineas} líneas): no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.`
+                          : 'Ya existía un documento con el mismo número, proveedor, fecha y total: no se ha creado uno nuevo.'}
+                      </span>
+                    )}
+                    {r.success && r.duplicado && r.sustituible && (
+                      <div className="basis-full pl-6">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 gap-2"
+                          onClick={() => setASustituir({ indice: i, s: r.sustituible! })}
+                        >
+                          <Replace className="h-4 w-4" aria-hidden="true" />
+                          Sustituir la existente
+                        </Button>
+                      </div>
+                    )}
+                    {r.success && r.sustituida && (
+                      <span className="basis-full pl-6 flex items-start gap-1 text-xs font-medium text-green-700">
+                        <Replace className="mt-0.5 h-3 w-3 shrink-0" /> Factura existente sustituida por este documento.
+                      </span>
+                    )}
+                    {r.piezas && r.piezas > 1 && (
+                      <span className="basis-full pl-6 flex items-start gap-1 text-xs text-muted-foreground">
+                        <Layers className="mt-0.5 h-3 w-3 shrink-0" /> Documento largo: leído en {r.piezas} trozos y unido.
                       </span>
                     )}
                     {r.success && r.archivoGuardado === false && (
@@ -576,6 +693,11 @@ export function SubidaFacturas() {
           </Button>
         )}
       </CardContent>
+      <SustituirFacturaDialog
+        sustituible={aSustituir?.s ?? null}
+        onCancelar={() => setASustituir(null)}
+        onConfirmar={confirmarSustitucion}
+      />
     </Card>
   );
 }
