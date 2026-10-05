@@ -53,7 +53,7 @@ export function EstadisticasNewsletter() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 basis-64">
           <h3 className="text-lg font-semibold">Estadísticas de los correos</h3>
           <p className="text-sm text-muted-foreground">
             Cuenta todos los correos que envía el restaurante: los de las reservas y los de la newsletter. Cada correo

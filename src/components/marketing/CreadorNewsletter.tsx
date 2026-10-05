@@ -63,9 +63,13 @@ export function CreadorNewsletter() {
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-2">
-        {/* Left Column - Form */}
-        <div className="space-y-6">
+      {/* Desde `lg` (tablet apaisada y escritorio) las dos columnas van lado a
+          lado y llenan el alto de la pestaña (Marketing.tsx lo calcula): cada
+          una hace su propio scroll. Por debajo van apiladas y desplaza la
+          pestaña entera. */}
+      <div className="grid gap-6 lg:flex-1 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]">
+        {/* Columna del formulario */}
+        <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <Card>
             <CardHeader>
               <CardTitle>Crear newsletter</CardTitle>
@@ -163,17 +167,15 @@ export function CreadorNewsletter() {
           </Card>
         </div>
 
-        {/* Right Column - Preview */}
-        <div>
-          <div className="xl:sticky xl:top-6">
-            <Label className="mb-3 block">Vista previa del email</Label>
-            <PreviewNewsletter
-              tipo={tipo}
-              titulo={titulo}
-              mensaje={mensaje}
-              imagenUrl={imagenUrl}
-            />
-          </div>
+        {/* Columna de la vista previa: desde `lg` la tarjeta llena la columna y el correo se desplaza dentro */}
+        <div className="lg:flex lg:min-h-0 lg:flex-col">
+          <Label className="mb-3 block shrink-0">Vista previa del email</Label>
+          <PreviewNewsletter
+            tipo={tipo}
+            titulo={titulo}
+            mensaje={mensaje}
+            imagenUrl={imagenUrl}
+          />
         </div>
       </div>
 
