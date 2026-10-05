@@ -97,14 +97,18 @@ export function useEnviarNewsletter() {
       } else {
         toast.success('Newsletter enviada correctamente.');
       }
-      queryClient.invalidateQueries({ queryKey: ["newsletter-suscriptores"] });
-      // Historial y estado de Resend (useResendMarketing): el envío por Broadcast sincroniza antes.
-      queryClient.invalidateQueries({ queryKey: ["newsletter-envios-historial"] });
-      queryClient.invalidateQueries({ queryKey: ["newsletter-resend-estado"] });
     },
     onError: (error: Error) => {
       console.error('Envío de newsletter:', error.message);
       toast.error(`No se ha enviado la newsletter. ${textoErrorCliente(error.message)}`);
+    },
+    // También si falla: en modo Broadcast la función sincroniza ANTES de
+    // decidir si envía (y puede negarse después, 409/502), así que la lista de
+    // envío, las bajas reconciliadas y el historial pueden haber cambiado igual.
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["newsletter-suscriptores"] });
+      queryClient.invalidateQueries({ queryKey: ["newsletter-envios-historial"] });
+      queryClient.invalidateQueries({ queryKey: ["newsletter-resend-estado"] });
     },
   });
 }
