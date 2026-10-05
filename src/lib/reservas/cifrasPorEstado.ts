@@ -42,12 +42,22 @@
 // y `filtrarFilasUnificadas` (`vistaUnificada.ts`) con los mismos filtros y
 // `estado: "all"`. Nada de repetir aquí la lógica de búsqueda o canal: si cambia
 // allí, cambia aquí.
+//
+// LA CIFRA DEL BOTÓN «PENDIENTES» (2026-10-05): `cifraPorAtender`
+// ----------------------------------------------------------------------------
+//   Se cuenta igual que las del timeline —la lista con sus filtros MENOS el de
+//   estado— y es justo el número de filas que la lista enseña al pulsar el botón:
+//   las reservas `pendiente` MÁS las solicitudes del asistente sin resolver
+//   (`estaPorAtender`). A diferencia de las seis cifras de arriba, SÍ cuenta las
+//   solicitudes, porque el botón las enseña.
 // ============================================================================
 
 import { format, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
+import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { ORDEN_ESTADOS, type EstadoReserva } from "./estadosReserva";
 import {
+  FILTRO_POR_ATENDER,
   filtrarFilasUnificadas,
   unificarReservasYSolicitudes,
   type FiltrosListaUnificada,
@@ -110,6 +120,23 @@ export function cifrasDeLaLista<R extends ReservaListable>(
     estado: "all",
   });
   return recontar(filas.flatMap((fila) => (fila.tipo === "reserva" ? [fila.reserva] : [])));
+}
+
+/**
+ * La cifra del botón «Pendientes» de la Lista: las filas que la lista enseña al
+ * pulsarlo (reservas `pendiente` + solicitudes sin resolver), con sus filtros
+ * (búsqueda, fecha, canal) y SIN el de estado (`filtros.estado` se ignora). Como
+ * en la lista, lo que no es de Casa Tomás no entra. No toca lo que recibe.
+ */
+export function cifraPorAtender<R extends ReservaListable>(
+  reservas: readonly R[],
+  solicitudes: readonly SolicitudPendiente[],
+  filtros: FiltrosListaUnificada,
+): number {
+  return filtrarFilasUnificadas(unificarReservasYSolicitudes(reservas, solicitudes), {
+    ...filtros,
+    estado: FILTRO_POR_ATENDER,
+  }).length;
 }
 
 /** Cómo se rotulan las cifras: en la cabecera del timeline y en la lectura de cada una. */

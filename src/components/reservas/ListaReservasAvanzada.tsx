@@ -86,6 +86,7 @@ import {
 } from "@/lib/reservas/propuestaCliente";
 import { actualizacionPropuesta, type PropuestaSolicitud } from "@/lib/reservas/solicitudPropuesta";
 import {
+  FILTRO_POR_ATENDER,
   OPCIONES_FILTRO_ESTADO,
   esSolicitudAbierta,
   filtrarFilasUnificadas,
@@ -95,7 +96,7 @@ import {
 // «Cómo avanza una reserva» (2026-10-01): el timeline de la pestaña Hoy, con las cifras de lo que se ve
 // aquí (los filtros de la lista menos el de estado) y los estados pulsables como filtro.
 import { TimelineEstadosReserva } from "./TimelineEstadosReserva";
-import { alcanceCifrasDeLaLista, cifrasDeLaLista } from "@/lib/reservas/cifrasPorEstado";
+import { alcanceCifrasDeLaLista, cifraPorAtender, cifrasDeLaLista } from "@/lib/reservas/cifrasPorEstado";
 // Quién puede saltar al plano de su sala para que le den mesa, y con qué
 // texto cuando no puede. Módulo compartido con la pestaña Hoy a propósito: el
 // dueño pidió que las dos pantallas digan exactamente lo mismo.
@@ -346,6 +347,33 @@ function InsigniaEstado({ estado }: { estado: string }) {
       {info.etiqueta}
     </Badge>
   );
+}
+
+/**
+ * Opciones del desplegable «Canal» (los valores son los de `FiltrosListaUnificada.canal`). `corta` es lo que
+ * dice el desplegable CERRADO tras «Canal: »: sin el icono y con el nombre de la insignia de la columna Canal.
+ */
+const OPCIONES_FILTRO_CANAL: { value: string; label: string; corta?: string }[] = [
+  { value: "all", label: "Todos los canales" },
+  { value: "telefono", label: "📞 Tel", corta: "Teléfono" },
+  { value: "web", label: "🌐 Web", corta: "Web" },
+  { value: "manual", label: "✏️ Manual", corta: "Manual" },
+];
+
+/**
+ * Lo que dice un desplegable de filtro CERRADO (2026-10-05, petición del dueño: «en los dos filtros pon lo que
+ * es el filtro en lugar de "Todos" para que se entienda»): sin filtro, su nombre («Estado»); con un valor
+ * elegido, «Nombre: valor» («Estado: Pendiente», «Canal: Web»). Un valor que no está entre las opciones (una
+ * URL antigua, p. ej.) se enseña tal cual.
+ */
+function textoFiltroCerrado(
+  nombre: string,
+  valor: string,
+  opciones: readonly { value: string; label: string; corta?: string }[],
+): string {
+  if (valor === "all") return nombre;
+  const opcion = opciones.find((o) => o.value === valor);
+  return `${nombre}: ${opcion ? opcion.corta ?? opcion.label : valor}`;
 }
 
 interface ListaReservasAvanzadaProps {
@@ -711,6 +739,22 @@ export function ListaReservasAvanzada({
     () => alcanceCifrasDeLaLista({ fecha: dateFilter, filtroDeEstado: statusFilter !== "all" }),
     [dateFilter, statusFilter],
   );
+  // «Pendientes» (botón de la barra = opción `FILTRO_POR_ATENDER` del desplegable «Estado»). Su cifra se cuenta
+  // como las del timeline —la lista con sus filtros menos el de estado— pero con las solicitudes sin resolver,
+  // que el botón también enseña: es justo lo que se verá al pulsarlo (`cifraPorAtender`).
+  const soloPendientes = statusFilter === FILTRO_POR_ATENDER;
+  const cifraPendientes = useMemo(
+    () => cifraPorAtender(reservations, solicitudes, filtrosLista),
+    [reservations, solicitudes, filtrosLista],
+  );
+  // Lo que dicen los dos desplegables cerrados: «Estado» / «Estado: Pendiente», «Canal» / «Canal: Web».
+  const textoEstado = textoFiltroCerrado("Estado", statusFilter, OPCIONES_FILTRO_ESTADO);
+  const textoCanal = textoFiltroCerrado("Canal", canalFilter, OPCIONES_FILTRO_CANAL);
+  // Lista vacía: con «Pendientes» se dice que no queda nada pendiente (con los demás filtros, si los hay).
+  const hayOtrosFiltros = searchQuery.trim() !== "" || !!dateFilter || canalFilter !== "all";
+  const textoListaVacia = soloPendientes
+    ? `No hay nada pendiente${hayOtrosFiltros ? " con los filtros aplicados" : ""}: ninguna reserva pendiente ni solicitud sin resolver`
+    : "No se encontraron reservas con los filtros aplicados";
 
   // --- Paginación -----------------------------------------------------------
   // Medido en el navegador con las 375 reservas + 2 solicitudes reales:
@@ -885,10 +929,60 @@ export function ListaReservasAvanzada({
                 </PopoverContent>
               </Popover>
 
-              {/* Filtro de estado */}
+              {/* «Pendientes» (2026-10-05, petición del dueño: «pon aquí un filtro de solo pendientes»): botón de
+                  alternancia con el estilo de «Hoy» para ver solo lo que espera a que el personal haga algo —las
+                  reservas pendientes y las solicitudes sin resolver—. No es un filtro aparte: pone y quita la
+                  opción «Pendientes» del desplegable «Estado» (`FILTRO_POR_ATENDER`), así que los dos van siempre
+                  a la par, y volver a pulsarlo deja «Todos los estados». La cifra es lo que enseñaría al pulsarlo
+                  con los demás filtros puestos. Un poco más ceñido que «Hoy» (`px-3 gap-1.5`): con él, la barra
+                  sigue cabiendo en una línea a 1440 px. */}
+              <Button
+                variant={soloPendientes ? "default" : "outline"}
+                className="gap-1.5 px-3"
+                aria-pressed={soloPendientes}
+                title={
+                  soloPendientes
+                    ? "Quitar el filtro «Pendientes»"
+                    : "Ver solo lo pendiente: reservas pendientes y solicitudes sin resolver"
+                }
+                onClick={() => setStatusFilter((actual) => (actual === FILTRO_POR_ATENDER ? "all" : FILTRO_POR_ATENDER))}
+              >
+                Pendientes{" "}
+                <span
+                  data-cifra-pendientes={cifraPendientes}
+                  className={cn(
+                    "rounded-full px-1.5 text-[11px] font-semibold leading-5 tabular-nums",
+                    // Pulsado, en negativo sobre el botón oscuro (también con un 0), como la cifra del timeline.
+                    soloPendientes
+                      ? "bg-primary-foreground text-primary"
+                      : cifraPendientes > 0
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {cifraPendientes}
+                  {/* El espacio, fuera del `sr-only` (dentro, el nombre accesible lo recorta). */}
+                  {" "}
+                  <span className="sr-only">por atender</span>
+                </span>
+              </Button>
+
+              {/* Filtro de estado. Cerrado dice QUÉ filtra (2026-10-05, petición del dueño): «Estado» sin filtro y
+                  «Estado: Pendiente» con uno (`textoFiltroCerrado`). Lo que no cabe se recorta con «…» letra a
+                  letra (`truncate`: el `line-clamp-1` del primitivo corta por palabras y dejaba «Canal:…» sin el
+                  valor), a la izquierda (un `<button>` centra), sin encoger la flecha (`[&>svg]:shrink-0`) y con
+                  el texto entero en el `title`. Ancho: 170 px (antes 200 desde `sm`): caben enteros los seis
+                  estados y «Pendientes» y, con el botón nuevo, la barra sigue en una línea a 1440 px; solo las
+                  dos opciones de solicitudes se recortan, y desde `2xl` (1536 px), donde sobra sitio, caben. */}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[170px] sm:w-[200px]" aria-label="Filtrar por estado">
-                  <SelectValue placeholder="Estado" />
+                <SelectTrigger
+                  className="w-[170px] gap-1 text-left 2xl:w-[236px] [&>svg]:shrink-0"
+                  aria-label="Filtrar por estado"
+                  title={statusFilter === "all" ? undefined : textoEstado}
+                >
+                  <SelectValue>
+                    <span className="block truncate">{textoEstado}</span>
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {OPCIONES_FILTRO_ESTADO.map((o) => (
@@ -897,16 +991,22 @@ export function ListaReservasAvanzada({
                 </SelectContent>
               </Select>
 
-              {/* Filtro de canal */}
+              {/* Filtro de canal: igual que el de estado («Canal» / «Canal: Web»). 144 px en todas las anchuras
+                  (antes 120 en el móvil y 140 desde `sm`): cabe «Canal: Teléfono», y a 375 px va en su línea. */}
               <Select value={canalFilter} onValueChange={setCanalFilter}>
-                <SelectTrigger className="w-[120px] sm:w-[140px]">
-                  <SelectValue placeholder="Canal" />
+                <SelectTrigger
+                  className="w-[144px] gap-1 text-left [&>svg]:shrink-0"
+                  aria-label="Filtrar por canal"
+                  title={canalFilter === "all" ? undefined : textoCanal}
+                >
+                  <SelectValue>
+                    <span className="block truncate">{textoCanal}</span>
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="telefono">📞 Tel</SelectItem>
-                  <SelectItem value="web">🌐 Web</SelectItem>
-                  <SelectItem value="manual">✏️ Manual</SelectItem>
+                  {OPCIONES_FILTRO_CANAL.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -952,7 +1052,7 @@ export function ListaReservasAvanzada({
         {filas.length === 0 ? (
           <Card>
             <CardContent className="text-center py-8 text-muted-foreground">
-              No se encontraron reservas con los filtros aplicados
+              {textoListaVacia}
             </CardContent>
           </Card>
         ) : (
@@ -1074,7 +1174,7 @@ export function ListaReservasAvanzada({
               {filas.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No se encontraron reservas con los filtros aplicados
+                    {textoListaVacia}
                   </TableCell>
                 </TableRow>
               ) : (

@@ -1,12 +1,16 @@
 import { describe, it, expect } from "vitest";
 import {
+  FILTRO_POR_ATENDER,
   FILTRO_SOLICITUDES,
   FILTRO_SOLICITUDES_CERRADAS,
+  OPCIONES_FILTRO_ESTADO,
+  estaPorAtender,
   filtrarFilasUnificadas,
   resolverDeepLinkReservas,
   unificarReservasYSolicitudes,
   type ReservaListable,
 } from "@/lib/reservas/vistaUnificada";
+import { ESTADOS_RESERVA, ORDEN_ESTADOS } from "@/lib/reservas/estadosReserva";
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 
 const reserva = (o: Partial<ReservaListable> = {}): ReservaListable => ({
@@ -98,6 +102,78 @@ describe("filtrarFilasUnificadas", () => {
     expect(ids("all", { fecha: "2026-09-25" }).sort()).toEqual(["solicitud-abierta", "solicitud-contactada"]);
     expect(ids("all", { busqueda: "666 111" }).sort()).toEqual(["solicitud-abierta", "solicitud-contactada"]);
     expect(ids("all", { busqueda: "ANA@" }).sort()).toEqual(["conf", "lleg", "pend"]);
+  });
+
+  // «Pendientes» (2026-10-05, petición del dueño): un valor más del filtro de estado.
+  it("«Pendientes» (FILTRO_POR_ATENDER): las reservas pendientes y las solicitudes sin resolver, y nada más", () => {
+    expect(FILTRO_POR_ATENDER).toBe("por_atender");
+    // Ni la confirmada ni la «Llegó», ni la solicitud descartada.
+    expect(ids(FILTRO_POR_ATENDER).sort()).toEqual(["pend", "solicitud-abierta", "solicitud-contactada"]);
+  });
+
+  it("«Pendientes» se combina con el canal, la fecha y la búsqueda como cualquier estado", () => {
+    // Las solicitudes solo salen con «teléfono» (el único canal que las registra), y la pendiente es de teléfono.
+    expect(ids(FILTRO_POR_ATENDER, { canal: "telefono" }).sort()).toEqual(["pend", "solicitud-abierta", "solicitud-contactada"]);
+    expect(ids(FILTRO_POR_ATENDER, { canal: "web" })).toEqual([]);
+    expect(ids(FILTRO_POR_ATENDER, { fecha: "2026-09-25" }).sort()).toEqual(["solicitud-abierta", "solicitud-contactada"]);
+    expect(ids(FILTRO_POR_ATENDER, { fecha: "2026-09-23" })).toEqual(["pend"]);
+    expect(ids(FILTRO_POR_ATENDER, { busqueda: "ANA@" })).toEqual(["pend"]);
+    expect(ids(FILTRO_POR_ATENDER, { busqueda: "666 111" }).sort()).toEqual(["solicitud-abierta", "solicitud-contactada"]);
+  });
+
+  it("el estado «pendiente» del timeline sigue siendo SOLO de reservas (sin solicitudes)", () => {
+    expect(ids("pendiente")).toEqual(["pend"]);
+  });
+});
+
+describe("estaPorAtender (qué entra en «Pendientes»)", () => {
+  const filaDeReserva = (estado: string) => unificarReservasYSolicitudes([reserva({ estado })], [])[0];
+  const filaDeSolicitud = (estado: string) => unificarReservasYSolicitudes([], [solicitud({ estado })])[0];
+
+  it("de las reservas, solo las `pendiente`", () => {
+    for (const estado of [...ORDEN_ESTADOS, "rechazada"]) {
+      expect(estaPorAtender(filaDeReserva(estado)), estado).toBe(estado === "pendiente");
+    }
+  });
+
+  it("de las solicitudes, las sin resolver (pendiente, contactado); las cerradas no", () => {
+    expect(estaPorAtender(filaDeSolicitud("pendiente"))).toBe(true);
+    expect(estaPorAtender(filaDeSolicitud("contactado"))).toBe(true);
+    expect(estaPorAtender(filaDeSolicitud("resuelta"))).toBe(false);
+    expect(estaPorAtender(filaDeSolicitud("descartada"))).toBe(false);
+  });
+});
+
+describe("OPCIONES_FILTRO_ESTADO (el desplegable «Estado»)", () => {
+  it("empieza por «Todos los estados» (ya no «Todos») y justo después «Pendientes»", () => {
+    expect(OPCIONES_FILTRO_ESTADO.slice(0, 2)).toEqual([
+      { value: "all", label: "Todos los estados" },
+      { value: FILTRO_POR_ATENDER, label: "Pendientes (reservas y solicitudes sin resolver)", corta: "Pendientes" },
+    ]);
+  });
+
+  it("cerrado, un estado de reserva se dice con el nombre de su insignia («Llegó», no «Llegó / completada»)", () => {
+    for (const estado of ORDEN_ESTADOS) {
+      const opcion = OPCIONES_FILTRO_ESTADO.find((o) => o.value === estado)!;
+      expect(opcion.label, estado).toBe(ESTADOS_RESERVA[estado].etiquetaFiltro);
+      expect(opcion.corta, estado).toBe(ESTADOS_RESERVA[estado].etiqueta);
+    }
+    expect(OPCIONES_FILTRO_ESTADO.find((o) => o.value === "completada")?.corta).toBe("Llegó");
+  });
+
+  it("los valores no cambian: los de siempre más `por_atender`", () => {
+    expect(OPCIONES_FILTRO_ESTADO.map((o) => o.value)).toEqual([
+      "all",
+      "por_atender",
+      FILTRO_SOLICITUDES,
+      "pendiente",
+      "verificada",
+      "confirmada",
+      "completada",
+      "no_show",
+      "cancelada",
+      FILTRO_SOLICITUDES_CERRADAS,
+    ]);
   });
 });
 

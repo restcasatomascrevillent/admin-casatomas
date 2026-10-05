@@ -18,13 +18,18 @@
  *   `unificarReservasYSolicitudes`. Ya no hay filtro «Negocio» en la lista.
  * · `alcanceCifrasDeLaLista`: cómo se rotulan esas cifras («cifras de la lista»,
  *   «…de hoy», «…del 3 oct 2026»), y el aviso de que el filtro de estado no cuenta.
+ * · `cifraPorAtender` (2026-10-05): la cifra del botón «Pendientes». Se cuenta como
+ *   las del timeline (sin el filtro de estado) pero con las solicitudes sin resolver:
+ *   es EXACTAMENTE el número de filas que la lista enseña al pulsar el botón.
  */
 import { describe, it, expect } from "vitest";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ALCANCE_HOY, alcanceCifrasDeLaLista, cifrasDeLaLista, contarPorEstado } from "../cifrasPorEstado";
+import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
+import { ALCANCE_HOY, alcanceCifrasDeLaLista, cifraPorAtender, cifrasDeLaLista, contarPorEstado } from "../cifrasPorEstado";
 import { admiteReservas } from "../negocios";
 import {
+  FILTRO_POR_ATENDER,
   FILTRO_SOLICITUDES,
   FILTRO_SOLICITUDES_CERRADAS,
   filtrarFilasUnificadas,
@@ -251,6 +256,88 @@ describe("cifrasDeLaLista", () => {
     cifrasDeLaLista(LISTA, filtros);
     expect(LISTA).toEqual(copia);
     expect(filtros).toEqual({ busqueda: "a", estado: "pendiente" });
+  });
+});
+
+describe("cifraPorAtender (el botón «Pendientes»)", () => {
+  const solicitud = (id: string, estado: string, o: Partial<SolicitudPendiente> = {}): SolicitudPendiente => ({
+    id,
+    nombre: `Solicitud ${id}`,
+    telefono: "699000000",
+    email: null,
+    fecha_solicitada: "2026-10-01",
+    hora_solicitada: "14:00",
+    numero_comensales: 12,
+    notas_cliente: null,
+    motivo_rechazo: "grupo_grande",
+    descripcion_rechazo: null,
+    estado,
+    notas_internas: null,
+    created_at: null,
+    updated_at: null,
+    marca: "casa_tomas",
+    ...o,
+  });
+  /** Dos sin resolver (pendiente, contactado), dos cerradas y una de Touza sin resolver (no cuenta). */
+  const SOLICITUDES: SolicitudPendiente[] = [
+    solicitud("s1", "pendiente", { nombre: "Familia Navarro" }),
+    solicitud("s2", "contactado", { fecha_solicitada: "2026-10-02" }),
+    solicitud("s3", "resuelta"),
+    solicitud("s4", "descartada"),
+    solicitud("s5", "pendiente", { marca: "touza" }),
+  ];
+
+  it("sin filtros: las reservas `pendiente` MÁS las solicitudes sin resolver (ni otros estados, ni cerradas, ni Touza)", () => {
+    // LISTA: una pendiente de Casa Tomás («a»). SOLICITUDES: dos sin resolver de Casa Tomás.
+    expect(cifraPorAtender(LISTA, SOLICITUDES, {})).toBe(3);
+    expect(cifraPorAtender(LISTA, [], {})).toBe(1);
+    expect(cifraPorAtender([], SOLICITUDES, {})).toBe(2);
+  });
+
+  it("sin nada pendiente es 0 (dato real)", () => {
+    expect(cifraPorAtender([reserva("x", "confirmada")], [solicitud("y", "resuelta")], {})).toBe(0);
+    expect(cifraPorAtender([], [], {})).toBe(0);
+  });
+
+  it("el filtro de ESTADO no la cambia, sea cual sea (como las cifras del timeline)", () => {
+    const todos = cifraPorAtender(LISTA, SOLICITUDES, {});
+    for (const estado of [...ORDEN_ESTADOS, "all", FILTRO_POR_ATENDER, FILTRO_SOLICITUDES, FILTRO_SOLICITUDES_CERRADAS, "valor-raro"]) {
+      expect(cifraPorAtender(LISTA, SOLICITUDES, { estado }), estado).toBe(todos);
+    }
+  });
+
+  it("sigue la búsqueda, la fecha y el canal", () => {
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { busqueda: "navarro" })).toBe(1);
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { busqueda: "ana pendiente" })).toBe(1);
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { fecha: "2026-10-01" })).toBe(2); // «a» y «s1»
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { fecha: "2026-10-02" })).toBe(1); // «s2»
+    // Las solicitudes solo salen con «teléfono»; «a» es de teléfono.
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { canal: "telefono" })).toBe(3);
+    expect(cifraPorAtender(LISTA, SOLICITUDES, { canal: "web" })).toBe(0);
+  });
+
+  it("es justo el número de filas que la lista enseña con «Pendientes» puesto, con cualquier combinación de filtros", () => {
+    const combinaciones: FiltrosListaUnificada[] = [
+      {},
+      { fecha: "2026-10-01" },
+      { canal: "telefono" },
+      { busqueda: "e" },
+      { fecha: "2026-10-02", canal: "telefono", busqueda: "solicitud" },
+    ];
+    for (const f of combinaciones) {
+      const filas = filtrarFilasUnificadas(unificarReservasYSolicitudes(LISTA, SOLICITUDES), { ...f, estado: FILTRO_POR_ATENDER });
+      expect(cifraPorAtender(LISTA, SOLICITUDES, f), JSON.stringify(f)).toBe(filas.length);
+    }
+  });
+
+  it("no toca lo que recibe", () => {
+    const copiaReservas = JSON.parse(JSON.stringify(LISTA));
+    const copiaSolicitudes = JSON.parse(JSON.stringify(SOLICITUDES));
+    const filtros = { busqueda: "a", estado: "confirmada" };
+    cifraPorAtender(LISTA, SOLICITUDES, filtros);
+    expect(LISTA).toEqual(copiaReservas);
+    expect(SOLICITUDES).toEqual(copiaSolicitudes);
+    expect(filtros).toEqual({ busqueda: "a", estado: "confirmada" });
   });
 });
 

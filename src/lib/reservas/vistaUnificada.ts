@@ -17,7 +17,7 @@
 
 import type { SolicitudPendiente } from "@/hooks/useSolicitudesPendientes";
 import { admiteReservas } from "./negocios";
-import { ESTADOS_RESERVA, type EstadoReserva } from "./estadosReserva";
+import { ESTADO_PENDIENTE, ESTADOS_RESERVA, type EstadoReserva } from "./estadosReserva";
 
 /** Mínimo de `reservas` que necesita la lista unificada. */
 export interface ReservaListable {
@@ -59,6 +59,27 @@ export function contarSolicitudesPendientes(solicitudes: readonly SolicitudPendi
  */
 export const FILTRO_SOLICITUDES = "solicitudes";
 export const FILTRO_SOLICITUDES_CERRADAS = "solicitudes_cerradas";
+/**
+ * «Pendientes» (2026-10-05, petición del dueño: «pon aquí un filtro de solo
+ * pendientes»): lo que espera a que el personal haga algo, sea reserva o
+ * solicitud (`estaPorAtender`). Es un valor más del filtro «Estado», no un
+ * filtro aparte: así el botón «Pendientes» de la barra y el desplegable «Estado»
+ * no pueden desincronizarse, y se combina con la búsqueda, la fecha y el canal
+ * como cualquier otro estado.
+ */
+export const FILTRO_POR_ATENDER = "por_atender";
+
+/**
+ * ¿Espera la fila a que el personal haga algo? Es lo que enseña «Pendientes»
+ * (`FILTRO_POR_ATENDER`):
+ *   · las RESERVAS en estado `pendiente` (hay que aceptarlas o verificarlas). Las
+ *     de otro estado, no: una verificada ya espera al cliente, no al personal;
+ *   · las SOLICITUDES del asistente sin resolver (`esSolicitudAbierta`: pendiente
+ *     o contactado). Las cerradas (resuelta, descartada), no.
+ */
+export function estaPorAtender<R extends ReservaListable>(fila: FilaUnificada<R>): boolean {
+  return fila.tipo === "solicitud" ? esSolicitudAbierta(fila.solicitud.estado) : fila.reserva.estado === ESTADO_PENDIENTE;
+}
 
 /**
  * Orden de los estados en el filtro: «No vino» antes que «Cancelada» (el ciclo de
@@ -74,16 +95,29 @@ const ORDEN_ESTADOS_EN_FILTRO: readonly EstadoReserva[] = [
   "cancelada",
 ];
 
-export const OPCIONES_FILTRO_ESTADO: { value: string; label: string }[] = [
-  { value: "all", label: "Todos" },
+/**
+ * Opciones del desplegable «Estado». `label` es el texto de la opción en la lista
+ * abierta; `corta`, si la hay, lo que dice el desplegable CERRADO tras «Estado: »
+ * (si no, `label`): «Pendientes» en vez de la explicación entera y, en los estados
+ * de reserva, el nombre de la insignia («Llegó», no «Llegó / completada», que no
+ * cabe). «Todos los estados» y no «Todos» (2026-10-05, petición del dueño):
+ * cerrado, el desplegable ya no dice «Todos» sino el nombre del filtro.
+ */
+export const OPCIONES_FILTRO_ESTADO: { value: string; label: string; corta?: string }[] = [
+  { value: "all", label: "Todos los estados" },
+  { value: FILTRO_POR_ATENDER, label: "Pendientes (reservas y solicitudes sin resolver)", corta: "Pendientes" },
   { value: FILTRO_SOLICITUDES, label: "Solicitudes sin resolver" },
-  ...ORDEN_ESTADOS_EN_FILTRO.map((estado) => ({ value: estado, label: ESTADOS_RESERVA[estado].etiquetaFiltro })),
+  ...ORDEN_ESTADOS_EN_FILTRO.map((estado) => ({
+    value: estado,
+    label: ESTADOS_RESERVA[estado].etiquetaFiltro,
+    corta: ESTADOS_RESERVA[estado].etiqueta,
+  })),
   { value: FILTRO_SOLICITUDES_CERRADAS, label: "Solicitudes cerradas" },
 ];
 
 export interface FiltrosListaUnificada {
   busqueda?: string;
-  /** "all" | estado de reserva | FILTRO_SOLICITUDES | FILTRO_SOLICITUDES_CERRADAS */
+  /** "all" | estado de reserva | FILTRO_POR_ATENDER | FILTRO_SOLICITUDES | FILTRO_SOLICITUDES_CERRADAS */
   estado?: string;
   /** "all" | telefono | web | manual */
   canal?: string;
@@ -157,8 +191,12 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
   const canal = filtros.canal ?? "all";
   const fecha = filtros.fecha ?? null;
 
+  // «Pendientes»: reservas y solicitudes a la vez, pero solo lo que espera al personal (`estaPorAtender`).
+  const porAtender = estado === FILTRO_POR_ATENDER;
+
   return filas.filter((f) => {
     if (fecha && f.fecha !== fecha) return false;
+    if (porAtender && !estaPorAtender(f)) return false;
 
     if (f.tipo === "solicitud") {
       const s = f.solicitud;
@@ -167,7 +205,7 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
       // "Todos" muestra solo las solicitudes abiertas: las cerradas son
       // historial y se consultan con su filtro propio.
       if (estado === "all" && !esSolicitudAbierta(s.estado)) return false;
-      if (estado !== "all" && estado !== FILTRO_SOLICITUDES && estado !== FILTRO_SOLICITUDES_CERRADAS) {
+      if (estado !== "all" && !porAtender && estado !== FILTRO_SOLICITUDES && estado !== FILTRO_SOLICITUDES_CERRADAS) {
         return false;
       }
       // Hoy solo el canal telefónico registra solicitudes.
@@ -180,7 +218,7 @@ export function filtrarFilasUnificadas<R extends ReservaListable>(
 
     const r = f.reserva;
     if (estado === FILTRO_SOLICITUDES || estado === FILTRO_SOLICITUDES_CERRADAS) return false;
-    if (estado !== "all" && r.estado !== estado) return false;
+    if (estado !== "all" && !porAtender && r.estado !== estado) return false;
     if (canal !== "all" && (r.canal || "web") !== canal) return false;
     return coincideBusqueda([r.nombre, r.telefono, r.email, r.notas_cliente], termino);
   });
