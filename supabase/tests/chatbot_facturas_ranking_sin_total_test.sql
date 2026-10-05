@@ -13,6 +13,19 @@ set client_encoding = 'UTF8';
 
 begin;
 
+-- sin_total cambió de forma en 20261005140000 (número -> {n, docs} por tipo,
+-- sin lista global): estos ayudantes aceptan las dos para que el test valga
+-- antes y después de esa migración.
+create function pg_temp.st(x jsonb) returns int language sql immutable as $f$
+  select coalesce(case jsonb_typeof(x -> 'sin_total') when 'number' then (x ->> 'sin_total')::int
+                                                     when 'object' then (x -> 'sin_total' ->> 'n')::int end, 0)
+$f$;
+create function pg_temp.docs_st(x jsonb) returns jsonb language sql immutable as $f$
+  select coalesce(x -> 'documentos_sin_total' -> 'docs',
+                  coalesce(x -> 'facturas' -> 'sin_total' -> 'docs', '[]'::jsonb)
+                  || coalesce(x -> 'albaranes' -> 'sin_total' -> 'docs', '[]'::jsonb))
+$f$;
+
 do $$
 declare
   j   jsonb;
@@ -23,10 +36,10 @@ declare
 begin
   -- A1. documentos_sin_total incluye hoy las facturas 54 (Luga) y 39 (Garre).
   j := estadisticas_globales_agente()::jsonb;
-  select array_agg((d ->> 'id')::bigint) into ids from jsonb_array_elements(j -> 'documentos_sin_total' -> 'docs') d;
+  select array_agg((d ->> 'id')::bigint) into ids from jsonb_array_elements(pg_temp.docs_st(j)) d;
   assert 54 = any(ids) and 39 = any(ids), format('A1: documentos_sin_total = %s', ids);
-  assert (j -> 'documentos_sin_total' ->> 'n')::int = cardinality(ids), 'A1: n no coincide con la lista';
-  assert (j -> 'facturas' ->> 'sin_total')::int >= 2, 'A1: facturas.sin_total < 2';
+  assert pg_temp.st(j -> 'facturas') + pg_temp.st(j -> 'albaranes') = cardinality(ids), 'A1: n no coincide con la lista';
+  assert pg_temp.st(j -> 'facturas') >= 2, 'A1: facturas.sin_total < 2';
 
   -- A2. Conteos alineados: para CADA mes, estadisticas.meses y
   --     resumen_periodo dan el mismo número de facturas, gasto y sin_total.
@@ -39,7 +52,7 @@ begin
         format('A2: %s facturas resumen=%s estadisticas=%s', j2 ->> 'mes', r -> 'facturas' ->> 'n', j2 ->> 'facturas');
       assert (r -> 'facturas' ->> 'gasto')::numeric = (j2 ->> 'gasto')::numeric,
         format('A2: %s gasto resumen=%s estadisticas=%s', j2 ->> 'mes', r -> 'facturas' ->> 'gasto', j2 ->> 'gasto');
-      assert coalesce((r -> 'facturas' ->> 'sin_total')::int, 0) = coalesce((j2 ->> 'sin_total')::int, 0),
+      assert pg_temp.st(r -> 'facturas') = coalesce((j2 ->> 'sin_total')::int, 0),
         format('A2: %s sin_total distinto', j2 ->> 'mes');
     end;
   end loop;
@@ -53,8 +66,8 @@ begin
 
   -- A3. Enero de 2026 marca cifra parcial: Luga (54) sin total.
   j := resumen_periodo_agente('2026-01-01', '2026-01-31')::jsonb;
-  assert (j -> 'facturas' ->> 'sin_total')::int = 1, format('A3: enero sin_total = %s', j -> 'facturas' ->> 'sin_total');
-  assert exists (select 1 from jsonb_array_elements(j -> 'documentos_sin_total' -> 'docs') d where (d ->> 'id')::int = 54
+  assert pg_temp.st(j -> 'facturas') = 1, format('A3: enero sin_total = %s', j -> 'facturas' -> 'sin_total');
+  assert exists (select 1 from jsonb_array_elements(pg_temp.docs_st(j)) d where (d ->> 'id')::int = 54
                     and d ->> 'numero' = 'ML/101511'), 'A3: enero no cita ML/101511';
   assert exists (select 1 from jsonb_array_elements(j -> 'proveedores') p
                   where p ->> 'proveedor' ilike 'luga%' and (p ->> 'sin_total')::int = 1), 'A3: Luga sin marca sin_total';

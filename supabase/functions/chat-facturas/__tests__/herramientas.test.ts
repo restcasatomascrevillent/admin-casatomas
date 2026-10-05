@@ -76,11 +76,11 @@ describe("TOOLS", () => {
   it("las listas blancas de consulta_flexible coinciden con el esquema", () => {
     const flex = TOOLS.find((t) => t.function.name === "consulta_flexible")!.function.parameters as Esquema;
     // Las metricas no van como enum (ahorro de tokens): la descripcion las nombra todas.
-    for (const m of ["count_documentos", "count_lineas", "sum", "avg", "min", "max", "total", "subtotal", "iva",
+    for (const m of ["count_documentos", "count_con_total", "count_lineas", "sum", "avg", "min", "max", "total", "subtotal", "iva",
                      "cantidad", "precio_unitario", "total_linea"]) {
       expect(flex.properties.metricas.description).toContain(m);
     }
-    expect(METRICAS_FLEX).toHaveLength(26);
+    expect(METRICAS_FLEX).toHaveLength(27);
     expect(flex.properties.agrupar.items.enum).toEqual([...AGRUPAR_FLEX]);
     expect(Object.keys(flex.properties.filtros.properties)).toEqual([...FILTROS_FLEX]);
   });
@@ -104,17 +104,42 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/total\/gasto\/valor de un DOCUMENTO llevan IVA incluido/);
   });
 
-  it("documentos sin total => cifra parcial y citarlos", () => {
+  it("documentos sin total => cifra parcial y citarlos, solo del tipo y solo con importes", () => {
     expect(p).toMatch(/documentos_sin_total.*PARCIAL/s);
     expect(p).toMatch(/cita esos documentos/);
+    expect(p).toMatch(/solo los del tipo del que hablas \(facturas o albaranes\)/);
+    expect(p).toMatch(/En conteos y listados no hables de cifra parcial/);
+  });
+
+  it("medias y cruces: consulta_flexible, nunca calcular a mano (prueba 2: ticket medio)", () => {
+    expect(p).toMatch(/consulta_flexible: medias, ticket medio y cruces "por X y por Y"/);
+    expect(p).toMatch(/las dos agrupaciones a la vez/);
+    expect(p).toMatch(/Nunca calcules tu sumas, medias ni divisiones/);
+    expect(p).toMatch(/n_con_\*/);
+  });
+
+  it("historial con varios proveedores: comparativa, no subida (prueba 2: portes)", () => {
+    expect(p).toMatch(/comparativa_entre_proveedores.*NO hay subida ni bajada/s);
+  });
+
+  it("rankings por cantidad: criterio con palabras y primero de cada unidad (prueba 2: q09)", () => {
+    expect(p).toMatch(/por cantidad total en kg/);
+    expect(p).toMatch(/primero_por_unidad/);
   });
 
   it("numero de documento solo si aparece literal", () => {
     expect(p).toMatch(/Cita un numero de documento solo si aparece literal/);
   });
 
-  it("no hay relacion albaran-factura", () => {
+  it("no hay relacion albaran-factura: no se puede saber, sin llamar herramientas (prueba 2: q19)", () => {
     expect(p).toMatch(/No hay ninguna relacion guardada entre albaranes y facturas/);
+    expect(p).toMatch(/SIN llamar herramientas/);
+    expect(p).toMatch(/"sin_total" NO significa sin factura/);
+    const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
+    expect(filtrar.description).toMatch(/sin_total = sin importe leido; NO significa sin factura/);
+    // El modelo no puede pedir un filtro "sin_factura": el enum no lo tiene.
+    const enumFiltro = (filtrar.parameters as Esquema).properties.filtro.enum as string[];
+    expect(enumFiltro.some((f) => /factur|albar|pag/.test(f))).toBe(false);
   });
 
   it("ambito: solo compras; lo demas se rechaza con amabilidad", () => {
@@ -128,7 +153,8 @@ describe("systemPrompt", () => {
   });
 
   it("fecha dudosa y alertas con su mensaje", () => {
-    expect(p).toMatch(/fecha_dudosa": su fecha es la de subida/);
+    expect(p).toMatch(/"fecha_dudosa"\/"fechas_dudosas": la fecha es la de subida/);
+    expect(p).toMatch(/dia de la semana/);
     expect(p).toMatch(/"alertas": explica su "mensaje"/);
   });
 
@@ -266,20 +292,27 @@ describe("marcarResultado", () => {
     expect(r.aviso_vacio).toMatch(/no hay datos/);
   });
 
-  it("documentos_sin_total => aviso de cifra parcial (fallo 1 de la prueba)", () => {
+  it("documentos_sin_total de primer nivel => aviso de cifra parcial (fallo 1 de la prueba)", () => {
     const r = marcarResultado("resumen_periodo", {
       facturas: { n: 6, gasto: 8172.21, sin_total: 1 },
       documentos_sin_total: { n: 1, docs: [{ id: 54, numero: "ML/101511" }] },
     }, null) as Record<string, unknown>;
-    expect(r.aviso_parcial).toMatch(/CIFRA PARCIAL: 1 documento/);
+    expect(r.aviso_parcial).toMatch(/PARCIAL: 1 documento/);
   });
 
-  it("filtrar_documentos sin lista pero con sumas.sin_total => tambien parcial", () => {
-    const r = marcarResultado("filtrar_documentos", {
+  it("sin aviso global de parcial cuando sin_total va dentro de su tipo o en sumas (prueba 2: ruido)", () => {
+    // filtrar_documentos con las filas a la vista: las propias filas dicen sin_total.
+    const f = marcarResultado("filtrar_documentos", {
       filas: [{ id: 54, sin_total: true }], total_filas: 1,
       sumas: { facturas: { n: 1, total: 0, sin_total: 1 } },
     }, null) as Record<string, unknown>;
-    expect(r.aviso_parcial).toMatch(/1 documento/);
+    expect(f.aviso_parcial).toBeUndefined();
+    // estadisticas/resumen: sin_total {n, docs} dentro de facturas/albaranes.
+    const e = marcarResultado("estadisticas_globales", {
+      facturas: { n: 12, gasto: 31555.19, sin_total: { n: 2, docs: [] } },
+      albaranes: { n: 7, valor: 6413.42, sin_total: { n: 1, docs: [] } },
+    }, null) as Record<string, unknown>;
+    expect(e.aviso_parcial).toBeUndefined();
   });
 
   it("errores pasan tal cual", () => {
