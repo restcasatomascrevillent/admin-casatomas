@@ -11,6 +11,7 @@ import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
+import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Reservas from "./pages/Reservas";
@@ -74,6 +75,9 @@ const App = () => (
             {/* Los toasts viven fuera de la barrera para seguir funcionando si el router falla. */}
             <Toaster />
             <BrowserRouter>
+              {/* Cola de subida de facturas en segundo plano: por encima de las rutas
+                  para que cambiar de sección no la cancele (05-oct-2026). */}
+              <ColaSubidaProvider>
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta
@@ -110,6 +114,7 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </RouteErrorBoundary>
+              </ColaSubidaProvider>
             </BrowserRouter>
           </TooltipProvider>
         </SuperAdminProvider>

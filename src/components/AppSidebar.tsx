@@ -22,6 +22,7 @@ import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
+import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -129,6 +130,12 @@ export function AppSidebar() {
       <SidebarFooter
         className={`border-t border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
       >
+        {/* Subidas de facturas en segundo plano («Facturas: 2 procesando»): visible
+            en cualquier sección. En el panel deslizante (< 1024 px) va en la
+            barra superior (DashboardLayout), no aquí. */}
+        {!isMobile && (
+          <IndicadorSubidasFacturas variante="menu" colapsado={isCollapsed} className={isCollapsed ? "flex justify-center" : ""} />
+        )}
         <div className={`flex gap-2 ${isCollapsed ? "flex-col items-center" : "flex-row"}`}>
           <Button
             variant="ghost"

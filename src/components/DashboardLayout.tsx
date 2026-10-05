@@ -5,6 +5,7 @@ import { CentroNotificaciones } from "@/components/notificaciones/CentroNotifica
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
+import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -56,6 +57,8 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
           {isCompactNav && (
             <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card flex items-center justify-between gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
               <SidebarTrigger className="shrink-0" />
+              {/* Subidas de facturas en segundo plano; no pinta nada si no hay. */}
+              <IndicadorSubidasFacturas variante="cabecera" className="min-w-0 flex-1 flex justify-center" />
               <CentroNotificaciones className="shrink-0" />
             </header>
           )}

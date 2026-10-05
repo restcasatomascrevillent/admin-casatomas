@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Receipt, Trash2 } from "lucide-react";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,8 @@ const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   // Aviso del cron `reservas-aviso-sin-asignar`: reserva dentro de la ventana
   // de asignación que aún no tiene sala o mesa.
   reserva_sin_asignar: LayoutGrid,
+  // Fin de una tanda de subida de facturas en segundo plano (ColaSubidaProvider).
+  facturas_subida: Receipt,
   sistema: Info,
 };
 
@@ -51,6 +53,8 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
       navigate("/reservas?tab=asignacion");
     } else if (notif.referencia_tipo === "solicitud") {
       navigate("/reservas?tab=reservas&status=solicitudes");
+    } else if (notif.referencia_tipo === "facturas_cargar") {
+      navigate("/facturas?tab=cargar");
     }
   };
 

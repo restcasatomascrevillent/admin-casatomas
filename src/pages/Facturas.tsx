@@ -1,4 +1,5 @@
-import { useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SubidaFacturas } from "@/components/facturas/SubidaFacturas";
 import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFacturas";
@@ -9,10 +10,43 @@ import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen, BarChart3, 
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
 import type { Sugerencia } from "@/components/facturas/ChatArea";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
+import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
+
+const PESTANAS = ["documentos", "chat", "cargar"] as const;
+const pestanaDeUrl = (v: string | null) => (PESTANAS as readonly string[]).includes(v ?? "") ? (v as string) : null;
 
 const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
-  const [activeTab, setActiveTab] = useState<string>("documentos");
+  // `?tab=cargar`: el indicador global de subidas, los toasts y la campana
+  // llevan directos a la pestaña «Cargar», también si ya estabas en Facturas.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { key: claveNavegacion } = useLocation();
+  const tabUrl = pestanaDeUrl(searchParams.get("tab"));
+  const [activeTab, setActiveTab] = useState<string>(tabUrl ?? "documentos");
+  useEffect(() => {
+    if (tabUrl) setActiveTab(tabUrl);
+    // `claveNavegacion`: volver a tocar el indicador estando ya en esta URL
+    // (pero en otra pestaña) también vuelve a «Cargar».
+  }, [tabUrl, claveNavegacion]);
+  // La pestaña va también a la URL (sin apilar historial): así la cola sabe si
+  // estás mirando «Cargar» y no apunta en la campana lo que ya ves.
+  const cambiarPestana = (v: string) => {
+    setActiveTab(v);
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set("tab", v);
+      return p;
+    }, { replace: true });
+  };
+  const subidas = useColaSubidaOpcional();
+  const activosSubida = subidas?.activos ?? 0;
+  // Alto de la pantalla, calculado solo (como Calendario y Newsletter): la
+  // página ocupa justo lo visible y cada pestaña reparte ese alto por dentro.
+  // Sin medida (jsdom, primer pintado) cae al `calc(100dvh-6rem)` de siempre.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_FACTURAS);
   const topTabClass =
     "flex min-h-11 items-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 transition-colors hover:bg-background/70 hover:text-foreground data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary";
   const docsTabClass =
@@ -62,7 +96,7 @@ const Facturas = () => {
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
-    setActiveTab("chat");
+    cambiarPestana("chat");
 
     // 2. Construir el prompt natural
     const provTexto = doc.proveedor ? `del proveedor ${doc.proveedor}` : "sin proveedor especificado";
@@ -81,11 +115,15 @@ const Facturas = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-6rem)] supports-[height:100dvh]:h-[calc(100dvh-6rem)] space-y-2 sm:space-y-4">
+      <div
+        ref={setRaiz}
+        className={`flex flex-col space-y-2 sm:space-y-4 ${alto ? "" : "h-[calc(100vh-6rem)] supports-[height:100dvh]:h-[calc(100dvh-6rem)]"}`}
+        style={alto ? { height: alto } : undefined}
+      >
 
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={cambiarPestana}
           className="flex-1 flex flex-col min-h-0"
         >
           {/* Botonera de navegación superior */}
@@ -121,6 +159,14 @@ const Facturas = () => {
               >
                 <Upload className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Cargar</span>
+                {activosSubida > 0 && (
+                  <span
+                    className="ml-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-0.5 leading-none tabular-nums"
+                    aria-label={`${activosSubida} procesando`}
+                  >
+                    {activosSubida}
+                  </span>
+                )}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -176,8 +222,11 @@ const Facturas = () => {
             </TabsContent>
 
             {/* PESTAÑA 3: CARGAR DATOS */}
-            <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden overflow-y-auto">
-              <div className="max-w-4xl mx-auto rounded-xl overflow-hidden border border-border/50 shadow-sm bg-card mt-1 sm:mt-2">
+            {/* Sin scroll de página (petición del dueño, 05-oct-2026): la tarjeta
+                ocupa el alto de la pestaña y solo su lista hace scroll por dentro
+                (ver lib/facturas/alturaCargar.ts). */}
+            <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
+              <div className="mx-auto h-full max-w-4xl">
                 <SubidaFacturas />
               </div>
             </TabsContent>
