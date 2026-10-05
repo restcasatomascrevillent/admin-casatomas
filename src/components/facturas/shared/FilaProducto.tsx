@@ -6,6 +6,7 @@ import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
 import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
+import { normalizarUnidadFactura } from "./unidad";
 
 export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isMobile?: boolean, allDocs: Factura[] }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -18,15 +19,18 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
   const updateMutation = useUpdateProductoFactura();
 
   const handleSave = async () => {
+    // Misma regla que el OCR y que el trigger de la base (ud / kg / l; lo demás se deja).
+    const unidadNormalizada = normalizarUnidadFactura(unidad);
     try {
       await updateMutation.mutateAsync({
         id: p.id,
         producto_nombre: nombre,
         cantidad: cantidad !== "" ? Number(cantidad) : undefined,
-        unidad: unidad || null,
+        unidad: unidadNormalizada,
         precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
         precio: total !== "" ? Number(total) : undefined,
       });
+      setUnidad(unidadNormalizada);
       setIsEditing(false);
     } catch (err) {
       console.error("Error guardando producto:", err);
