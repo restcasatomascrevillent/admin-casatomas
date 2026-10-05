@@ -6,10 +6,11 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useHistorialEnvios, type EnvioNewsletter } from "@/hooks/useResendMarketing";
 
-// Historial de envíos del newsletter (newsletter_envios): canal de cada uno y,
-// para los Broadcasts, entregas/aperturas/clics/rebotes a partir de los eventos
-// que archiva resend-webhook (newsletter_estadisticas_broadcasts). Las
-// aperturas son orientativas: los clientes de correo las bloquean o inflan.
+// Historial de envíos del newsletter (newsletter_envios): cómo salió cada uno y,
+// para los envíos por lista (Broadcast), entregas/aperturas/clics/rebotes a
+// partir de los eventos que archiva resend-webhook
+// (newsletter_estadisticas_broadcasts). Las aperturas son orientativas: los
+// clientes de correo las bloquean o inflan.
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   pendiente: "Pendiente",
@@ -23,12 +24,12 @@ function Cifras({ e }: { e: EnvioNewsletter }) {
     return <span>{e.total_destinatarios} destinatarios</span>;
   }
   const s = e.estadisticas;
-  if (!s) return <span>{e.total_destinatarios} destinatarios · estadísticas en cuanto Resend las mande</span>;
+  if (!s) return <span>{e.total_destinatarios} destinatarios · las estadísticas aparecerán en cuanto lleguen los primeros datos</span>;
   return (
     <span>
       {e.total_destinatarios} destinatarios · {s.entregados} entregados · {s.abiertos} abiertos · {s.clics} con clic
-      {s.rebotes ? ` · ${s.rebotes} rebotes` : ""}
-      {s.quejas ? ` · ${s.quejas} spam` : ""}
+      {s.rebotes ? ` · ${s.rebotes} no entregados` : ""}
+      {s.quejas ? ` · ${s.quejas} marcados como spam` : ""}
     </span>
   );
 }
@@ -43,7 +44,7 @@ export function HistorialEnvios() {
           <History className="h-5 w-5 text-primary" />
           Historial de envíos
         </CardTitle>
-        <CardDescription>Los últimos newsletters enviados y por dónde salieron.</CardDescription>
+        <CardDescription>Las últimas newsletters enviadas y cómo salieron.</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -54,7 +55,7 @@ export function HistorialEnvios() {
         ) : error ? (
           <p className="text-sm text-destructive">No se pudo cargar el historial.</p>
         ) : !envios?.length ? (
-          <p className="text-sm text-muted-foreground">Todavía no se ha enviado ningún newsletter.</p>
+          <p className="text-sm text-muted-foreground">Todavía no se ha enviado ninguna newsletter.</p>
         ) : (
           <ul className="divide-y">
             {envios.map((e) => (
@@ -62,7 +63,7 @@ export function HistorialEnvios() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium break-words">{e.asunto}</span>
                   <Badge variant={e.canal === "broadcast" ? "default" : "secondary"} className="font-normal">
-                    {e.canal === "broadcast" ? "Broadcast" : "Directo"}
+                    {e.canal === "broadcast" ? "Lista de envío" : "Correo directo"}
                   </Badge>
                   {e.estado ? (
                     <Badge variant={e.estado === "fallido" ? "destructive" : "outline"} className="font-normal">

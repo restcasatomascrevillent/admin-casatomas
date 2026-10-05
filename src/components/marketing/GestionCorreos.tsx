@@ -23,20 +23,15 @@ export function GestionCorreos() {
           <div className="flex items-start gap-3">
             <Info className="h-5 w-5 text-sky-600 mt-0.5 shrink-0" />
             <div className="text-sm text-sky-900 dark:text-sky-200">
-              <p className="font-medium">Altas solo desde la reserva web, con consentimiento explícito y email confirmado</p>
+              <p className="font-medium">Cómo se apunta la gente</p>
               <p className="mt-1">
-                Solo se da de alta quien, al reservar en la web de Casa Tomás, marca la casilla opcional
-                para recibir el newsletter y después pulsa «Confirmo» en el correo de su reserva. Así nadie
-                puede apuntar el email de otra persona. Si la reserva la confirmáis vosotros a mano (por
-                teléfono o desde el panel), no se da de alta. La reserva guarda la constancia del
-                consentimiento y de la confirmación. Si alguien que se había dado de baja vuelve a marcarla
-                en una reserva nueva y la confirma desde su correo, se le reactiva; si no, no se le vuelve a
-                suscribir.
+                Se apuntan al reservar en la web marcando la casilla de la newsletter, y quedan suscritos cuando
+                confirman su reserva desde el email. Quien se da de baja no vuelve a recibirla salvo que se apunte de
+                nuevo.
               </p>
               <p className="mt-1">
-                Por teléfono todavía no se pide el consentimiento y este panel no tiene alta manual. Hasta
-                enero se añadía automáticamente a todo el que reservaba mesa, sin pedirle permiso; se quitó
-                por RGPD.
+                Las reservas por teléfono o apuntadas desde el panel no suscriben a nadie: el cliente tiene que
+                marcar la casilla él mismo en la web.
               </p>
             </div>
           </div>
@@ -50,17 +45,15 @@ export function GestionCorreos() {
           <div className="flex items-start gap-3">
             <ShieldCheck className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
             <div className="text-sm text-emerald-900 dark:text-emerald-200">
-              <p className="font-medium">La baja es automática</p>
+              <p className="font-medium">Las bajas se hacen solas</p>
               <p className="mt-1">
-                Todos los newsletters llevan, sin que tengas que añadir nada, un enlace personal para darse de baja
-                en el pie y el botón «Cancelar suscripción» de Gmail, Outlook o Yahoo. Quien lo pulsa queda dado de
-                baja al momento. También se da de baja solo a quien marca un correo nuestro como spam o tiene una
-                dirección que no existe.
+                Cada newsletter incluye un enlace para darse de baja (y el botón «Cancelar suscripción» de Gmail,
+                Outlook o Yahoo), sin que tengas que añadir nada. Quien lo pulsa deja de recibirla al momento. También
+                se da de baja a quien marca un correo nuestro como spam o tiene un email que no existe.
               </p>
               <p className="mt-1">
-                Las bajas aparecen aquí solas (en un minuto como mucho), con su fecha y el motivo. Los dados de baja
-                no reciben ningún envío y no se pueden volver a activar desde el panel: solo vuelven si marcan otra
-                vez la casilla del newsletter en una reserva nueva y la confirman desde su correo.
+                Las bajas aparecen aquí solas (en un minuto como mucho), con su fecha y el motivo. No se pueden volver a
+                activar desde el panel.
               </p>
             </div>
           </div>
@@ -75,7 +68,7 @@ export function GestionCorreos() {
               Suscriptores activos
             </CardTitle>
             <CardDescription>
-              Reciben el newsletter
+              Reciben la newsletter
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -104,10 +97,10 @@ export function GestionCorreos() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
-              Lista de Suscriptores
+              Lista de suscriptores
             </CardTitle>
             <CardDescription>
-              El envío se hace desde la pestaña "Crear Newsletter" de este panel.
+              Para enviar una newsletter, ve a la pestaña «Enviar Newsletter».
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -116,7 +109,7 @@ export function GestionCorreos() {
         </Card>
       </div>
 
-      {/* Fase 2: conexión con Resend Marketing (newsletter-sync-resend). */}
+      {/* Fase 2: lista de envío (conexión con Resend Marketing, newsletter-sync-resend). */}
       <SincronizacionResend />
     </div>
   );

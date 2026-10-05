@@ -23,8 +23,8 @@ const eventoBadgeVariant: Record<string, { color: string; icon: React.ReactNode;
   delivered: { color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300", icon: <CheckCircle className="h-3 w-3" />, label: "Entregado" },
   opened: { color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300", icon: <Mail className="h-3 w-3" />, label: "Abierto" },
   clicked: { color: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300", icon: <MousePointerClick className="h-3 w-3" />, label: "Clic" },
-  bounced: { color: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", icon: <XCircle className="h-3 w-3" />, label: "Rebotado" },
-  complained: { color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300", icon: <AlertCircle className="h-3 w-3" />, label: "Queja" },
+  bounced: { color: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300", icon: <XCircle className="h-3 w-3" />, label: "No entregado" },
+  complained: { color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300", icon: <AlertCircle className="h-3 w-3" />, label: "Marcado como spam" },
 };
 
 export function EstadisticasNewsletter() {
@@ -46,7 +46,7 @@ export function EstadisticasNewsletter() {
         <CardContent className="py-8">
           <div className="text-center text-muted-foreground">
             <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-            <p className="font-medium">Error al cargar estadísticas</p>
+            <p className="font-medium">No se pudieron cargar las estadísticas</p>
             <Button onClick={() => refetchStats()} className="mt-4" variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               Reintentar
@@ -64,10 +64,10 @@ export function EstadisticasNewsletter() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Estadísticas de Email (Tiempo Real)</h3>
+          <h3 className="text-lg font-semibold">Estadísticas de los correos</h3>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            Datos actualizados en tiempo real via webhooks
+            Se actualizan solas cuando llegan los datos de cada correo
           </p>
         </div>
         <Button 
@@ -85,18 +85,18 @@ export function EstadisticasNewsletter() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Enviados</CardTitle>
+            <CardTitle className="text-sm font-medium">Total enviados</CardTitle>
             <Send className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.sent || 0}</div>
-            <p className="text-xs text-muted-foreground">emails enviados</p>
+            <p className="text-xs text-muted-foreground">correos enviados</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa de Entrega</CardTitle>
+            <CardTitle className="text-sm font-medium">Entregados</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -109,7 +109,7 @@ export function EstadisticasNewsletter() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa de Apertura</CardTitle>
+            <CardTitle className="text-sm font-medium">Abiertos</CardTitle>
             <Mail className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
@@ -122,7 +122,7 @@ export function EstadisticasNewsletter() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tasa de Clics</CardTitle>
+            <CardTitle className="text-sm font-medium">Con clic</CardTitle>
             <MousePointerClick className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
@@ -140,7 +140,7 @@ export function EstadisticasNewsletter() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Tendencia Últimos 7 Días
+              Últimos 7 días
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -177,7 +177,7 @@ export function EstadisticasNewsletter() {
       {/* Detailed breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Desglose Detallado</CardTitle>
+          <CardTitle>Desglose</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
@@ -199,11 +199,11 @@ export function EstadisticasNewsletter() {
             </div>
             <div className="text-center p-4 rounded-lg bg-orange-50 dark:bg-orange-950">
               <div className="text-2xl font-bold text-orange-600">{stats?.bounced || 0}</div>
-              <div className="text-xs text-muted-foreground">Rebotados</div>
+              <div className="text-xs text-muted-foreground">No entregados</div>
             </div>
             <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-950">
               <div className="text-2xl font-bold text-red-600">{stats?.complained || 0}</div>
-              <div className="text-xs text-muted-foreground">Quejas</div>
+              <div className="text-xs text-muted-foreground">Marcados como spam</div>
             </div>
           </div>
         </CardContent>
@@ -214,7 +214,7 @@ export function EstadisticasNewsletter() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Eventos Recientes
+            Últimos movimientos
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -249,8 +249,8 @@ export function EstadisticasNewsletter() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Mail className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No hay eventos registrados aún</p>
-              <p className="text-sm mt-1">Los eventos aparecerán cuando Resend envíe webhooks</p>
+              <p>Todavía no hay movimientos</p>
+              <p className="text-sm mt-1">Aparecerán aquí en cuanto se envíe una newsletter.</p>
             </div>
           )}
         </CardContent>
@@ -262,16 +262,19 @@ export function EstadisticasNewsletter() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
             <div className="text-sm text-blue-800 dark:text-blue-200">
-              <p className="font-medium">Webhooks de Resend configurados</p>
+              <p className="font-medium">Las aperturas y los clics son orientativos</p>
               <p className="mt-1">
-                Los eventos se registran en tiempo real. Asegúrate de configurar el webhook en{" "}
-                <a href="https://resend.com/webhooks" target="_blank" rel="noopener" className="underline">
-                  resend.com/webhooks
-                </a>{" "}
-                con la URL: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded text-xs">
-                  https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/resend-webhook
-                </code>
+                Algunos programas de correo bloquean o inflan estos datos, así que úsalos como referencia, no como cifra exacta.
               </p>
+              <details className="mt-1 text-xs">
+                <summary className="cursor-pointer select-none py-2">Detalle técnico</summary>
+                <p className="break-words">
+                  Los datos llegan por un webhook de Resend (resend.com/webhooks) que apunta a{" "}
+                  <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">
+                    https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/resend-webhook
+                  </code>
+                </p>
+              </details>
             </div>
           </div>
         </CardContent>

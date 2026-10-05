@@ -15,12 +15,16 @@ import {
   textoCanal,
   textoCuota,
 } from "@/lib/newsletter/resend";
+import { MENSAJE_NO_DISPONIBLE, formatoNumero, plural } from "@/lib/newsletter/textos";
 
-// Estado de la conexión con Resend Marketing (fase 2 del newsletter). La tabla
-// newsletter_suscriptores sigue siendo la fuente de verdad; esto solo enseña
-// cómo de cuadrado está Resend y deja forzar una sincronización (la función
+// Tarjeta «Lista de envío» (por dentro: sincronización con Resend Marketing,
+// fase 2 del newsletter). La tabla newsletter_suscriptores sigue siendo la
+// fuente de verdad; esto solo enseña cómo de cuadrada está la lista que usa el
+// servicio de envío y deja forzar una actualización (la función
 // newsletter-sync-resend también se ejecuta sola cada día y antes de cada
-// Broadcast). Controles táctiles de ≥ 44 px (h-11), como el resto del panel en tablet.
+// envío). Los textos son para personal no técnico: nada de nombres de servicios
+// ni de variables; el detalle técnico va dentro de un desplegable.
+// Controles táctiles de ≥ 44 px (h-11), como el resto del panel en tablet.
 
 const COLOR_BARRA = { ok: "bg-emerald-500", aviso: "bg-amber-500", lleno: "bg-destructive" } as const;
 
@@ -54,13 +58,17 @@ export function SincronizacionResend() {
         <CardContent className="py-4">
           <div className="flex items-start gap-3 text-sm text-muted-foreground">
             <CloudCog className="h-5 w-5 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-foreground">Resend Marketing todavía no está conectado</p>
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">La lista de envío todavía no está disponible</p>
               <p className="mt-1">
-                El newsletter se envía por la vía directa de siempre. Para usar los 1.000 contactos del plan de marketing
-                falta desplegar la función de sincronización y aplicar su migración.
+                Por ahora la newsletter se envía por correo directo, con un límite de destinatarios. Avisa al equipo
+                técnico para activar la lista de envío, que admite hasta 1.000 contactos.
               </p>
-              {error instanceof Error && error.message ? <p className="mt-1 text-xs">Detalle: {error.message}</p> : null}
+              <details className="mt-1 text-xs">
+                <summary className="cursor-pointer select-none py-2">Detalle técnico</summary>
+                <p>Falta desplegar la función de sincronización con Resend o aplicar su migración.</p>
+                {error instanceof Error && error.message ? <p className="mt-1 break-words">{error.message}</p> : null}
+              </details>
             </div>
           </div>
         </CardContent>
@@ -74,39 +82,42 @@ export function SincronizacionResend() {
   const aviso = textoCuota(usados, limite);
   const ultima = estado.ultima_pasada;
   const sinClave = !estado.configurado.api_key;
+  // Con poco uso el relleno mediría menos de un píxel y parecería vacío: mínimo visible.
+  const anchoRelleno = usados && usados > 0 ? Math.max(porcentajeCuota(usados, limite), 3) : 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
           <CloudCog className="h-5 w-5 text-primary" />
-          Resend Marketing
+          Lista de envío
           <Badge variant={estado.canal === "broadcast" ? "default" : "secondary"} className="font-normal">
             Envío actual: {textoCanal(estado.canal)}
           </Badge>
         </CardTitle>
         <CardDescription>
-          La lista de esta página es la que manda. Resend solo reparte: se le copian los activos y se le borran los que se
-          dan de baja. Se sincroniza sola cada día y justo antes de cada envío como Broadcast.
+          Es la copia de los suscriptores activos que usa el servicio de envío. La lista de esta página es la que
+          manda: se añaden los activos y se quitan los que se dan de baja. Se actualiza sola cada día y justo antes de
+          cada envío.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <div className="flex items-baseline justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">Contactos usados en Resend</span>
-            <span className="font-semibold tabular-nums">
-              {usados ?? "—"} / {limite}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="text-muted-foreground">Contactos:</span>
+            <span className="font-semibold tabular-nums whitespace-nowrap">
+              {usados ?? "—"} de {formatoNumero(limite)}
             </span>
-          </div>
+          </p>
           <div
-            className="mt-2 h-3 w-full overflow-hidden rounded-full bg-secondary"
+            className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted"
             role="progressbar"
-            aria-label="Contactos usados del plan de Resend"
+            aria-label="Contactos usados del plan"
             aria-valuemin={0}
             aria-valuemax={limite}
             aria-valuenow={usados ?? 0}
           >
-            <div className={cn("h-full transition-all", COLOR_BARRA[nivel])} style={{ width: `${porcentajeCuota(usados, limite)}%` }} />
+            <div className={cn("h-full rounded-full transition-all", COLOR_BARRA[nivel])} style={{ width: `${anchoRelleno}%` }} />
           </div>
           {aviso ? (
             <p className={cn("mt-2 flex items-start gap-2 text-sm", nivel === "lleno" ? "text-destructive" : "text-amber-700 dark:text-amber-400")}>
@@ -120,35 +131,49 @@ export function SincronizacionResend() {
           {ultima ? (
             <>
               <p>
-                Última sincronización {hace(ultima.terminada_at ?? ultima.iniciada_at)} ({etiquetaOrigenPasada(ultima)}):{" "}
+                Última actualización {hace(ultima.terminada_at ?? ultima.iniciada_at)} ({etiquetaOrigenPasada(ultima)}):{" "}
                 <span className={cn("font-medium", ultima.estado === "error" ? "text-destructive" : "text-foreground")}>{etiquetaPasada(ultima)}</span>
               </p>
               {ultima.estado !== "en_curso" ? (
                 <p>
-                  {ultima.destinatarios ?? 0} recibirían el próximo Broadcast · {ultima.altas} añadidos · {ultima.borrados} quitados
-                  {ultima.bajas_resend ? ` · ${ultima.bajas_resend} bajas desde Resend` : ""}
-                  {ultima.errores ? ` · ${ultima.errores} avisos` : ""}
-                  {ultima.pendientes ? ` · ${ultima.pendientes} pendientes` : ""}
+                  {ultima.destinatarios ?? 0} recibirían el próximo envío · {plural(ultima.altas, "añadido", "añadidos")} ·{" "}
+                  {plural(ultima.borrados, "quitado", "quitados")}
+                  {ultima.bajas_resend ? ` · ${plural(ultima.bajas_resend, "baja nueva", "bajas nuevas")}` : ""}
+                  {ultima.errores ? ` · ${plural(ultima.errores, "aviso", "avisos")}` : ""}
+                  {ultima.pendientes ? ` · ${plural(ultima.pendientes, "cambio pendiente", "cambios pendientes")}` : ""}
                 </p>
               ) : null}
-              {ultima.mensaje_error ? <p className="text-destructive">{ultima.mensaje_error}</p> : null}
+              {ultima.mensaje_error ? (
+                <details className="text-destructive">
+                  <summary className="cursor-pointer select-none py-2">La última actualización tuvo un problema. Detalle técnico</summary>
+                  <p className="break-words">{ultima.mensaje_error}</p>
+                </details>
+              ) : null}
             </>
           ) : (
-            <p>Todavía no se ha sincronizado nunca.</p>
+            <p>La lista de envío todavía no se ha actualizado nunca.</p>
           )}
-          {sinClave ? <p className="text-destructive">Falta la clave de Resend Marketing (RESEND_MARKETING_API_KEY).</p> : null}
+          {sinClave ? (
+            <div className="text-destructive">
+              <p>{MENSAJE_NO_DISPONIBLE}</p>
+              <details className="text-xs">
+                <summary className="cursor-pointer select-none py-2">Detalle técnico</summary>
+                <p>Falta la clave de Resend Marketing (RESEND_MARKETING_API_KEY).</p>
+              </details>
+            </div>
+          ) : null}
         </div>
 
         <Button className="h-11 w-full sm:w-auto" variant="outline" onClick={() => sincronizar()} disabled={isPending || sinClave}>
           {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Sincronizar con Resend
+          Actualizar lista de envío
         </Button>
       </CardContent>
     </Card>
   );
 }
 
-/** Línea para «Enviar Newsletter»: por dónde va a salir el próximo envío. */
+/** Línea para «Enviar Newsletter»: cómo va a salir el próximo envío. */
 export function CanalEnvio() {
   const { data: estado, isError } = useEstadoResend();
   const canal = !isError && estado ? estado.canal : "transaccional";
@@ -156,10 +181,10 @@ export function CanalEnvio() {
     <div className="flex items-start gap-2 text-sm text-muted-foreground">
       <Send className="h-4 w-4 mt-0.5 shrink-0" />
       <span>
-        Saldrá como <strong className="text-foreground">{textoCanal(canal)}</strong>
+        Envío: <strong className="text-foreground">{textoCanal(canal).toLowerCase()}</strong>
         {canal === "broadcast"
-          ? ". Cada correo lleva el enlace de baja de Resend; las bajas vuelven solas a la lista."
-          : ". Limitado para no dejar sin correos a las reservas."}
+          ? ". Cada correo incluye un enlace para darse de baja. Las bajas se registran solas en la lista de suscriptores."
+          : ". Hay un límite de destinatarios para no dejar sin correos a las reservas."}
       </span>
     </div>
   );

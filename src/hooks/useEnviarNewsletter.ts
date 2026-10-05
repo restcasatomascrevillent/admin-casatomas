@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { textoErrorCliente, textoSuscriptores } from "@/lib/newsletter/textos";
 
 export interface NewsletterPayload {
   tipo: 'anuncio' | 'nuevo_menu' | 'oferta';
@@ -63,11 +64,13 @@ export function useEnviarPruebaNewsletter() {
       }
       return data as RespuestaEnvio;
     },
-    onSuccess: (data) => {
-      toast.success(data?.message || 'Prueba enviada');
+    onSuccess: () => {
+      toast.success('Prueba enviada. Solo llega a la dirección de pruebas del equipo, no a ningún cliente.');
     },
     onError: (error: Error) => {
-      toast.error(`Prueba: ${error.message}`);
+      // El motivo técnico se queda en la consola; en pantalla, una frase para el personal.
+      console.error('Prueba de newsletter:', error.message);
+      toast.error(`No se pudo enviar la prueba. ${textoErrorCliente(error.message)}`);
     },
   });
 }
@@ -88,9 +91,11 @@ export function useEnviarNewsletter() {
     },
     onSuccess: (data) => {
       if (data?.fallidos) {
-        toast.warning(`Newsletter enviado a ${data.exitosos ?? 0} suscriptores; ${data.fallidos} no se pudieron enviar`);
+        toast.warning(`Newsletter enviada a ${textoSuscriptores(data.exitosos ?? 0)}; a ${data.fallidos} no se pudo enviar.`);
+      } else if (typeof data?.exitosos === 'number') {
+        toast.success(`Newsletter enviada a ${textoSuscriptores(data.exitosos)}.`);
       } else {
-        toast.success(data?.message || 'Newsletter enviado correctamente');
+        toast.success('Newsletter enviada correctamente.');
       }
       queryClient.invalidateQueries({ queryKey: ["newsletter-suscriptores"] });
       // Historial y estado de Resend (useResendMarketing): el envío por Broadcast sincroniza antes.
@@ -98,7 +103,8 @@ export function useEnviarNewsletter() {
       queryClient.invalidateQueries({ queryKey: ["newsletter-resend-estado"] });
     },
     onError: (error: Error) => {
-      toast.error(`Error: ${error.message}`);
+      console.error('Envío de newsletter:', error.message);
+      toast.error(`No se ha enviado la newsletter. ${textoErrorCliente(error.message)}`);
     },
   });
 }

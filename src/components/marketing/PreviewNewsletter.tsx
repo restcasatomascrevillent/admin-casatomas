@@ -41,7 +41,7 @@ export function PreviewNewsletter({ tipo, titulo, mensaje, imagenUrl }: PreviewN
       <Card className="h-full flex items-center justify-center bg-muted/30 min-h-[500px]">
         <div className="text-center py-12">
           <p className="text-muted-foreground">
-            Selecciona un tipo de newsletter para ver la preview
+            Elige un tipo de newsletter para ver aquí cómo quedará
           </p>
         </div>
       </Card>

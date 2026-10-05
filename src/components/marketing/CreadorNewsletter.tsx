@@ -12,6 +12,7 @@ import { SelectorImagenGaleria } from "./SelectorImagenGaleria";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { useEnviarNewsletter, useEnviarPruebaNewsletter } from "@/hooks/useEnviarNewsletter";
 import { CanalEnvio } from "./SincronizacionResend";
+import { textoSuscriptores } from "@/lib/newsletter/textos";
 
 export function CreadorNewsletter() {
   const [tipo, setTipo] = useState<TipoNewsletter | null>(null);
@@ -67,9 +68,9 @@ export function CreadorNewsletter() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Crear Newsletter</CardTitle>
+              <CardTitle>Crear newsletter</CardTitle>
               <CardDescription>
-                Selecciona el tipo y personaliza el contenido
+                Elige el tipo, escribe el texto y revisa cómo queda en la vista previa.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -87,7 +88,7 @@ export function CreadorNewsletter() {
                 <Label htmlFor="titulo">Título</Label>
                 <Input
                   id="titulo"
-                  placeholder="Título del newsletter"
+                  placeholder="Título de la newsletter"
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   disabled={!tipo}
@@ -100,7 +101,7 @@ export function CreadorNewsletter() {
                 <Label htmlFor="mensaje">Mensaje</Label>
                 <Textarea
                   id="mensaje"
-                  placeholder="Escribe el mensaje del newsletter..."
+                  placeholder="Escribe el mensaje de la newsletter..."
                   value={mensaje}
                   onChange={(e) => setMensaje(e.target.value)}
                   disabled={!tipo}
@@ -115,13 +116,16 @@ export function CreadorNewsletter() {
                 onSeleccionar={setImagenUrl}
               />
 
-              {/* Canal del envío (NEWSLETTER_CANAL: directo o Broadcast de Resend Marketing) */}
+              {/* Cómo saldrá el envío (NEWSLETTER_CANAL: directo o por lista, Broadcast de Resend Marketing) */}
               <CanalEnvio />
 
               {/* Recipients Count */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                <Users className="h-4 w-4" />
-                <span>Se enviará a <strong className="text-foreground">{totalSuscriptores}</strong> suscriptores</span>
+              <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                <Users className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  Al enviarla, le llegará a <strong className="text-foreground">{textoSuscriptores(totalSuscriptores)}</strong> de
+                  verdad. Antes puedes mandarte una prueba.
+                </span>
               </div>
 
               {/* Send Button */}
@@ -136,19 +140,25 @@ export function CreadorNewsletter() {
                 ) : (
                   <Send className="h-4 w-4 mr-2" />
                 )}
-                Enviar Newsletter
+                Enviar a {textoSuscriptores(totalSuscriptores)}
               </Button>
 
               {/* Prueba por Resend Marketing: solo a la dirección de prueba, nunca a clientes */}
-              <Button
-                className="h-11 w-full"
-                variant="outline"
-                onClick={() => tipo && enviarPrueba({ tipo, titulo, mensaje, imagen_url: imagenUrl })}
-                disabled={!isFormValid || isPending || enviandoPrueba}
-              >
-                {enviandoPrueba ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
-                Enviar prueba por Resend (no llega a clientes)
-              </Button>
+              <div className="space-y-1">
+                <Button
+                  className="h-11 w-full"
+                  variant="outline"
+                  onClick={() => tipo && enviarPrueba({ tipo, titulo, mensaje, imagen_url: imagenUrl })}
+                  disabled={!isFormValid || isPending || enviandoPrueba}
+                  aria-describedby="ayuda-prueba"
+                >
+                  {enviandoPrueba ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FlaskConical className="h-4 w-4 mr-2" />}
+                  Enviar prueba (no llega a clientes)
+                </Button>
+                <p id="ayuda-prueba" className="text-xs text-muted-foreground text-center">
+                  La prueba se envía solo a una dirección de pruebas del equipo; ningún cliente la recibe.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -171,9 +181,9 @@ export function CreadorNewsletter() {
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Enviar newsletter?</AlertDialogTitle>
+            <AlertDialogTitle>¿Enviar la newsletter a {textoSuscriptores(totalSuscriptores)}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se enviará "{titulo}" a {totalSuscriptores} suscriptores. Esta acción no se puede deshacer.
+              Es un envío real: «{titulo}» le llegará a {textoSuscriptores(totalSuscriptores)} y no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -182,7 +192,7 @@ export function CreadorNewsletter() {
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
-              Confirmar envío
+              Sí, enviar a todos
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -31,19 +31,33 @@ export interface SuscriptorNewsletter {
 }
 
 const ETIQUETAS_ORIGEN_BAJA: Record<OrigenBaja, string> = {
-  enlace_email: "Enlace de baja del correo",
-  cabecera_one_click: "Botón «Cancelar suscripción» del correo",
-  panel_manual: "Desde el panel",
-  queja_spam: "Marcó un correo como spam",
-  rebote_permanente: "Dirección inexistente (rebote)",
-  suprimido_resend: "Bloqueada por Resend",
-  resend_baja_nativa: "Página de baja de Resend",
+  enlace_email: "Se dio de baja desde el email",
+  cabecera_one_click: "Pulsó «Cancelar suscripción» en su correo",
+  panel_manual: "Dado de baja desde el panel",
+  queja_spam: "Marcó el correo como spam",
+  rebote_permanente: "Email inexistente o rechazado",
+  suprimido_resend: "Email rechazado por el servicio de envío",
+  resend_baja_nativa: "Se dio de baja desde la página de baja del correo",
 };
 
 /** Texto para el personal. Las bajas de antes de septiembre de 2026 no guardaban el origen. */
 export function etiquetaOrigenBaja(origen: string | null | undefined): string {
-  if (!origen) return "Sin registrar (baja antigua)";
-  return ETIQUETAS_ORIGEN_BAJA[origen as OrigenBaja] ?? origen;
+  if (!origen) return "Motivo no registrado (baja antigua)";
+  return ETIQUETAS_ORIGEN_BAJA[origen as OrigenBaja] ?? "Otro motivo";
+}
+
+const ETIQUETAS_ORIGEN_ALTA: Record<string, string> = {
+  reserva_web: "Reserva web",
+  reserva_telefono: "Reserva por teléfono",
+  reserva_manual: "Reserva manual",
+  solicitud_web: "Solicitud web",
+  panel_manual: "Añadido desde el panel",
+};
+
+/** De dónde vino el suscriptor. Vacío si no se guardó. */
+export function etiquetaOrigenAlta(origen: string | null | undefined): string {
+  if (!origen) return "";
+  return ETIQUETAS_ORIGEN_ALTA[origen] ?? "Otro origen";
 }
 
 /** Las que se producen sin que el cliente pulse nada: el panel las marca distinto. */
