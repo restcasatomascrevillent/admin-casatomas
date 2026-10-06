@@ -2,7 +2,8 @@
  * Tests de supabase/functions/chat-facturas/herramientas.ts (TS puro, sin
  * Deno): prompt, esquema de TOOLS, traduccion herramienta -> RPC y marcas
  * sobre el resultado. Origen: prueba del chatbot del 05/10/2026 (engram
- * `facturas/chatbot-prueba-2026-10`) y migracion 20261005100000.
+ * `facturas/chatbot-prueba-2026-10`) y migracion 20261005100000; tercera
+ * prueba (06/10/2026) y migracion 20261006100000 (deducidos, conteos, IVA).
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -107,8 +108,31 @@ describe("systemPrompt", () => {
   it("documentos sin total => cifra parcial y citarlos, solo del tipo y solo con importes", () => {
     expect(p).toMatch(/documentos_sin_total.*PARCIAL/s);
     expect(p).toMatch(/cita esos documentos/);
-    expect(p).toMatch(/solo los del tipo del que hablas \(facturas o albaranes\)/);
-    expect(p).toMatch(/En conteos y listados no hables de cifra parcial/);
+    expect(p).toMatch(/del tipo del que hablas \(facturas o albaranes\)/);
+    expect(p).toMatch(/nunca digas que la cifra es completa/);
+  });
+
+  it("totales deducidos: decirlo, base SIN IVA si iva_conocido=false, nunca 'IVA incluido' (prueba 3: q20, q01, n1)", () => {
+    expect(p).toMatch(/total_origen "deducido"/);
+    expect(p).toMatch(/total calculado desde las lineas, no leido: dilo/);
+    expect(p).toMatch(/si iva_conocido=false es la base SIN IVA y el real sera mayor/);
+    expect(p).toMatch(/nunca digas "IVA incluido" de un deducido/);
+    expect(p).toMatch(/IVA incluido salvo los deducidos/);
+    expect(p).toMatch(/si_das_importes/);
+  });
+
+  it("IVA: los documentos sin IVA no estan en la suma (prueba 3: q22)", () => {
+    expect(p).toMatch(/sin_iva: su IVA no esta en la suma de IVA/);
+  });
+
+  it("conteos: solo numeros, sin importes ni avisos (prueba 3: q04, q12, q13)", () => {
+    expect(p).toMatch(/Pregunta de cuantos: solo los numeros pedidos; sin importes ni avisos de parcial/);
+    const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
+    expect(filtrar.description).toMatch(/los demas filtros solo cuentan/);
+  });
+
+  it("lineas SIN IVA salvo nota contraria (prueba 3: q21)", () => {
+    expect(p).toMatch(/van SIN IVA salvo nota contraria/);
   });
 
   it("medias y cruces: consulta_flexible, nunca calcular a mano (prueba 2: ticket medio)", () => {
@@ -297,7 +321,39 @@ describe("marcarResultado", () => {
       facturas: { n: 6, gasto: 8172.21, sin_total: 1 },
       documentos_sin_total: { n: 1, docs: [{ id: 54, numero: "ML/101511" }] },
     }, null) as Record<string, unknown>;
-    expect(r.aviso_parcial).toMatch(/PARCIAL: 1 documento/);
+    expect(r.aviso_parcial).toMatch(/no es completo: 1 sin total \(no suman\)/);
+  });
+
+  it("deducidos y sin IVA de primer nivel tambien avisan, y el aviso va delante (prueba 3: n1, q22)", () => {
+    const r = marcarResultado("consulta_flexible", {
+      criterio: "sum_total de documentos por proveedor, mes",
+      filas: [{ proveedor: "Salazones Garre", mes: "2025-12", sum_total: null, sin_total: 1 }],
+      total_filas: 1,
+      documentos_sin_total: { n: 1, docs: [{ id: 39, numero: "F / 25011959" }] },
+      documentos_deducidos: { n: 1, docs: [{ id: 54, numero: "ML/101511", iva_conocido: false }] },
+      documentos_sin_iva: { n: 1, docs: [{ id: 54, numero: "ML/101511" }] },
+    }, null) as Record<string, unknown>;
+    expect(Object.keys(r)[0]).toBe("aviso_parcial");
+    expect(r.aviso_parcial).toMatch(/1 sin total \(no suman\); 1 con total deducido de las lineas; 1 sin IVA/);
+    const d = marcarResultado("ranking", {
+      criterio: "x", filas: [{ proveedor: "LUGA", importe: 3787.53, deducidos: 1 }], total_filas: 1,
+      documentos_deducidos: { n: 1, docs: [{ id: 54 }] },
+    }, null) as Record<string, unknown>;
+    expect(d.aviso_parcial).toMatch(/1 con total deducido/);
+    expect(d.aviso_parcial).not.toMatch(/sin total/);
+  });
+
+  it("conteo sin bloques de importe => sin aviso (prueba 3: q04)", () => {
+    const c = marcarResultado("consulta_flexible", {
+      criterio: "count_documentos de documentos por tipo",
+      filas: [{ tipo: "factura", count_documentos: 12 }, { tipo: "albaran", count_documentos: 7 }], total_filas: 2,
+    }, null) as Record<string, unknown>;
+    expect(c.aviso_parcial).toBeUndefined();
+    const f = marcarResultado("filtrar_documentos", {
+      criterio: "filtro=sin_verificar; solo conteo", filas: [{ id: 52 }], total_filas: 12, truncado: true,
+      sumas: { facturas: { n: 12 } },
+    }, null) as Record<string, unknown>;
+    expect(f.aviso_parcial).toBeUndefined();
   });
 
   it("sin aviso global de parcial cuando sin_total va dentro de su tipo o en sumas (prueba 2: ruido)", () => {
@@ -307,10 +363,10 @@ describe("marcarResultado", () => {
       sumas: { facturas: { n: 1, total: 0, sin_total: 1 } },
     }, null) as Record<string, unknown>;
     expect(f.aviso_parcial).toBeUndefined();
-    // estadisticas/resumen: sin_total {n, docs} dentro de facturas/albaranes.
+    // estadisticas/resumen: avisos dentro de facturas/albaranes.si_das_importes.
     const e = marcarResultado("estadisticas_globales", {
-      facturas: { n: 12, gasto: 31555.19, sin_total: { n: 2, docs: [] } },
-      albaranes: { n: 7, valor: 6413.42, sin_total: { n: 1, docs: [] } },
+      facturas: { n: 12, gasto: 35342.72, si_das_importes: { sin_total: { n: 1, docs: [] }, deducidos: { n: 1, docs: [] } } },
+      albaranes: { n: 7, valor: 6413.42, si_das_importes: { sin_total: { n: 1, docs: [] } } },
     }, null) as Record<string, unknown>;
     expect(e.aviso_parcial).toBeUndefined();
   });

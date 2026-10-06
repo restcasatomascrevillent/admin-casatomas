@@ -17,6 +17,9 @@
 //  filtrar_documentos_agente, detalle_documento_agente,
 //  buscar_productos_texto_agente, consulta_flexible_agente y las versiones
 //  compactas de estadisticas/resumen/buscar_*).
+//  Las reglas de deducidos/conteos/IVA (regla 3 y 3b) cuentan con
+//  20261006100000_chatbot_facturas_deducidos APLICADA (total_origen,
+//  si_das_importes, documentos_deducidos/_sin_iva); sin ella siguen valiendo.
 // ============================================================================
 
 export const MAX_CHARS_RESULTADO_TOOL = 6_000;
@@ -48,7 +51,7 @@ Hoy es ${hoy}. Pasa fechas ISO AAAA-MM-DD. Si una herramienta da error de argume
 
 DATOS
 - Factura = gasto. Albaran = entrega, NO es gasto: nunca lo sumes al gasto; si salen ambos, separalos.
-- IVA: total/gasto/valor de un DOCUMENTO llevan IVA incluido; "base" es sin IVA. El precio_unitario y el importe de una LINEA de producto van SIN IVA: dilo asi, nunca "IVA incluido".
+- IVA: total/gasto/valor de un DOCUMENTO llevan IVA incluido salvo los deducidos (regla 3); "base" es sin IVA. El precio_unitario y el importe de una LINEA de producto van SIN IVA salvo nota contraria: dilo asi, nunca "IVA incluido".
 - No hay ninguna relacion guardada entre albaranes y facturas ni estado de pago. Si preguntan por albaranes "sin factura"/"sin facturar", que albaran va con que factura o que esta pagado: responde que con los datos no se puede saber, SIN llamar herramientas. "sin_total" NO significa sin factura.
 
 HERRAMIENTAS (usa la especifica)
@@ -65,7 +68,8 @@ HERRAMIENTAS (usa la especifica)
 REGLAS
 1. Usa solo datos de las herramientas: nunca inventes importes, fechas, proveedores ni numeros. Cita un numero de documento solo si aparece literal en un campo "numero" del resultado.
 2. Lista vacia o "sin_datos" = no hay datos registrados, nunca "no se gasto nada". No estimes.
-3. Si das un importe (gasto, total, IVA, media) y su bloque trae "sin_total" o "documentos_sin_total", la cifra es PARCIAL: dilo y cita esos documentos (numero, proveedor, fecha), solo los del tipo del que hablas (facturas o albaranes). En conteos y listados no hables de cifra parcial.
+3. Si das un importe (gasto, total, IVA, media), mira sin_total, deducidos y sin_iva (sueltos, en "si_das_importes" o como documentos_sin_total/_deducidos/_sin_iva) del tipo del que hablas (facturas o albaranes): cita esos documentos (numero, proveedor) y nunca digas que la cifra es completa. sin_total: no suma, la cifra es PARCIAL. Deducido (total_origen "deducido"): total calculado desde las lineas, no leido: dilo; si iva_conocido=false es la base SIN IVA y el real sera mayor; nunca digas "IVA incluido" de un deducido. sin_iva: su IVA no esta en la suma de IVA.
+3b. Pregunta de cuantos: solo los numeros pedidos; sin importes ni avisos de parcial.
 4. "fecha_dudosa"/"fechas_dudosas": la fecha es la de subida, no la del documento; avisalo al hablar de la ultima factura o al agrupar por mes, año o dia de la semana.
 5. "alertas": explica su "mensaje"; no lo generalices a "importes que no cuadran".
 6. "truncado": true = extracto: no sumes filas ni afirmes que algo no existe. Nunca calcules tu sumas, medias ni divisiones: usa las cifras de la herramienta (medias con consulta_flexible avg_*, que trae n_con_*: di sobre cuantos documentos se calcula).
@@ -141,7 +145,8 @@ export const TOOLS = [
     }),
   fn("filtrar_documentos",
     "Busca, lista y suma documentos por numero, proveedor o CIF (texto), tipo, fechas y estado. " +
-    "'sumas' cubre TODO lo filtrado. sin_total = sin importe leido; NO significa sin factura.",
+    "Con 'todos', 'sumas' = TODO lo filtrado; los demas filtros solo cuentan. " +
+    "sin_total = sin importe leido; NO significa sin factura.",
     {
       filtro: { type: "string", enum: ["todos", "sin_total", "sin_verificar", "con_alertas", "fecha_dudosa"] },
       texto: { type: ["string", "null"], description: "Numero de documento, proveedor o CIF" },
@@ -443,15 +448,24 @@ export function esErrorCorregible(msg: string): boolean {
 // ─── Marcas sobre el resultado ───────────────────────────────────────────────
 
 /**
- * Documentos sin total de PRIMER nivel (ranking, consulta_flexible, filtrar
- * truncado): esas RPC ya los acotan al tipo consultado y solo los mandan
- * cuando hay importes. En estadisticas/resumen van dentro de facturas/albaranes
- * (`sin_total: {n, docs}`) y no se avisa aqui: el aviso global mezclaba
- * albaranes en el gasto de facturas y se repetia en preguntas de conteo.
+ * Avisos de importe de PRIMER nivel (ranking, consulta_flexible, filtrar
+ * truncado): documentos sin total, con total deducido y sin IVA. Esas RPC ya
+ * los acotan al tipo consultado y solo los mandan cuando hay importes (un
+ * conteo no los trae: migracion 20261006100000). En estadisticas/resumen van
+ * dentro de facturas/albaranes (`si_das_importes`) y no se avisa aqui: el
+ * aviso global mezclaba albaranes en el gasto de facturas y se repetia en
+ * preguntas de conteo.
  */
 // deno-lint-ignore no-explicit-any
-function documentosSinTotal(data: any): number {
-  return Number(data?.documentos_sin_total?.n ?? 0);
+function avisosImporte(data: any): string | null {
+  const n = (k: string) => Number(data?.[k]?.n ?? 0);
+  const partes = [
+    n("documentos_sin_total") > 0 ? `${n("documentos_sin_total")} sin total (no suman)` : "",
+    n("documentos_deducidos") > 0 ? `${n("documentos_deducidos")} con total deducido de las lineas` : "",
+    n("documentos_sin_iva") > 0 ? `${n("documentos_sin_iva")} sin IVA (no estan en el IVA)` : "",
+  ].filter(Boolean);
+  if (partes.length === 0) return null;
+  return `Si das un importe de aqui no es completo: ${partes.join("; ")}. Citalos (regla 3).`;
 }
 
 /**
@@ -460,7 +474,7 @@ function documentosSinTotal(data: any): number {
  *  · Arrays (busquedas): sin `truncado` el modelo sumaba 8 filas y lo llamaba
  *    "el total".
  *  · Objetos: "0,00 €" con 0 documentos es "no hay datos", nunca "no se gasto".
- *  · documentos_sin_total > 0: aviso corto en el punto de uso (regla 3).
+ *  · documentos_sin_total/_deducidos/_sin_iva: aviso corto delante (regla 3).
  */
 // deno-lint-ignore no-explicit-any
 export function marcarResultado(nombre: string, data: any, limite: number | null): unknown {
@@ -498,13 +512,10 @@ export function marcarResultado(nombre: string, data: any, limite: number | null
       };
     }
 
-    const sinTotal = documentosSinTotal(data);
-    if (sinTotal > 0) {
-      return {
-        ...data,
-        aviso_parcial: `Si das un importe de aqui es PARCIAL: ${sinTotal} documento(s) sin total no suman; citalos.`,
-      };
-    }
+    // Delante de las filas, para que no se lea despues de redactar (prueba
+    // del 06/10, n1: con documentos_sin_total al final decia «datos completos»).
+    const aviso = avisosImporte(data);
+    if (aviso) return { aviso_parcial: aviso, ...data };
     return data;
   }
 
