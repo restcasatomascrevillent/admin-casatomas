@@ -66,9 +66,10 @@ export default function Marketing() {
             <GestionCorreos />
           </TabsContent>
 
-          <TabsContent value="estadisticas" className={`${CONTENIDO_PESTANA} space-y-6`}>
-            <EstadisticasNewsletter />
-            <HistorialEnvios />
+          {/* Todo a la vista sin scroll (2026-10-06): las estadísticas llenan justo el alto de la
+              pestaña y el historial va junto a la gráfica (EstadisticasNewsletter). */}
+          <TabsContent value="estadisticas" className={CONTENIDO_PESTANA}>
+            <EstadisticasNewsletter historial={<HistorialEnvios />} />
           </TabsContent>
         </Tabs>
       </div>

@@ -220,6 +220,29 @@ describe("HistorialEnvios", () => {
     expect(rpc).toHaveBeenCalledWith("newsletter_estadisticas_broadcasts", { p_broadcast_ids: ["b1"] });
   });
 
+  it("compacto junto a la gráfica de Estadísticas: llena el alto que le dan y, si no caben los envíos, solo su lista hace scroll", async () => {
+    tablas.newsletter_envios = [
+      {
+        data: [{ id: "e1", asunto: "Menú de otoño", created_at: "2026-10-03T10:00:00Z", total_destinatarios: 12, estado: "completado", tipo_newsletter: "nuevo_menu", canal: "transaccional", resend_broadcast_id: null }],
+        error: null,
+      },
+    ];
+    envolver(<HistorialEnvios />);
+    const asunto = await screen.findByText("Menú de otoño");
+    const titulo = screen.getByRole("heading", { name: "Historial de envíos" });
+    expect(titulo).toHaveClass("text-sm");
+    const tarjeta = titulo.closest(".rounded-lg") as HTMLElement;
+    expect(tarjeta).toHaveClass("flex", "flex-1", "flex-col");
+    // La cabecera no encoge; la lista se queda el resto y es lo único que desplaza.
+    expect(titulo.parentElement).toHaveClass("shrink-0", "p-3");
+    const lista = screen.getByTestId("lista-historial");
+    expect(lista).toContainElement(asunto);
+    expect(lista).toHaveClass("min-h-0", "flex-1", "overflow-y-auto", "overscroll-contain");
+    expect(tarjeta.querySelectorAll('[class*="overflow-y-auto"]')).toHaveLength(1);
+    // Detalle de cada envío legible pero compacto (12 px).
+    expect(screen.getByText(/12 destinatarios/).closest("p")).toHaveClass("text-xs");
+  });
+
   it("sin la migración aplicada (sin columna canal) el historial se sigue viendo", async () => {
     tablas.newsletter_envios = [
       { data: null, error: { message: 'column newsletter_envios.canal does not exist' } },

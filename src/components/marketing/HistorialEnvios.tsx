@@ -34,19 +34,21 @@ function Cifras({ e }: { e: EnvioNewsletter }) {
   );
 }
 
+// Compacto y con el alto que le dé su contenedor (pestaña Estadísticas, junto a la gráfica): si hay más
+// envíos de los que caben, solo la lista hace scroll; si caben, no hay scroll ninguno.
 export function HistorialEnvios() {
   const { data: envios, isLoading, error } = useHistorialEnvios();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <History className="h-5 w-5 text-primary" />
+    <Card className="flex min-h-[8rem] flex-1 flex-col">
+      <CardHeader className="shrink-0 space-y-0.5 p-3 pb-2">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <History className="h-4 w-4 text-primary" aria-hidden="true" />
           Historial de envíos
         </CardTitle>
-        <CardDescription>Las últimas newsletters enviadas y cómo salieron.</CardDescription>
+        <CardDescription className="text-xs">Las últimas newsletters enviadas y cómo salieron.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent data-testid="lista-historial" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pt-0">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -59,9 +61,9 @@ export function HistorialEnvios() {
         ) : (
           <ul className="divide-y">
             {envios.map((e) => (
-              <li key={e.id} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium break-words">{e.asunto}</span>
+              <li key={e.id} className="py-2 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-sm font-medium break-words">{e.asunto}</span>
                   <Badge variant={e.canal === "broadcast" ? "default" : "secondary"} className="font-normal">
                     {e.canal === "broadcast" ? "Lista de envío" : "Correo directo"}
                   </Badge>
@@ -71,7 +73,7 @@ export function HistorialEnvios() {
                     </Badge>
                   ) : null}
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {format(new Date(e.created_at), "d MMM yyyy, HH:mm", { locale: es })} · <Cifras e={e} />
                 </p>
               </li>
