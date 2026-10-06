@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock, SquarePen } from "lucide-react";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { useIsCompactNav } from "@/hooks/use-mobile";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
@@ -60,6 +61,43 @@ const getStatusColor = (p: number) => {
   if (p < 80) return { bg: "bg-amber-500/10", text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
   return { bg: "bg-red-500/10", text: "text-red-600", bar: "bg-red-500", label: "Alta" };
 };
+
+/** Comida o Cena en una sola fila baja: nombre (y «Ahora») a la izquierda; reservas y comensales a la derecha. */
+function TurnoHoy({ icono, nombre, ahora, reservas, comensales }: {
+  icono: ReactNode;
+  nombre: string;
+  ahora: boolean;
+  reservas: number;
+  comensales: number;
+}) {
+  return (
+    <div
+      data-testid={`turno-${nombre.toLowerCase()}`}
+      className={cn(
+        "flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-1.5",
+        ahora ? "border-primary bg-primary/5" : "bg-muted/30",
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        {icono}
+        <span className="text-sm font-medium">{nombre}</span>
+        {ahora && <Badge variant="default" className="px-1.5 py-0 text-xs">Ahora</Badge>}
+      </div>
+      <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
+        <span className="text-xl font-bold leading-none tabular-nums">{reservas}</span>
+        <span className="text-xs text-muted-foreground">reservas</span>
+        <span className="ml-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <Users className="h-3 w-3" aria-hidden="true" />
+          {comensales} comensales
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Cifra de estado (Activas, Confirmadas, Pendientes, Próxima): baja, con la cifra y su nombre en una fila desde `sm`. */
+const MOSAICO = "flex flex-col items-center justify-center gap-x-2 rounded-lg px-1 py-1.5 text-center sm:flex-row sm:py-2";
+const CIFRA_MOSAICO = "text-xl font-bold leading-tight tabular-nums sm:text-2xl";
 
 export function ReservasHoy() {
   const navigate = useNavigate();
@@ -151,9 +189,15 @@ export function ReservasHoy() {
     .filter(r => r.hora >= horaActualStr)
     .sort((a, b) => a.hora.localeCompare(b.hora))[0];
 
+  // Antes era una línea fija bajo la barra de ocupación; ahora vive en la ayuda «ⓘ» de la franja (se abre con un
+  // toque) y en el nombre accesible de ese botón, para que la tarjeta quepa con las gráficas sin scroll.
+  const desgloseActivas = `${reservasActivas.length} reservas activas (${comensalesActivos} pax, sin canceladas) = ${numConfirmadas} confirmadas + ${reservasVerificadas} verificadas + ${reservasPendientes} pendientes`;
+
+  // COMPACTA (06/10/2026, el Dashboard ocupa el alto de la pantalla sin scroll): cabecera fina, ocupación en una
+  // franja, el Reservado en una línea, Comida/Cena y las cuatro cifras en filas bajas. Mismos datos que antes.
   return (
     <Card className="h-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2 sm:px-5">
         <CardTitle className="text-lg font-semibold">Reservas de Hoy</CardTitle>
         <div className="flex items-center gap-2">
           {reservasBlacklist.length > 0 && (
@@ -239,85 +283,79 @@ export function ReservasHoy() {
           {!navCompacta && <CentroNotificaciones className="h-7 w-7" />}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Ocupación de hoy contra el aforo del restaurante */}
-        <div className="space-y-2">
-          <div className={`p-3 rounded-lg ${colors.bg}`}>
-            <div className="flex items-center justify-between mb-1.5 gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`text-2xl font-bold ${colors.text}`}>{porcentaje}%</span>
-                <Badge variant="outline" className={`${colors.text} border-current text-xs`}>
-                  {colors.label}
-                </Badge>
-              </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {comensalesActivos}/{capacidad} pax · {reservasActivas.length} res.
-              </span>
-            </div>
-            <div className="h-2 bg-background/50 rounded-full overflow-hidden">
-              <div
-                className={`h-full ${colors.bar} transition-all duration-500`}
-                style={{ width: `${Math.min(100, porcentaje)}%` }}
-              />
-            </div>
+      <CardContent className="flex flex-col gap-2 px-4 pb-3 pt-0 sm:px-5">
+        {/* Ocupación de hoy contra el aforo del restaurante: %, nivel, barra y pax en UNA franja (la barra baja a
+            su propia línea en el móvil). El desglose de las reservas activas, en la ayuda «ⓘ». */}
+        <div
+          data-testid="franja-ocupacion"
+          className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2", colors.bg)}
+        >
+          <div className="flex items-center gap-2">
+            <span className={cn("text-2xl font-bold leading-none tabular-nums", colors.text)}>{porcentaje}%</span>
+            <Badge variant="outline" className={cn(colors.text, "border-current text-xs")}>
+              {colors.label}
+            </Badge>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {reservasActivas.length} reservas activas ({comensalesActivos} pax, sin canceladas) = {numConfirmadas} confirmadas
-            + {reservasVerificadas} verificadas + {reservasPendientes} pendientes
-          </p>
-          {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. */}
-          <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={todasReservas as unknown as ReservaServicio[] | undefined} />
+          <div
+            role="progressbar"
+            aria-label="Ocupación de hoy"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.min(100, porcentaje)}
+            aria-valuetext={`${porcentaje}% (${colors.label})`}
+            className="order-last h-2 basis-full overflow-hidden rounded-full bg-background/50 sm:order-none sm:min-w-16 sm:flex-1 sm:basis-auto"
+          >
+            <div
+              className={`h-full ${colors.bar} transition-all duration-500`}
+              style={{ width: `${Math.min(100, porcentaje)}%` }}
+            />
+          </div>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+              {comensalesActivos}/{capacidad} pax · {reservasActivas.length} res.
+            </span>
+            <AyudaPopover etiqueta={`Desglose: ${desgloseActivas}`}>{desgloseActivas}</AyudaPopover>
+          </div>
         </div>
+        {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. Una línea fina. */}
+        <AvisoSalasPrivadas
+          avisos={avisosPrivadas}
+          reservas={todasReservas as unknown as ReservaServicio[] | undefined}
+          className="py-1"
+        />
 
         {/* Desglose por turno */}
-        <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3">
-          <div className={`p-2 sm:p-3 rounded-lg border ${horaActual < 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-              <Utensils className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
-              <span className="text-xs sm:text-sm font-medium">Comida</span>
-              {horaActual < 17 && <Badge variant="default" className="text-xs px-1 sm:px-1.5 py-0">Ahora</Badge>}
-            </div>
-            <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasComida.length}</span>
-              <span className="text-xs text-muted-foreground">reservas</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 sm:mt-1">
-              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              {comensalesComida} comensales
-            </div>
-          </div>
-
-          <div className={`p-2 sm:p-3 rounded-lg border ${horaActual >= 17 ? 'border-primary bg-primary/5' : 'bg-muted/30'}`}>
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-              <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-indigo-500" />
-              <span className="text-xs sm:text-sm font-medium">Cena</span>
-              {horaActual >= 17 && <Badge variant="default" className="text-xs px-1 sm:px-1.5 py-0">Ahora</Badge>}
-            </div>
-            <div className="flex items-baseline gap-1.5 sm:gap-2">
-              <span className="text-xl sm:text-2xl font-bold">{reservasCena.length}</span>
-              <span className="text-xs text-muted-foreground">reservas</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 sm:mt-1">
-              <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-              {comensalesCena} comensales
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-2 xs:grid-cols-2">
+          <TurnoHoy
+            icono={<Utensils className="h-4 w-4 text-amber-600" aria-hidden="true" />}
+            nombre="Comida"
+            ahora={horaActual < 17}
+            reservas={reservasComida.length}
+            comensales={comensalesComida}
+          />
+          <TurnoHoy
+            icono={<Moon className="h-4 w-4 text-indigo-500" aria-hidden="true" />}
+            nombre="Cena"
+            ahora={horaActual >= 17}
+            reservas={reservasCena.length}
+            comensales={comensalesCena}
+          />
         </div>
 
         {/* Estados + Próxima reserva */}
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-          <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-primary">{reservasActivas.length}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">Activas</p>
+        <div data-testid="mosaicos-estado" className="grid grid-cols-4 gap-1.5 sm:gap-2">
+          <div className={cn(MOSAICO, "bg-primary/10")}>
+            <div className={cn(CIFRA_MOSAICO, "text-primary")}>{reservasActivas.length}</div>
+            <p className="text-xs text-muted-foreground">Activas</p>
           </div>
-          <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
-            <div className="text-lg sm:text-2xl font-bold text-green-600">{numConfirmadas}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">Confirmadas</p>
+          <div className={cn(MOSAICO, "bg-green-500/10")}>
+            <div className={cn(CIFRA_MOSAICO, "text-green-600")}>{numConfirmadas}</div>
+            <p className="text-xs text-muted-foreground">Confirmadas</p>
           </div>
           <div
             role="link"
             tabIndex={0}
-            className="text-center p-2 sm:p-3 bg-amber-500/10 rounded-lg cursor-pointer hover:bg-amber-500/20 active:bg-amber-500/20 transition-colors"
+            className={cn(MOSAICO, "cursor-pointer bg-amber-500/10 transition-colors hover:bg-amber-500/20 active:bg-amber-500/20")}
             onClick={() => navigate('/reservas?tab=reservas&status=pendiente&date=today')}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -326,21 +364,21 @@ export function ReservasHoy() {
               }
             }}
           >
-            <div className="text-lg sm:text-2xl font-bold text-amber-600">{reservasPendientes}</div>
-            <p className="text-xs text-muted-foreground mt-0.5">Pendientes</p>
+            <div className={cn(CIFRA_MOSAICO, "text-amber-600")}>{reservasPendientes}</div>
+            <p className="text-xs text-muted-foreground">Pendientes</p>
           </div>
           {proximaReserva ? (
-            <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
+            <div className={cn(MOSAICO, "bg-muted/50")}>
               <div className="flex items-center justify-center gap-1">
-                <Clock className="h-3 w-3 text-muted-foreground" />
+                <Clock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className={CIFRA_MOSAICO}>{proximaReserva.hora.slice(0, 5)}</span>
               </div>
-              <div className="text-lg sm:text-xl font-bold">{proximaReserva.hora.slice(0, 5)}</div>
-              <p className="text-xs text-muted-foreground mt-0.5">Próxima</p>
+              <p className="text-xs text-muted-foreground">Próxima</p>
             </div>
           ) : (
-            <div className="text-center p-2 sm:p-3 bg-muted/50 rounded-lg">
-              <div className="text-lg sm:text-2xl font-bold text-muted-foreground">—</div>
-              <p className="text-xs text-muted-foreground mt-0.5">Próxima</p>
+            <div className={cn(MOSAICO, "bg-muted/50")}>
+              <div className={cn(CIFRA_MOSAICO, "text-muted-foreground")}>—</div>
+              <p className="text-xs text-muted-foreground">Próxima</p>
             </div>
           )}
         </div>

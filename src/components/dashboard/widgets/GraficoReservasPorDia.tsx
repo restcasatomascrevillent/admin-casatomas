@@ -39,42 +39,47 @@ export function GraficoReservasPorDia() {
 
   // Sin esto, un fallo de consulta dibujaba un gráfico plano a cero.
   if (isError) {
-    return <EstadoErrorCarga titulo="las reservas por día" error={error} onReintentar={() => refetch()} />;
+    return <EstadoErrorCarga titulo="las reservas por día" error={error} onReintentar={() => refetch()} className="h-full" />;
   }
 
+  // ALTO (06/10/2026, el Dashboard ocupa el alto de la pantalla): la tarjeta llena el hueco que le da el Dashboard
+  // y la gráfica se queda con todo lo que hay bajo el título (antes, 250 px fijos). Va en una capa absoluta para
+  // que el ResponsiveContainer mida el hueco real y no su propio contenido. `min-h`: por debajo no se lee.
   return (
-    <Card>
-      <CardHeader className="pb-2 sm:pb-4">
-        <CardTitle className="text-sm sm:text-base font-medium">Reservas por Día</CardTitle>
+    <Card className="flex h-full flex-col">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2.5 sm:px-5">
+        <CardTitle className="text-sm font-medium">Reservas por Día</CardTitle>
       </CardHeader>
-      <CardContent className="px-2 sm:px-6">
+      <CardContent className="relative min-h-[120px] flex-1 p-0 sm:min-h-[150px]">
         {datos.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <BarChart data={datos} margin={{ left: -20, right: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="fecha"
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-              />
-              <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Bar dataKey="reservas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div data-testid="area-grafica" className="absolute inset-x-2 bottom-2 top-0 sm:inset-x-4 sm:bottom-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={datos} margin={{ left: -20, right: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="fecha"
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Bar dataKey="reservas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
             No hay datos disponibles
           </div>
         )}

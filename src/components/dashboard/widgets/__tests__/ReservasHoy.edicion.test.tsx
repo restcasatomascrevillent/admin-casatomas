@@ -74,12 +74,16 @@ function montar() {
   );
 }
 
-/** La insignia de las notas (un `div` con `aria-haspopup="dialog"` que abre el popup). */
-const insigniaDeNotas = (contenedor: HTMLElement) => contenedor.querySelector('[aria-haspopup="dialog"]') as HTMLElement;
+/**
+ * La insignia de las notas: el botón «Ver notas y peticiones especiales (N)» que abre el popup. Por su nombre, no
+ * por `aria-haspopup="dialog"`: desde el 06/10/2026 la franja de ocupación lleva también una ayuda «ⓘ» (un popover,
+ * con el mismo atributo) con el desglose de las reservas activas.
+ */
+const insigniaDeNotas = () => screen.queryByRole("button", { name: /^Ver notas y peticiones especiales/ });
 
 async function abrirNotas() {
-  const { container } = montar();
-  fireEvent.click(insigniaDeNotas(container));
+  montar();
+  fireEvent.click(insigniaDeNotas()!);
   return await screen.findByRole("dialog");
 }
 
@@ -152,9 +156,9 @@ describe("ReservasHoy · editar desde el popup de notas", () => {
 
   it("sin reservas con nota no hay insignia de notas ni popup: el widget sigue igual", () => {
     h.reservas = [reserva("r1", "confirmada", "Ana", null)];
-    const { container } = montar();
+    montar();
 
-    expect(insigniaDeNotas(container)).toBeNull();
+    expect(insigniaDeNotas()).toBeNull();
     expect(screen.getByText("Reservas de Hoy")).toBeInTheDocument();
   });
 });

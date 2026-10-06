@@ -45,66 +45,80 @@ export function CurvaReservasPorHora() {
 
   // Sin esto, un fallo de consulta dibujaba una curva vacía como si no hubiera reservas.
   if (isError) {
-    return <EstadoErrorCarga titulo="la curva de reservas por hora" error={error} onReintentar={() => refetch()} />;
+    return <EstadoErrorCarga titulo="la curva de reservas por hora" error={error} onReintentar={() => refetch()} className="h-full" />;
   }
 
+  // Mismo reparto de alto que `GraficoReservasPorDia` (06/10/2026). La leyenda (qué línea es cada cosa: antes no
+  // había) va en la fila del título, para no quitarle alto a la curva.
   return (
-    <Card>
-      <CardHeader className="pb-2 sm:pb-4">
-        <CardTitle className="text-sm sm:text-base font-medium">Curva de Reservas por Hora</CardTitle>
+    <Card className="flex h-full flex-col">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1 space-y-0 px-4 py-2.5 sm:px-5">
+        <CardTitle className="text-sm font-medium">Curva de Reservas por Hora</CardTitle>
+        <ul aria-label="Leyenda" className="flex items-center gap-3 text-xs text-muted-foreground">
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-1 w-4 rounded-full bg-primary" />
+            Reservas
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="h-0.5 w-4 rounded-full bg-accent" />
+            Comensales
+          </li>
+        </ul>
       </CardHeader>
-      <CardContent className="px-2 sm:px-6">
+      <CardContent className="relative min-h-[120px] flex-1 p-0 sm:min-h-[150px]">
         {datos.length > 0 ? (
-          <ResponsiveContainer width="100%" height={250} className="sm:h-[300px]">
-            <LineChart data={datos} margin={{ left: -20, right: 5 }}>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="hsl(var(--border))" 
-                strokeOpacity={0.5}
-                horizontal={true}
-                vertical={false}
-              />
-              <XAxis
-                dataKey="hora"
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-              />
-              <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                domain={[0, yMax]}
-                ticks={yTicks}
-                allowDecimals={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="reservas"
-                stroke="hsl(var(--primary))"
-                strokeWidth={3}
-                dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                name="Reservas"
-              />
-              <Line
-                type="monotone"
-                dataKey="comensales"
-                stroke="hsl(var(--accent))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--accent))", r: 3 }}
-                name="Comensales"
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div data-testid="area-grafica" className="absolute inset-x-2 bottom-2 top-0 sm:inset-x-4 sm:bottom-3">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={datos} margin={{ left: -20, right: 5 }}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  strokeOpacity={0.5}
+                  horizontal={true}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="hora"
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tickLine={false}
+                  domain={[0, yMax]}
+                  ticks={yTicks}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="reservas"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={3}
+                  dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                  name="Reservas"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="comensales"
+                  stroke="hsl(var(--accent))"
+                  strokeWidth={2}
+                  dot={{ fill: "hsl(var(--accent))", r: 3 }}
+                  name="Comensales"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
             No hay datos disponibles
           </div>
         )}
