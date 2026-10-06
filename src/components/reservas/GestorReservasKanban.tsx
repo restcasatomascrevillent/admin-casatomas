@@ -18,7 +18,7 @@ import { snapCenterToCursor } from "@dnd-kit/modifiers";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { turnoDeHora } from "@/hooks/useDisponibilidad";
+import { coincideFiltroHoy, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
@@ -30,9 +30,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Users, Search, ChevronDown, ChevronLeft, ChevronRight, MoreVertical, Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Users, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
@@ -69,7 +67,9 @@ import {
 // Qué botones tiene cada tarjeta, y cuáles se pueden pulsar, lo decide
 // `accionesDisponibles(reserva, { vista: "hoy", canEdit })`.
 
-type FiltroTurno = "todo" | "comida" | "cena";
+// El buscador y «Todo el día / Comida / Cena» viven en `VistaHoy` desde el 06/10/2026: son
+// comunes a las dos vistas de «Hoy» (Kanban | Plano). Aquí llegan como props.
+type FiltroTurno = FiltroTurnoHoy;
 
 /**
  * ALTO DEL KANBAN (05/10/2026, petición del dueño: en «Hoy», sin scroll de página): la fila de columnas mide
@@ -130,6 +130,7 @@ function KanbanColumn({
   margenDerecho,
   conIman,
   alturaMaxima,
+  onVerPlano,
 }: {
   id: string;
   title: string;
@@ -155,6 +156,11 @@ function KanbanColumn({
    * hay tope: la columna se estira hasta el fondo de la fila y las tarjetas se desplazan por dentro.
    */
   alturaMaxima?: string;
+  /**
+   * Abre esta sala en la vista «Plano» de «Hoy» (06/10/2026). Con él, el NOMBRE de la columna es un
+   * botón (se ve igual; subrayado al pasar el ratón). «Sin asignar» no lo lleva: no tiene plano.
+   */
+  onVerPlano?: () => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
   // El ancho va en `style` y no en clases porque lo decide la aritmética de
@@ -212,7 +218,21 @@ function KanbanColumn({
             >
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
-            <h4 className="font-semibold text-sm">{title}</h4>
+            <h4 className="font-semibold text-sm">
+              {onVerPlano ? (
+                <button
+                  type="button"
+                  onClick={onVerPlano}
+                  className="touch-hit rounded text-left underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Ver ${title} en el plano`}
+                  title={`Ver ${title} en el plano`}
+                >
+                  {title}
+                </button>
+              ) : (
+                title
+              )}
+            </h4>
           </div>
           <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
@@ -451,7 +471,18 @@ const deteccionColisiones: CollisionDetection = (args) => {
   return bajoPuntero.length > 0 ? bajoPuntero : rectIntersection(args);
 };
 
-export function GestorReservasKanban() {
+export function GestorReservasKanban({
+  busqueda = "",
+  filtroTurno = "todo",
+  onVerPlanoSala,
+}: {
+  /** El buscador de «Hoy» (vive en `VistaHoy`, común a las dos vistas). */
+  busqueda?: string;
+  /** «Todo el día / Comida / Cena» de «Hoy» (ídem). */
+  filtroTurno?: FiltroTurno;
+  /** Tocar el nombre de una sala abre su plano (vista «Plano» de «Hoy»). Sin él, el nombre es solo texto. */
+  onVerPlanoSala?: (espacioId: string) => void;
+} = {}) {
   const { data: espacios } = useEspaciosReserva();
   const acciones = useAccionesServicioReserva();
   // Permiso de edición sobre «reservas». Antes solo lo miraba el editor y el resto
@@ -462,8 +493,6 @@ export function GestorReservasKanban() {
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const dedo = useIsCoarsePointer();
   const [activeReserva, setActiveReserva] = useState<ReservaServicio | null>(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [filtroTurno, setFiltroTurno] = useState<FiltroTurno>("todo");
   // Columnas plegadas a carril, SIEMPRE por decisión del usuario: ya no hay
   // plegado automático (2026-09-26, el dueño lo rechazó: "tienen que estar
   // todos aunque ocupen menos espacio de ancho por columna"). Por defecto el
@@ -567,18 +596,12 @@ export function GestorReservasKanban() {
     [columnasPintadas, minimizedCols],
   );
 
-  const reservasFiltradas = useMemo(() => {
-    const q = busqueda.toLowerCase().trim();
-    return (reservas || []).filter((r) => {
-      if (filtroTurno !== "todo" && turnoDeHora(r.hora) !== filtroTurno) return false;
-      if (!q) return true;
-      return (
-        (r.nombre || "").toLowerCase().includes(q) ||
-        (r.email || "").toLowerCase().includes(q) ||
-        (r.telefono || "").includes(q)
-      );
-    });
-  }, [reservas, busqueda, filtroTurno]);
+  // La regla de siempre (turno por la hora; texto en nombre, email o teléfono), ahora en
+  // `coincideFiltroHoy` para que el plano de «Hoy» filtre exactamente igual.
+  const reservasFiltradas = useMemo(
+    () => (reservas || []).filter((r) => coincideFiltroHoy(r, { busqueda, filtroTurno })),
+    [reservas, busqueda, filtroTurno],
+  );
 
   const reservasPorColumna = useMemo(() => {
     const map: Record<string, ReservaServicio[]> = {};
@@ -666,38 +689,8 @@ export function GestorReservasKanban() {
 
   return (
     <div className="space-y-3 sm:space-y-4 h-full flex flex-col">
-      {/* `flex-wrap`: por debajo de ~1100px el texto de ayuda se baja a su
-          propia línea en vez de estrujar el filtro de turno hasta partir
-          "Todo el día" en dos renglones. */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
-        <div className="relative w-full min-w-0 sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          <Input
-            placeholder="Buscar por nombre, email o teléfono…"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9"
-            aria-label="Buscar reservas"
-          />
-        </div>
-        <ToggleGroup
-          type="single"
-          value={filtroTurno}
-          onValueChange={(v) => v && setFiltroTurno(v as FiltroTurno)}
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          aria-label="Filtrar por turno"
-        >
-          <ToggleGroupItem value="todo" className="whitespace-nowrap">Todo el día</ToggleGroupItem>
-          <ToggleGroupItem value="comida" className="whitespace-nowrap">Comida</ToggleGroupItem>
-          <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
-        </ToggleGroup>
-        <p className="text-xs text-muted-foreground sm:basis-full lg:basis-auto lg:ml-auto">
-          Toca una tarjeta para ver sus acciones (<MoreVertical className="inline h-3 w-3" aria-hidden="true" />), o mantenla pulsada y arrástrala a otro espacio.
-        </p>
-      </div>
-
+      {/* El buscador, «Todo el día / Comida / Cena» y la ayuda se pintan en `VistaHoy` (comunes a las dos
+          vistas de «Hoy»), justo encima de este bloque y con la misma separación. */}
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -745,6 +738,7 @@ export function GestorReservasKanban() {
                     margenDerecho={disposicion.margenes[col.id] ?? 0}
                     conIman={disposicion.idsConIman.includes(col.id)}
                     alturaMaxima={medida ? undefined : "65dvh"}
+                    onVerPlano={onVerPlanoSala && !esSinAsignar(col.id) ? () => onVerPlanoSala(col.id) : undefined}
                   >
                     {(reservasPorColumna[col.id] || []).map((reserva) => (
                       <ReservaCard

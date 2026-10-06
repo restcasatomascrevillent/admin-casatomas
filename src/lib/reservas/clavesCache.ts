@@ -91,8 +91,10 @@ export const CLAVES_POR_CAMBIO: Readonly<Record<TipoCambioReserva, readonly stri
     ...CLAVES_ASIGNACION,
   ]),
   importante: unicas([...CLAVES_LISTAS_RESERVAS, ...CLAVES_VISTAS_DEL_DIA]),
-  // Exactamente lo que refrescaba `invalidarTodo` del modo servicio.
-  salida: ["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"],
+  // Lo que refrescaba `invalidarTodo` del modo servicio, MÁS «reservas-hoy» (06/10/2026): la vista
+  // «Plano» de «Hoy» pinta cada mesa con las reservas de hoy de esa clave (`salida_at` incluido), y
+  // sin esto una mesa liberada —o devuelta con el «Deshacer» del aviso— no cambiaba hasta el sondeo.
+  salida: ["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia", "reservas-hoy"],
 };
 
 /** Quita repetidos conservando el orden de aparición. */

@@ -90,8 +90,14 @@ describe("las listas por tipo de cambio", () => {
     ]);
   });
 
-  it("«salida» (liberar mesa en el modo servicio): exactamente lo que refrescaba `invalidarTodo`, en su orden", () => {
-    expect([...CLAVES_POR_CAMBIO.salida]).toEqual(["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"]);
+  it("«salida» (liberar mesa en el modo servicio): lo que refrescaba `invalidarTodo`, en su orden, y las reservas de «Hoy»", () => {
+    // «reservas-hoy» (06/10/2026): la vista «Plano» de «Hoy» pinta las mesas con esa lista (`salida_at` incluido).
+    expect([...CLAVES_POR_CAMBIO.salida]).toEqual([
+      "reservas-servicio-dia",
+      "asignaciones_mesa",
+      "ocupacion-salas-dia",
+      "reservas-hoy",
+    ]);
   });
 
   it.each(TIPOS)("la lista de «%s» no repite ninguna clave", (tipo) => {
@@ -155,7 +161,12 @@ describe("las claves son las de verdad", () => {
         CLAVE_OCUPACION_SALAS_DIA,
       ]),
     );
-    expect(CLAVES_POR_CAMBIO.salida).toEqual([CLAVE_RESERVAS_SERVICIO_DIA, CLAVE_ASIGNACIONES_MESA, CLAVE_OCUPACION_SALAS_DIA]);
+    expect(CLAVES_POR_CAMBIO.salida).toEqual([
+      CLAVE_RESERVAS_SERVICIO_DIA,
+      CLAVE_ASIGNACIONES_MESA,
+      CLAVE_OCUPACION_SALAS_DIA,
+      "reservas-hoy",
+    ]);
   });
 
   it("cada clave está declarada como `queryKey` (o como su constante) en algún fichero de la app", () => {

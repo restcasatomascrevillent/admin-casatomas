@@ -60,10 +60,7 @@ import {
   Clock,
   Users,
   Phone,
-  AlertTriangle,
   Utensils,
-  TimerOff,
-  CircleDashed,
   ChevronLeft,
   ChevronRight,
   RotateCcw,
@@ -72,6 +69,7 @@ import {
   CalendarIcon,
   SquarePen,
 } from "lucide-react";
+import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 import { cn } from "@/lib/utils";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
 import { useAsignacionesMesa, useAsignarMesasReserva } from "@/hooks/useAsignacionesMesa";
@@ -105,50 +103,10 @@ interface ModoServicioPlanoProps {
 /** Refresco de "ahora": cada 45s alcanza para que los chips de minutos no se queden atrás. */
 const INTERVALO_REFRESCO_MS = 45_000;
 
-const CONFIG_ESTADO: Record<
-  EstadoMesaServicio,
-  { etiqueta: string; Icono: typeof Clock; clases: string; badge: string }
-> = {
-  libre: {
-    etiqueta: "Libre",
-    Icono: CircleDashed,
-    clases: "border-slate-300 bg-slate-50 dark:bg-slate-900/30 dark:border-slate-700",
-    badge: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  },
-  reservada: {
-    etiqueta: "Reservada",
-    Icono: Clock,
-    clases: "border-sky-400 bg-sky-50 dark:bg-sky-900/30 dark:border-sky-700",
-    badge: "bg-sky-500 text-white",
-  },
-  retrasada: {
-    etiqueta: "Retrasada",
-    Icono: AlertTriangle,
-    clases: "border-amber-400 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700",
-    badge: "bg-amber-500 text-white",
-  },
-  ocupada: {
-    etiqueta: "Ocupada",
-    Icono: Utensils,
-    clases: "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 dark:border-emerald-700",
-    badge: "bg-emerald-600 text-white",
-  },
-  por_liberar: {
-    etiqueta: "Por liberar",
-    Icono: TimerOff,
-    clases: "border-rose-400 bg-rose-50 dark:bg-rose-900/30 dark:border-rose-700",
-    badge: "bg-rose-600 text-white",
-  },
-};
-
-/** "45 min" / "retraso 10 min" / "quedan 5 min" — el chip de tiempo de cada tarjeta. */
-function textoMinutos(estado: EstadoMesaServicio, minutos: number | null): string | null {
-  if (minutos == null) return null;
-  if (estado === "reservada") return minutos >= 0 ? `en ${minutos} min` : `dentro de ${Math.abs(minutos)} min`;
-  if (estado === "retrasada") return `retraso ${minutos} min`;
-  if (estado === "ocupada" || estado === "por_liberar") return `${minutos} min sentada`;
-  return null;
-}
+// Nombre, icono y color de cada estado de mesa, y el chip de minutos: en `./estadosMesa.ts`
+// (06/10/2026), compartidos con la vista «Plano» de «Hoy».
+const CONFIG_ESTADO = CONFIG_ESTADO_MESA;
+const textoMinutos = textoMinutosMesa;
 
 export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: ModoServicioPlanoProps) {
   const [fechaSel, setFechaSel] = useState<string>(() => (esFechaISO(fecha) ? (fecha as string) : hoyLocal()));

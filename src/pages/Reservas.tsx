@@ -307,9 +307,14 @@ export default function Reservas() {
         {/* "Hoy" (2026-09-25, petición del dueño): el kanban por espacios
             es la vista principal — lo primero que se ve al entrar en
             /reservas. Sin lista/tabla aquí a propósito: con el kanban
-            delante, una tabla debajo solo duplicaba las mismas reservas. */}
+            delante, una tabla debajo solo duplicaba las mismas reservas.
+            Desde el 06/10/2026 con dos vistas, «Kanban | Plano»: el plano de
+            Hoy es el servicio en vivo de todas las salas; su botón «Reparto de
+            mesas» abre la sala aquí, a pantalla completa (el mismo salto que el
+            Calendario: reparto `PlanoEspacio2D` ↔ modo servicio), y «Volver»
+            regresa a Hoy en la vista en que se estaba. */}
         <TabsContent value="hoy" className="mt-6">
-          <VistaHoy />
+          <VistaHoy onAbrirSala={handleEspacioClick} />
         </TabsContent>
 
         {/* "Lista" (antes "Reservas", unificaba Hoy + Lista + Solicitudes):

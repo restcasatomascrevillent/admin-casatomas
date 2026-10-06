@@ -124,7 +124,7 @@ describe("useAccionesModoServicio", () => {
     expect(toast.warning).toHaveBeenCalled();
   });
 
-  it("liberar y deshacer refrescan el modo servicio, las mesas asignadas y la rejilla de salas (la lista de «salida» de clavesCache), y nada más", async () => {
+  it("liberar y deshacer refrescan el modo servicio, las mesas asignadas, la rejilla de salas y las reservas de «Hoy» (la lista de «salida» de clavesCache), y nada más", async () => {
     mockUpdate([{ id: "r1" }]);
     const { result, queryClient } = setup();
     const invalidadas: string[] = [];
@@ -132,17 +132,19 @@ describe("useAccionesModoServicio", () => {
       invalidadas.push(String((filtros as { queryKey: unknown[] }).queryKey[0]));
       return Promise.resolve();
     });
+    // «reservas-hoy»: la vista «Plano» de «Hoy» pinta la mesa liberada con esa lista (06/10/2026).
+    const esperadas = ["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia", "reservas-hoy"];
 
     await act(async () => {
       await result.current.liberarMesa(reserva);
     });
-    expect(invalidadas).toEqual(["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"]);
+    expect(invalidadas).toEqual(esperadas);
 
     invalidadas.length = 0;
     await act(async () => {
       await result.current.deshacerLiberarMesa(reserva);
     });
-    expect(invalidadas).toEqual(["reservas-servicio-dia", "asignaciones_mesa", "ocupacion-salas-dia"]);
+    expect(invalidadas).toEqual(esperadas);
   });
 
   it("columna salida_at sin migrar: mensaje específico, no el genérico", async () => {
