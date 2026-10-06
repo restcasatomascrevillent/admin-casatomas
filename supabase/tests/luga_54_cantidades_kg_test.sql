@@ -48,7 +48,9 @@ begin
 
   -- T5. Importes, total e historial intactos.
   assert (select sum(total) from public.productos_factura where factura_id = 54) = 3787.53, 'T5: suma de importes';
-  assert (select total from public.facturas where id = 54) = 3787.53, 'T5: total de la factura';
+  -- 3.787,53 es la BASE: desde 20261006110000 va en subtotal y el total es
+  -- 4.162,54 (con IVA); antes de esa migración estaba (mal) en total.
+  assert (select coalesce(subtotal, total) from public.facturas where id = 54) = 3787.53, 'T5: base de la factura';
   assert (select count(*) from public.historial_precios where factura_id = 54) = 54, 'T5: historial con 54 filas';
   assert (select count(*) from public.historial_precios h join public.productos_factura p
             on p.factura_id = 54 and p.nombre = h.producto_nombre and p.precio_unitario = h.precio

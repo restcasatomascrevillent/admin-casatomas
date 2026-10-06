@@ -3243,6 +3243,7 @@ export type Database = {
           embedding: string | null
           factura_id: number
           id: number
+          iva_pct: number | null
           nombre: string
           nombre_normalizado: string | null
           orden: number | null
@@ -3259,6 +3260,7 @@ export type Database = {
           embedding?: string | null
           factura_id: number
           id?: number
+          iva_pct?: number | null
           nombre: string
           nombre_normalizado?: string | null
           orden?: number | null
@@ -3275,6 +3277,7 @@ export type Database = {
           embedding?: string | null
           factura_id?: number
           id?: number
+          iva_pct?: number | null
           nombre?: string
           nombre_normalizado?: string | null
           orden?: number | null

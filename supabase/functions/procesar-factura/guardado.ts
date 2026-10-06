@@ -132,7 +132,13 @@ function textoEmbedding(d: DatosNormalizados): string {
     }`;
 }
 
-function filasProductos(d: DatosNormalizados, embeddings: number[][], conColumnas04b: boolean, conBultos = true) {
+function filasProductos(
+  d: DatosNormalizados,
+  embeddings: number[][],
+  conColumnas04b: boolean,
+  conBultos = true,
+  conIvaPct = true,
+) {
   return d.productos.map((p, i) => ({
     nombre: p.nombre,
     cantidad: p.cantidad,
@@ -145,12 +151,20 @@ function filasProductos(d: DatosNormalizados, embeddings: number[][], conColumna
     // 20261005150000). Solo se manda si hay valor: un documento sin líneas al
     // peso se guarda igual aunque la columna aún no exista.
     ...(conBultos && p.bultos !== null && p.bultos !== undefined ? { bultos: p.bultos } : {}),
+    // Tipo de IVA impreso en la línea (migración 20261006105000). Igual que
+    // `bultos`: solo si hay valor, para no depender de que la columna exista.
+    ...(conIvaPct && p.iva_pct !== null && p.iva_pct !== undefined ? { iva_pct: p.iva_pct } : {}),
   }));
 }
 
 /** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
 export function faltaColumnaBultos(msg: string | undefined | null): boolean {
   return !!msg && /bultos/i.test(msg) && /column|columna|schema cache/i.test(msg);
+}
+
+/** ¿El error es que falta la columna `iva_pct` (migración 20261006105000 sin aplicar)? */
+export function faltaColumnaIvaPct(msg: string | undefined | null): boolean {
+  return !!msg && /iva_pct/i.test(msg) && /column|columna|schema cache/i.test(msg);
 }
 
 /** Mezcla alertas pre-guardado con las de validar_cordura_factura (manda SQL por código). */
@@ -314,13 +328,25 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 7) Líneas (embeddings en lotes de 100)
     if (d.productos.length > 0) {
       const embs = await openai.embed(d.productos.map((p) => p.nombre));
-      const insertar = (conBultos: boolean) =>
+      const insertar = (conBultos: boolean, conIvaPct: boolean) =>
         supabase.from("productos_factura")
-          .insert(filasProductos(d, embs, conColumnas04b, conBultos).map((f) => ({ factura_id: facturaId, ...f })));
-      let { error } = await insertar(true);
-      if (error && faltaColumnaBultos(error.message)) {
-        console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
-        ({ error } = await insertar(false));
+          .insert(
+            filasProductos(d, embs, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
+          );
+      // Columnas opcionales que puede faltar por migrar: se quita la que falte
+      // y se reintenta (a lo sumo una vez por columna).
+      let conBultos = true;
+      let conIvaPct = true;
+      let { error } = await insertar(conBultos, conIvaPct);
+      for (let i = 0; i < 2 && error; i++) {
+        if (conBultos && faltaColumnaBultos(error.message)) {
+          console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
+          conBultos = false;
+        } else if (conIvaPct && faltaColumnaIvaPct(error.message)) {
+          console.warn("[procesar-factura] columna iva_pct ausente; se guardan las líneas sin ella:", error.message);
+          conIvaPct = false;
+        } else break;
+        ({ error } = await insertar(conBultos, conIvaPct));
       }
       if (error) throw new Error(`insert productos: ${error.message}`);
     }

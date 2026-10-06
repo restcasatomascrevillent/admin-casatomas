@@ -55,6 +55,18 @@ import { resolverMagnitud } from "./magnitudes.ts";
 //   - `description` SI esta soportado y es donde mas rinde: es instruccion
 //     pegada al campo, no texto muerto.
 
+/** Descripcion del tipo de IVA de una linea. La comparten el esquema de un
+ *  documento (aqui) y el de una pieza (pagina.ts): es el dato que permite
+ *  deducir el total con IVA cuando el pie no se ve (Luga ML/101511, ver
+ *  `deducirImportes`). */
+export const DESCRIPCION_IVA_PCT =
+  "El TIPO de IVA de ESTA linea, en porcentaje, SOLO si la tabla trae una columna con el tipo de cada " +
+  "fila (cabecera 'IVA', '% IVA', 'T. IVA', 'Tipo'). Copia el numero tal cual: 10 para 10 %, 4 para 4 %, " +
+  "21 para 21 %, 0 si pone 0 o 'Exento'. Ejemplo (Luga): 'PICOS Sin Gluten ... 18.07 | 4' -> 4; " +
+  "'NATOP ... 99.46 | 10' -> 10. Es un PORCENTAJE, no euros: no confundas esa columna con 'Dto%' ni con " +
+  "'% R.E.'. null si no hay columna de tipo por linea, si en vez del porcentaje trae un codigo (1, 2, A) " +
+  "o si no se lee. NO lo deduzcas por el tipo de producto.";
+
 export const DOCUMENTO_JSON_SCHEMA = {
   name: "documento_comercial",
   strict: true,
@@ -162,7 +174,9 @@ export const DOCUMENTO_JSON_SCHEMA = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "bonificada"],
+          required: [
+            "nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "iva_pct", "bonificada",
+          ],
           properties: {
             nombre: {
               type: "string",
@@ -215,6 +229,10 @@ export const DOCUMENTO_JSON_SCHEMA = {
                 "del papel: no lo recalcules como cantidad x precio_unitario, ni siquiera si la " +
                 "multiplicacion no cuadra — muchos proveedores imprimen el precio unitario redondeado y " +
                 "el importe impreso es el bueno. null si el documento no lo muestra.",
+            },
+            iva_pct: {
+              type: ["number", "null"],
+              description: DESCRIPCION_IVA_PCT,
             },
             bonificada: {
               type: "boolean",
@@ -270,6 +288,10 @@ export interface LineaExtraida {
   base_precio: BasePrecio;
   precio_unitario: number | null;
   total: number | null;
+  /** Tipo de IVA de la linea en % (10, 4, 21, 0), si el documento lo imprime
+   *  por fila. Opcional en el tipo por lo mismo que `filas_tabla`: payloads
+   *  antiguos y piezas guardadas antes del 06/10/2026 no lo traen. */
+  iva_pct?: number | null;
   bonificada: boolean;
 }
 
@@ -459,6 +481,11 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
       }
       if (!esNumeroONull(l.total)) {
         push(en("total"), `debe ser un numero o null, llego ${JSON.stringify(l.total)}`);
+      }
+      // Se valida SI VIENE (respuestas antiguas no lo traen). Un tipo fuera de
+      // rango no tumba el documento: `tipoIvaLinea` lo deja en null despues.
+      if (l.iva_pct !== undefined && !esNumeroONull(l.iva_pct)) {
+        push(en("iva_pct"), `debe ser un numero o null, llego ${JSON.stringify(l.iva_pct)}`);
       }
       if (typeof l.bonificada !== "boolean") {
         push(en("bonificada"), `debe ser true o false, llego ${JSON.stringify(l.bonificada)}`);
@@ -1457,37 +1484,62 @@ export function aplicarRecuentoVerificado(
 //   · El resultado queda marcado como `deducido` en `facturas.total_origen`
 //     (migracion 20260928160000). Un total leido del papel y un total
 //     calculado por nosotros no son el mismo dato, y el dueno tiene que
-//     poder distinguirlos de un vistazo.
+//     poder distinguirlos de un vistazo. La base y el IVA deducidos no tienen
+//     columna de origen: lo dice el aviso, con el desglose.
 //
 //  QUE ES HONESTAMENTE DEDUCIBLE — Y QUE NO
 //  ----------------------------------------
-//  De las lineas solas sale UN numero: su suma, que es la BASE IMPONIBLE. El
-//  IVA no sale de ahi: el tipo puede ser el 10% (alimentacion), el 21%, o
-//  varios en el mismo documento, y elegir uno seria inventarselo. De ahi las
-//  tres reglas:
+//  De las lineas solas sale la BASE IMPONIBLE: su suma. El IVA sale de las
+//  lineas SOLO si cada una trae IMPRESO su tipo (columna «IVA» por fila, como
+//  en las facturas mensuales de Luga: 10 % casi todo, 4 % el pan sin gluten y
+//  las rosquillas). Sin esa columna el tipo puede ser el 10 %, el 21 % o una
+//  mezcla, y elegir uno seria inventarselo. De ahi las reglas:
 //
 //    A. `subtotal` e `iva` LEIDOS y `total` ausente -> total = subtotal + iva.
 //       Aritmetica exacta sobre dos importes impresos. Cero supuestos.
-//    B. NI `subtotal` NI `iva` impresos, y TODAS las lineas con importe ->
-//       total = suma de lineas. Unico supuesto: que el papel no tenga un
-//       bloque de IVA que no hemos llegado a ver. Por eso este caso ademas
-//       deja aviso en `alertas_validacion` pidiendo contrastar con el papel.
-//       Y ADEMAS exige que la lectura este COMPLETA (ver mas abajo, caso
-//       Luga): si faltan filas, esa suma no es la del documento.
+//    B. NI `subtotal` NI `iva` NI `total` impresos, TODAS las lineas con
+//       importe y la lectura COMPLETA (ver mas abajo, caso Luga):
+//       B1. Todas las lineas con importe traen su tipo de IVA ->
+//           subtotal = suma de lineas; iva = suma, POR TIPO, de base x tipo,
+//           con cada cuota redondeada a centimos (asi lo hacen las facturas
+//           espanolas: una cuota por tipo, no una por linea); total =
+//           subtotal + iva. Sin recargo de equivalencia: no consta en ningun
+//           sitio que se lea. Metodo `iva_por_linea`, aviso `total_deducido`.
+//       B2. Alguna linea sin tipo -> subtotal = suma de lineas y el TOTAL SE
+//           QUEDA A NULL, con el aviso `falta_iva`. Metodo `base_sin_iva`.
 //    C. Cualquier otra combinacion -> NO SE DEDUCE NADA. Si el documento
 //       imprime PARTE del bloque de totales (solo la base, o solo el IVA) es
 //       que ese bloque existe y solo hemos leido un trozo de el; completarlo
 //       nosotros seria reconstruirlo a ojo, no calcularlo.
 //
-//  `subtotal` e `iva` NO SE DEDUCEN NUNCA, ni siquiera cuando saldrian de una
-//  resta. Dos razones:
-//    (1) el IVA no es derivable de las lineas — ese es justo el reparto que no
-//        se puede adivinar, y un IVA inventado es indistinguible de uno leido;
+//  POR QUE B2 YA NO GUARDA LA SUMA COMO TOTAL (06/10/2026)
+//  -------------------------------------------------------
+//  Hasta hoy B guardaba `total = suma de lineas` con un aviso que decia "si
+//  habia IVA, el total real sera mayor". En Luga ML/101511 (factura 54) eso
+//  dejo total = 3.787,53, que es la BASE: el total real era 4.162,54. Y el
+//  chatbot trata `facturas.total` como IVA INCLUIDO (herramientas.ts y las
+//  RPC *_agente: "Gasto por proveedor: suma del total (IVA incluido)"), asi
+//  que la base entraba en el gasto como si fuera el total, ~10 % por debajo,
+//  sin que nadie leyera el aviso. Un total con IVA que es una base miente
+//  igual que uno parcial.
+//  Lo honesto con lo que hay: la suma va a `subtotal` (es exactamente eso, la
+//  base) y el total se queda vacio. Un total NULL ya tiene tratamiento en todo
+//  el sistema: validar_cordura_factura avisa `total_ausente`, el chatbot lo
+//  cuenta en `documentos_sin_total` en vez de sumarlo, y el panel pide
+//  completarlo en "Editar". Se pierde un numero aproximado en el gasto; a
+//  cambio, ningun gasto sale calculado sobre una base presentada como total.
+//
+//  `subtotal` e `iva` SOLO se escriben en B (las lineas son la unica fuente y
+//  el pie no existe). NUNCA en A ni en C, ni por resta:
+//    (1) con medio pie leido, el IVA que falta no es derivable de las lineas
+//        sin reconstruir el pie, y un IVA inventado es indistinguible de uno
+//        leido;
 //    (2) `comprobarCuadre` usa `subtotal ?? total` como REFERENCIA contra la
-//        que compara la suma de lineas. Si escribieramos ahi esa misma suma,
-//        la comprobacion se estaria comparando consigo misma y dejaria de
-//        detectar nada. La redundancia aritmetica del documento es la unica
-//        senal que hay: no se gasta rellenando huecos.
+//        que compara la suma de lineas. Escribir en B la suma de lineas no le
+//        quita nada: corre ANTES, y con el pie vacio no tenia referencia; y
+//        `validar_cordura_factura` comparaba antes esa misma suma contra el
+//        total deducido, que era la misma suma. En A y C si habria referencia
+//        leida, y no se toca.
 //
 //  POR QUE LA REGLA B EXIGE ADEMAS QUE LA LECTURA ESTE COMPLETA
 //  ------------------------------------------------------------
@@ -1507,8 +1559,8 @@ export function aplicarRecuentoVerificado(
 //    · `continua_en_otra_pagina` -> hay documento que no se ha visto.
 //    · `filas_tabla` a null -> el propio modelo dice que no pudo contarlas.
 //
-//  Con cualquiera de las tres NO se deduce nada: el total se queda a null y se
-//  deja el aviso `total_no_deducible` diciendo por que. La deduccion A
+//  Con cualquiera de las tres NO se deduce nada (ni base, ni IVA, ni total):
+//  se deja el aviso `total_no_deducible` diciendo por que. La deduccion A
 //  (`subtotal + iva`, los dos impresos) NO se toca: no depende de las lineas.
 //
 //  Un albaran SIN PRECIOS (el caso Joselito) sale por el primer `return`:
@@ -1519,38 +1571,126 @@ export function aplicarRecuentoVerificado(
  *  columna `facturas.total_origen`. */
 export type OrigenImporte = "leido" | "deducido";
 
-/** Como se ha llegado al total deducido. Va en `detalle.metodo` del aviso. */
-export type MetodoDeduccion = "subtotal_mas_iva" | "suma_lineas" | "no_deducible";
+/** Como se ha llegado al importe deducido. Va en `detalle.metodo` del aviso. */
+export type MetodoDeduccion = "subtotal_mas_iva" | "iva_por_linea" | "base_sin_iva" | "no_deducible";
 
 export interface Deduccion {
-  /** Hoy solo se deduce el total. `subtotal` e `iva` no son derivables. */
-  campo: "total";
+  /** El importe que se ha rellenado: `total` (A y B1; en B1 tambien base e
+   *  IVA) o solo `subtotal` (B2, el total se queda a null). */
+  campo: "total" | "subtotal";
   /** Con `metodo: "no_deducible"` este valor NO se escribe en ningun sitio: la
    *  `Deduccion` viaja solo para llevar su `alerta`, y `datos.total` sigue a
    *  null. Quien la consume tiene que mirar `metodo`, no `valor`. */
   valor: number;
   metodo: MetodoDeduccion;
-  /** Aviso para `alertas_validacion`: que el total no se leyo tiene que
+  /** Aviso para `alertas_validacion`: que el importe no se leyo tiene que
    *  verse tambien donde se miran los avisos, no solo en la columna. */
   alerta: AlertaValidacion;
 }
 
+/** Tipos de IVA (e IGIC) espanoles: 0, 2, 3, 4, 5, 7, 7,5, 9,5, 10, 15, 21.
+ *  Por encima de esto no es un tipo de IVA: es otra columna mal leida. */
+const IVA_PCT_MAX = 30;
+
 /**
- * Rellena `total` cuando el documento no lo imprime pero SI se puede calcular
- * con aritmetica exacta a partir de lo que si esta leido.
+ * Normaliza el tipo de IVA de una linea: un porcentaje finito entre 0 y 30, a
+ * dos decimales. Cualquier otra cosa (null, NaN, 110, un -10) es "sin tipo":
+ * mejor un hueco que un tipo inventado.
+ */
+export function tipoIvaLinea(v: unknown): number | null {
+  if (!esNumeroFinito(v) || v < 0 || v > IVA_PCT_MAX) return null;
+  return Math.round(v * 100) / 100;
+}
+
+/** Un tipo de IVA del desglose: base, cuota (ya redondeada) y lineas. */
+export interface TramoIva {
+  tipo: number;
+  base: number;
+  cuota: number;
+  lineas: number;
+}
+
+export interface DesgloseIva {
+  /** Ordenados de mayor a menor tipo. */
+  tramos: TramoIva[];
+  /** Suma de TODAS las lineas (con y sin tipo). */
+  base: number;
+  /** Suma de las cuotas de los tramos. Solo es el IVA del documento si
+   *  `lineas_sin_tipo` es 0. */
+  cuota: number;
+  /** Lineas con importe distinto de 0 y sin tipo de IVA legible. */
+  lineas_sin_tipo: number;
+}
+
+/** Redondeo a centimos "de factura": la mitad se aleja del cero. */
+const redondearCentimos = (centimosPorCien: number) =>
+  Math.sign(centimosPorCien) * Math.round(Math.abs(centimosPorCien) + Number.EPSILON);
+
+/**
+ * Desglose del IVA a partir del tipo de cada linea, como lo imprime una
+ * factura espanola: las bases se agrupan por tipo y la cuota de cada tipo se
+ * redondea a centimos UNA vez (no linea a linea). Todo en centimos enteros
+ * para no arrastrar coma flotante (3.725,10 x 10 % = 372,51 exacto).
+ * Las lineas sin importe cuentan como 0. Una linea a 0 EUR (bonificada) sin
+ * tipo no cuenta como "sin tipo": no aporta IVA tenga el que tenga.
+ */
+export function desgloseIvaPorLinea(lineas: LineaExtraida[]): DesgloseIva {
+  const porTipo = new Map<number, { base: number; lineas: number }>();
+  let baseTotal = 0;
+  let sinTipo = 0;
+  for (const l of lineas) {
+    const c = esNumeroFinito(l.total) ? Math.round(l.total * 100) : 0;
+    baseTotal += c;
+    if (c === 0) continue;
+    const tipo = tipoIvaLinea(l.iva_pct);
+    if (tipo === null) {
+      sinTipo++;
+      continue;
+    }
+    const t = porTipo.get(tipo) ?? { base: 0, lineas: 0 };
+    t.base += c;
+    t.lineas++;
+    porTipo.set(tipo, t);
+  }
+  const tramos = [...porTipo.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([tipo, t]) => ({
+      tipo,
+      base: t.base / 100,
+      cuota: redondearCentimos((t.base * tipo) / 100) / 100,
+      lineas: t.lineas,
+    }));
+  const cuota = tramos.reduce((a, t) => a + Math.round(t.cuota * 100), 0) / 100;
+  return { tramos, base: baseTotal / 100, cuota, lineas_sin_tipo: sinTipo };
+}
+
+/** "10 %: base 3725.10 EUR -> IVA 372.51 EUR; 4 %: ..." para los avisos. */
+function describirTramos(tramos: TramoIva[]): string {
+  return tramos
+    .map((t) => `${String(t.tipo).replace(".", ",")} %: base ${eur(t.base)} -> IVA ${eur(t.cuota)}`)
+    .join("; ");
+}
+
+/**
+ * Rellena `total` (y en el caso B1 tambien `subtotal` e `iva`) cuando el
+ * documento no lo imprime pero SI se puede calcular con aritmetica exacta a
+ * partir de lo que si esta leido.
  *
  * Devuelve SIEMPRE un documento nuevo (no muta la entrada) y, si ha deducido
  * algo, la `Deduccion` con el metodo y el aviso que hay que guardar.
  *
  * Invariantes que este codigo mantiene, y que los tests fijan:
- *  - nunca sobrescribe un `total` leido del documento;
- *  - nunca escribe en `subtotal` ni en `iva`;
+ *  - nunca sobrescribe un importe leido del documento (subtotal, iva, total);
+ *  - nunca escribe en `subtotal` ni en `iva` si alguno de los tres se ha
+ *    leido (reglas A y C);
+ *  - nunca inventa un tipo de IVA: sin el tipo IMPRESO en TODAS las lineas
+ *    con importe, el total se queda a null (B2);
  *  - nunca deduce sobre un documento `sin_importes` (albaran sin precios);
  *  - nunca deduce si alguna linea se quedo sin importe (la suma no seria la
  *    del documento, sino la de lo que se pudo leer);
- *  - nunca deduce por suma de lineas si hay indicios de que faltan filas
+ *  - nunca deduce por las lineas si hay indicios de que faltan filas
  *    (`filas_tabla`, `continua_en_otra_pagina`): en ese caso devuelve una
- *    `Deduccion` con `metodo: "no_deducible"`, que NO trae total y solo
+ *    `Deduccion` con `metodo: "no_deducible"`, que NO trae importe y solo
  *    sirve para llevar el aviso.
  */
 export function deducirImportes(datos: DocumentoExtraido): {
@@ -1595,17 +1735,16 @@ export function deducirImportes(datos: DocumentoExtraido): {
 
   // ── C) Medio bloque de totales leido: no se completa a ojo ──
   //    Si hay base pero no IVA (o al reves), el documento SI tiene bloque de
-  //    totales y solo hemos leido un trozo. Lo que falta no es calculable: el
-  //    tipo de IVA no esta impreso en ninguna otra parte del documento.
+  //    totales y solo hemos leido un trozo. Lo que falta no se calcula.
   if (esNumeroFinito(datos.subtotal) || esNumeroFinito(datos.iva)) return sinDeducir;
 
-  // ── B) Lo unico que hay son lineas: su suma es lo unico deducible ──
+  // ── B) Lo unico que hay son lineas ──
   const lineas = datos.productos ?? [];
   if (lineas.length === 0) return sinDeducir;
 
   //    ...pero SOLO si estan TODAS. Ver la explicacion de arriba (caso Luga):
-  //    sumar una lectura incompleta da un total con pinta de calculado y con
-  //    una fraccion del valor real, que es peor que no tener total.
+  //    sumar una lectura incompleta da un importe con pinta de calculado y
+  //    con una fraccion del valor real, que es peor que no tenerlo.
   const motivos: string[] = [];
   if (datos.continua_en_otra_pagina === true) {
     motivos.push("el documento continua en otra pagina o la tabla se corta en el borde de la imagen");
@@ -1648,32 +1787,71 @@ export function deducirImportes(datos: DocumentoExtraido): {
     };
   }
   // TODAS las lineas tienen que traer importe. Si falta el de una, la suma no
-  // es la del documento: es la de lo que se pudo leer, y pasarla por total
-  // seria dar por completo un numero incompleto.
+  // es la del documento: es la de lo que se pudo leer, y pasarla por base o
+  // por total seria dar por completo un numero incompleto.
   if (!lineas.every((l) => esNumeroFinito(l.total))) return sinDeducir;
 
-  const suma = redondear2(lineas.reduce((acc, l) => acc + (l.total as number), 0));
+  const desglose = desgloseIvaPorLinea(lineas);
+  const base = desglose.base;
 
+  // ── B1) Cada linea trae su tipo de IVA impreso: el IVA SI es calculable ──
+  if (desglose.lineas_sin_tipo === 0) {
+    const iva = desglose.cuota;
+    const total = redondear2(base + iva);
+    return {
+      datos: { ...datos, subtotal: base, iva, total },
+      deduccion: {
+        campo: "total",
+        valor: total,
+        metodo: "iva_por_linea",
+        alerta: {
+          codigo: "total_deducido",
+          severidad: "media",
+          mensaje:
+            `El documento no declara ni base imponible, ni IVA, ni total: el bloque de totales no se ve ` +
+            `(recortado, en blanco o fuera del encuadre). Se ha CALCULADO deducido con el IVA de cada ` +
+            `linea: base ${eur(base)} (suma de ${lineas.length} linea(s)) + IVA ${eur(iva)} ` +
+            `(${describirTramos(desglose.tramos) || "sin importes"}) = ${eur(total)}. Sin recargo de ` +
+            `equivalencia (no consta). Si el pie llevara portes, descuentos, recargo o retencion, o los ` +
+            `importes de linea ya incluyeran el IVA, el total real sera distinto: contrastalo con el papel.`,
+          detalle: {
+            metodo: "iva_por_linea",
+            num_lineas: lineas.length,
+            subtotal: base,
+            iva,
+            total,
+            desglose: desglose.tramos,
+            recargo_equivalencia: null,
+            origen: "deduccion",
+          },
+        },
+      },
+    };
+  }
+
+  // ── B2) Sin el tipo de cada linea el IVA no se sabe: base si, total no ──
   return {
-    datos: { ...datos, total: suma },
+    datos: { ...datos, subtotal: base },
     deduccion: {
-      campo: "total",
-      valor: suma,
-      metodo: "suma_lineas",
+      campo: "subtotal",
+      valor: base,
+      metodo: "base_sin_iva",
       alerta: {
-        codigo: "total_deducido",
+        codigo: "falta_iva",
         severidad: "media",
         mensaje:
           `El documento no declara ni base imponible, ni IVA, ni total: el bloque de totales no se ve ` +
-          `(recortado, tapado o fuera del encuadre). Se ha CALCULADO sumando sus ${lineas.length} ` +
-          `linea(s): ${eur(suma)}. Ese importe es la BASE de las lineas: si el original llevaba un ` +
-          `desglose de IVA que no aparece en la imagen, el total real sera mayor. Contrastalo con el ` +
-          `papel antes de darlo por bueno.`,
+          `(recortado, tapado o fuera del encuadre), y ${desglose.lineas_sin_tipo} de las ` +
+          `${lineas.length} linea(s) no traen su tipo de IVA. Se guarda como BASE la suma de las lineas, ` +
+          `${eur(base)}, y el TOTAL SE DEJA VACIO a proposito: falta el IVA, y esa base presentada como ` +
+          `total con IVA infravaloraria el gasto. Completa el IVA y el total con el papel en "Editar".`,
         detalle: {
-          metodo: "suma_lineas",
+          metodo: "base_sin_iva",
           num_lineas: lineas.length,
-          suma_lineas: suma,
-          total: suma,
+          lineas_sin_tipo: desglose.lineas_sin_tipo,
+          subtotal: base,
+          suma_lineas: base,
+          total: null,
           origen: "deduccion",
         },
       },

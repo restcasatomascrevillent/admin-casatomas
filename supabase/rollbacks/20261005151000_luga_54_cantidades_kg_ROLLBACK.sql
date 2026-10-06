@@ -13,6 +13,9 @@ set client_encoding = 'UTF8';
 -- La copia de seguridad se CONSERVA (es auditoría).
 -- ABORTA sin tocar nada si la 54 ya no es Luga ML/101511 con esas 54 líneas
 -- (mismos id y orden) o si falta la copia de seguridad.
+-- ANTES: si está aplicada 20261006110000_luga_54_total_con_iva.sql, deshacerla
+-- primero (su rollback): esta restaura los avisos de antes de los kilos, que
+-- daban la base 3.787,53 por total, y ABORTA si la 54 sigue con el IVA.
 -- Imprime «luga_54_cantidades_kg: revertida | 54 | 0».
 -- ===========================================================================
 
@@ -84,6 +87,9 @@ declare n integer;
 begin
   if not exists (select 1 from public.facturas where id = 54 and numero_documento = 'ML/101511') then
     raise exception 'ROLLBACK ABORTADO: la factura 54 ya no es Luga ML/101511. No se ha cambiado nada.';
+  end if;
+  if exists (select 1 from public.facturas where id = 54 and iva = 375.01 and total = 4162.54) then
+    raise exception 'ROLLBACK ABORTADO: la 54 sigue con el total con IVA de 20261006110000. Ejecuta antes su rollback. No se ha cambiado nada.';
   end if;
   select count(*) into n from public.productos_factura p join _luga54_antes a on a.id = p.id and a.orden = p.orden
    where p.factura_id = 54;

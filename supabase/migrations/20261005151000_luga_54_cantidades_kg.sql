@@ -35,6 +35,11 @@ set client_encoding = 'UTF8';
 --      (subtotal_ausente, total_deducido) se queda.
 --   NO toca historial_precios (el trigger es solo AFTER INSERT y el precio por
 --   kilo no cambia), ni nombres, precios, importes ni el total (3.787,53).
+--   OJO (06/10/2026): ese 3.787,53 NO es el total con IVA: es la BASE (la suma
+--   de las líneas, sin IVA) que el OCR guardó como total. Lo corrige
+--   20261006110000_luga_54_total_con_iva.sql (base 3.787,53 + IVA 375,01 =
+--   4.162,54), que también sustituye esos dos avisos. Esta migración no cambia
+--   de comportamiento por ello (solo comprueba la suma de las LÍNEAS).
 --   Comprobación final: las 54 líneas cuadran cantidad × precio = importe
 --   (margen de redondeo: max(0,05; |cantidad| × 0,005 + 0,01), el de
 --   magnitudes.ts; NATOP: 24 × 4,14 = 99,36 frente a 99,46).

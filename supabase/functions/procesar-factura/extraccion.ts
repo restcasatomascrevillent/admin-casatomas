@@ -25,6 +25,7 @@ import {
   mensajeCorrectivo,
   type OrigenImporte,
   retirarImportesNoImpresos,
+  tipoIvaLinea,
   validarEstructura,
 } from "./esquema.ts";
 import { type BloqueContenido, bloqueContenido, type ClienteOpenAI } from "./openai.ts";
@@ -118,6 +119,9 @@ export function normalizarDatos(data: any) {
         bultos: m.bultos,
         precio_unitario,
         total,
+        // Tipo de IVA impreso en la fila (productos_factura.iva_pct, migración
+        // 20261006105000). null si el documento no lo trae por línea.
+        iva_pct: tipoIvaLinea(toNumber(p.iva_pct, true)),
         // `base_precio`, `bonificada`, `regla_magnitud` y `sugerencia_magnitud`
         // NO tienen columna en `productos_factura`.
         base_precio: p.base_precio ?? "desconocida",

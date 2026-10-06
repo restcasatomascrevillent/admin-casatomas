@@ -29,6 +29,7 @@ import {
   type LineaExtraida,
   type OrigenImporte,
   retirarImportesNoImpresos,
+  tipoIvaLinea,
   toleranciaCabecera,
 } from "./esquema.ts";
 import { esCifCliente, esNombreCliente, normalizarCif, normalizarDatos } from "./extraccion.ts";
@@ -472,6 +473,8 @@ export function consolidar(piezasEntrada: PaginaCerrada[], rondaRelectura = 0): 
         base_precio: l.base_precio,
         precio_unitario: l.precio_unitario,
         total: l.total,
+        // Piezas guardadas antes del 06/10/2026 no traen el tipo: null.
+        iva_pct: tipoIvaLinea(l.iva_pct),
         bonificada: l.bonificada,
         pagina: Math.min(20, Math.max(1, p.pagina_doc)),
         orden: orden++,
@@ -709,6 +712,7 @@ function unirPartida(prev: LineaPagina, cur: LineaPagina): LineaPagina | null {
     precio_unitario: tomar("precio_unitario"),
     total: tomar("total"),
     peso_kg: tomar("peso_kg"),
+    iva_pct: prev.iva_pct ?? cur.iva_pct ?? null,
     importe_literal: prev.importe_literal ?? cur.importe_literal,
     albaran_ref: prev.albaran_ref ?? cur.albaran_ref,
     partida: "no",

@@ -5,6 +5,8 @@ import {
   conservarRecuentoFilas,
   contarCambiosNumericos,
   deducirImportes,
+  DESCRIPCION_IVA_PCT,
+  desgloseIvaPorLinea,
   DOCUMENTO_JSON_SCHEMA,
   describirProblemas,
   descuadresComoAlertas,
@@ -15,6 +17,7 @@ import {
   aplicarRecuentoVerificado,
   RECUENTO_FILAS_SCHEMA,
   type RecuentoFilas,
+  tipoIvaLinea,
   toleranciaCabecera,
   validarEstructura,
   VERIFICACION_PIE_SCHEMA,
@@ -22,6 +25,9 @@ import {
   type LineaExtraida,
   type VerificacionPie,
 } from "./esquema.ts";
+import { normalizarDatos } from "./extraccion.ts";
+import { PAGINA_JSON_SCHEMA, validarPagina } from "./pagina.ts";
+import { LUGA_FILAS, LUGA_IVA, LUGA_SUMA, LUGA_TOTAL } from "./fixtures/luga-ml101511.ts";
 
 // ============================================================================
 //  esquema.test.ts
@@ -645,7 +651,10 @@ describe("descuadresComoAlertas — mismo formato que validar_cordura_factura", 
 //  invente numeros para que le cuadren las sumas son cosas opuestas, y la
 //  unica forma de que no se confundan es que las reglas esten escritas:
 //   · nunca se pisa un valor leido,
-//   · nunca se escribe en subtotal ni en iva (el IVA no es derivable),
+//   · sin el tipo de IVA de cada linea, la suma de lineas es la BASE: va a
+//     subtotal y el total se queda a null (06/10/2026, Luga: la base guardada
+//     como total entraba en el gasto "IVA incluido" del chatbot),
+//   · nunca se inventa un tipo de IVA,
 //   · nunca se deduce sobre un albaran sin precios,
 //   · nunca se deduce con una linea sin importe,
 //   · y el umbral de `MAX_CAMBIOS_RELECTURA` sigue donde estaba.
@@ -690,48 +699,47 @@ const doTotalAusente = (over: { subtotal: number | null; iva: number | null }) =
 };
 
 describe("deducirImportes — Salazones Garre F/25011959 (totales fuera del encuadre)", () => {
-  it("recupera los 436,92 sumando las tres lineas", () => {
+  it("recupera los 436,92 sumando las tres lineas, como BASE", () => {
     const { datos, deduccion } = deducirImportes(garre());
-    expect(datos.total).toBe(436.92);
+    expect(datos.subtotal).toBe(436.92);
+    expect(deduccion?.campo).toBe("subtotal");
     expect(deduccion?.valor).toBe(436.92);
-    expect(deduccion?.metodo).toBe("suma_lineas");
+    expect(deduccion?.metodo).toBe("base_sin_iva");
   });
 
   it("lo redondea a centimos: 208.32 + 105 + 123.6 da 436.92000000000004 en coma flotante", () => {
     // Sin redondear, ese numero llega tal cual a una columna NUMERIC(10,2).
     expect(208.32 + 105 + 123.6).not.toBe(436.92);
-    expect(deducirImportes(garre()).datos.total).toBe(436.92);
+    expect(deducirImportes(garre()).datos.subtotal).toBe(436.92);
   });
 
-  it("NO inventa el reparto subtotal/IVA: los dos siguen a null", () => {
-    // Es la parte que no se puede derivar. El tipo podria ser el 10% de
-    // alimentacion o el 21%, y no esta impreso en ninguna parte.
+  it("NO inventa el IVA: sin el tipo de cada linea, iva y TOTAL siguen a null", () => {
+    // El tipo podria ser el 10% de alimentacion o el 21%, y no esta impreso en
+    // ninguna parte. Y la base NO se presenta como total: el chatbot suma
+    // `total` como IVA incluido (caso Luga 54, 06/10/2026).
     const { datos } = deducirImportes(garre());
-    expect(datos.subtotal).toBeNull();
     expect(datos.iva).toBeNull();
+    expect(datos.total).toBeNull();
   });
 
-  it("deja un aviso que dice que el importe esta CALCULADO, no leido", () => {
+  it("deja un aviso falta_iva que dice que es la BASE y que el total se deja vacio", () => {
     const { deduccion } = deducirImportes(garre());
-    expect(deduccion?.alerta.codigo).toBe("total_deducido");
+    expect(deduccion?.alerta.codigo).toBe("falta_iva");
     expect(deduccion?.alerta.severidad).toBe("media");
-    expect(deduccion?.alerta.mensaje).toMatch(/CALCULADO/);
+    expect(deduccion?.alerta.mensaje).toMatch(/BASE/);
+    expect(deduccion?.alerta.mensaje).toMatch(/falta el IVA/);
+    expect(deduccion?.alerta.mensaje).toMatch(/VACIO/);
     expect(deduccion?.alerta.detalle.origen).toBe("deduccion");
     expect(deduccion?.alerta.detalle.num_lineas).toBe(3);
-  });
-
-  it("el aviso advierte de que ese importe es la BASE si habia IVA sin ver", () => {
-    // Lo unico que se asume en este camino es que no hay un bloque de IVA
-    // fuera del encuadre. Como es un supuesto, tiene que estar dicho.
-    const { deduccion } = deducirImportes(garre());
-    expect(deduccion?.alerta.mensaje).toMatch(/BASE/);
-    expect(deduccion?.alerta.mensaje).toMatch(/mayor/);
+    expect(deduccion?.alerta.detalle.lineas_sin_tipo).toBe(3);
+    expect(deduccion?.alerta.detalle.total).toBeNull();
   });
 
   it("no muta el documento de entrada", () => {
     const entrada = garre();
     deducirImportes(entrada);
     expect(entrada.total).toBeNull();
+    expect(entrada.subtotal).toBeNull();
   });
 });
 
@@ -1230,10 +1238,24 @@ describe("deducirImportes — no se deduce sobre una lectura incompleta", () => 
     ...over,
   });
 
-  it("con el recuento cuadrado, la suma de lineas SIGUE deduciendose", () => {
+  it("con el recuento cuadrado, la suma de lineas SIGUE deduciendose (como base)", () => {
     const { datos, deduccion } = deducirImportes(luga());
-    expect(datos.total).toBe(1772.82);
-    expect(deduccion?.metodo).toBe("suma_lineas");
+    expect(datos.subtotal).toBe(1772.82);
+    expect(datos.total).toBeNull();
+    expect(deduccion?.metodo).toBe("base_sin_iva");
+  });
+
+  it("si faltan filas, tampoco se deduce la BASE ni el IVA aunque las lineas traigan tipo", () => {
+    const conIva = luga({
+      filas_tabla: 54,
+      productos: [
+        linea({ nombre: "NATOP", cantidad: 1, precio_unitario: 1000, total: 1000, iva_pct: 10 }),
+        linea({ nombre: "MAYONESA", cantidad: 1, precio_unitario: 772.82, total: 772.82, iva_pct: 10 }),
+      ],
+    });
+    const { datos, deduccion } = deducirImportes(conIva);
+    expect(deduccion?.metodo).toBe("no_deducible");
+    expect([datos.subtotal, datos.iva, datos.total]).toEqual([null, null, null]);
   });
 
   it("si faltan filas, NO se deduce: el total se queda vacio", () => {
@@ -1275,7 +1297,8 @@ describe("deducirImportes — no se deduce sobre una lectura incompleta", () => 
     const antiguo = luga();
     delete (antiguo as Record<string, unknown>).filas_tabla;
     delete (antiguo as Record<string, unknown>).continua_en_otra_pagina;
-    expect(deducirImportes(antiguo).datos.total).toBe(1772.82);
+    expect(deducirImportes(antiguo).datos.subtotal).toBe(1772.82);
+    expect(deducirImportes(antiguo).datos.total).toBeNull();
   });
 });
 
@@ -1449,10 +1472,10 @@ describe("aplicarRecuentoVerificado", () => {
 
   it("ese recuento hace que NO se deduzca ningun total de la suma de lineas", () => {
     const d = doc({ subtotal: null, iva: null, total: null, productos: lineas(10), filas_tabla: 10 });
-    // sin contador: la suma parcial se guarda como total deducido
+    // sin contador: la suma parcial se guarda como base deducida
     const sinContador = deducirImportes(d);
-    expect(sinContador.deduccion?.metodo).toBe("suma_lineas");
-    expect(sinContador.datos.total).toBe(100);
+    expect(sinContador.deduccion?.metodo).toBe("base_sin_iva");
+    expect(sinContador.datos.subtotal).toBe(100);
     // con contador: se retira la deduccion entera
     const { datos } = aplicarRecuentoVerificado(d, { filas_tabla: 54 });
     const conContador = deducirImportes(datos);
@@ -1466,7 +1489,7 @@ describe("aplicarRecuentoVerificado", () => {
     const { datos, alerta } = aplicarRecuentoVerificado(d, { filas_tabla: 3 });
     expect(alerta).toBeNull();
     expect(datos.filas_tabla).toBe(3);
-    expect(deducirImportes(datos).deduccion?.metodo).toBe("suma_lineas");
+    expect(deducirImportes(datos).deduccion?.metodo).toBe("base_sin_iva");
   });
 
   it("NUNCA baja el recuento: si el contador ve menos, manda el mas alto", () => {
@@ -1575,5 +1598,195 @@ describe("VERIFICACION_PIE_SCHEMA: lo que decide es ver los digitos, no la etiqu
   it("mantiene la regla contraria: base + cuota de IVA NO es ver el total", () => {
     expect(d.description).toMatch(/cuota de IVA NO es ver el total/i);
     expect(d.description).toMatch(/si tendrias que calcularlos, es false/i);
+  });
+});
+
+// ============================================================================
+//  14. El total CON IVA se deduce si cada linea trae su tipo (06/10/2026)
+// ----------------------------------------------------------------------------
+//  Luga ML/101511 (factura 54): la captura no llega al pie, pero la tabla trae
+//  una columna «IVA» por fila (10 % casi todo; 4 % PICOS Sin Gluten y
+//  ROSQUILLA). Se guardaba total = 3.787,53, que es la BASE, y el chatbot lo
+//  sumaba como "IVA incluido". Con el tipo de cada linea el total es exacto:
+//  10 % de 3.725,10 = 372,51; 4 % de 62,43 = 2,50; total 4.162,54.
+// ============================================================================
+
+describe("deducirImportes — IVA por linea (Luga ML/101511)", () => {
+  const lugaCompleta = (over: Partial<DocumentoExtraido> = {}) => doc({
+    proveedor: "LUGA SABORES S.L.",
+    numero_documento: "ML/101511",
+    productos: LUGA_FILAS.map((f) => linea({
+      nombre: f.nombre, cantidad: f.cantidad, peso_kg: f.peso_kg,
+      base_precio: "desconocida",
+      precio_unitario: f.precio_unitario, total: f.total, iva_pct: f.iva_pct,
+    })),
+    subtotal: null, iva: null, total: null,
+    filas_tabla: 54,
+    continua_en_otra_pagina: false,
+    ...over,
+  });
+
+  it("IVA mixto 10 % / 4 %: base 3.787,53 + IVA 375,01 = 4.162,54, marcado deducido", () => {
+    const { datos, deduccion } = deducirImportes(lugaCompleta());
+    expect(datos.subtotal).toBe(LUGA_SUMA);
+    expect(datos.iva).toBe(LUGA_IVA);
+    expect(datos.total).toBe(LUGA_TOTAL);
+    expect(deduccion?.campo).toBe("total");
+    expect(deduccion?.metodo).toBe("iva_por_linea");
+    expect(deduccion?.valor).toBe(LUGA_TOTAL);
+  });
+
+  it("el desglose agrupa por tipo y redondea UNA cuota por tipo", () => {
+    const { deduccion } = deducirImportes(lugaCompleta());
+    expect(deduccion?.alerta.detalle.desglose).toEqual([
+      { tipo: 10, base: 3725.1, cuota: 372.51, lineas: 49 },
+      { tipo: 4, base: 62.43, cuota: 2.5, lineas: 5 },
+    ]);
+  });
+
+  it("el aviso es total_deducido, dice que sale del IVA de cada linea y sin recargo", () => {
+    const { deduccion } = deducirImportes(lugaCompleta());
+    expect(deduccion?.alerta.codigo).toBe("total_deducido");
+    expect(deduccion?.alerta.severidad).toBe("media");
+    expect(deduccion?.alerta.mensaje).toMatch(/deducido con el IVA de cada/);
+    expect(deduccion?.alerta.mensaje).toMatch(/recargo de\s+equivalencia/);
+    expect(deduccion?.alerta.mensaje).toMatch(/4162\.54/);
+    expect(deduccion?.alerta.detalle).toMatchObject({
+      metodo: "iva_por_linea", subtotal: 3787.53, iva: 375.01, total: 4162.54,
+    });
+  });
+
+  it("lo deducido cuadra solo: comprobarCuadre no ve descuadre de cabecera ni de IVA", () => {
+    const { datos } = deducirImportes(lugaCompleta());
+    const cods = comprobarCuadre(datos).map((d) => d.codigo);
+    expect(cods).not.toContain("descuadre_cabecera");
+    expect(cods).not.toContain("iva_incoherente");
+  });
+
+  it("redondeo por tipo, no por linea: 3 x 0,15 al 4 % es 0,02 (no 0,03)", () => {
+    const tres = doc({
+      productos: [0, 1, 2].map(() => linea({ cantidad: 1, precio_unitario: 0.15, total: 0.15, iva_pct: 4 })),
+      subtotal: null, iva: null, total: null, filas_tabla: 3,
+    });
+    const { datos } = deducirImportes(tres);
+    expect(datos.subtotal).toBe(0.45);
+    expect(datos.iva).toBe(0.02);
+    expect(datos.total).toBe(0.47);
+  });
+
+  it("basta UNA linea con importe sin tipo para no inventar IVA: base si, total no", () => {
+    const productos = lugaCompleta().productos.map((l, i) => (i === 7 ? { ...l, iva_pct: null } : l));
+    const { datos, deduccion } = deducirImportes(lugaCompleta({ productos }));
+    expect(deduccion?.metodo).toBe("base_sin_iva");
+    expect(deduccion?.alerta.codigo).toBe("falta_iva");
+    expect(deduccion?.alerta.detalle.lineas_sin_tipo).toBe(1);
+    expect(datos.subtotal).toBe(LUGA_SUMA);
+    expect(datos.iva).toBeNull();
+    expect(datos.total).toBeNull();
+  });
+
+  it("una linea bonificada (0 EUR) sin tipo no impide deducir: no aporta IVA", () => {
+    const d = doc({
+      productos: [
+        linea({ cantidad: 1, precio_unitario: 100, total: 100, iva_pct: 10 }),
+        linea({ nombre: "Regalo", cantidad: 2, precio_unitario: 0, total: 0, bonificada: true, iva_pct: null }),
+      ],
+      subtotal: null, iva: null, total: null, filas_tabla: 2,
+    });
+    const { datos, deduccion } = deducirImportes(d);
+    expect(deduccion?.metodo).toBe("iva_por_linea");
+    expect(datos.total).toBe(110);
+  });
+
+  it("un tipo fuera de rango (110, -10) cuenta como sin tipo", () => {
+    const d = doc({
+      productos: [linea({ total: 100, iva_pct: 110 }), linea({ total: 50, iva_pct: -10 })],
+      subtotal: null, iva: null, total: null, filas_tabla: 2,
+    });
+    const { datos, deduccion } = deducirImportes(d);
+    expect(deduccion?.metodo).toBe("base_sin_iva");
+    expect(deduccion?.alerta.detalle.lineas_sin_tipo).toBe(2);
+    expect(datos.total).toBeNull();
+  });
+
+  it("lectura incompleta (faltan filas / continua / sin recuento) -> no se deduce nada", () => {
+    const casos: Partial<DocumentoExtraido>[] = [
+      { filas_tabla: 60 }, { continua_en_otra_pagina: true }, { filas_tabla: null },
+    ];
+    for (const over of casos) {
+      const { datos, deduccion } = deducirImportes(lugaCompleta(over));
+      expect(deduccion?.metodo).toBe("no_deducible");
+      expect(deduccion?.alerta.codigo).toBe("total_no_deducible");
+      expect([datos.subtotal, datos.iva, datos.total]).toEqual([null, null, null]);
+    }
+  });
+
+  it("un pie LEIDO manda: ni total, ni base, ni IVA se recalculan con los tipos de linea", () => {
+    const leido = deducirImportes(lugaCompleta({ total: 4000, total_literal: "4,000.00" }));
+    expect(leido.deduccion).toBeNull();
+    expect(leido.datos.total).toBe(4000);
+    expect(leido.datos.subtotal).toBeNull();
+    // Medio pie leido (solo base): regla C, no se completa con los tipos.
+    const medio = deducirImportes(lugaCompleta({ subtotal: 3787.53 }));
+    expect(medio.deduccion).toBeNull();
+    expect(medio.datos.iva).toBeNull();
+    expect(medio.datos.total).toBeNull();
+  });
+
+  it("desgloseIvaPorLinea trabaja en centimos y cuenta las lineas sin tipo", () => {
+    const d = desgloseIvaPorLinea([
+      linea({ total: 0.1, iva_pct: 21 }), linea({ total: 0.2, iva_pct: 21 }), linea({ total: 5, iva_pct: null }),
+    ]);
+    expect(d.base).toBe(5.3);
+    expect(d.tramos).toEqual([{ tipo: 21, base: 0.3, cuota: 0.06, lineas: 2 }]);
+    expect(d.cuota).toBe(0.06);
+    expect(d.lineas_sin_tipo).toBe(1);
+  });
+
+  it("tipoIvaLinea: porcentajes 0..30 a dos decimales; lo demas es null", () => {
+    expect([10, 4, 21, 0, 7.5, 5].map(tipoIvaLinea)).toEqual([10, 4, 21, 0, 7.5, 5]);
+    expect([null, undefined, NaN, 110, -1, "10", 30.01].map(tipoIvaLinea))
+      .toEqual([null, null, null, null, null, null, null]);
+  });
+});
+
+describe("iva_pct en los esquemas y en el guardado", () => {
+  it("el esquema de un documento lo exige en cada linea (strict) y explica el ejemplo de Luga", () => {
+    const items = DOCUMENTO_JSON_SCHEMA.schema.properties.productos.items;
+    expect(items.required).toContain("iva_pct");
+    expect(Object.keys(items.properties).sort()).toEqual([...items.required].sort());
+    expect(items.properties.iva_pct.type).toEqual(["number", "null"]);
+    expect(DESCRIPCION_IVA_PCT).toMatch(/Luga/);
+    expect(DESCRIPCION_IVA_PCT).toMatch(/Dto%/);
+  });
+
+  it("el esquema de una pieza tambien", () => {
+    const items = PAGINA_JSON_SCHEMA.schema.properties.lineas.items;
+    expect(items.required).toContain("iva_pct");
+    expect(Object.keys(items.properties).sort()).toEqual([...items.required].sort());
+  });
+
+  it("validarEstructura acepta una respuesta antigua sin iva_pct y rechaza un texto", () => {
+    expect(validarEstructura(doc()).ok).toBe(true);
+    const malo = doc({ productos: [{ ...linea(), iva_pct: "10%" as unknown as number }] });
+    const v = validarEstructura(malo);
+    expect(v.ok).toBe(false);
+    expect(v.problemas.map((p) => p.campo)).toContain("productos[0].iva_pct");
+  });
+
+  it("validarPagina lo lee, lo deja en null si falta y si esta fuera de rango", () => {
+    const base = {
+      nombre: "X", cantidad: 1, unidad: "ud", peso_kg: null, base_precio: "por_unidad",
+      precio_unitario: 1, total: 1, bonificada: false,
+    };
+    const v = validarPagina({ lineas: [{ ...base, iva_pct: 10 }, { ...base }, { ...base, iva_pct: 99 }] });
+    expect(v.ok).toBe(true);
+    if (v.ok) expect(v.datos.lineas.map((l) => l.iva_pct)).toEqual([10, null, null]);
+    expect(validarPagina({ lineas: [{ ...base, iva_pct: "10" }] }).ok).toBe(false);
+  });
+
+  it("normalizarDatos lo conserva por linea (va a productos_factura.iva_pct)", () => {
+    const n = normalizarDatos(doc({ productos: [linea({ iva_pct: 4 }), linea({ iva_pct: null }), linea()] }));
+    expect(n.productos.map((p: { iva_pct: number | null }) => p.iva_pct)).toEqual([4, null, null]);
   });
 });

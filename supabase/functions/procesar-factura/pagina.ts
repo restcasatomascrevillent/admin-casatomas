@@ -15,10 +15,12 @@
 
 import {
   comprobarCuadre,
+  DESCRIPCION_IVA_PCT,
   type DocumentoExtraido,
   leerImporteLiteral,
   type LineaExtraida,
   type RecuentoFilas,
+  tipoIvaLinea,
   type VerificacionPie,
 } from "./esquema.ts";
 
@@ -185,7 +187,7 @@ export const PAGINA_JSON_SCHEMA = {
           additionalProperties: false,
           required: [
             "nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "importe_literal",
-            "bonificada", "albaran_ref", "es_fila_arrastre", "partida",
+            "iva_pct", "bonificada", "albaran_ref", "es_fila_arrastre", "partida",
           ],
           properties: {
             nombre: { type: "string", description: "Descripción sin códigos ni lote. PUEDE REPETIRSE." },
@@ -212,6 +214,7 @@ export const PAGINA_JSON_SCHEMA = {
             precio_unitario: { ...numNull, description: "Tal como está impreso; null si no se imprime." },
             total: { ...numNull, description: "Importe de la línea tal como está impreso; null si no se ve." },
             importe_literal: { ...strNull, description: "Los caracteres del importe de la línea ('1,547.26')." },
+            iva_pct: { ...numNull, description: DESCRIPCION_IVA_PCT },
             bonificada: { type: "boolean" },
             albaran_ref: {
               ...strNull,
@@ -370,6 +373,10 @@ export function validarPagina(
     for (const c of ["peso_kg", "precio_unitario", "total"]) {
       if (!esNumONull(l[c])) problemas.push({ campo: `${ruta}.${c}`, mensaje: "no es número ni null" });
     }
+    // iva_pct (06/10/2026): se valida SI VIENE; piezas guardadas antes no lo traen.
+    if (l.iva_pct !== undefined && !esNumONull(l.iva_pct)) {
+      problemas.push({ campo: `${ruta}.iva_pct`, mensaje: "no es número ni null" });
+    }
     for (const c of ["importe_literal", "albaran_ref"]) {
       if (l[c] !== undefined && !esStrONull(l[c])) problemas.push({ campo: `${ruta}.${c}`, mensaje: "no es texto ni null" });
     }
@@ -385,6 +392,8 @@ export function validarPagina(
       base_precio: base,
       precio_unitario: numOrNull(l.precio_unitario),
       total: numOrNull(l.total),
+      // Tipo de IVA impreso en la fila (06/10/2026). Fuera de 0..30 → null.
+      iva_pct: tipoIvaLinea(l.iva_pct),
       bonificada: l.bonificada === true,
       importe_literal: strOrNull(l.importe_literal),
       albaran_ref: strOrNull(l.albaran_ref),

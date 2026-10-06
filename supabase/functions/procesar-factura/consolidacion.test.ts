@@ -8,7 +8,7 @@ import {
 } from "./consolidacion.ts";
 import { esCifCliente, normalizarDatos } from "./extraccion.ts";
 import type { LineaPagina, PaginaCerrada, ResultadoPagina } from "./pagina.ts";
-import { LUGA_FILAS, LUGA_FILAS_P1, LUGA_SUMA, type FilaLuga } from "./fixtures/luga-ml101511.ts";
+import { LUGA_FILAS, LUGA_FILAS_P1, LUGA_IVA, LUGA_SUMA, LUGA_TOTAL, type FilaLuga } from "./fixtures/luga-ml101511.ts";
 
 // ─── Constructores de piezas simuladas ──────────────────────────────────────
 
@@ -37,6 +37,7 @@ const deLuga = (f: FilaLuga, conAlbaran = true): LineaPagina =>
     precio_unitario: f.precio_unitario,
     total: f.total,
     importe_literal: f.total.toFixed(2),
+    iva_pct: f.iva_pct,
     albaran_ref: conAlbaran ? f.albaran_ref : null,
   });
 
@@ -174,11 +175,34 @@ describe("consolidar · Luga ML/101511 por páginas", () => {
     expect(c.alertas).toEqual([]);
     expect(c.relecturas).toEqual([]);
 
+    // El pie no sale en la captura, pero cada fila trae su IVA (10 % / 4 %):
+    // el total CON IVA es deducible (06/10/2026). Antes se guardaba la base
+    // (3.787,53) como total.
     const listo = prepararDocumentoConsolidado(c);
-    expect(listo.datos.total).toBe(LUGA_SUMA);
+    expect(listo.datos.subtotal).toBe(LUGA_SUMA);
+    expect(listo.datos.iva).toBe(LUGA_IVA);
+    expect(listo.datos.total).toBe(LUGA_TOTAL);
     expect(listo.totalOrigen).toBe("deducido");
     expect(listo.datos.productos).toHaveLength(54);
+    expect(listo.datos.productos.filter((p) => p.iva_pct === 4)).toHaveLength(5);
+    expect(listo.datos.productos.filter((p) => p.iva_pct === 10)).toHaveLength(49);
     expect(listo.alertasPrevias.map((a) => a.codigo)).toEqual(["total_deducido"]);
+    expect(listo.alertasPrevias[0].detalle).toMatchObject({ metodo: "iva_por_linea", subtotal: LUGA_SUMA, iva: LUGA_IVA });
+  });
+
+  it("piezas leídas sin el tipo de IVA por fila → base deducida, total VACÍO y aviso falta_iva", () => {
+    // Piezas guardadas antes del 06/10/2026 (sin iva_pct) o un modelo que no
+    // lo lee: la base no se presenta como total con IVA.
+    const piezas = lugaPorPaginas().map((p) => ({
+      ...p,
+      resultado: { ...p.resultado!, lineas: p.resultado!.lineas.map(({ iva_pct: _x, ...l }) => l as LineaPagina) },
+    }));
+    const listo = prepararDocumentoConsolidado(consolidar(piezas));
+    expect(listo.datos.subtotal).toBe(LUGA_SUMA);
+    expect(listo.datos.iva).toBeNull();
+    expect(listo.datos.total).toBeNull();
+    expect(listo.totalOrigen).toBeNull();
+    expect(listo.alertasPrevias.map((a) => a.codigo)).toEqual(["falta_iva"]);
   });
 
   it("repetidos no contiguos (NATOP, ESPINAS…) se conservan todos", () => {
@@ -322,7 +346,8 @@ describe("consolidar · Luga en FRANJAS con solape", () => {
     expect(c.documento.numero_documento).toBe("ML/101511");
     expect(c.documento.productos.filter((l) => l.albaran_ref === "V/ 781.316")).toHaveLength(10);
     const listo = prepararDocumentoConsolidado(c);
-    expect(listo.datos.total).toBe(LUGA_SUMA);
+    expect(listo.datos.subtotal).toBe(LUGA_SUMA);
+    expect(listo.datos.total).toBe(LUGA_TOTAL);
     expect(listo.totalOrigen).toBe("deducido");
   });
 

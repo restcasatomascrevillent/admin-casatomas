@@ -48,6 +48,10 @@ export const CIF_CLIENTE = "B54583356";
 //      precio es por kilo: la sección B pide las Uds en `cantidad`, los
 //      kilos en `peso_kg` y qué multiplica el precio en `base_precio`. La
 //      cantidad que se GUARDA la decide después magnitudes.ts por aritmética.
+//   9. (06-oct-2026, Luga ML/101511) Con una columna «IVA» por fila (10 / 4)
+//      y el pie fuera de la foto, el total con IVA SÍ se puede calcular, pero
+//      solo si se lee el tipo de cada línea: la sección E pide `iva_pct` por
+//      línea. El cálculo lo hace deducirImportes (esquema.ts), nunca el modelo.
 export const VISION_SYSTEM_PROMPT = `Eres un sistema experto de análisis documental para contabilidad en España.
 
 Analizas VISUALMENTE documentos comerciales españoles (facturas y albaranes) de un RESTAURANTE y extraes sus datos. La forma exacta de la salida la impone el esquema JSON de la respuesta; tú concéntrate en LEER BIEN.
@@ -248,6 +252,14 @@ E. IVA: el campo "iva" es el IMPORTE EN EUROS IMPRESO, no el porcentaje. Si
    Si sólo ves el porcentaje y el importe en euros no aparece, o queda fuera
    del encuadre, iva = null. NO lo calcules aplicando el porcentaje a la base:
    un IVA calculado es indistinguible de uno leído.
+   TIPO DE IVA DE CADA LÍNEA ("iva_pct" de la línea): si la tabla trae una
+   columna con el tipo de IVA de cada fila (cabecera "IVA", "% IVA", "T.IVA"),
+   copia en cada línea ese PORCENTAJE tal cual: 10, 4, 21, 0. Ejemplo (Luga):
+     PICOS Sin Gluten ... | Importe 18.07 | IVA 4    → iva_pct 4
+     NATOP 2 L ...        | Importe 99.46 | IVA 10   → iva_pct 10
+   No lo confundas con "Dto%" ni con "% R.E.". Si no hay esa columna, si trae
+   un código (1, 2, A) en vez del porcentaje, o no se lee: iva_pct = null. No
+   lo deduzcas por el tipo de producto. Esto NO es el campo "iva" del pie.
 
 F. IMPORTES DEL PIE: SE COPIAN, NO SE CALCULAN. Y SE CITAN.
    subtotal, iva y total son TRES LECTURAS INDEPENDIENTES del pie del
