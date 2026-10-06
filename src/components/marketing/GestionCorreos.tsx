@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Mail, Info, UserMinus, ShieldCheck } from "lucide-react";
+import { Users, Mail, UserMinus } from "lucide-react";
 import { useNewsletterSuscriptores } from "@/hooks/useNewsletterSuscriptores";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListaSuscriptores } from "./ListaSuscriptores";
@@ -18,53 +18,6 @@ export function GestionCorreos() {
 
   return (
     <div className="space-y-4">
-      {/* Origen de los suscriptores. Altas (doble opt-in): triggers newsletter_alta_reserva_verificada_*
-          sobre `reservas`, solo si la reserva trae consentimiento_newsletter = true (casilla del formulario
-          web, también si la reserva sale de una solicitud) Y el cliente ha verificado el email pulsando
-          «Confirmo» en el correo (email_verificado_at). Ver
-          supabase/migrations/20261003184500_newsletter_doble_optin_y_email_normalizado.sql. */}
-      <Card className="border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-sky-600 mt-0.5 shrink-0" />
-            <div className="text-sm text-sky-900 dark:text-sky-200">
-              <p className="font-medium">Cómo se apunta la gente</p>
-              <p className="mt-1">
-                Se apuntan al reservar en la web marcando la casilla de la newsletter, y quedan suscritos cuando
-                confirman su reserva desde el email. Quien se da de baja no vuelve a recibirla salvo que se apunte de
-                nuevo.
-              </p>
-              <p className="mt-1">
-                Las reservas por teléfono o apuntadas desde el panel no suscriben a nadie: el cliente tiene que
-                marcar la casilla él mismo en la web.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Baja automática (encargo del dueño, 2026-10-03). Pie y cabeceras: enviar-newsletter/plantillas.ts;
-          baja: newsletter-baja y resend-webhook; protección: migración 20261003171500. */}
-      <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
-            <div className="text-sm text-emerald-900 dark:text-emerald-200">
-              <p className="font-medium">Las bajas se hacen solas</p>
-              <p className="mt-1">
-                Cada newsletter incluye un enlace para darse de baja (y el botón «Cancelar suscripción» de Gmail,
-                Outlook o Yahoo), sin que tengas que añadir nada. Quien lo pulsa deja de recibirla al momento. También
-                se da de baja a quien marca un correo nuestro como spam o tiene un email que no existe.
-              </p>
-              <p className="mt-1">
-                Las bajas aparecen aquí solas (en un minuto como mucho), con su fecha y el motivo. No se pueden volver a
-                activar desde el panel.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-6 xl:grid-cols-3">
         <Card>
           <CardHeader>
