@@ -117,9 +117,32 @@
 //
 // Las cifras de la cabecera (comensales, reservas, con mesa) siguen al filtro de
 // turno; el desglose de ocupación enseña siempre los dos turnos.
+//
+// ---------------------------------------------------------------------------
+// LEGIBLE Y TÁCTIL (2026-10-06)
+// ---------------------------------------------------------------------------
+// «Se ve súper pequeño; esto de reservas es posible que se gestione desde una
+// tablet» (el dueño, con el panel a ~315 px de ancho). Lo que había: letra de
+// 10-12 px, el título «Martes, 6 De Octubre» (un `capitalize` de CSS) y la
+// rejilla por cuartos en dos tablas con su propia barra de scroll horizontal
+// dentro del scroll vertical del panel. Ahora:
+//   · Ningún texto del panel baja de 13 px (los números, de 16 px o más), y el
+//     título lleva solo la primera letra en mayúscula («Martes, 6 de octubre»).
+//   · El selector de turno mide 36 px con ratón y 44 px con el dedo (la
+//     variante táctil del Toggle), y también filtra la rejilla por cuartos.
+//   · Fijos arriba, solo el título y el selector. El resumen del turno
+//     (comensales, reservas, aforo y barras) abre el cuerpo desplazable: fijo,
+//     con ventanas de 700-770 px de alto dejaba 200-250 px para todo lo demás.
+//     Al cambiar de día el cuerpo vuelve arriba.
+//   · La rejilla por cuartos va en BALDOSAS (`DisponibilidadCuartos baldosas`):
+//     se reparten en filas según el ancho, así que el único scroll del panel es
+//     el vertical de su cuerpo. La tabla clásica sigue igual en Hoy y en los
+//     diálogos, donde cabe.
+//   · El panel tiene más ancho desde `lg` (3/5 mes y 2/5 panel: ver
+//     `CalendarioOcupacion`).
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -176,6 +199,9 @@ const ETIQUETA_TURNO: Record<FiltroTurno, string> = {
 function plural(n: number, singular: string, plural_: string) {
   return `${n} ${n === 1 ? singular : plural_}`;
 }
+
+/** «martes, 6 de octubre» → «Martes, 6 de octubre» (solo la primera letra: `capitalize` pondría «De Octubre»). */
+const conMayuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
 
 /**
  * Una fila de la vista reducida a lo justo para agrupar por sala. `turno` y
@@ -270,11 +296,11 @@ function BloqueErrorDia({
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
         <div className="min-w-0 space-y-1">
           <p className="text-sm font-medium">No se ha podido leer el reparto de este día</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             No se enseña ninguna cifra para no dar por buenos unos datos que no se han
             llegado a leer. Vuelve a intentarlo.
           </p>
-          {detalle && <p className="break-words text-xs text-muted-foreground/80">{detalle}</p>}
+          {detalle && <p className="break-words text-sm text-muted-foreground/80">{detalle}</p>}
         </div>
       </div>
       <Button
@@ -332,19 +358,20 @@ function TarjetaSala({
           <span className="truncate font-medium" title={grupo.espacio_nombre}>
             {grupo.espacio_nombre}
           </span>
-          {fueraDeAforo && <EtiquetaFueraDeAforo />}
+          {/* A 13 px como el resto del panel (la etiqueta, compartida, es de 10 px en el kanban y la Lista). */}
+          {fueraDeAforo && <EtiquetaFueraDeAforo className="h-auto py-0.5 text-[13px] [&_svg]:h-3 [&_svg]:w-3" />}
         </div>
         <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
         <span className="flex items-center gap-1 whitespace-nowrap tabular-nums">
-          <CalendarIcon className="h-3 w-3" aria-hidden="true" />
+          <CalendarIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {plural(grupo.total, "reserva", "reservas")}
         </span>
         <span aria-hidden="true">·</span>
         <span className="flex items-center gap-1 whitespace-nowrap tabular-nums">
-          <Users className="h-3 w-3" aria-hidden="true" />
+          <Users className="h-3.5 w-3.5" aria-hidden="true" />
           {plural(grupo.comensales, "comensal", "comensales")}
         </span>
       </div>
@@ -352,8 +379,8 @@ function TarjetaSala({
       {!tieneMesas ? (
         // Aviso, NO error: la sala funciona igual, simplemente no se puede
         // bajar al grado de mesa hasta que alguien dé de alta mesas.
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
-          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+        <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>Esta sala no tiene mesas en el plano: entra para crearlas.</span>
         </p>
       ) : (
@@ -362,9 +389,9 @@ function TarjetaSala({
             {grupo.conMesa > 0 && (
               <Badge
                 variant="outline"
-                className="gap-1 whitespace-nowrap border-green-300 bg-green-50 text-[10px] tabular-nums text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200"
+                className="gap-1 whitespace-nowrap border-green-300 bg-green-50 text-[13px] tabular-nums text-green-800 dark:border-green-800 dark:bg-green-950/50 dark:text-green-200"
               >
-                <Armchair className="h-3 w-3" aria-hidden="true" />
+                <Armchair className="h-3.5 w-3.5" aria-hidden="true" />
                 {grupo.conMesa} con mesa
               </Badge>
             )}
@@ -374,7 +401,7 @@ function TarjetaSala({
               // real (lo cuenta la vista), así que se escribe tal cual.
               <Badge
                 variant="outline"
-                className="whitespace-nowrap text-[10px] tabular-nums text-muted-foreground"
+                className="whitespace-nowrap text-[13px] tabular-nums text-muted-foreground"
               >
                 {grupo.sinMesa} pendiente{grupo.sinMesa === 1 ? "" : "s"} de mesa
               </Badge>
@@ -385,7 +412,7 @@ function TarjetaSala({
             <BarraCierre porcentaje={grupo.porcentajeCerrado} />
             <span
               className={cn(
-                "shrink-0 text-xs tabular-nums",
+                "shrink-0 text-sm tabular-nums",
                 cerrada
                   ? "font-medium text-green-700 dark:text-green-400"
                   : "text-muted-foreground",
@@ -407,6 +434,13 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
   const [turno, setTurno] = useState<FiltroTurno>("todos");
 
   const fechaISO = format(fecha, "yyyy-MM-dd");
+
+  // Al cambiar de día, el cuerpo vuelve arriba: el resumen del día nuevo va en
+  // él y, si no, se vería a media altura (p. ej. en las baldosas del anterior).
+  const regionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (regionRef.current) regionRef.current.scrollTop = 0;
+  }, [fechaISO]);
 
   // El turno NO se le pasa al hook aunque lo acepte: filtrando en cliente el
   // botón responde al instante (sin ir al servidor por cada cambio) y además se
@@ -522,15 +556,16 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
     // el contenido no se desplazaría: se CORTARÍA contra el `overflow-hidden`
     // de la tarjeta.
     <div className="flex min-h-0 flex-1 flex-col gap-3" data-testid="panel-dia">
-      {/* Cabecera: qué día es, el filtro de turno y el resumen del turno */}
+      {/* Fijo arriba: qué día es y el filtro de turno. */}
       <div className="flex-shrink-0 space-y-2">
         <div className="flex min-w-0 items-center gap-2">
           <CalendarIcon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-          <h4 className="min-w-0 truncate font-semibold capitalize">
-            {format(fecha, "EEEE, d 'de' MMMM", { locale: es })}
+          <h4 className="min-w-0 truncate text-lg font-semibold">
+            {conMayuscula(format(fecha, "EEEE, d 'de' MMMM", { locale: es }))}
           </h4>
         </div>
 
+        {/* 36 px con ratón; con el dedo, los 44 px de la variante táctil del Toggle (`pointer-coarse:h-11`). */}
         <ToggleGroup
           type="single"
           value={turno}
@@ -541,20 +576,26 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
           aria-label="Filtrar por turno"
         >
           {(["todos", "comida", "cena"] as FiltroTurno[]).map((t) => (
-            <ToggleGroupItem key={t} value={t} className="h-7 px-2 text-xs">
+            <ToggleGroupItem key={t} value={t} className="h-9 px-3 text-sm pointer-coarse:h-11">
               {ETIQUETA_TURNO[t]}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+      </div>
 
+      {/* Cuerpo desplazable, el ÚNICO scroll del panel. `min-h-0` es lo que impide
+          que el contenido empuje la tarjeta y se salga: sin él `overflow-y-auto` no
+          recorta nada. El resumen del turno va DENTRO (2026-10-06): fijo arriba, con
+          ventanas de 700-770 px de alto dejaba 200-250 px para todo lo demás. */}
+      <div ref={regionRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {/* Ni cifras ni porcentajes mientras no se sepa: cargando y error tienen
             su propia frase, y el recuento solo aparece cuando es de verdad. */}
         {isError ? (
-          <p className="text-xs text-muted-foreground">El reparto de este día no se ha podido leer.</p>
+          <p className="text-sm text-muted-foreground">El reparto de este día no se ha podido leer.</p>
         ) : isLoading ? (
-          <p className="text-xs text-muted-foreground">Leyendo el reparto del día…</p>
+          <p className="text-sm text-muted-foreground">Leyendo el reparto del día…</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 pb-1">
             <div>
               {/* Los COMENSALES, protagonistas. Sin `tabular-nums`: es un número
                   grande suelto, no una columna. */}
@@ -567,9 +608,9 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
                 </span>
                 {/* El espacio de texto no se ve (es un flex con `gap`) pero hace que el
                     lector de pantalla y el texto copiado digan «35 comensales». */}{" "}
-                <span className="text-sm text-muted-foreground">{comensales === 1 ? "comensal" : "comensales"}</span>
+                <span className="text-base text-muted-foreground">{comensales === 1 ? "comensal" : "comensales"}</span>
               </p>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                 <span className="whitespace-nowrap tabular-nums">
                   {plural(resumen.total, "reserva", "reservas")}
                 </span>
@@ -586,11 +627,7 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
             {mostrarOcupacion && <OcupacionDelDia turnos={ocupacion.turnos} aforo={aforo} />}
           </div>
         )}
-      </div>
 
-      {/* Cuerpo desplazable. `min-h-0` es lo que impide que el contenido empuje
-          la tarjeta y se salga: sin él `overflow-y-auto` no recorta nada. */}
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {isError ? (
           <BloqueErrorDia
             error={error}
@@ -622,7 +659,7 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
                     Sin sala
                   </span>
                 </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-800 dark:text-amber-200">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-amber-800 dark:text-amber-200">
                   <span className="whitespace-nowrap tabular-nums">
                     {plural(sinSala.total, "reserva", "reservas")}
                   </span>
@@ -631,7 +668,7 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
                     {plural(sinSala.comensales, "comensal", "comensales")}
                   </span>
                 </div>
-                <p className="mt-1.5 text-xs text-amber-800 dark:text-amber-200">
+                <p className="mt-1.5 text-sm text-amber-800 dark:text-amber-200">
                   Todavía no se han repartido por sala. Se hace en la pestaña Hoy,
                   arrastrando sus tarjetas o con ⋮ → «Mover a…».
                 </p>
@@ -653,8 +690,15 @@ export function DetalleDiaEspacios({ fecha, onEspacioClick }: DetalleDiaEspacios
           </>
         )}
 
-        <div className="space-y-3 border-t pt-3">
-          <DisponibilidadCuartos fecha={fechaISO} compacto />
+        {/* En baldosas (sin scroll lateral) y con el turno del selector. */}
+        <div className="border-t pt-3">
+          <DisponibilidadCuartos
+            fecha={fechaISO}
+            compacto
+            baldosas
+            turno={turno === "todos" ? null : turno}
+            className="space-y-3"
+          />
         </div>
       </div>
     </div>

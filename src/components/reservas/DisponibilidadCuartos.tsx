@@ -17,6 +17,7 @@ import {
   type NivelOcupacion,
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
+import { estiloNivel, nivelDeOcupacion } from "@/lib/reservas/ocupacionCalendario";
 import {
   construirRejillaCuartos,
   periodosDelDia,
@@ -41,6 +42,19 @@ import {
 //
 // Una sola rejilla, la de Casa Tomás: Touza no admite reservas (decisión del
 // dueño, 2026-10-01) y sus datos ya llegan descartados de `useOcupacionSalasDia`.
+//
+// DOS FORMAS DE PINTARLA (mismos datos, misma cuenta):
+//   · TABLA (por defecto): una columna por cuarto, filas «Llegan» y «En sala».
+//     Donde cabe a lo ancho (Hoy en escritorio, diálogos) es la más densa y deja
+//     elegir la hora pulsando su cabecera.
+//   · BALDOSAS (`baldosas`, solo el panel del día del Calendario, 2026-10-06):
+//     el panel es una columna estrecha y se gestiona desde una tablet; la tabla
+//     no cabía y cada turno tenía su propia barra de scroll horizontal, con letra
+//     de 12 px. Las baldosas se reparten en filas según el ancho (sin scroll
+//     lateral): en cada una la hora, los comensales EN SALA en grande, teñidos
+//     con la MISMA escala que las casillas del mes (`UMBRALES_OCUPACION`, azul;
+//     el ámbar del Calendario es «sin sala» y el rojo no se usa), y «+N llegan»
+//     solo si llega alguien. Solo consulta: no eligen hora.
 // ============================================================================
 
 export interface OpcionesRejillaCuartos {
@@ -127,8 +141,24 @@ export interface DisponibilidadCuartosProps extends Omit<OpcionesRejillaCuartos,
    * otro título que el suyo.
    */
   ocultarTitulo?: boolean;
+  /**
+   * Baldosas en vez de tabla (ver la cabecera): se reparten en filas según el ancho, sin scroll horizontal.
+   * Para el panel del día del Calendario. Solo consulta: con baldosas `onSeleccionarHora` no se usa.
+   */
+  baldosas?: boolean;
+  /** Solo ese turno (el filtro del panel del día). Sin él, todos los que tengan horas ese día. */
+  turno?: Turno | null;
   className?: string;
 }
+
+/** Leyenda de las baldosas: lo justo para leerlas sin conocer la tabla. */
+const LEYENDA_BALDOSAS = (
+  <>
+    En grande, los comensales <strong className="whitespace-nowrap font-semibold text-foreground">en sala</strong> en
+    cada cuarto de hora; <strong className="whitespace-nowrap font-semibold text-foreground">«+4 llegan»</strong>, los
+    que entran en ese cuarto. El color es la ocupación del aforo, como en las casillas del mes.
+  </>
+);
 
 export function DisponibilidadCuartos({
   fecha,
@@ -138,6 +168,8 @@ export function DisponibilidadCuartos({
   onSeleccionarHora,
   compacto = false,
   ocultarTitulo = false,
+  baldosas = false,
+  turno = null,
   className,
 }: DisponibilidadCuartosProps) {
   const { rejilla, isLoading, isError, isFetching, refetch } = useRejillaCuartos({
@@ -155,6 +187,12 @@ export function DisponibilidadCuartos({
     for (const f of rejilla?.franjas ?? []) salida[f.turno].push(f);
     return salida;
   }, [rejilla]);
+  const turnosVisibles = TURNOS.filter((t) => (!turno || t === turno) && porTurno[t].length > 0);
+  // Horas fuera del horario de los turnos (salen por una reserva o por la hora propuesta): en las baldosas,
+  // su porqué va escrito debajo, no solo en el lector de pantalla (con el dedo no hay `title`).
+  const origenesFuera = baldosas
+    ? Array.from(new Set(turnosVisibles.flatMap((t) => porTurno[t].map((f) => f.origen)))).filter((o) => o !== "turno")
+    : [];
 
   return (
     <section
@@ -180,7 +218,7 @@ export function DisponibilidadCuartos({
       )}
 
       {!fecha ? (
-        <EstadoVacio>Elige un día para ver cómo se reparte el turno.</EstadoVacio>
+        <EstadoVacio grande={baldosas}>Elige un día para ver cómo se reparte el turno.</EstadoVacio>
       ) : isLoading ? (
         <div className="space-y-2" aria-busy="true" aria-label="Cargando disponibilidad">
           <Skeleton className="h-16 w-full" />
@@ -200,21 +238,35 @@ export function DisponibilidadCuartos({
           </Button>
         </div>
       ) : !rejilla || rejilla.franjas.length === 0 ? (
-        <EstadoVacio>Ese día no hay turnos configurados (cerrado).</EstadoVacio>
+        <EstadoVacio grande={baldosas}>Ese día no hay turnos configurados (cerrado).</EstadoVacio>
       ) : (
         <>
-          {TURNOS.filter((t) => porTurno[t].length > 0).map((t) => (
-            <TablaTurno
-              key={t}
-              turno={t}
-              franjas={porTurno[t]}
-              rejilla={rejilla}
-              pax={pax}
-              horaSel={horaSel}
-              onSeleccionarHora={onSeleccionarHora}
-            />
+          {baldosas && <p className="text-[13px] text-muted-foreground">{LEYENDA_BALDOSAS}</p>}
+          {turno && turnosVisibles.length === 0 && (
+            <EstadoVacio grande={baldosas}>Ese día no hay horas de {ETIQUETA_TURNO[turno].toLowerCase()}.</EstadoVacio>
+          )}
+          {turnosVisibles.map((t) =>
+            baldosas ? (
+              <BaldosasTurno key={t} turno={t} franjas={porTurno[t]} rejilla={rejilla} pax={pax} horaSel={horaSel} />
+            ) : (
+              <TablaTurno
+                key={t}
+                turno={t}
+                franjas={porTurno[t]}
+                rejilla={rejilla}
+                pax={pax}
+                horaSel={horaSel}
+                onSeleccionarHora={onSeleccionarHora}
+              />
+            ),
+          )}
+          {origenesFuera.map((o) => (
+            <p key={o} className="text-[13px] text-muted-foreground">
+              <span aria-hidden="true">* </span>
+              {MOTIVO_ORIGEN[o]}
+            </p>
           ))}
-          {!compacto && (
+          {!compacto && !baldosas && (
             <p className="text-[11px] text-muted-foreground">
               Todas las horas del turno de 15 en 15 minutos. «Llegan»: comensales que entran en ese cuarto. «En sala»:
               los que están sentados según la estancia estimada del turno. El aforo se cuenta por turno (corte a las
@@ -228,6 +280,96 @@ export function DisponibilidadCuartos({
   );
 }
 
+interface PropsTurno {
+  turno: Turno;
+  franjas: FranjaCuarto[];
+  rejilla: RejillaCuartos;
+  pax: number;
+  horaSel: string | null;
+}
+
+/** «Cena 43/150 · quedan 107» (y, si se está probando un grupo, si cabe). La misma en la tabla y en las baldosas. */
+function CabeceraTurno({ turno, franjas, rejilla, pax, horaSel, className }: PropsTurno & { className: string }) {
+  const aforo = rejilla.aforo[turno];
+  const quedan = aforo.capacidad - aforo.ocupados;
+  const probar = pax > 0 && !!horaSel && franjas.some((f) => f.hora === horaSel);
+
+  return (
+    <p className={cn("flex flex-wrap items-baseline gap-x-2", className)}>
+      <span className="font-medium">{ETIQUETA_TURNO[turno]}</span>
+      <span className="tabular-nums text-muted-foreground">
+        {aforo.ocupados}/{aforo.capacidad} · quedan {Math.max(0, quedan)}
+      </span>
+      {probar && (
+        <span className={cn("font-medium", aforo.cabe ? "text-emerald-700 dark:text-emerald-400" : "text-destructive")}>
+          {aforo.cabe ? `Caben ${pax} más` : `No caben ${pax} más (${aforo.tras}/${aforo.capacidad})`}
+        </span>
+      )}
+    </p>
+  );
+}
+
+/** «13:45: 6 en sala, llegan 4»: todo lo de la baldosa en una frase (y el porqué si está fuera del turno). */
+function etiquetaBaldosa(f: FranjaCuarto): string {
+  const llegadas = f.llegan === 0 ? "sin llegadas" : f.llegan === 1 ? "llega 1" : `llegan ${f.llegan}`;
+  const fuera = f.origen !== "turno" ? `. ${MOTIVO_ORIGEN[f.origen]}` : "";
+  return `${f.hora}: ${f.enSala} en sala, ${llegadas}${fuera}`;
+}
+
+/**
+ * Un turno en baldosas: tantas por fila como quepan (mínimo 4,5 rem = 72 px, lo que pide «+26 llegan» a 13 px),
+ * así que nunca hay scroll lateral. El tinte es el de las casillas del mes con los comensales EN SALA contra el
+ * aforo del turno (`nivelDeOcupacion` + `estiloNivel`): mismos umbrales, mismos colores y mismos contrastes (el
+ * texto pequeño va al 80 %, como en la casilla).
+ */
+function BaldosasTurno({ turno, franjas, rejilla, pax, horaSel }: PropsTurno) {
+  const capacidad = rejilla.aforo[turno].capacidad;
+  return (
+    <div className="space-y-1.5" data-turno-cuartos={turno}>
+      <CabeceraTurno turno={turno} franjas={franjas} rejilla={rejilla} pax={pax} horaSel={horaSel} className="text-sm" />
+      <ul
+        role="list"
+        aria-label={`${ETIQUETA_TURNO[turno]}: comensales en sala y que llegan en cada cuarto de hora`}
+        className="grid grid-cols-[repeat(auto-fill,minmax(min(4.5rem,100%),1fr))] gap-1.5"
+      >
+        {franjas.map((f) => {
+          const nivel = nivelDeOcupacion(f.enSala, capacidad);
+          const fuera = f.origen !== "turno";
+          return (
+            <li
+              key={f.hora}
+              data-cuarto={f.hora}
+              data-nivel={nivel}
+              aria-label={etiquetaBaldosa(f)}
+              className={cn(
+                "flex min-w-0 flex-col items-center rounded-md border px-1 py-1 text-center leading-tight tabular-nums",
+                estiloNivel(nivel).celda,
+                f.hora === horaSel && "ring-2 ring-primary ring-offset-1",
+              )}
+            >
+              <span className={cn("text-[13px] opacity-80", fuera && CLASES_FUERA)}>
+                {f.hora}
+                {fuera && <span aria-hidden="true">*</span>}
+              </span>
+              <span className="text-xl font-semibold">{f.enSala}</span>
+              {/* Sin llegadas, la línea queda en blanco: todas las baldosas miden lo mismo. */}
+              {f.llegan > 0 ? (
+                <span className="text-[13px] opacity-80">
+                  +{f.llegan} {f.llegan === 1 ? "llega" : "llegan"}
+                </span>
+              ) : (
+                <span aria-hidden="true" className="text-[13px]">
+                  {"\u00a0"}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function TablaTurno({
   turno,
   franjas,
@@ -235,31 +377,12 @@ function TablaTurno({
   pax,
   horaSel,
   onSeleccionarHora,
-}: {
-  turno: Turno;
-  franjas: FranjaCuarto[];
-  rejilla: RejillaCuartos;
-  pax: number;
-  horaSel: string | null;
-  onSeleccionarHora?: (hora: string) => void;
-}) {
+}: PropsTurno & { onSeleccionarHora?: (hora: string) => void }) {
   const aforo = rejilla.aforo[turno];
-  const quedan = aforo.capacidad - aforo.ocupados;
-  const probar = pax > 0 && !!horaSel && franjas.some((f) => f.hora === horaSel);
 
   return (
     <div className="space-y-1">
-      <p className="flex flex-wrap items-baseline gap-x-2 text-xs">
-        <span className="font-medium">{ETIQUETA_TURNO[turno]}</span>
-        <span className="tabular-nums text-muted-foreground">
-          {aforo.ocupados}/{aforo.capacidad} · quedan {Math.max(0, quedan)}
-        </span>
-        {probar && (
-          <span className={cn("font-medium", aforo.cabe ? "text-emerald-700 dark:text-emerald-400" : "text-destructive")}>
-            {aforo.cabe ? `Caben ${pax} más` : `No caben ${pax} más (${aforo.tras}/${aforo.capacidad})`}
-          </span>
-        )}
-      </p>
+      <CabeceraTurno turno={turno} franjas={franjas} rejilla={rejilla} pax={pax} horaSel={horaSel} className="text-xs" />
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full border-collapse text-xs tabular-nums">
           <caption className="sr-only">
@@ -347,6 +470,11 @@ function TablaTurno({
   );
 }
 
-function EstadoVacio({ children }: { children: ReactNode }) {
-  return <p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">{children}</p>;
+/** `grande`: con las baldosas (panel del día, tablet) el aviso va a 14 px como el resto del panel. */
+function EstadoVacio({ children, grande = false }: { children: ReactNode; grande?: boolean }) {
+  return (
+    <p className={cn("rounded-md border border-dashed p-3 text-center text-muted-foreground", grande ? "text-sm" : "text-xs")}>
+      {children}
+    </p>
+  );
 }

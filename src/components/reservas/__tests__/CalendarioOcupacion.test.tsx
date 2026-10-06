@@ -407,7 +407,7 @@ describe("CalendarioOcupacion · el color es el % de ocupación", () => {
     const { container } = montar();
     await mesPintado();
     // El panel del día (con sus salas) no es parte de la cuadrícula: se mira solo la rejilla y la leyenda.
-    const rejilla = container.querySelector(".lg\\:col-span-2") as HTMLElement;
+    const rejilla = within(container).getByTestId("tarjeta-mes");
     expect(rejilla.textContent ?? "").not.toMatch(/touza/i);
     const leyenda = screen.getByRole("list", { name: "Escala de ocupación" }).closest("div.rounded-lg") as HTMLElement;
     expect(leyenda.textContent ?? "").not.toMatch(/touza|\b80\b/i);
@@ -746,18 +746,29 @@ describe("CalendarioOcupacion · estados de la consulta del mes", () => {
 
 describe("CalendarioOcupacion · estructura", () => {
   it("la columna de la cuadrícula y la del panel no se ensanchan con su contenido (`grid-cols-1` + `min-w-0`)", async () => {
-    // Sin `grid-cols-1`, por debajo de `lg` la columna es `auto` y se estira hasta la
-    // tabla de cuartos de hora del panel: en un móvil de 375 px la cuadrícula se salía
-    // de la pantalla (medido con Chrome headless). jsdom no calcula layout: aquí solo
-    // se protege que las clases que lo arreglan no se pierdan.
-    const { container } = montar();
+    // Sin `grid-cols-1`, por debajo de `lg` la columna es `auto` y se estira hasta lo más
+    // ancho del panel (lo fue la antigua tabla de cuartos de hora): en un móvil de 375 px
+    // la cuadrícula se salía de la pantalla (medido con Chrome headless). jsdom no calcula
+    // layout: aquí solo se protege que las clases que lo arreglan no se pierdan.
+    montar();
     await mesPintado();
-    const rejilla = container.querySelector(".lg\\:grid-cols-3") as HTMLElement;
-    expect(rejilla).not.toBeNull();
-    expect(rejilla.className).toMatch(/\bgrid-cols-1\b/);
+    const rejilla = screen.getByTestId("tarjeta-mes").parentElement as HTMLElement;
+    expect(rejilla).toContainElement(screen.getByTestId("panel-dia"));
+    expect(rejilla.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
     for (const hijo of Array.from(rejilla.children)) {
       expect((hijo as HTMLElement).className).toMatch(/\bmin-w-0\b/);
     }
+  });
+
+  it("desde `lg`, 3/5 del ancho para el mes y 2/5 para el panel del día (antes 2/3 y 1/3: el panel no se leía)", async () => {
+    // Medido en el navegador (capturas del 06/10/2026): a 1024 px el panel pasa de 291 a 355 px y la casilla
+    // del mes se queda en 69 px de ancho; a 1280 px al 150 % (la captura del dueño), de 315 a 384 px.
+    montar();
+    await mesPintado();
+    const mes = screen.getByTestId("tarjeta-mes");
+    expect(mes.parentElement).toHaveClass("lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]");
+    expect(mes.parentElement).not.toHaveClass("lg:grid-cols-3");
+    expect(mes).not.toHaveClass("lg:col-span-2");
   });
 
   it("la casilla seleccionada marca `aria-pressed` y se mueve al pulsar otra", async () => {
@@ -769,11 +780,11 @@ describe("CalendarioOcupacion · estructura", () => {
     expect(casilla(14)).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("el selector del panel sigue el día pulsado", async () => {
+  it("el selector del panel sigue el día pulsado (con el título bien escrito: «Martes, 20 de octubre»)", async () => {
     montar();
     await mesPintado();
     fireEvent.click(casilla(20));
-    await waitFor(() => expect(screen.getByTestId("panel-dia")).toHaveTextContent(/20 De Octubre/i));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent(/^Martes, 20 de octubre$/));
   });
 });
 

@@ -380,22 +380,25 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
         </Card>
 
         {/* `grid-cols-1` explícito: sin él, por debajo de `lg` la columna es
-            `auto` y se ensancha hasta lo más ancho que lleve dentro (la tabla de
-            cuartos de hora del panel), con lo que la cuadrícula se salía de la
-            pantalla en el móvil. Con altura fija, desde `lg` la única fila ocupa
-            todo el alto que queda (`minmax(0,1fr)`) y ambas tarjetas lo llenan. */}
+            `auto` y se ensancha hasta lo más ancho que lleve dentro, con lo que la
+            cuadrícula se salía de la pantalla en el móvil (pasó con la antigua
+            tabla de cuartos de hora del panel). Con altura fija, desde `lg` la
+            única fila ocupa todo el alto que queda (`minmax(0,1fr)`) y ambas
+            tarjetas lo llenan.
+            Desde `lg`, 3/5 del ancho para el mes y 2/5 para el panel del día
+            (2026-10-06; antes 2/3 y 1/3): con 1/3 el panel se quedaba en 290-370 px
+            y no se leía en tablet. Con 2/5 gana un ~22 % y las casillas del mes
+            siguen por encima de 68 px de ancho (1024 px de ventana). */}
         <div
           className={cn(
-            "grid grid-cols-1 gap-4 lg:grid-cols-3",
+            "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]",
             medida ? "lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)]" : "sm:gap-6",
           )}
         >
           {/* Calendario. Apilado (< lg) con altura fija: cabecera + mes entero a la vista. */}
           <Card
-            className={cn(
-              "min-w-0 lg:col-span-2",
-              medida && "flex min-h-0 flex-col max-lg:h-[var(--alto-calendario)]",
-            )}
+            data-testid="tarjeta-mes"
+            className={cn("min-w-0", medida && "flex min-h-0 flex-col max-lg:h-[var(--alto-calendario)]")}
           >
             <CardContent className={cn("p-2 sm:p-4", medida && "flex min-h-0 flex-1 flex-col p-2 sm:p-3")}>
               {isError ? (
@@ -467,9 +470,10 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
             ref={panelDiaRef}
             className={cn("flex min-w-0 flex-col scroll-mt-4", medida ? "lg:min-h-0" : "lg:max-h-[620px]")}
           >
-            {/* `relative`: sin él, los hijos `position:absolute` del panel (el `caption sr-only` de
-                la rejilla por cuartos) se anclan al documento, escapan del `overflow-hidden` y
-                añaden unos píxeles de scroll de página bajo el calendario de altura fija. */}
+            {/* `relative`: sin él, los hijos `position:absolute` del panel (cualquier `sr-only`;
+                lo fue el `caption` de la antigua tabla por cuartos) se anclan al documento, escapan
+                del `overflow-hidden` y añaden unos píxeles de scroll de página bajo el calendario
+                de altura fija. */}
             <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-4">
               {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
                   sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}

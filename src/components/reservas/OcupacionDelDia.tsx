@@ -12,6 +12,9 @@
 // enseña y sus reservas antiguas se ignoran). Cada fila lleva el % escrito y una
 // barra: el color de la barra es el nivel (mismo azul que la casilla), pero
 // nunca va solo.
+//
+// Letra de 13-14 px y barra de 8 px (2026-10-06): el panel se gestiona también
+// desde una tablet y a 11-12 px no se leía (ver `DetalleDiaEspacios`).
 // ============================================================================
 
 import { cn } from "@/lib/utils";
@@ -28,7 +31,7 @@ function FilaTurno({ ocupacion }: { ocupacion: TurnoOcupacion }) {
 
   return (
     <div
-      className="flex items-center gap-2 text-xs"
+      className="flex items-center gap-2 text-sm"
       data-testid={`ocupacion-${ocupacion.turno}`}
       data-nivel={ocupacion.nivel}
       title={
@@ -37,8 +40,8 @@ function FilaTurno({ ocupacion }: { ocupacion: TurnoOcupacion }) {
           : `${Math.min(ocupacion.comensales, ocupacion.capacidad ?? 0)} de ${ocupacion.capacidad} comensales`
       }
     >
-      <span className="w-12 shrink-0 text-muted-foreground">{NOMBRE_TURNO[ocupacion.turno]}</span>
-      <span aria-hidden="true" className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+      <span className="w-16 shrink-0 text-muted-foreground">{NOMBRE_TURNO[ocupacion.turno]}</span>
+      <span aria-hidden="true" className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
         <span className={cn("block h-full rounded-full", estilo.relleno)} style={{ width: `${ancho}%` }} />
       </span>
       <span
@@ -64,7 +67,7 @@ export function OcupacionDelDia({
 }) {
   return (
     <div className="space-y-1" role="group" aria-label="Ocupación por turno" data-testid="ocupacion-del-dia">
-      {aforo !== null && <p className="text-[11px] text-muted-foreground">Aforo: {aforo} comensales por turno</p>}
+      {aforo !== null && <p className="text-[13px] text-muted-foreground">Aforo: {aforo} comensales por turno</p>}
       {TURNOS.map((turno) => (
         <FilaTurno key={turno} ocupacion={turnos[turno]} />
       ))}

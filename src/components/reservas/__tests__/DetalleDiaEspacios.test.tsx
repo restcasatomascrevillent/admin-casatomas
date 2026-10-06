@@ -92,9 +92,18 @@ vi.mock("@/integrations/supabase/client", () => {
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
 // La rejilla por cuartos (reservas-sin-salas) se prueba aparte; aquí solo se
-// comprueba que el panel del día la monta, una sola y para ese día.
+// comprueba que el panel del día la monta, una sola y para ese día, en baldosas
+// y con el turno del selector (el panel con la rejilla de verdad, en
+// `DetalleDiaEspacios.tactil.test.tsx`).
 vi.mock("@/components/reservas/DisponibilidadCuartos", () => ({
-  DisponibilidadCuartos: ({ fecha }: { fecha: string }) => <div data-testid="rejilla-cuartos" data-fecha={fecha} />,
+  DisponibilidadCuartos: ({ fecha, baldosas, turno }: { fecha: string; baldosas?: boolean; turno?: string | null }) => (
+    <div
+      data-testid="rejilla-cuartos"
+      data-fecha={fecha}
+      data-baldosas={String(!!baldosas)}
+      data-turno={turno ?? "todos"}
+    />
+  ),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // El calendario monta la suscripción realtime compartida; tiene sus tests (useReservasEnVivo.test.tsx).
@@ -123,6 +132,12 @@ const OTRO_DIA =
 // dependería de la hora a la que se pasaran los tests, y el punto de «sin sala»
 // de la cuadrícula saldría o no según cuándo se ejecutaran.
 const MEDIODIA = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate(), 12, 0, 0);
+
+/** El título del panel: «Martes, 6 de octubre» (solo la primera letra en mayúscula). */
+const tituloDia = (d: Date) => {
+  const t = format(d, "EEEE, d 'de' MMMM", { locale: es });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -265,13 +280,22 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     ).toBeInTheDocument();
     expect(tarjetaSala("Salón")).toBeInTheDocument();
     // Y la cabecera del panel lleva escrito el día que se está mirando. Se busca
-    // por ROL y NOMBRE COMPLETO (el <h4>, «viernes, 2 de octubre») y no con un
+    // por ROL y NOMBRE COMPLETO (el <h4>, «Viernes, 2 de octubre») y no con un
     // «N de » suelto sobre el texto de la pantalla: ese patrón también casa con
     // el resumen «2 de 5 con mesa» cuando hoy es día 2, y el test pasaba o
     // fallaba según el día del mes en que se ejecutara.
-    expect(
-      screen.getByRole("heading", { name: format(HOY, "EEEE, d 'de' MMMM", { locale: es }) }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: tituloDia(HOY) })).toBeInTheDocument();
+  });
+
+  it("el título del día lleva solo la PRIMERA letra en mayúscula («Martes, 6 de octubre», no «6 De Octubre»)", async () => {
+    montar();
+    await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
+    const titulo = screen.getByRole("heading", { level: 4 });
+    // El texto ya va bien escrito (no lo arregla un CSS que mayusculiza cada palabra).
+    expect(titulo).toHaveTextContent(new RegExp(`^${tituloDia(HOY)}$`));
+    expect(titulo.textContent?.charAt(0)).toBe(titulo.textContent?.charAt(0).toUpperCase());
+    expect(titulo.textContent).toMatch(/ de [a-zé]+$/);
+    expect(titulo).not.toHaveClass("capitalize");
   });
 
   it("marca la casilla de hoy como seleccionada en la cuadrícula", async () => {
@@ -380,8 +404,8 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
     // «35» en grande, con su palabra al lado…
     expect(comensales).toHaveClass("text-3xl");
     expect(comensales.parentElement).toHaveTextContent("35 comensales");
-    // …y el nº de reservas, en la línea pequeña de debajo.
-    expect(reservas.closest("p")).toHaveClass("text-xs");
+    // …y el nº de reservas, en la línea de debajo: más pequeña, pero a 14 px (se lee en una tablet).
+    expect(reservas.closest("p")).toHaveClass("text-sm");
     expect(reservas.closest("p")).not.toBe(comensales.parentElement);
   });
 
@@ -485,6 +509,22 @@ describe("DetalleDiaEspacios (panel del día del calendario)", () => {
         true,
       ),
     );
+  });
+
+  it("la rejilla por cuartos va en BALDOSAS y sigue al turno del selector (también al volver a «Todo el día»)", async () => {
+    montar();
+    await screen.findByRole("button", { name: "Abrir el plano de Comedor" });
+    const rejilla = () => screen.getByTestId("rejilla-cuartos");
+    expect(rejilla()).toHaveAttribute("data-baldosas", "true");
+    expect(rejilla()).toHaveAttribute("data-turno", "todos");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Cena" }));
+    expect(rejilla()).toHaveAttribute("data-turno", "cena");
+    fireEvent.click(screen.getByRole("radio", { name: "Comida" }));
+    expect(rejilla()).toHaveAttribute("data-turno", "comida");
+    // Pulsar el turno activo vuelve al día entero: la rejilla, también.
+    fireEvent.click(screen.getByRole("radio", { name: "Comida" }));
+    expect(rejilla()).toHaveAttribute("data-turno", "todos");
   });
 
   it("distingue un día vacío de un turno vacío", async () => {
