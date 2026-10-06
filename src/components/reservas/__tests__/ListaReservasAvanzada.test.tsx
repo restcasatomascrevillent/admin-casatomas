@@ -21,9 +21,8 @@
  * las solicitudes sigue siendo «Gestionar»). Se comprueba al final del fichero.
  *
  * Y lo que pidió el 2026-10-01 («este timeline ponlo en la lista también»): arriba
- * de la lista va «Cómo avanza una reserva», el mismo timeline de la pestaña Hoy,
- * pero con las cifras de LO QUE SE VE EN LA LISTA (sus filtros menos el de estado)
- * y con los estados pulsables como filtro. Se comprueba al final del fichero.
+ * de la lista va «Cómo avanza una reserva», con los estados pulsables como filtro;
+ * desde el 2026-10-06, en una fila fina y sin cifras. Se comprueba al final del fichero.
  *
  * Y la LECTURA POR LOTES (2026-10-01): PostgREST corta cada consulta a 1000 filas y la Lista pedía todas
  * las reservas de una vez, así que con 1.241 en la base de datos el histórico más antiguo desaparecía de la
@@ -39,8 +38,13 @@
  * la par con el desplegable. Se
  * comprueba en su propio describe, antes del de la lectura por lotes.
  *
- * Lo de "cero scroll horizontal" no se puede comprobar en jsdom (no calcula
- * diseño): eso se mide en el navegador con datos reales.
+ * Y lo que pidió el 2026-10-06 («perdemos mucho espacio vertical»): sin el recuento «N reservas ·
+ * M solicitudes», sin scroll de página (el bloque de la lista mide lo que queda de ventana y solo se
+ * desplazan las filas, que conservan su posición al refrescar y vuelven arriba al cambiar de filtro) y sin
+ * scroll horizontal en la tabla (reparto fijo de columnas). Se comprueba en su propio describe, al final.
+ *
+ * Que todo QUEPA de verdad no se puede medir en jsdom (no calcula diseño): aquí se comprueba la
+ * estructura que lo garantiza; las medidas se toman en el navegador.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, type MockInstance } from "vitest";
 import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
@@ -532,7 +536,7 @@ describe("ListaReservasAvanzada · reservas sin email", () => {
 // puede convertir sin querer en una reserva de Casa Tomás), y las de Casa Tomás se convierten sin negocio: el
 // alta escribe siempre la marca de Casa Tomás.
 describe("ListaReservasAvanzada · solicitudes: solo Casa Tomás", () => {
-  it("una solicitud de Touza no sale en la lista (ni en el contador)", async () => {
+  it("una solicitud de Touza no sale en la lista", async () => {
     const deTouza = { ...solicitud, id: "sol-tz", nombre: "Grupo Touza", marca: "touza" } as SolicitudPendiente;
     const { tabla } = await montar({
       solicitudesState: { ...estadoSolicitudes, solicitudes: [solicitud, deTouza] } as typeof estadoSolicitudes,
@@ -540,7 +544,8 @@ describe("ListaReservasAvanzada · solicitudes: solo Casa Tomás", () => {
 
     expect(within(tabla).getByText("Familia Ballester")).toBeInTheDocument();
     expect(screen.queryByText("Grupo Touza")).not.toBeInTheDocument();
-    expect(screen.getByText(/· 1 solicitud$/)).toBeInTheDocument();
+    // Una sola fila de solicitud: la de Casa Tomás.
+    expect(within(tabla).getAllByText(/^Solicitud ·/)).toHaveLength(1);
   });
 
   it("convertir una solicitud de Casa Tomás no pasa ningún negocio al alta", async () => {
@@ -1043,15 +1048,14 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
   });
 });
 
-// «Cómo avanza una reserva» también en la Lista (2026-10-01, petición del dueño). Es el timeline de la pestaña
-// Hoy (`TimelineEstadosReserva`) con otras cifras: las de lo que se ve en ESTA lista. Cuenta las reservas que
-// pasan los filtros de la lista —fecha, búsqueda y canal— y NO el de estado, para que al filtrar por uno los
-// demás sigan dando su cifra. No cuenta las solicitudes del bot (no son reservas) ni las reservas de Touza (no
-// admite reservas: `admiteReservas`, que tampoco las deja salir en la tabla), y no hace consultas propias: usa
-// las reservas que la lista ya tiene cargadas.
+// «Cómo avanza una reserva» también en la Lista (2026-10-01, petición del dueño): arriba de la lista, con los
+// estados pulsables como filtro (volver a pulsar el que está puesto lo quita). El 2026-10-06 el dueño pidió
+// «achatar más» y quitar los totales: ahora es UNA fila fina, SIN cifras y sin la frase debajo de cada estado
+// (va en el tooltip y en `aria-description`). No hace consultas propias. Touza no admite reservas
+// (`admiteReservas`): sus reservas no salen en la tabla.
 // Tiempo límite holgado (30 s) para todo el bloque: cada test monta la lista entera (tabla + tarjetas) y,
 // con la máquina cargada, alguno pasa de los 5 s por defecto sin que haya ningún problema.
-describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras de la lista", { timeout: 30_000 }, () => {
+describe("ListaReservasAvanzada · «Cómo avanza una reserva»: una fila, sin cifras, y sus estados filtran", { timeout: 30_000 }, () => {
   const CLAVE_ABIERTO = "reservas:timeline-estados:abierto";
   /** Orden del timeline: pendiente, verificada, confirmada, llegó, cancelada, no vino. */
   const ESTADOS_EN_ORDEN = ["pendiente", "verificada", "confirmada", "completada", "cancelada", "no_show"] as const;
@@ -1059,16 +1063,19 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
 
   const region = () => screen.getByRole("region", { name: /Cómo avanza una reserva/ });
   const nodos = () => within(region()).getAllByRole("listitem");
-  const cifras = () => nodos().map((li) => li.querySelector("[data-cifra]")?.getAttribute("data-cifra") ?? null);
   const pulsados = () => nodos().map((li) => within(li).getByRole("button").getAttribute("aria-pressed"));
-  const botonDeEstado = (nombre: string) => within(region()).getByRole("button", { name: new RegExp(`^${nombre}`) });
+  const botonDeEstado = (nombre: string) => within(region()).getByRole("button", { name: nombre });
+  /** El texto que se VE en un elemento (sin lo que solo oye el lector de pantalla). */
+  const textoVisible = (el: HTMLElement) => {
+    const copia = el.cloneNode(true) as HTMLElement;
+    copia.querySelectorAll(".sr-only").forEach((n) => n.remove());
+    return copia.textContent?.replace(/\s+/g, " ").trim() ?? "";
+  };
   /** Filas de la tabla con datos (sin la fila «No se encontraron reservas…», que ocupa las seis columnas). */
   const filasDeDatos = (tabla: HTMLElement) =>
     ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).filter((f) => !f.querySelector("td[colspan]"));
   const buscador = () => screen.getByRole("textbox", { name: "Buscar reservas y solicitudes" });
   const desplegableDeEstado = () => screen.getByRole("combobox", { name: "Filtrar por estado" });
-  /** Los desplegables de la lista que aquí se usan, en orden de pantalla: estado y canal. */
-  const desplegable = (i: 0 | 1) => screen.getAllByRole("combobox")[i];
   async function elegirOpcion(trigger: HTMLElement, opcion: string | RegExp) {
     fireEvent.click(trigger);
     fireEvent.click(await screen.findByRole("option", { name: opcion }));
@@ -1104,96 +1111,44 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     expect(region().compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("las cifras son las de la lista: reservas por estado (canceladas incluidas) y SIN las solicitudes del bot", async () => {
-    // El fixture trae 5 reservas (pendiente, verificada, 2 confirmadas, cancelada) y 1 solicitud del bot.
+  it("SIN cifras (2026-10-06): cada estado enseña solo su nombre y su botón se llama así, sin número", async () => {
+    // El fixture trae 5 reservas (pendiente, verificada, 2 confirmadas, cancelada) y 1 solicitud del bot: antes
+    // el timeline decía «1», «1», «2», «0», «1», «0».
     await montar();
 
-    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
-    expect(region()).toHaveTextContent("cifras de la lista");
-    expect(region()).not.toHaveTextContent("cifras de hoy");
+    expect(region().querySelectorAll("[data-cifra]")).toHaveLength(0);
+    nodos().forEach((li, i) => {
+      expect(textoVisible(li)).toBe(NOMBRES_EN_ORDEN[i]);
+      expect(within(li).getByRole("button")).toHaveAccessibleName(NOMBRES_EN_ORDEN[i]);
+    });
+    // Ni un número a la vista en toda la fila, ni el rótulo «cifras de la lista».
+    expect(textoVisible(region())).not.toMatch(/\d/);
+    expect(region()).not.toHaveTextContent(/cifras/);
   });
 
-  it("suman lo que dice el contador «N reservas» de los filtros (solicitudes aparte)", async () => {
+  it("UNA fila fina: sin frases debajo de los estados; la de cada uno va en su tooltip y en `aria-description`", async () => {
     await montar();
 
-    const contador = screen.getByText(/^5 reservas/);
-    expect(contador).toHaveTextContent("5 reservas · 1 solicitud");
-    expect(cifras().reduce((suma, n) => suma + Number(n), 0)).toBe(5);
+    expect(region()).toHaveClass("flex", "items-center");
+    expect(region().querySelectorAll("p")).toHaveLength(0);
+    expect(screen.queryByText("Solicitada por web o teléfono. Toca verificarla.")).toBeNull();
+    expect(botonDeEstado("Pendiente")).toHaveAttribute("aria-description", "Solicitada por web o teléfono. Toca verificarla.");
+    expect(botonDeEstado("Pendiente")).toHaveAttribute(
+      "title",
+      "Solicitada por web o teléfono. Toca verificarla.\nVer solo las reservas «Pendiente»",
+    );
   });
 
-  it("no hace ninguna consulta nueva: usa las reservas que la lista ya tiene cargadas", async () => {
+  it("no hace ninguna consulta propia: la única carga es la de la lista", async () => {
     await montar();
 
     // La única carga es la de la propia lista (`reservas-lista`).
     expect(supa.cargas).toHaveBeenCalledTimes(1);
   });
 
-  it("con la lista sin reservas pinta seis ceros (dato real) aunque haya solicitudes del bot", async () => {
-    supa.filas = [];
-    await montar();
-
-    expect(cifras()).toEqual(["0", "0", "0", "0", "0", "0"]);
-  });
-
-  it("las cifras siguen la búsqueda", async () => {
-    await montar();
-
-    // («Diana Cancelada» también lleva «ana»: por eso se busca el nombre entero.)
-    fireEvent.change(buscador(), { target: { value: "Ana Pendiente" } });
-    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
-
-    fireEvent.change(buscador(), { target: { value: "ana" } });
-    expect(cifras()).toEqual(["1", "0", "0", "0", "1", "0"]);
-    expect(region()).toHaveTextContent("cifras de la lista");
-  });
-
-  it("las cifras siguen el día elegido, y el rótulo lo dice", async () => {
-    supa.filas = [
-      reserva("hoy-1", "pendiente", "Hoy Pendiente"),
-      reserva("hoy-2", "confirmada", "Hoy Confirmada"),
-      { ...reserva("man-1", "pendiente", "Manana Pendiente"), fecha: MANANA },
-      { ...reserva("man-2", "cancelada", "Manana Cancelada"), fecha: MANANA },
-      { ...reserva("man-3", "cancelada", "Manana OtraCancelada"), fecha: MANANA },
-    ];
-    await montar();
-    expect(cifras()).toEqual(["2", "0", "1", "0", "2", "0"]);
-
-    // El atajo «Hoy» de los filtros.
-    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
-
-    expect(cifras()).toEqual(["1", "0", "1", "0", "0", "0"]);
-    expect(region()).toHaveTextContent("cifras de la lista de hoy");
-  });
-
-  it("también desde la URL: con el día de hoy ya elegido al abrir, las cifras son las de hoy", async () => {
-    supa.filas = [
-      reserva("hoy-1", "pendiente", "Hoy Pendiente"),
-      { ...reserva("man-1", "pendiente", "Manana Pendiente"), fecha: MANANA },
-    ];
-    await montar({ initialDateFilter: new Date() });
-
-    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
-    expect(region()).toHaveTextContent("cifras de la lista de hoy");
-  });
-
-  it("las cifras siguen el canal", async () => {
-    supa.filas = [
-      reserva("tel", "pendiente", "Por Telefono"),
-      { ...reserva("web-1", "verificada", "Por Web"), canal: "web" },
-      { ...reserva("web-2", "confirmada", "Tambien Web"), canal: "web" },
-    ];
-    await montar();
-    expect(cifras()).toEqual(["1", "1", "1", "0", "0", "0"]);
-
-    await elegirOpcion(desplegable(1), /Web/);
-
-    expect(cifras()).toEqual(["0", "1", "1", "0", "0", "0"]);
-  });
-
-  it("TOUZA NO ADMITE RESERVAS: las reservas de `marca = 'touza'` no cuentan en ninguna cifra ni salen en la tabla", async () => {
+  it("TOUZA NO ADMITE RESERVAS: las reservas de `marca = 'touza'` no salen en la tabla", async () => {
     // Decisión del dueño (2026-10-01; en los datos de demo hay 5 de Touza). La regla es la común,
-    // `admiteReservas`: lo comprueba aquí el resultado. Una reserva sin marca es de Casa Tomás y sí cuenta.
-    // Ya no hay filtro «Negocio» en la lista, así que filas, contador y cifras cuadran siempre.
+    // `admiteReservas`: lo comprueba aquí el resultado. Una reserva sin marca es de Casa Tomás y sí sale.
     supa.filas = [
       reserva("ct", "pendiente", "De Casa Tomas"),
       { ...reserva("sin-marca", "verificada", "Sin Marca"), marca: null },
@@ -1203,53 +1158,35 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     ];
     const { tabla } = await montar();
 
-    expect(cifras()).toEqual(["1", "1", "0", "0", "0", "0"]);
     expect(filasDeDatos(tabla).filter((f) => !f.textContent?.includes("Familia Ballester"))).toHaveLength(2);
     expect(screen.queryByText(/De Touza/)).not.toBeInTheDocument();
-    expect(screen.getByText(/^2 reservas/)).toBeInTheDocument();
+    // Ni siquiera filtrando por el estado de las de Touza.
+    fireEvent.click(botonDeEstado("Confirmada"));
+    expect(filasDeDatos(tabla)).toHaveLength(0);
     expect(screen.queryByRole("combobox", { name: "Filtrar por negocio" })).not.toBeInTheDocument();
   });
 
-  it("los filtros se combinan: día + búsqueda", async () => {
-    supa.filas = [
-      reserva("a", "pendiente", "Ana Hoy"),
-      reserva("b", "confirmada", "Berta Hoy"),
-      { ...reserva("c", "pendiente", "Ana Manana"), fecha: MANANA },
-    ];
-    await montar();
-
-    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
-    fireEvent.change(buscador(), { target: { value: "ana" } });
-
-    expect(cifras()).toEqual(["1", "0", "0", "0", "0", "0"]);
-  });
-
-  it("el filtro de estado NO cambia las cifras: filtrando por «Pendiente» la tabla enseña solo esa fila y los demás estados siguen dando la suya", async () => {
+  it("con «Pendiente» puesto desde la URL, la tabla enseña solo esa fila y ese paso sale pulsado", async () => {
     const { tabla } = await montar({ initialStatusFilter: "pendiente" });
 
     expect(filasDeDatos(tabla).map((f) => f.textContent)).toEqual([expect.stringContaining("Ana Pendiente")]);
-    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
-    // Y el rótulo avisa de que las cifras no son las de las filas visibles.
-    expect(region()).toHaveTextContent("cifras de la lista, sin el filtro de estado");
     expect(pulsados()).toEqual(["true", "false", "false", "false", "false", "false"]);
   });
 
-  it("lo mismo con el filtro de «Solicitudes sin resolver»: la tabla enseña solo la solicitud y las cifras de reservas se quedan", async () => {
+  it("con «Solicitudes sin resolver», la tabla enseña solo la solicitud y ningún paso sale pulsado", async () => {
     const { tabla } = await montar({ initialStatusFilter: "solicitudes" });
 
     expect(filasDeDatos(tabla)).toHaveLength(1);
-    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
     expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
   });
 
-  it("sin filtro de estado el rótulo no avisa de nada y ningún estado sale pulsado", async () => {
+  it("sin filtro de estado ningún paso sale pulsado", async () => {
     await montar();
 
-    expect(region()).not.toHaveTextContent("sin el filtro de estado");
     expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
   });
 
-  it("la cifra de cada estado es justo las filas que la lista enseña al pulsarlo", async () => {
+  it("pulsar cada estado enseña justo sus reservas, y solo ese queda pulsado", async () => {
     supa.filas = [
       reserva("p1", "pendiente", "Pe Uno"),
       reserva("p2", "pendiente", "Pe Dos"),
@@ -1262,15 +1199,16 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
       reserva("x2", "cancelada", "Ca Dos"),
     ];
     const { tabla } = await montar();
-    const antes = cifras();
-    expect(antes).toEqual(["3", "1", "2", "1", "2", "0"]);
+    // pendiente, verificada, confirmada, llegó, cancelada, no vino
+    const cuantas = [3, 1, 2, 1, 2, 0];
 
     for (const [i, estado] of ESTADOS_EN_ORDEN.entries()) {
       fireEvent.click(botonDeEstado(NOMBRES_EN_ORDEN[i]));
 
-      expect(filasDeDatos(tabla), estado).toHaveLength(Number(antes[i]));
-      // Pulsar un estado no cambia ninguna cifra, y solo ese queda pulsado.
-      expect(cifras(), estado).toEqual(antes);
+      expect(filasDeDatos(tabla), estado).toHaveLength(cuantas[i]);
+      for (const fila of filasDeDatos(tabla)) {
+        expect(fila.querySelectorAll("td")[5], estado).toHaveTextContent(NOMBRES_EN_ORDEN[i]);
+      }
       expect(pulsados(), estado).toEqual(SEIS_SIN_PULSAR.map((_, j) => (j === i ? "true" : "false")));
     }
   });
@@ -1315,7 +1253,6 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     expect(pulsados()).toEqual(SEIS_SIN_PULSAR);
     // Sin filtro, el desplegable dice el nombre del filtro (antes, «Todos»).
     expect(desplegableDeEstado().textContent?.trim()).toBe("Estado");
-    expect(region()).not.toHaveTextContent("sin el filtro de estado");
   });
 
   it("pulsar otro estado cambia el filtro (no suma): solo uno a la vez, como el desplegable", async () => {
@@ -1343,7 +1280,6 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     await elegirOpcion(desplegableDeEstado(), "Confirmada");
 
     expect(pulsados()).toEqual(["false", "false", "true", "false", "false", "false"]);
-    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
   });
 
   it("un estado sin reservas se puede pulsar: la lista dice que no hay ninguna y se deshace igual", async () => {
@@ -1374,18 +1310,6 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     // 3 filas: ya no hay paginación y se ven todas.
     expect(filasDeDatos(tabla)).toHaveLength(3);
     expect(screen.queryByText(/Página \d+ de/)).not.toBeInTheDocument();
-    expect(cifras()).toEqual(["52", "3", "0", "0", "0", "0"]);
-  });
-
-  it("al recargar la lista (p. ej. tras «Aceptar») las cifras se recalculan solas", async () => {
-    const { tabla } = await montar();
-    expect(cifras()).toEqual(["1", "1", "2", "0", "1", "0"]);
-    // Lo que dirá el servidor al recargar tras aceptar a Ana: ahora es «verificada».
-    supa.filas = supa.filas.map((f) => (f.id === "res-pendiente" ? { ...f, estado: "verificada" } : f));
-
-    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
-
-    await waitFor(() => expect(cifras()).toEqual(["0", "2", "2", "0", "1", "0"]));
   });
 
   it("se pliega, recuerda la elección y NO cambia lo que enseña la lista", async () => {
@@ -1402,25 +1326,22 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva» con las cifras d
     expect(filasDeDatos(tabla)).toHaveLength(6);
   });
 
-  it("COMPARTE la preferencia de plegado con la pestaña Hoy: si ahí se plegó, la Lista sale plegada", async () => {
-    // Lo mismo que deja escrito el timeline de Hoy al plegarse (misma clave: es el mismo componente).
+  it("si se plegó antes en este navegador, la Lista sale plegada (y la lista y sus filtros, a la vista)", async () => {
     window.localStorage.setItem(CLAVE_ABIERTO, "0");
     const { tabla } = await montar();
 
     expect(screen.getByRole("button", { name: /Cómo avanza una reserva/ })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("list", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
-    // La lista y sus filtros están a la vista, como siempre.
     expect(filasDeDatos(tabla)).toHaveLength(6);
     expect(buscador()).toBeInTheDocument();
   });
 
-  it("y al revés: lo que se pliega aquí lo recuerda el timeline de Hoy (misma clave, mismo valor)", async () => {
+  it("plegar y desplegar deja guardado «1» (abierto)", async () => {
     await montar();
 
     fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
     fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
 
-    // Plegar y desplegar dejan «1»: es lo que lee Hoy (`!== "0"` = abierto).
     expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("1");
   });
 
@@ -1450,10 +1371,9 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
   const clasesDe = (el: HTMLElement) => el.className.split(/\s+/);
   const botonPorAtender = () => screen.getByRole("button", { name: /^Por atender/ });
   const cifraDelBoton = () => botonPorAtender().querySelector("[data-cifra-por-atender]")?.textContent?.replace(/\D/g, "");
-  const contador = () => screen.getByText(/^\d+ reservas/);
   const buscador = () => screen.getByRole("textbox", { name: "Buscar reservas y solicitudes" });
   const timeline = () => screen.getByRole("region", { name: /Cómo avanza una reserva/ });
-  const pasoDelTimeline = (nombre: string) => within(timeline()).getByRole("button", { name: new RegExp(`^${nombre} `) });
+  const pasoDelTimeline = (nombre: string) => within(timeline()).getByRole("button", { name: nombre });
   const pulsadosDelTimeline = () => within(timeline()).queryAllByRole("button", { pressed: true });
   /** Los clientes de las filas de la tabla, en orden (sin la fila de «lista vacía»). */
   const clientes = (tabla: HTMLElement) =>
@@ -1585,9 +1505,9 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     );
   });
 
-  it("pulsado enseña SOLO las reservas pendientes y las solicitudes sin resolver (ningún otro estado, ninguna cerrada) y la insignia lo cuenta", async () => {
+  it("pulsado enseña SOLO las reservas pendientes y las solicitudes sin resolver (ningún otro estado, ninguna cerrada)", async () => {
     const { tabla } = await montar(conSolicitudes());
-    expect(contador()).toHaveTextContent("7 reservas · 2 solicitudes");
+    expect(clientes(tabla)).toHaveLength(9); // 7 reservas + 2 solicitudes sin resolver
 
     fireEvent.click(botonPorAtender());
 
@@ -1597,7 +1517,6 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     expect(clasesDe(botonPorAtender())).toContain("bg-primary");
     // Las solicitudes abiertas van primero (orden de la lista); luego las reservas, de la más reciente a la más antigua.
     expect(clientes(tabla)).toEqual(["Familia Ballester", "Grupo Contactado", "Pepa PendienteWeb", "Ana Pendiente"]);
-    expect(contador()).toHaveTextContent("2 reservas · 2 solicitudes");
     // La cifra del botón es justo lo que se ve.
     expect(cifraDelBoton()).toBe("4");
   });
@@ -1611,7 +1530,6 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     expect(botonPorAtender()).toHaveAttribute("aria-pressed", "false");
     expect(textoDe(desplegableEstado())).toBe("Estado");
     expect(clientes(tabla)).toHaveLength(9); // 7 reservas + 2 solicitudes sin resolver
-    expect(contador()).toHaveTextContent("7 reservas · 2 solicitudes");
   });
 
   it("el botón y el desplegable «Estado» van a la par, en los dos sentidos", async () => {
@@ -1708,7 +1626,6 @@ describe("ListaReservasAvanzada · los desplegables dicen qué filtran y el ataj
     expect(botonPorAtender()).toHaveAttribute("aria-pressed", "true");
     expect(clientes(tabla)).toEqual([]);
     expect(tabla).toHaveTextContent("No hay nada por atender: ninguna reserva pendiente ni solicitud sin resolver");
-    expect(contador()).toHaveTextContent(/^0 reservas$/);
   });
 
   it("con más filtros puestos, la lista vacía de «Por atender» lo dice («con los filtros aplicados»)", async () => {
@@ -1780,8 +1697,8 @@ describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
     // Las más antiguas (las que una consulta de 1.000 dejaba fuera) están: son las dos del día más lejano.
     const masAntigua = format(addDays(new Date(), -419), "yyyy-MM-dd");
     expect(enCache.filter((r) => r.fecha === masAntigua).map((r) => r.id).sort()).toEqual(["h-00419", "h-00839"]);
-    // Y la pantalla las cuenta todas (la solicitud del bot, aparte).
-    expect(screen.getByText(/^1241 reservas/)).toHaveTextContent("1241 reservas · 1 solicitud");
+    // Y la pantalla las cuenta todas: la paginación dice 1.242 filas (las 1.241 reservas y la solicitud del bot).
+    expect(screen.getByText(/^Mostrando/)).toHaveTextContent("Mostrando 1–50 de 1242");
   });
 
   it("la consulta pide dos lotes de la MISMA consulta: `select(\"*\")`, sin filtros, `fecha` desc, `hora` asc y `id`, el recuento solo en el primero", async () => {
@@ -1841,7 +1758,8 @@ describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(registro).toHaveBeenCalledWith(ERROR_REAL);
     expect(client.getQueryData(["reservas-lista"])).toBeUndefined();
-    expect(screen.queryByText(/^\d+ reservas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Mostrando/)).not.toBeInTheDocument();
+    expect(document.querySelector("table")).toBeNull();
   });
 
   // ── Lo que NO es un error de carga: no avisa ni registra ───────────────────
@@ -1940,7 +1858,7 @@ describe("ListaReservasAvanzada · lee todo el histórico por lotes", () => {
     const { client } = await montar({}, 1);
 
     expect(client.getQueryData<unknown[]>(["reservas-lista"])).toHaveLength(1241);
-    expect(screen.getByText(/^1241 reservas/)).toBeInTheDocument();
+    expect(screen.getByText(/^Mostrando/)).toHaveTextContent("de 1242");
     expect(supa.lecturas.peticiones).toHaveLength(4); // los 2 lotes del primer intento y los 2 del reintento
     expect(toast.error).not.toHaveBeenCalled();
     expect(registrosDeCarga()).toEqual([]);
@@ -1975,5 +1893,262 @@ describe("ListaReservasAvanzada · el Reservado (sala privada) está fuera de af
     const { tabla } = await montar();
 
     expect(within(tabla).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
+  });
+});
+
+// Lo que pidió el dueño el 2026-10-06 mirando la Lista a 1280×711 (150 % de zoom): «Perdemos mucho espacio
+// vertical… quita también lo de "1239 reservas · 2 solicitudes"… hay que hacer que NO haya scroll horizontal
+// dentro de la tabla de reservas… la página sigue teniendo scroll vertical: que no lo haya».
+//   · Sin el recuento de la barra de filtros (la cifra de «Por atender» sigue).
+//   · El bloque de la lista (barra de «N seleccionadas», tabla o tarjetas, paginación) mide lo que queda de
+//     ventana, como «Hoy» (`useAlturaDisponible`); lo de arriba queda fijo y solo se desplazan las filas, que
+//     conservan su posición al refrescar o al hacer algo y vuelven arriba al cambiar de filtro o de página.
+//   · Sin scroll horizontal: reparto FIJO de columnas; Cliente se queda con lo que sobra.
+// jsdom no calcula layout: las medidas se dan a mano (el bloque empieza en y = 200, dentro de un <main> con 24 px
+// de relleno abajo) y lo demás se comprueba por estructura, como en `PanelAsignacion.altura.test.tsx`. Que todo
+// quepa de verdad se mide en el navegador (capturas del 2026-10-06).
+describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin scroll de página ni horizontal", { timeout: 30_000 }, () => {
+  const original = { innerHeight: window.innerHeight };
+  function altoVentana(px: number) {
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: px });
+  }
+  /** El bloque de la lista empieza en y = 200; el resto de nodos, con tamaño pero arriba del todo. */
+  function conLayout(alto: number) {
+    altoVentana(alto);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const top = this.dataset.testid === "lista-bloque" ? 200 : 0;
+      return { top, bottom: top + 100, left: 0, right: 100, width: 100, height: 100, x: 0, y: top, toJSON: () => ({}) };
+    });
+  }
+  /** Como `montar`, pero dentro de un <main> con el relleno inferior del layout (24 px, `sm:p-6`). */
+  async function montarEnMain() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0, gcTime: 0 } } });
+    const vista = render(
+      <QueryClientProvider client={client}>
+        <main style={{ paddingBottom: 24 }}>
+          <ListaReservasAvanzada solicitudesState={estadoSolicitudes} />
+        </main>
+      </QueryClientProvider>,
+    );
+    const tabla = await waitFor(() => {
+      const t = vista.container.querySelector("table");
+      if (!t || !t.querySelector("tbody tr td")) throw new Error("tabla sin filas todavía");
+      return t;
+    });
+    return { ...vista, client, tabla };
+  }
+  const bloque = () => screen.getByTestId("lista-bloque");
+  /** El contenedor con scroll de las tarjetas (< 1024 px; en jsdom se pinta a la vez que la tabla). */
+  const tarjetas = () => bloque().querySelector<HTMLElement>(":scope > .lg\\:hidden")!;
+  const buscador = () => screen.getByRole("textbox", { name: "Buscar reservas y solicitudes" });
+
+  beforeAll(() => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+    window.HTMLElement.prototype.releasePointerCapture = vi.fn();
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+  });
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    altoVentana(original.innerHeight);
+    window.localStorage.clear();
+  });
+
+  // ── Lo que se quita ─────────────────────────────────────────────────────────
+
+  it("sin el recuento «N reservas · M solicitudes» en la barra de filtros; «Por atender» conserva su cifra", async () => {
+    await montar();
+
+    expect(screen.queryByText(/^\d+ reservas( · \d+ solicitud(es)?)?$/)).not.toBeInTheDocument();
+    // Lo que hay por atender sigue a la vista: 1 reserva pendiente + 1 solicitud sin resolver.
+    expect(screen.getByRole("button", { name: /^Por atender/ })).toHaveAccessibleName("Por atender 2 reservas y solicitudes");
+  });
+
+  // ── Sin scroll de página: el bloque de la lista mide lo que queda ──────────
+
+  it("el bloque de la lista mide justo lo que queda de ventana: alto visible − su posición − relleno inferior del <main>", async () => {
+    conLayout(800);
+    await montarEnMain();
+
+    // 800 − 200 − 24: termina en el borde inferior del <main>, sin scroll de página.
+    expect(bloque()).toHaveAttribute("data-altura-fija", "576");
+    expect(bloque().style.height).toBe("576px");
+    // Una columna con su alto propio (`flex-none`: con `flex-1`, Chrome ignoraría el `height`).
+    expect(bloque()).toHaveClass("flex", "flex-col", "flex-none");
+  });
+
+  it("lo de arriba (timeline y filtros) queda FUERA del bloque y no encoge; dentro, la tabla se queda con lo que sobra y desplaza sus filas por dentro", async () => {
+    conLayout(800);
+    const { tabla } = await montarEnMain();
+
+    const timeline = screen.getByRole("region", { name: /Cómo avanza una reserva/ });
+    const filtros = buscador().closest(".rounded-lg") as HTMLElement;
+    for (const fijo of [timeline, filtros]) {
+      expect(bloque()).not.toContainElement(fijo);
+      expect(fijo).toHaveClass("shrink-0");
+    }
+    // La tabla: su tarjeta crece hasta llenar el bloque y el contenedor de la tabla la llena y hace scroll.
+    const scroller = tabla.parentElement as HTMLElement;
+    const contenido = scroller.parentElement as HTMLElement;
+    const tarjetaTabla = contenido.parentElement as HTMLElement;
+    expect(bloque()).toContainElement(tabla);
+    expect(tarjetaTabla).toHaveClass("flex-1", "min-h-0");
+    expect(contenido).toHaveClass("h-full", "[&>div]:h-full");
+    expect(scroller).toHaveClass("overflow-auto");
+    // La cabecera de columnas, pegada arriba dentro de ese scroll.
+    expect(tabla.querySelector("thead")).toHaveClass("sticky", "top-0");
+    // Las tarjetas (< 1024 px) también se desplazan por dentro, como el kanban de Hoy en el móvil.
+    expect(tarjetas()).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+  });
+
+  it("sin medida (jsdom, primer pintado) se queda como antes: sin alto fijo y con el tope de siempre en la tabla", async () => {
+    const { tabla } = await montar();
+
+    expect(bloque()).not.toHaveAttribute("data-altura-fija");
+    expect(bloque().style.height).toBe("");
+    expect(tabla.parentElement!.parentElement).toHaveClass("[&>div]:max-h-[calc(100vh-17rem)]");
+    expect(tarjetas()).not.toHaveClass("overflow-y-auto");
+  });
+
+  it("se recalcula al redimensionar la ventana y no baja del suelo de 280 px (entonces, y solo entonces, la página hace scroll)", async () => {
+    conLayout(800);
+    await montarEnMain();
+    expect(bloque()).toHaveAttribute("data-altura-fija", "576");
+
+    act(() => {
+      altoVentana(700);
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(bloque()).toHaveAttribute("data-altura-fija", "476");
+
+    act(() => {
+      altoVentana(420);
+      window.dispatchEvent(new Event("resize"));
+    });
+    // 420 − 200 − 24 = 196 < 280: se queda en el suelo.
+    expect(bloque()).toHaveAttribute("data-altura-fija", "280");
+  });
+
+  it("la barra de «N seleccionadas» va DENTRO del bloque, encima de la tabla y a su alto: al aparecer no mueve el bloque", async () => {
+    conLayout(800);
+    const { tabla } = await montarEnMain();
+
+    fireEvent.click(within(filaDe(tabla, "Ana Pendiente")).getByRole("checkbox"));
+
+    const barra = screen.getByRole("button", { name: "Quitar selección" }).closest(".rounded-lg") as HTMLElement;
+    expect(bloque()).toContainElement(barra);
+    expect(barra).toHaveClass("shrink-0");
+    expect(barra.compareDocumentPosition(tabla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(bloque()).toHaveAttribute("data-altura-fija", "576");
+  });
+
+  // ── Sin scroll horizontal ───────────────────────────────────────────────────
+
+  it("la tabla es de reparto FIJO al ancho de su contenedor: cada columna con su ancho menos Cliente, que se queda lo que sobra", async () => {
+    const { tabla } = await montar();
+
+    expect(tabla).toHaveClass("table-fixed", "w-full");
+    expect([...tabla.classList].some((c) => c.startsWith("min-w"))).toBe(false);
+    const conAncho = [...tabla.querySelectorAll("thead th")].map((th) => [...th.classList].some((c) => /^w-\[/.test(c)));
+    // Acciones, Fecha, Cliente (sin ancho), Pax, Canal, Estado.
+    expect(conAncho).toEqual([true, true, false, true, true, true]);
+    // Lo largo de Cliente se recorta con «…» y va entero en el `title`.
+    const fila = filaDe(tabla, "Ana Pendiente");
+    expect(within(fila).getByText("Ana Pendiente")).toHaveClass("truncate");
+    expect(within(fila).getByText("Ana Pendiente")).toHaveAttribute("title", "Ana Pendiente");
+    expect(within(fila).getByText("+34 600 111 222")).toHaveClass("truncate");
+    // Con nombre accesible: el título que había encima de la lista se quitó.
+    expect(tabla).toHaveAccessibleName("Reservas y solicitudes");
+  });
+
+  it("la acción principal mide lo mismo en todas las filas también con dedo (la columna de acciones cuenta con ese ancho)", async () => {
+    const { tabla } = await montar();
+
+    const principales = ([...tabla.querySelectorAll("tbody tr")] as HTMLElement[]).map((f) => botonesDeFila(f)[0]);
+    expect(principales.map((b) => b.textContent?.trim())).toEqual(
+      expect.arrayContaining(["Aceptar", "Confirmar", "Convertir"]),
+    );
+    for (const b of principales) {
+      expect(b).toHaveClass("w-[76px]", "xl:w-[88px]", "pointer-coarse:w-[6.25rem]", "pointer-coarse:px-2");
+      expect(b).not.toHaveClass("pointer-coarse:w-auto");
+    }
+  });
+
+  // ── La posición de las filas ────────────────────────────────────────────────
+
+  it("al refrescar los datos (otra lectura de `reservas-lista`, con algo nuevo) las filas conservan su posición", async () => {
+    const { tabla, client } = await montar();
+    const scroller = tabla.parentElement as HTMLElement;
+    scroller.scrollTop = 300;
+    tarjetas().scrollTop = 120;
+    // Mientras tanto, otro dispositivo ha dado de alta una reserva: la relectura trae datos DISTINTOS (con los
+    // mismos, TanStack Query conservaría la misma lista y no se probaría nada).
+    supa.filas = [...supa.filas, reserva("res-nueva", "confirmada", "Zoe Nueva")];
+
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ["reservas-lista"] });
+    });
+    await waitFor(() => expect(within(tabla).getByText("Zoe Nueva")).toBeInTheDocument());
+
+    // El mismo contenedor (no se ha vuelto a montar) y en el mismo sitio.
+    expect(supa.cargas).toHaveBeenCalledTimes(2);
+    expect(tabla.parentElement).toBe(scroller);
+    expect(scroller.scrollTop).toBe(300);
+    expect(tarjetas().scrollTop).toBe(120);
+  });
+
+  it("al hacer algo en una fila («Aceptar»: parche al instante y relectura) tampoco se mueven", async () => {
+    const { tabla } = await montar();
+    const scroller = tabla.parentElement as HTMLElement;
+    scroller.scrollTop = 300;
+
+    fireEvent.click(botonesDeFila(filaDe(tabla, "Ana Pendiente"))[0]);
+    await waitFor(() => expect(supa.update).toHaveBeenCalledWith({ estado: "verificada" }));
+    await waitFor(() => expect(supa.cargas.mock.calls.length).toBeGreaterThanOrEqual(2));
+
+    expect(scroller.scrollTop).toBe(300);
+  });
+
+  it("al cambiar de filtro (búsqueda, «Por atender», un estado del timeline, «Hoy») vuelven arriba, en la tabla y en las tarjetas", async () => {
+    const { tabla } = await montar();
+    const scroller = tabla.parentElement as HTMLElement;
+    const bajar = () => {
+      scroller.scrollTop = 300;
+      tarjetas().scrollTop = 200;
+    };
+    const arriba = () => [scroller.scrollTop, tarjetas().scrollTop];
+
+    bajar();
+    fireEvent.change(buscador(), { target: { value: "a" } });
+    expect(arriba()).toEqual([0, 0]);
+
+    bajar();
+    fireEvent.click(screen.getByRole("button", { name: /^Por atender/ }));
+    expect(arriba()).toEqual([0, 0]);
+
+    bajar();
+    fireEvent.click(within(screen.getByRole("region", { name: /Cómo avanza una reserva/ })).getByRole("button", { name: "Confirmada" }));
+    expect(arriba()).toEqual([0, 0]);
+
+    bajar();
+    fireEvent.click(screen.getByRole("button", { name: "Hoy" }));
+    expect(arriba()).toEqual([0, 0]);
+  });
+
+  // Pesado a propósito (50 filas por página, en tabla y en tarjetas).
+  it("al cambiar de página también vuelven arriba", async () => {
+    supa.filas = Array.from({ length: 55 }, (_, i) => reserva(`p-${i}`, "pendiente", `Pen ${String(i).padStart(2, "0")}`));
+    const { tabla } = await montar();
+    const scroller = tabla.parentElement as HTMLElement;
+    scroller.scrollTop = 900;
+    tarjetas().scrollTop = 700;
+
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(screen.getByText(/Página 2 de 2/)).toBeInTheDocument();
+    expect([scroller.scrollTop, tarjetas().scrollTop]).toEqual([0, 0]);
   });
 });

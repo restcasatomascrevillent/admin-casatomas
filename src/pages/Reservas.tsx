@@ -320,13 +320,18 @@ export default function Reservas() {
             muestre. Las solicitudes del bot sin resolver (insignia roja)
             siguen viviendo aquí, mezcladas como filas "Solicitud". */}
         <TabsContent value="reservas" className="mt-6">
-          <section ref={listaRef} aria-labelledby="titulo-todas-reservas" className="space-y-3 scroll-mt-4">
-            <div>
-              <h3 id="titulo-todas-reservas" className="text-lg sm:text-xl font-semibold">Todas las reservas y solicitudes</h3>
-              <p className="text-muted-foreground text-xs sm:text-sm">
-                Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
-              </p>
-            </div>
+          {/* Sin título ni subtítulo (2026-10-06, petición del dueño: «perdemos mucho espacio vertical»):
+              la pestaña «Lista» ya dice dónde estás. La región conserva su nombre para el lector de pantalla
+              y la explicación, como descripción (no ocupa alto). */}
+          <section
+            ref={listaRef}
+            aria-label="Todas las reservas y solicitudes"
+            aria-describedby="descripcion-todas-reservas"
+            className="scroll-mt-4"
+          >
+            <p id="descripcion-todas-reservas" className="sr-only">
+              Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
+            </p>
             <ListaReservasAvanzada
               // `key`: si llega otro filtro por URL estando ya en la página
               // (p. ej. desde la campana), la lista se reinicia con él.

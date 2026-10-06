@@ -6,7 +6,7 @@ import {
   normalizarMarca,
   salaAdmiteReservas,
 } from "@/lib/reservas/negocios";
-import { cifrasDeLaLista } from "@/lib/reservas/cifrasPorEstado";
+import { cifraPorAtender } from "@/lib/reservas/cifrasPorEstado";
 import { aforoCasaTomas, resumirDia, resumirMes } from "@/lib/reservas/ocupacionCalendario";
 import { calcularCuadres, calcularCuadreTotal } from "@/lib/reservas/aforoMesas";
 import { resumirOcupacion } from "@/lib/reservas/resumenOcupacion";
@@ -112,7 +112,7 @@ const TOUZA = [
 const TODAS = [...CASA_TOMAS, ...TOUZA];
 
 describe("Touza se ignora en los recuentos (misma regla en todas las pantallas)", () => {
-  it("Lista: ni sus reservas ni sus solicitudes llegan a ser filas; el «N reservas» es el de Casa Tomás", () => {
+  it("Lista: ni sus reservas ni sus solicitudes llegan a ser filas", () => {
     const solicitudes = [
       { id: "s-ct", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "casa_tomas", motivo_rechazo: "grupo_grande" },
       { id: "s-tz", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "touza", motivo_rechazo: "grupo_grande" },
@@ -139,9 +139,16 @@ describe("Touza se ignora en los recuentos (misma regla en todas las pantallas)"
     expect(contarSolicitudesPendientes(cerradas)).toBe(0);
   });
 
-  it("Timeline de la Lista: las cifras por estado son las de Casa Tomás", () => {
-    expect(cifrasDeLaLista(TODAS, {})).toEqual(cifrasDeLaLista(CASA_TOMAS, {}));
-    expect(cifrasDeLaLista(TODAS, {})).toMatchObject({ confirmada: 2, pendiente: 1, verificada: 0 });
+  // (Hasta el 2026-10-06 aquí se comprobaban las cifras por estado del timeline de la Lista, retiradas ese día.)
+  it("Botón «Por atender» de la Lista: solo cuenta lo de Casa Tomás", () => {
+    // La pendiente de Casa Tomás (ct3) sí; la de Touza (tz-pasada), no.
+    expect(cifraPorAtender(TODAS, [], {})).toBe(cifraPorAtender(CASA_TOMAS, [], {}));
+    expect(cifraPorAtender(TODAS, [], {})).toBe(1);
+    const solicitudes = [
+      { id: "s-ct", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "casa_tomas", motivo_rechazo: "grupo_grande" },
+      { id: "s-tz", estado: "pendiente", fecha_solicitada: HOY, hora_solicitada: "21:00", marca: "touza", motivo_rechazo: "grupo_grande" },
+    ] as unknown as SolicitudPendiente[];
+    expect(cifraPorAtender(TODAS, solicitudes, {})).toBe(2);
   });
 
   it("Calendario: comensales, reservas y % del día solo de Casa Tomás; un día con solo Touza sale vacío", () => {

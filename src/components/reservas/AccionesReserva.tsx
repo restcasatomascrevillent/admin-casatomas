@@ -155,9 +155,12 @@ function AccionIcono({
 // los iconos de al lado caerían en una X distinta según la fila. Si algún día
 // apareciera scroll horizontal a 1024 px, esto (o el hueco entre ranuras) es lo
 // primero que se aprieta; "Confirmar" es la etiqueta más larga y ya va justa.
-// En táctil el botón sube a 44 px y `ui/button` le pone `px-4`: 76 px ya no dejaban sitio a
-// «Confirmar», que se salía por los lados. Ahí manda el contenido (con un mínimo).
-const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px] pointer-coarse:w-auto pointer-coarse:min-w-[5.5rem]";
+// En táctil el botón sube a 44 px de alto y el texto a 14 px: 76 px ya no dejaban sitio a «Confirmar».
+// Ahí va a 100 px FIJOS con relleno de 8 px (en vez del `px-4` de `ui/button`): cabe «Confirmar» con su
+// icono (97 px medidos) y los iconos de al lado vuelven a caer en la misma X en todas las filas (con el
+// ancho del texto, de 100 a 113 px, bailaban). La columna de acciones de la Lista, con reparto fijo,
+// cuenta con estos 100 px (`ANCHO_ACCIONES` en ListaReservasAvanzada.tsx).
+const ANCHO_PRINCIPAL = "w-[76px] xl:w-[88px] pointer-coarse:w-[6.25rem] pointer-coarse:px-2";
 
 /**
  * Acción PRINCIPAL de la fila: la única con texto, para que se distinga de un

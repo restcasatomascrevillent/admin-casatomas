@@ -133,8 +133,8 @@ const normalizarHora = (hora: string | null | undefined) =>
 /**
  * Junta reservas y solicitudes en una sola lista ordenada. Lo que no es de Casa
  * Tomás (`admiteReservas`: Touza ya no admite reservas) se queda FUERA aquí, en el
- * único punto de entrada de la lista: las filas, el contador «N reservas» y las
- * cifras del timeline (`cifrasDeLaLista`) salen todos de este resultado.
+ * único punto de entrada de la lista: las filas y la cifra del botón «Por
+ * atender» (`cifraPorAtender`) salen de este resultado.
  */
 export function unificarReservasYSolicitudes<R extends ReservaListable>(
   reservas: readonly R[],

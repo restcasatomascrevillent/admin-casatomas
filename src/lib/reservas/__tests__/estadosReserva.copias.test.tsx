@@ -56,11 +56,15 @@ describe("contra TimelineEstadosReserva (nombre, frase, burbuja e icono)", () =>
     }
   });
 
+  // Desde el 2026-10-06 la frase ya no se pinta debajo del estado: va en el tooltip del nombre (y, con los
+  // estados pulsables de la Lista, en `aria-description`; ver TimelineEstadosReserva.test.tsx).
   it("cada nodo lleva la frase del mapa, precedida de su «cuando» en las dos salidas", () => {
     for (const li of montar()) {
       const estado = li.getAttribute("data-estado") as EstadoReserva;
       const { cuando, descripcion } = ESTADOS_RESERVA[estado];
-      expect(normalizar(li.querySelector("p")?.textContent), estado).toBe(normalizar([cuando, descripcion].filter(Boolean).join(" ")));
+      expect(normalizar(li.querySelector("[title]")?.getAttribute("title")), estado).toBe(
+        normalizar([cuando, descripcion].filter(Boolean).join(" ")),
+      );
     }
   });
 

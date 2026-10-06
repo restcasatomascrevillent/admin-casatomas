@@ -6,6 +6,8 @@
  *
  * (04/10/2026: «Hoy» ya no recibe callbacks de edición ni de asignación —se retiró la franja
  * «Pendientes de mesa»; el kanban lleva su propio editor—, así que `VistaHoy` se monta sin props.)
+ *
+ * (06/10/2026: la pestaña Lista ya no lleva título ni subtítulo; su región conserva nombre y descripción.)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -131,5 +133,37 @@ describe("Reservas (página) · el alta manual sigue igual", () => {
     for (const [props] of h.formulario.mock.calls as Array<[{ datosPreseleccionados: { fecha: Date } }]>) {
       expect(props.datosPreseleccionados).toBe(alAbrir.datosPreseleccionados);
     }
+  });
+});
+
+// 2026-10-06, petición del dueño («Perdemos mucho espacio vertical… quita el título de "Todas las reservas" y la
+// parte de "Historial completo"»): la pestaña Lista ya no lleva título ni subtítulo encima de la lista. La región
+// conserva su nombre para el lector de pantalla y la explicación, como descripción que no ocupa alto.
+describe("Reservas (página) · la pestaña Lista sin título ni subtítulo", () => {
+  async function abrirLista() {
+    montar();
+    const pestana = screen.getByRole("tab", { name: /^Lista/ });
+    fireEvent.mouseDown(pestana);
+    fireEvent.click(pestana);
+    return screen.findByRole("region", { name: "Todas las reservas y solicitudes" });
+  }
+
+  it("no hay título «Todas las reservas y solicitudes» ni subtítulo «Historial completo…» a la vista", async () => {
+    const region = await abrirLista();
+
+    expect(screen.queryByRole("heading", { name: /Todas las reservas/ })).not.toBeInTheDocument();
+    expect(region.querySelector("h1, h2, h3, h4")).toBeNull();
+    // La explicación solo existe para el lector de pantalla: `sr-only`, sin alto.
+    const explicacion = screen.getByText(/^Historial completo, de cualquier fecha/);
+    expect(explicacion).toHaveClass("sr-only");
+  });
+
+  it("la región sigue teniendo nombre y descripción para el lector de pantalla", async () => {
+    const region = await abrirLista();
+
+    expect(region).toHaveAccessibleName("Todas las reservas y solicitudes");
+    expect(region).toHaveAccessibleDescription(
+      "Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.",
+    );
   });
 });
