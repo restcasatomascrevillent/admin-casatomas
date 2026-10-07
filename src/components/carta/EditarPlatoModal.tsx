@@ -18,6 +18,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -44,6 +45,7 @@ const formSchema = z.object({
   categoria: z.string().min(1, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   descripcion: z.string().optional(),
+  sin_gluten_disponible: z.boolean().default(false),
   ingredientes: z.string().optional(),
   unidad: z.string().optional(),
   alergenos_notas: z.string().optional(),
@@ -89,6 +91,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       categoria: "",
       precio_eur: 0,
       descripcion: "",
+      sin_gluten_disponible: false,
       ingredientes: "",
       unidad: "",
       alergenos_notas: "",
@@ -108,6 +111,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       categoria: plato.categoria ?? "",
       precio_eur: plato.precio_eur ?? 0,
       descripcion: plato.descripcion ?? "",
+      sin_gluten_disponible: plato.sin_gluten_disponible === true,
       ingredientes: plato.ingredientes ?? "",
       unidad: plato.unidad ?? "",
       alergenos_notas: plato.alergenos_notas ?? "",
@@ -243,6 +247,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion?.trim() || null,
+        sin_gluten_disponible: values.sin_gluten_disponible,
         ingredientes: values.ingredientes?.trim() || null,
         unidad: values.unidad?.trim() || null,
         alergenos_notas: values.alergenos_notas?.trim() || null,
@@ -502,6 +507,20 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
                 </div>
               )}
             </div>
+
+            <FormField
+              control={form.control}
+              name="sin_gluten_disponible"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
+                  </FormControl>
+                  <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

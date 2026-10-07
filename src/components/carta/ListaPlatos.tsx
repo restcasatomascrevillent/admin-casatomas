@@ -234,6 +234,12 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 )}
               </div>
 
+              {plato.sin_gluten_disponible === true && (
+                <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal">
+                  Se puede hacer sin gluten
+                </Badge>
+              )}
+
               {/* Mostrar alérgenos oficiales como badges */}
               {parseAlergenos(plato.alergenos_oficiales).length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-2 border-t">

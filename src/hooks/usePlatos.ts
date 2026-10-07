@@ -10,6 +10,7 @@ export interface Plato {
   categoria: string | null;
   precio_eur: number | null;
   descripcion: string | null;
+  sin_gluten_disponible?: boolean | null;
   ingredientes: string | null;
   unidad: string | null;
   alergenos_oficiales: any;
@@ -32,6 +33,7 @@ export interface NuevoPlato {
   categoria: string;
   precio_eur: number;
   descripcion?: string;
+  sin_gluten_disponible?: boolean;
   ingredientes?: string;
   unidad?: string;
   alergenos_oficiales?: any;
@@ -148,6 +150,7 @@ export function usePlatos() {
             categoria: nuevoPlato.categoria,
             precio_eur: nuevoPlato.precio_eur,
             descripcion: nuevoPlato.descripcion || null,
+            ...(nuevoPlato.sin_gluten_disponible === true ? { sin_gluten_disponible: true } : {}),
             ingredientes: nuevoPlato.ingredientes || null,
             unidad: nuevoPlato.unidad || null,
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
@@ -198,6 +201,12 @@ export function usePlatos() {
       // guardado de precio o de imagen_url/imagen_posicion_y (que reenvían
       // solo esa clave) nunca llame a la función de traducción.
       const anterior = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === id);
+
+      // Antes de aplicar la migración la columna no viene en select('*').
+      // Una edición normal con la casilla apagada sigue guardándose.
+      if (cambios.sin_gluten_disponible === false && anterior && anterior.sin_gluten_disponible === undefined) {
+        delete cambios.sin_gluten_disponible;
+      }
 
       // GUARDA: si no hay `anterior` (caché fría, invalidada, o el id aún no
       // se cargó), NO se puede rellenar con seguridad lo que falte en
