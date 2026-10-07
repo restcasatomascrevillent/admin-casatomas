@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck } from "lucide-react";
+import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, Ticket, HandCoins } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -158,11 +158,11 @@ export default function Cheques() {
     <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
       <Tabs value={pestana} onValueChange={setPestana} className="flex min-h-0 flex-1 flex-col gap-6">
         <TabsList className="flex w-full shrink-0 justify-start gap-1 overflow-x-auto h-auto rounded-xl p-1.5 bg-muted/60">
-          <TabsTrigger value="expedicion" className="min-h-11 shrink-0 whitespace-normal text-xs sm:text-sm rounded-lg">Expedición de tickets</TabsTrigger>
-          <TabsTrigger value="verificar" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
-          <TabsTrigger value="manual" className="min-h-11 shrink-0 text-xs sm:text-sm rounded-lg">Compra manual</TabsTrigger>
-          <TabsTrigger value="regalo" className="min-h-11 shrink-0 text-xs sm:text-sm rounded-lg"><Palette className="h-4 w-4 mr-2" />Correo y PDF</TabsTrigger>
-          <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
+          <TabsTrigger value="expedicion" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg"><Ticket aria-hidden="true" className="h-4 w-4 shrink-0" />Expedición de tickets</TabsTrigger>
+          <TabsTrigger value="verificar" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search aria-hidden="true" className="h-4 w-4 shrink-0" />Verificar cheque</TabsTrigger>
+          <TabsTrigger value="manual" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><HandCoins aria-hidden="true" className="h-4 w-4 shrink-0" />Compra manual</TabsTrigger>
+          <TabsTrigger value="regalo" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><Palette aria-hidden="true" className="h-4 w-4 shrink-0" />Correo y PDF</TabsTrigger>
+          <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText aria-hidden="true" className="h-4 w-4 shrink-0" />Plantilla de factura</TabsTrigger>
         </TabsList>
         <TabsContent value="expedicion" className={`${CONTENIDO_PESTANA} flex flex-col`}><ListaTickets /></TabsContent>
         <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
