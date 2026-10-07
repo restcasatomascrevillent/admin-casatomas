@@ -48,7 +48,6 @@ const formSchema = z.object({
   sin_gluten_disponible: z.boolean().default(false),
   ingredientes: z.string().optional(),
   unidad: z.string().optional(),
-  alergenos_notas: z.string().optional(),
 });
 
 /**
@@ -94,7 +93,6 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       sin_gluten_disponible: false,
       ingredientes: "",
       unidad: "",
-      alergenos_notas: "",
     },
   });
 
@@ -114,7 +112,6 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       sin_gluten_disponible: plato.sin_gluten_disponible === true,
       ingredientes: plato.ingredientes ?? "",
       unidad: plato.unidad ?? "",
-      alergenos_notas: plato.alergenos_notas ?? "",
     });
 
     setAlergenosSeleccionados(oficiales);
@@ -250,7 +247,6 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
         sin_gluten_disponible: values.sin_gluten_disponible,
         ingredientes: values.ingredientes?.trim() || null,
         unidad: values.unidad?.trim() || null,
-        alergenos_notas: values.alergenos_notas?.trim() || null,
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
       });
@@ -517,25 +513,6 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
                     <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
                   </FormControl>
                   <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="alergenos_notas"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notas adicionales</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ej: Puede contener trazas de..."
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

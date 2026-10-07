@@ -4,9 +4,9 @@ import { cn } from "@/lib/utils";
 
 interface VisibilidadTogglesProps {
   restaurante: boolean;
-  touza: boolean;
+  touza?: boolean;
   onRestauranteChange: (checked: boolean) => void;
-  onTouzaChange: (checked: boolean) => void;
+  onTouzaChange?: (checked: boolean) => void;
   isPending?: boolean;
   compact?: boolean;
   /**
@@ -20,7 +20,7 @@ interface VisibilidadTogglesProps {
 
 export function VisibilidadToggles({
   restaurante,
-  touza,
+  touza = false,
   onRestauranteChange,
   onTouzaChange,
   isPending = false,
@@ -51,18 +51,20 @@ export function VisibilidadToggles({
             )}
           />
         </label>
-        <label className="flex min-h-11 cursor-pointer items-center gap-2">
-          <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
-          <Switch
-            checked={touza}
-            onCheckedChange={onTouzaChange}
-            disabled={isPending}
-            className={cn(
-              "data-[state=checked]:bg-purple-600"
-            )}
-          />
-        </label>
+        {onTouzaChange && (
+          <label className="flex min-h-11 cursor-pointer items-center gap-2">
+            <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+            <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
+            <Switch
+              checked={touza}
+              onCheckedChange={onTouzaChange}
+              disabled={isPending}
+              className={cn(
+                "data-[state=checked]:bg-purple-600"
+              )}
+            />
+          </label>
+        )}
       </div>
 
       {/*
