@@ -136,6 +136,25 @@ describe("SincronizacionResend", () => {
     expect(invoke).toHaveBeenCalledWith("newsletter-sync-resend", { body: { accion: "estado" } });
   });
 
+  it("la explicación de la tarjeta ya no ocupa alto: se lee abriendo la ayuda «i» del título; el estado y el botón comparten fila", async () => {
+    invoke.mockResolvedValueOnce({ data: estado(), error: null });
+    envolver(<SincronizacionResend />);
+    expect(await screen.findByText(/Envío actual: Por lista de envío/)).toBeInTheDocument();
+
+    // Antes era una descripción fija de 2-3 líneas bajo el título: ahora solo está tras el (i).
+    const TEXTO_AYUDA = /Es la copia de los suscriptores activos que usa el servicio de envío/;
+    expect(screen.queryByText(TEXTO_AYUDA)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Qué es la lista de envío" }));
+    expect(await screen.findByText(TEXTO_AYUDA)).toBeInTheDocument();
+
+    // La última actualización y el botón de sincronizar siguen a la vista y van en una misma fila desde `sm`
+    // (jsdom no calcula alturas: se comprueba el contrato de la rejilla, que es lo que hace que quepa a 1280x711).
+    const boton = screen.getByRole("button", { name: /Actualizar lista de envío/ });
+    const contenido = boton.parentElement as HTMLElement;
+    expect(contenido).toContainElement(screen.getByText(/Última actualización/));
+    expect(contenido.className).toMatch(/sm:grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  });
+
   it("avisa al 80 % y al 100 % del límite", async () => {
     invoke.mockResolvedValueOnce({ data: estado({ contactos_resend: 850 }), error: null });
     const { unmount } = envolver(<SincronizacionResend />);

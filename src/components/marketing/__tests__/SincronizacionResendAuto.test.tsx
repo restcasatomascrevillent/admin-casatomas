@@ -294,6 +294,8 @@ describe("SincronizacionResend se actualiza sola al abrirse", () => {
   it("el texto ya no promete una actualización diaria", async () => {
     invoke.mockResolvedValue({ data: estado(pasada({ destinatarios: 2 })), error: null });
     envolver(<SincronizacionResend activos={2} />);
+    // La explicación vive tras el (i) del título (antes era una descripción fija que ocupaba alto).
+    fireEvent.click(await screen.findByRole("button", { name: "Qué es la lista de envío" }));
     expect(await screen.findByText(/Se actualiza sola al abrir esta pestaña y\s+justo antes de cada envío\./)).toBeInTheDocument();
     expect(screen.queryByText(/cada día/)).not.toBeInTheDocument();
   });

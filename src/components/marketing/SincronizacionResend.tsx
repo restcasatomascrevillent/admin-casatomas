@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,6 +39,11 @@ import { MENSAJE_NO_DISPONIBLE, formatoNumero, plural } from "@/lib/newsletter/t
 // Controles táctiles de ≥ 44 px (h-11), como el resto del panel en tablet.
 
 const COLOR_BARRA = { ok: "bg-emerald-500", aviso: "bg-amber-500", lleno: "bg-destructive" } as const;
+
+// Explicación de la tarjeta. Antes era una descripción fija bajo el título (2-3 líneas); va tras el (i) del título
+// para que la pestaña Suscriptores quepa sin scroll en pantallas bajas (1280x711 al 150 %, tablet apaisada).
+const TEXTO_AYUDA =
+  "Es la copia de los suscriptores activos que usa el servicio de envío. La lista de esta página es la que manda: se añaden los activos y se quitan los que se dan de baja. Se actualiza sola al abrir esta pestaña y justo antes de cada envío.";
 
 function hace(fecha: string | null | undefined): string {
   if (!fecha) return "";
@@ -131,15 +137,12 @@ export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}
           <Badge variant={estado.canal === "broadcast" ? "default" : "secondary"} className="font-normal">
             Envío actual: {textoCanal(estado.canal)}
           </Badge>
+          <AyudaPopover etiqueta="Qué es la lista de envío">{TEXTO_AYUDA}</AyudaPopover>
         </CardTitle>
-        <CardDescription>
-          Es la copia de los suscriptores activos que usa el servicio de envío. La lista de esta página es la que
-          manda: se añaden los activos y se quitan los que se dan de baja. Se actualiza sola al abrir esta pestaña y
-          justo antes de cada envío.
-        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
+      {/* Desde `sm` el estado de la última actualización y el botón van en la misma fila (una sola columna debajo). */}
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="sm:col-span-2">
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
             <span className="text-muted-foreground">Contactos:</span>
             <span className="font-semibold tabular-nums whitespace-nowrap">
