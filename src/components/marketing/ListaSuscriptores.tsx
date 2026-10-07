@@ -35,17 +35,20 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
   }
 
   return (
-    <Tabs defaultValue="activos">
-      <TabsList className="grid w-full grid-cols-2">
+    // Sin alto fijo: llena el hueco que le deja la tarjeta (GestionCorreos) y el scroll es el de la propia
+    // lista. `data-[state=inactive]:hidden`: Radix deja la pestaña inactiva con el atributo `hidden` y un
+    // `flex` le gana.
+    <Tabs defaultValue="activos" className="flex min-h-0 flex-1 flex-col">
+      <TabsList className="grid w-full shrink-0 grid-cols-2">
         <TabsTrigger value="activos">Activos ({activos.length})</TabsTrigger>
         <TabsTrigger value="bajas">Dados de baja ({bajas.length})</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="activos">
+      <TabsContent value="activos" className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
         {activos.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">Todavía no hay suscriptores activos.</p>
         ) : (
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="min-h-0 flex-1">
             <ul className="space-y-2">
               {activos.map((s) => (
                 <li key={s.id} className="p-2 rounded-md bg-muted/50 min-w-0">
@@ -61,15 +64,15 @@ export function ListaSuscriptores({ activos, bajas, isLoading }: ListaSuscriptor
         )}
       </TabsContent>
 
-      <TabsContent value="bajas">
-        <p className="text-xs text-muted-foreground mb-2">
+      <TabsContent value="bajas" className="flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+        <p className="text-xs text-muted-foreground mb-2 shrink-0">
           No reciben ninguna newsletter. No se pueden volver a activar desde aquí: solo vuelven a recibirla si se
           apuntan de nuevo al reservar en la web y confirman su reserva desde el email.
         </p>
         {bajas.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-8">Todavía nadie se ha dado de baja.</p>
         ) : (
-          <ScrollArea className="h-[300px]">
+          <ScrollArea className="min-h-0 flex-1">
             <ul className="space-y-2">
               {bajas.map((s) => (
                 <li

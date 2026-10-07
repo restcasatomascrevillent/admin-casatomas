@@ -63,7 +63,7 @@ Fuentes oficiales (consultadas el 2026-10-03):
 - `supabase/functions/enviar-newsletter/index.ts`: usa lo anterior; comprueba el `error` de Resend (y reintenta una vez si es 429); etiquetas `categoria=newsletter` + `suscriptor=<id>`; excluye `direcciones_email_suprimidas`; límite transaccional; remitente configurable; 502 si no sale ninguno.
 - `supabase/functions/resend-webhook/newsletter.ts` (nuevo, puro) + `index.ts`: queja/rebote/supresión/`contact.updated` → baja vía `newsletter_registrar_baja()`; archiva los eventos sin `email_id` con un id sintético.
 - `supabase/migrations/20261003171500_newsletter_baja_automatica.sql` (**NO APLICADA**) + rollback + `supabase/tests/newsletter_baja_automatica_test.sql`.
-- Panel: `GestionCorreos.tsx` (aviso "la baja es automática", contadores), `ListaSuscriptores.tsx` (nuevo: pestañas Activos / Dados de baja con fecha y motivo, sin botón de reactivar), `PreviewNewsletter.tsx` (usa la misma plantilla que el envío; muestra el pie), hooks `useNewsletterSuscriptores` (activos + bajas, refresco cada 60 s) y `useEnviarNewsletter` (muestra el motivo real del error), `src/lib/newsletter/bajas.ts`.
+- Panel: `GestionCorreos.tsx` (contadores; el aviso "la baja es automática" se quitó el 2026-10-06 a petición del dueño), `ListaSuscriptores.tsx` (nuevo: pestañas Activos / Dados de baja con fecha y motivo, sin botón de reactivar), `PreviewNewsletter.tsx` (usa la misma plantilla que el envío; muestra el pie), hooks `useNewsletterSuscriptores` (activos + bajas, refresco cada 60 s) y `useEnviarNewsletter` (muestra el motivo real del error), `src/lib/newsletter/bajas.ts`.
 
 ## 5. Pasos del dueño para desplegar la fase 1
 
