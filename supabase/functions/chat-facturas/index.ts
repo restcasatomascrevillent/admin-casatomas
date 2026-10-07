@@ -4,6 +4,7 @@ import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
   esErrorCorregible,
   marcarResultado,
+  necesitaRespaldoSemantico,
   prepararLlamada,
   recortar,
   systemPrompt,
@@ -153,6 +154,14 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
       const r = await supabase.rpc(ll.rpc, ll.params);
       if (r.error) throw r.error;
       data = r.data;
+      // compras_producto: si el texto no casa con nada, UNA segunda llamada
+      // con el embedding (solo sugerencias). Se paga solo en ese caso.
+      if (ll.respaldoSemantico && necesitaRespaldoSemantico(data)) {
+        const embedding = await embedConsulta(ll.respaldoSemantico.consulta, ctx);
+        const r2 = await supabase.rpc(ll.rpc, { ...ll.params, [ll.respaldoSemantico.param]: embedding });
+        if (r2.error) throw r2.error;
+        data = r2.data;
+      }
     } else {
       if (ll.textoPrimero) {
         const t = await supabase.rpc(ll.textoPrimero.rpc, ll.textoPrimero.params);
