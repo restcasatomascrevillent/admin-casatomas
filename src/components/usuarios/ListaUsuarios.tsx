@@ -45,12 +45,6 @@ import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
-const ROLE_LABELS: Record<AppRole, { label: string; color: string }> = {
-  admin: { label: "Administrador", color: "bg-red-500" },
-  manager: { label: "Manager", color: "bg-blue-500" },
-  staff: { label: "Staff", color: "bg-gray-500" },
-};
-
 interface ListaUsuariosProps {
   /** Solo en el área de Super Admin: permite gestionar el acceso de super
    * admin de otros usuarios y actuar (contraseña) sobre usuarios admin, que
@@ -144,7 +138,8 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     if (selectedPresetId !== "manual") {
       const selectedPreset = presets.find((preset) => preset.id === selectedPresetId);
       if (selectedPreset) {
-        await updateUserRole(selectedUser.id, selectedPreset.base_role);
+        const actualizado = await updateUserRole(selectedUser.id, selectedPreset.base_role);
+        if (!actualizado) return;
       }
     }
     closePermissionsDialog();
@@ -294,15 +289,16 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
         </TableHeader>
         <TableBody>
           {users.map((user) => {
-            const roleInfo = user.role ? ROLE_LABELS[user.role] : null;
-            const accessCount = user.permissions.filter((p) => p.can_view).length;
-            const editCount = user.permissions.filter((p) => p.can_edit).length;
+            const permisosActuales = permisosParaEditar(user.permissions);
+            const matchingPreset = findMatchingPreset(user.role, permisosActuales);
+            const accessCount = permisosActuales.filter((p) => p.can_view).length;
+            const editCount = permisosActuales.filter((p) => p.can_edit).length;
 
             return (
               <TableRow key={user.id}>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    {user.role === "admin" ? (
+                    {user.is_super_admin ? (
                       <ShieldCheck className="h-4 w-4 text-red-500" />
                     ) : (
                       <User className="h-4 w-4 text-muted-foreground" />
@@ -314,10 +310,11 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {user.role === "admin" ? (
-                      <Badge className={roleInfo?.color}>{roleInfo?.label}</Badge>
-                    ) : (
-                      <Badge variant="outline">Acceso por permisos</Badge>
+                    {!user.is_super_admin && (
+                      <Badge variant="outline">{matchingPreset?.name ?? "Acceso por permisos"}</Badge>
+                    )}
+                    {user.role === "admin" && !user.is_super_admin && (
+                      <Badge variant="outline">Gestiona usuarios</Badge>
                     )}
                     {user.is_super_admin && (
                       <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
@@ -328,7 +325,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                   </div>
                 </TableCell>
                 <TableCell>
-                  {user.role === "admin" ? (
+                  {user.is_super_admin ? (
                     <span className="text-sm text-muted-foreground">Acceso completo</span>
                   ) : (
                     <div className="flex flex-wrap gap-2">

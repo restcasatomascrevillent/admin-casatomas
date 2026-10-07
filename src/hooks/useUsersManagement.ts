@@ -59,14 +59,14 @@ export function useUsersManagement() {
     return fallbackMessage;
   };
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (mostrarCarga = true) => {
     if (!isAdmin) {
       setUsers([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (mostrarCarga) setLoading(true);
     try {
       // Obtener usuarios desde auth.users mediante edge function
       const authUsersMap = new Map<
@@ -206,7 +206,7 @@ export function useUsersManagement() {
     void fetchUsers();
   }, [fetchUsers]);
 
-  const updateUserRole = async (userId: string, newRole: AppRole) => {
+  const updateUserRole = async (userId: string, newRole: AppRole): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from("user_roles")
@@ -215,10 +215,12 @@ export function useUsersManagement() {
       if (error) throw error;
 
       toast.success("Rol actualizado correctamente");
-      fetchUsers();
+      await fetchUsers(false);
+      return true;
     } catch (error) {
       console.error("Error updating role:", error);
       toast.error("Error al actualizar el rol");
+      return false;
     }
   };
 
@@ -306,7 +308,7 @@ export function useUsersManagement() {
       } else {
         // Pudo aplicarse antes de perder la respuesta: se relee la lista.
         toast.error("Puede que no se haya guardado: revisa cómo han quedado los permisos", { description });
-        fetchUsers();
+        await fetchUsers(false);
       }
       return false;
     }
@@ -339,12 +341,12 @@ export function useUsersManagement() {
       toast.error("No se han podido quitar algunos permisos: vuelve a guardar", {
         description: (error as { message?: string })?.message || undefined,
       });
-      fetchUsers();
+      await fetchUsers(false);
       return false;
     }
 
     toast.success("Permisos actualizados");
-    fetchUsers();
+    await fetchUsers(false);
     return true;
   };
 

@@ -129,6 +129,61 @@ async function abrirPermisosDelCamarero() {
 
 const interruptor = (dialogo: HTMLElement, nombre: string) => within(dialogo).getByRole("switch", { name: nombre });
 
+describe("ListaUsuarios · información de accesos actualizada", () => {
+  it("un admin con permisos limitados muestra sus secciones reales, sin acceso completo", async () => {
+    doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role = "admin";
+    render(<ListaUsuarios canManageSuperAdmins />);
+    const fila = (await screen.findByText("camarero1")).closest("tr")!;
+    expect(within(fila).queryByText("Administrador")).toBeNull();
+    expect(within(fila).queryByText("Acceso completo")).toBeNull();
+    expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
+    expect(within(fila).getByText("Gestiona usuarios")).toBeInTheDocument();
+    expect(within(fila).getByText("3 secciones")).toBeInTheDocument();
+    expect(within(fila).getByText("1 con edición")).toBeInTheDocument();
+  });
+
+  it("al cambiar los permisos actualiza los contadores y deja de mostrar el preset anterior", async () => {
+    h.presets = [preset("p-sala", "Sala", PERMISOS_CAMARERO)];
+    render(<ListaUsuarios />);
+    let fila = (await screen.findByText("camarero1")).closest("tr")!;
+    expect(within(fila).getByText("Sala")).toBeInTheDocument();
+    fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.click(interruptor(dialogo, "Ver Reservas"));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fila = screen.getByText("camarero1").closest("tr")!;
+    expect(within(fila).queryByText("Sala")).toBeNull();
+    expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
+    expect(within(fila).getByText("2 secciones")).toBeInTheDocument();
+    expect(within(fila).queryByText(/con edición/)).toBeNull();
+  });
+
+  it("al aplicar un preset a un admin relee el nuevo rol antes de cerrar el diálogo", async () => {
+    doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role = "admin";
+    h.presets = [preset("p-sala", "Sala", PERMISOS_CAMARERO)];
+    render(<ListaUsuarios canManageSuperAdmins />);
+    const fila = (await screen.findByText("camarero1")).closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    fireEvent.click(within(dialogo).getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "Sala" }));
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const actualizada = screen.getByText("camarero1").closest("tr")!;
+    expect(doble.filasDe("user_roles", CAMARERO)[0].role).toBe("staff");
+    expect(within(actualizada).getByText("Sala")).toBeInTheDocument();
+    expect(within(actualizada).queryByText("Gestiona usuarios")).toBeNull();
+  });
+
+  it("el acceso completo solo se muestra a los super admins", async () => {
+    render(<ListaUsuarios />);
+    const fila = (await screen.findByText("Dueño")).closest("tr")!;
+    expect(within(fila).getByText("Super Admin")).toBeInTheDocument();
+    expect(within(fila).getByText("Acceso completo")).toBeInTheDocument();
+  });
+});
+
 /**
  * Pulsa «Guardar Permisos», espera a que termine y devuelve cómo quedan los permisos del
  * camarero en la BD, sección a sección (sin fila = ni «Ver» ni «Puede editar»).

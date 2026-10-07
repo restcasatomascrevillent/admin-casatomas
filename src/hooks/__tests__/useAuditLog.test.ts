@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
-import { agruparEntradas, identificarActor, type AuditLogEntry } from "../useAuditLog";
+import { agruparEntradas, identificarActor, resumirCambios, type AuditLogEntry } from "../useAuditLog";
 
 const entry = (overrides: Partial<AuditLogEntry> = {}): AuditLogEntry => ({
   id: "event-1", created_at: "2026-10-07T10:00:00Z", actor_user_id: null,
@@ -9,6 +9,27 @@ const entry = (overrides: Partial<AuditLogEntry> = {}): AuditLogEntry => ({
 });
 
 describe("identidad de auditoría", () => {
+  it("explica un permiso nuevo como un cambio de acceso, sin inventar una fila anterior", () => {
+    expect(resumirCambios({
+      despues: { id: "new-row", user_id: "target", section_key: "reservas", can_view: true, can_edit: false },
+      permiso_antes: { user_id: "target", section_key: "reservas", can_view: false, can_edit: false },
+      permiso_despues: { user_id: "target", section_key: "reservas", can_view: true, can_edit: false },
+    })).toEqual([{ campo: "can_view", antes: false, despues: true }]);
+  });
+  it("explica retirar un permiso como pérdida de acceso", () => {
+    expect(resumirCambios({
+      antes: { id: "old-row", can_view: true, can_edit: true },
+      permiso_antes: { can_view: true, can_edit: true },
+      permiso_despues: { can_view: false, can_edit: false },
+    })).toEqual([
+      { campo: "can_view", antes: true, despues: false },
+      { campo: "can_edit", antes: true, despues: false },
+    ]);
+  });
+  it("mantiene el resumen de los cambios que no son permisos", () => {
+    expect(resumirCambios({ antes: { enabled: false, updated_at: "a" }, despues: { enabled: true, updated_at: "b" } }))
+      .toEqual([{ campo: "enabled", antes: false, despues: true }]);
+  });
   it("conserva el origen resuelto por el servidor", () => {
     expect(identificarActor(entry({ actor_label: "API · service_role · admin-create-user" })))
       .toBe("API · service_role · admin-create-user");
@@ -43,3 +64,4 @@ describe("identidad de auditoría", () => {
     ])).toHaveLength(2);
   });
 });
+

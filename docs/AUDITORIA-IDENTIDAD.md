@@ -70,3 +70,24 @@ sesiones sin UUID válido no pueden producir eventos.
 La restricción de tabla prohíbe nuevos registros `historico`. Esta nueva
 migración no requiere nuevos cambios de frontend ni de Edge Functions, pero
 las funciones de la primera migración deben estar desplegadas.
+
+## Cambios de permisos
+
+Aplicar después `20261007210000_audit_log_cambios_permisos.sql`. Conceder,
+modificar o retirar un acceso se registra como `actualizar`, aunque en SQL
+se inserte o se elimine una fila de `user_permissions`. Los detalles incluyen
+el estado efectivo anterior y posterior: una fila ausente equivale a no tener
+acceso. Se conservan también las instantáneas originales y la identidad del actor.
+
+Guardar permisos idénticos o actualizar únicamente marcas de tiempo no produce
+un evento. El alta real de otras entidades sigue siendo `crear`. La migración
+corrige la clasificación de los eventos de permisos existentes sin borrarlos
+ni cambiar su autor, fecha o identificador. La validación estricta de identidad
+de la migración anterior sigue vigente.
+
+La lista de usuarios muestra el preset que coincide con los permisos actuales,
+o «Acceso por permisos», y cuenta las secciones configurables con acceso y
+edición. Solo un super admin tiene «Acceso completo». El rol base admin conserva
+su capacidad de gestionar usuarios, indicada por separado. Al guardar se espera
+a releer los permisos y, si procede, el nuevo rol antes de cerrar el diálogo.
+

@@ -148,8 +148,10 @@ const CAMPOS_IGNORADOS_EN_DIFF = new Set(["updated_at", "created_at"]);
  */
 export function resumirCambios(detalles: Record<string, unknown> | null): CambioCampo[] {
   if (!detalles) return [];
-  const antes = detalles.antes as Record<string, unknown> | null | undefined;
-  const despues = detalles.despues as Record<string, unknown> | null | undefined;
+  // Conceder/retirar un permiso tiene un estado efectivo anterior y posterior
+  // aunque la fila SQL sea nueva o se haya borrado. Los snapshots se conservan.
+  const antes = (detalles.permiso_antes ?? detalles.antes) as Record<string, unknown> | null | undefined;
+  const despues = (detalles.permiso_despues ?? detalles.despues) as Record<string, unknown> | null | undefined;
   if (!antes || !despues) return [];
 
   const campos = new Set([...Object.keys(antes), ...Object.keys(despues)]);
@@ -204,4 +206,3 @@ export function identificarActor(entrada: AuditLogEntry): string {
   return entrada.actor_label?.trim() || entrada.actor_email?.trim()
     || (entrada.actor_user_id ? `Usuario · ${entrada.actor_user_id}` : `Registro histórico · ${entrada.id}`);
 }
-
