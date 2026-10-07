@@ -47,3 +47,26 @@ Pruebas del cliente y del ciclo de Auth:
 ```sh
 npm test -- src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/audit-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
 ```
+
+
+## Limpieza completa y rechazo de operaciones sin identidad
+
+La migración `20261007200000_audit_log_limpiar_y_exigir_identidad.sql` elimina
+**todos** los registros de `audit_log`, incluidos los históricos, por petición
+expresa del propietario. Se ejecuta después de la migración de identidad de
+las 19:00. El bloqueo de la tabla, la validación y el borrado forman una única
+transacción; el SQL final muestra los tres contadores de comprobación.
+
+A partir de esa migración se cancela la operación original si no hay un UUID
+de usuario existente, un proceso automático identificado por la conexión de
+servicio o una cuenta SQL directa. Los procesos service_role deben indicar
+`x-audit-source`; las tres funciones administrativas requieren además al
+usuario iniciador. GoTrue no puede sustituir al iniciador por su cuenta de
+sistema: el alta o la baja necesita el contexto que preparan las funciones ya
+actualizadas. Esto también bloquea las altas/bajas de Auth realizadas fuera
+del panel cuando no llevan contexto de auditoría. Las sesiones anónimas y las
+sesiones sin UUID válido no pueden producir eventos.
+
+La restricción de tabla prohíbe nuevos registros `historico`. Esta nueva
+migración no requiere nuevos cambios de frontend ni de Edge Functions, pero
+las funciones de la primera migración deben estar desplegadas.
