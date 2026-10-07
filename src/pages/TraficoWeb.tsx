@@ -22,8 +22,12 @@ import { FdtMes } from "@/components/trafico-web/FdtMes";
 import { TopPaginas } from "@/components/trafico-web/TopPaginas";
 import { Desgloses } from "@/components/trafico-web/Desgloses";
 import { EditorPesoPaginas } from "@/components/trafico-web/EditorPesoPaginas";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
 const ISO = "yyyy-MM-dd";
+
+/** Suelo (px) del alto de la página: por debajo deja de encoger y vuelve el scroll de página. */
+const ALTURA_MINIMA_TRAFICO = 360;
 
 function EstadoVacio() {
   return (
@@ -86,9 +90,18 @@ export default function TraficoWeb() {
 
   const sinDatos = serieQ.isSuccess && actual.diasConDato === 0 && anterior.diasConDato === 0;
 
+  // Alto de la pantalla (regla del dueño, 2026-10-07: sin scroll de página).
+  // Solución provisional de la auditoría para este informe (clase C): subtítulo,
+  // filtros y KPIs fijos arriba; avisos, gráfica, transferencia, anomalías y
+  // desgloses en una región con scroll propio. Sin medida (jsdom, primer
+  // pintado) cae al layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_TRAFICO);
+  const kpisListos = !serieQ.isError && !serieQ.isLoading && !sinDatos;
+
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
+      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
         {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa
             del menú lateral. Se conserva el subtítulo — no es relleno: dice de
             dónde salen los datos (Vercel Web Analytics) y que incluye una
@@ -103,41 +116,48 @@ export default function TraficoWeb() {
 
         <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
 
-        {serieQ.isError ? (
-          <EstadoErrorCarga titulo="las visitas" error={serieQ.error} onReintentar={() => serieQ.refetch()} />
-        ) : serieQ.isLoading ? (
-          <CargandoPagina />
-        ) : sinDatos ? (
-          <>
-            <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={0} />
-            <EstadoVacio />
-          </>
-        ) : (
-          <>
-            <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={actual.diasConDato} />
+        {/* KPIs fijos bajo los filtros. Mientras cargan, su esqueleto va en la región (CargandoPagina). */}
+        {kpisListos && <KpisTrafico actual={actual} anterior={anterior} tendencia={tendenciaQ.data} dias={dias} />}
 
-            {tendenciaQ.isError && (
-              <EstadoErrorCarga titulo="la tendencia" error={tendenciaQ.error} onReintentar={() => tendenciaQ.refetch()} />
-            )}
-            <KpisTrafico actual={actual} anterior={anterior} tendencia={tendenciaQ.data} dias={dias} />
+        {/* Región con scroll. Los avisos van aquí (y no fijos arriba) porque pueden
+            ser varios y dejarían sin sitio al resto. `min-h-48`: suelo de la región;
+            si lo fijo no deja sitio (móvil) vuelve el scroll de página. */}
+        <div className="min-h-48 flex-1 space-y-6 overflow-y-auto overscroll-contain">
+          {serieQ.isError ? (
+            <EstadoErrorCarga titulo="las visitas" error={serieQ.error} onReintentar={() => serieQ.refetch()} />
+          ) : serieQ.isLoading ? (
+            <CargandoPagina />
+          ) : sinDatos ? (
+            <>
+              <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={0} />
+              <EstadoVacio />
+            </>
+          ) : (
+            <>
+              <AvisosTrafico proyecto={proyecto} estados={syncQ.data} diasConDato={actual.diasConDato} />
 
-            <GraficoSerieVisitas serie={serieActual} tendencia={tendenciaQ.data} hoy={hoy} />
-
-            <div className="grid gap-6 xl:grid-cols-2">
-              {fdtQ.isError ? (
-                <EstadoErrorCarga titulo="la estimación de transferencia" error={fdtQ.error} onReintentar={() => fdtQ.refetch()} />
-              ) : fdtQ.isLoading ? (
-                <Skeleton className="h-[320px]" />
-              ) : (
-                <FdtMes filas={fdtQ.data ?? []} proyectoSeleccionado={proyecto === "ambos" ? null : proyecto} />
+              {tendenciaQ.isError && (
+                <EstadoErrorCarga titulo="la tendencia" error={tendenciaQ.error} onReintentar={() => tendenciaQ.refetch()} />
               )}
-              <TablaAnomalias serie={serieActual} />
-            </div>
 
-            <TopPaginas proyecto={proyecto} desde={desde} hasta={hasta} />
-            <Desgloses proyecto={proyecto} desde={desde} hasta={hasta} />
-          </>
-        )}
+              <GraficoSerieVisitas serie={serieActual} tendencia={tendenciaQ.data} hoy={hoy} />
+
+              <div className="grid gap-6 xl:grid-cols-2">
+                {fdtQ.isError ? (
+                  <EstadoErrorCarga titulo="la estimación de transferencia" error={fdtQ.error} onReintentar={() => fdtQ.refetch()} />
+                ) : fdtQ.isLoading ? (
+                  <Skeleton className="h-[320px]" />
+                ) : (
+                  <FdtMes filas={fdtQ.data ?? []} proyectoSeleccionado={proyecto === "ambos" ? null : proyecto} />
+                )}
+                <TablaAnomalias serie={serieActual} />
+              </div>
+
+              <TopPaginas proyecto={proyecto} desde={desde} hasta={hasta} />
+              <Desgloses proyecto={proyecto} desde={desde} hasta={hasta} />
+            </>
+          )}
+        </div>
       </div>
     </SuperAdminLayout>
   );

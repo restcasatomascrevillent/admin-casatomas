@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Bot, User, Check, X, SmilePlus, Meh, Frown } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface CallLog {
     id: string;
@@ -22,6 +23,11 @@ interface Props {
     calls?: CallLog[];
     isLoading?: boolean;
     onSelect?: (call: CallLog) => void;
+    /**
+     * Clases de la tarjeta. Si el llamador le limita el alto (p. ej. `flex-1` dentro de
+     * una columna con alto fijo), la cabecera queda fija y las filas hacen scroll por dentro.
+     */
+    className?: string;
 }
 
 function formatDuration(sec: number | null | undefined) {
@@ -99,16 +105,18 @@ function SentimentBadge({ sentiment }: { sentiment: string | null }) {
     );
 }
 
-export function TelefoniaRecentCallsTable({ calls, isLoading, onSelect }: Props) {
+export function TelefoniaRecentCallsTable({ calls, isLoading, onSelect, className }: Props) {
     return (
-        <Card>
-            <CardHeader>
+        <Card className={cn("flex flex-col", className)}>
+            <CardHeader className="shrink-0">
                 <CardTitle>Llamadas recientes</CardTitle>
                 <CardDescription>
                     Actualizado en tiempo real. Pulsa una fila para ver el detalle.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="p-0 sm:p-6">
+            {/* `min-h-0 flex-1 overflow-y-auto`: sin alto limitado crece con las filas,
+                como siempre; con alto limitado las filas hacen scroll aquí dentro. */}
+            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-0 sm:p-6">
                 {isLoading ? (
                     <div className="space-y-2 p-4">
                         {Array.from({ length: 6 }).map((_, i) => (

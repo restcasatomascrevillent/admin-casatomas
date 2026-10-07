@@ -47,6 +47,32 @@ import type { CallLogFilters, DateRange, PresetRange } from "@/components/telefo
 // que se integren. Los nombres son fijos por contrato.)
 import { useCallLogs } from "@/hooks/useCallLogs";
 import { useCallLogsAnalytics } from "@/hooks/useCallLogsAnalytics";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+// ── Alto de pantalla ────────────────────────────────────────────────────────
+// La página mide el alto de la pantalla (regla del dueño, 2026-10-07: sin
+// scroll de página): el interruptor de modo y las pestañas quedan fijos arriba
+// y el contenido largo hace scroll por dentro. Mismo patrón que Marketing.tsx.
+
+/** Suelo (px) del alto de la página: por debajo deja de encoger y vuelve el scroll de página. */
+const ALTURA_MINIMA_ASISTENTE = 360;
+
+/**
+ * Pestaña que hace scroll entera (Alertas, Configuración). `data-[state=inactive]:hidden`
+ * imprescindible (como en Marketing/Facturas): Radix deja montado el contenedor de las
+ * pestañas inactivas con el atributo `hidden`, y una clase que fije `display` le gana.
+ */
+const PESTANA_CON_SCROLL = "mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+
+/** Pestaña con una parte fija arriba (filtros, KPIs) y una región con scroll debajo (Resumen, Llamadas). */
+const PESTANA_EN_COLUMNA = "mt-6 min-h-0 flex-1 flex-col data-[state=active]:flex data-[state=inactive]:hidden";
+
+/**
+ * Región con scroll bajo una parte fija. `min-h-48` es su suelo: si lo fijo no deja sitio
+ * (móvil, teclado abierto) la región no baja de 192 px y vuelve el scroll de página, en vez
+ * de quedarse a 0 px, invisible.
+ */
+const REGION_CON_SCROLL = "min-h-48 flex-1 overflow-y-auto overscroll-contain";
 
 // ── Config fetcher ──────────────────────────────────────────────────────────
 async function getPhoneConfig() {
@@ -159,6 +185,11 @@ function defaultRange(): DateRange {
 
 export default function AsistenteTelefonico() {
     const queryClient = useQueryClient();
+
+    // Alto disponible bajo la cabecera del layout (useAlturaDisponible). Sin
+    // medida (jsdom, primer pintado) cae al layout de siempre, con scroll de página.
+    const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+    const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_ASISTENTE);
 
     // ── Estado del dashboard ────────────────────────────────────────────────
     const [range, setRange] = useState<DateRange>(defaultRange());
@@ -360,7 +391,7 @@ export default function AsistenteTelefonico() {
 
     return (
         <SuperAdminLayout>
-            <div className="space-y-6">
+            <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
                 {/* Sin título de página (2026-09-25): la pestaña "Asistente
                     Tel." activa en el menú lateral ya dice dónde estás. Se
                     conserva el interruptor de modo (Bot IA / Humano), que es
@@ -369,8 +400,9 @@ export default function AsistenteTelefonico() {
                     {modeBadge}
                 </div>
 
-                <Tabs defaultValue="resumen" className="w-full">
-                    <TabsList className="w-full sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
+                <Tabs defaultValue="resumen" className="flex min-h-0 w-full flex-1 flex-col">
+                    {/* `self-start`: en columna flex la barra se estiraría a todo el ancho. */}
+                    <TabsList className="w-full shrink-0 self-start sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
                         <TabsTrigger value="resumen" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
                             <BarChart3 className="h-4 w-4" /> Resumen
                         </TabsTrigger>
@@ -386,7 +418,9 @@ export default function AsistenteTelefonico() {
                     </TabsList>
 
                     {/* ═══════════ RESUMEN ═══════════ */}
-                    <TabsContent value="resumen" className="space-y-6 mt-6">
+                    {/* Solución provisional (cuadro de mando, clase C de la auditoría de
+                        scroll): periodo y KPIs fijos; las gráficas hacen scroll por dentro. */}
+                    <TabsContent value="resumen" className={`${PESTANA_EN_COLUMNA} gap-6`}>
                         <div className="flex justify-end">
                             <TelefoniaDateRangePicker
                                 value={range}
@@ -397,18 +431,21 @@ export default function AsistenteTelefonico() {
 
                         <TelefoniaKpiCards analytics={analytics} isLoading={isLoadingAnalytics} />
 
-                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-                            <TelefoniaIntentChart data={analytics?.byIntent} isLoading={isLoadingAnalytics} />
-                            <TelefoniaSentimentChart data={analytics?.bySentiment} isLoading={isLoadingAnalytics} />
-                            <TelefoniaEndedReasonChart data={analytics?.byEndedReason} isLoading={isLoadingAnalytics} />
-                            <TelefoniaMotivoFalloChart data={analytics?.byMotivoFallo} isLoading={isLoadingAnalytics} />
-                        </div>
+                        <div className={`${REGION_CON_SCROLL} space-y-6`}>
+                            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                                <TelefoniaIntentChart data={analytics?.byIntent} isLoading={isLoadingAnalytics} />
+                                <TelefoniaSentimentChart data={analytics?.bySentiment} isLoading={isLoadingAnalytics} />
+                                <TelefoniaEndedReasonChart data={analytics?.byEndedReason} isLoading={isLoadingAnalytics} />
+                                <TelefoniaMotivoFalloChart data={analytics?.byMotivoFallo} isLoading={isLoadingAnalytics} />
+                            </div>
 
-                        <TelefoniaCallsTimeline data={analytics?.callsPerDay} isLoading={isLoadingAnalytics} />
+                            <TelefoniaCallsTimeline data={analytics?.callsPerDay} isLoading={isLoadingAnalytics} />
+                        </div>
                     </TabsContent>
 
                     {/* ═══════════ LLAMADAS ═══════════ */}
-                    <TabsContent value="llamadas" className="space-y-4 mt-6">
+                    {/* Filtros fijos arriba; la tabla de llamadas hace scroll por dentro. */}
+                    <TabsContent value="llamadas" className={`${PESTANA_EN_COLUMNA} gap-4`}>
                         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                             <TelefoniaFilters value={filters} onChange={setFilters} />
                             <TelefoniaDateRangePicker
@@ -422,11 +459,12 @@ export default function AsistenteTelefonico() {
                             calls={calls}
                             isLoading={isLoadingCalls}
                             onSelect={setSelectedCall}
+                            className="min-h-48 flex-1"
                         />
                     </TabsContent>
 
                     {/* ═══════════ ALERTAS ═══════════ */}
-                    <TabsContent value="alertas" className="space-y-4 mt-6">
+                    <TabsContent value="alertas" className={`${PESTANA_CON_SCROLL} space-y-4`}>
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -481,7 +519,8 @@ export default function AsistenteTelefonico() {
                     </TabsContent>
 
                     {/* ═══════════ CONFIGURACIÓN ═══════════ */}
-                    <TabsContent value="configuracion" className="space-y-6 mt-6">
+                    {/* Formulario largo: la pestaña entera hace scroll por dentro. */}
+                    <TabsContent value="configuracion" className={`${PESTANA_CON_SCROLL} space-y-6`}>
                         {/* Horario programado */}
                         <Card>
                             <CardHeader>

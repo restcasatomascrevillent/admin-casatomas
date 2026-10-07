@@ -34,8 +34,12 @@ import { DesglosePorFuncion } from "@/components/costes/DesglosePorFuncion";
 import { DesglosePorModelo } from "@/components/costes/DesglosePorModelo";
 import { EstimacionInicial } from "@/components/costes/EstimacionInicial";
 import { CostesFijos } from "@/components/costes/CostesFijos";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
 const ISO = "yyyy-MM-dd";
+
+/** Suelo (px) del alto de la página: por debajo deja de encoger y vuelve el scroll de página. */
+const ALTURA_MINIMA_COSTES = 360;
 
 interface FiltrosCostesProps {
   dias: RangoDias;
@@ -152,9 +156,18 @@ export default function Costes() {
     [funcionesQ.data],
   );
 
+  // Alto de la pantalla (regla del dueño, 2026-10-07: sin scroll de página).
+  // Solución provisional de la auditoría para este informe (clase C): subtítulo,
+  // filtros y KPIs fijos arriba; avisos, gráfica, desgloses y costes fijos en
+  // una región con scroll propio. Sin medida (jsdom, primer pintado) cae al
+  // layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_COSTES);
+  const kpisListos = !serieQ.isError && !serieQ.isLoading;
+
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
+      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
         {/* Sin título "Costes del sistema": ya lo dice la pestaña activa del menú
             lateral. El subtítulo sí se queda, porque dice algo que nadie
             adivinaría solo por el nombre: de dónde sale cada mitad del número y
@@ -173,73 +186,80 @@ export default function Costes() {
           funciones={opcionesFuncion}
         />
 
-        <AvisosCostes
-          sinRegistro={sinRegistroQ.data}
-          modelos={porModeloQ.data}
-          fijos={fijosQ.data}
-          fijosSinVerificarRpc={mesQ.data?.fijos_sin_verificar ?? null}
-        />
+        {/* KPIs fijos bajo los filtros. Mientras cargan, su esqueleto va en la región (CargandoPagina). */}
+        {kpisListos && <KpisCostes resumen={resumen} mes={mesQ.data} dias={dias} />}
 
-        {serieQ.isError ? (
-          <EstadoErrorCarga titulo="el coste de IA" error={serieQ.error} onReintentar={() => serieQ.refetch()} />
-        ) : serieQ.isLoading ? (
-          <CargandoPagina />
-        ) : (
-          <>
-            {mesQ.isError && (
-              <EstadoErrorCarga titulo="el resumen del mes" error={mesQ.error} onReintentar={() => mesQ.refetch()} />
-            )}
-            <KpisCostes resumen={resumen} mes={mesQ.data} dias={dias} />
-
-            {sinDatos ? <EstadoVacio /> : <GraficoSerieCoste serie={serieQ.data ?? []} />}
-
-            <ProyeccionMes mes={mesQ.data} />
-
-            {porFuncionQ.isError ? (
-              <EstadoErrorCarga
-                titulo="el desglose por función"
-                error={porFuncionQ.error}
-                onReintentar={() => porFuncionQ.refetch()}
-              />
-            ) : porFuncionQ.isLoading ? (
-              <Skeleton className="h-[260px]" />
-            ) : (
-              <DesglosePorFuncion filas={porFuncionQ.data ?? []} />
-            )}
-
-            {porModeloQ.isError ? (
-              <EstadoErrorCarga
-                titulo="el desglose por modelo"
-                error={porModeloQ.error}
-                onReintentar={() => porModeloQ.refetch()}
-              />
-            ) : porModeloQ.isLoading ? (
-              <Skeleton className="h-[260px]" />
-            ) : (
-              <DesglosePorModelo filas={porModeloQ.data ?? []} />
-            )}
-          </>
-        )}
-
-        {estimadoQ.isError ? (
-          <EstadoErrorCarga
-            titulo="la estimación inicial"
-            error={estimadoQ.error}
-            onReintentar={() => estimadoQ.refetch()}
+        {/* Región con scroll. Los avisos van aquí (y no fijos arriba) porque pueden
+            ser varios párrafos y dejarían sin sitio al resto. `min-h-48`: suelo de la
+            región; si lo fijo no deja sitio (móvil) vuelve el scroll de página. */}
+        <div className="min-h-48 flex-1 space-y-6 overflow-y-auto overscroll-contain">
+          <AvisosCostes
+            sinRegistro={sinRegistroQ.data}
+            modelos={porModeloQ.data}
+            fijos={fijosQ.data}
+            fijosSinVerificarRpc={mesQ.data?.fijos_sin_verificar ?? null}
           />
-        ) : estimadoQ.isLoading ? (
-          <Skeleton className="h-[220px]" />
-        ) : (
-          <EstimacionInicial filas={estimadoQ.data ?? []} />
-        )}
 
-        {fijosQ.isError ? (
-          <EstadoErrorCarga titulo="los costes fijos" error={fijosQ.error} onReintentar={() => fijosQ.refetch()} />
-        ) : fijosQ.isLoading ? (
-          <Skeleton className="h-[260px]" />
-        ) : (
-          <CostesFijos filas={fijosQ.data ?? []} />
-        )}
+          {serieQ.isError ? (
+            <EstadoErrorCarga titulo="el coste de IA" error={serieQ.error} onReintentar={() => serieQ.refetch()} />
+          ) : serieQ.isLoading ? (
+            <CargandoPagina />
+          ) : (
+            <>
+              {mesQ.isError && (
+                <EstadoErrorCarga titulo="el resumen del mes" error={mesQ.error} onReintentar={() => mesQ.refetch()} />
+              )}
+
+              {sinDatos ? <EstadoVacio /> : <GraficoSerieCoste serie={serieQ.data ?? []} />}
+
+              <ProyeccionMes mes={mesQ.data} />
+
+              {porFuncionQ.isError ? (
+                <EstadoErrorCarga
+                  titulo="el desglose por función"
+                  error={porFuncionQ.error}
+                  onReintentar={() => porFuncionQ.refetch()}
+                />
+              ) : porFuncionQ.isLoading ? (
+                <Skeleton className="h-[260px]" />
+              ) : (
+                <DesglosePorFuncion filas={porFuncionQ.data ?? []} />
+              )}
+
+              {porModeloQ.isError ? (
+                <EstadoErrorCarga
+                  titulo="el desglose por modelo"
+                  error={porModeloQ.error}
+                  onReintentar={() => porModeloQ.refetch()}
+                />
+              ) : porModeloQ.isLoading ? (
+                <Skeleton className="h-[260px]" />
+              ) : (
+                <DesglosePorModelo filas={porModeloQ.data ?? []} />
+              )}
+            </>
+          )}
+
+          {estimadoQ.isError ? (
+            <EstadoErrorCarga
+              titulo="la estimación inicial"
+              error={estimadoQ.error}
+              onReintentar={() => estimadoQ.refetch()}
+            />
+          ) : estimadoQ.isLoading ? (
+            <Skeleton className="h-[220px]" />
+          ) : (
+            <EstimacionInicial filas={estimadoQ.data ?? []} />
+          )}
+
+          {fijosQ.isError ? (
+            <EstadoErrorCarga titulo="los costes fijos" error={fijosQ.error} onReintentar={() => fijosQ.refetch()} />
+          ) : fijosQ.isLoading ? (
+            <Skeleton className="h-[260px]" />
+          ) : (
+            <CostesFijos filas={fijosQ.data ?? []} />
+          )}
+        </div>
       </div>
     </SuperAdminLayout>
   );
