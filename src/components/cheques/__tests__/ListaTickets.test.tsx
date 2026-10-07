@@ -16,6 +16,20 @@ describe("Listado de tickets", () => {
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
     await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v2", { p_pagina: 0, p_busqueda: "Ana" }));
   });
+  it("oculta compras sin código y abre la ficha privada al pulsar una compra", async () => {
+    const ticket = { id: "1", codigo: "CT-ABC", creado_en: null, comprador_nombre: "Ana", comprador_telefono: "600123456", importe_eur: 100, estado: "pagado", usado: false };
+    rpc.mockResolvedValueOnce({ data: { expedidos: 1, canjeados: 0, coincidencias: 1, importe_pagado: 100, tickets: [ticket, { ...ticket, id: "2", codigo: null, comprador_nombre: "Sin emitir" }, { ...ticket, id: "3", codigo: "   " }] }, error: null });
+    rpc.mockResolvedValueOnce({ data: { ...ticket, comprador_email: "ana@example.com", mensaje: "Feliz cumpleaños", origen: "web" }, error: null });
+    render(<ListaTickets />);
+    expect(await screen.findByText("600123456")).toBeTruthy();
+    expect(screen.queryByText("Sin emitir")).toBeNull();
+    expect(screen.queryByText("Sin expedir")).toBeNull();
+    expect(screen.queryByText("ana@example.com")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ver compra CT-ABC" }));
+    expect(await screen.findByText("ana@example.com")).toBeTruthy();
+    expect(screen.getByText("Feliz cumpleaños")).toBeTruthy();
+    expect(rpc).toHaveBeenLastCalledWith("detalle_cheque_regalo", { p_id: "1" });
+  });
   it("sin scroll de página: solo desplaza la tabla, con la cabecera pegada y totales y paginación fuera", async () => {
     rpc.mockResolvedValue({ data: { total: 1, expedidos: 1, canjeados: 0, coincidencias: 1, importe_pagado: 50, tickets: [{ id: "1", codigo: "CT-XYZ", creado_en: null, comprador_nombre: "Luis", importe_eur: 50, estado: "pagado", usado: false }] }, error: null });
     render(<ListaTickets />);

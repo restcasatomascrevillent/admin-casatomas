@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { CASA_TOMAS, LOGO_CASA_TOMAS } from "@/lib/cheques/casaTomas";
 import { ListaTickets } from "@/components/cheques/ListaTickets";
 import { VistaFacturaCheque } from "@/components/cheques/VistaFacturaCheque";
+import { CompraManual } from "@/components/cheques/CompraManual";
+import { PlantillaChequeRegalo } from "@/components/cheques/PlantillaChequeRegalo";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
 /**
@@ -155,12 +157,16 @@ export default function Cheques() {
   return <DashboardLayout>
     <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
       <Tabs value={pestana} onValueChange={setPestana} className="flex min-h-0 flex-1 flex-col gap-6">
-        <TabsList className="grid w-full max-w-2xl shrink-0 grid-cols-3 h-auto rounded-xl p-1.5 bg-muted/60">
-          <TabsTrigger value="expedicion" className="min-h-11 whitespace-normal text-xs sm:text-sm rounded-lg">Expedición de tickets</TabsTrigger>
-          <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
-          <TabsTrigger value="plantilla" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
+        <TabsList className="flex w-full shrink-0 justify-start gap-1 overflow-x-auto h-auto rounded-xl p-1.5 bg-muted/60">
+          <TabsTrigger value="expedicion" className="min-h-11 shrink-0 whitespace-normal text-xs sm:text-sm rounded-lg">Expedición de tickets</TabsTrigger>
+          <TabsTrigger value="verificar" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
+          <TabsTrigger value="manual" className="min-h-11 shrink-0 text-xs sm:text-sm rounded-lg">Compra manual</TabsTrigger>
+          <TabsTrigger value="regalo" className="min-h-11 shrink-0 text-xs sm:text-sm rounded-lg"><Palette className="h-4 w-4 mr-2" />Correo y PDF</TabsTrigger>
+          <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
         </TabsList>
         <TabsContent value="expedicion" className={`${CONTENIDO_PESTANA} flex flex-col`}><ListaTickets /></TabsContent>
+        <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
+        <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo /></TabsContent>
         <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
             <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">

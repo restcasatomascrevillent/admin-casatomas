@@ -1,4 +1,29 @@
-# Cheques regalo: validador y factura
+# Cheques regalo: expedición, compra manual, correo y PDF
+
+## Actualización de compra manual y plantilla (7 de octubre de 2026)
+
+- **Expedición de tickets** solo incluye cheques con código expedido. El filtro se aplica antes de contar y paginar, también en la búsqueda. Se muestran teléfono, comprador y estado; al pulsar la fila o el código se abre la ficha completa, incluidos email, dedicatoria, entrega, pago y datos de factura.
+- **Compra manual** registra importe, comprador, teléfono, destinatario, dedicatoria y método de pago (efectivo, tarjeta, transferencia o cortesía). Se confirma el cobro antes de expedir. El código se crea en una transacción autorizada, con referencia de solicitud única para reintentar sin duplicarlo. Se puede ocultar el importe del regalo. Si falla el envío, se conserva el código y se reintenta solo el correo.
+- **Correo y PDF** permite guardar asunto, mensaje, título, subtítulo, logo PNG/JPG, colores, instrucciones y pie. Los tokens `{comprador}`, `{destinatario}`, `{codigo}` y `{importe}` usan los datos de cada cheque. La vista previa y la descarga usan el mismo generador que el PDF adjunto del email.
+- La plantilla se copia en el cheque al expedir una compra manual o antes del primer envío de una compra web. Los reintentos conservan ese diseño. Las cortesías se cuentan como expedidas, pero no se suman al importe cobrado.
+- Consultar exige `cheques / view`; crear, enviar o editar exige `cheques / edit`, tanto en SQL como en la función del servidor. No hay lectura pública de datos del comprador.
+
+### Activar esta actualización
+
+1. Aplicar `supabase/migrations/20261007190000_cheques_manual_plantilla.sql` en el proyecto compartido `jeamoczmbfsnwkfjxcyo`, después de las migraciones de Cheques anteriores.
+2. Desde el repositorio `casa-tomas-story`, desplegar las funciones actualizadas:
+
+   ```sh
+   supabase functions deploy cheques-regalo-admin
+   supabase functions deploy stripe-webhook-cheques-regalo --no-verify-jwt
+   ```
+
+3. Conservar `RESEND_API_KEY`, `RESEND_FROM_EMAIL` y las variables de Supabase/Stripe existentes. Publicar el panel desde `main`.
+4. Configurar **Cheques → Correo y PDF**; hacer una expedición de prueba, revisar el email con adjunto, comprobar el teléfono y la ficha, verificar el código y canjearlo una sola vez. Comprobar también una compra web pagada.
+
+Subir a GitHub o publicar Vercel no ejecuta esta migración ni despliega Edge Functions. Sin esos pasos, las pestañas nuevas informan de la configuración que falta y no permiten guardar datos ficticios.
+
+Validación: pruebas de interfaz de `src/components/cheques/__tests__` y del verificador, build de producción y pruebas Deno de `supabase/functions/_shared/cheques-regalo/plantilla.test.ts`. La migración se comprobó en PostgreSQL local con paginación, búsqueda por teléfono/email, permisos, datos inválidos, referencia repetida, snapshot y canje único.
 
 El menú **Cheques** abre `/cheques`: verificación por código, canje con confirmación y plantilla con datos fiscales, logo PNG/JPG y vista previa. El permiso `cheques / view` permite verificar y ver la plantilla; `cheques / edit` permite canjear y guardarla. Se conceden desde Usuarios por un super admin. Los super admins conservan acceso.
 
