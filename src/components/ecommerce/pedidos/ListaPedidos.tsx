@@ -52,9 +52,14 @@ export function ListaPedidos() {
     p.numero_ticket?.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  // Alto de la pantalla (Ecommerce.tsx le da el alto que queda bajo sus
+  // pestañas): los filtros se quedan fijos arriba y la tabla encoge hasta lo que
+  // sobra y hace scroll por dentro con la cabecera pegada arriba, sin paginar y
+  // sin scroll de página. Con pocas filas mide lo que ellas. Sin alto medido
+  // todo crece como siempre.
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -104,9 +109,13 @@ export function ListaPedidos() {
       ) : pedidosFiltrados.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">No hay pedidos</div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        // `flex flex-col min-h-0`: el contenedor con scroll de <Table> (su `div` con `overflow-auto`) encoge
+        // hasta el alto que queda y es él quien desplaza; la cabecera `sticky` (fondo opaco, como la página)
+        // se pega a su borde. La sombra de 1 px hace de línea inferior: con bordes colapsados el `border-b` de la
+        // fila no acompaña a la cabecera al desplazar (como en Usuarios).
+        <div className="flex min-h-0 flex-col border rounded-lg overflow-hidden">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
               <TableRow>
                 <TableHead>Nº Pedido</TableHead>
                 <TableHead>Tipo</TableHead>

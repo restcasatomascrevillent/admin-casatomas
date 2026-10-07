@@ -73,9 +73,13 @@ export function TablaStock() {
   const formatCurrency = (value: number | null) => 
     value ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value) : '-';
 
+  // Alto de la pantalla (Ecommerce.tsx le da el alto que queda bajo las
+  // pestañas de Stock): el buscador se queda fijo arriba y la tabla encoge hasta
+  // lo que sobra y hace scroll por dentro con la cabecera pegada arriba, sin
+  // scroll de página. Sin alto medido todo crece como siempre.
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex shrink-0 flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -100,9 +104,11 @@ export function TablaStock() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Cargando stock...</div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        // `flex flex-col min-h-0`: el contenedor con scroll de <Table> encoge hasta el alto que queda y es
+        // él quien desplaza; la cabecera `sticky` (fondo opaco, como la página) se pega a su borde, con una sombra de 1 px como línea inferior (el borde de la fila no la acompaña).
+        <div className="flex min-h-0 flex-col border rounded-lg overflow-hidden">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
               <TableRow>
                 <TableHead>Producto</TableHead>
                 <TableHead>Categoría</TableHead>

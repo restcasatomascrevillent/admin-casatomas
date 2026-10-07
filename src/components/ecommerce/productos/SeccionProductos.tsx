@@ -28,6 +28,9 @@ const CATEGORIAS_COMIDA = [
   "Quesos",
 ];
 
+/** La rejilla de Bebidas/Comida: se queda con el alto que dejan los filtros y desplaza por dentro. */
+const CONTENIDO_PRODUCTOS = "mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+
 export function SeccionProductos() {
   const [activeTab, setActiveTab] = useState("bebidas");
   const [busqueda, setBusqueda] = useState("");
@@ -76,10 +79,14 @@ export function SeccionProductos() {
     setDialogOpen(true);
   };
 
+  // Alto de la pantalla (Ecommerce.tsx le da el alto que queda bajo sus
+  // pestañas): Bebidas/Comida, «Añadir» y los filtros se quedan fijos arriba y
+  // la rejilla de productos hace scroll por dentro, sin scroll de página. Sin
+  // alto medido todo crece como siempre.
   return (
-    <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <TabsList>
             <TabsTrigger value="bebidas" className="min-h-11 gap-2 px-4">
               <Wine className="h-4 w-4" />
@@ -114,7 +121,7 @@ export function SeccionProductos() {
           </Dialog>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 mt-4">
+        <div className="flex shrink-0 flex-col sm:flex-row gap-2 mt-4">
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -137,7 +144,8 @@ export function SeccionProductos() {
           </Select>
         </div>
 
-        <TabsContent value="bebidas" className="mt-6">
+        {/* `data-[state=inactive]:hidden`: como en Ecommerce.tsx, que la pestaña oculta no ocupe sitio. */}
+        <TabsContent value="bebidas" className={CONTENIDO_PRODUCTOS}>
           {loadingBebidas ? (
             <div className="text-center py-12 text-muted-foreground">Cargando bebidas...</div>
           ) : (
@@ -150,7 +158,7 @@ export function SeccionProductos() {
           )}
         </TabsContent>
 
-        <TabsContent value="comida" className="mt-6">
+        <TabsContent value="comida" className={CONTENIDO_PRODUCTOS}>
           {loadingComidas ? (
             <div className="text-center py-12 text-muted-foreground">Cargando productos...</div>
           ) : (

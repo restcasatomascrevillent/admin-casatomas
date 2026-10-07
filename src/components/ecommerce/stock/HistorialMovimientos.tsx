@@ -28,10 +28,16 @@ export function HistorialMovimientos() {
     );
   }
 
+  // Alto de la pantalla (Ecommerce.tsx le da el alto que queda bajo las
+  // pestañas de Stock): la caja encoge hasta lo que sobra (`flex flex-col
+  // min-h-0`) y el contenedor con scroll de <Table> desplaza por dentro con la
+  // cabecera pegada arriba (fondo opaco, como la página, y sombra de 1 px como
+  // línea inferior, que el borde de la fila no acompaña), sin paginar y sin
+  // scroll de página. Con pocas filas mide lo que ellas.
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="flex min-h-0 flex-col border rounded-lg overflow-hidden">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
           <TableRow>
             <TableHead>Fecha</TableHead>
             <TableHead>Tipo</TableHead>
