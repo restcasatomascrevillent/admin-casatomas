@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import {
   PESTANAS_GESTOR_WEB,
   esPestanaGestorWeb,
@@ -49,6 +50,13 @@ const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = 
   menus: UtensilsCrossed,
   tapas: CalendarDays,
 };
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
+ * abierto en el móvil) deja de encoger y vuelve el scroll de página. Con 420 px
+ * caben el subtítulo, la barra de pestañas y unos 280 px de pestaña con scroll.
+ */
+const ALTURA_MINIMA_GESTOR_WEB = 420;
 
 const Cargando = () => (
   <div className="flex items-center justify-center min-h-[300px]">
@@ -98,14 +106,24 @@ export default function GestorWeb() {
     setSearchParams(next);
   };
 
+  // Alto de la pantalla, calculado solo (regla del dueño, 2026-10-07: la página
+  // no hace scroll, mide lo que se ve): el mismo patrón que Newsletter y
+  // Facturas (`useAlturaDisponible`). El subtítulo y la barra de pestañas quedan
+  // fijos arriba y la pestaña activa hace scroll por dentro; Novedades, Menús y
+  // Tapas, desde `xl`, reparten además ese alto en dos columnas con su propio
+  // scroll. Sin medida (jsdom, primer pintado sin layout) cae al layout de
+  // siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_GESTOR_WEB);
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div ref={setRaiz} className="flex flex-col space-y-6" style={alto ? { height: alto } : undefined}>
         {/* Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa
             del menú lateral. Se conserva el subtítulo: no es relleno, aclara
             que la página cubre DOS webs distintas (Casa Tomás y Touza), algo
             que el menú no dice. */}
-        <p className="text-muted-foreground">
+        <p className="shrink-0 text-muted-foreground">
           Todo lo que aparece en las webs de Casa Tomás y Touza: carta, novedades, menús y tapas.
         </p>
 
@@ -114,7 +132,7 @@ export default function GestorWeb() {
         ) : !pestanaActiva ? (
           <p className="text-sm text-muted-foreground">No tienes acceso a ninguna parte del Gestor Web.</p>
         ) : (
-          <Tabs value={pestanaActiva} onValueChange={cambiarPestana}>
+          <Tabs value={pestanaActiva} onValueChange={cambiarPestana} className="shrink-0">
             <div className="-mx-3 px-3 sm:mx-0 sm:px-0 overflow-x-auto">
               <TabsList className="h-auto p-1 gap-1 w-max">
                 {pestanasVisibles.map((p) => {
@@ -137,13 +155,16 @@ export default function GestorWeb() {
             .map((p) => {
               const Componente = COMPONENTES[p.id];
               const activa = p.id === pestanaActiva;
+              // La región con scroll de la pestaña: ocupa el alto que queda bajo
+              // la barra. Sin clases de `display`: le ganarían al atributo
+              // `hidden` y la pestaña oculta seguiría ocupando sitio.
               return (
                 <section
                   key={p.id}
                   hidden={!activa}
                   role="tabpanel"
                   aria-label={p.label}
-                  className="pt-2"
+                  className="pt-2 flex-1 min-h-0 overflow-y-auto overscroll-contain"
                 >
                   <Suspense fallback={<Cargando />}>
                     <Componente />

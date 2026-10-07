@@ -825,8 +825,13 @@ export function EditorNovedadesWeb() {
   const vistaPrevia = <MobilePreview novedades={novedadesPreview} idResaltado={idBorrador} />;
 
   // --- Render ---------------------------------------------------------------
+  // Alto de pantalla (2026-10-07): la pestaña del Gestor Web mide lo que queda
+  // de pantalla (GestorWeb.tsx). Desde `xl`, lista + formulario y la vista
+  // previa son dos columnas y cada una hace su propio scroll (antes la vista
+  // previa era `sticky top-20` contra la ventana, que ya no se desplaza); por
+  // debajo de `xl` va todo apilado y desplaza la pestaña entera.
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 xl:flex xl:h-full xl:flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Se muestran en la web de Casa Tomás y los cambios se ven al momento.
@@ -837,8 +842,8 @@ export function EditorNovedadesWeb() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
-        <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0 gap-4 items-start">
+        <div className="space-y-4 min-w-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain">
           {/* ------------------------------------------------ Lista */}
           <Card>
             <CardHeader className="p-4 pb-3">
@@ -989,7 +994,7 @@ export function EditorNovedadesWeb() {
           </Card>
 
           {/* ------------------------------------------------ Formulario */}
-          <Card ref={formRef} className={`scroll-mt-20 ${editando ? "border-primary" : ""}`}>
+          <Card ref={formRef} className={`scroll-mt-4 ${editando ? "border-primary" : ""}`}>
             <CardHeader className="p-4 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1458,7 +1463,7 @@ export function EditorNovedadesWeb() {
         </div>
 
         {/* ------------------------------------------------ Vista previa */}
-        <aside className="hidden xl:block sticky top-20">
+        <aside className="hidden xl:block xl:max-h-full xl:overflow-y-auto xl:overscroll-contain">
           <h3 className="text-sm font-medium text-muted-foreground mb-3 text-center">Así se ve en el móvil</h3>
           {vistaPrevia}
         </aside>

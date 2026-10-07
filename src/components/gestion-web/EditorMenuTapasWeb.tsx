@@ -405,8 +405,13 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     }
   };
 
+  // Alto de pantalla (2026-10-07): la pestaña del Gestor Web mide lo que queda
+  // de pantalla (GestorWeb.tsx). Desde `xl`, lista + formulario y la vista
+  // previa son dos columnas y cada una hace su propio scroll (antes la vista
+  // previa era `sticky top-20` contra la ventana, que ya no se desplaza); por
+  // debajo de `xl` va todo apilado y desplaza la pestaña entera.
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 xl:flex xl:h-full xl:flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{config.descripcion}</p>
         <Button variant="outline" onClick={() => cargarDatos()} disabled={isLoading}>
@@ -415,8 +420,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-4 items-start">
-        <div className="space-y-4 min-w-0">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0 gap-4 items-start">
+        <div className="space-y-4 min-w-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain">
           {/* ---------------------------------------------- Lista */}
           <Card>
             <CardHeader className="p-4 pb-3">
@@ -499,7 +504,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
             </CardContent>
           </Card>
           {/* ---------------------------------------------- Formulario */}
-          <Card ref={formRef} className={`scroll-mt-20 ${editandoFecha ? "border-primary" : ""}`}>
+          <Card ref={formRef} className={`scroll-mt-4 ${editandoFecha ? "border-primary" : ""}`}>
             <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                 {editandoFecha ? `Editar ${config.singular}` : esMenu ? "Nuevo menú del día" : "Nuevas tapas del día"}
@@ -617,7 +622,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
         </div>
 
         {/* ---------------------------------------------- Vista previa */}
-        <aside className="xl:sticky xl:top-20 space-y-3">
+        <aside className="space-y-3 xl:max-h-full xl:overflow-y-auto xl:overscroll-contain">
           <h3 className="text-sm font-medium text-muted-foreground text-center">Así se leerá en la web</h3>
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
