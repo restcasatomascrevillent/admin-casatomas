@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -422,6 +422,9 @@ export function SugerenciasBlacklist() {
   const [motivoAprobacion, setMotivoAprobacion] = useState("");
 
   const [pagina, setPagina] = useState(1);
+  // Raíz de la bandeja: al cambiar de página se sube también la región con scroll propio que la
+  // contiene (Reservas → Blacklist), donde `window.scrollTo` ya no mueve nada.
+  const raizRef = useRef<HTMLDivElement>(null);
 
   const abrirAprobar = (s: SugerenciaBlacklist) => {
     // Reset por sugerencia: la caducidad y el motivo de la anterior no se
@@ -487,7 +490,10 @@ export function SugerenciasBlacklist() {
   const irAPagina = (destino: number) => {
     setPagina(Math.min(Math.max(1, destino), totalPaginas));
     // Volver arriba: si no, cambias de página y sigues viendo el centro de la
-    // lista anterior.
+    // lista anterior. Primero la región que desplaza la pestaña (la bandeja va
+    // la primera, así que queda arriba del todo) y después la ventana, por si
+    // la región no se ha medido y es la página la que desplaza.
+    raizRef.current?.scrollIntoView?.({ block: "start" });
     window.scrollTo({ top: 0 });
   };
 
@@ -495,7 +501,7 @@ export function SugerenciasBlacklist() {
   const nombreDe = (s: SugerenciaBlacklist | null) => s?.nombre_cliente || "este cliente";
 
   return (
-    <div className="space-y-3">
+    <div ref={raizRef} className="space-y-3">
       <div>
         <h3 className="text-sm font-medium flex items-center gap-1.5">
           <ShieldAlert className="h-4 w-4 text-amber-600" />

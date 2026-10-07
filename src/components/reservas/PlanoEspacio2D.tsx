@@ -104,6 +104,8 @@ import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
 import {
@@ -192,6 +194,12 @@ import {
   type ElementoPlano,
 } from "./elementosPlano";
 
+/**
+ * Suelo (px) de la pantalla con `altoDePantalla`: cabecera, barra del día y un plano de ~300 px.
+ * Por debajo (ventana muy baja) deja de encoger y la página hace scroll.
+ */
+const ALTURA_MINIMA_PLANO_PAGINA = 480;
+
 interface PlanoEspacio2DProps {
   espacioId: string;
   espacioNombre: string;
@@ -223,6 +231,14 @@ interface PlanoEspacio2DProps {
    * comporta igual que siempre.
    */
   reservaId?: string;
+  /**
+   * Página de Reservas (regla del dueño, 2026-10-07: el alto de la página es el de la pantalla): la
+   * pantalla mide lo que le queda hasta el fondo de la ventana (`useAlturaDisponible`) y la página no
+   * desplaza; el plano se queda con el alto que sobra y la lista de reservas hace scroll por dentro.
+   * Desde 768 px: en el móvil sigue el layout de siempre (plano de 340 px y la lista debajo). Sin
+   * prop (el diálogo «Elegir mesa», que ya acota el alto con sus propias clases) no cambia nada.
+   */
+  altoDePantalla?: boolean;
 }
 
 interface DragState {
@@ -803,9 +819,15 @@ export function PlanoEspacio2D({
   fecha,
   turno,
   reservaId,
+  altoDePantalla = false,
 }: PlanoEspacio2DProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Alto de pantalla (ver `altoDePantalla`): `raiz` es el contenedor de toda la pantalla. `null`
+  // (móvil, diálogo, jsdom, primer pintado) = el layout de siempre.
+  const esMovil = useIsMobile();
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const altoPantalla = useAlturaDisponible(altoDePantalla && !esMovil ? raiz : null, ALTURA_MINIMA_PLANO_PAGINA);
   const [searchParams, setSearchParams] = useSearchParams();
   // Editar una reserva desde su fila del panel (2026-09-30).
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
@@ -2160,7 +2182,11 @@ export function PlanoEspacio2D({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex min-h-[calc(100dvh-220px)] flex-col gap-3">
+      <div
+        ref={altoDePantalla ? setRaiz : undefined}
+        className={cn("flex flex-col gap-3", altoPantalla ? "min-h-0" : "min-h-[calc(100dvh-220px)]")}
+        style={altoPantalla ? { height: altoPantalla } : undefined}
+      >
         {/* ── Cabecera ────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -2425,7 +2451,14 @@ export function PlanoEspacio2D({
         )}
 
         {/* ── Plano + panel ──────────────────────────────────────────────── */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_380px]">
+        {/* Con alto de pantalla y la lista DEBAJO del plano (< lg): la lista ocupa lo que pida hasta el
+            40 % del alto (`fit-content`) y el plano, el resto. Desde lg van lado a lado en una fila. */}
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_380px]",
+            altoPantalla && "grid-rows-[minmax(0,1fr)_fit-content(40%)] lg:grid-rows-[minmax(0,1fr)]",
+          )}
+        >
           {/* Plano */}
           <Card className="flex flex-col overflow-hidden">
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
@@ -2433,7 +2466,9 @@ export function PlanoEspacio2D({
                 ref={containerRef}
                 className={cn(
                   // `touch-none`: ni scroll ni zoom de página encima del plano (los gestos son suyos).
-                  "relative min-h-[340px] w-full flex-1 touch-none select-none overflow-hidden md:min-h-[min(56dvh,36rem)]",
+                  "relative w-full flex-1 touch-none select-none overflow-hidden",
+                  // Con alto de pantalla el alto lo pone la rejilla; sin él, el suelo de siempre.
+                  altoPantalla ? "min-h-0" : "min-h-[340px] md:min-h-[min(56dvh,36rem)]",
                   isSpacePressed && "cursor-grab",
                   isPanning && "cursor-grabbing",
                 )}
@@ -2600,8 +2635,10 @@ export function PlanoEspacio2D({
             </CardContent>
           </Card>
 
-          {/* Panel lateral */}
-          <div className="flex min-h-0 flex-col gap-3">
+          {/* Panel lateral. Con alto de pantalla la lista de reservas no baja de 14rem (con la ficha
+              de una mesa abierta se quedaba en nada) y, si con la ficha no cabe todo, el panel hace
+              scroll por dentro en vez de estirar la página. */}
+          <div className={cn("flex min-h-0 flex-col gap-3", altoPantalla && "overflow-y-auto overscroll-contain")}>
             {selectedMesa && !reservaActiva && (
               <Card>
                 <CardHeader className="pb-2">
@@ -2679,7 +2716,7 @@ export function PlanoEspacio2D({
               </Card>
             )}
 
-            <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <Card className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", altoPantalla && "min-h-56")}>
               <CardHeader className="border-b pb-3">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="flex min-w-0 items-center gap-2 text-base">

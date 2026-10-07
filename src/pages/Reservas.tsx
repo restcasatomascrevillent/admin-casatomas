@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,43 @@ import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import { contarSolicitudesPendientes, resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { toast } from "sonner";
 
 /** Por qué «Nueva Reserva» sale deshabilitado (se ve al pasar el ratón). */
 const MOTIVO_SIN_PERMISO_ALTA = "Necesitas permiso de edición en Reservas para crear reservas";
+
+/**
+ * Suelo (px) de las pestañas largas: por debajo (ventana muy baja, teclado del móvil abierto) la
+ * región deja de encoger y vuelve el scroll de página. El mismo que Newsletter.
+ */
+const ALTURA_MINIMA_PESTANA_LARGA = 360;
+
+/**
+ * Pestañas largas (Blacklist, Configuración): el contenido ocupa el alto que queda hasta el fondo de
+ * la pantalla y hace scroll por dentro, así la página no desplaza y las pestañas y «Nueva Reserva»
+ * quedan fijas arriba (regla del dueño, 2026-10-07: el alto de la página es el de la pantalla). Mismo
+ * patrón que las pestañas de Newsletter (`useAlturaDisponible`). Sin medida (jsdom, primer pintado)
+ * cae al layout de siempre.
+ *
+ * `relative` imprescindible: sin él, lo que va en posición absoluta dentro (el `<input>` oculto que
+ * Radix pinta junto a cada casilla `Checkbox` de un formulario) toma de referencia el `<body>`, se
+ * escapa del recorte de la región y vuelve a estirar la página (medido: 1 435 px en Configuración a
+ * 1024×768).
+ */
+function RegionPestanaLarga({ children }: { children: ReactNode }) {
+  const [nodo, setNodo] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(nodo, ALTURA_MINIMA_PESTANA_LARGA);
+  return (
+    <div
+      ref={setNodo}
+      className={alto ? "relative overflow-y-auto overscroll-contain" : undefined}
+      style={alto ? { height: alto } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -199,7 +232,10 @@ export default function Reservas() {
              primer render. Dejar que el turno lo dedujera él después de cargar
              las reservas no funcionaba (medido en el navegador el 2026-09-28:
              la URL se quedaba en `turno=cena` pero el panel seguía en comida y
-             la reserva a sentar no salía). Ver `saltoAsignacion.ts`. */
+             la reserva a sentar no salía). Ver `saltoAsignacion.ts`.
+
+             `altoDePantalla`: aquí el plano ocupa justo lo que queda de ventana y la
+             página no desplaza (en el diálogo «Elegir mesa» no se pasa). */
           <PlanoEspacio2D
             espacioId={selectedEspacio.id}
             espacioNombre={selectedEspacio.nombre}
@@ -207,6 +243,7 @@ export default function Reservas() {
             fecha={saltoAsignacion?.fecha}
             turno={saltoAsignacion?.turno}
             reservaId={saltoAsignacion?.reservaId}
+            altoDePantalla
           />
         )}
       </DashboardLayout>
@@ -361,12 +398,16 @@ export default function Reservas() {
         </TabsContent>
 
         <TabsContent value="blacklist" className="space-y-6 mt-6">
-          <GestionBlacklist />
+          <RegionPestanaLarga>
+            <GestionBlacklist />
+          </RegionPestanaLarga>
         </TabsContent>
 
         {isAdmin && (
           <TabsContent value="configuracion" className="space-y-6 mt-6">
-            <ConfiguracionTurnos />
+            <RegionPestanaLarga>
+              <ConfiguracionTurnos />
+            </RegionPestanaLarga>
           </TabsContent>
         )}
       </Tabs>

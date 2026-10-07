@@ -274,9 +274,27 @@ describe("SugerenciasBlacklist", () => {
     expect(screen.getByText("1–50")).toBeDefined();
     expect(screen.getByText(/Página 1 de 4/)).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-    expect(screen.getByText("51–100")).toBeDefined();
-    expect(screen.getByText(/Página 2 de 4/)).toBeDefined();
+    // Al cambiar de página se vuelve arriba también DENTRO de la región con scroll propio de
+    // Reservas → Blacklist (2026-10-07), donde `window.scrollTo` ya no mueve nada: la bandeja se
+    // sube a sí misma. jsdom no trae `scrollIntoView` ni `scrollTo`: se ponen espías y se quitan.
+    const subir = vi.fn();
+    const ventana = vi.fn();
+    const scrollIntoViewOriginal = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+    const scrollToOriginal = window.scrollTo;
+    Element.prototype.scrollIntoView = subir;
+    window.scrollTo = ventana as unknown as typeof window.scrollTo;
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      expect(screen.getByText("51–100")).toBeDefined();
+      expect(screen.getByText(/Página 2 de 4/)).toBeDefined();
+      expect(subir).toHaveBeenCalledWith({ block: "start" });
+      expect((subir.mock.contexts[0] as HTMLElement).contains(screen.getByText("Sugerencias pendientes"))).toBe(true);
+      expect(ventana).toHaveBeenCalledWith({ top: 0 });
+    } finally {
+      if (scrollIntoViewOriginal) Object.defineProperty(Element.prototype, "scrollIntoView", scrollIntoViewOriginal);
+      else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+      window.scrollTo = scrollToOriginal;
+    }
     // Dos renders de 50 filas con jsdom: en un portátil normal pasa de los 5 s por defecto.
   }, 30_000);
 

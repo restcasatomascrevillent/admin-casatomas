@@ -80,6 +80,7 @@ import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
 import {
@@ -108,7 +109,20 @@ const INTERVALO_REFRESCO_MS = 45_000;
 const CONFIG_ESTADO = CONFIG_ESTADO_MESA;
 const textoMinutos = textoMinutosMesa;
 
+/**
+ * Suelo (px) de la pantalla: cabecera, leyenda, ~300 px de mesas (el `min-h-[320px]` de siempre) y la
+ * nota del pie. Por debajo (ventana muy baja), deja de encoger y la página hace scroll.
+ */
+const ALTURA_MINIMA_MODO_SERVICIO = 480;
+
 export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: ModoServicioPlanoProps) {
+  // Alto de pantalla (regla del dueño, 2026-10-07: la página no desplaza): la pantalla mide lo que le
+  // queda de ventana (`useAlturaDisponible`) y la rejilla de mesas se queda con lo que sobra tras la
+  // cabecera, la leyenda y la nota del pie, en vez del `calc(100vh-320px)` puesto a ojo, que no
+  // contaba la fila Plano/Servicio, la nota ni la cabecera envuelta en la tablet vertical. Sin medida
+  // (jsdom, primer pintado) se queda el layout de siempre.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const altoPantalla = useAlturaDisponible(raiz, ALTURA_MINIMA_MODO_SERVICIO);
   const [fechaSel, setFechaSel] = useState<string>(() => (esFechaISO(fecha) ? (fecha as string) : hoyLocal()));
   const [turnoSel, setTurnoSel] = useState<Turno>(() => turnoDeHora(new Date().toLocaleTimeString("es-ES", { hour12: false })));
   const [ahora, setAhora] = useState<Date>(() => new Date());
@@ -260,7 +274,11 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
   }
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={setRaiz}
+      className={altoPantalla ? "flex flex-col gap-4" : "space-y-4"}
+      style={altoPantalla ? { height: altoPantalla } : undefined}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {onBack && (
@@ -321,7 +339,7 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
         })}
       </div>
 
-      <ScrollArea className="h-[calc(100vh-320px)] min-h-[320px]">
+      <ScrollArea className={altoPantalla ? "min-h-0 flex-1" : "h-[calc(100vh-320px)] min-h-[320px]"}>
         {cargando ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 pr-2">
             {Array.from({ length: 6 }).map((_, i) => (
