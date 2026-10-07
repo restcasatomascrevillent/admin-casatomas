@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2, UserX } from "lucide-react";
+import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -124,10 +124,10 @@ export default function SuperAdminAuditoria() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="auditoria-actor">Email de quién actuó</Label>
+              <Label htmlFor="auditoria-actor">Quién actuó / origen</Label>
               <Input
                 id="auditoria-actor"
-                placeholder="nombre@dominio.com"
+                placeholder="Email, ID de usuario u origen"
                 value={filtrosPendientes.actor ?? ""}
                 onChange={(e) => setFiltrosPendientes((prev) => ({ ...prev, actor: e.target.value }))}
               />
@@ -236,12 +236,9 @@ export default function SuperAdminAuditoria() {
                       const ui = ACCION_UI[grupo.accion] ?? ACCION_UI.actualizar;
                       const Icon = ui.icon;
                       const esGrupo = grupo.entradas.length > 1;
-                      // Un grupo de "N registros" siempre se puede desplegar (para ver
-                      // cada fila); una fila suelta solo si de verdad trae algo que ver.
-                      const tieneDetalles =
-                        esGrupo || (grupo.entradas[0].detalles && Object.keys(grupo.entradas[0].detalles).length > 0);
+                      // Cada fila permite consultar su ID y el UUID del actor.
+                      const tieneDetalles = true;
                       const abierta = expandidas.has(grupo.key);
-                      const sinActor = !grupo.actor_email;
 
                       return (
                         <Fragment key={grupo.key}>
@@ -261,13 +258,11 @@ export default function SuperAdminAuditoria() {
                               {format(new Date(grupo.created_at), "d MMM yyyy, HH:mm:ss", { locale: es })}
                             </TableCell>
                             <TableCell className="text-sm">
-                              {sinActor ? (
-                                <span className="inline-flex items-center gap-1 text-muted-foreground">
-                                  <UserX className="h-3.5 w-3.5" />
-                                  Sin identificar
-                                </span>
-                              ) : (
-                                grupo.actor_email
+                              <span className="break-all">{grupo.actor_label}</span>
+                              {(grupo.actor_origin === "historico" || (!grupo.actor_email && !grupo.actor_user_id && !grupo.actor_origin)) && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  El registro original no conservó el autor.
+                                </p>
                               )}
                             </TableCell>
                             <TableCell>
@@ -285,9 +280,16 @@ export default function SuperAdminAuditoria() {
                             <TableRow>
                               <TableCell colSpan={5} className="border-0 p-0">
                                 <div className="m-3 space-y-2">
-                                  {esGrupo ? (
-                                    grupo.entradas.map((entrada) => (
+                                  {grupo.entradas.map((entrada) => (
                                       <div key={entrada.id} className="rounded-md border border-border/60 p-2">
+                                        <p className="mb-1 break-all font-mono text-[11px] text-muted-foreground">
+                                          Registro de auditoría: {entrada.id}
+                                        </p>
+                                        {entrada.actor_user_id && (
+                                          <p className="mb-1 break-all font-mono text-[11px] text-muted-foreground">
+                                            Usuario: {entrada.actor_user_id}
+                                          </p>
+                                        )}
                                         {entrada.registro_id && (
                                           <p className="mb-1 font-mono text-[11px] text-muted-foreground">
                                             {entrada.registro_id}
@@ -295,10 +297,7 @@ export default function SuperAdminAuditoria() {
                                         )}
                                         <DetalleEntrada entrada={entrada} />
                                       </div>
-                                    ))
-                                  ) : (
-                                    <DetalleEntrada entrada={grupo.entradas[0]} />
-                                  )}
+                                    ))}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -335,3 +334,4 @@ export default function SuperAdminAuditoria() {
     </SuperAdminLayout>
   );
 }
+

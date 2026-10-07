@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
         headers: {
           "x-audit-actor-id": currentUser.id,
           "x-audit-actor-email": currentUser.email ?? "",
+          "x-audit-source": "admin-set-super-admin",
         },
       },
     });
@@ -176,3 +177,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+
