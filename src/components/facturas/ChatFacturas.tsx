@@ -5,6 +5,9 @@ import { ChatArea, Sugerencia } from "./ChatArea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
+import { usePreguntasRapidas } from "@/hooks/usePreguntasRapidas";
+import { PREGUNTAS_RAPIDAS } from "./preguntas-rapidas/catalogo";
+import { BarraPreguntasRapidas, TarjetaResultadoRapido } from "./preguntas-rapidas/PreguntasRapidas";
 
 export interface ChatFacturasRef {
   enviarConsulta: (texto: string) => void;
@@ -30,6 +33,19 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
 
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Preguntas rápidas (sin IA): resultados solo en memoria, fuera de
+  // `mensajes`; ver usePreguntasRapidas.ts. Se vacían al cambiar a mano de
+  // conversación (no cuando la primera pregunta libre crea una nueva).
+  const rapidas = usePreguntasRapidas({ catalogo: PREGUNTAS_RAPIDAS });
+  const seleccionar = (conv: Parameters<typeof seleccionarConversacion>[0]) => {
+    rapidas.limpiar();
+    return seleccionarConversacion(conv);
+  };
+  const nueva = () => {
+    rapidas.limpiar();
+    return nuevaConversacion();
+  };
+
   useImperativeHandle(ref, () => ({
     enviarConsulta: (texto: string) => {
       enviarMensaje(texto);
@@ -48,14 +64,16 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
           <ConversacionesList
             conversaciones={conversaciones}
             conversacionActiva={conversacionActiva}
-            onSeleccionar={seleccionarConversacion}
-            onNueva={nuevaConversacion}
+            onSeleccionar={seleccionar}
+            onNueva={nueva}
             onEliminar={eliminarConversacion}
           />
         </div>
 
-        {/* Área interactiva del chat */}
-        <div className="flex-1 flex flex-col min-h-0">
+        {/* Área interactiva del chat. `min-w-0` (aquí y abajo): la botonera de
+            preguntas rápidas es una fila larga con scroll horizontal propio y,
+            sin él, su ancho mínimo ensancharía la columna en tablet. */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
 
           {/* Barra superior móvil con botón de historial (Sheet drawer) */}
           <div className="flex xl:hidden items-center gap-2 px-3 py-1 shrink-0 border-b border-border/40">
@@ -83,11 +101,11 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                   conversaciones={conversaciones}
                   conversacionActiva={conversacionActiva}
                   onSeleccionar={(conv) => {
-                    seleccionarConversacion(conv);
+                    seleccionar(conv);
                     setSheetOpen(false);
                   }}
                   onNueva={() => {
-                    nuevaConversacion();
+                    nueva();
                     setSheetOpen(false);
                   }}
                   onEliminar={eliminarConversacion}
@@ -98,7 +116,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
 
           {/* Chat principal — ocupa el espacio restante */}
           <div className="flex-1 flex justify-center bg-background min-h-0">
-            <div className="w-full max-w-4xl flex flex-col h-full bg-card/50">
+            <div className="w-full min-w-0 max-w-4xl flex flex-col h-full bg-card/50">
               <ChatArea
                 mensajes={mensajes}
                 isLoading={isLoading}
@@ -107,6 +125,21 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                 onEnviar={enviarMensaje}
                 onRegenerar={regenerarRespuesta}
                 tieneConversacion={!!conversacionActiva}
+                resultadosRapidos={rapidas.resultados}
+                renderResultadoRapido={(r) => (
+                  <TarjetaResultadoRapido
+                    resultado={r}
+                    pregunta={PREGUNTAS_RAPIDAS.find((p) => p.id === r.preguntaId)}
+                    onDescartar={rapidas.descartar}
+                  />
+                )}
+                barraRapida={
+                  <BarraPreguntasRapidas
+                    catalogo={PREGUNTAS_RAPIDAS}
+                    cargando={rapidas.cargando}
+                    onPreguntar={(id) => rapidas.lanzar(id, mensajes.length)}
+                  />
+                }
               />
             </div>
           </div>

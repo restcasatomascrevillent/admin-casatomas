@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { Fragment, useRef, useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,6 +6,7 @@ import { Send, Bot, User, Zap, FileText, BarChart3, Package, Copy, Check, Refres
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
+import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
 
 export interface Sugerencia {
   icon: React.ElementType;
@@ -27,6 +28,15 @@ interface ChatAreaProps {
   onEnviar: (texto: string) => void;
   onRegenerar?: () => void;
   tieneConversacion: boolean;
+  /**
+   * Respuestas de las preguntas rápidas (sin IA). Se pintan en el hilo como
+   * «mensaje del sistema», pero NO son mensajes: no están en `mensajes`, no se
+   * guardan en la BD y no le llegan nunca al modelo.
+   */
+  resultadosRapidos?: ResultadoRapido[];
+  renderResultadoRapido?: (r: ResultadoRapido) => ReactNode;
+  /** Botonera de preguntas rápidas, encima de la caja de texto. */
+  barraRapida?: ReactNode;
 }
 
 function TypingDots() {
@@ -92,6 +102,9 @@ export function ChatArea({
   onEnviar,
   onRegenerar,
   tieneConversacion,
+  resultadosRapidos = [],
+  renderResultadoRapido,
+  barraRapida,
 }: ChatAreaProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -107,7 +120,15 @@ export function ChatArea({
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [mensajes, isSending]);
+  }, [mensajes, isSending, resultadosRapidos]);
+
+  // Cada respuesta rápida va justo después del mensaje que había al pedirla.
+  const rapidosEn = (posicion: number) =>
+    renderResultadoRapido
+      ? resultadosRapidos
+          .filter((r) => Math.min(r.despuesDe, mensajes.length) === posicion)
+          .map((r) => <Fragment key={r.id}>{renderResultadoRapido(r)}</Fragment>)
+      : null;
 
   const handleSend = () => {
     if (!input.trim() || isSending) return;
@@ -128,7 +149,7 @@ export function ChatArea({
   };
 
   // ─── Estado vacío (sin mensajes) ──────────────────────────────────────────
-  if (mensajes.length === 0 && !isSending) {
+  if (mensajes.length === 0 && !isSending && resultadosRapidos.length === 0) {
     return (
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
@@ -167,6 +188,7 @@ export function ChatArea({
           </div>
         </div>
 
+        {barraRapida}
         {/* Input inferior */}
         <InputBar
           input={input}
@@ -194,8 +216,9 @@ export function ChatArea({
               const isLastAssistant = !isUser && index === lastAssistantIndex;
 
               return (
+                <Fragment key={msg.id}>
+                {rapidosEn(index)}
                 <div
-                  key={msg.id}
                   className={cn(
                     "flex gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300",
                     isUser ? "flex-row-reverse" : "flex-row"
@@ -291,9 +314,12 @@ export function ChatArea({
                     )}
                   </div>
                 </div>
+                </Fragment>
               );
             })
           )}
+
+          {rapidosEn(mensajes.length)}
 
           {/* Typing indicator */}
           {isSending && (
@@ -314,6 +340,7 @@ export function ChatArea({
         </div>
       </ScrollArea>
 
+      {barraRapida}
       <InputBar
         input={input}
         setInput={setInput}
