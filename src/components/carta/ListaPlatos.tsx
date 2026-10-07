@@ -36,7 +36,6 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
     toggleExpanded,
     toggleActivado,
     eliminarPlato,
-    toggleRestaurante,
     actualizarPlato,
   } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
@@ -180,9 +179,6 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
 
               {/* Visibilidad Web */}
               <VisibilidadToggles
-                restaurante={plato.restaurante ?? false}
-                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: plato.id, restaurante: checked })}
-                isPending={toggleRestaurante.isPending}
                 activado={plato.activado ?? true}
                 onActivadoChange={(checked) =>
                   toggleActivado.mutate({
