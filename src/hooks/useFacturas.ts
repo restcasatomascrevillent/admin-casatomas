@@ -41,10 +41,12 @@ export interface Factura {
   numero_documento: string;
   proveedor: string | null;
   /**
-   * `facturas.proveedor_normalizado` (columna generada con
-   * `normalizar_proveedor()`): minusculas, sin acentos ni sufijo legal. Es lo
-   * que permite saber que "Bodega Campoluz, S.L." y "BODEGA CAMPOLUZ, S.L."
-   * son el mismo proveedor. Opcional para no romper los mocks que no la traen.
+   * `facturas.proveedor_normalizado`: minusculas, sin acentos ni sufijo legal
+   * y, desde 20261007180000_proveedores_unificados, el nombre CANONICO del
+   * proveedor asignado (lo mantiene un trigger; antes era columna generada).
+   * Es lo que permite saber que "Bodega Campoluz, S.L." y "BODEGA CAMPOLUZ,
+   * S.L." -o "JOSELITO (Carnicas Joselito)" y "Carnicas Joselito S.A."- son
+   * el mismo proveedor. Opcional para no romper los mocks que no la traen.
    */
   proveedor_normalizado?: string | null;
   cif: string | null;

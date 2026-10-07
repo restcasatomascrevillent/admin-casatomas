@@ -4,7 +4,8 @@
  * sobre el resultado. Origen: prueba del chatbot del 05/10/2026 (engram
  * `facturas/chatbot-prueba-2026-10`) y migracion 20261005100000; tercera
  * prueba (06/10/2026) y migracion 20261006100000 (deducidos, conteos, IVA);
- * compras de un producto (07/10/2026, migracion 20261007150000).
+ * compras de un producto (07/10/2026, migracion 20261007150000); gasto por
+ * categoria y subidas de precio (07/10/2026, migracion 20261007170000).
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -48,6 +49,8 @@ describe("TOOLS", () => {
       "detalle_documento",
       "historial_precios",
       "compras_producto",
+      "gasto_por_categoria",
+      "variacion_precios",
       "buscar_productos",
       "buscar_facturas",
       "consulta_flexible",
@@ -94,7 +97,9 @@ describe("TOOLS", () => {
   it("las descripciones son cortas (se envian en cada ronda)", () => {
     const tamano = JSON.stringify(TOOLS).length;
     // 5.997 antes de compras_producto (07/10/2026); la nueva suma ~920 (~230 tokens por ronda).
-    expect(tamano).toBeLessThan(7_000);
+    // 6.918 antes de gasto_por_categoria + variacion_precios (07/10/2026): 8.180 con ellas
+    // (+1.262, ~315 tokens por ronda; strict mode obliga a declarar sus 11 parametros).
+    expect(tamano).toBeLessThan(8_200);
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -205,9 +210,24 @@ describe("systemPrompt", () => {
     expect(d).toMatch(/este año = AAAA-01-01\.\.hoy; este trimestre = su primer dia\.\.hoy; el mes pasado = dia 1\.\.ultimo dia/);
   });
 
+  it("gasto por categoria y subidas de precio: periodo, sin IVA, sin clasificar, cambio de proveedor (07/10/2026)", () => {
+    expect(p).toMatch(/gasto_por_categoria: gasto en vinos, marisco, limpieza\.\.\. o reparto por categorias/);
+    expect(p).toMatch(/variacion_precios: que ha subido o bajado de precio/);
+    expect(p).toMatch(/13\. gasto_por_categoria: di periodo, base SIN IVA, incluye_albaranes \(regla 12\) y sin_clasificar/);
+    expect(p).toMatch(/cambio_proveedor = otro proveedor, no subida del mismo: dilo/);
+    expect(p).toMatch(/pocas_compras\/ref_antigua: comparacion debil/);
+    const g = TOOLS.find((t) => t.function.name === "gasto_por_categoria")!.function;
+    expect(g.description).toMatch(/categoria null/);
+    expect((g.parameters as Esquema).properties.agrupar.enum).toEqual(["mes", "proveedor", null]);
+    const v = TOOLS.find((t) => t.function.name === "variacion_precios")!.function;
+    expect((v.parameters as Esquema).properties.sentido.enum).toEqual(["subidas", "bajadas", "ambas", null]);
+  });
+
   it("es mas corto que el anterior (≈ 7.300 caracteres)", () => {
     // 4.045 antes de compras_producto (07/10/2026); su linea y la regla 12 suman ~500.
-    expect(p.length).toBeLessThan(4_650);
+    // 4.547 antes de gasto_por_categoria/variacion_precios: sus dos lineas y la regla 13
+    // suman 416 (~105 tokens por ronda).
+    expect(p.length).toBeLessThan(5_000);
   });
 });
 
@@ -321,6 +341,42 @@ describe("prepararLlamada", () => {
       return ll.tipo === "rpc" && ll.respaldoSemantico !== undefined;
     });
     expect(conRespaldo).toEqual(["compras_producto"]);
+  });
+
+  it("gasto_por_categoria: categoria, periodo, tipo y cruce; todo null = reparto de todas", () => {
+    expect(prepararLlamada("gasto_por_categoria", {
+      categoria: " vinos ", desde: "2026-01-01", hasta: "2026-10-07", tipo: "facturas", agrupar: "mes",
+    })).toEqual({
+      tipo: "rpc",
+      rpc: "gasto_categorias_agente",
+      params: { p_categoria: "vinos", p_desde: "2026-01-01", p_hasta: "2026-10-07", p_tipo: "factura", p_agrupar: "mes" },
+      limite: null,
+    });
+    expect(prepararLlamada("gasto_por_categoria", { categoria: null, desde: null, hasta: null, tipo: null, agrupar: null }))
+      .toMatchObject({ params: { p_categoria: null, p_desde: null, p_hasta: null, p_tipo: null, p_agrupar: null } });
+    for (const args of [{ desde: "2026-13-01" }, { desde: "2026-03-01", hasta: "2026-01-01" }]) {
+      let msg = "";
+      try { prepararLlamada("gasto_por_categoria", args); } catch (e) { msg = (e as Error).message; }
+      expect(esErrorCorregible(msg), msg).toBe(true);
+    }
+  });
+
+  it("variacion_precios: umbral numerico, sentido, categoria o producto y tope de filas", () => {
+    expect(prepararLlamada("variacion_precios", {
+      desde: null, hasta: "2026-10-07", umbral_pct: 5, categoria: "pescado", producto: null, sentido: "bajadas",
+    })).toEqual({
+      tipo: "rpc",
+      rpc: "variacion_precios_agente",
+      params: {
+        p_desde: null, p_hasta: "2026-10-07", p_umbral_pct: 5, p_categoria: "pescado", p_producto: null,
+        p_limite: LIMITES.variacion_precios, p_sentido: "bajadas",
+      },
+      limite: null,
+    });
+    // Un umbral que no es numero no pasa (la RPC usa su 10 por defecto).
+    expect(prepararLlamada("variacion_precios", { umbral_pct: "10%", producto: " merluza " }))
+      .toMatchObject({ params: { p_umbral_pct: null, p_producto: "merluza" } });
+    expect(() => prepararLlamada("variacion_precios", { desde: "ayer" })).toThrow(/fecha/);
   });
 
   it("buscar_facturas sigue siendo semantica pura", () => {
@@ -459,6 +515,17 @@ describe("marcarResultado", () => {
   it("compras_producto con datos pasa sin avisos de documento", () => {
     const data = { buscado: "nata", coincidencia: "exacta", total: { importe: 497.3, lineas: 5 }, por_unidad: [{ unidad: "kg", cantidad: 120 }] };
     expect(marcarResultado("compras_producto", data, null)).toEqual(data);
+  });
+
+  it("gasto_por_categoria sin datos => aviso de vacio y conserva la ultima compra", () => {
+    const r = marcarResultado("gasto_por_categoria", { categoria: "Vinos", sin_datos: true, ultima_compra: "2026-09-28" }, null) as Record<string, unknown>;
+    expect(r.aviso_vacio).toMatch(/no hay datos/);
+    expect(r.ultima_compra).toBe("2026-09-28");
+  });
+
+  it("variacion_precios sin subidas pero con productos comparados NO es 'no hay datos'", () => {
+    const data = { sentido: "subidas", umbral_pct: 10, productos: [], total_productos: 0, comparados: 3 };
+    expect(marcarResultado("variacion_precios", data, null)).toEqual(data);
   });
 
   it("errores pasan tal cual", () => {

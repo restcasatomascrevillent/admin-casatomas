@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FolderTree, Merge, Search, Sparkles, X } from "lucide-react";
+import { FolderTree, Merge, Search, Sparkles, Truck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,12 +13,15 @@ import {
   useRecategorizarProductos,
   useResumenProductos,
 } from "@/hooks/useProductosCatalogo";
+import { useProveedores } from "@/hooks/useProveedores";
+import { crearResolverProveedor, type ResolverProveedor } from "@/lib/facturas/proveedores";
 import {
   ETIQUETAS_PERIODO,
   faltaMigracionCatalogo,
   filtrarProductos,
   formatCantidades,
   indexarCategorias,
+  nombresProveedores,
   proveedoresDe,
   rangoPeriodo,
   rutaCategoria,
@@ -31,7 +34,9 @@ import { DetalleProductoDialog } from "./DetalleProductoDialog";
 import { FusionarDialog } from "./FusionarDialog";
 import { CategoriasDialog } from "./CategoriasDialog";
 import { LineasSinClasificar } from "./LineasSinClasificar";
+import { ProveedoresDialog } from "./ProveedoresDialog";
 import { SelectorCategoria } from "./SelectorCategoria";
+import { AvisosPrecio } from "./AvisosPrecio";
 
 type Orden = "gasto" | "compras" | "nombre";
 const TODOS = "__todos";
@@ -57,6 +62,7 @@ export function TabProductos() {
   const [detalle, setDetalle] = useState<number | null>(null);
   const [fusionando, setFusionando] = useState(false);
   const [editandoCategorias, setEditandoCategorias] = useState(false);
+  const [viendoProveedores, setViendoProveedores] = useState(false);
 
   const filtroPeriodo = useMemo(() => ({ ...rangoPeriodo(periodo), tipo: tipo === TODOS ? null : tipo }), [periodo, tipo]);
   const categoriasQ = useCategoriasProducto();
@@ -64,25 +70,30 @@ export function TabProductos() {
   const gastoQ = useGastoCategorias(filtroPeriodo);
   const recategorizar = useRecategorizarProductos();
   const clasificar = useClasificarConIA();
+  // Proveedores unificados (20261007180000): el filtro y la lista usan el
+  // proveedor canónico. Sin la migración, el texto del documento como antes.
+  const proveedoresQ = useProveedores();
+  const resolver = useMemo(() => crearResolverProveedor(proveedoresQ.data?.proveedores), [proveedoresQ.data]);
 
   const categorias = useMemo(() => categoriasQ.data ?? [], [categoriasQ.data]);
   const mapa = useMemo(() => indexarCategorias(categorias), [categorias]);
   const productos = useMemo(() => resumenQ.data ?? [], [resumenQ.data]);
   const totales = useMemo(() => totalesPorRaiz(gastoQ.data ?? [], mapa), [gastoQ.data, mapa]);
-  const proveedores = useMemo(() => proveedoresDe(productos), [productos]);
+  const proveedores = useMemo(() => proveedoresDe(productos, resolver), [productos, resolver]);
 
   const visibles = useMemo(() => {
     const lista = filtrarProductos(
       productos,
       { busqueda, categoria, proveedor, soloConCompras: periodo !== "todo" || tipo !== TODOS },
       mapa,
+      resolver,
     );
     const ordenada = [...lista];
     if (orden === "nombre") ordenada.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
     else if (orden === "compras") ordenada.sort((a, b) => b.compras - a.compras || b.gasto - a.gasto);
     else ordenada.sort((a, b) => b.gasto - a.gasto || a.nombre.localeCompare(b.nombre, "es"));
     return ordenada;
-  }, [productos, busqueda, categoria, proveedor, periodo, tipo, orden, mapa]);
+  }, [productos, busqueda, categoria, proveedor, periodo, tipo, orden, mapa, resolver]);
 
   const gastoTotal = totales.reduce((a, t) => a + t.gasto, 0);
   const gastoVisible = visibles.reduce((a, p) => a + p.gasto, 0);
@@ -180,11 +191,15 @@ export function TabProductos() {
             <SelectItem value="nombre">Nombre</SelectItem>
           </SelectContent>
         </Select>
+        <Button variant="outline" onClick={() => setViendoProveedores(true)}>
+          <Truck className="mr-1 h-4 w-4" aria-hidden="true" /> Proveedores
+        </Button>
         {puedeEditar && (
           <Button variant="outline" onClick={() => setEditandoCategorias(true)}>
             <FolderTree className="mr-1 h-4 w-4" aria-hidden="true" /> Categorías
           </Button>
         )}
+        <AvisosPrecio puedeEditar={puedeEditar} />
         {puedeEditar && pendientes > 0 && (
           <Button variant="outline" disabled={clasificar.isPending} onClick={() => clasificar.mutate()}>
             <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -286,6 +301,7 @@ export function TabProductos() {
                   key={p.producto_id}
                   p={p}
                   ruta={rutaCategoria(mapa, p.categoria_id)}
+                  resolver={resolver}
                   seleccionado={seleccion.has(p.producto_id)}
                   conCasilla={puedeEditar}
                   onAlternar={() => alternar(p.producto_id)}
@@ -324,6 +340,7 @@ export function TabProductos() {
         />
       )}
       {editandoCategorias && <CategoriasDialog categorias={categorias} onCerrar={() => setEditandoCategorias(false)} />}
+      {viendoProveedores && <ProveedoresDialog puedeEditar={puedeEditar} onCerrar={() => setViendoProveedores(false)} />}
     </div>
   );
 }
@@ -331,6 +348,7 @@ export function TabProductos() {
 function FilaResumen({
   p,
   ruta,
+  resolver,
   seleccionado,
   conCasilla,
   onAlternar,
@@ -338,11 +356,13 @@ function FilaResumen({
 }: {
   p: ResumenProducto;
   ruta: string | null;
+  resolver: ResolverProveedor;
   seleccionado: boolean;
   conCasilla: boolean;
   onAlternar: () => void;
   onAbrir: () => void;
 }) {
+  const nombresProv = nombresProveedores(p, resolver);
   return (
     <li className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 px-2 py-1.5 ${COLUMNAS} ${seleccionado ? "bg-primary/5" : ""}`}>
       <div className="flex h-11 w-11 items-center justify-center">
@@ -363,7 +383,7 @@ function FilaResumen({
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {ruta ?? "Sin categoría"}
-          {p.proveedores.length > 0 && ` · ${p.proveedores.join(", ")}`}
+          {nombresProv.length > 0 && ` · ${nombresProv.join(", ")}`}
         </span>
       </button>
       {/* Móvil y tablet vertical: gasto a la derecha; el resto debajo. lg+: columnas. */}

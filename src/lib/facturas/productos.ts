@@ -5,6 +5,7 @@
 //  20261007160000_productos_catalogo_categorias): árbol de dos niveles,
 //  filtros de la pantalla, totales por categoría y periodos.
 // ============================================================================
+import type { ResolverProveedor } from "./proveedores";
 
 export interface CategoriaProducto {
   id: number;
@@ -113,14 +114,38 @@ export const normalizarBusqueda = (s: string | null | undefined) =>
 export const claveProveedor = (s: string) =>
   normalizarBusqueda(s).replace(/[.,]/g, " ").replace(/\b(s\s?l\s?u?|s\s?a|c\s?b|slu)\b/g, "").replace(/\s+/g, " ").trim();
 
-/** Proveedores distintos (por clave), con el primer nombre visto. Orden alfabético. */
-export function proveedoresDe(lista: Pick<ResumenProducto, "proveedores">[]): { clave: string; nombre: string }[] {
+/** Sin proveedores unificados: la clave de texto de siempre y el propio texto. */
+const resolverPorTexto: ResolverProveedor = (texto) => ({ clave: claveProveedor(texto), nombre: texto });
+
+/**
+ * Proveedores distintos (por clave), con el primer nombre visto. Orden alfabético.
+ * Con `resolver` (proveedores unificados, `crearResolverProveedor`) la clave y el
+ * nombre son los del proveedor canónico: «JOSELITO (Cárnicas Joselito)» y
+ * «Cárnicas Joselito S.A.» salen una sola vez.
+ */
+export function proveedoresDe(
+  lista: Pick<ResumenProducto, "proveedores">[],
+  resolver: ResolverProveedor = resolverPorTexto,
+): { clave: string; nombre: string }[] {
   const mapa = new Map<string, string>();
   for (const p of lista) for (const n of p.proveedores ?? []) {
-    const k = claveProveedor(n);
-    if (k && !mapa.has(k)) mapa.set(k, n);
+    const r = resolver(n);
+    if (r.clave && !mapa.has(r.clave)) mapa.set(r.clave, r.nombre);
   }
   return [...mapa].map(([clave, nombre]) => ({ clave, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+/** Nombres de proveedor de un producto, ya canónicos y sin repetir. */
+export function nombresProveedores(
+  p: Pick<ResumenProducto, "proveedores">,
+  resolver: ResolverProveedor = resolverPorTexto,
+): string[] {
+  const vistos = new Map<string, string>();
+  for (const n of p.proveedores ?? []) {
+    const r = resolver(n);
+    if (r.clave && !vistos.has(r.clave)) vistos.set(r.clave, r.nombre);
+  }
+  return [...vistos.values()];
 }
 
 /** «todas» · «sin» (productos sin categoría) · id de categoría (incluye sus hijas). */
@@ -129,13 +154,18 @@ export type FiltroCategoria = "todas" | "sin" | number;
 export interface FiltrosProductos {
   busqueda: string;
   categoria: FiltroCategoria;
-  /** Clave de proveedor (`claveProveedor`) o "" para todos. */
+  /** Clave de proveedor (la de `proveedoresDe` con el mismo resolver) o "" para todos. */
   proveedor: string;
   /** Ocultar productos sin compras en el periodo. */
   soloConCompras: boolean;
 }
 
-export function filtrarProductos(lista: ResumenProducto[], f: FiltrosProductos, mapa: MapaCategorias): ResumenProducto[] {
+export function filtrarProductos(
+  lista: ResumenProducto[],
+  f: FiltrosProductos,
+  mapa: MapaCategorias,
+  resolver: ResolverProveedor = resolverPorTexto,
+): ResumenProducto[] {
   const q = normalizarBusqueda(f.busqueda);
   return lista.filter((p) => {
     if (f.soloConCompras && p.compras === 0) return false;
@@ -143,7 +173,7 @@ export function filtrarProductos(lista: ResumenProducto[], f: FiltrosProductos, 
     if (typeof f.categoria === "number" && p.categoria_id !== f.categoria && categoriaRaiz(mapa, p.categoria_id) !== f.categoria) {
       return false;
     }
-    if (f.proveedor && !(p.proveedores ?? []).some((n) => claveProveedor(n) === f.proveedor)) return false;
+    if (f.proveedor && !(p.proveedores ?? []).some((n) => resolver(n).clave === f.proveedor)) return false;
     if (q && !normalizarBusqueda(p.nombre).includes(q) && !normalizarBusqueda(rutaCategoria(mapa, p.categoria_id)).includes(q)) {
       return false;
     }

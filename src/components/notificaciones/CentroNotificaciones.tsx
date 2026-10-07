@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Receipt, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Receipt, Trash2, TrendingUp } from "lucide-react";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,8 @@ const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   reserva_sin_asignar: LayoutGrid,
   // Fin de una tanda de subida de facturas en segundo plano (ColaSubidaProvider).
   facturas_subida: Receipt,
+  // Trigger de productos_factura (20261007170000): producto más caro que su referencia.
+  subida_precio: TrendingUp,
   sistema: Info,
 };
 
@@ -55,6 +57,8 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
       navigate("/reservas?tab=reservas&status=solicitudes");
     } else if (notif.referencia_tipo === "facturas_cargar") {
       navigate("/facturas?tab=cargar");
+    } else if (notif.referencia_tipo === "facturas_productos") {
+      navigate("/facturas?tab=productos");
     }
   };
 

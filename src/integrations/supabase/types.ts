@@ -1551,6 +1551,7 @@ export type Database = {
           paginas: number
           procesado_en: string | null
           proveedor: string | null
+          proveedor_id: number | null
           proveedor_normalizado: string | null
           resumen: string | null
           subtotal: number | null
@@ -1577,6 +1578,7 @@ export type Database = {
           paginas?: number
           procesado_en?: string | null
           proveedor?: string | null
+          proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
           subtotal?: number | null
@@ -1603,6 +1605,7 @@ export type Database = {
           paginas?: number
           procesado_en?: string | null
           proveedor?: string | null
+          proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
           subtotal?: number | null
@@ -1613,6 +1616,13 @@ export type Database = {
           verificada?: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "facturas_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "facturas_ocr_trabajo_fk"
             columns: ["ocr_trabajo_id"]
@@ -3394,12 +3404,16 @@ export type Database = {
           activo: boolean | null
           categoria: string | null
           cif: string | null
+          cif_normalizado: string | null
           created_at: string | null
           direccion: string | null
           email: string | null
           id: number
           nombre: string
+          nombre_comercial: string | null
+          nombre_normalizado: string | null
           notas: string | null
+          origen: string | null
           telefono: string | null
           updated_at: string | null
         }
@@ -3412,7 +3426,9 @@ export type Database = {
           email?: string | null
           id?: number
           nombre: string
+          nombre_comercial?: string | null
           notas?: string | null
+          origen?: string | null
           telefono?: string | null
           updated_at?: string | null
         }
@@ -3425,11 +3441,51 @@ export type Database = {
           email?: string | null
           id?: number
           nombre?: string
+          nombre_comercial?: string | null
           notas?: string | null
+          origen?: string | null
           telefono?: string | null
           updated_at?: string | null
         }
         Relationships: []
+      }
+      proveedores_alias: {
+        Row: {
+          alias_normalizado: string | null
+          cif_normalizado: string | null
+          created_at: string
+          id: number
+          origen: string
+          proveedor_id: number
+          texto_original: string | null
+        }
+        Insert: {
+          alias_normalizado?: string | null
+          cif_normalizado?: string | null
+          created_at?: string
+          id?: never
+          origen?: string
+          proveedor_id: number
+          texto_original?: string | null
+        }
+        Update: {
+          alias_normalizado?: string | null
+          cif_normalizado?: string | null
+          created_at?: string
+          id?: never
+          origen?: string
+          proveedor_id?: number
+          texto_original?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proveedores_alias_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       publicaciones_redes: {
         Row: {
@@ -5207,7 +5263,12 @@ export type Database = {
         Args: { p_nombre: string }
         Returns: string
       }
+      normalizar_cif: { Args: { p_cif: string }; Returns: string }
       normalizar_proveedor: { Args: { p_proveedor: string }; Returns: string }
+      normalizar_proveedor_base: {
+        Args: { p_proveedor: string }
+        Returns: string
+      }
       normalizar_texto: { Args: { p_texto: string }; Returns: string }
       productos_asignar_lineas: {
         Args: {
@@ -5264,6 +5325,40 @@ export type Database = {
           unidad_habitual: string | null
         }[]
       }
+      proveedores_editar: {
+        Args: {
+          p_cif?: string | null
+          p_id: number
+          p_nombre: string
+          p_nombre_comercial?: string | null
+        }
+        Returns: Json
+      }
+      proveedores_fusionar: {
+        Args: { p_destino_id: number; p_origen_ids: number[] }
+        Returns: Json
+      }
+      proveedores_listado: {
+        Args: never
+        Returns: {
+          activo: boolean
+          albaranes: number
+          alias: string[]
+          cif: string | null
+          cifs_extra: string[]
+          documentos: number
+          facturas: number
+          id: number
+          nombre: string
+          nombre_comercial: string | null
+          origen: string | null
+          total_albaranes: number
+          total_facturas: number
+          ultima_fecha: string | null
+          variantes: string[]
+        }[]
+      }
+      proveedores_puede_editar: { Args: never; Returns: boolean }
       recalcular_ocupacion_historica: {
         Args: { fecha_desde?: string; fecha_hasta?: string }
         Returns: number
