@@ -274,9 +274,17 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   }
 
   return (
-    <div className="space-y-4">
+    // Con alto medido (Usuarios / SuperAdminUsuarios) la lista llena lo que queda de la tarjeta y
+    // solo hace scroll el cuerpo de la tabla. El contenedor de scroll es el `div` que el primitivo
+    // `Table` pone alrededor de la tabla; su alto se fija desde aquí con `[&>div]:…` (como en
+    // ListaReservasAvanzada) para no tocar `ui/table.tsx`, que es compartido. Los diálogos van en
+    // portal, así que ese `div` es el único hijo `div`. La cabecera se pega arriba (`sticky top-0`)
+    // con el fondo de la tarjeta para tapar las filas; la sombra de 1 px hace de línea inferior
+    // cuando está pegada (con `border-collapse` el borde de la fila no viaja con el thead; en
+    // reposo coincide con ese borde y no se nota).
+    <div className="flex min-h-0 flex-1 flex-col [&>div]:min-h-0 [&>div]:flex-1">
       <Table>
-        <TableHeader>
+        <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
           <TableRow>
             <TableHead>Usuario</TableHead>
             <TableHead>Rol</TableHead>

@@ -15,6 +15,20 @@ import { toast } from "sonner";
 import { CASA_TOMAS, LOGO_CASA_TOMAS } from "@/lib/cheques/casaTomas";
 import { ListaTickets } from "@/components/cheques/ListaTickets";
 import { VistaFacturaCheque } from "@/components/cheques/VistaFacturaCheque";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
+ * móvil) deja de encoger y vuelve el scroll de página. El mismo que Newsletter.
+ */
+const ALTURA_MINIMA_CHEQUES = 360;
+
+/**
+ * Contenido de cada pestaña: ocupa el alto que queda bajo la barra y hace scroll por dentro.
+ * `data-[state=inactive]:hidden` imprescindible (como en Marketing/Facturas): Radix deja montadas
+ * las pestañas inactivas con el atributo `hidden`, y una clase `flex` le gana a ese atributo.
+ */
+const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 // Estas tablas/RPC se incorporan mediante la migración de Cheques.
 const db = supabase as unknown as SupabaseClient;
@@ -62,6 +76,12 @@ export default function Cheques() {
   const [errorCarga, setErrorCarga] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [cambios, setCambios] = useState(false);
+  // Alto de la pantalla, sin scroll de página (petición del dueño, 2026-10-07): mismo patrón que
+  // Newsletter (`useAlturaDisponible`). La barra de pestañas queda fija y cada pestaña hace scroll
+  // por dentro; en Expedición solo se desplaza el cuerpo de la tabla (ListaTickets). Sin medida
+  // (jsdom, primer pintado) cae al layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_CHEQUES);
 
   async function cargar() {
     setCargando(true); setErrorCarga("");
@@ -133,15 +153,15 @@ export default function Cheques() {
   const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : "Cheque válido para canjear";
 
   return <DashboardLayout>
-    <div className="space-y-6">
-      <Tabs value={pestana} onValueChange={setPestana}>
-        <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto rounded-xl p-1.5 bg-muted/60">
+    <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
+      <Tabs value={pestana} onValueChange={setPestana} className="flex min-h-0 flex-1 flex-col gap-6">
+        <TabsList className="grid w-full max-w-2xl shrink-0 grid-cols-3 h-auto rounded-xl p-1.5 bg-muted/60">
           <TabsTrigger value="expedicion" className="min-h-11 whitespace-normal text-xs sm:text-sm rounded-lg">Expedición de tickets</TabsTrigger>
           <TabsTrigger value="verificar" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search className="h-4 w-4" />Verificar cheque</TabsTrigger>
           <TabsTrigger value="plantilla" className="min-h-11 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText className="h-4 w-4" />Plantilla de factura</TabsTrigger>
         </TabsList>
-        <TabsContent value="expedicion" className="mt-6"><ListaTickets /></TabsContent>
-        <TabsContent value="verificar" className="mt-6 space-y-5 max-w-4xl">
+        <TabsContent value="expedicion" className={`${CONTENIDO_PESTANA} flex flex-col`}><ListaTickets /></TabsContent>
+        <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
             <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">
               <div className="space-y-2 flex-1 min-w-0"><Label htmlFor="codigo-cheque">Código del cheque</Label><Input id="codigo-cheque" placeholder="CT-XXXXXXXX" value={codigo} maxLength={32} autoComplete="off" autoCapitalize="characters" disabled={ocupado} onChange={e => { setCodigo(e.target.value); setResultado(null); setErrorVerificacion(""); }} className="h-14 rounded-xl uppercase font-mono text-lg tracking-widest bg-muted/20" /></div>
@@ -154,7 +174,8 @@ export default function Cheques() {
             {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{resultado.valido && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{resultado.valido && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
           </CardContent></Card>}
         </TabsContent>
-        <TabsContent value="plantilla" className="mt-6">
+        {/* La vista previa se pega arriba de la REGIÓN de la pestaña (su contenedor de scroll), ya no de la ventana. */}
+        <TabsContent value="plantilla" className={CONTENIDO_PESTANA}>
           {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
             <Card className="rounded-2xl shadow-sm"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Personaliza tu factura</CardTitle><p className="text-sm text-muted-foreground mt-2">El logo y los datos de Casa Tomás ya están preparados.</p></div><Palette className="h-5 w-5 text-[#795440] shrink-0" /></div></CardHeader><CardContent>
               {errorCarga && <div className="space-y-3 rounded-lg border border-destructive/40 p-4"><p role="alert">{errorCarga}</p><p className="text-sm text-muted-foreground">Vista previa de la plantilla Casa Tomás. No se han recuperado los datos guardados; la edición está bloqueada hasta restablecer la conexión.</p><Button onClick={() => void cargar()} variant="outline">Reintentar conexión</Button></div>}
@@ -173,7 +194,7 @@ export default function Cheques() {
                 {puedeEditar && <Button type="submit" disabled={guardando || !cambios || !!errorCarga}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
               </form>
             </CardContent></Card>
-            <div className="space-y-3 min-w-0 xl:sticky xl:top-6"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
+            <div className="space-y-3 min-w-0 xl:sticky xl:top-0"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
               <VistaFacturaCheque plantilla={plantilla} />
               <Card><CardHeader><CardTitle className="text-base">Mensaje que recibirá el cliente</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap break-words text-sm">{plantilla.email_mensaje}</p><p className="mt-4 text-xs text-muted-foreground">Adjunto: Factura-CT-00000001.pdf</p></CardContent></Card>
             </div>

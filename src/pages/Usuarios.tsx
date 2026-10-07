@@ -12,14 +12,27 @@ import {
 } from "@/components/ui/dialog";
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 import { InvitarUsuario } from "@/components/usuarios/InvitarUsuario";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { UserPlus } from "lucide-react";
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
+ * móvil) deja de encoger y vuelve el scroll de página. El mismo que Newsletter.
+ */
+const ALTURA_MINIMA_USUARIOS = 360;
 
 export default function Usuarios() {
   const [addUserOpen, setAddUserOpen] = useState(false);
+  // Alto de la pantalla, sin scroll de página (petición del dueño, 2026-10-07): mismo patrón que
+  // Newsletter (`useAlturaDisponible`). El botón y la cabecera de la tarjeta quedan fijos y la
+  // tabla hace scroll por dentro con la cabecera de columnas pegada (ListaUsuarios). Sin medida
+  // (jsdom, primer pintado) cae al layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_USUARIOS);
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
         {/* Sin título de página (2026-09-25): la pestaña "Usuarios" activa en
             el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
 
@@ -43,14 +56,14 @@ export default function Usuarios() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="flex min-h-0 flex-1 flex-col">
           <CardHeader>
             <CardTitle>Lista de Usuarios</CardTitle>
             <CardDescription>
               Gestiona los permisos de cada usuario del sistema
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex min-h-0 flex-1 flex-col">
             <ListaUsuarios />
           </CardContent>
         </Card>

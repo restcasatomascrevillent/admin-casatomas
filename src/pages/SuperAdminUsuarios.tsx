@@ -12,14 +12,25 @@ import {
 } from "@/components/ui/dialog";
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 import { InvitarUsuario } from "@/components/usuarios/InvitarUsuario";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { UserPlus } from "lucide-react";
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
+ * móvil) deja de encoger y vuelve el scroll de página. El mismo que Usuarios y Newsletter.
+ */
+const ALTURA_MINIMA_USUARIOS = 360;
 
 export default function SuperAdminUsuarios() {
   const [addUserOpen, setAddUserOpen] = useState(false);
+  // Alto de la pantalla, sin scroll de página (petición del dueño, 2026-10-07): el mismo patrón
+  // que Usuarios (`useAlturaDisponible`); la tabla hace scroll por dentro (ListaUsuarios).
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_USUARIOS);
 
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
+      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
         <div className="flex justify-end">
           <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
             <DialogTrigger asChild>
@@ -40,14 +51,14 @@ export default function SuperAdminUsuarios() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card className="flex min-h-0 flex-1 flex-col">
           <CardHeader>
             <CardTitle>Lista de Usuarios</CardTitle>
             <CardDescription>
               Gestiona roles, permisos y el acceso de super admin de todos los usuarios del sistema
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex min-h-0 flex-1 flex-col">
             <ListaUsuarios canManageSuperAdmins />
           </CardContent>
         </Card>

@@ -37,7 +37,13 @@ export function ListaTickets() {
     void cargar();
     return () => { activo = false; };
   }, [pagina, revision, busqueda]);
-  return <div className="space-y-4">
+  // Con alto medido (pestaña Expedición de Cheques.tsx) la lista llena la pestaña: título, búsqueda,
+  // totales y paginación quedan fijos y solo la tabla hace scroll, con la cabecera de columnas pegada
+  // (`sticky top-0`; el `bg-background` del thead tapa las filas y la fila conserva su `bg-muted/50`).
+  // Suelo de la tabla (como la lista de Suscriptores): 12 rem desde `md` y 32 rem en el móvil, donde
+  // los totales van apilados; por debajo de ese suelo desplaza la pestaña entera. Sin
+  // `overscroll-contain` en la tabla: al llegar a su final, el gesto sigue en la pestaña.
+  return <div className="flex min-h-0 flex-1 flex-col gap-4">
     <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Expedición total de tickets</h2><p className="text-sm text-muted-foreground">Todos los cheques regalo, del más reciente al más antiguo.</p></div><Button variant="outline" disabled={cargando} onClick={() => setRevision(r => r + 1)}>Actualizar</Button></div>
     <form className="flex flex-col sm:flex-row gap-3" onSubmit={e => { e.preventDefault(); setPagina(0); setBusqueda(texto.trim()); setRevision(r => r + 1); }}>
       <Input aria-label="Buscar tickets por código o comprador" placeholder="Buscar por código o comprador…" value={texto} onChange={e => setTexto(e.target.value)} className="sm:max-w-md h-11" />
@@ -46,7 +52,7 @@ export function ListaTickets() {
     </form>
     {cargando ? <p role="status">Cargando tickets…</p> : error ? <p role="alert" className="rounded-xl border border-destructive/40 p-4">{error}</p> : datos && <>
       <div className="grid gap-3 sm:grid-cols-3">{[["Tickets expedidos", datos.expedidos], ["Tickets canjeados", datos.canjeados], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <Card key={nombre}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{nombre}</p><p className="text-2xl font-semibold mt-1">{valor}</p></CardContent></Card>)}</div>
-      <div className="overflow-x-auto rounded-xl border"><table className="w-full text-sm"><thead className="bg-muted/50"><tr>{["Fecha", "Código", "Comprador", "Importe", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
+      <div className="min-h-[32rem] flex-1 overflow-auto rounded-xl border md:min-h-[12rem]"><table className="w-full text-sm"><thead className="sticky top-0 z-10 bg-background"><tr className="bg-muted/50">{["Fecha", "Código", "Comprador", "Importe", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
         {datos.tickets.map(t => <tr key={t.id} className={`border-t ${t.usado ? "bg-red-50 text-red-950 dark:bg-red-950/30 dark:text-red-100" : t.estado === "pagado" ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100" : ""}`}><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap">{t.codigo || "Sin expedir"}</td><td className="p-3">{t.comprador_nombre}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : "Disponible"}</td></tr>)}
         {!datos.tickets.length && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No hay tickets que coincidan con la búsqueda.</td></tr>}
       </tbody></table></div>
