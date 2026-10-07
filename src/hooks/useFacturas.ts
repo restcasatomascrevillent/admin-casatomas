@@ -17,6 +17,14 @@ export interface ProductoFactura {
   bultos?: number | null;
   proveedor: string | null;
   precio_unitario?: number;
+  /**
+   * Categoría del producto canónico de la línea (Facturas › Productos,
+   * migración 20261007160000). null/ausente = sin clasificar o migración sin
+   * aplicar. Solo lectura aquí: se cambia en la pestaña Productos.
+   */
+  categoria?: { nombre: string; ruta: string } | null;
+  /** Nombre del producto canónico (productos_catalogo) si la línea lo tiene. */
+  producto_canonico?: string | null;
 }
 
 /** Una anomalia de importes detectada por `procesar-factura` al cargar el documento. */
@@ -72,21 +80,47 @@ export interface Factura {
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
 
-const columnasDocumento = (conBultos: boolean) => `
+const columnasDocumento = (conBultos: boolean, conProducto: boolean) => `
       id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
-        id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}
+        id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}${
+          conProducto ? ", producto_id, productos_catalogo ( nombre, categoria_id )" : ""
+        }
       )
     `;
 
+interface CategoriaMin {
+  id: number;
+  nombre: string;
+  padre_id: number | null;
+}
+
+/** Categorías de producto para la etiqueta de cada línea. [] si la migración no está. */
+const leerCategorias = async (): Promise<CategoriaMin[] | null> => {
+  const { data, error } = await supabase.from('categorias_producto').select('id, nombre, padre_id');
+  if (error) return null;
+  return (data ?? []) as CategoriaMin[];
+};
+
+function categoriaDeLinea(
+  mapa: Map<number, CategoriaMin>,
+  id: number | null | undefined,
+): { nombre: string; ruta: string } | null {
+  if (id === null || id === undefined) return null;
+  const c = mapa.get(id);
+  if (!c) return null;
+  const padre = c.padre_id !== null ? mapa.get(c.padre_id) : undefined;
+  return { nombre: c.nombre, ruta: padre ? `${padre.nombre} › ${c.nombre}` : c.nombre };
+}
+
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
   // Una sola query con JOIN — se evita el N+1 de queries separadas
-  const consultar = (conBultos: boolean) =>
+  const consultar = (conBultos: boolean, conProducto: boolean) =>
     supabase
       .from('facturas')
-      .select(columnasDocumento(conBultos))
+      .select(columnasDocumento(conBultos, conProducto))
       .eq('tipo', tipo)
       .order('fecha', { ascending: false })
       // Las líneas en el orden impreso: se insertan en ese orden (también las de
@@ -94,13 +128,23 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       // la columna `orden` (migración 20261005120000, puede no estar aplicada).
       .order('id', { referencedTable: 'productos_factura', ascending: true });
 
-  let { data, error } = await consultar(true);
-  // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
-  // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
-  // listado de facturas vacío.
-  if (error && /bultos/i.test(error.message ?? '')) {
-    ({ data, error } = await consultar(false));
+  // La categoría de cada línea (catálogo de productos, migración
+  // 20261007160000) es un extra: sin la migración se consulta sin ella.
+  const categorias = await leerCategorias();
+  let conProducto = categorias !== null;
+  let conBultos = true;
+  let { data, error } = await consultar(conBultos, conProducto);
+  for (let i = 0; i < 2 && error; i++) {
+    const msg = error.message ?? '';
+    if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
+    // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
+    // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
+    // listado de facturas vacío.
+    else if (conBultos && /bultos/i.test(msg)) conBultos = false;
+    else break;
+    ({ data, error } = await consultar(conBultos, conProducto));
   }
+  const mapaCategorias = new Map((categorias ?? []).map((c) => [c.id, c]));
 
   if (error) throw error;
   if (!data || data.length === 0) return [];
@@ -119,6 +163,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
         bultos: p.bultos != null ? Number(p.bultos) : null,
         proveedor: null,
         precio_unitario: precioUnitario,
+        categoria: categoriaDeLinea(mapaCategorias, p.productos_catalogo?.categoria_id),
+        producto_canonico: p.productos_catalogo?.nombre ?? null,
       };
     });
 

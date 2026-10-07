@@ -707,6 +707,50 @@ export type Database = {
         }
         Relationships: []
       }
+      categorias_producto: {
+        Row: {
+          activa: boolean
+          clave: string | null
+          created_at: string
+          descripcion: string | null
+          id: number
+          nombre: string
+          orden: number
+          padre_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          clave?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: never
+          nombre: string
+          orden?: number
+          padre_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          clave?: string | null
+          created_at?: string
+          descripcion?: string | null
+          id?: never
+          nombre?: string
+          orden?: number
+          padre_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorias_producto_padre_id_fkey"
+            columns: ["padre_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_producto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_web_config: {
         Row: {
           activo: boolean
@@ -3190,49 +3234,78 @@ export type Database = {
         }
         Relationships: []
       }
-      productos_catalogo: {
+      productos_alias: {
         Row: {
-          activo: boolean | null
-          categoria: string | null
-          created_at: string | null
-          id: number
-          nombre: string
-          notas: string | null
-          precio_actual: number | null
-          proveedor_habitual_id: number | null
-          unidad_medida: string | null
-          updated_at: string | null
+          created_at: string
+          origen: string
+          producto_id: number
+          texto_normalizado: string
+          updated_at: string
         }
         Insert: {
-          activo?: boolean | null
-          categoria?: string | null
-          created_at?: string | null
-          id?: number
-          nombre: string
-          notas?: string | null
-          precio_actual?: number | null
-          proveedor_habitual_id?: number | null
-          unidad_medida?: string | null
-          updated_at?: string | null
+          created_at?: string
+          origen?: string
+          producto_id: number
+          texto_normalizado: string
+          updated_at?: string
         }
         Update: {
-          activo?: boolean | null
-          categoria?: string | null
-          created_at?: string | null
-          id?: number
-          nombre?: string
-          notas?: string | null
-          precio_actual?: number | null
-          proveedor_habitual_id?: number | null
-          unidad_medida?: string | null
-          updated_at?: string | null
+          created_at?: string
+          origen?: string
+          producto_id?: number
+          texto_normalizado?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "productos_catalogo_proveedor_habitual_id_fkey"
-            columns: ["proveedor_habitual_id"]
+            foreignKeyName: "productos_alias_producto_id_fkey"
+            columns: ["producto_id"]
             isOneToOne: false
-            referencedRelation: "proveedores"
+            referencedRelation: "productos_catalogo"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_catalogo: {
+        Row: {
+          categoria_id: number | null
+          created_at: string
+          creado_por: string | null
+          id: number
+          nombre: string
+          nombre_normalizado: string | null
+          origen: string
+          unidad_habitual: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria_id?: number | null
+          created_at?: string
+          creado_por?: string | null
+          id?: never
+          nombre: string
+          nombre_normalizado?: never
+          origen?: string
+          unidad_habitual?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria_id?: number | null
+          created_at?: string
+          creado_por?: string | null
+          id?: never
+          nombre?: string
+          nombre_normalizado?: never
+          origen?: string
+          unidad_habitual?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_catalogo_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_producto"
             referencedColumns: ["id"]
           },
         ]
@@ -3252,6 +3325,7 @@ export type Database = {
           orden: number | null
           pagina: number | null
           precio_unitario: number | null
+          producto_id: number | null
           total: number | null
           unidad: string | null
         }
@@ -3269,6 +3343,7 @@ export type Database = {
           orden?: number | null
           pagina?: number | null
           precio_unitario?: number | null
+          producto_id?: number | null
           total?: number | null
           unidad?: string | null
         }
@@ -3286,10 +3361,18 @@ export type Database = {
           orden?: number | null
           pagina?: number | null
           precio_unitario?: number | null
+          producto_id?: number | null
           total?: number | null
           unidad?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "productos_factura_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "productos_factura_factura_id_fkey"
             columns: ["factura_id"]
@@ -5126,6 +5209,61 @@ export type Database = {
       }
       normalizar_proveedor: { Args: { p_proveedor: string }; Returns: string }
       normalizar_texto: { Args: { p_texto: string }; Returns: string }
+      productos_asignar_lineas: {
+        Args: {
+          p_categoria_id?: number | null
+          p_linea_ids: number[]
+          p_nombre_nuevo?: string | null
+          p_producto_id?: number | null
+        }
+        Returns: Json
+      }
+      productos_borrar: { Args: { p_producto_id: number }; Returns: undefined }
+      productos_fusionar: {
+        Args: { p_destino_id: number; p_origen_ids: number[] }
+        Returns: Json
+      }
+      productos_gasto_por_categoria: {
+        Args: { p_desde?: string | null; p_hasta?: string | null; p_tipo?: string | null }
+        Returns: {
+          categoria: string
+          categoria_id: number | null
+          gasto: number
+          lineas: number
+          lineas_sin_importe: number
+          padre: string | null
+          padre_id: number | null
+          productos: number
+          sin_clasificar: boolean
+        }[]
+      }
+      productos_puede_editar: { Args: never; Returns: boolean }
+      productos_recategorizar: {
+        Args: { p_categoria_id: number | null; p_producto_ids: number[] }
+        Returns: number
+      }
+      productos_renombrar: {
+        Args: { p_nombre: string; p_producto_id: number }
+        Returns: Json
+      }
+      productos_resumen: {
+        Args: { p_desde?: string | null; p_hasta?: string | null; p_tipo?: string | null }
+        Returns: {
+          cantidades: Json
+          categoria_id: number | null
+          compras: number
+          documentos: number
+          gasto: number
+          lineas_sin_importe: number
+          nombre: string
+          origen: string
+          producto_id: number
+          proveedores: string[]
+          ultima_fecha: string | null
+          ultimo_precio: number | null
+          unidad_habitual: string | null
+        }[]
+      }
       recalcular_ocupacion_historica: {
         Args: { fecha_desde?: string; fecha_hasta?: string }
         Returns: number

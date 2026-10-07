@@ -8,6 +8,20 @@ import { Pencil, AlertCircle, Check, X } from "lucide-react";
 import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
 
+/**
+ * Categoría del producto de la línea (catálogo de Facturas › Productos). Solo
+ * lectura: se cambia en la pestaña Productos, no aquí.
+ */
+export const EtiquetaCategoria = ({ p }: { p: ProductoFactura }) =>
+  p.categoria ? (
+    <span
+      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-normal leading-none text-muted-foreground"
+      title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}
+    >
+      {p.categoria.nombre}
+    </span>
+  ) : null;
+
 export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isMobile?: boolean, allDocs: Factura[] }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nombre, setNombre] = useState(p.producto_nombre);
@@ -81,6 +95,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
           <Pencil className="h-4 w-4 text-muted-foreground" />
         </Button>
         <span className="font-medium text-foreground mb-1 min-h-6 pr-11">{p.producto_nombre}</span>
+        {p.categoria && <span className="mb-1 -mt-0.5"><EtiquetaCategoria p={p} /></span>}
         <div className="flex justify-between text-muted-foreground items-center">
           <span>{formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}</span>
           <div className="flex items-center gap-1.5">
@@ -152,6 +167,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
             <Pencil className="h-4 w-4" />
           </Button>
           <span className="truncate" title={p.producto_nombre}>{p.producto_nombre}</span>
+          <EtiquetaCategoria p={p} />
         </div>
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground whitespace-nowrap" title={formatCantidadLinea(p)}>

@@ -5,8 +5,9 @@ import { SubidaFacturas } from "@/components/facturas/SubidaFacturas";
 import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFacturas";
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TablaAlbaranes } from "@/components/facturas/TablaAlbaranes";
+import { TabProductos } from "@/components/facturas/productos/TabProductos";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen, BarChart3, Package, Zap } from "lucide-react";
+import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen, BarChart3, Package, Zap, Tags } from "lucide-react";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
 import type { Sugerencia } from "@/components/facturas/ChatArea";
@@ -14,7 +15,7 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 
-const PESTANAS = ["documentos", "chat", "cargar"] as const;
+const PESTANAS = ["documentos", "productos", "chat", "cargar"] as const;
 const pestanaDeUrl = (v: string | null) => (PESTANAS as readonly string[]).includes(v ?? "") ? (v as string) : null;
 
 const Facturas = () => {
@@ -128,7 +129,7 @@ const Facturas = () => {
         >
           {/* Botonera de navegación superior */}
           <div className="shrink-0 mb-2 sm:mb-4 bg-card rounded-lg border border-border/50 shadow-sm p-1 w-full sm:inline-block sm:max-w-3xl">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/40 h-11 sm:h-12">
+            <TabsList className="grid w-full grid-cols-4 bg-muted/40 h-11 sm:h-12">
               <TabsTrigger
                 value="documentos"
                 className={topTabClass}
@@ -140,6 +141,14 @@ const Facturas = () => {
                     {totalDocumentos}
                   </span>
                 )}
+              </TabsTrigger>
+              {/* Productos (07-oct-2026): catálogo con categorías, gasto y correcciones. */}
+              <TabsTrigger
+                value="productos"
+                className={topTabClass}
+              >
+                <Tags className="h-4 w-4 shrink-0" />
+                <span className="font-medium text-xs sm:text-[15px] truncate">Productos</span>
               </TabsTrigger>
               <TabsTrigger
                 value="chat"
@@ -212,6 +221,12 @@ const Facturas = () => {
                   </div>
                 </Tabs>
               </div>
+            </TabsContent>
+
+            {/* PESTAÑA PRODUCTOS: catálogo y categorías. Ocupa el alto de la
+                pestaña; solo su lista hace scroll por dentro. */}
+            <TabsContent value="productos" className="h-full m-0 outline-none data-[state=inactive]:hidden">
+              {activeTab === "productos" && <TabProductos />}
             </TabsContent>
 
             {/* PESTAÑA 2: ASISTENTE IA */}

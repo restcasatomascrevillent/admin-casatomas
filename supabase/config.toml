@@ -94,6 +94,16 @@ verify_jwt = false
 [functions.ocr-trabajo]
 verify_jwt = false
 
+# clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
+# JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
+# mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con
+# el JWT de un usuario: entonces comprueba que tiene permiso de EDICIÓN en
+# facturas (has_section_permission). No acepta datos del cuerpo. Ver
+# supabase/functions/clasificar-productos/index.ts y la migración
+# 20261007160000_productos_catalogo_categorias.sql.
+[functions.clasificar-productos]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — autenticación propia REAL + filtro barato encima
