@@ -19,12 +19,16 @@ import {
   formatFechaEs,
   formatMesEs,
   formatNumeroEs,
+  formatPorcentaje,
+  formatPrecioUnidad,
   plural,
   type Aviso,
   type DocumentoCompacto,
   type FiltroDocumentos,
   type FilaCantidadProducto,
   type FilaGastoProveedor,
+  type GastoCategorias,
+  type VariacionPrecios,
   type MesEstadistica,
   type Ranking,
   type ResumenPeriodo,
@@ -470,6 +474,185 @@ export function ResultadoDocumentos({ datos }: { datos: DatosDocumentos }) {
         </p>
       )}
       {lista.nota && <Avisos avisos={[{ texto: "Sin total = no se leyó el importe. No quiere decir sin factura ni sin pagar." }]} />}
+    </div>
+  );
+}
+
+// ─── Gasto por categoría ─────────────────────────────────────────────────────
+
+export interface DatosGastoCategorias {
+  desde: string;
+  hasta: string;
+  datos: GastoCategorias;
+}
+
+export function ResultadoGastoCategorias({ datos: { desde, hasta, datos } }: { datos: DatosGastoCategorias }) {
+  const periodo = `Del ${formatFechaEs(desde)} al ${formatFechaEs(hasta)}.`;
+  if (datos.sin_datos || !datos.total)
+    return <p className="text-sm text-muted-foreground">No hay líneas de producto con importe en ese periodo. {periodo}</p>;
+  const total = datos.total.importe;
+  const categorias = [...(datos.categorias ?? [])].sort((a, b) => b.importe - a.importe);
+  const maximo = Math.max(0, ...categorias.map((c) => c.importe));
+  return (
+    <div>
+      <p className="text-sm">
+        Total: <span className="font-semibold tabular-nums">{formatEuros(total)}</span>{" "}
+        <span className="text-xs text-muted-foreground">base sin IVA · {periodo}</span>
+      </p>
+      <ul className="mt-1.5 space-y-1.5">
+        {categorias.map((c) => {
+          const conSub = !!c.sub && c.sub.length > 0;
+          const fila = (
+            <>
+              <span className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate font-medium" title={c.categoria}>
+                  {c.categoria}
+                  {conSub && (
+                    <span className="ml-1 text-xs font-normal text-muted-foreground group-open:hidden">
+                      ({c.sub!.length} sub.)
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {formatEuros(c.importe)}
+                  {c.pct !== undefined && (
+                    <span className="ml-1 text-xs text-muted-foreground">{formatNumeroEs(c.pct, 1, 0)} %</span>
+                  )}
+                </span>
+              </span>
+              <Barra valor={c.importe} maximo={maximo} />
+            </>
+          );
+          return (
+            <li key={c.categoria} className="text-sm">
+              {conSub ? (
+                <details className="group">
+                  <summary className="flex min-h-8 pointer-coarse:min-h-11 cursor-pointer list-none flex-col justify-center [&::-webkit-details-marker]:hidden">
+                    {fila}
+                  </summary>
+                  <ul className="ml-3 mt-1 space-y-0.5 border-l border-border/60 pl-2">
+                    {c.sub!.map((s) => (
+                      <li key={s.categoria} className="flex items-baseline gap-2 text-xs text-muted-foreground">
+                        <span className="min-w-0 flex-1 truncate">{s.categoria}</span>
+                        <span className="shrink-0 tabular-nums">{formatEuros(s.importe)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : (
+                <div className="flex min-h-8 flex-col justify-center">{fila}</div>
+              )}
+            </li>
+          );
+        })}
+        {datos.sin_categoria && datos.sin_categoria.importe > 0 && (
+          <li className="flex items-baseline gap-2 text-sm text-muted-foreground">
+            <span className="flex-1">Productos sin categoría</span>
+            <span className="tabular-nums">{formatEuros(datos.sin_categoria.importe)}</span>
+          </li>
+        )}
+      </ul>
+      <Avisos
+        avisos={[
+          datos.sin_clasificar && datos.sin_clasificar.lineas > 0
+            ? {
+                texto: `${plural(datos.sin_clasificar.lineas, "línea", "líneas")} aún sin clasificar (${formatEuros(datos.sin_clasificar.importe)}): no están en ninguna categoría.`,
+              }
+            : null,
+          datos.avisos?.sin_importe
+            ? { texto: `${plural(datos.avisos.sin_importe, "línea", "líneas")} sin importe: no suman.` }
+            : null,
+          datos.avisos?.albaranes_ya_facturados
+            ? {
+                texto: `${plural(datos.avisos.albaranes_ya_facturados, "línea de albarán ya facturada", "líneas de albarán ya facturadas")}: cuentan solo en su factura.`,
+              }
+            : null,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ─── Qué ha subido de precio ─────────────────────────────────────────────────
+
+export interface DatosSubidasPrecio {
+  umbral: number;
+  datos: VariacionPrecios;
+}
+
+export function ResultadoSubidasPrecio({ datos: { umbral, datos } }: { datos: DatosSubidasPrecio }) {
+  const productos = datos.productos ?? [];
+  const umbralTexto = `${formatNumeroEs(datos.umbral_pct ?? umbral, 1, 0)} %`;
+  const sinReferencia = datos.avisos?.sin_referencia ?? 0;
+  const avisos = [
+    sinReferencia > 0
+      ? { texto: `${plural(sinReferencia, "producto", "productos")} con una sola compra: no se pueden comparar.` }
+      : null,
+    datos.avisos?.sin_clasificar
+      ? { texto: `${plural(datos.avisos.sin_clasificar, "línea", "líneas")} aún sin clasificar: no entran en la comparación.` }
+      : null,
+  ];
+  if (productos.length === 0) {
+    const comparados = datos.comparados ?? 0;
+    return (
+      <div>
+        <p className="text-sm text-foreground">
+          {comparados > 0
+            ? `Nada ha subido más del ${umbralTexto} (${plural(comparados, "producto comparado", "productos comparados")}).`
+            : "Todavía no hay compras repetidas de ningún producto con las que comparar precios."}
+        </p>
+        <Avisos avisos={avisos} />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <p className="mb-1 text-xs text-muted-foreground">
+        Subidas de más del {umbralTexto}: última compra frente a la referencia (compras anteriores). Precios sin IVA.
+      </p>
+      <ul className="divide-y divide-border/40">
+        {productos.map((p) => (
+          <li key={`${p.producto}-${p.unidad ?? ""}`} className="py-1.5 text-sm">
+            <p className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 truncate font-medium" title={p.producto}>
+                {p.producto}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 font-semibold tabular-nums",
+                  p.cambio_proveedor ? "text-muted-foreground" : "text-amber-800 dark:text-amber-300",
+                )}
+              >
+                {formatPorcentaje(p.variacion_pct)}
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {formatPrecioUnidad(p.ref_precio, p.unidad)} → {formatPrecioUnidad(p.precio, p.unidad)}
+              {p.proveedor && <> · {p.proveedor}</>}
+              {p.fecha && <> · {formatFechaEs(p.fecha)}</>}
+            </p>
+            {(p.cambio_proveedor || p.pocas_compras || p.ref_antigua) && (
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                {[
+                  p.cambio_proveedor
+                    ? `cambio de proveedor${p.ref_proveedor ? ` (antes ${p.ref_proveedor})` : ""}, no es una subida real`
+                    : null,
+                  p.pocas_compras ? "referencia de una sola compra" : null,
+                  p.ref_antigua ? "referencia antigua (más de 90 días)" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {datos.truncado && datos.total_productos !== undefined && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Se enseñan {productos.length} de {datos.total_productos}.
+        </p>
+      )}
+      <Avisos avisos={avisos} />
     </div>
   );
 }

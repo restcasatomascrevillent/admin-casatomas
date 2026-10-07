@@ -11,7 +11,10 @@ const doble = vi.hoisted(() => {
   const rpc = vi.fn();
   const invoke = vi.fn();
   const inserts: { tabla: string; fila: unknown }[] = [];
+  /** Filas de configuracion_facturas (vacía = migración sin aplicar). */
+  const config = { filas: [] as unknown[] };
   const respuestaTabla = (tabla: string, llamadas: string[]) => {
+    if (tabla === "configuracion_facturas") return config.filas;
     if (tabla === "chat_facturas_conversaciones" && llamadas.includes("insert"))
       return { id: "c1", session_id: "s1", titulo: "Nueva conversación", created_at: "", updated_at: "" };
     if (tabla === "chat_facturas_mensajes" && llamadas.includes("insert"))
@@ -40,7 +43,7 @@ const doble = vi.hoisted(() => {
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
     storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
   };
-  return { supabase, rpc, invoke, inserts };
+  return { supabase, rpc, invoke, inserts, config };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: doble.supabase }));
@@ -136,6 +139,60 @@ const DOCS_CON_AVISOS = {
   sumas: { facturas: { n: 2 } },
 };
 
+const GASTO_CATEGORIAS = {
+  periodo: { desde: "2026-01-01", hasta: "2026-10-07" },
+  total: { importe: 13292.4, lineas: 40, documentos: 12 },
+  categorias: [
+    { categoria: "Frutas y verduras", importe: 300, pct: 2.3, lineas: 5 },
+    {
+      categoria: "Bebidas",
+      importe: 12792.4,
+      pct: 96.2,
+      lineas: 30,
+      sub: [
+        { categoria: "Vinos", importe: 12000, lineas: 20 },
+        { categoria: "Refrescos y aguas", importe: 792.4, lineas: 10 },
+      ],
+    },
+  ],
+  sin_categoria: { importe: 200, lineas: 5 },
+  sin_clasificar: { lineas: 3, importe: 436.92 },
+  avisos: { sin_importe: 2, albaranes_ya_facturados: 4 },
+  nota: "Importes de linea: base SIN IVA.",
+};
+const VARIACION_PRECIOS = {
+  umbral_pct: 15,
+  productos: [
+    {
+      producto: "Helado frambuesa",
+      unidad: "ud",
+      precio: 36,
+      fecha: "2026-10-03",
+      proveedor: "Racionalismo Dulce",
+      variacion_pct: 12.5,
+      ref_precio: 32,
+      ref_compras: 1,
+      ref_desde: "2026-06-01",
+      pocas_compras: true,
+      ref_antigua: true,
+    },
+    {
+      producto: "Merluza",
+      unidad: "kg",
+      precio: 12.9,
+      proveedor: "Flope",
+      variacion_pct: 20,
+      ref_precio: 10.75,
+      ref_compras: 3,
+      ref_proveedor: "Pescados Paco",
+      cambio_proveedor: true,
+    },
+  ],
+  total_productos: 2,
+  comparados: 14,
+  avisos: { sin_referencia: 30 },
+};
+
 function responderRpc(fn: string, args?: Record<string, unknown>) {
   switch (fn) {
     case "resumen_periodo_agente":
@@ -146,6 +203,10 @@ function responderRpc(fn: string, args?: Record<string, unknown>) {
       return args?.p_criterio === "gasto_proveedor" ? RANKING_PROVEEDORES : RANKING_PRODUCTOS;
     case "filtrar_documentos_agente":
       return DOCS_CON_AVISOS;
+    case "gasto_categorias_agente":
+      return GASTO_CATEGORIAS;
+    case "variacion_precios_agente":
+      return VARIACION_PRECIOS;
     default:
       return { error: `RPC desconocida ${fn}` };
   }
@@ -199,6 +260,7 @@ beforeEach(() => {
   doble.invoke.mockReset();
   doble.invoke.mockResolvedValue({ data: { respuesta: "Respuesta de la IA" }, error: null });
   doble.inserts.length = 0;
+  doble.config.filas = [];
 });
 
 afterEach(() => {
@@ -306,18 +368,67 @@ describe("cada botón llama a su RPC con sus argumentos", () => {
     });
   });
 
-  it("los de «próximamente» están deshabilitados y no llaman a nada", () => {
+  it("Gasto por categoría: gasto_categorias_agente del 1 de enero a hoy", async () => {
     montar();
-    for (const nombre of [/gasto por categoría/i, /qué ha subido de precio/i]) {
-      const b = boton(nombre);
-      expect(b).toBeDisabled();
-      expect(b).toHaveTextContent(/próximamente/i);
-      fireEvent.click(b);
-    }
-    expect(doble.rpc).not.toHaveBeenCalled();
+    fireEvent.click(boton(/gasto por categoría/i));
+    await screen.findByText("Bebidas");
+    expect(doble.rpc).toHaveBeenCalledWith("gasto_categorias_agente", {
+      p_categoria: null,
+      p_desde: "2026-01-01",
+      p_hasta: "2026-10-07",
+      p_tipo: null,
+      p_agrupar: null,
+    });
+  });
+
+  it("Qué ha subido de precio: variacion_precios_agente con el umbral de configuracion_facturas", async () => {
+    doble.config.filas = [{ umbral_subida_precio_pct: 15 }];
+    montar();
+    fireEvent.click(boton(/qué ha subido de precio/i));
+    await screen.findByText("Merluza");
+    expect(doble.rpc).toHaveBeenCalledWith("variacion_precios_agente", {
+      p_desde: null,
+      p_hasta: null,
+      p_umbral_pct: 15,
+      p_categoria: null,
+      p_producto: null,
+      p_limite: 10,
+      p_sentido: "subidas",
+    });
+  });
+
+  it("Qué ha subido de precio: sin configuración legible usa el 10 %", async () => {
+    montar();
+    fireEvent.click(boton(/qué ha subido de precio/i));
+    await screen.findByText("Merluza");
+    expect(doble.rpc).toHaveBeenCalledWith("variacion_precios_agente", expect.objectContaining({ p_umbral_pct: 10 }));
+  });
+
+  it("si la RPC aún no existe (migración sin aplicar), lo dice y apaga el botón", async () => {
+    doble.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "Could not find the function" } });
+    montar();
+    fireEvent.click(boton(/gasto por categoría/i));
+    const tarjeta = await screen.findByRole("region", { name: /gasto por categoría/i });
+    expect(
+      await within(tarjeta).findByText(/disponible cuando se aplique la actualización de la base de datos/i),
+    ).toBeInTheDocument();
+    expect(within(tarjeta).queryByRole("alert")).not.toBeInTheDocument();
+    const b = boton(/gasto por categoría/i);
+    expect(b).toBeDisabled();
+    expect(b).toHaveTextContent(/pendiente/i);
+    // El resto sigue funcionando.
+    expect(boton(/top proveedores/i)).toBeEnabled();
+  });
+
+  it("42883 (función inexistente en Postgres) también cuenta como no disponible", async () => {
+    doble.rpc.mockResolvedValue({ data: null, error: { code: "42883", message: "function does not exist" } });
+    montar();
+    fireEvent.click(boton(/qué ha subido de precio/i));
+    expect(await screen.findByText(/disponible cuando se aplique la actualización/i)).toBeInTheDocument();
   });
 
   it("el catálogo es una lista: cada entrada activa tiene consulta y pintado", () => {
+    expect(PREGUNTAS_RAPIDAS).toHaveLength(9);
     for (const p of PREGUNTAS_RAPIDAS) {
       if (p.proximamente) continue;
       expect(typeof p.consultar).toBe("function");
@@ -395,6 +506,51 @@ describe("pintado del resultado", () => {
     // El 52 sí: abre el mismo diálogo de edición que la pestaña Documentos.
     fireEvent.click(t.getByRole("button", { name: /abrir la factura 1 - 701405/i }));
     expect(await screen.findByRole("dialog")).toHaveTextContent(/1 - 701405/);
+  });
+
+  it("Gasto por categoría: total base sin IVA, madres por importe, subcategorías y avisos", async () => {
+    montar();
+    fireEvent.click(boton(/gasto por categoría/i));
+    const tarjeta = await screen.findByRole("region", { name: /gasto por categoría/i });
+    const t = within(tarjeta);
+    await t.findByText("Bebidas");
+    expect(t.getByText("13.292,40 €")).toBeInTheDocument();
+    expect(t.getByText(/^base sin IVA · Del 01\/01\/2026 al 07\/10\/2026/i)).toBeInTheDocument();
+    // Ordenadas por importe: Bebidas antes que Frutas y verduras.
+    const nombres = t.getAllByTitle(/^(Bebidas|Frutas y verduras)$/).map((e) => e.getAttribute("title"));
+    expect(nombres).toEqual(["Bebidas", "Frutas y verduras"]);
+    expect(t.getByText("Vinos")).toBeInTheDocument();
+    expect(t.getByText("12.000,00 €")).toBeInTheDocument();
+    expect(t.getByText(/productos sin categoría/i)).toBeInTheDocument();
+    expect(t.getByText(/3 líneas aún sin clasificar \(436,92 €\)/i)).toBeInTheDocument();
+    expect(t.getByText(/2 líneas sin importe/i)).toBeInTheDocument();
+    expect(t.getByText(/4 líneas de albarán ya facturadas/i)).toBeInTheDocument();
+  });
+
+  it("Qué ha subido de precio: variación, precios €/unidad, marcas y productos sin referencia", async () => {
+    montar();
+    fireEvent.click(boton(/qué ha subido de precio/i));
+    const tarjeta = await screen.findByRole("region", { name: /qué ha subido de precio/i });
+    const t = within(tarjeta);
+    await t.findByText("Helado frambuesa");
+    expect(t.getByText("+12,5 %")).toBeInTheDocument();
+    expect(t.getByText(/32,00 €\/ud → 36,00 €\/ud/)).toBeInTheDocument();
+    expect(t.getByText(/10,75 €\/kg → 12,90 €\/kg/)).toBeInTheDocument();
+    expect(t.getByText(/cambio de proveedor \(antes Pescados Paco\), no es una subida real/i)).toBeInTheDocument();
+    expect(t.getByText(/referencia de una sola compra · referencia antigua/i)).toBeInTheDocument();
+    expect(t.getByText(/30 productos con una sola compra/i)).toBeInTheDocument();
+    expect(t.getByText(/más del 15 %/)).toBeInTheDocument();
+  });
+
+  it("Qué ha subido de precio: sin subidas dice «Nada ha subido más del X %»", async () => {
+    doble.rpc.mockResolvedValue({
+      data: { umbral_pct: 10, productos: [], comparados: 14, avisos: { sin_referencia: 3 } },
+      error: null,
+    });
+    montar();
+    fireEvent.click(boton(/qué ha subido de precio/i));
+    expect(await screen.findByText(/nada ha subido más del 10 % \(14 productos comparados\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 productos con una sola compra/i)).toBeInTheDocument();
   });
 
   it("si la RPC contesta {error}, la tarjeta lo dice", async () => {

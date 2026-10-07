@@ -5,19 +5,22 @@
 import { Loader2, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
+import { TEXTO_RPC_NO_DISPONIBLE } from "@/lib/facturas/preguntasRapidas";
 import type { PreguntaRapida } from "./catalogo";
 
 interface BarraProps {
   catalogo: PreguntaRapida[];
   onPreguntar: (preguntaId: string) => void;
   cargando: (preguntaId: string) => boolean;
+  /** La RPC aún no existe en la BD (migración sin aplicar). */
+  noDisponible?: (preguntaId: string) => boolean;
 }
 
 /**
  * Una sola fila con desplazamiento horizontal: no crece en alto (la pestaña IA
  * tiene altura calculada y sin scroll de página). Botones de 44 px.
  */
-export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando }: BarraProps) {
+export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDisponible = () => false }: BarraProps) {
   return (
     <div
       role="group"
@@ -31,14 +34,15 @@ export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando }: Barra
       {catalogo.map((p) => {
         const Icono = p.icono;
         const ocupado = cargando(p.id);
-        const deshabilitado = !!p.proximamente || !p.consultar || ocupado;
+        const pendiente = noDisponible(p.id);
+        const deshabilitado = !!p.proximamente || !p.consultar || ocupado || pendiente;
         return (
           <button
             key={p.id}
             type="button"
             onClick={() => onPreguntar(p.id)}
             disabled={deshabilitado}
-            title={p.descripcion}
+            title={pendiente ? TEXTO_RPC_NO_DISPONIBLE : p.descripcion}
             aria-busy={ocupado || undefined}
             className={cn(
               "inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 bg-card px-3.5 text-sm text-foreground transition-colors",
@@ -49,6 +53,7 @@ export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando }: Barra
             {ocupado ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icono className="h-4 w-4" aria-hidden />}
             {p.etiqueta}
             {p.proximamente && <span className="text-xs text-muted-foreground">· próximamente</span>}
+            {pendiente && <span className="text-xs text-muted-foreground">· pendiente</span>}
           </button>
         );
       })}
@@ -107,6 +112,11 @@ export function TarjetaResultadoRapido({ resultado, pregunta, onDescartar }: Tar
       {resultado.estado === "error" && (
         <p className="text-sm text-destructive" role="alert">
           No se ha podido consultar: {resultado.error}
+        </p>
+      )}
+      {resultado.estado === "no_disponible" && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {TEXTO_RPC_NO_DISPONIBLE}
         </p>
       )}
       {resultado.estado === "ok" && Resultado && <Resultado datos={resultado.datos} />}

@@ -309,3 +309,86 @@ export function comprobarErrorRpc<T>(datos: T): T {
   if (datos === null || datos === undefined) throw new Error("La consulta no ha devuelto nada.");
   return datos;
 }
+
+// ─── Gasto por categoría y variación de precios ──────────────────────────────
+// Definiciones en supabase/migrations/20261007170000_chatbot_categorias_precios.sql.
+
+/** Precio unitario: hasta 4 decimales, mínimo 2 («12,9» → «12,90 €/kg»). */
+export const formatPrecioUnidad = (precio: number | null | undefined, unidad?: string | null): string =>
+  precio === null || precio === undefined ? "—" : `${formatNumeroEs(precio, 4, 2)}${NBSP}€${unidad ? `/${unidad}` : ""}`;
+
+/** «+12,5 %» / «−3 %». */
+export const formatPorcentaje = (pct: number): string =>
+  `${pct > 0 ? "+" : pct < 0 ? "−" : ""}${formatNumeroEs(Math.abs(pct), 1, 0)}${NBSP}%`;
+
+export interface ImporteLineas {
+  importe: number;
+  lineas: number;
+}
+
+export interface GastoCategoria extends ImporteLineas {
+  categoria: string;
+  pct?: number;
+  sub?: (ImporteLineas & { categoria: string })[];
+}
+
+export interface GastoCategorias {
+  error?: string;
+  periodo?: Partial<Rango>;
+  total?: ImporteLineas & { documentos?: number; de_albaranes?: number };
+  categorias?: GastoCategoria[];
+  sin_categoria?: ImporteLineas;
+  sin_clasificar?: ImporteLineas;
+  incluye_albaranes?: boolean;
+  avisos?: { sin_importe?: number; albaranes_ya_facturados?: number };
+  nota?: string;
+  sin_datos?: boolean;
+}
+
+export interface VariacionPrecio {
+  producto: string;
+  unidad?: string | null;
+  precio: number;
+  fecha?: string;
+  proveedor?: string | null;
+  tipo?: "albaran";
+  variacion_pct: number;
+  ref_precio: number;
+  ref_compras?: number;
+  ref_desde?: string;
+  ref_hasta?: string;
+  ref_proveedor?: string | null;
+  cambio_proveedor?: boolean;
+  pocas_compras?: boolean;
+  ref_antigua?: boolean;
+}
+
+export interface VariacionPrecios {
+  error?: string;
+  umbral_pct?: number;
+  productos: VariacionPrecio[];
+  total_productos?: number;
+  truncado?: boolean;
+  comparados?: number;
+  avisos?: { sin_referencia?: number; pocas_compras?: number; cambio_proveedor?: number; sin_clasificar?: number };
+  sin_datos?: boolean;
+}
+
+/** Umbral por defecto si no se puede leer configuracion_facturas. */
+export const UMBRAL_SUBIDA_POR_DEFECTO = 10;
+
+/**
+ * La RPC no existe en la base de datos (migración sin aplicar). PostgREST
+ * contesta PGRST202 («Could not find the function»); Postgres, 42883.
+ */
+export class RpcNoDisponibleError extends Error {
+  constructor(funcion: string) {
+    super(`La función ${funcion} todavía no existe en la base de datos.`);
+    this.name = "RpcNoDisponibleError";
+  }
+}
+
+export const esErrorRpcInexistente = (error: { code?: string; message?: string } | null | undefined) =>
+  !!error && (error.code === "PGRST202" || error.code === "42883");
+
+export const TEXTO_RPC_NO_DISPONIBLE = "Disponible cuando se aplique la actualización de la base de datos.";

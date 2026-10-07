@@ -2,7 +2,7 @@
 //
 // Añadir un botón = añadir una entrada a `PREGUNTAS_RAPIDAS`:
 //   { id, etiqueta, icono, descripcion, rpc, consultar, Resultado }
-//   · `consultar(llamarRpc, ahora)` llama a la(s) RPC con sus argumentos y
+//   · `consultar(llamarRpc, ahora, contexto)` llama a la(s) RPC con sus argumentos y
 //     devuelve los datos (lanza Error si la RPC contesta {error}).
 //   · `Resultado` pinta esos datos (resultados.tsx).
 //   · `proximamente: true` (sin `consultar`) deja el botón visible pero
@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import {
   comprobarErrorRpc,
+  fechaIso,
+  hoyMadrid,
+  UMBRAL_SUBIDA_POR_DEFECTO,
+  type GastoCategorias,
+  type VariacionPrecios,
   rangoAnioActual,
   rangosGastoMes,
   rangoUltimos12Meses,
@@ -35,6 +40,10 @@ import {
 } from "@/lib/facturas/preguntasRapidas";
 import {
   ResultadoDocumentos,
+  ResultadoGastoCategorias,
+  ResultadoSubidasPrecio,
+  type DatosGastoCategorias,
+  type DatosSubidasPrecio,
   ResultadoGastoMes,
   ResultadoGastoPorMes,
   ResultadoProductos,
@@ -49,6 +58,12 @@ import {
 /** Llama a una RPC de Postgres y devuelve `data` (lanza si hay error). */
 export type LlamarRpc = (funcion: string, args?: Record<string, unknown>) => Promise<unknown>;
 
+/** Lo que una consulta puede necesitar además de las RPC. */
+export interface ContextoConsulta {
+  /** Umbral de configuracion_facturas (null si no se puede leer). */
+  umbralSubidaPrecio: () => Promise<number | null>;
+}
+
 export interface PreguntaRapida<T = unknown> {
   id: string;
   etiqueta: string;
@@ -58,7 +73,7 @@ export interface PreguntaRapida<T = unknown> {
   /** RPC(s) que usa; informativo (documentación y pruebas). */
   rpc: string;
   proximamente?: boolean;
-  consultar?: (llamar: LlamarRpc, ahora: Date) => Promise<T>;
+  consultar?: (llamar: LlamarRpc, ahora: Date, contexto: ContextoConsulta) => Promise<T>;
   Resultado?: ComponentType<{ datos: T }>;
 }
 
@@ -189,23 +204,50 @@ export const PREGUNTAS_RAPIDAS: PreguntaRapida[] = [
     consultar: listaDocumentos("sin_total"),
     Resultado: ResultadoDocumentos,
   }),
-  // ── Próximamente: faltan sus RPC. Para activarlas, quitar `proximamente` y
-  //    añadir `consultar` + `Resultado` (ver informe en engram
-  //    facturas/preguntas-rapidas-sin-ia).
-  definir({
+  definir<DatosGastoCategorias>({
     id: "gasto-categoria",
     etiqueta: "Gasto por categoría",
     icono: PieChart,
-    descripcion: "Gasto por categoría de producto (próximamente)",
-    rpc: "pendiente",
-    proximamente: true,
+    descripcion: "Gasto por categoría de producto este año (base sin IVA)",
+    rpc: "gasto_categorias_agente",
+    consultar: async (llamar, ahora) => {
+      const hoy = hoyMadrid(ahora);
+      const desde = `${hoy.anio}-01-01`;
+      const hasta = fechaIso(hoy);
+      const datos = comprobarErrorRpc(
+        (await llamar("gasto_categorias_agente", {
+          p_categoria: null,
+          p_desde: desde,
+          p_hasta: hasta,
+          p_tipo: null,
+          p_agrupar: null,
+        })) as GastoCategorias,
+      );
+      return { desde, hasta, datos };
+    },
+    Resultado: ResultadoGastoCategorias,
   }),
-  definir({
+  definir<DatosSubidasPrecio>({
     id: "subidas-precio",
     etiqueta: "Qué ha subido de precio",
     icono: TrendingUp,
-    descripcion: "Productos que han subido de precio (próximamente)",
-    rpc: "pendiente",
-    proximamente: true,
+    descripcion: "Última compra frente al precio de referencia de cada producto (sin IVA)",
+    rpc: "variacion_precios_agente",
+    consultar: async (llamar, _ahora, contexto) => {
+      const umbral = (await contexto.umbralSubidaPrecio()) ?? UMBRAL_SUBIDA_POR_DEFECTO;
+      const datos = comprobarErrorRpc(
+        (await llamar("variacion_precios_agente", {
+          p_desde: null,
+          p_hasta: null,
+          p_umbral_pct: umbral,
+          p_categoria: null,
+          p_producto: null,
+          p_limite: 10,
+          p_sentido: "subidas",
+        })) as VariacionPrecios,
+      );
+      return { umbral, datos };
+    },
+    Resultado: ResultadoSubidasPrecio,
   }),
 ];

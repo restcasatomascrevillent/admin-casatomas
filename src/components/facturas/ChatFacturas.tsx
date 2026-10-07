@@ -137,6 +137,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                   <BarraPreguntasRapidas
                     catalogo={PREGUNTAS_RAPIDAS}
                     cargando={rapidas.cargando}
+                    noDisponible={rapidas.noDisponible}
                     onPreguntar={(id) => rapidas.lanzar(id, mensajes.length)}
                   />
                 }
