@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +65,7 @@ Deno.serve(async (req) => {
         headers: {
           "x-audit-actor-id": currentUser.id,
           "x-audit-actor-email": currentUser.email ?? "",
+          "x-audit-source": "admin-delete-user",
         },
       },
     });
@@ -142,7 +144,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    const { error: deleteError } = await ejecutarOperacionAuthAuditada(
+      supabaseAdmin, currentUser.id, "eliminar", { userId },
+      () => supabaseAdmin.auth.admin.deleteUser(userId),
+    );
 
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
@@ -163,3 +168,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+

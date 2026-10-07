@@ -26,7 +26,6 @@ import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
 import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
-import { InterruptoresFotosPlatos } from "@/components/carta/InterruptoresFotosPlatos";
 
 type Seccion = "platos" | "bebidas" | "vinos" | "cocteles";
 type FiltroEstado = "todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza";
@@ -327,7 +326,6 @@ export default function TabCarta() {
         </div>
 
         <TabsContent value="platos" className="mt-0 space-y-4">
-          <InterruptoresFotosPlatos />
           {renderContenido("platos", <ListaPlatos platos={platosFiltrados} />)}
         </TabsContent>
         <TabsContent value="bebidas" className="mt-0">

@@ -4238,6 +4238,8 @@ export type Database = {
         Row: {
           accion: string
           actor_email: string | null
+          actor_label: string
+          actor_origin: string
           actor_user_id: string | null
           created_at: string
           detalles: Json | null
@@ -4249,6 +4251,8 @@ export type Database = {
         Insert: {
           accion: string
           actor_email?: string | null
+          actor_label?: string
+          actor_origin?: string
           actor_user_id?: string | null
           created_at?: string
           detalles?: Json | null
@@ -4260,6 +4264,8 @@ export type Database = {
         Update: {
           accion?: string
           actor_email?: string | null
+          actor_label?: string
+          actor_origin?: string
           actor_user_id?: string | null
           created_at?: string
           detalles?: Json | null

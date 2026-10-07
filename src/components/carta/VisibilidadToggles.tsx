@@ -3,9 +3,9 @@ import { EyeOff, UtensilsCrossed, Wine } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VisibilidadTogglesProps {
-  restaurante: boolean;
+  restaurante?: boolean;
   touza?: boolean;
-  onRestauranteChange: (checked: boolean) => void;
+  onRestauranteChange?: (checked: boolean) => void;
   onTouzaChange?: (checked: boolean) => void;
   isPending?: boolean;
   compact?: boolean;
@@ -33,39 +33,43 @@ export function VisibilidadToggles({
 
   return (
     <div className="space-y-1.5">
-      <div
-        className={cn(
-          "flex gap-3 py-2 px-3 rounded-md bg-muted/50",
-          compact && "gap-2 py-1.5 px-2"
-        )}
-      >
-        <label className="flex min-h-11 cursor-pointer items-center gap-2">
-          <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-          <span className={cn("text-muted-foreground", "text-sm")}>Restaurante</span>
-          <Switch
-            checked={restaurante}
-            onCheckedChange={onRestauranteChange}
-            disabled={isPending}
-            className={cn(
-              "data-[state=checked]:bg-amber-600"
-            )}
-          />
-        </label>
-        {onTouzaChange && (
-          <label className="flex min-h-11 cursor-pointer items-center gap-2">
-            <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-            <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
-            <Switch
-              checked={touza}
-              onCheckedChange={onTouzaChange}
-              disabled={isPending}
-              className={cn(
-                "data-[state=checked]:bg-purple-600"
-              )}
-            />
-          </label>
-        )}
-      </div>
+      {(onRestauranteChange || onTouzaChange) && (
+        <div
+          className={cn(
+            "flex gap-3 py-2 px-3 rounded-md bg-muted/50",
+            compact && "gap-2 py-1.5 px-2"
+          )}
+        >
+          {onRestauranteChange && (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2">
+              <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+              <span className={cn("text-muted-foreground", "text-sm")}>Restaurante</span>
+              <Switch
+                checked={restaurante}
+                onCheckedChange={onRestauranteChange}
+                disabled={isPending}
+                className={cn(
+                  "data-[state=checked]:bg-amber-600"
+                )}
+              />
+            </label>
+          )}
+          {onTouzaChange && (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2">
+              <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+              <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
+              <Switch
+                checked={touza}
+                onCheckedChange={onTouzaChange}
+                disabled={isPending}
+                className={cn(
+                  "data-[state=checked]:bg-purple-600"
+                )}
+              />
+            </label>
+          )}
+        </div>
+      )}
 
       {/*
         Despublicar sin borrar. Hasta ahora `toggleActivado` existía en los
