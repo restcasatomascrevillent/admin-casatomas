@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,6 +86,7 @@ Deno.serve(async (req) => {
         headers: {
           "x-audit-actor-id": currentUser.id,
           "x-audit-actor-email": currentUser.email ?? "",
+          "x-audit-source": "admin-create-user",
         },
       },
     });
@@ -184,14 +186,17 @@ Deno.serve(async (req) => {
     console.log("Creating user:", username, "with internal email:", internalEmail, "role:", role);
 
     // Create user with admin API
-    const { data: newUserData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: internalEmail,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        display_name: username,
-      },
-    });
+    const { data: newUserData, error: createError } = await ejecutarOperacionAuthAuditada(
+      supabaseAdmin, currentUser.id, "crear", { email: internalEmail },
+      () => supabaseAdmin.auth.admin.createUser({
+        email: internalEmail,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          display_name: username,
+        },
+      }),
+    );
 
     if (createError) {
       console.error("Error creating user:", createError);
@@ -264,3 +269,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+

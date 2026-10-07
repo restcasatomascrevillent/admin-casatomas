@@ -6,6 +6,8 @@ export interface AuditLogEntry {
   created_at: string;
   actor_user_id: string | null;
   actor_email: string | null;
+  actor_label?: string;
+  actor_origin?: "usuario" | "servicio" | "base_de_datos" | "historico";
   accion: "login" | "logout" | "crear" | "actualizar" | "eliminar";
   tabla: string | null;
   registro_id: string | null;
@@ -39,22 +41,27 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
     setLoading(true);
     setError(null);
 
-    let query = supabase.from("audit_log").select("*", { count: "exact" });
-
-    if (filtros.actor?.trim()) query = query.ilike("actor_email", `%${filtros.actor.trim()}%`);
-    if (filtros.accion) query = query.eq("accion", filtros.accion);
-    if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
-    if (filtros.desde) query = query.gte("created_at", filtros.desde);
-    if (filtros.hasta) query = query.lte("created_at", filtros.hasta);
-
     const desde = pagina * PAGE_SIZE;
-    const { data, error: queryError, count } = await query
-      .order("created_at", { ascending: false })
-      .range(desde, desde + PAGE_SIZE - 1);
+    const consultar = (columnaActor: "actor_label" | "actor_email") => {
+      let query = supabase.from("audit_log").select("*", { count: "exact" });
+      if (filtros.actor?.trim()) query = query.ilike(columnaActor, `%${filtros.actor.trim()}%`);
+      if (filtros.accion) query = query.eq("accion", filtros.accion);
+      if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
+      if (filtros.desde) query = query.gte("created_at", filtros.desde);
+      if (filtros.hasta) query = query.lte("created_at", filtros.hasta);
+      return query.order("created_at", { ascending: false }).range(desde, desde + PAGE_SIZE - 1);
+    };
+    let resultado = await consultar("actor_label");
+    // Mantiene el filtro de emails operativo durante el despliegue del SQL.
+    if (resultado.error?.code === "42703" && resultado.error.message.includes("actor_label")) {
+      resultado = await consultar("actor_email");
+    }
+    const { data, error: queryError, count } = resultado;
 
     if (queryError) {
       setError(queryError.message);
       setEntradas([]);
+      setTotal(0);
     } else {
       setEntradas((data ?? []) as AuditLogEntry[]);
       setTotal(count ?? 0);
@@ -107,6 +114,9 @@ export interface AuditLogGrupo {
   /** Clave estable para `key` de React: no cambia al reordenar ni al re-renderizar. */
   key: string;
   actor_email: string | null;
+  actor_user_id: string | null;
+  actor_label: string;
+  actor_origin: AuditLogEntry["actor_origin"];
   accion: AuditLogEntry["accion"];
   tabla: string | null;
   created_at: string;
@@ -162,7 +172,9 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
     const anterior = grupos[grupos.length - 1];
     const mismoBloque =
       anterior &&
-      anterior.actor_email === entrada.actor_email &&
+      anterior.actor_user_id === entrada.actor_user_id &&
+      anterior.actor_label === identificarActor(entrada) &&
+      anterior.actor_origin === entrada.actor_origin &&
       anterior.accion === entrada.accion &&
       anterior.tabla === entrada.tabla &&
       anterior.created_at === entrada.created_at;
@@ -173,6 +185,9 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
       grupos.push({
         key: entrada.id,
         actor_email: entrada.actor_email,
+        actor_user_id: entrada.actor_user_id,
+        actor_label: identificarActor(entrada),
+        actor_origin: entrada.actor_origin,
         accion: entrada.accion,
         tabla: entrada.tabla,
         created_at: entrada.created_at,
@@ -183,3 +198,10 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
 
   return grupos;
 }
+
+/** Compatible con históricos y con datos leídos antes de aplicar la migración. */
+export function identificarActor(entrada: AuditLogEntry): string {
+  return entrada.actor_label?.trim() || entrada.actor_email?.trim()
+    || (entrada.actor_user_id ? `Usuario · ${entrada.actor_user_id}` : `Registro histórico · ${entrada.id}`);
+}
+
